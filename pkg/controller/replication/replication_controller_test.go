@@ -96,12 +96,12 @@ func newReplicationController(replicas int) *api.ReplicationController {
 }
 
 // create count pods with the given phase for the given rc (same selectors and namespace), and add them to the store.
-func newPodList(store cache.Store, count int, status api.PodPhase, rc *api.ReplicationController) *api.PodList {
+func newPodList(store cache.Store, count int, status api.PodPhase, rc *api.ReplicationController, name string) *api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		newPod := api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      fmt.Sprintf("pod%d", i),
+				Name:      fmt.Sprintf("%s%d", name, i),
 				Labels:    rc.Spec.Selector,
 				Namespace: rc.Namespace,
 			},
@@ -144,7 +144,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 	// 2 running pods, a controller with 2 replicas, sync is a no-op
 	controllerSpec := newReplicationController(2)
 	manager.rcStore.Store.Add(controllerSpec)
-	newPodList(manager.podStore.Store, 2, api.PodRunning, controllerSpec)
+	newPodList(manager.podStore.Store, 2, api.PodRunning, controllerSpec, "pod")
 
 	manager.podControl = &fakePodControl
 	manager.syncReplicationController(getKey(controllerSpec, t))
@@ -161,7 +161,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 	// 2 running pods and a controller with 1 replica, one pod delete expected
 	controllerSpec := newReplicationController(1)
 	manager.rcStore.Store.Add(controllerSpec)
-	newPodList(manager.podStore.Store, 2, api.PodRunning, controllerSpec)
+	newPodList(manager.podStore.Store, 2, api.PodRunning, controllerSpec, "pod")
 
 	manager.syncReplicationController(getKey(controllerSpec, t))
 	validateSyncReplication(t, &fakePodControl, 0, 1)
@@ -184,7 +184,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	// the controller matching the selectors of the deleted pod into the work queue.
 	controllerSpec := newReplicationController(1)
 	manager.rcStore.Store.Add(controllerSpec)
-	pods := newPodList(nil, 1, api.PodRunning, controllerSpec)
+	pods := newPodList(nil, 1, api.PodRunning, controllerSpec, "pod")
 	manager.deletePod(cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
 
 	go manager.worker()
@@ -233,7 +233,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	rc := newReplicationController(activePods)
 	manager.rcStore.Store.Add(rc)
 	rc.Status = api.ReplicationControllerStatus{Replicas: activePods}
-	newPodList(manager.podStore.Store, activePods, api.PodRunning, rc)
+	newPodList(manager.podStore.Store, activePods, api.PodRunning, rc, "pod")
 
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -274,9 +274,13 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
 	rc := newReplicationController(5)
 	manager.rcStore.Store.Add(rc)
-	rc.Status = api.ReplicationControllerStatus{Replicas: 2, ObservedGeneration: 0}
+	rc.Status = api.ReplicationControllerStatus{Replicas: 2, FullyLabeledReplicas: 6, ObservedGeneration: 0}
 	rc.Generation = 1
-	newPodList(manager.podStore.Store, 4, api.PodRunning, rc)
+	newPodList(manager.podStore.Store, 2, api.PodRunning, rc, "pod")
+	rcCopy := *rc
+	extraLabelMap := map[string]string{"foo": "bar", "extraKey": "extraValue"}
+	rcCopy.Spec.Selector = extraLabelMap
+	newPodList(manager.podStore.Store, 2, api.PodRunning, &rcCopy, "podWithExtraLabel")
 
 	// This response body is just so we don't err out decoding the http response
 	response := runtime.EncodeOrDie(testapi.Default.Codec(), &api.ReplicationController{})
@@ -288,7 +292,9 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	manager.syncReplicationController(getKey(rc, t))
 
 	// 1. Status.Replicas should go up from 2->4 even though we created 5-4=1 pod.
-	// 2. Every update to the status should include the Generation of the spec.
+	// 2. Status.FullyLabeledReplicas should equal to the number of pods that
+	// has the extra labels, i.e., 2.
+	// 3. Every update to the status should include the Generation of the spec.
 	rc.Status = api.ReplicationControllerStatus{Replicas: 4, ObservedGeneration: 1}
 
 	decRc := runtime.EncodeOrDie(testapi.Default.Codec(), rc)
@@ -313,7 +319,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 
 	controllerSpec := newReplicationController(2)
 	manager.rcStore.Store.Add(controllerSpec)
-	newPodList(manager.podStore.Store, 1, api.PodRunning, controllerSpec)
+	newPodList(manager.podStore.Store, 1, api.PodRunning, controllerSpec, "pod")
 
 	// Creates a replica and sets expectations
 	controllerSpec.Status.Replicas = 1
@@ -488,7 +494,7 @@ func TestWatchPods(t *testing.T) {
 	go manager.podController.Run(stopCh)
 	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
-	pods := newPodList(nil, 1, api.PodRunning, testControllerSpec)
+	pods := newPodList(nil, 1, api.PodRunning, testControllerSpec, "pod")
 	testPod := pods.Items[0]
 	testPod.Status.Phase = api.PodFailed
 	fakeWatch.Add(&testPod)
@@ -528,7 +534,7 @@ func TestUpdatePods(t *testing.T) {
 	manager.rcStore.Store.Add(&testControllerSpec2)
 
 	// Put one pod in the podStore
-	pod1 := newPodList(manager.podStore.Store, 1, api.PodRunning, testControllerSpec1).Items[0]
+	pod1 := newPodList(manager.podStore.Store, 1, api.PodRunning, testControllerSpec1, "pod").Items[0]
 	pod2 := pod1
 	pod2.Labels = testControllerSpec2.Spec.Selector
 
@@ -567,7 +573,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	rc := newReplicationController(1)
 	manager.rcStore.Store.Add(rc)
 	rc.Status = api.ReplicationControllerStatus{Replicas: 2}
-	newPodList(manager.podStore.Store, 1, api.PodRunning, rc)
+	newPodList(manager.podStore.Store, 1, api.PodRunning, rc, "pod")
 
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -604,7 +610,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	})
 	fakeRCClient := c.Core().ReplicationControllers("default")
 	numReplicas := 10
-	updateReplicaCount(fakeRCClient, *rc, numReplicas)
+	updateReplicaCount(fakeRCClient, *rc, numReplicas, 0)
 	updates, gets := 0, 0
 	for _, a := range c.Actions() {
 		if a.GetResource() != "replicationcontrollers" {
@@ -651,7 +657,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	manager.rcStore.Store.Add(controllerSpec)
 
 	expectedPods := 0
-	pods := newPodList(nil, numReplicas, api.PodPending, controllerSpec)
+	pods := newPodList(nil, numReplicas, api.PodPending, controllerSpec, "pod")
 
 	rcKey, err := controller.KeyFunc(controllerSpec)
 	if err != nil {
@@ -767,7 +773,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 			t.Fatalf("Unexpected number of active pods, expected %d, got %d", controllerSpec.Spec.Replicas, activePods)
 		}
 		// Replenish the pod list, since we cut it down sizing up
-		pods = newPodList(nil, replicas, api.PodRunning, controllerSpec)
+		pods = newPodList(nil, replicas, api.PodRunning, controllerSpec, "pod")
 	}
 }
 
@@ -799,7 +805,7 @@ func TestRCSyncExpectations(t *testing.T) {
 
 	controllerSpec := newReplicationController(2)
 	manager.rcStore.Store.Add(controllerSpec)
-	pods := newPodList(nil, 2, api.PodPending, controllerSpec)
+	pods := newPodList(nil, 2, api.PodPending, controllerSpec, "pod")
 	manager.podStore.Store.Add(&pods.Items[0])
 	postExpectationsPod := pods.Items[1]
 
@@ -914,7 +920,7 @@ func TestOverlappingRCs(t *testing.T) {
 			manager.rcStore.Store.Add(shuffledControllers[j])
 		}
 		// Add a pod and make sure only the oldest rc is synced
-		pods := newPodList(nil, 1, api.PodPending, controllers[0])
+		pods := newPodList(nil, 1, api.PodPending, controllers[0], "pod")
 		rcKey := getKey(controllers[0], t)
 
 		manager.addPod(&pods.Items[0])
@@ -936,7 +942,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	if err != nil {
 		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
 	}
-	pod := newPodList(nil, 1, api.PodPending, controllerSpec).Items[0]
+	pod := newPodList(nil, 1, api.PodPending, controllerSpec, "pod").Items[0]
 	pod.DeletionTimestamp = &unversioned.Time{time.Now()}
 	manager.expectations.ExpectDeletions(rcKey, []string{controller.PodKey(&pod)})
 
@@ -956,7 +962,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	// An update from no deletion timestamp to having one should be treated
 	// as a deletion.
-	oldPod := newPodList(nil, 1, api.PodPending, controllerSpec).Items[0]
+	oldPod := newPodList(nil, 1, api.PodPending, controllerSpec, "pod").Items[0]
 	manager.expectations.ExpectDeletions(rcKey, []string{controller.PodKey(&pod)})
 	manager.updatePod(&oldPod, &pod)
 
