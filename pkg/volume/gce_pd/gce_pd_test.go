@@ -113,8 +113,10 @@ func (fake *fakePDManager) DetachDisk(c *gcePersistentDiskCleaner) error {
 	return nil
 }
 
-func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, err error) {
-	return "test-gce-volume-name", 100, nil
+func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error) {
+	labels = make(map[string]string)
+	labels["fakepdmanager"] = "yes"
+	return "test-gce-volume-name", 100, labels, nil
 }
 
 func (fake *fakePDManager) DeleteVolume(cd *gcePersistentDiskDeleter) error {
@@ -233,6 +235,10 @@ func TestPlugin(t *testing.T) {
 	size := cap.Value()
 	if size != 100*1024*1024*1024 {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
+	}
+
+	if persistentSpec.Labels["fakepdmanager"] != "yes" {
+		t.Errorf("Provision() returned unexpected labels: %v", persistentSpec.Labels)
 	}
 
 	// Test Deleter
