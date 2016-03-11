@@ -196,6 +196,8 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdExplain(f, out))
 	cmds.AddCommand(NewCmdConvert(f, out))
 
+	cmds.AddCommand(NewCmdAuth(f, cmdconfig.NewDefaultPathOptions(), out))
+
 	return cmds
 }
 
