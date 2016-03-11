@@ -102,6 +102,9 @@ etcd-quorum-read
 etcd-server
 etcd-servers
 etcd-servers-overrides
+etcd-keyfile
+etcd-certfile
+etcd-cafile
 event-burst
 event-qps
 event-ttl
