@@ -1144,6 +1144,8 @@ func (self *awsDisk) describeVolume() (*ec2.Volume, error) {
 	return volumes[0], nil
 }
 
+// waitForAttachmentStatus polls until the attachment status is the expected value
+// TODO(justinsb): return (bool, error)
 func (self *awsDisk) waitForAttachmentStatus(status string) error {
 	// TODO: There may be a faster way to get this when we're attaching locally
 	attempt := 0
@@ -1278,9 +1280,11 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 		ec2Device = "/dev/sd" + string(mountDevice)
 	}
 
-	attached := false
+	// attachEnded is set to true if the attach operation completed
+	// (successfully or not)
+	attachEnded := false
 	defer func() {
-		if attached {
+		if attachEnded {
 			awsInstance.endAttaching(disk.awsID, mountDevice)
 		}
 	}()
@@ -1294,6 +1298,7 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 
 		attachResponse, err := c.ec2.AttachVolume(request)
 		if err != nil {
+			attachEnded = true
 			// TODO: Check if the volume was concurrently attached?
 			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
 		}
@@ -1306,7 +1311,7 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 		return "", err
 	}
 
-	attached = true
+	attachEnded = true
 
 	return hostDevice, nil
 }
