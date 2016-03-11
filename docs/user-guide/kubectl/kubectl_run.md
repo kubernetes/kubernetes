@@ -59,7 +59,7 @@ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print
       --dry-run[=false]: If true, only print the object that would be sent, without sending it.
       --env=[]: Environment variables to set in the container
       --expose[=false]: If true, a public, external service is created for the container(s) which are run
-      --generator="": The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1'.  This will happen only for cluster version at least 1.2, for olders we will fallback to 'run/v1' for --restart=Alwyas, 'run-pod/v1' for others.
+      --generator="": The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1'.  This will happen only for cluster version at least 1.2, for olders we will fallback to 'run/v1' for --restart=Always, 'run-pod/v1' for others.
       --hostport=-1: The host port mapping for the container port. To demonstrate a single-machine container.
       --image="": The image for the container to run.
   -l, --labels="": Labels to apply to the pod(s).
@@ -67,7 +67,7 @@ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print
       --limits="": The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/release-1.2/docs/user-guide/jsonpath.md].
-      --output-version="": Output the formatted object with the given version (default api-version).
+      --output-version="": Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
       --port=-1: The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.
       --record[=false]: Record current kubectl command in the resource annotation.
@@ -90,7 +90,6 @@ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print
 
 ```
       --alsologtostderr[=false]: log to standard error as well as files
-      --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client certificate file for TLS.
       --client-key="": Path to a client key file for TLS.

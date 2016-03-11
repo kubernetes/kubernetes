@@ -18,6 +18,7 @@ package serviceaccount
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/admission"
@@ -367,7 +368,7 @@ func TestRespectsExistingMount(t *testing.T) {
 	}
 }
 
-func TestAllowsReferencedSecretVolumes(t *testing.T) {
+func TestAllowsReferencedSecret(t *testing.T) {
 	ns := "myns"
 
 	admit := NewServiceAccount(nil)
@@ -385,16 +386,39 @@ func TestAllowsReferencedSecretVolumes(t *testing.T) {
 		},
 	})
 
-	pod := &api.Pod{
+	pod1 := &api.Pod{
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
 				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "foo"}}},
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, api.Kind("Pod"), ns, "myname", api.Resource("pods"), "", admission.Create, nil)
-	err := admit.Admit(attrs)
-	if err != nil {
+	attrs := admission.NewAttributesRecord(pod1, api.Kind("Pod"), ns, "myname", api.Resource("pods"), "", admission.Create, nil)
+	if err := admit.Admit(attrs); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	pod2 := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "container-1",
+					Env: []api.EnvVar{
+						{
+							Name: "env-1",
+							ValueFrom: &api.EnvVarSource{
+								SecretKeyRef: &api.SecretKeySelector{
+									LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod2, api.Kind("Pod"), ns, "myname", api.Resource("pods"), "", admission.Create, nil)
+	if err := admit.Admit(attrs); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
@@ -414,17 +438,40 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	})
 
-	pod := &api.Pod{
+	pod1 := &api.Pod{
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
 				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "foo"}}},
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, api.Kind("Pod"), ns, "myname", api.Resource("pods"), "", admission.Create, nil)
-	err := admit.Admit(attrs)
-	if err == nil {
+	attrs := admission.NewAttributesRecord(pod1, api.Kind("Pod"), ns, "myname", api.Resource("pods"), "", admission.Create, nil)
+	if err := admit.Admit(attrs); err == nil {
 		t.Errorf("Expected rejection for using a secret the service account does not reference")
+	}
+
+	pod2 := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "container-1",
+					Env: []api.EnvVar{
+						{
+							Name: "env-1",
+							ValueFrom: &api.EnvVarSource{
+								SecretKeyRef: &api.SecretKeySelector{
+									LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod2, api.Kind("Pod"), ns, "myname", api.Resource("pods"), "", admission.Create, nil)
+	if err := admit.Admit(attrs); err == nil || !strings.Contains(err.Error(), "with envVar") {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 

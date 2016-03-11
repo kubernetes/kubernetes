@@ -18,8 +18,10 @@ package scheduler
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -158,8 +160,34 @@ func TestScheduler(t *testing.T) {
 }
 
 func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
+	// Set up a channel through which we'll funnel log messages from the watcher.
+	// This way, we can guarantee that when the test ends no thread will still be
+	// trying to write to t.Logf (which it would if we handed t.Logf directly to
+	// StartLogging).
+	ch := make(chan string)
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case msg := <-ch:
+				t.Log(msg)
+			case <-done:
+				return
+			}
+		}
+	}()
 	eventBroadcaster := record.NewBroadcaster()
-	defer eventBroadcaster.StartLogging(t.Logf).Stop()
+	watcher := eventBroadcaster.StartLogging(func(format string, args ...interface{}) {
+		ch <- fmt.Sprintf(format, args...)
+	})
+	defer func() {
+		watcher.Stop()
+		close(done)
+		wg.Wait()
+	}()
 
 	// Setup modeler so we control the contents of all 3 stores: assumed,
 	// scheduled and queued
