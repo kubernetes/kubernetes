@@ -94,6 +94,11 @@ const (
 	// hence, setting ndots to be 5.
 	// TODO(yifan): Move this and dockertools.ndotsDNSOption to a common package.
 	defaultDNSOption = "ndots:5"
+
+	// Annotations for the ENTRYPOINT and CMD for an ACI that's converted from Docker image.
+	// TODO(yifan): Import them from docker2aci. See https://github.com/appc/docker2aci/issues/133.
+	appcDockerEntrypoint = "appc.io/docker/entrypoint"
+	appcDockerCmd        = "appc.io/docker/cmd"
 )
 
 // Runtime implements the Containerruntime for rkt. The implementation
@@ -414,10 +419,29 @@ func setSupplementaryGIDs(app *appctypes.App, podCtx *api.PodSecurityContext) {
 }
 
 // setApp merges the container spec with the image's manifest.
-func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContainerOptions, ctx *api.SecurityContext, podCtx *api.PodSecurityContext) error {
-	// TODO(yifan): If ENTRYPOINT and CMD are both specified in the image,
-	// we cannot override just one of these at this point as they are already mixed.
-	command, args := kubecontainer.ExpandContainerCommandAndArgs(c, opts.Envs)
+func setApp(imgManifest *appcschema.ImageManifest, c *api.Container, opts *kubecontainer.RunContainerOptions, ctx *api.SecurityContext, podCtx *api.PodSecurityContext) error {
+	app := imgManifest.App
+
+	// Set up Exec.
+	var command, args []string
+	cmd, ok := imgManifest.Annotations.Get(appcDockerEntrypoint)
+	if ok {
+		command = strings.Fields(cmd)
+	}
+	ag, ok := imgManifest.Annotations.Get(appcDockerCmd)
+	if ok {
+		args = strings.Fields(ag)
+	}
+	userCommand, userArgs := kubecontainer.ExpandContainerCommandAndArgs(c, opts.Envs)
+
+	if len(userCommand) > 0 {
+		command = userCommand
+		args = nil // If 'command' is specified, then drop the default args.
+	}
+	if len(userArgs) > 0 {
+		args = userArgs
+	}
+
 	exec := append(command, args...)
 	if len(exec) > 0 {
 		app.Exec = exec
@@ -592,7 +616,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets [
 	}
 
 	ctx := securitycontext.DetermineEffectiveSecurityContext(pod, &c)
-	if err := setApp(imgManifest.App, &c, opts, ctx, pod.Spec.SecurityContext); err != nil {
+	if err := setApp(imgManifest, &c, opts, ctx, pod.Spec.SecurityContext); err != nil {
 		return err
 	}
 
