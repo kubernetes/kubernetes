@@ -56,7 +56,6 @@ all:
 #   make verify BRANCH=branch_x
 verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/verify-all.sh -v
-	hack/verify-godep-licenses.sh $(BRANCH)  # Remove this after fixing issue #22843
 .PHONY: verify
 
 # Build and run tests.
