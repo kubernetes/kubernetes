@@ -102,6 +102,7 @@ func (eNode *NodeExtern) Clone() *NodeExtern {
 type NodeExterns []*NodeExtern
 
 // interfaces for sorting
+
 func (ns NodeExterns) Len() int {
 	return len(ns)
 }

@@ -53,15 +53,19 @@ func (x Event_EventType) String() string {
 }
 
 type KeyValue struct {
-	Key            []byte `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	CreateRevision int64  `protobuf:"varint,2,opt,name=create_revision,proto3" json:"create_revision,omitempty"`
-	// mod_revision is the last modified revision of the key.
+	Key []byte `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// create_revision is the revision of last creation on this key.
+	CreateRevision int64 `protobuf:"varint,2,opt,name=create_revision,proto3" json:"create_revision,omitempty"`
+	// mod_revision is the revision of last modification on this key.
 	ModRevision int64 `protobuf:"varint,3,opt,name=mod_revision,proto3" json:"mod_revision,omitempty"`
 	// version is the version of the key. A deletion resets
 	// the version to zero and any modification of the key
 	// increases its version.
 	Version int64  `protobuf:"varint,4,opt,name=version,proto3" json:"version,omitempty"`
 	Value   []byte `protobuf:"bytes,5,opt,name=value,proto3" json:"value,omitempty"`
+	// lease is the ID of the lease that attached to key.
+	// When the attached lease expires, the key will be deleted.
+	Lease int64 `protobuf:"varint,6,opt,name=lease,proto3" json:"lease,omitempty"`
 }
 
 func (m *KeyValue) Reset()         { *m = KeyValue{} }
@@ -70,9 +74,10 @@ func (*KeyValue) ProtoMessage()    {}
 
 type Event struct {
 	Type Event_EventType `protobuf:"varint,1,opt,name=type,proto3,enum=storagepb.Event_EventType" json:"type,omitempty"`
-	// a put event contains the current key-value
-	// a delete/expire event contains the previous
-	// key-value
+	// A PUT event contains current kv pair.
+	// A PUT event with kv.Version=1 indicates the creation of a key.
+	// A DELETE/EXPIRE event contains the deleted key with
+	// its modification revision set to the revision of deletion.
 	Kv *KeyValue `protobuf:"bytes,2,opt,name=kv" json:"kv,omitempty"`
 }
 
@@ -130,6 +135,11 @@ func (m *KeyValue) MarshalTo(data []byte) (int, error) {
 			i = encodeVarintKv(data, i, uint64(len(m.Value)))
 			i += copy(data[i:], m.Value)
 		}
+	}
+	if m.Lease != 0 {
+		data[i] = 0x30
+		i++
+		i = encodeVarintKv(data, i, uint64(m.Lease))
 	}
 	return i, nil
 }
@@ -217,6 +227,9 @@ func (m *KeyValue) Size() (n int) {
 		if l > 0 {
 			n += 1 + l + sovKv(uint64(l))
 		}
+	}
+	if m.Lease != 0 {
+		n += 1 + sovKv(uint64(m.Lease))
 	}
 	return n
 }
@@ -395,6 +408,25 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 				m.Value = []byte{}
 			}
 			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Lease", wireType)
+			}
+			m.Lease = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowKv
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				m.Lease |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipKv(data[iNdEx:])

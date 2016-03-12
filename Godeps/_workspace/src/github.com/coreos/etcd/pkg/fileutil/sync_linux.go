@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2016 CoreOS, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
-Package httptypes defines how etcd's HTTP API entities are serialized to and deserialized from JSON.
-*/
+// +build linux
 
-package httptypes
+package fileutil
+
+import (
+	"os"
+	"syscall"
+)
+
+// Fdatasync is similar to fsync(), but does not flush modified metadata
+// unless that metadata is needed in order to allow a subsequent data retrieval
+// to be correctly handled.
+func Fdatasync(f *os.File) error {
+	return syscall.Fdatasync(int(f.Fd()))
+}

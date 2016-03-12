@@ -82,12 +82,16 @@ func (eh *EventHistory) scan(key string, recursive bool, index uint64) (*Event, 
 
 		if recursive {
 			// add tailing slash
-			key := path.Clean(key)
+			key = path.Clean(key)
 			if key[len(key)-1] != '/' {
 				key = key + "/"
 			}
 
 			ok = ok || strings.HasPrefix(e.Node.Key, key)
+		}
+
+		if (e.Action == Delete || e.Action == Expire) && e.PrevNode != nil && e.PrevNode.Dir {
+			ok = ok || strings.HasPrefix(key, e.PrevNode.Key)
 		}
 
 		if ok {

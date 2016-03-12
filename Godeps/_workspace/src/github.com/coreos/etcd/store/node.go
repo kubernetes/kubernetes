@@ -25,10 +25,10 @@ import (
 
 // explanations of Compare function result
 const (
-	CompareMatch         = 0
-	CompareIndexNotMatch = 1
-	CompareValueNotMatch = 2
-	CompareNotMatch      = 3
+	CompareMatch = iota
+	CompareIndexNotMatch
+	CompareValueNotMatch
+	CompareNotMatch
 )
 
 var Permanent time.Time
@@ -101,7 +101,7 @@ func (n *node) IsPermanent() bool {
 // If the node is a directory, the function will return true.
 // Otherwise the function will return false.
 func (n *node) IsDir() bool {
-	return !(n.Children == nil)
+	return n.Children != nil
 }
 
 // Read function gets the value of the node.
@@ -183,7 +183,7 @@ func (n *node) GetChild(name string) (*node, *etcdErr.Error) {
 
 // Add function adds a node to the receiver node.
 // If the receiver is not a directory, a "Not A Directory" error will be returned.
-// If there is a existing node with the same name under the directory, a "Already Exist"
+// If there is an existing node with the same name under the directory, a "Already Exist"
 // error will be returned
 func (n *node) Add(child *node) *etcdErr.Error {
 	if !n.IsDir() {
@@ -192,9 +192,7 @@ func (n *node) Add(child *node) *etcdErr.Error {
 
 	_, name := path.Split(child.Path)
 
-	_, ok := n.Children[name]
-
-	if ok {
+	if _, ok := n.Children[name]; ok {
 		return etcdErr.NewError(etcdErr.EcodeNodeExist, "", n.store.CurrentIndex)
 	}
 
@@ -205,20 +203,6 @@ func (n *node) Add(child *node) *etcdErr.Error {
 
 // Remove function remove the node.
 func (n *node) Remove(dir, recursive bool, callback func(path string)) *etcdErr.Error {
-
-	if n.IsDir() {
-		if !dir {
-			// cannot delete a directory without recursive set to true
-			return etcdErr.NewError(etcdErr.EcodeNotFile, n.Path, n.store.CurrentIndex)
-		}
-
-		if len(n.Children) != 0 && !recursive {
-			// cannot delete a directory if it is not empty and the operation
-			// is not recursive
-			return etcdErr.NewError(etcdErr.EcodeDirNotEmpty, n.Path, n.store.CurrentIndex)
-		}
-	}
-
 	if !n.IsDir() { // key-value pair
 		_, name := path.Split(n.Path)
 
@@ -238,6 +222,17 @@ func (n *node) Remove(dir, recursive bool, callback func(path string)) *etcdErr.
 		return nil
 	}
 
+	if !dir {
+		// cannot delete a directory without dir set to true
+		return etcdErr.NewError(etcdErr.EcodeNotFile, n.Path, n.store.CurrentIndex)
+	}
+
+	if len(n.Children) != 0 && !recursive {
+		// cannot delete a directory if it is not empty and the operation
+		// is not recursive
+		return etcdErr.NewError(etcdErr.EcodeDirNotEmpty, n.Path, n.store.CurrentIndex)
+	}
+
 	for _, child := range n.Children { // delete all children
 		child.Remove(true, true, callback)
 	}
@@ -254,7 +249,6 @@ func (n *node) Remove(dir, recursive bool, callback func(path string)) *etcdErr.
 		if !n.IsPermanent() {
 			n.store.ttlKeyHeap.remove(n)
 		}
-
 	}
 
 	return nil
@@ -314,28 +308,31 @@ func (n *node) Repr(recursive, sorted bool, clock clockwork.Clock) *NodeExtern {
 }
 
 func (n *node) UpdateTTL(expireTime time.Time) {
-
 	if !n.IsPermanent() {
 		if expireTime.IsZero() {
 			// from ttl to permanent
 			n.ExpireTime = expireTime
 			// remove from ttl heap
 			n.store.ttlKeyHeap.remove(n)
-		} else {
-			// update ttl
-			n.ExpireTime = expireTime
-			// update ttl heap
-			n.store.ttlKeyHeap.update(n)
+			return
 		}
 
-	} else {
-		if !expireTime.IsZero() {
-			// from permanent to ttl
-			n.ExpireTime = expireTime
-			// push into ttl heap
-			n.store.ttlKeyHeap.push(n)
-		}
+		// update ttl
+		n.ExpireTime = expireTime
+		// update ttl heap
+		n.store.ttlKeyHeap.update(n)
+		return
 	}
+
+	if expireTime.IsZero() {
+		return
+	}
+
+	// from permanent to ttl
+	n.ExpireTime = expireTime
+	// push into ttl heap
+	n.store.ttlKeyHeap.push(n)
+	return
 }
 
 // Compare function compares node index and value with provided ones.
@@ -379,7 +376,7 @@ func (n *node) Clone() *node {
 
 // recoverAndclean function help to do recovery.
 // Two things need to be done: 1. recovery structure; 2. delete expired nodes
-
+//
 // If the node is a directory, it will help recover children's parent pointer and recursively
 // call this function on its children.
 // We check the expire last since we need to recover the whole structure first and add all the
@@ -396,5 +393,4 @@ func (n *node) recoverAndclean() {
 	if !n.ExpireTime.IsZero() {
 		n.store.ttlKeyHeap.push(n)
 	}
-
 }

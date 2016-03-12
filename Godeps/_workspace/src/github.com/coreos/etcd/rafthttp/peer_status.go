@@ -31,14 +31,12 @@ type peerStatus struct {
 	id          types.ID
 	mu          sync.Mutex // protect variables below
 	active      bool
-	failureMap  map[failureType]string
 	activeSince time.Time
 }
 
 func newPeerStatus(id types.ID) *peerStatus {
 	return &peerStatus{
-		id:         id,
-		failureMap: make(map[failureType]string),
+		id: id,
 	}
 }
 
@@ -49,25 +47,21 @@ func (s *peerStatus) activate() {
 		plog.Infof("the connection with %s became active", s.id)
 		s.active = true
 		s.activeSince = time.Now()
-		s.failureMap = make(map[failureType]string)
 	}
 }
 
 func (s *peerStatus) deactivate(failure failureType, reason string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	msg := fmt.Sprintf("failed to %s %s on %s (%s)", failure.action, s.id, failure.source, reason)
 	if s.active {
+		plog.Errorf(msg)
 		plog.Infof("the connection with %s became inactive", s.id)
 		s.active = false
 		s.activeSince = time.Time{}
-	}
-	logline := fmt.Sprintf("failed to %s %s on %s (%s)", failure.action, s.id, failure.source, reason)
-	if r, ok := s.failureMap[failure]; ok && r == reason {
-		plog.Debugf(logline)
 		return
 	}
-	s.failureMap[failure] = reason
-	plog.Errorf(logline)
+	plog.Debugf(msg)
 }
 
 func (s *peerStatus) isActive() bool {

@@ -25,14 +25,6 @@ var (
 	ErrLocked = errors.New("file already locked")
 )
 
-type Lock interface {
-	Name() string
-	TryLock() error
-	Lock() error
-	Unlock() error
-	Destroy() error
-}
-
 type lock struct {
 	fname string
 	file  *os.File
@@ -42,7 +34,6 @@ func (l *lock) Name() string {
 	return l.fname
 }
 
-// TryLock acquires exclusivity on the lock without blocking
 func (l *lock) TryLock() error {
 	err := os.Chmod(l.fname, syscall.DMEXCL|0600)
 	if err != nil {
@@ -58,7 +49,6 @@ func (l *lock) TryLock() error {
 	return nil
 }
 
-// Lock acquires exclusivity on the lock with blocking
 func (l *lock) Lock() error {
 	err := os.Chmod(l.fname, syscall.DMEXCL|0600)
 	if err != nil {
@@ -75,7 +65,6 @@ func (l *lock) Lock() error {
 	}
 }
 
-// Unlock unlocks the lock
 func (l *lock) Unlock() error {
 	return l.file.Close()
 }
