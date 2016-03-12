@@ -99,11 +99,16 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	logPodsOnNodes(f.Client, nodeNames.List())
 	usageSummary, err := rm.GetLatest()
 	Expect(err).NotTo(HaveOccurred())
+	// TODO(random-liu): Remove the original log when we migrate to new perfdash
 	framework.Logf("%s", rm.FormatResourceUsage(usageSummary))
+	// Log perf result
+	framework.PrintPerfData(framework.ResourceUsageToPerfData(rm.GetMasterNodeLatest(usageSummary)))
 	verifyMemoryLimits(f.Client, expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
 	framework.Logf("%s", rm.FormatCPUSummary(cpuSummary))
+	// Log perf result
+	framework.PrintPerfData(framework.CPUUsageToPerfData(rm.GetMasterNodeCPUSummary(cpuSummary)))
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	By("Deleting the RC")
@@ -243,7 +248,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 			itArg := testArg
 			podsPerNode := itArg.podsPerNode
 			name := fmt.Sprintf(
-				"for %d pods per node over %v", podsPerNode, monitoringTime)
+				"resource tracking for %d pods per node", podsPerNode)
 			It(name, func() {
 				runResourceTrackingTest(f, podsPerNode, nodeNames, rm, itArg.cpuLimits, itArg.memLimits)
 			})
@@ -254,7 +259,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		for i := range density {
 			podsPerNode := density[i]
 			name := fmt.Sprintf(
-				"for %d pods per node over %v", podsPerNode, monitoringTime)
+				"resource tracking for %d pods per node", podsPerNode)
 			It(name, func() {
 				runResourceTrackingTest(f, podsPerNode, nodeNames, rm, nil, nil)
 			})

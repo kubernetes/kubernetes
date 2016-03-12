@@ -287,7 +287,10 @@ func HighLatencyRequests(c *client.Client) (int, error) {
 		}
 	}
 
+	// TODO(random-liu): Remove the log when we migrate to new perfdash
 	Logf("API calls latencies: %s", PrettyPrintJSON(metrics))
+	// Log perf data
+	PrintPerfData(ApiCallToPerfData(metrics))
 
 	return badMetrics, nil
 }
