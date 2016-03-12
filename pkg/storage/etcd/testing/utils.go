@@ -30,9 +30,9 @@ import (
 	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/etcdhttp"
+	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
-	"github.com/coreos/etcd/rafthttp"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 )
@@ -88,7 +88,7 @@ func newHttpTransport(t *testing.T, certFile, keyFile, caFile string) etcd.Cance
 		KeyFile:  keyFile,
 		CAFile:   caFile,
 	}
-	tr, err := transport.NewTransport(tlsInfo)
+	tr, err := transport.NewTransport(tlsInfo, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,10 +142,7 @@ func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.Transport, err = transport.NewTimeoutTransport(transport.TLSInfo{}, time.Second, rafthttp.ConnReadTimeout, rafthttp.ConnWriteTimeout)
-	if err != nil {
-		t.Fatal(err)
-	}
+	m.InitialClusterToken = "TestEtcd"
 	m.NewCluster = true
 	m.ForceNewCluster = false
 	m.ElectionTicks = 10
@@ -162,7 +159,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 	}
 	m.s.SyncTicker = time.Tick(500 * time.Millisecond)
 	m.s.Start()
-	m.raftHandler = etcdhttp.NewPeerHandler(m.s.Cluster(), m.s.RaftHandler())
+	m.raftHandler = &testutil.PauseableHandler{Next: etcdhttp.NewPeerHandler(m.s)}
 	for _, ln := range m.PeerListeners {
 		hs := &httptest.Server{
 			Listener: ln,
