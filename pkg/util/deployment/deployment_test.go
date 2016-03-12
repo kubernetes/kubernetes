@@ -291,21 +291,25 @@ func TestGetNewRC(t *testing.T) {
 func TestGetOldRCs(t *testing.T) {
 	newDeployment := generateDeployment("nginx")
 	newRS := generateRS(newDeployment)
+	newRS.Status.FullyLabeledReplicas = newRS.Spec.Replicas
 	newPod := generatePodFromRS(newRS)
 
 	// create 2 old deployments and related replica sets/pods, with the same labels but different template
 	oldDeployment := generateDeployment("nginx")
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
 	oldRS := generateRS(oldDeployment)
+	oldRS.Status.FullyLabeledReplicas = oldRS.Spec.Replicas
 	oldPod := generatePodFromRS(oldRS)
 	oldDeployment2 := generateDeployment("nginx")
 	oldDeployment2.Spec.Template.Spec.Containers[0].Name = "nginx-old-2"
 	oldRS2 := generateRS(oldDeployment2)
+	oldRS2.Status.FullyLabeledReplicas = oldRS2.Spec.Replicas
 	oldPod2 := generatePodFromRS(oldRS2)
 
 	// create 1 ReplicaSet that existed before the deployment, with the same labels as the deployment
 	existedPod := generatePod(newDeployment.Spec.Template.Labels, "foo")
 	existedRS := generateRSWithLabel(newDeployment.Spec.Template.Labels, "foo")
+	existedRS.Status.FullyLabeledReplicas = existedRS.Spec.Replicas
 
 	tests := []struct {
 		test     string
