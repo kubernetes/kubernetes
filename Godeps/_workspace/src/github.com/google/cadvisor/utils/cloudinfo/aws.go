@@ -15,6 +15,8 @@
 package cloudinfo
 
 import (
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -23,7 +25,13 @@ import (
 )
 
 func onAWS() bool {
-	client := ec2metadata.New(session.New(&aws.Config{}))
+	// the default client behavior retried the operation multiple times with a 5s timeout per attempt.
+	// if you were not on aws, you would block for 20s when invoking this operation.
+	// we reduce retries to 0 and set the timeout to 2s to reduce the time this blocks when not on aws.
+	client := ec2metadata.New(session.New(&aws.Config{MaxRetries: aws.Int(0)}))
+	if client.Config.HTTPClient != nil {
+		client.Config.HTTPClient.Timeout = time.Duration(2 * time.Second)
+	}
 	return client.Available()
 }
 
