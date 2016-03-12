@@ -161,7 +161,7 @@ type EC2Metadata interface {
 
 type VolumeOptions struct {
 	CapacityGB int
-	Tags       *map[string]string
+	Tags       map[string]string
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -1387,8 +1387,17 @@ func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	volumeName := "aws://" + az + "/" + awsID
 
 	// apply tags
-	if volumeOptions.Tags != nil {
-		if err := s.createTags(awsID, *volumeOptions.Tags); err != nil {
+	tags := make(map[string]string)
+	for k, v := range volumeOptions.Tags {
+		tags[k] = v
+	}
+
+	if s.getClusterName() != "" {
+		tags[TagNameKubernetesCluster] = s.getClusterName()
+	}
+
+	if len(tags) != 0 {
+		if err := s.createTags(awsID, tags); err != nil {
 			// delete the volume and hope it succeeds
 			_, delerr := s.DeleteDisk(volumeName)
 			if delerr != nil {
