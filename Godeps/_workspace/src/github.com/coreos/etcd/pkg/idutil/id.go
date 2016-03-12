@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package idutil implements utility functions for generating unique,
+// randomized ids.
 package idutil
 
 import (
@@ -22,15 +24,18 @@ import (
 
 const (
 	tsLen     = 5 * 8
-	cntLen    = 2 * 8
+	cntLen    = 8
 	suffixLen = tsLen + cntLen
 )
 
+// Generator generates unique identifiers based on counters, timestamps, and
+// a node member ID.
+//
 // The initial id is in this format:
 // High order byte is memberID, next 5 bytes are from timestamp,
 // and low order 2 bytes are 0s.
 // | prefix   | suffix              |
-// | 1 byte   | 5 bytes   | 2 bytes |
+// | 2 bytes  | 5 bytes   | 1 byte  |
 // | memberID | timestamp | cnt     |
 //
 // The timestamp 5 bytes is different when the machine is restart
@@ -40,16 +45,16 @@ const (
 // The count field may overflow to timestamp field, which is intentional.
 // It helps to extend the event window to 2^56. This doesn't break that
 // id generated after restart is unique because etcd throughput is <<
-// 65536req/ms.
+// 256req/ms(250k reqs/second).
 type Generator struct {
 	mu sync.Mutex
-	// high order byte
+	// high order 2 bytes
 	prefix uint64
-	// low order 7 bytes
+	// low order 6 bytes
 	suffix uint64
 }
 
-func NewGenerator(memberID uint8, now time.Time) *Generator {
+func NewGenerator(memberID uint16, now time.Time) *Generator {
 	prefix := uint64(memberID) << suffixLen
 	unixMilli := uint64(now.UnixNano()) / uint64(time.Millisecond/time.Nanosecond)
 	suffix := lowbit(unixMilli, tsLen) << cntLen

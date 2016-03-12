@@ -146,123 +146,238 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/client",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/clientv3",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/clientv3/concurrency",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/compactor",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/contrib/recipes",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/discovery",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/error",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver/api/v3rpc",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver/auth",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdhttp",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdhttp/httptypes",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdserverpb",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver/stats",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/integration",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/lease",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/lease/leasehttp",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/lease/leasepb",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/adt",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/contention",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/crc",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/fileutil",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/httputil",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/idutil",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/ioutil",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/logutil",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/netutil",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/pbutil",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/runtime",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
-			"ImportPath": "github.com/coreos/etcd/pkg/timeutil",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"ImportPath": "github.com/coreos/etcd/pkg/schedule",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/testutil",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/transport",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/wait",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/raft",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/raft/raftpb",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/rafthttp",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/snap",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/snap/snappb",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/storage",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/storage/backend",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/storage/storagepb",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/store",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/version",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/wal",
-			"Comment": "v2.2.5",
-			"Rev": "bc9ddf260115d2680191c46977ae72b837785472"
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/wal/walpb",
+			"Comment": "v2.3.0-alpha.1-233-ga462466",
+			"Rev": "a4624666fec6b9f82400ea873d5c3d2f968fb737"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
@@ -978,6 +1093,10 @@
 			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
 		},
 		{
+			"ImportPath": "golang.org/x/net/http2/hpack",
+			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
+		},
+		{
 			"ImportPath": "golang.org/x/net/internal/timeseries",
 			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
 		},
@@ -1035,6 +1154,34 @@
 		},
 		{
 			"ImportPath": "google.golang.org/grpc",
+			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/codes",
+			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/credentials",
+			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/grpclog",
+			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/metadata",
+			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/naming",
+			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/peer",
+			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/transport",
 			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
 		},
 		{

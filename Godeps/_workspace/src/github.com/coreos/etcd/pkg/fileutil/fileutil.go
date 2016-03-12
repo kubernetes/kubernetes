@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package fileutil implements utility functions related to files and paths.
 package fileutil
 
 import (
@@ -58,7 +59,7 @@ func ReadDir(dirpath string) ([]string, error) {
 	return names, nil
 }
 
-// TouchDirAll is simliar to os.MkdirAll. It creates directories with 0700 permission if any directory
+// TouchDirAll is similar to os.MkdirAll. It creates directories with 0700 permission if any directory
 // does not exists. TouchDirAll also ensures the given directory is writable.
 func TouchDirAll(dir string) error {
 	err := os.MkdirAll(dir, privateDirMode)
@@ -66,4 +67,9 @@ func TouchDirAll(dir string) error {
 		return err
 	}
 	return IsDirWriteable(dir)
+}
+
+func Exist(name string) bool {
+	_, err := os.Stat(name)
+	return err == nil
 }

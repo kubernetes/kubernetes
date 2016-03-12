@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
-Package httptypes defines how etcd's HTTP API entities are serialized to and deserialized from JSON.
-*/
+package backend
 
-package httptypes
+import "github.com/boltdb/bolt"
+
+// TODO: support syscall.MAP_POPULATE in windows.
+// Need upstream patch from boltdb/bolt.
+var boltOpenOptions *bolt.Options = nil

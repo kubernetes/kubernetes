@@ -1,7 +1,22 @@
+// Copyright 2015 CoreOS, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storage
 
 import (
 	"log"
+	"sort"
 	"sync"
 
 	"github.com/google/btree"
@@ -13,6 +28,7 @@ type index interface {
 	Put(key []byte, rev revision)
 	Restore(key []byte, created, modified revision, ver int64)
 	Tombstone(key []byte, rev revision) error
+	RangeSince(key, end []byte, rev int64) []revision
 	Compact(rev int64) map[revision]struct{}
 	Equal(b index) bool
 }
@@ -88,7 +104,7 @@ func (ti *treeIndex) Range(key, end []byte, atRev int64) (keys [][]byte, revs []
 	defer ti.RUnlock()
 
 	ti.tree.AscendGreaterOrEqual(keyi, func(item btree.Item) bool {
-		if !item.Less(endi) {
+		if len(endi.key) > 0 && !item.Less(endi) {
 			return false
 		}
 		curKeyi := item.(*keyIndex)
@@ -116,6 +132,38 @@ func (ti *treeIndex) Tombstone(key []byte, rev revision) error {
 
 	ki := item.(*keyIndex)
 	return ki.tombstone(rev.main, rev.sub)
+}
+
+// RangeSince returns all revisions from key(including) to end(excluding)
+// at or after the given rev. The returned slice is sorted in the order
+// of revision.
+func (ti *treeIndex) RangeSince(key, end []byte, rev int64) []revision {
+	ti.RLock()
+	defer ti.RUnlock()
+
+	keyi := &keyIndex{key: key}
+	if end == nil {
+		item := ti.tree.Get(keyi)
+		if item == nil {
+			return nil
+		}
+		keyi = item.(*keyIndex)
+		return keyi.since(rev)
+	}
+
+	endi := &keyIndex{key: end}
+	var revs []revision
+	ti.tree.AscendGreaterOrEqual(keyi, func(item btree.Item) bool {
+		if len(endi.key) > 0 && !item.Less(endi) {
+			return false
+		}
+		curKeyi := item.(*keyIndex)
+		revs = append(revs, curKeyi.since(rev)...)
+		return true
+	})
+	sort.Sort(revisions(revs))
+
+	return revs
 }
 
 func (ti *treeIndex) Compact(rev int64) map[revision]struct{} {

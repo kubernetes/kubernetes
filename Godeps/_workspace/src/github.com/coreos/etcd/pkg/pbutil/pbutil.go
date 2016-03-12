@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package pbutil defines interfaces for handling Protocol Buffer objects.
 package pbutil
 
 import "github.com/coreos/pkg/capnslog"

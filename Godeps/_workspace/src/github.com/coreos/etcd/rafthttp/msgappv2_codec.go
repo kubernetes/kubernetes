@@ -36,7 +36,7 @@ const (
 
 // msgappv2 stream sends three types of message: linkHeartbeatMessage,
 // AppEntries and MsgApp. AppEntries is the MsgApp that is sent in
-// replicate state in raft, whose index and term are fully predicatable.
+// replicate state in raft, whose index and term are fully predictable.
 //
 // Data format of linkHeartbeatMessage:
 // | offset | bytes | description |

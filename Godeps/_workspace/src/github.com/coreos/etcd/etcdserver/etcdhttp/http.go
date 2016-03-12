@@ -25,6 +25,7 @@ import (
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/auth"
 	"github.com/coreos/etcd/etcdserver/etcdhttp/httptypes"
+	"github.com/coreos/etcd/pkg/logutil"
 	"github.com/coreos/pkg/capnslog"
 )
 
@@ -35,13 +36,14 @@ const (
 
 var (
 	plog      = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdhttp")
+	mlog      = logutil.NewMergeLogger(plog)
 	errClosed = errors.New("etcdhttp: client closed connection")
 )
 
 // writeError logs and writes the given Error to the ResponseWriter
 // If Error is an etcdErr, it is rendered to the ResponseWriter
-// Otherwise, it is assumed to be an InternalServerError
-func writeError(w http.ResponseWriter, err error) {
+// Otherwise, it is assumed to be a StatusInternalServerError
+func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	if err == nil {
 		return
 	}
@@ -49,19 +51,25 @@ func writeError(w http.ResponseWriter, err error) {
 	case *etcdErr.Error:
 		e.WriteTo(w)
 	case *httptypes.HTTPError:
-		e.WriteTo(w)
+		if et := e.WriteTo(w); et != nil {
+			plog.Debugf("error writing HTTPError (%v) to %s", et, r.RemoteAddr)
+		}
 	case auth.Error:
 		herr := httptypes.NewHTTPError(e.HTTPStatus(), e.Error())
-		herr.WriteTo(w)
+		if et := herr.WriteTo(w); et != nil {
+			plog.Debugf("error writing HTTPError (%v) to %s", et, r.RemoteAddr)
+		}
 	default:
 		switch err {
-		case etcdserver.ErrTimeoutDueToLeaderFail, etcdserver.ErrTimeoutDueToConnectionLost:
-			plog.Error(err)
+		case etcdserver.ErrTimeoutDueToLeaderFail, etcdserver.ErrTimeoutDueToConnectionLost, etcdserver.ErrNotEnoughStartedMembers:
+			mlog.MergeError(err)
 		default:
-			plog.Errorf("got unexpected response error (%v)", err)
+			mlog.MergeErrorf("got unexpected response error (%v)", err)
 		}
 		herr := httptypes.NewHTTPError(http.StatusInternalServerError, "Internal Server Error")
-		herr.WriteTo(w)
+		if et := herr.WriteTo(w); et != nil {
+			plog.Debugf("error writing HTTPError (%v) to %s", et, r.RemoteAddr)
+		}
 	}
 }
 
