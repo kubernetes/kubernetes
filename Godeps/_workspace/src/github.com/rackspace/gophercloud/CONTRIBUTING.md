@@ -11,7 +11,8 @@ As a contributor you will need to setup your workspace in a slightly different
 way than just downloading it. Here are the basic installation instructions:
 
 1. Configure your `$GOPATH` and run `go get` as described in the main
-[README](/README.md#how-to-install).
+[README](/README.md#how-to-install) but add `-tags "fixtures acceptance"` to
+get dependencies for unit and acceptance tests.
 
 2. Move into the directory that houses your local repository:
 
@@ -158,25 +159,25 @@ deleted after the test suite finishes.
 To run all tests:
 
 ```bash
-go test ./...
+go test -tags fixtures ./...
 ```
 
 To run all tests with verbose output:
 
 ```bash
-go test -v ./...
+go test -v -tags fixtures ./...
 ```
 
 To run tests that match certain [build tags]():
 
 ```bash
-go test -tags "foo bar" ./...
+go test -tags "fixtures foo bar" ./...
 ```
 
 To run tests for a particular sub-package:
 
 ```bash
-cd ./path/to/package && go test .
+cd ./path/to/package && go test -tags fixtures .
 ```
 
 ## Basic style guide
