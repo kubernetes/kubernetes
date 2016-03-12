@@ -417,7 +417,7 @@ function stage-images() {
 # "strip out quotes", and we really should be using a YAML library for
 # this, but PyYAML isn't shipped by default, and *rant rant rant ... SIGH*
 function yaml-quote {
-  echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
+  echo "'$(echo "${@:-}" | sed -e "s/'/''/g")'"
 }
 
 # Builds the RUNTIME_CONFIG var from other feature enable options (such as
