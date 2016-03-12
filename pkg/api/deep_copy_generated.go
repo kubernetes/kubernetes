@@ -2214,6 +2214,7 @@ func DeepCopy_api_PodStatus(in PodStatus, out *PodStatus, c *conversion.Cloner) 
 	} else {
 		out.ContainerStatuses = nil
 	}
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 

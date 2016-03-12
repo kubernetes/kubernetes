@@ -1851,6 +1851,7 @@ func deepCopy_v1_PodStatus(in PodStatus, out *PodStatus, c *conversion.Cloner) e
 	} else {
 		out.ContainerStatuses = nil
 	}
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 

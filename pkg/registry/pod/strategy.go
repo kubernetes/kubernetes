@@ -55,6 +55,7 @@ func (podStrategy) NamespaceScoped() bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (podStrategy) PrepareForCreate(obj runtime.Object) {
 	pod := obj.(*api.Pod)
+	pod.ObjectMeta.Generation = 0
 	pod.Status = api.PodStatus{
 		Phase: api.PodPending,
 	}
@@ -64,6 +65,11 @@ func (podStrategy) PrepareForCreate(obj runtime.Object) {
 func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
+	// We want to update the Generation when the spec, labels or annotations
+	// change but we can ignore Kubelet updates. Kubelet will update annotations
+	// through the status resource which will not bump spec, so while this blanket
+	// policy seems wrong, it's actually works correctly right now.
+	newPod.ObjectMeta.Generation = oldPod.ObjectMeta.Generation + 1
 	newPod.Status = oldPod.Status
 }
 

@@ -3769,6 +3769,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_containerstatus">v1.ContainerStatus</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">observedGeneration</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ObservedGeneration is the last generation of the pod that the kubelet has synced. The kubelet that the pod is bound to is considered the main observer. Other secondary observers (e.g. the scheduler) should not update this field.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -7625,7 +7632,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-03-03 20:47:22 UTC
+Last updated 2016-03-04 23:19:28 UTC
 </div>
 </div>
 </body>
