@@ -4,8 +4,8 @@
   {% set metrics_memory = (200 + num_nodes * 4)|string + "Mi" -%}
 {% endif -%}
 
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: heapster-v1.0.0
   namespace: kube-system
@@ -15,7 +15,8 @@ metadata:
 spec:
   replicas: 1
   selector:
-    k8s-app: heapster
+    matchLabels:
+      k8s-app: heapster
   template:
     metadata:
       labels:
@@ -37,3 +38,31 @@ spec:
             - /heapster
             - --source=kubernetes.summary_api:''
             - --metric_resolution=60s
+        - image: gcr.io/google_containers/addon-resizer:1.0
+          name: heapster-nanny
+          resources:
+            limits:
+              cpu: 50m
+              memory: 100Mi
+            requests:
+              cpu: 50m
+              memory: 100Mi
+          env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - /pod_nanny
+            - --cpu=100m
+            - --extra-cpu=0m
+            - --memory=200Mi
+            - --extra-memory=3Mi
+            - --threshold=5
+            - --deployment=heapster-v1.0.0-beta1
+            - --container=heapster
+            - --poll-period=300000
