@@ -260,9 +260,9 @@ func TestCheckVersion(t *testing.T) {
 			assert.Equal(t, fs.called, []string{"Version"}, testCaseHint)
 		}
 		if err == nil {
-			assert.Equal(t, fr.info.RktVersion, r.binVersion.String(), testCaseHint)
-			assert.Equal(t, fr.info.AppcVersion, r.appcVersion.String(), testCaseHint)
-			assert.Equal(t, fr.info.ApiVersion, r.apiVersion.String(), testCaseHint)
+			assert.Equal(t, fr.info.RktVersion, r.versions.binVersion.String(), testCaseHint)
+			assert.Equal(t, fr.info.AppcVersion, r.versions.appcVersion.String(), testCaseHint)
+			assert.Equal(t, fr.info.ApiVersion, r.versions.apiVersion.String(), testCaseHint)
 		}
 		fr.CleanCalls()
 		fs.CleanCalls()
