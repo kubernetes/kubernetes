@@ -24,6 +24,10 @@ import (
 
 	"google.golang.org/api/googleapi"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
@@ -320,14 +324,25 @@ func createPD() (string, error) {
 			return "", err
 		}
 		return pdName, nil
-	} else {
-		volumes, ok := testContext.CloudConfig.Provider.(awscloud.Volumes)
-		if !ok {
-			return "", fmt.Errorf("Provider does not support volumes")
+	} else if testContext.Provider == "aws" {
+		client := ec2.New(session.New())
+
+		request := &ec2.CreateVolumeInput{}
+		request.AvailabilityZone = aws.String(cloudConfig.Zone)
+		request.Size = aws.Int64(10)
+		request.VolumeType = aws.String(awscloud.DefaultVolumeType)
+		response, err := client.CreateVolume(request)
+		if err != nil {
+			return "", err
 		}
-		volumeOptions := &awscloud.VolumeOptions{}
-		volumeOptions.CapacityGB = 10
-		return volumes.CreateDisk(volumeOptions)
+
+		az := aws.StringValue(response.AvailabilityZone)
+		awsID := aws.StringValue(response.VolumeId)
+
+		volumeName := "aws://" + az + "/" + awsID
+		return volumeName, nil
+	} else {
+		return "", fmt.Errorf("Provider does not support volume creation")
 	}
 }
 
@@ -349,20 +364,24 @@ func deletePD(pdName string) error {
 			Logf("Error deleting PD %q: %v", pdName, err)
 		}
 		return err
-	} else {
-		volumes, ok := testContext.CloudConfig.Provider.(awscloud.Volumes)
-		if !ok {
-			return fmt.Errorf("Provider does not support volumes")
-		}
-		deleted, err := volumes.DeleteDisk(pdName)
+	} else if testContext.Provider == "aws" {
+		client := ec2.New(session.New())
+
+		tokens := strings.Split(pdName, "/")
+		awsVolumeID := tokens[len(tokens)-1]
+
+		request := &ec2.DeleteVolumeInput{VolumeId: aws.String(awsVolumeID)}
+		_, err := client.DeleteVolume(request)
 		if err != nil {
-			return err
-		} else {
-			if !deleted {
+			if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
 				Logf("Volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+			} else {
+				return fmt.Errorf("error deleting EBS volumes: %v", err)
 			}
-			return nil
 		}
+		return nil
+	} else {
+		return fmt.Errorf("Provider does not support volume deletion")
 	}
 }
 
@@ -386,14 +405,23 @@ func detachPD(hostName, pdName string) error {
 		}
 
 		return err
+	} else if testContext.Provider == "aws" {
+		client := ec2.New(session.New())
 
-	} else {
-		volumes, ok := testContext.CloudConfig.Provider.(awscloud.Volumes)
-		if !ok {
-			return fmt.Errorf("Provider does not support volumes")
+		tokens := strings.Split(pdName, "/")
+		awsVolumeID := tokens[len(tokens)-1]
+
+		request := ec2.DetachVolumeInput{
+			VolumeId: aws.String(awsVolumeID),
 		}
-		_, err := volumes.DetachDisk(pdName, hostName)
-		return err
+
+		_, err := client.DetachVolume(&request)
+		if err != nil {
+			return fmt.Errorf("error detaching EBS volume: %v", err)
+		}
+		return nil
+	} else {
+		return fmt.Errorf("Provider does not support volume detaching")
 	}
 }
 
