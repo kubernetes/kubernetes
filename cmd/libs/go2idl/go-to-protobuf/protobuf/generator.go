@@ -17,13 +17,9 @@ limitations under the License.
 package protobuf
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -231,7 +227,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 	if len(b.t.Name.Name) == 0 {
 		return nil
 	}
-	if isPrivateGoName(b.t.Name.Name) {
+	if namer.IsPrivateGoName(b.t.Name.Name) {
 		return nil
 	}
 
@@ -525,7 +521,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 	fields := []protoField{}
 
 	for _, m := range t.Members {
-		if isPrivateGoName(m.Name) {
+		if namer.IsPrivateGoName(m.Name) {
 			// skip private fields
 			continue
 		}
@@ -561,7 +557,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 			}
 		}
 		if len(field.Name) == 0 {
-			field.Name = strings.ToLower(m.Name[:1]) + m.Name[1:]
+			field.Name = namer.IL(m.Name)
 		}
 
 		if field.Map && field.Repeated {
@@ -573,7 +569,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 		if !field.Nullable {
 			field.Extras["(gogoproto.nullable)"] = "false"
 		}
-		if (field.Type.Name.Name == "bytes" && field.Type.Name.Package == "") || (field.Repeated && field.Type.Name.Package == "" && isPrivateGoName(field.Type.Name.Name)) {
+		if (field.Type.Name.Name == "bytes" && field.Type.Name.Package == "") || (field.Repeated && field.Type.Name.Package == "" && namer.IsPrivateGoName(field.Type.Name.Name)) {
 			delete(field.Extras, "(gogoproto.nullable)")
 		}
 		if field.Name != m.Name {
@@ -627,61 +623,12 @@ func genComment(out io.Writer, comment, indent string) {
 	}
 }
 
-type protoIDLFileType struct{}
-
-func (ft protoIDLFileType) AssembleFile(f *generator.File, pathname string) error {
-	log.Printf("Assembling IDL file %q", pathname)
-	destFile, err := os.Create(pathname)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	b := &bytes.Buffer{}
-	et := generator.NewErrorTracker(b)
-	ft.assemble(et, f)
-	if et.Error() != nil {
-		return et.Error()
-	}
-
-	// TODO: is there an IDL formatter?
-	_, err = destFile.Write(b.Bytes())
-	return err
+func formatProtoFile(source []byte) ([]byte, error) {
+	// TODO; Is there any protobuf formatter?
+	return source, nil
 }
 
-func (ft protoIDLFileType) VerifyFile(f *generator.File, pathname string) error {
-	log.Printf("Verifying IDL file %q", pathname)
-	friendlyName := filepath.Join(f.PackageName, f.Name)
-	b := &bytes.Buffer{}
-	et := generator.NewErrorTracker(b)
-	ft.assemble(et, f)
-	if et.Error() != nil {
-		return et.Error()
-	}
-	formatted := b.Bytes()
-	existing, err := ioutil.ReadFile(pathname)
-	if err != nil {
-		return fmt.Errorf("unable to read file %q for comparison: %v", friendlyName, err)
-	}
-	if bytes.Compare(formatted, existing) == 0 {
-		return nil
-	}
-	// Be nice and find the first place where they differ
-	i := 0
-	for i < len(formatted) && i < len(existing) && formatted[i] == existing[i] {
-		i++
-	}
-	eDiff, fDiff := existing[i:], formatted[i:]
-	if len(eDiff) > 100 {
-		eDiff = eDiff[:100]
-	}
-	if len(fDiff) > 100 {
-		fDiff = fDiff[:100]
-	}
-	return fmt.Errorf("output for %q differs; first existing/expected diff: \n  %q\n  %q", friendlyName, string(eDiff), string(fDiff))
-}
-
-func (ft protoIDLFileType) assemble(w io.Writer, f *generator.File) {
+func assembleProtoFile(w io.Writer, f *generator.File) {
 	w.Write(f.Header)
 
 	fmt.Fprint(w, "syntax = 'proto2';\n\n")
@@ -709,9 +656,9 @@ func (ft protoIDLFileType) assemble(w io.Writer, f *generator.File) {
 	w.Write(f.Body.Bytes())
 }
 
-func isPrivateGoName(name string) bool {
-	if len(name) == 0 {
-		return true
+func NewProtoFile() *generator.DefaultFileType {
+	return &generator.DefaultFileType{
+		Format:   formatProtoFile,
+		Assemble: assembleProtoFile,
 	}
-	return strings.ToLower(name[:1]) == name[:1]
 }
