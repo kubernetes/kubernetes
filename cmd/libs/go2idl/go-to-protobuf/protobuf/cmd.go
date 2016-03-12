@@ -170,7 +170,7 @@ func Run(g *Generator) {
 		"public",
 	)
 	c.Verify = g.Common.VerifyOnly
-	c.FileTypes["protoidl"] = protoIDLFileType{}
+	c.FileTypes["protoidl"] = NewProtoFile()
 
 	if err != nil {
 		log.Fatalf("Failed making a context: %v", err)
