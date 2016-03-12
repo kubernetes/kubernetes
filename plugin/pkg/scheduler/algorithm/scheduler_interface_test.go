@@ -34,7 +34,7 @@ type schedulerTester struct {
 func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
 	actual, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err != nil {
-		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
+		st.t.Errorf("Unexpected error %v\nTried to schedule: %#v", err, pod)
 		return
 	}
 	if actual != expected {
