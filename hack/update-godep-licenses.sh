@@ -116,7 +116,7 @@ process_content () {
                         -maxdepth ${find_maxdepth} -type f "${find_names[@]}"))
   done
   # Uniquely sort the array
-  IFS=$'\n' local_files=($(sort -u <<<"${local_files[*]-}"))
+  IFS=$'\n' local_files=($(LC_ALL=C sort -u <<<"${local_files[*]-}"))
   unset IFS
 
   for f in ${local_files[@]-}; do
