@@ -2496,7 +2496,7 @@ func (s *AWSCloud) EnsureLoadBalancerDeleted(name, region string) error {
 		}
 
 		// Loop through and try to delete them
-		timeoutAt := time.Now().Add(time.Second * 300)
+		timeoutAt := time.Now().Add(time.Second * 600)
 		for {
 			for securityGroupID := range securityGroupIDs {
 				request := &ec2.DeleteSecurityGroupInput{}
@@ -2524,12 +2524,17 @@ func (s *AWSCloud) EnsureLoadBalancerDeleted(name, region string) error {
 			}
 
 			if time.Now().After(timeoutAt) {
-				return fmt.Errorf("timed out waiting for load-balancer deletion: %s", name)
+				ids := []string{}
+				for id := range securityGroupIDs {
+					ids = append(ids, id)
+				}
+
+				return fmt.Errorf("timed out deleting ELB: %s. Could not delete security groups %v", name, strings.Join(ids, ","))
 			}
 
 			glog.V(2).Info("Waiting for load-balancer to delete so we can delete security groups: ", name)
 
-			time.Sleep(5 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	}
 
