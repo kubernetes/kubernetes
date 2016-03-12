@@ -121,11 +121,11 @@ type NetInfo struct {
 type CloudProvider string
 
 const (
-	GCE            CloudProvider = "GCE"
-	AWS                          = "AWS"
-	Azure                        = "Azure"
-	Baremetal                    = "Baremetal"
-	UnkownProvider               = "Unknown"
+	GCE             CloudProvider = "GCE"
+	AWS                           = "AWS"
+	Azure                         = "Azure"
+	Baremetal                     = "Baremetal"
+	UnknownProvider               = "Unknown"
 )
 
 type InstanceType string
