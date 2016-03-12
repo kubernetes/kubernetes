@@ -1006,7 +1006,7 @@ case ${JOB_NAME} in
   # TODO(ihmccreery) When we release v1.2.0, these jobs will need to migrate to the release-1.2 branch.
 
   kubernetes-upgrade-gke-stable-1.2-step1-deploy)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-1.2' 'kubernetes-jenkins-gke-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-1-2' 'kubernetes-jenkins-gke-upgrade'
     # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
     NUM_MINIONS=3
     # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
@@ -1014,7 +1014,7 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-upgrade-gke-stable-1.2-step4-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-1.2' 'kubernetes-jenkins-gke-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-1-2' 'kubernetes-jenkins-gke-upgrade'
     # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
     NUM_MINIONS=3
     # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
@@ -1022,7 +1022,7 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-upgrade-gke-stable-1.2-step6-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-1.2' 'kubernetes-jenkins-gke-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-1-2' 'kubernetes-jenkins-gke-upgrade'
     # Starting in v1.2, NUM_MINIONS/NUM_NODES defaults to 3, so we have to deploy 3 here.
     NUM_MINIONS=3
     # Starting in v1.2, GKE defaults to deploying to n1-standard-2, and some tests require that.
