@@ -516,6 +516,7 @@ func (ReplicaSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetStatus = map[string]string{
+<<<<<<< f3ee61a1b4cf98bdba321c3250dddb950ca66423
 <<<<<<< 5470488aa560ab70b5e5240b7ad2f917a7a0251f
 	"":                     "ReplicaSetStatus represents the current status of a ReplicaSet.",
 	"replicas":             "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller",
@@ -526,6 +527,12 @@ var map_ReplicaSetStatus = map[string]string{
 	"replicas":           "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#what-is-a-replication-controller",
 	"observedGeneration": "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
 >>>>>>> Versioning docs and examples for release-1.2.
+=======
+	"":                     "ReplicaSetStatus represents the current status of a ReplicaSet.",
+	"replicas":             "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#what-is-a-replication-controller",
+	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
+	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
+>>>>>>> Merge pull request #22847 from caesarxuchao/matching-replicas
 }
 
 func (ReplicaSetStatus) SwaggerDoc() map[string]string {

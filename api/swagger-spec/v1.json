@@ -17632,7 +17632,8 @@
     "id": "v1.ReplicationControllerStatus",
     "description": "ReplicationControllerStatus represents the current status of a replication controller.",
     "required": [
-     "replicas"
+     "replicas",
+     "fullyLabeledReplicas"
     ],
     "properties": {
      "replicas": {

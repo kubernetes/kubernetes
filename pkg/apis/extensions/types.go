@@ -825,7 +825,11 @@ type ReplicaSetStatus struct {
 	Replicas int `json:"replicas"`
 
 	// The number of pods that have labels matching the labels of the pod template of the replicaset.
+<<<<<<< f3ee61a1b4cf98bdba321c3250dddb950ca66423
 	FullyLabeledReplicas int `json:"fullyLabeledReplicas,omitempty"`
+=======
+	FullyLabeledReplicas int `json:"fullyLabeledReplicas"`
+>>>>>>> Merge pull request #22847 from caesarxuchao/matching-replicas
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

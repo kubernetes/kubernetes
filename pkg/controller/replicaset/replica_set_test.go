@@ -961,7 +961,11 @@ func TestDeletionTimestamp(t *testing.T) {
 		t.Errorf("Couldn't get key for object %+v: %v", rs, err)
 	}
 	pod := newPodList(nil, 1, api.PodPending, labelMap, rs, "pod").Items[0]
+<<<<<<< f3ee61a1b4cf98bdba321c3250dddb950ca66423
 	pod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
+=======
+	pod.DeletionTimestamp = &unversioned.Time{time.Now()}
+>>>>>>> Merge pull request #22847 from caesarxuchao/matching-replicas
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 
 	// A pod added with a deletion timestamp should decrement deletions, not creations.
