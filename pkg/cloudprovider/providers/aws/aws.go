@@ -75,11 +75,6 @@ const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-lo
 // MaxReadThenCreateRetries sets the maximum number of attempts we will make
 const MaxReadThenCreateRetries = 30
 
-// Default volume type for newly created Volumes
-// TODO: Remove when user/admin can configure volume types and thus we don't
-// need hardcoded defaults.
-const DefaultVolumeType = "gp2"
-
 // Used to call aws_credentials.Init() just once
 var once sync.Once
 
@@ -159,9 +154,27 @@ type EC2Metadata interface {
 	GetMetadata(path string) (string, error)
 }
 
+// VolumeOptions.VolumeType values
+const (
+	// VolumeType value for SSD-class EBS
+	EBSVolumeTypeGP2 = "gp2"
+	// VolumeType value for HDD-class EBS
+	EBSVolumeTypeStandard = "standard"
+	// VolumeType value for IOPS-class EBS
+	EBSVolumeTypeIO1  = "io1"
+	DefaultVolumeType = EBSVolumeTypeGP2
+)
+
+// VolumeOptions are requirements on volume to create
 type VolumeOptions struct {
+	// VolumeOptions is size of the volume to create in GiB
 	CapacityGB int
-	Tags       *map[string]string
+	// Tags is map of tags to attach to the created volume.
+	Tags *map[string]string
+	// VolumeType is type of the volume to create. Either "gp2", "standard" or "io1".
+	VolumeType string
+	// IOPS is requested number I/O operations per second requirement for the volume to create.
+	IOPS int64
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -185,6 +198,9 @@ type Volumes interface {
 
 	// Get labels to apply to volume on creation
 	GetVolumeLabels(volumeName string) (map[string]string, error)
+
+	// Get volume properties, used only for testing of CreateDisk
+	GetDiskProperties(diskName string) (VolumeOptions, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -1375,7 +1391,14 @@ func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	request.AvailabilityZone = &createAZ
 	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
-	request.VolumeType = aws.String(DefaultVolumeType)
+	if volumeOptions.VolumeType != "" {
+		request.VolumeType = aws.String(volumeOptions.VolumeType)
+		if volumeOptions.VolumeType == EBSVolumeTypeIO1 && volumeOptions.IOPS != 0 {
+			request.Iops = aws.Int64(volumeOptions.IOPS)
+		}
+	} else {
+		request.VolumeType = aws.String(DefaultVolumeType)
+	}
 	response, err := s.ec2.CreateVolume(request)
 	if err != nil {
 		return "", err
@@ -1399,6 +1422,31 @@ func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 		}
 	}
 	return volumeName, nil
+}
+
+// Implements Volumes.GetDiskProperties
+func (aws *AWSCloud) GetDiskProperties(volumeName string) (VolumeOptions, error) {
+	opts := VolumeOptions{}
+
+	awsDisk, err := newAWSDisk(aws, volumeName)
+	if err != nil {
+		return opts, err
+	}
+
+	info, err := awsDisk.getInfo()
+	if err != nil {
+		return opts, err
+	}
+	if info.Size != nil {
+		opts.CapacityGB = int(*info.Size)
+	}
+	if info.Iops != nil {
+		opts.IOPS = *info.Iops
+	}
+	if info.VolumeType != nil {
+		opts.VolumeType = *info.VolumeType
+	}
+	return opts, nil
 }
 
 // Implements Volumes.DeleteDisk
