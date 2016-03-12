@@ -17,6 +17,8 @@ limitations under the License.
 package node
 
 import (
+	"strings"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
@@ -31,6 +33,20 @@ const (
 	RunningExecutorMessage = "node is running k8sm executor"
 )
 
+const uuidPrefix = "uuid_" // prefix for Condition.Reason of RunningExecutorCondition
+
+func ParseConditionReason(cond api.NodeCondition) (interface{}, bool) {
+	switch cond.Type {
+	case RunningExecutorCondition:
+		if strings.HasPrefix(cond.Reason, uuidPrefix) && len(cond.Reason) > len(uuidPrefix) {
+			return cond.Reason[len(uuidPrefix):], true
+		}
+	default:
+		// noop
+	}
+	return nil, false
+}
+
 // SetRunningExecutorCondition serves to associate an executor heartbeat w/ the
 // node (we only allow a single executor instance running per node anyway). The Reason
 // field is populated with `uuid={mesosContainerID}` in order to allow an external
@@ -42,7 +58,7 @@ func SetRunningExecutorCondition(mesosContainerID string, clock util.Clock) func
 			nodeCondition *api.NodeCondition
 		)
 
-		reasonCode := "uuid_" + mesosContainerID
+		reasonCode := uuidPrefix + mesosContainerID
 		for i := range node.Status.Conditions {
 			if node.Status.Conditions[i].Type == RunningExecutorCondition {
 				nodeCondition = &node.Status.Conditions[i]

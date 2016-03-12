@@ -132,21 +132,17 @@ func (s *KubeletExecutorServer) runExecutor(
 		}),
 	}
 	if s.containerID != "" {
-		// tag static pods with annotation that reflects the executor container UUID and the
-		// birth-time of the executor. useful for GC. it's important that this same UUID;ts
-		// is applied to ALL pods created by this executor. see contrib/mesos/pkg/controller/node
-		timestamp := time.Now().UTC().Format(time.RFC3339)
-		uuidAnnotator := podutil.FilterFunc(func(pod *api.Pod) (bool, error) {
-			podutil.Annotate(&pod.ObjectMeta, map[string]string{
-				meta.TimestampedExecutorContainerUUID: s.containerID + ";" + timestamp,
-			})
-			return true, nil
-		})
+		var (
+			// tag static pods with annotation that reflects the executor container UUID and the
+			// birth-time of the executor. useful for GC. it's important that this same UUID;ts
+			// is applied to ALL pods created by this executor. see contrib/mesos/pkg/controller/node
+			uuidAnnotator = podutil.UUIDAnnotator(s.containerID, time.Now())
 
-		// tag all pod containers with the containerID so that they can be properly GC'd by Mesos
-		userContainerEnv := podutil.Environment([]api.EnvVar{
-			{Name: envContainerID, Value: s.containerID},
-		})
+			// tag all pod containers with the containerID so that they can be properly GC'd by Mesos
+			userContainerEnv = podutil.Environment([]api.EnvVar{
+				{Name: envContainerID, Value: s.containerID},
+			})
+		)
 		staticPodFilters = append(staticPodFilters, uuidAnnotator, userContainerEnv)
 
 		// annotate non-static pods with a timestamped executor container UUID as well. we need to
