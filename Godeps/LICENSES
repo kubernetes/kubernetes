@@ -16168,8 +16168,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -16259,8 +16258,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -16273,9 +16279,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -16289,6 +16297,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -16308,10 +16317,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -16379,8 +16410,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -16470,8 +16500,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -16484,9 +16521,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -16500,6 +16539,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -16519,10 +16559,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -16590,8 +16652,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -16681,8 +16742,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -16695,9 +16763,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -16711,6 +16781,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -16730,10 +16801,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -16801,8 +16894,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -16892,8 +16984,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -16906,9 +17005,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -16922,6 +17023,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -16941,10 +17043,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -17012,8 +17136,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -17103,8 +17226,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -17117,9 +17247,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -17133,6 +17265,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -17152,10 +17285,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -17223,8 +17378,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -17314,8 +17468,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -17328,9 +17489,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -17344,6 +17507,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -17363,10 +17527,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -17434,8 +17620,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -17525,8 +17710,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -17539,9 +17731,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -17555,6 +17749,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -17574,10 +17769,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -17645,8 +17862,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -17736,8 +17952,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -17750,9 +17973,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -17766,6 +17991,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -17785,10 +18011,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -17856,8 +18104,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -17947,8 +18194,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -17961,9 +18215,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -17977,6 +18233,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -17996,10 +18253,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -18067,8 +18346,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -18158,8 +18436,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -18172,9 +18457,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -18188,6 +18475,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -18207,10 +18495,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -18278,8 +18588,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -18369,8 +18678,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -18383,9 +18699,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -18399,6 +18717,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -18418,10 +18737,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -18489,8 +18830,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -18580,8 +18920,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -18594,9 +18941,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -18610,6 +18959,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -18629,10 +18979,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -18700,8 +19072,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -18791,8 +19162,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -18805,9 +19183,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -18821,6 +19201,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -18840,10 +19221,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -18911,8 +19314,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -19002,8 +19404,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -19016,9 +19425,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -19032,6 +19443,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -19051,10 +19463,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -19122,8 +19556,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -19213,8 +19646,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -19227,9 +19667,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -19243,6 +19685,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -19262,10 +19705,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -19333,8 +19798,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -19424,8 +19888,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -19438,9 +19909,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -19454,6 +19927,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -19473,10 +19947,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -19544,8 +20040,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -19635,8 +20130,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -19649,9 +20151,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -19665,6 +20169,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -19684,10 +20189,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -19755,8 +20282,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -19846,8 +20372,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -19860,9 +20393,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -19876,6 +20411,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -19895,10 +20431,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -19966,8 +20524,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -20057,8 +20614,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -20071,9 +20635,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -20087,6 +20653,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -20106,10 +20673,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -20177,8 +20766,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -20268,8 +20856,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -20282,9 +20877,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -20298,6 +20895,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -20317,10 +20915,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -20388,8 +21008,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -20479,8 +21098,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -20493,9 +21119,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -20509,6 +21137,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -20528,10 +21157,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -20599,8 +21250,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -20690,8 +21340,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -20704,9 +21361,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -20720,6 +21379,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -20739,10 +21399,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -20810,8 +21492,7 @@ To use this software, you must:
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
 - Grab the code from the repository and install the proto package.
-  The simplest way is to run
-	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+  The simplest way is to run `go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`.
   The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
   defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
   compiler, protoc, to find it.
@@ -20901,8 +21582,15 @@ for a protocol buffer variable v:
 	with distinguished wrapper types for each possible field value.
   - Marshal and Unmarshal are functions to encode and decode the wire format.
 
+When the .proto file specifies `syntax="proto3"`, there are some differences:
+
+  - Non-repeated fields of non-message type are values instead of pointers.
+  - Getters are only generated for message and oneof fields.
+  - Enum types do not get an Enum method.
+
 Consider file test.proto, containing
 
+```proto
 	package example;
 	
 	enum FOO { X = 17; };
@@ -20915,9 +21603,11 @@ Consider file test.proto, containing
 	    required string RequiredField = 5;
 	  }
 	}
+```
 
 To create and play with a Test object from the example package,
 
+```go
 	package main
 
 	import (
@@ -20931,6 +21621,7 @@ To create and play with a Test object from the example package,
 		test := &example.Test {
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
+			Reps:  []int64{1, 2, 3},
 			Optionalgroup: &example.Test_OptionalGroup {
 				RequiredField: proto.String("good bye"),
 			},
@@ -20950,10 +21641,32 @@ To create and play with a Test object from the example package,
 		}
 		// etc.
 	}
+```
 
 
-gRPC Support
-============
+## Parameters ##
+
+To pass extra parameters to the plugin, use a comma-separated
+parameter list separated from the output directory by a colon:
+
+
+	protoc --gogo_out=plugins=grpc,import_path=mypackage:. *.proto
+
+
+- `import_prefix=xxx` - a prefix that is added onto the beginning of
+  all imports. Useful for things like generating protos in a
+  subdirectory, or regenerating vendored protobufs in-place.
+- `import_path=foo/bar` - used as the package if no input files
+  declare `go_package`. If it contains slashes, everything up to the
+  rightmost slash is ignored.
+- `plugins=plugin1+plugin2` - specifies the list of sub-plugins to
+  load. The only plugin in this repo is `grpc`.
+- `Mfoo/bar.proto=quux/shme` - declares that foo/bar.proto is
+  associated with Go package quux/shme.  This is subject to the
+  import_prefix parameter.
+
+## gRPC Support ##
+
 If a proto file specifies RPC services, protoc-gen-go can be instructed to
 generate code compatible with gRPC (http://www.grpc.io/). To do this, pass
 the `plugins` parameter to protoc-gen-go; the usual way is to insert it into
@@ -30113,10 +30826,21 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    See the License for the specific language governing permissions and
    limitations under the License.
 
-## Copyright and license
+Copyright 2012-2015 Docker, Inc.
 
-Code and documentation copyright 2014 Docker, inc. Code released under the Apache 2.0 license.
-Docs released under Creative commons.
+This product includes software developed at Docker, Inc. (http://www.docker.com).
+
+The following is courtesy of our legal counsel:
+
+
+Use and transfer of Docker may be subject to certain restrictions by the
+United States and other governments.  
+It is your responsibility to ensure that your use and/or transfer does not
+violate applicable laws. 
+
+For more information, please see http://www.bis.doc.gov
+
+See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
 
 ================================================================================
 = Godeps/_workspace/src/github.com/pborman/uuid licensed under: =
