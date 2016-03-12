@@ -2400,6 +2400,7 @@ func DeepCopy_api_ReplicationControllerSpec(in ReplicationControllerSpec, out *R
 
 func DeepCopy_api_ReplicationControllerStatus(in ReplicationControllerStatus, out *ReplicationControllerStatus, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
+	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }

@@ -7877,13 +7877,19 @@
     "id": "v1beta1.ReplicaSetStatus",
     "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
     "required": [
-     "replicas"
+     "replicas",
+     "fullyLabeledReplicas"
     ],
     "properties": {
      "replicas": {
       "type": "integer",
       "format": "int32",
       "description": "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#what-is-a-replication-controller"
+     },
+     "fullyLabeledReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of pods that have labels matching the labels of the pod template of the replicaset."
      },
      "observedGeneration": {
       "type": "integer",

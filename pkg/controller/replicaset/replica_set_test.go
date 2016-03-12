@@ -98,12 +98,12 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.Repl
 }
 
 // create count pods with the given phase for the given ReplicaSet (same selectors and namespace), and add them to the store.
-func newPodList(store cache.Store, count int, status api.PodPhase, labelMap map[string]string, rs *extensions.ReplicaSet) *api.PodList {
+func newPodList(store cache.Store, count int, status api.PodPhase, labelMap map[string]string, rs *extensions.ReplicaSet, name string) *api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		newPod := api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      fmt.Sprintf("pod%d", i),
+				Name:      fmt.Sprintf("%s%d", name, i),
 				Labels:    labelMap,
 				Namespace: rs.Namespace,
 			},
@@ -147,7 +147,7 @@ func TestSyncReplicaSetDoesNothing(t *testing.T) {
 	labelMap := map[string]string{"foo": "bar"}
 	rsSpec := newReplicaSet(2, labelMap)
 	manager.rsStore.Store.Add(rsSpec)
-	newPodList(manager.podStore.Store, 2, api.PodRunning, labelMap, rsSpec)
+	newPodList(manager.podStore.Store, 2, api.PodRunning, labelMap, rsSpec, "pod")
 
 	manager.podControl = &fakePodControl
 	manager.syncReplicaSet(getKey(rsSpec, t))
@@ -165,7 +165,7 @@ func TestSyncReplicaSetDeletes(t *testing.T) {
 	labelMap := map[string]string{"foo": "bar"}
 	rsSpec := newReplicaSet(1, labelMap)
 	manager.rsStore.Store.Add(rsSpec)
-	newPodList(manager.podStore.Store, 2, api.PodRunning, labelMap, rsSpec)
+	newPodList(manager.podStore.Store, 2, api.PodRunning, labelMap, rsSpec, "pod")
 
 	manager.syncReplicaSet(getKey(rsSpec, t))
 	validateSyncReplicaSet(t, &fakePodControl, 0, 1)
@@ -189,7 +189,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	labelMap := map[string]string{"foo": "bar"}
 	rsSpec := newReplicaSet(1, labelMap)
 	manager.rsStore.Store.Add(rsSpec)
-	pods := newPodList(nil, 1, api.PodRunning, labelMap, rsSpec)
+	pods := newPodList(nil, 1, api.PodRunning, labelMap, rsSpec, "pod")
 	manager.deletePod(cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
 
 	go manager.worker()
@@ -239,7 +239,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	rs := newReplicaSet(activePods, labelMap)
 	manager.rsStore.Store.Add(rs)
 	rs.Status = extensions.ReplicaSetStatus{Replicas: activePods}
-	newPodList(manager.podStore.Store, activePods, api.PodRunning, labelMap, rs)
+	newPodList(manager.podStore.Store, activePods, api.PodRunning, labelMap, rs, "pod")
 
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -279,11 +279,14 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	// Insufficient number of pods in the system, and Status.Replicas is wrong;
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
 	labelMap := map[string]string{"foo": "bar"}
+	extraLabelMap := map[string]string{"foo": "bar", "extraKey": "extraValue"}
 	rs := newReplicaSet(5, labelMap)
+	rs.Spec.Template.Labels = extraLabelMap
 	manager.rsStore.Store.Add(rs)
-	rs.Status = extensions.ReplicaSetStatus{Replicas: 2, ObservedGeneration: 0}
+	rs.Status = extensions.ReplicaSetStatus{Replicas: 2, FullyLabeledReplicas: 6, ObservedGeneration: 0}
 	rs.Generation = 1
-	newPodList(manager.podStore.Store, 4, api.PodRunning, labelMap, rs)
+	newPodList(manager.podStore.Store, 2, api.PodRunning, labelMap, rs, "pod")
+	newPodList(manager.podStore.Store, 2, api.PodRunning, extraLabelMap, rs, "podWithExtraLabel")
 
 	// This response body is just so we don't err out decoding the http response
 	response := runtime.EncodeOrDie(testapi.Extensions.Codec(), &extensions.ReplicaSet{})
@@ -295,8 +298,10 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	manager.syncReplicaSet(getKey(rs, t))
 
 	// 1. Status.Replicas should go up from 2->4 even though we created 5-4=1 pod.
-	// 2. Every update to the status should include the Generation of the spec.
-	rs.Status = extensions.ReplicaSetStatus{Replicas: 4, ObservedGeneration: 1}
+	// 2. Status.FullyLabeledReplicas should equal to the number of pods that
+	// has the extra labels, i.e., 2.
+	// 3. Every update to the status should include the Generation of the spec.
+	rs.Status = extensions.ReplicaSetStatus{Replicas: 4, FullyLabeledReplicas: 2, ObservedGeneration: 1}
 
 	decRc := runtime.EncodeOrDie(testapi.Extensions.Codec(), rs)
 	fakeHandler.ValidateRequest(t, testapi.Extensions.ResourcePath(replicaSetResourceName(), rs.Namespace, rs.Name)+"/status", "PUT", &decRc)
@@ -321,7 +326,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	labelMap := map[string]string{"foo": "bar"}
 	rsSpec := newReplicaSet(2, labelMap)
 	manager.rsStore.Store.Add(rsSpec)
-	newPodList(manager.podStore.Store, 1, api.PodRunning, labelMap, rsSpec)
+	newPodList(manager.podStore.Store, 1, api.PodRunning, labelMap, rsSpec, "pod")
 
 	// Creates a replica and sets expectations
 	rsSpec.Status.Replicas = 1
@@ -502,7 +507,7 @@ func TestWatchPods(t *testing.T) {
 	go manager.podController.Run(stopCh)
 	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
-	pods := newPodList(nil, 1, api.PodRunning, labelMap, testRSSpec)
+	pods := newPodList(nil, 1, api.PodRunning, labelMap, testRSSpec, "pod")
 	testPod := pods.Items[0]
 	testPod.Status.Phase = api.PodFailed
 	fakeWatch.Add(&testPod)
@@ -544,7 +549,7 @@ func TestUpdatePods(t *testing.T) {
 	manager.rsStore.Store.Add(&testRSSpec2)
 
 	// Put one pod in the podStore
-	pod1 := newPodList(manager.podStore.Store, 1, api.PodRunning, labelMap1, testRSSpec1).Items[0]
+	pod1 := newPodList(manager.podStore.Store, 1, api.PodRunning, labelMap1, testRSSpec1, "pod").Items[0]
 	pod2 := pod1
 	pod2.Labels = labelMap2
 
@@ -583,7 +588,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	rs := newReplicaSet(1, labelMap)
 	manager.rsStore.Store.Add(rs)
 	rs.Status = extensions.ReplicaSetStatus{Replicas: 2}
-	newPodList(manager.podStore.Store, 1, api.PodRunning, labelMap, rs)
+	newPodList(manager.podStore.Store, 1, api.PodRunning, labelMap, rs, "pod")
 
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -618,7 +623,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	})
 	fakeRSClient := fakeClient.Extensions().ReplicaSets("default")
 	numReplicas := 10
-	updateReplicaCount(fakeRSClient, *rs, numReplicas)
+	updateReplicaCount(fakeRSClient, *rs, numReplicas, 0)
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
 		if a.GetResource() != "replicasets" {
@@ -666,7 +671,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	manager.rsStore.Store.Add(rsSpec)
 
 	expectedPods := 0
-	pods := newPodList(nil, numReplicas, api.PodPending, labelMap, rsSpec)
+	pods := newPodList(nil, numReplicas, api.PodPending, labelMap, rsSpec, "pod")
 
 	rsKey, err := controller.KeyFunc(rsSpec)
 	if err != nil {
@@ -783,7 +788,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 			t.Fatalf("Unexpected number of active pods, expected %d, got %d", rsSpec.Spec.Replicas, activePods)
 		}
 		// Replenish the pod list, since we cut it down sizing up
-		pods = newPodList(nil, replicas, api.PodRunning, labelMap, rsSpec)
+		pods = newPodList(nil, replicas, api.PodRunning, labelMap, rsSpec, "pod")
 	}
 }
 
@@ -816,7 +821,7 @@ func TestRSSyncExpectations(t *testing.T) {
 	labelMap := map[string]string{"foo": "bar"}
 	rsSpec := newReplicaSet(2, labelMap)
 	manager.rsStore.Store.Add(rsSpec)
-	pods := newPodList(nil, 2, api.PodPending, labelMap, rsSpec)
+	pods := newPodList(nil, 2, api.PodPending, labelMap, rsSpec, "pod")
 	manager.podStore.Store.Add(&pods.Items[0])
 	postExpectationsPod := pods.Items[1]
 
@@ -932,7 +937,7 @@ func TestOverlappingRSs(t *testing.T) {
 			manager.rsStore.Store.Add(shuffledControllers[j])
 		}
 		// Add a pod and make sure only the oldest ReplicaSet is synced
-		pods := newPodList(nil, 1, api.PodPending, labelMap, controllers[0])
+		pods := newPodList(nil, 1, api.PodPending, labelMap, controllers[0], "pod")
 		rsKey := getKey(controllers[0], t)
 
 		manager.addPod(&pods.Items[0])
@@ -955,7 +960,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	if err != nil {
 		t.Errorf("Couldn't get key for object %+v: %v", rs, err)
 	}
-	pod := newPodList(nil, 1, api.PodPending, labelMap, rs).Items[0]
+	pod := newPodList(nil, 1, api.PodPending, labelMap, rs, "pod").Items[0]
 	pod.DeletionTimestamp = &unversioned.Time{time.Now()}
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 
@@ -975,7 +980,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	// An update from no deletion timestamp to having one should be treated
 	// as a deletion.
-	oldPod := newPodList(nil, 1, api.PodPending, labelMap, rs).Items[0]
+	oldPod := newPodList(nil, 1, api.PodPending, labelMap, rs, "pod").Items[0]
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 	manager.updatePod(&oldPod, &pod)
 
