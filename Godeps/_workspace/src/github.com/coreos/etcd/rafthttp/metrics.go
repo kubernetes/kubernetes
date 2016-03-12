@@ -23,12 +23,17 @@ import (
 )
 
 var (
-	msgSentDuration = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	// TODO: create a separate histogram for recording
+	// snapshot sending metric. snapshot can be large and
+	// take a long time to send. So it needs a different
+	// time range than other type of messages.
+	msgSentDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: "etcd",
 			Subsystem: "rafthttp",
-			Name:      "message_sent_latency_microseconds",
+			Name:      "message_sent_latency_seconds",
 			Help:      "message sent latency distributions.",
+			Buckets:   prometheus.ExponentialBuckets(0.0005, 2, 13),
 		},
 		[]string{"sendingType", "remoteID", "msgType"},
 	)
@@ -53,7 +58,7 @@ func reportSentDuration(sendingType string, m raftpb.Message, duration time.Dura
 	if isLinkHeartbeatMessage(m) {
 		typ = "MsgLinkHeartbeat"
 	}
-	msgSentDuration.WithLabelValues(sendingType, types.ID(m.To).String(), typ).Observe(float64(duration.Nanoseconds() / int64(time.Microsecond)))
+	msgSentDuration.WithLabelValues(sendingType, types.ID(m.To).String(), typ).Observe(float64(duration) / float64(time.Second))
 }
 
 func reportSentFailure(sendingType string, m raftpb.Message) {

@@ -19,15 +19,25 @@ import (
 	"net/http"
 
 	"github.com/coreos/etcd/etcdserver"
+	"github.com/coreos/etcd/lease/leasehttp"
 	"github.com/coreos/etcd/rafthttp"
 )
 
 const (
 	peerMembersPrefix = "/members"
+	leasesPrefix      = "/leases"
 )
 
-// NewPeerHandler generates an http.Handler to handle etcd peer (raft) requests.
-func NewPeerHandler(cluster etcdserver.Cluster, raftHandler http.Handler) http.Handler {
+// NewPeerHandler generates an http.Handler to handle etcd peer requests.
+func NewPeerHandler(s *etcdserver.EtcdServer) http.Handler {
+	var lh http.Handler
+	if l := s.Lessor(); l != nil {
+		lh = leasehttp.NewHandler(l)
+	}
+	return newPeerHandler(s.Cluster(), s.RaftHandler(), lh)
+}
+
+func newPeerHandler(cluster etcdserver.Cluster, raftHandler http.Handler, leaseHandler http.Handler) http.Handler {
 	mh := &peerMembersHandler{
 		cluster: cluster,
 	}
@@ -37,6 +47,9 @@ func NewPeerHandler(cluster etcdserver.Cluster, raftHandler http.Handler) http.H
 	mux.Handle(rafthttp.RaftPrefix, raftHandler)
 	mux.Handle(rafthttp.RaftPrefix+"/", raftHandler)
 	mux.Handle(peerMembersPrefix, mh)
+	if leaseHandler != nil {
+		mux.Handle(leasesPrefix, leaseHandler)
+	}
 	mux.HandleFunc(versionPath, versionHandler(cluster, serveVersion))
 	return mux
 }

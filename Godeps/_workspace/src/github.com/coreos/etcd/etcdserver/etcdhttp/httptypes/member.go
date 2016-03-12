@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package httptypes defines how etcd's HTTP API entities are serialized to and
+// deserialized from JSON.
 package httptypes
 
 import (

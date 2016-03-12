@@ -35,6 +35,7 @@ var (
 	ErrNoEndpoints           = errors.New("client: no endpoints available")
 	ErrTooManyRedirects      = errors.New("client: too many redirects")
 	ErrClusterUnavailable    = errors.New("client: etcd cluster is unavailable or misconfigured")
+	ErrNoLeaderEndpoint      = errors.New("client: no leader endpoint available")
 	errTooManyRedirectChecks = errors.New("client: too many redirect checks")
 )
 
@@ -48,6 +49,29 @@ var DefaultTransport CancelableTransport = &http.Transport{
 	}).Dial,
 	TLSHandshakeTimeout: 10 * time.Second,
 }
+
+type EndpointSelectionMode int
+
+const (
+	// EndpointSelectionRandom is the default value of the 'SelectionMode'.
+	// As the name implies, the client object will pick a node from the members
+	// of the cluster in a random fashion. If the cluster has three members, A, B,
+	// and C, the client picks any node from its three members as its request
+	// destination.
+	EndpointSelectionRandom EndpointSelectionMode = iota
+
+	// If 'SelectionMode' is set to 'EndpointSelectionPrioritizeLeader',
+	// requests are sent directly to the cluster leader. This reduces
+	// forwarding roundtrips compared to making requests to etcd followers
+	// who then forward them to the cluster leader. In the event of a leader
+	// failure, however, clients configured this way cannot prioritize among
+	// the remaining etcd followers. Therefore, when a client sets 'SelectionMode'
+	// to 'EndpointSelectionPrioritizeLeader', it must use 'client.AutoSync()' to
+	// maintain its knowledge of current cluster state.
+	//
+	// This mode should be used with Client.AutoSync().
+	EndpointSelectionPrioritizeLeader
+)
 
 type Config struct {
 	// Endpoints defines a set of URLs (schemes, hosts and ports only)
@@ -74,7 +98,7 @@ type Config struct {
 	// CheckRedirect specifies the policy for handling HTTP redirects.
 	// If CheckRedirect is not nil, the Client calls it before
 	// following an HTTP redirect. The sole argument is the number of
-	// requests that have alrady been made. If CheckRedirect returns
+	// requests that have already been made. If CheckRedirect returns
 	// an error, Client.Do will not make any further requests and return
 	// the error back it to the caller.
 	//
@@ -107,6 +131,10 @@ type Config struct {
 	//
 	// A HeaderTimeoutPerRequest of zero means no timeout.
 	HeaderTimeoutPerRequest time.Duration
+
+	// SelectionMode is an EndpointSelectionMode enum that specifies the
+	// policy for choosing the etcd cluster node to which requests are sent.
+	SelectionMode EndpointSelectionMode
 }
 
 func (cfg *Config) transport() CancelableTransport {
@@ -177,6 +205,7 @@ func New(cfg Config) (Client, error) {
 	c := &httpClusterClient{
 		clientFactory: newHTTPClientFactory(cfg.transport(), cfg.checkRedirect(), cfg.HeaderTimeoutPerRequest),
 		rand:          rand.New(rand.NewSource(int64(time.Now().Nanosecond()))),
+		selectionMode: cfg.SelectionMode,
 	}
 	if cfg.Username != "" {
 		c.credentials = &credentials{
@@ -224,7 +253,18 @@ type httpClusterClient struct {
 	pinned        int
 	credentials   *credentials
 	sync.RWMutex
-	rand *rand.Rand
+	rand          *rand.Rand
+	selectionMode EndpointSelectionMode
+}
+
+func (c *httpClusterClient) getLeaderEndpoint() (string, error) {
+	mAPI := NewMembersAPI(c)
+	leader, err := mAPI.Leader(context.Background())
+	if err != nil {
+		return "", err
+	}
+
+	return leader.ClientURLs[0], nil // TODO: how to handle multiple client URLs?
 }
 
 func (c *httpClusterClient) SetEndpoints(eps []string) error {
@@ -241,9 +281,28 @@ func (c *httpClusterClient) SetEndpoints(eps []string) error {
 		neps[i] = *u
 	}
 
-	c.endpoints = shuffleEndpoints(c.rand, neps)
-	// TODO: pin old endpoint if possible, and rebalance when new endpoint appears
-	c.pinned = 0
+	switch c.selectionMode {
+	case EndpointSelectionRandom:
+		c.endpoints = shuffleEndpoints(c.rand, neps)
+		c.pinned = 0
+	case EndpointSelectionPrioritizeLeader:
+		c.endpoints = neps
+		lep, err := c.getLeaderEndpoint()
+		if err != nil {
+			return ErrNoLeaderEndpoint
+		}
+
+		for i := range c.endpoints {
+			if c.endpoints[i].String() == lep {
+				c.pinned = i
+				break
+			}
+		}
+		// If endpoints doesn't have the lu, just keep c.pinned = 0.
+		// Forwarding between follower and leader would be required but it works.
+	default:
+		return errors.New(fmt.Sprintf("invalid endpoint selection mode: %d", c.selectionMode))
+	}
 
 	return nil
 }

@@ -17,10 +17,7 @@ package rafthttp
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io/ioutil"
-	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -30,7 +27,6 @@ import (
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/raft"
 	"github.com/coreos/etcd/raft/raftpb"
-	"github.com/coreos/etcd/version"
 )
 
 const (
@@ -48,7 +44,7 @@ type pipeline struct {
 	from, to types.ID
 	cid      types.ID
 
-	tr     http.RoundTripper
+	tr     *Transport
 	picker *urlPicker
 	status *peerStatus
 	fs     *stats.FollowerStats
@@ -61,7 +57,7 @@ type pipeline struct {
 	stopc chan struct{}
 }
 
-func newPipeline(tr http.RoundTripper, picker *urlPicker, from, to, cid types.ID, status *peerStatus, fs *stats.FollowerStats, r Raft, errorc chan error) *pipeline {
+func newPipeline(tr *Transport, picker *urlPicker, from, to, cid types.ID, status *peerStatus, fs *stats.FollowerStats, r Raft, errorc chan error) *pipeline {
 	p := &pipeline{
 		from:   from,
 		to:     to,
@@ -129,21 +125,10 @@ func (p *pipeline) handle() {
 // error on any failure.
 func (p *pipeline) post(data []byte) (err error) {
 	u := p.picker.pick()
-	uu := u
-	uu.Path = RaftPrefix
-	req, err := http.NewRequest("POST", uu.String(), bytes.NewBuffer(data))
-	if err != nil {
-		p.picker.unreachable(u)
-		return err
-	}
-	req.Header.Set("Content-Type", "application/protobuf")
-	req.Header.Set("X-Server-From", p.from.String())
-	req.Header.Set("X-Server-Version", version.Version)
-	req.Header.Set("X-Min-Cluster-Version", version.MinClusterVersion)
-	req.Header.Set("X-Etcd-Cluster-ID", p.cid.String())
+	req := createPostRequest(u, RaftPrefix, bytes.NewBuffer(data), "application/protobuf", p.tr.URLs, p.from, p.cid)
 
 	done := make(chan struct{}, 1)
-	cancel := httputil.RequestCanceler(p.tr, req)
+	cancel := httputil.RequestCanceler(p.tr.pipelineRt, req)
 	go func() {
 		select {
 		case <-done:
@@ -153,7 +138,7 @@ func (p *pipeline) post(data []byte) (err error) {
 		}
 	}()
 
-	resp, err := p.tr.RoundTrip(req)
+	resp, err := p.tr.pipelineRt.RoundTrip(req)
 	done <- struct{}{}
 	if err != nil {
 		p.picker.unreachable(u)
@@ -166,31 +151,18 @@ func (p *pipeline) post(data []byte) (err error) {
 	}
 	resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusPreconditionFailed:
-		switch strings.TrimSuffix(string(b), "\n") {
-		case errIncompatibleVersion.Error():
-			plog.Errorf("request sent was ignored by peer %s (server version incompatible)", p.to)
-			return errIncompatibleVersion
-		case errClusterIDMismatch.Error():
-			plog.Errorf("request sent was ignored (cluster ID mismatch: remote[%s]=%s, local=%s)",
-				p.to, resp.Header.Get("X-Etcd-Cluster-ID"), p.cid)
-			return errClusterIDMismatch
-		default:
-			return fmt.Errorf("unhandled error %q when precondition failed", string(b))
+	err = checkPostResponse(resp, b, req, p.to)
+	if err != nil {
+		p.picker.unreachable(u)
+		// errMemberRemoved is a critical error since a removed member should
+		// always be stopped. So we use reportCriticalError to report it to errorc.
+		if err == errMemberRemoved {
+			reportCriticalError(err, p.errorc)
 		}
-	case http.StatusForbidden:
-		err := fmt.Errorf("the member has been permanently removed from the cluster")
-		select {
-		case p.errorc <- err:
-		default:
-		}
-		return nil
-	case http.StatusNoContent:
-		return nil
-	default:
-		return fmt.Errorf("unexpected http status %s while posting to %q", http.StatusText(resp.StatusCode), req.URL.String())
+		return err
 	}
+
+	return nil
 }
 
 // waitSchedule waits other goroutines to be scheduled for a while

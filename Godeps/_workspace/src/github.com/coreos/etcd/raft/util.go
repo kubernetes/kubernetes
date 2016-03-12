@@ -47,7 +47,7 @@ func max(a, b uint64) uint64 {
 }
 
 func IsLocalMsg(m pb.Message) bool {
-	return m.Type == pb.MsgHup || m.Type == pb.MsgBeat || m.Type == pb.MsgUnreachable || m.Type == pb.MsgSnapStatus
+	return m.Type == pb.MsgHup || m.Type == pb.MsgBeat || m.Type == pb.MsgUnreachable || m.Type == pb.MsgSnapStatus || m.Type == pb.MsgCheckQuorum
 }
 
 func IsResponseMsg(m pb.Message) bool {
@@ -62,16 +62,22 @@ type EntryFormatter func([]byte) string
 // Message for debugging.
 func DescribeMessage(m pb.Message, f EntryFormatter) string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "%x->%x %s Term:%d Log:%d/%d", m.From, m.To, m.Type, m.Term, m.LogTerm, m.Index)
+	fmt.Fprintf(&buf, "%x->%x %v Term:%d Log:%d/%d", m.From, m.To, m.Type, m.Term, m.LogTerm, m.Index)
 	if m.Reject {
 		fmt.Fprintf(&buf, " Rejected")
+		if m.RejectHint != 0 {
+			fmt.Fprintf(&buf, "(Hint:%d)", m.RejectHint)
+		}
 	}
 	if m.Commit != 0 {
 		fmt.Fprintf(&buf, " Commit:%d", m.Commit)
 	}
 	if len(m.Entries) > 0 {
 		fmt.Fprintf(&buf, " Entries:[")
-		for _, e := range m.Entries {
+		for i, e := range m.Entries {
+			if i != 0 {
+				buf.WriteString(", ")
+			}
 			buf.WriteString(DescribeEntry(e, f))
 		}
 		fmt.Fprintf(&buf, "]")

@@ -14,6 +14,7 @@
 		Request
 		Metadata
 		InternalRaftRequest
+		EmptyResponse
 		ResponseHeader
 		RangeRequest
 		RangeResponse
@@ -28,6 +29,57 @@
 		TxnResponse
 		CompactionRequest
 		CompactionResponse
+		HashRequest
+		HashResponse
+		WatchRequest
+		WatchCreateRequest
+		WatchCancelRequest
+		WatchResponse
+		LeaseCreateRequest
+		LeaseCreateResponse
+		LeaseRevokeRequest
+		LeaseRevokeResponse
+		LeaseKeepAliveRequest
+		LeaseKeepAliveResponse
+		Member
+		MemberAddRequest
+		MemberAddResponse
+		MemberRemoveRequest
+		MemberRemoveResponse
+		MemberUpdateRequest
+		MemberUpdateResponse
+		MemberListRequest
+		MemberListResponse
+		DefragmentRequest
+		DefragmentResponse
+		AuthEnableRequest
+		AuthDisableRequest
+		AuthenticateRequest
+		UserAddRequest
+		UserGetRequest
+		UserDeleteRequest
+		UserChangePasswordRequest
+		UserGrantRequest
+		UserRevokeRequest
+		RoleAddRequest
+		RoleGetRequest
+		RoleDeleteRequest
+		RoleGrantRequest
+		RoleRevokeRequest
+		AuthEnableResponse
+		AuthDisableResponse
+		AuthenticateResponse
+		UserAddResponse
+		UserGetResponse
+		UserDeleteResponse
+		UserChangePasswordResponse
+		UserGrantResponse
+		UserRevokeResponse
+		RoleAddResponse
+		RoleGetResponse
+		RoleDeleteResponse
+		RoleGrantResponse
+		RoleRevokeResponse
 */
 package etcdserverpb
 
@@ -63,6 +115,7 @@ type Request struct {
 	Quorum           bool   `protobuf:"varint,14,opt,name=Quorum" json:"Quorum"`
 	Time             int64  `protobuf:"varint,15,opt,name=Time" json:"Time"`
 	Stream           bool   `protobuf:"varint,16,opt,name=Stream" json:"Stream"`
+	Refresh          *bool  `protobuf:"varint,17,opt,name=Refresh" json:"Refresh,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
 
@@ -190,6 +243,18 @@ func (m *Request) MarshalTo(data []byte) (int, error) {
 		data[i] = 0
 	}
 	i++
+	if m.Refresh != nil {
+		data[i] = 0x88
+		i++
+		data[i] = 0x1
+		i++
+		if *m.Refresh {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
 	if m.XXX_unrecognized != nil {
 		i += copy(data[i:], m.XXX_unrecognized)
 	}
@@ -275,6 +340,9 @@ func (m *Request) Size() (n int) {
 	n += 2
 	n += 1 + sovEtcdserver(uint64(m.Time))
 	n += 3
+	if m.Refresh != nil {
+		n += 3
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -686,6 +754,27 @@ func (m *Request) Unmarshal(data []byte) error {
 				}
 			}
 			m.Stream = bool(v != 0)
+		case 17:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Refresh", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEtcdserver
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Refresh = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipEtcdserver(data[iNdEx:])
