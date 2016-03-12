@@ -19,17 +19,20 @@ limitations under the License.
 package replicaset
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 // updateReplicaCount attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
-func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.ReplicaSet, numReplicas int) (updateErr error) {
+func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.ReplicaSet, numReplicas, numFullyLabeledReplicas int) (updateErr error) {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
 	if rs.Status.Replicas == numReplicas &&
+		rs.Status.FullyLabeledReplicas == numFullyLabeledReplicas &&
 		rs.Generation == rs.Status.ObservedGeneration {
 		return nil
 	}
@@ -41,10 +44,12 @@ func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.Repli
 
 	var getErr error
 	for i, rs := 0, &rs; ; i++ {
-		glog.V(4).Infof("Updating replica count for ReplicaSet: %v, %d->%d (need %d), sequence No: %v->%v",
-			rs.Name, rs.Status.Replicas, numReplicas, rs.Spec.Replicas, rs.Status.ObservedGeneration, generation)
+		glog.V(4).Infof(fmt.Sprintf("Updating replica count for ReplicaSet: %s/%s, ", rs.Namespace, rs.Name) +
+			fmt.Sprintf("replicas %d->%d (need %d), ", rs.Status.Replicas, numReplicas, rs.Spec.Replicas) +
+			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rs.Status.FullyLabeledReplicas, numFullyLabeledReplicas) +
+			fmt.Sprintf("sequence No: %v->%v", rs.Status.ObservedGeneration, generation))
 
-		rs.Status = extensions.ReplicaSetStatus{Replicas: numReplicas, ObservedGeneration: generation}
+		rs.Status = extensions.ReplicaSetStatus{Replicas: numReplicas, FullyLabeledReplicas: numFullyLabeledReplicas, ObservedGeneration: generation}
 		_, updateErr = rsClient.UpdateStatus(rs)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr
