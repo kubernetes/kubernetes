@@ -77,6 +77,12 @@ $kube_provider_boxes = {
       :box_name => 'kube-fedora23',
       :box_url => 'https://opscode-vm-bento.s3.amazonaws.com/vagrant/vmware/opscode_fedora-23_chef-provisionerless.box'
     }
+  },
+  :vsphere => {
+    'fedora' => {
+      :box_name => 'vsphere-dummy',
+      :box_url => 'http://10.57.32.6:8081/artifactory/simple/cisco-releases/boxes/vsphere/vsphere-dummy.box'
+    }
   }
 }
 
@@ -202,6 +208,67 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         exit
       }).strip
     end
+
+    # Then try vsphere
+    config.vm.provider :vsphere do |vsphere, override|
+      # Check if plugin installed
+      # https://github.com/nsidc/vagrant-vsphere
+      if Vagrant.has_plugin?("vagrant-vsphere") then
+        setvmboxandurl(override, :vsphere)
+
+         #config.vm.hostname = ENV['MASTER_NAME']
+
+         config.ssh.username = ENV['MASTER_USER']
+         config.ssh.password = ENV['MASTER_PASSWD']
+
+         config.ssh.pty = true
+         config.ssh.insert_key = true
+         #config.ssh.private_key_path = '~/.ssh/id_rsa_vsphere'
+        
+        # Don't attempt to update the tools on the image (this can
+        # be done manually if necessary)
+        # vsphere.update_guest_tools = false # v.customize ['set', :id, '--tools-autoupdate', 'off']
+
+        # The vSphere host we're going to connect to
+        vsphere.host = ENV['VAGRANT_VSPHERE_URL']
+
+        # The ESX host for the new VM
+        vsphere.compute_resource_name = ENV['VAGRANT_VSPHERE_RESOURCE_POOL']
+
+        # The resource pool for the new VM
+        #vsphere.resource_pool_name = 'Comp'
+
+        # path to folder where new VM should be created, if not specified template's parent folder will be used
+        vsphere.vm_base_path = ENV['VAGRANT_VSPHERE_BASE_PATH']
+
+        # The template we're going to clone
+        vsphere.template_name = ENV['VAGRANT_VSPHERE_TEMPLATE_NAME']
+
+        # The name of the new machine
+        #vsphere.name = ENV['MASTER_NAME']
+
+        # vSphere login
+        vsphere.user = ENV['VAGRANT_VSPHERE_USERNAME']
+
+        # vSphere password
+        vsphere.password = ENV['VAGRANT_VSPHERE_PASSWORD']
+
+        # cpu count
+        vsphere.cpu_count = $vm_cpus
+
+        # memory in MB
+        vsphere.memory_mb = vm_mem
+
+        # If you don't have SSL configured correctly, set this to 'true'
+        vsphere.insecure = ENV['VAGRANT_VSPHERE_INSECURE']
+
+
+      else
+        STDERR.puts("vagrant-vsphere plugin is not installed! Run 'vagrant plugin install vagrant-vsphere' For details please check the web page https://github.com/nsidc/vagrant-vsphere")
+        exit(false)
+      end
+    end
+
 
     # Don't attempt to update Virtualbox Guest Additions (requires gcc)
     if Vagrant.has_plugin?("vagrant-vbguest") then
