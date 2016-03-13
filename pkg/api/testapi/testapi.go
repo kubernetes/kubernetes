@@ -232,7 +232,7 @@ func (g TestGroup) ResourcePath(resource, namespace, name string) string {
 }
 
 func (g TestGroup) RESTMapper() meta.RESTMapper {
-	return registered.GroupOrDie(g.externalGroupVersion.Group).RESTMapper
+	return registered.RESTMapper()
 }
 
 // Get codec based on runtime.Object
