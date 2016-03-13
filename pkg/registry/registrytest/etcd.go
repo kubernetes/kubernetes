@@ -37,7 +37,7 @@ import (
 )
 
 func NewEtcdStorage(t *testing.T, group string) (storage.Interface, *etcdtesting.EtcdTestServer) {
-	server := etcdtesting.NewEtcdTestClientServer(t)
+	server := etcdtesting.NewUnsecuredEtcdTestClientServer(t)
 	storage := etcdstorage.NewEtcdStorage(server.Client, testapi.Groups[group].StorageCodec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 	return storage, server
 }
