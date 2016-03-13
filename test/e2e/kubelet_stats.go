@@ -575,7 +575,7 @@ func (r *resourceMonitor) LogLatest() {
 	if err != nil {
 		Logf("%v", err)
 	}
-	Logf(r.FormatResourceUsage(summary))
+	Logf("%s", r.FormatResourceUsage(summary))
 }
 
 func (r *resourceMonitor) FormatResourceUsage(s resourceUsagePerNode) string {
@@ -647,7 +647,7 @@ func (r *resourceMonitor) FormatCPUSummary(summary nodesCPUSummary) string {
 
 func (r *resourceMonitor) LogCPUSummary() {
 	summary := r.GetCPUSummary()
-	Logf(r.FormatCPUSummary(summary))
+	Logf("%s", r.FormatCPUSummary(summary))
 }
 
 func (r *resourceMonitor) GetCPUSummary() nodesCPUSummary {
