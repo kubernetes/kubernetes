@@ -32,7 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apiserver"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -130,6 +132,26 @@ func TestNew(t *testing.T) {
 	assert.Equal(masterDialerFunc, configDialerFunc)
 
 	assert.Equal(master.ProxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
+}
+
+// TestNamespaceSubresources ensures the namespace subresource parsing in apiserver/handlers.go doesn't drift
+func TestNamespaceSubresources(t *testing.T) {
+	master, etcdserver, _, _ := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	expectedSubresources := apiserver.NamespaceSubResourcesForTest
+	foundSubresources := sets.NewString()
+
+	for k := range master.v1ResourcesStorage {
+		parts := strings.Split(k, "/")
+		if len(parts) == 2 && parts[0] == "namespaces" {
+			foundSubresources.Insert(parts[1])
+		}
+	}
+
+	if !reflect.DeepEqual(expectedSubresources.List(), foundSubresources.List()) {
+		t.Errorf("Expected namespace subresources %#v, got %#v. Update apiserver/handlers.go#namespaceSubresources", expectedSubresources.List(), foundSubresources.List())
+	}
 }
 
 // TestGetServersToValidate verifies the unexported getServersToValidate function
