@@ -21,6 +21,7 @@ set -o pipefail
 # Set the host name explicitly
 # See: https://github.com/mitchellh/vagrant/issues/2430
 hostnamectl set-hostname ${NODE_NAME}
+if_to_edit=""
 
 if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=23 ]]; then
   # Disable network interface being managed by Network Manager (needed for Fedora 21+)
@@ -33,7 +34,13 @@ if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=23 ]]; then
   systemctl restart network
 fi
 
+# needed for vsphere support
+# handle the case when no 'VAGRANT-BEGIN' comment was defined in network-scripts
+# set the NETWORK_IF_NAME to have a default value in such case
 NETWORK_IF_NAME=`echo ${if_to_edit} | awk -F- '{ print $3 }'`
+if [[ -z "$NETWORK_IF_NAME" ]]; then
+  NETWORK_IF_NAME=${DEFAULT_NETWORK_IF_NAME}
+fi
 
 # Setup hosts file to support ping by hostname to master
 if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
