@@ -144,7 +144,6 @@ script
 		--system-cgroups=/system \
 		--runtime-cgroups=/docker-daemon \
 		--kubelet-cgroups=/kubelet \
-		--babysit-daemons=true \
 		${KUBELET_CMD_FLAGS} 1>>/var/log/kubelet.log 2>&1
 end script
 
@@ -161,10 +160,7 @@ Content-Disposition: attachment; filename="kube-docker.conf"
 
 description "Restart docker daemon"
 
-# The condition "stopped kube-install-additional-packages" is to avoid
-# breaking nsenter installation, which is through a docker container.
-# It can be removed if we find a better way to install nsenter.
-start on started kubelet and stopped kube-install-additional-packages
+start on started kubelet
 
 script
 	set -o errexit
@@ -255,6 +251,9 @@ script
 	set -o errexit
 	set -o nounset
 
+	# Wait for a minute to let docker and kubelet processes finish initialization.
+	# TODO(andyzheng0831): replace it with a more reliable method if possible.
+	sleep 60
 	. /etc/kube-configure.sh
 	. /etc/kube-env
 	health_monitoring
