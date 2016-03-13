@@ -41,4 +41,6 @@ type Args struct {
 	ClientsetOnly bool
 	// FakeClient determines if client-gen generates the fake clients.
 	FakeClient bool
+	// CmdArgs is the command line arguments supplied when the client-gen is called.
+	CmdArgs string
 }
