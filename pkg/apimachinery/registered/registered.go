@@ -181,9 +181,13 @@ func GroupOrDie(group string) *apimachinery.GroupMeta {
 //     all other groups alphabetical.
 func RESTMapper(versionPatterns ...unversioned.GroupVersion) meta.RESTMapper {
 	unionMapper := meta.MultiRESTMapper{}
+	unionedGroups := sets.NewString()
 	for enabledVersion := range enabledVersions {
-		groupMeta := groupMetaMap[enabledVersion.Group]
-		unionMapper = append(unionMapper, groupMeta.RESTMapper)
+		if !unionedGroups.Has(enabledVersion.Group) {
+			unionedGroups.Insert(enabledVersion.Group)
+			groupMeta := groupMetaMap[enabledVersion.Group]
+			unionMapper = append(unionMapper, groupMeta.RESTMapper)
+		}
 	}
 
 	if len(versionPatterns) != 0 {

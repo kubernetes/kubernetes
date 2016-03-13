@@ -18,6 +18,7 @@ package fake
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
@@ -39,7 +40,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	}
 
 	fakePtr := core.Fake{}
-	fakePtr.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
+	fakePtr.AddReactor("*", "*", core.ObjectReaction(o, registered.RESTMapper()))
 
 	fakePtr.AddWatchReactor("*", core.DefaultWatchReactor(watch.NewFake(), nil))
 

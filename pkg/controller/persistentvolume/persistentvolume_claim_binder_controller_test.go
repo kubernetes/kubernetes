@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -365,7 +366,7 @@ func TestExampleObjects(t *testing.T) {
 		}
 
 		clientset := &fake.Clientset{}
-		clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
+		clientset.AddReactor("*", "*", core.ObjectReaction(o, registered.RESTMapper()))
 
 		if reflect.TypeOf(scenario.expected) == reflect.TypeOf(&api.PersistentVolumeClaim{}) {
 			pvc, err := clientset.Core().PersistentVolumeClaims("ns").Get("doesntmatter")
@@ -432,7 +433,7 @@ func TestBindingWithExamples(t *testing.T) {
 	}
 
 	clientset := &fake.Clientset{}
-	clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
+	clientset.AddReactor("*", "*", core.ObjectReaction(o, registered.RESTMapper()))
 
 	pv, err := clientset.Core().PersistentVolumes().Get("any")
 	if err != nil {
