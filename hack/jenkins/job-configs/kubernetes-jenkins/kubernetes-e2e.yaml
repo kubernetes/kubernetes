@@ -89,7 +89,7 @@
                 export PROJECT="k8s-jkns-e2e-gce"
         - 'gce-slow':
             description: 'Runs slow tests on GCE, sequentially.'
-            timeout: 60
+            timeout: 150
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
@@ -242,7 +242,7 @@
                 export PROJECT="k8s-jkns-e2e-gce-1-2"
     jobs:
         - 'kubernetes-e2e-{suffix}'
- 
+
 - project:
     name: kubernetes-e2e-gke-1.1
     trigger-job: 'kubernetes-build-1.1'
