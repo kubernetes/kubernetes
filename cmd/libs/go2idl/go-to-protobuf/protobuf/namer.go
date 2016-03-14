@@ -31,7 +31,7 @@ type localNamer struct {
 }
 
 func (n localNamer) Name(t *types.Type) string {
-	if t.Kind == types.Map {
+	if t.Key != nil && t.Elem != nil {
 		return fmt.Sprintf("map<%s, %s>", n.Name(t.Key), n.Name(t.Elem))
 	}
 	if len(n.localPackage.Package) != 0 && n.localPackage.Package == t.Name.Package {
@@ -67,8 +67,10 @@ func (n *protobufNamer) List() []generator.Package {
 }
 
 func (n *protobufNamer) Add(p *protobufPackage) {
-	n.packagesByPath[p.PackagePath] = p
-	n.packages = append(n.packages, p)
+	if _, ok := n.packagesByPath[p.PackagePath]; !ok {
+		n.packagesByPath[p.PackagePath] = p
+		n.packages = append(n.packages, p)
+	}
 }
 
 func (n *protobufNamer) GoNameToProtoName(name types.Name) types.Name {
