@@ -21,7 +21,7 @@ set -o pipefail
 # Set the host name explicitly
 # See: https://github.com/mitchellh/vagrant/issues/2430
 hostnamectl set-hostname ${NODE_NAME}
-
+if_to_edit=""
 if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=23 ]]; then
   # Disable network interface being managed by Network Manager (needed for Fedora 21+)
   NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/

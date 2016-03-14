@@ -51,8 +51,8 @@ CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.246.0.0/16}"
 SERVICE_CLUSTER_IP_RANGE=10.247.0.0/16  # formerly PORTAL_NET
 
 # Since this isn't exposed on the network, default to a simple user/passwd
-MASTER_USER=vagrant
-MASTER_PASSWD=vagrant
+MASTER_USER="${MASTER_USER:-vagrant}"
+MASTER_PASSWD="${MASTER_PASSWD:-vagrant}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
