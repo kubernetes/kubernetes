@@ -15,7 +15,7 @@
     description: '{description} Test owner: {test-owner}.'
     logrotate:
         daysToKeep: 7
-    disabled: false
+    disabled: '{obj:disable_job}'
     builders:
         - shell: |
             {provider-env}
@@ -494,6 +494,9 @@
             description: 'Run slow E2E tests on latest Trusty build.'
             timeout: 270
         - 'dev-slow':
+            # Constantly failing due to a known issue of the image. Disabled
+            # until the issue is resolved.
+            disable_job: true
             description: 'Run slow E2E tests on latest Trusty dev build.'
             timeout: 270
         - 'beta-slow':
