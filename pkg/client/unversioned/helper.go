@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"fmt"
-	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -98,13 +97,14 @@ func MatchesServerVersion(client *Client, c *restclient.Config) error {
 			return err
 		}
 	}
-	clientVersion := version.Get()
-	serverVersion, err := client.Discovery().ServerVersion()
+	cVer := version.Get()
+	sVer, err := client.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("couldn't read version from server: %v\n", err)
 	}
-	if s := *serverVersion; !reflect.DeepEqual(clientVersion, s) {
-		return fmt.Errorf("server version (%#v) differs from client version (%#v)!\n", s, clientVersion)
+	// GitVersion includes GitCommit and GitTreeState, but best to be safe?
+	if cVer.GitVersion != sVer.GitVersion || cVer.GitCommit != sVer.GitCommit || cVer.GitTreeState != cVer.GitTreeState {
+		return fmt.Errorf("server version (%#v) differs from client version (%#v)!\n", sVer, cVer)
 	}
 
 	return nil

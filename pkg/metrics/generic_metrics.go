@@ -46,7 +46,7 @@ var CommonMetrics = map[string][]string{
 	"http_response_size_bytes":                 {"handler", "quantile"},
 	"http_response_size_bytes_count":           {"handler"},
 	"http_response_size_bytes_sum":             {"handler"},
-	"kubernetes_build_info":                    {"major", "minor", "gitCommit", "gitTreeState", "gitVersion"},
+	"kubernetes_build_info":                    {"major", "minor", "gitCommit", "gitTreeState", "gitVersion", "buildDate", "goVersion", "compiler", "platform"},
 	"process_cpu_seconds_total":                {},
 	"process_max_fds":                          {},
 	"process_open_fds":                         {},
