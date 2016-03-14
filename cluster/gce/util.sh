@@ -698,11 +698,11 @@ function create-nodes-template() {
 # exports:
 # - NUM_MIGS
 function set_num_migs() {
-  local defaulted_max_instances_per_mig=${MAX_INSTANCES_PER_MIG:-500}
+  local defaulted_max_instances_per_mig=${MAX_INSTANCES_PER_MIG:-1000}
 
   if [[ ${defaulted_max_instances_per_mig} -le "0" ]]; then
-    echo "MAX_INSTANCES_PER_MIG cannot be negative. Assuming default 500"
-    defaulted_max_instances_per_mig=500
+    echo "MAX_INSTANCES_PER_MIG cannot be negative. Assuming default 1000"
+    defaulted_max_instances_per_mig=1000
   fi
   export NUM_MIGS=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
 }
