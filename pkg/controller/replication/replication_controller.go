@@ -167,7 +167,7 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 		},
 	)
 
-	rm.podStore.Store, rm.podController = framework.NewInformer(
+	rm.podStore.Store, rm.podController = framework.NewParallelInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rm.kubeClient.Core().Pods(api.NamespaceAll).List(options)
@@ -186,6 +186,7 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 			UpdateFunc: rm.updatePod,
 			DeleteFunc: rm.deletePod,
 		},
+		8, /* parallel workers */
 	)
 
 	rm.syncHandler = rm.syncReplicationController
