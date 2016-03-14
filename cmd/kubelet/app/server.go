@@ -185,6 +185,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		AllowPrivileged:           s.AllowPrivileged,
 		Auth:                      nil, // default does not enforce auth[nz]
 		CAdvisorInterface:         nil, // launches background processes, not set here
+		BootstrapPodLabel:         s.BootstrapPodLabel,
 		VolumeStatsAggPeriod:      s.VolumeStatsAggPeriod.Duration,
 		CgroupRoot:                s.CgroupRoot,
 		Cloud:                     nil, // cloud provider might start background processes
@@ -363,7 +364,7 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		}, 5*time.Second, wait.NeverStop)
 	}
 
-	if s.RunOnce {
+	if s.RunOnce || len(s.BootstrapPodLabel) != 0 {
 		return nil
 	}
 
@@ -635,7 +636,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	util.ApplyRLimitForSelf(kcfg.MaxOpenFiles)
 
 	// process pods and exit.
-	if kcfg.Runonce {
+	if kcfg.Runonce || len(kcfg.BootstrapPodLabel) != 0 {
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
 			return fmt.Errorf("runonce failed: %v", err)
 		}
@@ -693,6 +694,7 @@ type KubeletConfig struct {
 	AllowPrivileged                bool
 	Auth                           server.AuthInterface
 	Builder                        KubeletBuilder
+	BootstrapPodLabel              map[string]string
 	CAdvisorInterface              cadvisor.Interface
 	VolumeStatsAggPeriod           time.Duration
 	CgroupRoot                     string
@@ -832,6 +834,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.DiskSpacePolicy,
 		kc.Cloud,
 		kc.NodeLabels,
+		kc.BootstrapPodLabel,
 		kc.NodeStatusUpdateFrequency,
 		kc.OSInterface,
 		kc.CgroupRoot,

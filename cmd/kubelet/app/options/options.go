@@ -46,7 +46,8 @@ type KubeletServer struct {
 	KubeConfig    util.StringFlag
 	APIServerList []string
 
-	RunOnce bool
+	RunOnce           bool
+	BootstrapPodLabel map[string]string
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
@@ -62,8 +63,9 @@ func NewKubeletServer() *KubeletServer {
 		AuthPath:   util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
 		KubeConfig: util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 
-		SystemReserved: make(util.ConfigurationMap),
-		KubeReserved:   make(util.ConfigurationMap),
+		SystemReserved:    make(util.ConfigurationMap),
+		KubeReserved:      make(util.ConfigurationMap),
+		BootstrapPodLabel: make(util.ConfigurationMap),
 		KubeletConfiguration: componentconfig.KubeletConfiguration{
 			Address:                     "0.0.0.0",
 			CAdvisorPort:                4194,
@@ -183,6 +185,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s")
 	bindableNodeLabels := util.ConfigurationMap(s.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be key=value pairs separated by ','.")
+	bindableBootstrapPodLabel := util.ConfigurationMap(s.BootstrapPodLabel)
+	fs.Var(&bindableBootstrapPodLabel, "bootstrap-pod-label", "Label used to filter pods when looking for bootstrap pod, must be key=value pair. Kubelet will run until seeing a pod with this label, after which it will run that pod and exit.")
 	fs.DurationVar(&s.ImageMinimumGCAge.Duration, "minimum-image-ttl-duration", s.ImageMinimumGCAge.Duration, "Minimum age for a unused image before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'. Default: '2m'")
 	fs.IntVar(&s.ImageGCHighThresholdPercent, "image-gc-high-threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%")
 	fs.IntVar(&s.ImageGCLowThresholdPercent, "image-gc-low-threshold", s.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Default: 80%")

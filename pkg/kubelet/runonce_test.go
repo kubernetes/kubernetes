@@ -34,11 +34,12 @@ import (
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
-func TestRunOnce(t *testing.T) {
+func initKubelet(t *testing.T) *Kubelet {
 	cadvisor := &cadvisortest.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	cadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
@@ -51,6 +52,7 @@ func TestRunOnce(t *testing.T) {
 		Capacity: 10 * mb,
 	}, nil)
 	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+	statusManager := status.NewManager(nil, podManager)
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &containertest.FakeRuntime{}
 	basePath, err := utiltesting.MkTmpdir("kubelet")
@@ -64,7 +66,7 @@ func TestRunOnce(t *testing.T) {
 		cadvisor:            cadvisor,
 		nodeLister:          testNodeLister{},
 		nodeInfo:            testNodeInfo{},
-		statusManager:       status.NewManager(nil, podManager),
+		statusManager:       statusManager,
 		containerRefManager: kubecontainer.NewRefManager(),
 		podManager:          podManager,
 		os:                  containertest.FakeOS{},
@@ -80,6 +82,11 @@ func TestRunOnce(t *testing.T) {
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}
+	return kb
+}
+
+func TestRunOnce(t *testing.T) {
+	kb := initKubelet(t)
 
 	pods := []*api.Pod{
 		{
@@ -95,13 +102,14 @@ func TestRunOnce(t *testing.T) {
 			},
 		},
 	}
-	podManager.SetPods(pods)
+	kb.podManager.SetPods(pods)
 	// The original test here is totally meaningless, because fakeruntime will always return an empty podStatus. While
 	// the originial logic of isPodRunning happens to return true when podstatus is empty, so the test can always pass.
 	// Now the logic in isPodRunning is changed, to let the test pass, we set the podstatus directly in fake runtime.
 	// This is also a meaningless test, because the isPodRunning will also always return true after setting this. However,
 	// because runonce is never used in kubernetes now, we should deprioritize the cleanup work.
 	// TODO(random-liu) Fix the test, make it meaningful.
+	fakeRuntime := kb.containerRuntime.(*containertest.FakeRuntime)
 	fakeRuntime.PodStatus = kubecontainer.PodStatus{
 		ContainerStatuses: []*kubecontainer.ContainerStatus{
 			{
@@ -118,6 +126,68 @@ func TestRunOnce(t *testing.T) {
 		t.Errorf("unexpected run pod error: %v", results[0].Err)
 	}
 	if results[0].Pod.Name != "foo" {
+		t.Errorf("unexpected pod: %q", results[0].Pod.Name)
+	}
+}
+
+func TestRunOnceBootstrap(t *testing.T) {
+	kb := initKubelet(t)
+	kb.bootstrapPodLabel = map[string]string{"app": "bootstrap"}
+
+	pods := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "123456789",
+				Name:      "foo2",
+				Namespace: "new",
+				Labels:    map[string]string{"app": "bootstrap"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "baz"},
+				},
+			},
+		},
+	}
+	fakeRuntime := kb.containerRuntime.(*containertest.FakeRuntime)
+	fakeRuntime.PodStatus = kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.ContainerStatus{
+			{
+				Name:  "baz",
+				State: kubecontainer.ContainerStateRunning,
+			},
+		},
+	}
+
+	updates := make(chan kubetypes.PodUpdate)
+	go func(pods []*api.Pod) {
+		updates <- kubetypes.PodUpdate{Pods: pods[0:1]}
+		updates <- kubetypes.PodUpdate{Pods: pods[1:2]}
+	}(pods)
+
+	results, err := kb.RunOnce(updates)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if results[0].Err != nil {
+		t.Errorf("unexpected run pod error: %v", results[0].Err)
+	}
+	if len(results) != 1 {
+		t.Errorf("expected only 1 pod to run, got %d", len(results))
+	}
+	if results[0].Pod.Name != "foo2" {
 		t.Errorf("unexpected pod: %q", results[0].Pod.Name)
 	}
 }

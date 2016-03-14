@@ -26,6 +26,8 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -42,6 +44,14 @@ type RunPodResult struct {
 
 // RunOnce polls from one configuration update and run the associated pods.
 func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, error) {
+	if !kl.standaloneMode {
+		// If we're not in standaloneMode we need to sync our status with
+		// the apiserver so we can get scheduled pods.
+		done := make(chan struct{})
+		defer close(done)
+		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, done)
+	}
+
 	// Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
 		return nil, err
@@ -54,14 +64,34 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 		}
 	}
 
-	select {
-	case u := <-updates:
-		glog.Infof("processing manifest with %d pods", len(u.Pods))
-		result, err := kl.runOnce(u.Pods, runOnceRetryDelay)
-		glog.Infof("finished processing %d pods", len(u.Pods))
-		return result, err
-	case <-time.After(runOnceManifestDelay):
-		return nil, fmt.Errorf("no pod manifest update after %v", runOnceManifestDelay)
+	var match bool
+	sel := labels.Everything()
+	bootstrap := len(kl.bootstrapPodLabel) != 0
+	if bootstrap {
+		sel = labels.Set(kl.bootstrapPodLabel).AsSelector()
+	}
+	for {
+		glog.Info("begin wait for update")
+		select {
+		case u := <-updates:
+			for _, p := range u.Pods {
+				if match = sel.Matches(labels.Set(p.Labels)); match {
+					break
+				}
+			}
+			if bootstrap && !match {
+				glog.Info("ignoring manifest, does not contain pod matching bootstrap pod label")
+				continue
+			}
+			glog.Infof("processing manifest with %d pods", len(u.Pods))
+			result, err := kl.runOnce(u.Pods, runOnceRetryDelay)
+			glog.Infof("finished processing %d pods", len(u.Pods))
+			return result, err
+		case <-time.After(runOnceManifestDelay):
+			if !bootstrap { // Ignore timeouts when waiting for a bootstrap pod.
+				return nil, fmt.Errorf("no pod manifest update after %v", runOnceManifestDelay)
+			}
+		}
 	}
 }
 
