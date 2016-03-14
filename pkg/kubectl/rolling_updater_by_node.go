@@ -351,7 +351,6 @@ func (r *RollingUpdaterByNode) Update(config *RollingUpdaterByNodeConfig) error 
 		}
 		if len(podList.Items) > 0 {
 			// Waiting for pods deletion
-			fmt.Fprintf(config.Out, "configtimeout %s", config.DeletionTimeout)
 			timer := time.NewTimer(config.DeletionTimeout)
 			watcher, _ := r.c.Pods(oldRc.Namespace).Watch(oldPodsListOptions)
 			if watcher != nil {
