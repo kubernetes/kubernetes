@@ -598,7 +598,7 @@ func TestEtcdDeleteCollectionNotFound(t *testing.T) {
 
 		// Kick off multiple delete collection calls to test notfound behavior
 		wg := &sync.WaitGroup{}
-		for j := 0; j < 5; j++ {
+		for j := 0; j < 2; j++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
