@@ -212,6 +212,9 @@ func setDiscoveryDefaults(config *restclient.Config) error {
 	config.APIPath = ""
 	config.GroupVersion = nil
 	config.Codec = runtime.NoopEncoder{api.Codecs.UniversalDecoder()}
+	if len(config.UserAgent) == 0 {
+		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+	}
 	return nil
 }
 
