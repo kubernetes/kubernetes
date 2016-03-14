@@ -81,7 +81,7 @@ $kube_provider_boxes = {
   :vsphere => {
     'fedora' => {
       :box_name => 'vsphere-dummy',
-      :box_url => 'http://10.57.32.6:8081/artifactory/simple/cisco-releases/boxes/vsphere/vsphere-dummy.box'
+      :box_url => 'https://github.com/deromka/vagrant-vsphere/blob/master/vsphere-dummy.box?raw=true'
     }
   }
 }
