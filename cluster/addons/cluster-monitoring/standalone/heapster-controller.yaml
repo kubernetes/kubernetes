@@ -1,13 +1,13 @@
-{% set heapster_memory = "200Mi" -%}
+{% set metrics_memory = "200Mi" -%}
 {% set num_nodes = pillar.get('num_nodes', -1) -%}
 {% if num_nodes >= 0 -%}
-  {% set heapster_memory = (200 + num_nodes * 3)|string + "Mi" -%}
+  {% set metrics_memory = (200 + num_nodes * 4)|string + "Mi" -%}
 {% endif -%}
 
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: heapster-v1.0.0-beta1
+  name: heapster-v1.0.0-beta2
   namespace: kube-system
   labels:
     k8s-app: heapster
@@ -23,16 +23,16 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster:v1.0.0-beta1
+        - image: gcr.io/google_containers/heapster:v1.0.0-beta2
           name: heapster
           resources:
             # keep request = limit to keep this container in guaranteed class
             limits:
               cpu: 100m
-              memory: {{ heapster_memory }}
+              memory: {{ metrics_memory }}
             requests:
               cpu: 100m
-              memory: {{ heapster_memory }}
+              memory: {{ metrics_memory }}
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
