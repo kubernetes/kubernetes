@@ -62,7 +62,7 @@ var _ = Describe("Kubelet", func() {
 							{
 								Image:   "gcr.io/google_containers/busybox",
 								Name:    podName,
-								Command: []string{"echo", "'Hello World'"},
+								Command: []string{"sh", "-c", "echo 'Hello World' ; sleep 240"},
 							},
 						},
 					},
@@ -82,7 +82,7 @@ var _ = Describe("Kubelet", func() {
 					buf := new(bytes.Buffer)
 					buf.ReadFrom(rc)
 					return buf.String()
-				}, time.Second*30, time.Second*4).Should(Equal("'Hello World'\n"))
+				}, time.Minute, time.Second*4).Should(Equal("Hello World\n"))
 			})
 
 			It("it should be possible to delete", func() {
@@ -109,7 +109,7 @@ var _ = Describe("Kubelet", func() {
 							{
 								Image:   "gcr.io/google_containers/busybox",
 								Name:    podName,
-								Command: []string{"sh", "-c", "echo test > /file"},
+								Command: []string{"sh", "-c", "echo test > /file; sleep 240"},
 								SecurityContext: &api.SecurityContext{
 									ReadOnlyRootFilesystem: &isReadOnly,
 								},
@@ -131,7 +131,7 @@ var _ = Describe("Kubelet", func() {
 					buf := new(bytes.Buffer)
 					buf.ReadFrom(rc)
 					return buf.String()
-				}, time.Second*30, time.Second*4).Should(Equal("sh: can't create /file: Read-only file system\n"))
+				}, time.Minute, time.Second*4).Should(Equal("sh: can't create /file: Read-only file system\n"))
 			})
 
 			It("it should be possible to delete", func() {
@@ -154,7 +154,7 @@ var _ = Describe("Kubelet", func() {
 				createPod(cl, podName, namespace, []api.Container{
 					{
 						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"sh", "-c", "echo 'Hello World' | tee ~/file | tee /test-empty-dir-mnt | sleep 60"},
+						Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee ~/file | tee /test-empty-dir-mnt ; sleep 1; done"},
 						Name:    podName + containerSuffix,
 						VolumeMounts: []api.VolumeMount{
 							{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
@@ -168,7 +168,8 @@ var _ = Describe("Kubelet", func() {
 			}
 
 			// Sleep long enough for cadvisor to see the pod and calculate all of its metrics
-			time.Sleep(60 * time.Second)
+			// TODO: Get this to work with polling / eventually
+			time.Sleep(time.Minute * 2)
 		})
 
 		Context("when querying /stats/summary", func() {
