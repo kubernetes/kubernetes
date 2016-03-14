@@ -124,15 +124,11 @@ script
 	echo "Start kubelet upstart job"
 	. /etc/kube-configure.sh
 	. /etc/kube-env
-	BINARY_PATH="/usr/bin/kubelet"
-	if [ "${TEST_CLUSTER:-}" = "true" ]; then
-		BINARY_PATH="/usr/local/bin/kubelet"
-	fi
 	# Assemble command line flags based on env variables, which will put the string
 	# of flags in variable KUBELET_CMD_FLAGS
 	assemble_kubelet_flags
 	
-	${BINARY_PATH} \
+	/usr/bin/kubelet \
 		--enable-debugging-handlers=false \
 		--cloud-provider=gce \
 		--config=/etc/kubernetes/manifests \
@@ -219,11 +215,7 @@ script
 
 	. /etc/kube-env
 	export HOME="/root"
-	if [ "${TEST_CLUSTER:-}" = "true" ]; then
-		export KUBECTL_BIN="/usr/local/bin/kubectl"
-	else
-		export KUBECTL_BIN="/usr/bin/kubectl"
-	fi
+	export KUBECTL_BIN="/usr/bin/kubectl"
 	export TOKEN_DIR="/etc/srv/kubernetes"
 	export kubelet_kubeconfig_file="/var/lib/kubelet/kubeconfig"
 	export TRUSTY_MASTER="true"
