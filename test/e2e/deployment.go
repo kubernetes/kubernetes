@@ -27,10 +27,12 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -434,12 +436,49 @@ func testDeploymentCleanUpPolicy(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-cleanup-deployment"
 	Logf("Creating deployment %s", deploymentName)
+
+	pods, err := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
+	if err != nil {
+		Expect(err).NotTo(HaveOccurred(), "Failed to query for pods: %v", err)
+	}
+	options := api.ListOptions{
+		ResourceVersion: pods.ListMeta.ResourceVersion,
+	}
+	stopCh := make(chan struct{})
+	w, err := c.Pods(ns).Watch(options)
+	go func() {
+		// There should be only one pod being created, which is the pod with the redis image.
+		// The old RS shouldn't create new pod when deployment controller adding pod template hash label to its selector.
+		numPodCreation := 1
+		for {
+			select {
+			case event, _ := <-w.ResultChan():
+				if event.Type != watch.Added {
+					continue
+				}
+				numPodCreation--
+				if numPodCreation < 0 {
+					Failf("Expect only one pod creation, the second creation event: %#v\n", event)
+				}
+				pod, ok := event.Object.(*api.Pod)
+				if !ok {
+					Fail("Expect event Object to be a pod")
+				}
+				if pod.Spec.Containers[0].Name != redisImageName {
+					Failf("Expect the created pod to have container name %s, got pod %#v\n", redisImageName, pod)
+				}
+			case <-stopCh:
+				return
+			}
+		}
+	}()
 	_, err = c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, redisImageName, redisImage, extensions.RollingUpdateDeploymentStrategyType, revisionHistoryLimit))
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
 	err = waitForDeploymentOldRSsNum(c, ns, deploymentName, *revisionHistoryLimit)
 	Expect(err).NotTo(HaveOccurred())
+	close(stopCh)
 }
 
 // testRolloverDeployment tests that deployment supports rollover.

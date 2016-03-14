@@ -172,7 +172,7 @@ func rsAndPodsWithHashKeySynced(deployment *extensions.Deployment, c clientset.I
 
 // addHashKeyToRSAndPods adds pod-template-hash information to the given rs, if it's not already there, with the following steps:
 // 1. Add hash label to the rs's pod template, and make sure the controller sees this update so that no orphaned pods will be created
-// 2. Add hash label to all pods this rs owns
+// 2. Add hash label to all pods this rs owns, wait until replicaset controller reports rs.Status.FullyLabeledReplicas equal to the desired number of replicas
 // 3. Add hash label to the rs's label and selector
 func addHashKeyToRSAndPods(deployment *extensions.Deployment, c clientset.Interface, rs extensions.ReplicaSet, getPodList podListFunc) (updatedRS *extensions.ReplicaSet, err error) {
 	updatedRS = &rs
@@ -236,6 +236,15 @@ func addHashKeyToRSAndPods(deployment *extensions.Deployment, c clientset.Interf
 		return updatedRS, nil
 	}
 
+	// We need to wait for the replicaset controller to observe the pods being
+	// labeled with pod template hash. Because previously we've called
+	// waitForReplicaSetUpdated, the replicaset controller should have dropped
+	// FullyLabeledReplicas to 0 already, we only need to wait it to increase
+	// back to the number of replicas in the spec.
+	if err = waitForPodsHashPopulated(c, updatedRS.Generation, namespace, updatedRS.Name); err != nil {
+		return nil, fmt.Errorf("%s %s/%s: error waiting for replicaset controller to observe pods being labeled with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
+	}
+
 	// 3. Update rs label and selector to include the new hash label
 	// Copy the old selector, so that we can scrub out any orphaned pods
 	if updatedRS, rsUpdated, err = rsutil.UpdateRSWithRetries(c.Extensions().ReplicaSets(namespace), updatedRS,
@@ -267,6 +276,17 @@ func waitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, na
 			return false, err
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration, nil
+	})
+}
+
+func waitForPodsHashPopulated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
+	return wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
+		rs, err := c.Extensions().ReplicaSets(namespace).Get(name)
+		if err != nil {
+			return false, err
+		}
+		return rs.Status.ObservedGeneration >= desiredGeneration &&
+			rs.Status.FullyLabeledReplicas == rs.Spec.Replicas, nil
 	})
 }
 

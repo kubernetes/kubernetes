@@ -153,12 +153,18 @@ func JobHasDesiredParallelism(c ExtensionsInterface, job *extensions.Job) wait.C
 // the desired replica count for a deployment equals its updated replicas count.
 // (non-terminated pods that have the desired template spec).
 func DeploymentHasDesiredReplicas(c ExtensionsInterface, deployment *extensions.Deployment) wait.ConditionFunc {
+	// If we're given a deployment where the status lags the spec, it either
+	// means that the deployment is stale, or that the deployment manager hasn't
+	// noticed the update yet. Polling status.Replicas is not safe in the latter
+	// case.
+	desiredGeneration := deployment.Generation
 
 	return func() (bool, error) {
 		deployment, err := c.Deployments(deployment.Namespace).Get(deployment.Name)
 		if err != nil {
 			return false, err
 		}
-		return deployment.Status.UpdatedReplicas == deployment.Spec.Replicas, nil
+		return deployment.Status.ObservedGeneration >= desiredGeneration &&
+			deployment.Status.UpdatedReplicas == deployment.Spec.Replicas, nil
 	}
 }

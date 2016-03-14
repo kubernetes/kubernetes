@@ -66,7 +66,7 @@ func detectCloudProvider() info.CloudProvider {
 	case onBaremetal():
 		return info.Baremetal
 	}
-	return info.UnkownProvider
+	return info.UnknownProvider
 }
 
 func detectInstanceType(cloudProvider info.CloudProvider) info.InstanceType {
