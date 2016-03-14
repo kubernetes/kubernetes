@@ -46,6 +46,7 @@ import (
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -55,7 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -161,7 +161,7 @@ type DockerManager struct {
 	configureHairpinMode bool
 
 	// The api version cache of docker daemon.
-	versionCache *VersionCache
+	versionCache *cache.VersionCache
 }
 
 // A subset of the pod.Manager interface extracted for testing purposes.
@@ -239,7 +239,6 @@ func NewDockerManager(
 		cpuCFSQuota:            cpuCFSQuota,
 		enableCustomMetrics:    enableCustomMetrics,
 		configureHairpinMode:   hairpinMode,
-		versionCache:           NewVersionCache(),
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	if serializeImagePulls {
@@ -254,20 +253,14 @@ func NewDockerManager(
 		optf(dm)
 	}
 
-	apiVersion, err := dm.APIVersion()
-	if err != nil {
-		glog.Errorf("Failed to get api version from docker %v", err)
+	// initialize versionCache with a updater
+	dm.versionCache = cache.NewVersionCache(func() (kubecontainer.Version, kubecontainer.Version, error) {
+		return dm.getVersionInfo()
+	})
+	// update version cache periodically.
+	if dm.machineInfo != nil {
+		dm.versionCache.UpdateCachePeriodly(dm.machineInfo.MachineID)
 	}
-
-	daemonVersion, err := dm.Version()
-	if err != nil {
-		glog.Errorf("Failed to get daemon version from docker %v", err)
-	}
-
-	// Update version cache periodically
-	go wait.Until(func() {
-		dm.versionCache.Update(dm.machineInfo.MachineID, apiVersion, daemonVersion)
-	}, 5*time.Second, wait.NeverStop)
 
 	return dm
 }
@@ -608,7 +601,10 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// If current api version is newer than docker 1.10 requested, set OomScoreAdj to HostConfig
-	if dm.checkDockerAPIVersion(dockerv110APIVersion) >= 0 {
+	result, err := dm.checkDockerAPIVersion(dockerv110APIVersion)
+	if err != nil {
+		glog.Errorf("Failed to check docker api version: %v", err)
+	} else if result >= 0 {
 		hc.OomScoreAdj = oomScoreAdj
 	}
 
@@ -1554,12 +1550,15 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 }
 
 func (dm *DockerManager) applyOOMScoreAdjIfNeeded(container *api.Container, containerInfo *docker.Container) error {
-	// Compare current API version with expected api version
-	result := dm.checkDockerAPIVersion(dockerv110APIVersion)
+	// Compare current API version with expected api version.
+	result, err := dm.checkDockerAPIVersion(dockerv110APIVersion)
+	if err != nil {
+		return fmt.Errorf("Failed to check docker api version: %v", err)
+	}
 	// If current api version is older than OOMScoreAdj requested, use the old way.
 	if result < 0 {
 		if err := dm.applyOOMScoreAdj(container, containerInfo); err != nil {
-			return fmt.Errorf("failed to apply oom-score-adj to container %q- %v", err, containerInfo.Name)
+			return fmt.Errorf("Failed to apply oom-score-adj to container %q- %v", err, containerInfo.Name)
 		}
 	}
 
@@ -1582,21 +1581,17 @@ func (dm *DockerManager) calculateOomScoreAdj(container *api.Container) int {
 	return oomScoreAdj
 }
 
-// getCachedApiVersion gets cached api version of docker runtime.
-func (dm *DockerManager) getCachedApiVersion() (kubecontainer.Version, error) {
-	apiVersion, _, err := dm.versionCache.Get(dm.machineInfo.MachineID)
+// getCachedVersionInfo gets cached version info of docker runtime.
+func (dm *DockerManager) getCachedVersionInfo() (kubecontainer.Version, kubecontainer.Version, error) {
+	apiVersion, daemonVersion, err := dm.versionCache.Get(dm.machineInfo.MachineID)
 	if err != nil {
 		glog.Errorf("Failed to get cached docker api version %v ", err)
 	}
-	// If we got nil apiVersion, try to get api version directly.
-	if apiVersion == nil {
-		apiVersion, err = dm.APIVersion()
-		if err != nil {
-			glog.Errorf("Failed to get docker api version directly %v ", err)
-		}
-		dm.versionCache.Update(dm.machineInfo.MachineID, apiVersion, nil)
+	// If we got nil versions, try to update version info.
+	if apiVersion == nil || daemonVersion == nil {
+		dm.versionCache.Update(dm.machineInfo.MachineID)
 	}
-	return apiVersion, err
+	return apiVersion, daemonVersion, err
 }
 
 // checkDockerAPIVersion checks current docker API version against expected version.
@@ -1604,17 +1599,17 @@ func (dm *DockerManager) getCachedApiVersion() (kubecontainer.Version, error) {
 // 1 : newer than expected version
 // -1: older than expected version
 // 0 : same version
-func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) int {
-	apiVersion, err := dm.getCachedApiVersion()
+func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) (int, error) {
+	apiVersion, _, err := dm.getCachedVersionInfo()
 	if err != nil {
-		glog.Errorf("Failed to get cached docker api version %v ", err)
+		return 0, err
 	}
 	result, err := apiVersion.Compare(expectedVersion)
 	if err != nil {
-		glog.Errorf("Failed to compare current docker api version %v with OOMScoreAdj supported Docker version %q - %v",
+		return 0, fmt.Errorf("Failed to compare current docker api version %v with OOMScoreAdj supported Docker version %q - %v",
 			apiVersion, expectedVersion, err)
 	}
-	return result
+	return result, nil
 }
 
 func addNDotsOption(resolvFilePath string) error {
@@ -2199,4 +2194,18 @@ func (dm *DockerManager) GetPodStatus(uid types.UID, name, namespace string) (*k
 
 	podStatus.ContainerStatuses = containerStatuses
 	return podStatus, nil
+}
+
+// getVersionInfo returns apiVersion & daemonVersion of docker runtime
+func (dm *DockerManager) getVersionInfo() (kubecontainer.Version, kubecontainer.Version, error) {
+	apiVersion, err := dm.APIVersion()
+	if err != nil {
+		return nil, nil, err
+	}
+	daemonVersion, err := dm.Version()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return apiVersion, daemonVersion, nil
 }

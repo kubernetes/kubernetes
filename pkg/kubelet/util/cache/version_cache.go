@@ -14,19 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package cache
 
 import (
 	"fmt"
 	"sync"
+	"time"
 
-	"github.com/golang/groupcache/lru"
+	"github.com/golang/glog"
+
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type VersionCache struct {
-	lock  sync.RWMutex
-	cache *lru.Cache
+	lock    sync.RWMutex
+	cache   map[string]versionInfo
+	updater func() (kubecontainer.Version, kubecontainer.Version, error)
 }
 
 // versionInfo caches api version and daemon version.
@@ -37,15 +41,24 @@ type versionInfo struct {
 
 const maxVersionCacheEntries = 1000
 
-func NewVersionCache() *VersionCache {
-	return &VersionCache{cache: lru.New(maxVersionCacheEntries)}
+func NewVersionCache(f func() (kubecontainer.Version, kubecontainer.Version, error)) *VersionCache {
+	return &VersionCache{
+		cache:   map[string]versionInfo{},
+		updater: f,
+	}
 }
 
 // Update updates cached versionInfo by using a unique string (e.g. machineInfo) as the key.
-func (c *VersionCache) Update(key string, apiVersion kubecontainer.Version, version kubecontainer.Version) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.cache.Add(key, versionInfo{apiVersion, version})
+func (c *VersionCache) Update(key string) {
+	apiVersion, daemonVersion, err := c.updater()
+
+	if err != nil {
+		glog.Errorf("Fail to get version info from container runtime: %v", err)
+	} else {
+		c.lock.Lock()
+		defer c.lock.Unlock()
+		c.cache[key] = versionInfo{apiVersion, daemonVersion}
+	}
 }
 
 // Get gets cached versionInfo by using a unique string (e.g. machineInfo) as the key.
@@ -53,10 +66,15 @@ func (c *VersionCache) Update(key string, apiVersion kubecontainer.Version, vers
 func (c *VersionCache) Get(key string) (kubecontainer.Version, kubecontainer.Version, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	value, ok := c.cache.Get(key)
+	value, ok := c.cache[key]
 	if !ok {
 		return nil, nil, fmt.Errorf("Failed to get version info from cache by key: ", key)
 	}
-	versions := value.(versionInfo)
-	return versions.apiVersion, versions.version, nil
+	return value.apiVersion, value.version, nil
+}
+
+func (c *VersionCache) UpdateCachePeriodly(key string) {
+	go wait.Until(func() {
+		c.Update(key)
+	}, 1*time.Minute, wait.NeverStop)
 }
