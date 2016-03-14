@@ -259,6 +259,39 @@
         - 'kubernetes-e2e-{suffix}'
  
 - project:
+    name: kubernetes-e2e-gke-1-2
+    trigger-job: 'kubernetes-build-1.2'
+    test-owner: 'GKE on-call'
+    provider-env: |
+        {gke-provider-env}
+        export JENKINS_PUBLISHED_VERSION="ci/latest-1.2"
+    suffix:
+        - 'gke-release-1.2':
+            description: 'Run E2E tests on GKE from the release-1.2 branch.'
+            timeout: 30
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-1-2"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+        - 'gke-serial-release-1.2':
+            description: 'Run [Serial], [Disruptive] tests on GKE on the release-1.2 branch.'
+            timeout: 300
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-serial-1-2"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+        - 'gke-slow-release-1.2':
+            description: 'Run slow E2E tests on GKE using the release-1.2 branch.'
+            timeout: 60
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-slow-1-2"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
+                                         --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+
+- project:
     name: kubernetes-e2e-gke-1.1
     trigger-job: 'kubernetes-build-1.1'
     test-owner: 'GKE on-call'
