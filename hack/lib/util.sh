@@ -332,13 +332,20 @@ kube::util::has_changes_against_upstream_branch() {
   echo "Checking for '${pattern}' changes against '${full_branch}'"
   # make sure the branch is valid, otherwise the check will pass erroneously.
   if ! git describe "${full_branch}" >/dev/null; then
+    # abort!
     exit 1
   fi
   # notice this uses ... to find the first shared ancestor
-  if ! git diff --name-only "${full_branch}...HEAD" | grep "${pattern}" > /dev/null; then
-    echo "No '${pattern}' changes detected."
-    return 1
+  if git diff --name-only "${full_branch}...HEAD" | grep "${pattern}" > /dev/null; then
+    return 0
   fi
+  # also check for pending changes
+  if git status --porcelain | grep "${pattern}" > /dev/null; then
+    echo "Detected '${pattern}' uncommitted changes."
+    return 0
+  fi
+  echo "No '${pattern}' changes detected."
+  return 1
 }
 
 # ex: ts=2 sw=2 et filetype=sh
