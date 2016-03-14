@@ -21,10 +21,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	errorsutil "k8s.io/kubernetes/pkg/util/errors"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	podutil "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -77,4 +80,14 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 	// If the error is non-nil the returned RS cannot be trusted; if rsUpdated is false, the contoller isn't updated;
 	// if the error is nil and rsUpdated is true, the returned RS contains the applied update.
 	return rs, rsUpdated, err
+}
+
+// GetPodTemplateSpecHash returns the pod template hash of a ReplicaSet's pod template space
+func GetPodTemplateSpecHash(rs extensions.ReplicaSet) string {
+	meta := rs.Spec.Template.ObjectMeta
+	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
+	return fmt.Sprintf("%d", podutil.GetPodTemplateSpecHash(api.PodTemplateSpec{
+		ObjectMeta: meta,
+		Spec:       rs.Spec.Template.Spec,
+	}))
 }
