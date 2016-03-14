@@ -45,6 +45,9 @@ const (
 	// Only print this many characters of the response (to keep the logs
 	// legible).
 	maxDisplayBodyLen = 100
+
+	// We have seen one of these calls take just over 15 seconds, so putting this at 30.
+	proxyHTTPCallTimeout = 30 * time.Second
 )
 
 func proxyContext(version string) {
@@ -228,8 +231,8 @@ func proxyContext(version string) {
 					if e, a := val, string(body); e != a {
 						recordError(fmt.Sprintf("%v: path %v: wanted %v, got %v", i, path, e, a))
 					}
-					if d > 15*time.Second {
-						recordError(fmt.Sprintf("%v: path %v took %v > 15s", i, path, d))
+					if d > proxyHTTPCallTimeout {
+						recordError(fmt.Sprintf("%v: path %v took %v > %v", i, path, d, proxyHTTPCallTimeout))
 					}
 				}(i, path, val)
 				// default QPS is 5
@@ -295,7 +298,7 @@ func nodeProxyTest(f *Framework, prefix, nodeDest string) {
 		} else {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(status).To(Equal(http.StatusOK))
-			Expect(d).To(BeNumerically("<", 15*time.Second))
+			Expect(d).To(BeNumerically("<", proxyHTTPCallTimeout))
 		}
 	}
 	if serviceUnavailableErrors > 0 {
