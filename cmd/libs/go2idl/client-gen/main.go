@@ -76,7 +76,7 @@ func main() {
 	flag.Parse()
 	var cmdArgs string
 	flag.VisitAll(func(f *flag.Flag) {
-		if !f.Changed {
+		if !f.Changed || f.Name == "verify-only" {
 			return
 		}
 		cmdArgs = cmdArgs + fmt.Sprintf("--%s=%s ", f.Name, f.Value)
