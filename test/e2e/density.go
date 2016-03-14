@@ -398,15 +398,15 @@ var _ = Describe("Density", func() {
 					}
 				}
 
-				additionalPodsPrefix = "density-latency-pod-" + string(util.NewUUID())
+				additionalPodsPrefix = "density-latency-pod"
 				latencyPodsStore, controller := controllerframework.NewInformer(
 					&cache.ListWatch{
 						ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-							options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+							options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix})
 							return c.Pods(ns).List(options)
 						},
 						WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-							options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+							options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix})
 							return c.Pods(ns).Watch(options)
 						},
 					},
@@ -432,9 +432,6 @@ var _ = Describe("Density", func() {
 				// Create some additional pods with throughput ~5 pods/sec.
 				var wg sync.WaitGroup
 				wg.Add(nodeCount)
-				podLabels := map[string]string{
-					"name": additionalPodsPrefix,
-				}
 				// Explicitly set requests here.
 				// Thanks to it we trigger increasing priority function by scheduling
 				// a pod to a node, which in turn will result in spreading latency pods
@@ -449,7 +446,7 @@ var _ = Describe("Density", func() {
 				}
 				for i := 1; i <= nodeCount; i++ {
 					name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-					go createRunningPod(&wg, c, name, ns, "gcr.io/google_containers/pause:2.0", podLabels, cpuRequest, memRequest)
+					go createRunningPodFromRC(&wg, c, name, ns, "gcr.io/google_containers/pause:2.0", additionalPodsPrefix, cpuRequest, memRequest)
 					time.Sleep(200 * time.Millisecond)
 				}
 				wg.Wait()
@@ -540,7 +537,7 @@ var _ = Describe("Density", func() {
 					float64(nodeCount)/(e2eLag[len(e2eLag)-1].Latency.Minutes()))
 			}
 
-			By("Deleting ReplicationController and all additional Pods")
+			By("Deleting ReplicationController")
 			// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
 			rc, err := c.ReplicationControllers(ns).Get(RCName)
 			if err == nil && rc.Spec.Replicas != 0 {
@@ -549,43 +546,54 @@ var _ = Describe("Density", func() {
 				expectNoError(err)
 			}
 
-			By("Removing additional pods if any")
+			By("Removing additional replication controllers if any")
 			for i := 1; i <= nodeCount; i++ {
 				name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-				c.Pods(ns).Delete(name, nil)
+				c.ReplicationControllers(ns).Delete(name)
 			}
 		})
 	}
 })
 
-func createRunningPod(wg *sync.WaitGroup, c *client.Client, name, ns, image string, labels map[string]string, cpuRequest, memRequest resource.Quantity) {
+func createRunningPodFromRC(wg *sync.WaitGroup, c *client.Client, name, ns, image, podType string, cpuRequest, memRequest resource.Quantity) {
 	defer GinkgoRecover()
 	defer wg.Done()
-	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind: "Pod",
-		},
+	labels := map[string]string{
+		"type": podType,
+		"name": name,
+	}
+	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:  name,
-					Image: image,
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceCPU:    cpuRequest,
-							api.ResourceMemory: memRequest,
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: labels,
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  name,
+							Image: image,
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    cpuRequest,
+									api.ResourceMemory: memRequest,
+								},
+							},
 						},
 					},
+					DNSPolicy: api.DNSDefault,
 				},
 			},
-			DNSPolicy: api.DNSDefault,
 		},
 	}
-	_, err := c.Pods(ns).Create(pod)
+	_, err := c.ReplicationControllers(ns).Create(rc)
 	expectNoError(err)
-	expectNoError(waitForPodRunningInNamespace(c, name, ns))
+	expectNoError(waitForRCPodsRunning(c, ns, name))
+	Logf("Found pod '%s' running", name)
 }
