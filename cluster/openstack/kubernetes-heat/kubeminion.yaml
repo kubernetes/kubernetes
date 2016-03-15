@@ -60,6 +60,10 @@ parameters:
     description: metadata for ceilometer query
   cluster_name:
     type: string
+  secgroup_base:
+    type: string
+  secgroup_node:
+    type: string
 
 resources:
 
@@ -72,14 +76,6 @@ resources:
     properties:
       handle: {get_resource: minion_wait_handle}
       timeout: {get_param: wait_condition_timeout}
-
-  secgroup_all_open:
-    type: OS::Neutron::SecurityGroup
-    properties:
-      rules:
-        - protocol: icmp
-        - protocol: tcp
-        - protocol: udp
 
   ######################################################################
   #
@@ -182,9 +178,12 @@ resources:
     properties:
       network: {get_param: fixed_network}
       security_groups:
-        - get_resource: secgroup_all_open
+        - {get_param: secgroup_base}
+        - {get_param: secgroup_node}
       fixed_ips:
         - subnet: {get_param: fixed_subnet}
+      allowed_address_pairs:
+        - ip_address: 10.246.0.0/16
       replacement_policy: AUTO
 
   kube_minion_floating:
