@@ -21,6 +21,7 @@ import (
 	"os"
 	"strconv"
 
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -30,10 +31,6 @@ import (
 
 	"github.com/golang/glog"
 )
-
-// Amazon recommends having no more that 40 volumes attached to an instance,
-// and at least one of those is for the system root volume.
-const DefaultMaxEBSVolumes = 39
 
 // GCE instances can have up to 16 PD volumes attached.
 const DefaultMaxGCEPDVolumes = 16
@@ -117,7 +114,7 @@ func defaultPredicates() sets.String {
 			"MaxEBSVolumeCount",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				// TODO: allow for generically parameterized scheduler predicates, because this is a bit ugly
-				maxVols := getMaxVols(DefaultMaxEBSVolumes)
+				maxVols := getMaxVols(aws.DefaultMaxEBSVolumes)
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilter, maxVols, args.PVInfo, args.PVCInfo)
 			},
 		),
