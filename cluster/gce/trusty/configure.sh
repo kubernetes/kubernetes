@@ -254,12 +254,13 @@ assemble_kubelet_flags() {
   if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} ${KUBELET_TEST_ARGS}"
   fi
-  if [ ! -z "${KUBELET_APISERVER:-}" ] && [ ! -z "${KUBELET_CERT:-}" ] && [ ! -z "${KUBELET_KEY:-}" ]; then
+  if [ "${KUBERNETES_MASTER:-}" = "true" ] && \
+     [ ! -z "${KUBELET_APISERVER:-}" ] && \
+     [ ! -z "${KUBELET_CERT:-}" ] && \
+     [ ! -z "${KUBELET_KEY:-}" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --api-servers=https://${KUBELET_APISERVER}"
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --register-schedulable=false --reconcile-cidr=false"
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --pod-cidr=10.123.45.0/30"
-  else
-    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --pod-cidr=${MASTER_IP_RANGE}"
   fi
   if [ "${ENABLE_MANIFEST_URL:-}" = "true" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --manifest-url=${MANIFEST_URL} --manifest-url-header=${MANIFEST_URL_HEADER}"
