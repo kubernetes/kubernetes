@@ -83,10 +83,6 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.StringVar(&g.DropEmbeddedFields, "drop-embedded-fields", g.DropEmbeddedFields, "Comma-delimited list of embedded Go types to omit from generated protobufs")
 }
 
-const (
-	typesKindProtobuf = "Protobuf"
-)
-
 func Run(g *Generator) {
 	if g.Common.VerifyOnly {
 		g.OnlyIDL = true

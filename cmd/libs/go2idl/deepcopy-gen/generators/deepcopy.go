@@ -110,7 +110,7 @@ const (
 type genDeepCopy struct {
 	generator.DefaultGen
 	targetPackage string
-	imports       *generator.ImportTracker
+	imports       namer.ImportTracker
 	typesForInit  []*types.Type
 }
 

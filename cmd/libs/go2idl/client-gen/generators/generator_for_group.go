@@ -31,7 +31,7 @@ type genGroup struct {
 	group         string
 	// types in this group
 	types   []*types.Type
-	imports *generator.ImportTracker
+	imports namer.ImportTracker
 }
 
 var _ generator.Generator = &genGroup{}

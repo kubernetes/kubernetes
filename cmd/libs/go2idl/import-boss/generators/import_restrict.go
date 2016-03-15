@@ -231,7 +231,7 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 // importRules produces a file with a set for a single type.
 type importRules struct {
 	myPackage *types.Package
-	imports   *generator.ImportTracker
+	imports   namer.ImportTracker
 }
 
 var (

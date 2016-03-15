@@ -32,7 +32,7 @@ type genFakeForType struct {
 	outputPackage string
 	group         string
 	typeToMatch   *types.Type
-	imports       *generator.ImportTracker
+	imports       namer.ImportTracker
 }
 
 var _ generator.Generator = &genFakeForType{}

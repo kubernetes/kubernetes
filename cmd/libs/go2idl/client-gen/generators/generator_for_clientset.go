@@ -34,7 +34,7 @@ type genClientset struct {
 	groupVersions      []unversioned.GroupVersion
 	typedClientPath    string
 	outputPackage      string
-	imports            *generator.ImportTracker
+	imports            namer.ImportTracker
 	clientsetGenerated bool
 }
 
