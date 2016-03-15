@@ -152,7 +152,7 @@
                 export E2E_OPT="--check_version_skew=false"
                 export E2E_UP="false"
                 export E2E_DOWN="false"
-                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\]"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\] --upgrade-target={upgrade-target}"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step4-e2e-old'
             runner: '{runner-old}'
@@ -169,7 +169,7 @@
                 export E2E_OPT="--check_version_skew=false"
                 export E2E_UP="false"
                 export E2E_DOWN="false"
-                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:NodeUpgrade\]"
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:NodeUpgrade\] --upgrade-target={upgrade-target}"
         - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
             step: 'step6-e2e-old'
             runner: '{runner-old}'
@@ -200,6 +200,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: '1.0'
             version-new: '1.2'
+            upgrade-target: 'ci/latest-1.2'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.0/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.2/hack/jenkins/e2e-runner.sh" | bash -
             project-env: |
@@ -208,6 +209,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: '1.1'
             version-new: '1.2'
+            upgrade-target: 'ci/latest-1.2'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.2/hack/jenkins/e2e-runner.sh" | bash -
             project-env: |
@@ -216,6 +218,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: 'stable'
             version-new: '1.2'
+            upgrade-target: 'ci/latest-1.2'
             # TODO(ihmccreery) When v1.2.0 gets released, we'll need to point this as the release-1.2 branch, not release-1.1.
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.2/hack/jenkins/e2e-runner.sh" | bash -
@@ -225,6 +228,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: '1.1'
             version-new: 'master'
+            upgrade-target: 'ci/latest'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -
             project-env: |
@@ -233,6 +237,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: '1.2'
             version-new: 'master'
+            upgrade-target: 'ci/latest'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.2/hack/jenkins/e2e-runner.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -
             project-env: |
@@ -251,6 +256,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: '1.0'
             version-new: '1.2'
+            upgrade-target: 'ci/latest-1.2'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.0/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.2/hack/jenkins/e2e-runner.sh" | bash -
             project-env: |
@@ -259,6 +265,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: '1.1'
             version-new: '1.2'
+            upgrade-target: 'ci/latest-1.2'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.2/hack/jenkins/e2e-runner.sh" | bash -
             project-env: |
@@ -267,6 +274,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: 'stable'
             version-new: '1.2'
+            upgrade-target: 'ci/latest-1.2'
             # TODO(ihmccreery) When v1.2.0 gets released, we'll need to point this as the release-1.2 branch, not release-1.1.
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.2/hack/jenkins/e2e-runner.sh" | bash -
@@ -276,6 +284,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: '1.1'
             version-new: 'master'
+            upgrade-target: 'ci/latest'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -
             project-env: |
@@ -284,6 +293,7 @@
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: '1.2'
             version-new: 'master'
+            upgrade-target: 'ci/latest'
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.2/hack/jenkins/e2e-runner.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh" | bash -
             project-env: |
