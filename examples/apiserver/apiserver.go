@@ -32,6 +32,13 @@ import (
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/install"
 )
 
+const (
+	// Ports on which to run the server.
+	// Explicitly setting these to a different value than the default values, to prevent this from clashing with a local cluster.
+	InsecurePort = 8081
+	SecurePort   = 6444
+)
+
 func newStorageDestinations(groupName string, groupMeta *apimachinery.GroupMeta) (*genericapiserver.StorageDestinations, error) {
 	storageDestinations := genericapiserver.NewStorageDestinations()
 	var storageConfig etcdstorage.EtcdStorageConfig
@@ -85,6 +92,9 @@ func Run() error {
 	if err := s.InstallAPIGroups([]genericapiserver.APIGroupInfo{apiGroupInfo}); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
 	}
-	s.Run(genericapiserver.NewServerRunOptions())
+	serverOptions := genericapiserver.NewServerRunOptions()
+	serverOptions.InsecurePort = InsecurePort
+	serverOptions.SecurePort = SecurePort
+	s.Run(serverOptions)
 	return nil
 }
