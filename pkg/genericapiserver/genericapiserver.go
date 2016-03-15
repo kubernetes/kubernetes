@@ -58,6 +58,7 @@ import (
 
 const (
 	DefaultEtcdPathPrefix = "/registry"
+	globalTimeout         = time.Minute
 )
 
 // StorageDestinations is a mapping from API group & resource to
@@ -662,7 +663,7 @@ func (s *GenericAPIServer) Run(options *ServerRunOptions) {
 		if longRunningRequestCheck(req) {
 			return nil, ""
 		}
-		return time.After(time.Minute), ""
+		return time.After(globalTimeout), ""
 	}
 
 	if secureLocation != "" {
