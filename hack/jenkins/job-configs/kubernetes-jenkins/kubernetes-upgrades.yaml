@@ -220,7 +220,7 @@
             runner-old: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh" | bash -
             runner-new: curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.2/hack/jenkins/e2e-runner.sh" | bash -
             project-env: |
-                export E2E_NAME="upgrade-gke-1-1-1-2"
+                export E2E_NAME="upgrade-gke-stable-1-2"
                 export PROJECT="kubernetes-jenkins-gke-upgrade"
         - '{provider}-{version-old}-{version-new}-upgrades':
             version-old: '1.1'
