@@ -69,6 +69,7 @@ cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_serve
 cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
 cluster/saltbase/salt/kubelet/default:  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
 cluster/saltbase/salt/kubelet/default:  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
+cluster/saltbase/salt/kubelet/default:{% if pillar.get('non_masquerade_cidr','') -%}
 cluster/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
 cluster/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
 cluster/saltbase/salt/supervisor/kubelet-checker.sh:	{% set kubelet_port = pillar['kubelet_port'] -%}
