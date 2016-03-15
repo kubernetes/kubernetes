@@ -50,42 +50,6 @@ var eventStorageAgeLimit = flag.String("event_storage_age_limit", "default=24h",
 var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
 var applicationMetricsCountLimit = flag.Int("application_metrics_count_limit", 100, "Max number of application metrics to store (per container)")
 
-var (
-	// Metrics to be ignored.
-	ignoreMetrics metricSetValue = metricSetValue{container.MetricSet{}}
-	// List of metrics that can be ignored.
-	ignoreWhitelist = container.MetricSet{
-		container.DiskUsageMetrics:       struct{}{},
-		container.NetworkUsageMetrics:    struct{}{},
-		container.NetworkTcpUsageMetrics: struct{}{},
-	}
-)
-
-func init() {
-	flag.Var(&ignoreMetrics, "disable_metrics", "comma-separated list of metrics to be disabled. Options are `disk`, `network`, `tcp`. Note: tcp is disabled by default due to high CPU usage.")
-	// Tcp metrics are ignored by default.
-	flag.Set("disable_metrics", "tcp")
-}
-
-type metricSetValue struct {
-	container.MetricSet
-}
-
-func (ml *metricSetValue) String() string {
-	return fmt.Sprint(*ml)
-}
-
-func (ml *metricSetValue) Set(value string) error {
-	for _, metric := range strings.Split(value, ",") {
-		if ignoreWhitelist.Has(container.MetricKind(metric)) {
-			(*ml).Add(container.MetricKind(metric))
-		} else {
-			return fmt.Errorf("unsupported metric %q specified in disable_metrics", metric)
-		}
-	}
-	return nil
-}
-
 // The Manager interface defines operations for starting a manager and getting
 // container and machine information.
 type Manager interface {
@@ -155,7 +119,7 @@ type Manager interface {
 }
 
 // New takes a memory storage and returns a new manager.
-func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool) (Manager, error) {
+func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool, ignoreMetricsSet container.MetricSet) (Manager, error) {
 	if memoryCache == nil {
 		return nil, fmt.Errorf("manager requires memory storage")
 	}
@@ -194,7 +158,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 		startupTime:              time.Now(),
 		maxHousekeepingInterval:  maxHousekeepingInterval,
 		allowDynamicHousekeeping: allowDynamicHousekeeping,
-		ignoreMetrics:            ignoreMetrics.MetricSet,
+		ignoreMetrics:            ignoreMetricsSet,
 	}
 
 	machineInfo, err := getMachineInfo(sysfs, fsInfo, inHostNamespace)

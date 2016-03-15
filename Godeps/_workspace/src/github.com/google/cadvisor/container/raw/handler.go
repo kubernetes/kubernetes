@@ -64,6 +64,12 @@ type rawContainerHandler struct {
 
 	// Metrics to be ignored.
 	ignoreMetrics container.MetricSet
+
+	pid int
+}
+
+func isRootCgroup(name string) bool {
+	return name == "/"
 }
 
 func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *InotifyWatcher, rootFs string, ignoreMetrics container.MetricSet) (container.ContainerHandler, error) {
@@ -94,6 +100,11 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		}
 	}
 
+	pid := 0
+	if isRootCgroup(name) {
+		pid = 1
+	}
+
 	return &rawContainerHandler{
 		name:               name,
 		cgroupSubsystems:   cgroupSubsystems,
@@ -106,6 +117,7 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		watcher:            watcher,
 		rootFs:             rootFs,
 		ignoreMetrics:      ignoreMetrics,
+		pid:                pid,
 	}, nil
 }
 
@@ -150,7 +162,7 @@ func readUInt64(dirpath string, file string) uint64 {
 
 func (self *rawContainerHandler) GetRootNetworkDevices() ([]info.NetInfo, error) {
 	nd := []info.NetInfo{}
-	if self.name == "/" {
+	if isRootCgroup(self.name) {
 		mi, err := self.machineInfoFactory.GetMachineInfo()
 		if err != nil {
 			return nd, err
@@ -278,7 +290,7 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 
 func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 	// Get Filesystem information only for the root cgroup.
-	if self.name == "/" {
+	if isRootCgroup(self.name) {
 		filesystems, err := self.fsInfo.GetGlobalFsInfo()
 		if err != nil {
 			return err
@@ -341,7 +353,7 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 }
 
 func (self *rawContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := libcontainer.GetStats(self.cgroupManager, self.rootFs, os.Getpid(), self.ignoreMetrics)
+	stats, err := libcontainer.GetStats(self.cgroupManager, self.rootFs, self.pid, self.ignoreMetrics)
 	if err != nil {
 		return stats, err
 	}
