@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
@@ -60,11 +61,11 @@ func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, erro
 		return nil, err
 	}
 	if tlsConfig != nil {
-		return &http.Transport{
+		return utilnet.SetTransportDefaults(&http.Transport{
 			TLSClientConfig: tlsConfig,
-		}, nil
+		}), nil
 	}
-	return http.DefaultTransport, nil
+	return utilnet.SetTransportDefaults(&http.Transport{}), nil
 }
 
 func NewHTTPExtender(config *schedulerapi.ExtenderConfig, apiVersion string) (algorithm.SchedulerExtender, error) {
