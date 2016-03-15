@@ -14,29 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package release_1_2
+package internalclientset
 
 import (
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	v1core "k8s.io/kubernetes/pkg/client/typed/generated/core/v1"
-	v1beta1extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/v1beta1"
+	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-// FromUnversionedClient adapts a pkg/client/unversioned#Client to a Clientset.
+// FromUnversionedClient adapts a unversioned.Client to a internalclientset.Clientset.
 // This function is temporary. We will remove it when everyone has moved to using
 // Clientset. New code should NOT use this function.
-func FromUnversionedClient(c *unversioned.Client) *Clientset {
-	var clientset Clientset
+func FromUnversionedClient(c *unversioned.Client) *internalclientset.Clientset {
+	var clientset internalclientset.Clientset
 	if c != nil {
-		clientset.CoreClient = v1core.New(c.RESTClient)
+		clientset.CoreClient = unversionedcore.New(c.RESTClient)
 	} else {
-		clientset.CoreClient = v1core.New(nil)
+		clientset.CoreClient = unversionedcore.New(nil)
 	}
 	if c != nil && c.ExtensionsClient != nil {
-		clientset.ExtensionsClient = v1beta1extensions.New(c.ExtensionsClient.RESTClient)
+		clientset.ExtensionsClient = unversionedextensions.New(c.ExtensionsClient.RESTClient)
 	} else {
-		clientset.ExtensionsClient = v1beta1extensions.New(nil)
+		clientset.ExtensionsClient = unversionedextensions.New(nil)
 	}
 
 	if c != nil && c.DiscoveryClient != nil {
