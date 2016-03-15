@@ -58,6 +58,7 @@ type APIServer struct {
 	EnableLogsSupport          bool
 	EnableProfiling            bool
 	EnableWatchCache           bool
+	EnableSwaggerUI            bool
 	EtcdServersOverrides       []string
 	EtcdConfig                 etcdstorage.EtcdConfig
 	EventTTL                   time.Duration
@@ -244,6 +245,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	// TODO: enable cache in integration tests.
 	fs.BoolVar(&s.EnableWatchCache, "watch-cache", true, "Enable watch caching in the apiserver")
+	fs.BoolVar(&s.EnableSwaggerUI, "enable-swagger-ui", false, "Enables swagger ui on the apiserver at /swagger-ui")
 	fs.StringVar(&s.ExternalHost, "external-hostname", "", "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", 400, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", 1800, "An optional field indicating the minimum number of seconds a handler must keep a request open before timing it out. Currently only honored by the watch request handler, which picks a randomized value above this number as the connection timeout, to spread out load.")

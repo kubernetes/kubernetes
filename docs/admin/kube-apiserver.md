@@ -67,6 +67,7 @@ kube-apiserver
       --cloud-provider="": The provider for cloud services.  Empty string for no provider.
       --cors-allowed-origins=[]: List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.
       --delete-collection-workers=1: Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.
+      --enable-swagger-ui[=false]: Enables swagger ui on the apiserver at /swagger-ui
       --etcd-cafile="": SSL Certificate Authority file used to secure etcd communication
       --etcd-certfile="": SSL certification file used to secure etcd communication
       --etcd-keyfile="": SSL key file used to secure etcd communication

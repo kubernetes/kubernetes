@@ -451,6 +451,7 @@ func Run(s *options.APIServer) error {
 			EnableLogsSupport:         s.EnableLogsSupport,
 			EnableUISupport:           true,
 			EnableSwaggerSupport:      true,
+			EnableSwaggerUI:           s.EnableSwaggerUI,
 			EnableProfiling:           s.EnableProfiling,
 			EnableWatchCache:          s.EnableWatchCache,
 			EnableIndex:               true,
