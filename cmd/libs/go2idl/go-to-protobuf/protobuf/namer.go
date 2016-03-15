@@ -107,7 +107,7 @@ func assignGoTypeToProtoPackage(p *protobufPackage, t *types.Type, local, global
 	if otherP, ok := global[t.Name]; ok {
 		if _, ok := local[t.Name]; !ok {
 			p.Imports.AddType(&types.Type{
-				Kind: typesKindProtobuf,
+				Kind: types.Protobuf,
 				Name: otherP.ProtoTypeName(),
 			})
 		}
