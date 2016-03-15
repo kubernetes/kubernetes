@@ -1680,11 +1680,15 @@ type ReplicationControllerStatus struct {
 	Replicas int32 `json:"replicas"`
 
 	// The number of pods that have labels matching the labels of the pod template of the replication controller.
+<<<<<<< a99238d61857a238dbfb230019565dce8386772c
 <<<<<<< f3ee61a1b4cf98bdba321c3250dddb950ca66423
 	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas,omitempty"`
 =======
 	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas"`
 >>>>>>> Merge pull request #22847 from caesarxuchao/matching-replicas
+=======
+	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas,omitempty"`
+>>>>>>> Merge pull request #23012 from caesarxuchao/fix-22996
 
 	// ObservedGeneration reflects the generation of the most recently observed replication controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

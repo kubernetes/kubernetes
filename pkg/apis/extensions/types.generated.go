@@ -14844,16 +14844,20 @@ func (x *ReplicaSetStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq2 [3]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
+<<<<<<< a99238d61857a238dbfb230019565dce8386772c
 <<<<<<< f3ee61a1b4cf98bdba321c3250dddb950ca66423
 			yyq2[1] = x.FullyLabeledReplicas != 0
 =======
 >>>>>>> Merge pull request #22847 from caesarxuchao/matching-replicas
+=======
+			yyq2[1] = x.FullyLabeledReplicas != 0
+>>>>>>> Merge pull request #23012 from caesarxuchao/fix-22996
 			yyq2[2] = x.ObservedGeneration != 0
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(3)
 			} else {
-				yynn2 = 2
+				yynn2 = 1
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -14883,21 +14887,27 @@ func (x *ReplicaSetStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym7 := z.EncBinary()
-				_ = yym7
-				if false {
+				if yyq2[1] {
+					yym7 := z.EncBinary()
+					_ = yym7
+					if false {
+					} else {
+						r.EncodeInt(int64(x.FullyLabeledReplicas))
+					}
 				} else {
-					r.EncodeInt(int64(x.FullyLabeledReplicas))
+					r.EncodeInt(0)
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("fullyLabeledReplicas"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym8 := z.EncBinary()
-				_ = yym8
-				if false {
-				} else {
-					r.EncodeInt(int64(x.FullyLabeledReplicas))
+				if yyq2[1] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("fullyLabeledReplicas"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym8 := z.EncBinary()
+					_ = yym8
+					if false {
+					} else {
+						r.EncodeInt(int64(x.FullyLabeledReplicas))
+					}
 				}
 			}
 			if yyr2 || yy2arr2 {
