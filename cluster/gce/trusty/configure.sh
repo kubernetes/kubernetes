@@ -711,9 +711,12 @@ prepare_kube_addons() {
     file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
     setup_addon_manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    heapster_memory="200Mi"
-    if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -gt 1 ]; then
-      heapster_memory="$((${NUM_NODES} * 3 + 200))Mi"
+    metrics_memory="200Mi"
+    eventer_memory="200Mi"
+    if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -ge 1 ]; then
+      num_kube_nodes="$((${NUM_NODES}-1))"
+      metrics_memory="$((${num_kube_nodes} * 4 + 200))Mi"
+      eventer_memory="$((${num_kube_nodes} * 500 + 200 * 1024))Ki"
     fi
     controller_yaml="${addon_dst_dir}/${file_dir}"
     if [ "${ENABLE_CLUSTER_MONITORING:-}" = "googleinfluxdb" ]; then
@@ -722,7 +725,8 @@ prepare_kube_addons() {
       controller_yaml="${controller_yaml}/heapster-controller.yaml"
     fi
     remove_salt_config_comments "${controller_yaml}"
-    sed -i -e "s@{{ *heapster_memory *}}@${heapster_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_memory *}}@${metrics_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *eventer_memory *}}@${eventer_memory}@g" "${controller_yaml}"
   fi
   cp "${addon_src_dir}/namespace.yaml" "${addon_dst_dir}"
   if [ "${ENABLE_L7_LOADBALANCING:-}" = "glbc" ]; then
