@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -65,13 +67,11 @@ func resizeGroup(size int) error {
 			Logf("Failed to resize node instance group: %v", string(output))
 		}
 		return err
+	} else if testContext.Provider == "aws" {
+		client := autoscaling.New(session.New())
+		return awscloud.ResizeInstanceGroup(client, testContext.CloudConfig.NodeInstanceGroup, size)
 	} else {
-		// Supported by aws
-		instanceGroups, ok := testContext.CloudConfig.Provider.(awscloud.InstanceGroups)
-		if !ok {
-			return fmt.Errorf("Provider does not support InstanceGroups")
-		}
-		return instanceGroups.ResizeInstanceGroup(testContext.CloudConfig.NodeInstanceGroup, size)
+		return fmt.Errorf("Provider does not support InstanceGroups")
 	}
 }
 
@@ -87,13 +87,9 @@ func groupSize() (int, error) {
 		}
 		re := regexp.MustCompile("RUNNING")
 		return len(re.FindAllString(string(output), -1)), nil
-	} else {
-		// Supported by aws
-		instanceGroups, ok := testContext.CloudConfig.Provider.(awscloud.InstanceGroups)
-		if !ok {
-			return -1, fmt.Errorf("provider does not support InstanceGroups")
-		}
-		instanceGroup, err := instanceGroups.DescribeInstanceGroup(testContext.CloudConfig.NodeInstanceGroup)
+	} else if testContext.Provider == "aws" {
+		client := autoscaling.New(session.New())
+		instanceGroup, err := awscloud.DescribeInstanceGroup(client, testContext.CloudConfig.NodeInstanceGroup)
 		if err != nil {
 			return -1, fmt.Errorf("error describing instance group: %v", err)
 		}
@@ -101,6 +97,8 @@ func groupSize() (int, error) {
 			return -1, fmt.Errorf("instance group not found: %s", testContext.CloudConfig.NodeInstanceGroup)
 		}
 		return instanceGroup.CurrentSize()
+	} else {
+		return -1, fmt.Errorf("provider does not support InstanceGroups")
 	}
 }
 

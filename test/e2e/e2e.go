@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -36,7 +35,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -125,21 +123,8 @@ func setupProviderConfig() error {
 		}
 
 	case "aws":
-		awsConfig := "[Global]\n"
 		if cloudConfig.Zone == "" {
 			return fmt.Errorf("gce-zone must be specified for AWS")
-		}
-		awsConfig += fmt.Sprintf("Zone=%s\n", cloudConfig.Zone)
-
-		if cloudConfig.ClusterTag == "" {
-			return fmt.Errorf("--cluster-tag must be specified for AWS")
-		}
-		awsConfig += fmt.Sprintf("KubernetesClusterTag=%s\n", cloudConfig.ClusterTag)
-
-		var err error
-		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(testContext.Provider, strings.NewReader(awsConfig))
-		if err != nil {
-			return fmt.Errorf("Error building AWS provider: %v", err)
 		}
 
 	}
