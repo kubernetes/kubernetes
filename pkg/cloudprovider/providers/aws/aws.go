@@ -80,6 +80,11 @@ const MaxReadThenCreateRetries = 30
 // need hardcoded defaults.
 const DefaultVolumeType = "gp2"
 
+// Amazon recommends having no more that 40 volumes attached to an instance,
+// and at least one of those is for the system root volume.
+// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
+const DefaultMaxEBSVolumes = 39
+
 // Used to call aws_credentials.Init() just once
 var once sync.Once
 
@@ -902,10 +907,17 @@ type mountDevice string
 // TODO: Also return number of mounts allowed?
 func (self *awsInstanceType) getEBSMountDevices() []mountDevice {
 	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html
+	// We will generate "ba", "bb", "bc"..."bz", "ca", ..., up to DefaultMaxEBSVolumes
 	devices := []mountDevice{}
-	for c := 'f'; c <= 'p'; c++ {
-		devices = append(devices, mountDevice(fmt.Sprintf("%c", c)))
+	count := 0
+	for first := 'b'; count < DefaultMaxEBSVolumes; first++ {
+		for second := 'a'; count < DefaultMaxEBSVolumes && second <= 'z'; second++ {
+			device := mountDevice(fmt.Sprintf("%c%c", first, second))
+			devices = append(devices, device)
+			count++
+		}
 	}
+
 	return devices
 }
 
@@ -1014,7 +1026,7 @@ func (self *awsInstance) getMountDevice(volumeID string, assign bool) (assigned 
 		if strings.HasPrefix(name, "/dev/xvd") {
 			name = name[8:]
 		}
-		if len(name) != 1 {
+		if len(name) < 1 || len(name) > 2 {
 			glog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
 		}
 		deviceMappings[mountDevice(name)] = aws.StringValue(blockDevice.Ebs.VolumeId)
@@ -1051,7 +1063,7 @@ func (self *awsInstance) getMountDevice(volumeID string, assign bool) (assigned 
 
 	if chosen == "" {
 		glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v, valid=%v", deviceMappings, valid)
-		return "", false, nil
+		return "", false, fmt.Errorf("Too many EBS volumes attached to node %s.", self.nodeName)
 	}
 
 	self.attaching[chosen] = volumeID
