@@ -36,36 +36,22 @@ Documentation for other releases can be found at
 
 This process employs building two docker images, one compiles the source and the other hosts the compiled binaries.
 
-Releasing the image requires that you have access to the docker registry user account which will host the image.
+Releasing the image requires that you have access to the docker registry user account which will host the image. You can specify the registry including the user account by setting the environment variable `REGISTRY`.
 
 To build and release the guestbook image:
 
     cd examples/guestbook-go/_src
-    ./script/release.sh
+    make release
 
-#### Step by step
+To build and release the guestbook image with a different registry and version:
 
-If you may want to, you can build and push the image step by step.
+    VERSION=v4 REGISTRY="docker.io/luebken" make build
 
-###### Start fresh before building
+If you want to, you can build and push the image step by step:
 
-    ./script/clean.sh 2> /dev/null
-
-###### Build
-
-Builds a docker image that builds the app and packages it into a minimal docker image
-
-    ./script/build.sh
-
-###### Push
-
-Accepts an optional tag (defaults to "latest")
-
-    ./script/push.sh [TAG]
-
-###### Clean up
-
-    ./script/clean.sh
+    make clean
+    make build
+    make push
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
