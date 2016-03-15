@@ -144,6 +144,7 @@ script
 		--system-cgroups=/system \
 		--runtime-cgroups=/docker-daemon \
 		--kubelet-cgroups=/kubelet \
+		--babysit-daemons=true \
 		${KUBELET_CMD_FLAGS} 1>>/var/log/kubelet.log 2>&1
 end script
 
