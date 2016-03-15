@@ -75,7 +75,6 @@ readonly DOCKER_MOUNT_ARGS_BASE=(
   --volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}"
   --volume /etc/localtime:/etc/localtime:ro
 )
-# DOCKER_MOUNT_ARGS=("${DOCKER_MOUNT_ARGS_BASE[@]}" --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
 
 # We create a Docker data container to cache incremental build artifacts.  We
 # need to cache both the go tree in _output and the go tree under Godeps.
