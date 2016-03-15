@@ -27,27 +27,35 @@ import (
 // AWSCloud implements InstanceGroups
 var _ InstanceGroups = &AWSCloud{}
 
-// Implement InstanceGroups.ResizeInstanceGroup
-// Set the size to the fixed size
-func (a *AWSCloud) ResizeInstanceGroup(instanceGroupName string, size int) error {
+// ResizeInstanceGroup sets the size of the specificed instancegroup Exported
+// so it can be used by the e2e tests, which don't want to instantiate a full
+// cloudprovider.
+func ResizeInstanceGroup(asg ASG, instanceGroupName string, size int) error {
 	request := &autoscaling.UpdateAutoScalingGroupInput{
 		AutoScalingGroupName: aws.String(instanceGroupName),
 		MinSize:              aws.Int64(int64(size)),
 		MaxSize:              aws.Int64(int64(size)),
 	}
-	if _, err := a.asg.UpdateAutoScalingGroup(request); err != nil {
+	if _, err := asg.UpdateAutoScalingGroup(request); err != nil {
 		return fmt.Errorf("error resizing AWS autoscaling group: %v", err)
 	}
 	return nil
 }
 
-// Implement InstanceGroups.DescribeInstanceGroup
-// Queries the cloud provider for information about the specified instance group
-func (a *AWSCloud) DescribeInstanceGroup(instanceGroupName string) (InstanceGroupInfo, error) {
+// Implement InstanceGroups.ResizeInstanceGroup
+// Set the size to the fixed size
+func (a *AWSCloud) ResizeInstanceGroup(instanceGroupName string, size int) error {
+	return ResizeInstanceGroup(a.asg, instanceGroupName, size)
+}
+
+// DescribeInstanceGroup gets info about the specified instancegroup
+// Exported so it can be used by the e2e tests,
+// which don't want to instantiate a full cloudprovider.
+func DescribeInstanceGroup(asg ASG, instanceGroupName string) (InstanceGroupInfo, error) {
 	request := &autoscaling.DescribeAutoScalingGroupsInput{
 		AutoScalingGroupNames: []*string{aws.String(instanceGroupName)},
 	}
-	response, err := a.asg.DescribeAutoScalingGroups(request)
+	response, err := asg.DescribeAutoScalingGroups(request)
 	if err != nil {
 		return nil, fmt.Errorf("error listing AWS autoscaling group (%s): %v", instanceGroupName, err)
 	}
@@ -60,6 +68,12 @@ func (a *AWSCloud) DescribeInstanceGroup(instanceGroupName string) (InstanceGrou
 	}
 	group := response.AutoScalingGroups[0]
 	return &awsInstanceGroup{group: group}, nil
+}
+
+// Implement InstanceGroups.DescribeInstanceGroup
+// Queries the cloud provider for information about the specified instance group
+func (a *AWSCloud) DescribeInstanceGroup(instanceGroupName string) (InstanceGroupInfo, error) {
+	return DescribeInstanceGroup(a.asg, instanceGroupName)
 }
 
 // awsInstanceGroup implements InstanceGroupInfo
