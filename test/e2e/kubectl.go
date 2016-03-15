@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -1203,9 +1204,9 @@ func curlUnix(url string, path string) (string, error) {
 	dial := func(proto, addr string) (net.Conn, error) {
 		return net.Dial("unix", path)
 	}
-	transport := &http.Transport{
+	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Dial: dial,
-	}
+	})
 	return curlTransport(url, transport)
 }
 
@@ -1224,7 +1225,7 @@ func curlTransport(url string, transport *http.Transport) (string, error) {
 }
 
 func curl(url string) (string, error) {
-	return curlTransport(url, &http.Transport{})
+	return curlTransport(url, utilnet.SetTransportDefaults(&http.Transport{}))
 }
 
 func validateGuestbookApp(c *client.Client, ns string) {

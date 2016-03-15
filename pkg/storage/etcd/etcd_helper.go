@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/watch"
 
 	etcd "github.com/coreos/etcd/client"
@@ -102,7 +103,7 @@ func (c *EtcdConfig) newHttpTransport() (*http.Transport, error) {
 
 	// Copied from etcd.DefaultTransport declaration.
 	// TODO: Determine if transport needs optimization
-	tr := &http.Transport{
+	tr := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		Dial: (&net.Dialer{
 			Timeout:   30 * time.Second,
@@ -111,7 +112,7 @@ func (c *EtcdConfig) newHttpTransport() (*http.Transport, error) {
 		TLSHandshakeTimeout: 10 * time.Second,
 		MaxIdleConnsPerHost: 500,
 		TLSClientConfig:     cfg,
-	}
+	})
 
 	return tr, nil
 }
