@@ -57,6 +57,18 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
 	if len(a.GetNamespace()) == 0 || a.GetKind() == api.Kind("Namespace") {
+		// if a namespace is deleted, we want to prevent all further creates into it
+		// while it is undergoing termination.  to reduce incidences where the cache
+		// is slow to update, we forcefully remove the namespace from our local cache.
+		// this will cause a live lookup of the namespace to get its latest state even
+		// before the watch notification is received.
+		if a.GetOperation() == admission.Delete {
+			l.store.Delete(&api.Namespace{
+				ObjectMeta: api.ObjectMeta{
+					Name: a.GetName(),
+				},
+			})
+		}
 		return nil
 	}
 
