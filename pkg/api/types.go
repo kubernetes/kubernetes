@@ -1381,7 +1381,7 @@ type ReplicationControllerStatus struct {
 	Replicas int `json:"replicas"`
 
 	// The number of pods that have labels matching the labels of the pod template of the replication controller.
-	FullyLabeledReplicas int `json:"fullyLabeledReplicas"`
+	FullyLabeledReplicas int `json:"fullyLabeledReplicas,omitempty"`
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
