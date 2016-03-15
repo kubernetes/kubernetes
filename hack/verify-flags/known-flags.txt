@@ -137,6 +137,7 @@ gather-resource-usage
 gce-project
 gce-service-account
 gce-zone
+global-housekeeping-interval
 gke-cluster
 go-header-file
 google-json-key
@@ -150,6 +151,7 @@ host-network-sources
 host-pid-sources
 host-port-endpoints
 hostname-override
+housekeeping-interval
 http-check-frequency
 http-port
 ignore-daemonsets

@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	log "github.com/golang/glog"
 	"github.com/kardianos/osext"
@@ -74,6 +75,9 @@ type MinionServer struct {
 	proxyMode                      string
 	conntrackMax                   int
 	conntrackTCPTimeoutEstablished int
+
+	globalHousekeepingInterval time.Duration
+	housekeepingInterval       time.Duration
 }
 
 // NewMinionServer creates the MinionServer struct with default values to be used by hyperkube
@@ -180,6 +184,9 @@ func (ms *MinionServer) launchExecutorServer(containerID string) <-chan struct{}
 	if ms.cgroupRoot != "" {
 		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
 	}
+
+	executorArgs = append(executorArgs, "--housekeeping_interval="+ms.housekeepingInterval.String())
+	executorArgs = append(executorArgs, "--global_housekeeping_interval="+ms.globalHousekeepingInterval.String())
 
 	// forward containerID so that the executor may pass it along to containers that it launches
 	var ctidOpt tasks.Option
@@ -346,6 +353,9 @@ func (ms *MinionServer) AddExecutorFlags(fs *pflag.FlagSet) {
 
 	// hack to forward log verbosity flag to the executor
 	fs.Int32Var(&ms.logVerbosity, "v", ms.logVerbosity, "log level for V logs")
+	// hacks to forward selected cadvisor flags to the executor
+	fs.DurationVar(&ms.housekeepingInterval, "housekeeping_interval", ms.housekeepingInterval, "Interval between container housekeepings")
+	fs.DurationVar(&ms.globalHousekeepingInterval, "global_housekeeping_interval", ms.globalHousekeepingInterval, "Interval between container global housekeepings")
 }
 
 func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
