@@ -23,25 +23,27 @@ import (
 
 // Cache collects pods' information and provides node-level aggregated information.
 // It's intended for generic scheduler to do efficient lookup.
-// Cache's operations are pod centric. It incrementally updates itself based on pod events.
+// Cache's operations are pod centric. It does incremental updates based on pod events.
 // Pod events are sent via network. We don't have guaranteed delivery of all events:
 // We use Reflector to list and watch from remote.
 // Reflector might be slow and do a relist, which would lead to missing events.
 //
 // State Machine of a pod's events in scheduler's cache:
 //
-//                                                +-------+
-//                                                |       |
-//                                                |       | Update
-//           Assume                Add            +       |
-// Initial +--------> Assumed +------------+---> Added <--+
-//                       +                 |       +
-//                       |                 |       |
-//                       |             Add |       | Remove
-//                       |                 |       |
-//                       |                 +       |
-//                       +-------------> Expired   +----> Deleted
+//
+//   +-------------------------------------------+  +----+
+//   |                            Add            |  |    |
+//   |                                           |  |    | Update
+//   +      Assume                Add            v  v    |
+//Initial +--------> Assumed +------------+---> Added <--+
+//                      +                 |       +
+//                      |                 |       |
+//                      |             Add |       | Remove
+//                      |                 |       |
+//                      |                 +       |
+//                      +-------------> Expired   +----> Deleted
 //                          Expire
+//
 //
 // Note that an assumed pod can expire, because if we haven't received Add event notifying us
 // for a while, there might be some problems and we shouldn't keep the pod in cache anymore.
@@ -49,6 +51,7 @@ import (
 // Note that "Initial", "Expired", and "Deleted" pods do not actually exist in cache.
 // Based on existing use cases, we are making the following assumptions:
 // - No pod would be assumed twice
+// - A pod could be added without going through scheduler. In this case, we will see Add but not Assume event.
 // - If a pod wasn't added, it wouldn't be removed or updated.
 // - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
 //   a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.

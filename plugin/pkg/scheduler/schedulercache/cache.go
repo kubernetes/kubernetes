@@ -59,7 +59,7 @@ type schedulerCache struct {
 type podState struct {
 	pod *api.Pod
 	// Used by assumedPod to determinate expiration.
-	deadline time.Time
+	deadline *time.Time
 }
 
 func newSchedulerCache(ttl, period time.Duration, stop chan struct{}) *schedulerCache {
@@ -120,9 +120,10 @@ func (cache *schedulerCache) assumePodIfBindSucceed(pod *api.Pod, bind func() bo
 	}
 
 	cache.addPod(pod)
+	dl := now.Add(cache.ttl)
 	ps := &podState{
 		pod:      pod,
-		deadline: now.Add(cache.ttl),
+		deadline: &dl,
 	}
 	cache.podStates[key] = ps
 	cache.assumedPods[key] = true
@@ -142,9 +143,14 @@ func (cache *schedulerCache) AddPod(pod *api.Pod) error {
 	switch {
 	case ok && cache.assumedPods[key]:
 		delete(cache.assumedPods, key)
+		cache.podStates[key].deadline = nil
 	case !ok:
 		// Pod was expired. We should add it back.
 		cache.addPod(pod)
+		ps := &podState{
+			pod: pod,
+		}
+		cache.podStates[key] = ps
 	default:
 		return fmt.Errorf("pod was already in added state. Pod key: %v", key)
 	}
@@ -246,7 +252,7 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 		if !ok {
 			panic("Key found in assumed set but not in podStates. Potentially a logical error.")
 		}
-		if now.After(ps.deadline) {
+		if now.After(*ps.deadline) {
 			if err := cache.expirePod(key, ps); err != nil {
 				glog.Errorf(" expirePod failed for %s: %v", key, err)
 			}
