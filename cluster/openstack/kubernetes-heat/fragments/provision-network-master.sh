@@ -49,8 +49,7 @@ cat <<EOF > /etc/flannel-config.json
   "Network": "${CONTAINER_SUBNET}",
   "SubnetLen": 24,
   "Backend": {
-    "Type": "udp",
-    "Port": 8285
+    "Type": "host-gw"
   }
 }
 EOF

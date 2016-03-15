@@ -144,21 +144,23 @@ resources:
         - protocol: tcp
           port_range_min: 22
           port_range_max: 22
+        - remote_mode: remote_group_id
 
-  secgroup_kubernetes:
+  secgroup_master:
     type: OS::Neutron::SecurityGroup
     properties:
       rules:
-        - protocol: tcp # etcd for flanneld
-          port_range_min: 4379
-          port_range_max: 4380
-        - protocol: udp # flannel backend
-          port_range_min: 8285
-          port_range_max: 8285
         - protocol: tcp # api-server
           port_range_min: 443
           port_range_max: 443
 
+  secgroup_node:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      rules:
+        - protocol: icmp
+        - protocol: tcp
+        - protocol: udp
 
   ######################################################################
   #
@@ -261,9 +263,11 @@ resources:
       network: {get_resource: fixed_network}
       security_groups:
         - {get_resource: secgroup_base}
-        - {get_resource: secgroup_kubernetes}
+        - {get_resource: secgroup_master}
       fixed_ips:
         - subnet: {get_resource: fixed_subnet}
+      allowed_address_pairs:
+        - ip_address: 10.246.0.0/16
       replacement_policy: AUTO
 
   kube_master_floating:
@@ -302,6 +306,8 @@ resources:
           wait_condition_timeout: {get_param: wait_condition_timeout}
           metadata: {"metering.stack": {get_param: "OS::stack_id"}}
           cluster_name: {get_param: "OS::stack_name"}
+          secgroup_base: {get_resource: secgroup_base}
+          secgroup_node: {get_resource: secgroup_node}
       min_size: {get_param: number_of_minions}
       desired_capacity: {get_param: number_of_minions}
       max_size: {get_param: max_number_of_minions}
