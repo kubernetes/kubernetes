@@ -90,7 +90,7 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 func getRequestedCPU(pod api.Pod) int64 {
 	var result int64
 	for _, container := range pod.Spec.Containers {
-		result += container.Resources.Limits.Cpu().MilliValue()
+		result += container.Resources.Requests.Cpu().MilliValue()
 	}
 	return result
 }
@@ -306,6 +306,9 @@ var _ = Describe("SchedulerPredicates", func() {
 						Image: "gcr.io/google_containers/pause:go",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
+								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+							},
+							Requests: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 							},
 						},
