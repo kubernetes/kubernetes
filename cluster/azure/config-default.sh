@@ -31,10 +31,6 @@ AZURE_USERNAME="${AZURE_USERNAME:-"kube"}"
 # Initial number of worker nodes to provision
 NUM_NODES=${NUM_NODES:-3}
 
-# The Azure Active Directoy (AAD) TenantID to which the subscription belongs.
-# This should be a GUID.
-AZURE_TENANT_ID="${AZURE_TENANT_ID:-}"
-
 # The target Azure subscription ID
 # This should be a GUID.
 AZURE_SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
