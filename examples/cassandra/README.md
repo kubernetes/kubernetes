@@ -183,7 +183,7 @@ metadata:
   # labels:
     # app: cassandra
 spec:
-  replicas: 2
+  replicas: 1
   # The selector will be applied automatically
   # from the labels in the pod template, if not set.
   # selector:
