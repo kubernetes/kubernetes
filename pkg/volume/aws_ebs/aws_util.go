@@ -170,6 +170,8 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (strin
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
 func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.String) (string, error) {
 	var awsCloud *aws.AWSCloud
+	var attachError error
+
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
 		var err error
 		if awsCloud == nil {
@@ -186,9 +188,10 @@ func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.Strin
 			glog.Warningf("Retrying attach for EBS Disk %q (retry count=%v).", b.volumeID, numRetries)
 		}
 
-		devicePath, err := awsCloud.AttachDisk(b.volumeID, "", b.readOnly)
-		if err != nil {
-			glog.Errorf("Error attaching PD %q: %v", b.volumeID, err)
+		var devicePath string
+		devicePath, attachError = awsCloud.AttachDisk(b.volumeID, "", b.readOnly)
+		if attachError != nil {
+			glog.Errorf("Error attaching PD %q: %v", b.volumeID, attachError)
 			time.Sleep(errorSleepDuration)
 			continue
 		}
@@ -212,6 +215,9 @@ func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.Strin
 		}
 	}
 
+	if attachError != nil {
+		return "", fmt.Errorf("Could not attach EBS Disk %q: %v", b.volumeID, attachError)
+	}
 	return "", fmt.Errorf("Could not attach EBS Disk %q. Timeout waiting for mount paths to be created.", b.volumeID)
 }
 

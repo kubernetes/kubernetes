@@ -7877,8 +7877,7 @@
     "id": "v1beta1.ReplicaSetStatus",
     "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
     "required": [
-     "replicas",
-     "fullyLabeledReplicas"
+     "replicas"
     ],
     "properties": {
      "replicas": {

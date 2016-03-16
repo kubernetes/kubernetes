@@ -101,6 +101,12 @@ var (
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
 	deploymentsVersion = version.MustParse("v1.2.0-alpha.7.726")
+
+	// Pod probe parameters were introduced in #15967 (v1.2) so we dont expect tests that use
+	// these probe parameters to work on clusters before that.
+	//
+	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
+	podProbeParametersVersion = version.MustParse("v1.2.0-alpha.4")
 )
 
 var _ = Describe("Kubectl client", func() {
@@ -271,7 +277,18 @@ var _ = Describe("Kubectl client", func() {
 			}
 			// start exec-proxy-tester container
 			netexecPodPath := filepath.Join(testContext.RepoRoot, "test/images/netexec/pod.yaml")
-			runKubectlOrDie("create", "-f", netexecPodPath, fmt.Sprintf("--namespace=%v", ns))
+
+			// Add "validate=false" if the server version is less than 1.2.
+			// More details: https://github.com/kubernetes/kubernetes/issues/22884.
+			validateFlag := "--validate=true"
+			gte, err := serverVersionGTE(podProbeParametersVersion, c)
+			if err != nil {
+				Failf("Failed to get server version: %v", err)
+			}
+			if !gte {
+				validateFlag = "--validate=false"
+			}
+			runKubectlOrDie("create", "-f", netexecPodPath, fmt.Sprintf("--namespace=%v", ns), validateFlag)
 			checkPodsRunningReady(c, ns, []string{netexecContainer}, podStartTimeout)
 			// Clean up
 			defer cleanup(netexecPodPath, ns, netexecPodSelector)
