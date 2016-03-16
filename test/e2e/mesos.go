@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Mesos", func() {
+var _ = KubeDescribe("Mesos", func() {
 	framework := NewDefaultFramework("pods")
 	var c *client.Client
 	var ns string

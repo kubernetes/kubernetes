@@ -413,3 +413,9 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 	err := cmd.Run()
 	return stdout.Bytes(), stderr.Bytes(), err
 }
+
+// Wrapper function for ginkgo describe.  Adds namespacing.
+// TODO: Support type safe tagging as well https://github.com/kubernetes/kubernetes/pull/22401.
+func KubeDescribe(text string, body func()) bool {
+	return Describe("[k8s.io] "+text, body)
+}

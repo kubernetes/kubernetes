@@ -137,7 +137,7 @@ func nodeUpgradeGKE(v string) error {
 	return err
 }
 
-var _ = Describe("Upgrade [Feature:Upgrade]", func() {
+var _ = KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 
 	svcName, replicas := "baz", 2
 	var rcName, ip, v string
@@ -190,7 +190,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 		w.Cleanup()
 	})
 
-	Describe("master upgrade", func() {
+	KubeDescribe("master upgrade", func() {
 		It("should maintain responsive services [Feature:MasterUpgrade]", func() {
 			By("Validating cluster before master upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
@@ -203,7 +203,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 		})
 	})
 
-	Describe("node upgrade", func() {
+	KubeDescribe("node upgrade", func() {
 		var tmplBefore, tmplAfter string
 		BeforeEach(func() {
 			if providerIs("gce") {

@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster level logging using Elasticsearch [Feature:Elasticsearch]", func() {
+var _ = KubeDescribe("Cluster level logging using Elasticsearch [Feature:Elasticsearch]", func() {
 	f := NewDefaultFramework("es-logging")
 
 	BeforeEach(func() {

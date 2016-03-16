@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("SSH", func() {
+var _ = KubeDescribe("SSH", func() {
 
 	f := NewDefaultFramework("ssh")
 

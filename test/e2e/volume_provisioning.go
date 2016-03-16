@@ -36,7 +36,7 @@ const (
 	expectedSize = "2Gi"
 )
 
-var _ = Describe("Dynamic provisioning", func() {
+var _ = KubeDescribe("Dynamic provisioning", func() {
 	framework := NewDefaultFramework("volume-provisioning")
 
 	// filled in BeforeEach
@@ -48,7 +48,7 @@ var _ = Describe("Dynamic provisioning", func() {
 		ns = framework.Namespace.Name
 	})
 
-	Describe("DynamicProvisioner", func() {
+	KubeDescribe("DynamicProvisioner", func() {
 		It("should create and delete persistent volumes", func() {
 			SkipUnlessProviderIs("openstack", "gce", "aws")
 			By("creating a claim with a dynamic provisioning annotation")

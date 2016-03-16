@@ -48,7 +48,7 @@ const (
 	restartPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = Describe("Restart [Disruptive]", func() {
+var _ = KubeDescribe("Restart [Disruptive]", func() {
 	f := NewDefaultFramework("restart")
 	var ps *podStore
 

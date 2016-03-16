@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("Monitoring", func() {
+var _ = KubeDescribe("Monitoring", func() {
 	f := NewDefaultFramework("monitoring")
 
 	BeforeEach(func() {
