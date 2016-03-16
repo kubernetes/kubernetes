@@ -45,4 +45,5 @@ sed -e 's/{{cloud_provider}}//' -i /srv/salt/kubelet/default
 # salt-call wants to start docker daemon but is unable to.
 # See <https://github.com/projectatomic/docker-storage-setup/issues/77>.
 # Run salt-call in background and make cloud-final finished.
-salt-call --local state.highstate && $$wc_notify --data-binary '{"status": "SUCCESS"}' || $$wc_notify --data-binary '{"status": "FAILURE"}' &
+# Salt-call might be unstable in some environments, execute it twice.
+salt-call --local state.highstate && salt-call --local state.highstate && $$wc_notify --data-binary '{"status": "SUCCESS"}' || $$wc_notify --data-binary '{"status": "FAILURE"}' &
