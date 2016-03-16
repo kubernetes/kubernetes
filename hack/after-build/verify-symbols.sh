@@ -29,13 +29,19 @@ BADSYMBOLS=(
   "testify"
   "testing[.]"
 )
-# Join symbols with OR '\|' pattern
-PATTERN="$(printf '\|%s' "${BADSYMBOLS[@]}" | tail -c +3)"
 
 # b/c hyperkube binds everything simply check that for bad symbols
-if nm ${KUBE_OUTPUT_HOSTBIN}/hyperkube | grep "${PATTERN}"; then
-  echo "output binaries contain bad symbols"
-  exit 1
-fi
+SYMBOLS="$(nm ${KUBE_OUTPUT_HOSTBIN}/hyperkube)"
+
+RESULT=0
+for BADSYMBOL in "${BADSYMBOLS[@]}"; do
+  if FOUND=$(echo "$SYMBOLS" | grep "$BADSYMBOL"); then
+    echo "Found bad symbol '${BADSYMBOL}':"
+    echo "$FOUND"
+    RESULT=1
+  fi
+done
+
+exit $RESULT
 
 # ex: ts=2 sw=2 et filetype=sh
