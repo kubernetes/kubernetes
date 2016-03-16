@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
-	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
+	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -188,7 +188,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *api.Li
 	if name, ok := m.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			err := e.Storage.GetToList(ctx, key, filterFunc, list)
-			return list, etcderr.InterpretListError(err, e.QualifiedResource)
+			return list, storeerr.InterpretListError(err, e.QualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
@@ -197,7 +197,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *api.Li
 		options = &api.ListOptions{ResourceVersion: "0"}
 	}
 	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, filterFunc, list)
-	return list, etcderr.InterpretListError(err, e.QualifiedResource)
+	return list, storeerr.InterpretListError(err, e.QualifiedResource)
 }
 
 // Create inserts a new item according to the unique key from the object.
@@ -219,7 +219,7 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 	}
 	out := e.NewFunc()
 	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
-		err = etcderr.InterpretCreateError(err, e.QualifiedResource, name)
+		err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		return nil, err
 	}
@@ -328,10 +328,10 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 
 	if err != nil {
 		if creating {
-			err = etcderr.InterpretCreateError(err, e.QualifiedResource, name)
+			err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
 			err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		} else {
-			err = etcderr.InterpretUpdateError(err, e.QualifiedResource, name)
+			err = storeerr.InterpretUpdateError(err, e.QualifiedResource, name)
 		}
 		return nil, false, err
 	}
@@ -364,7 +364,7 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 		return nil, err
 	}
 	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
-		return nil, etcderr.InterpretGetError(err, e.QualifiedResource, name)
+		return nil, storeerr.InterpretGetError(err, e.QualifiedResource, name)
 	}
 	if e.Decorator != nil {
 		if err := e.Decorator(obj); err != nil {
@@ -388,7 +388,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	obj := e.NewFunc()
 	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
-		return nil, etcderr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
 
 	// support older consumers of delete by treating "nil" as delete immediately
@@ -445,7 +445,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		case errAlreadyDeleting:
 			return e.finalizeDelete(obj, true)
 		default:
-			return nil, etcderr.InterpretUpdateError(err, e.QualifiedResource, name)
+			return nil, storeerr.InterpretUpdateError(err, e.QualifiedResource, name)
 		}
 	}
 
@@ -459,7 +459,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 			// before its deletion, but it's the best approximation.
 			return e.finalizeDelete(lastExisting, true)
 		}
-		return nil, etcderr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
 	return e.finalizeDelete(out, true)
 }
