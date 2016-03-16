@@ -171,10 +171,15 @@ func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
 		glog.V(4).Infof(debugErr.DebugError())
 	}
-	_, isStatus := err.(errors.APIStatus)
+	status, isStatus := err.(errors.APIStatus)
 	switch {
 	case isStatus:
-		return fmt.Sprintf("Error from server: %s", err.Error()), true
+		switch s := status.Status(); {
+		case s.Reason == "Unauthorized":
+			return fmt.Sprintf("error: You must be logged in to the server (%s)", s.Message), true
+		default:
+			return fmt.Sprintf("Error from server: %s", err.Error()), true
+		}
 	case errors.IsUnexpectedObjectError(err):
 		return fmt.Sprintf("Server returned an unexpected response: %s", err.Error()), true
 	}
