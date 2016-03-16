@@ -467,6 +467,15 @@ func GetRecordFlag(cmd *cobra.Command) bool {
 	return GetFlagBool(cmd, "record")
 }
 
+// PatchWithChangeCause updates change-cause annotation of the input info and ignores all errors.
+func PatchWithChangeCause(info *resource.Info, changeCause string) {
+	// If recording change cause failed, simply ignore the error. The command itself succeeds and if we failed here due to conflict,
+	// it means this record hint is likely to be invalid anyway.
+	if patch, err := ChangeResourcePatch(info, changeCause); err == nil {
+		resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+	}
+}
+
 // RecordChangeCause annotate change-cause to input runtime object.
 func RecordChangeCause(obj runtime.Object, changeCause string) error {
 	meta, err := api.ObjectMetaFor(obj)

@@ -36,6 +36,8 @@ type ResumeConfig struct {
 	Mapper       meta.RESTMapper
 	Typer        runtime.ObjectTyper
 	Info         *resource.Info
+	ShouldRecord bool
+	ChangeCause  string
 
 	Out       io.Writer
 	Filenames []string
@@ -68,6 +70,7 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
 	kubectl.AddJsonFilenameFlag(cmd, &opts.Filenames, usage)
+	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
@@ -79,6 +82,7 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 	o.Mapper, o.Typer = f.Object()
 	o.ResumeObject = f.ResumeObject
 	o.Out = out
+	o.ChangeCause = f.Command()
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -99,6 +103,7 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 		return fmt.Errorf("rollout resume is only supported on individual resources - %d resources were found", len(infos))
 	}
 	o.Info = infos[0]
+	o.ShouldRecord = cmdutil.ShouldRecord(cmd, o.Info)
 	return nil
 }
 
@@ -110,6 +115,9 @@ func (o ResumeConfig) RunResume() error {
 	if isAlreadyResumed {
 		cmdutil.PrintSuccess(o.Mapper, false, o.Out, o.Info.Mapping.Resource, o.Info.Name, "already resumed")
 		return nil
+	}
+	if o.ShouldRecord {
+		cmdutil.PatchWithChangeCause(o.Info, o.ChangeCause)
 	}
 	cmdutil.PrintSuccess(o.Mapper, false, o.Out, o.Info.Mapping.Resource, o.Info.Name, "resumed")
 	return nil

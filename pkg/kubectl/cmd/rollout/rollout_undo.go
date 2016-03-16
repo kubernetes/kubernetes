@@ -32,13 +32,15 @@ import (
 // UndoOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type UndoOptions struct {
-	Rollbacker kubectl.Rollbacker
-	Mapper     meta.RESTMapper
-	Typer      runtime.ObjectTyper
-	Info       *resource.Info
-	ToRevision int64
-	Out        io.Writer
-	Filenames  []string
+	Rollbacker   kubectl.Rollbacker
+	Mapper       meta.RESTMapper
+	Typer        runtime.ObjectTyper
+	Info         *resource.Info
+	ToRevision   int64
+	Out          io.Writer
+	Filenames    []string
+	ShouldRecord bool
+	ChangeCause  string
 }
 
 const (
@@ -64,6 +66,7 @@ func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int64("to-revision", 0, "The revision to rollback to. Default to 0 (last revision).")
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
@@ -75,6 +78,7 @@ func (o *UndoOptions) CompleteUndo(f *cmdutil.Factory, cmd *cobra.Command, out i
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
 	o.Mapper, o.Typer = f.Object()
 	o.Out = out
+	o.ChangeCause = f.Command()
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -97,6 +101,7 @@ func (o *UndoOptions) CompleteUndo(f *cmdutil.Factory, cmd *cobra.Command, out i
 		return fmt.Errorf("rollout undo is only supported on individual resources - %d resources were found", len(infos))
 	}
 	o.Info = infos[0]
+	o.ShouldRecord = cmdutil.ShouldRecord(cmd, o.Info)
 	o.Rollbacker, err = f.Rollbacker(o.Info.ResourceMapping())
 	return err
 }
@@ -105,6 +110,9 @@ func (o *UndoOptions) RunUndo() error {
 	result, err := o.Rollbacker.Rollback(o.Info.Namespace, o.Info.Name, nil, o.ToRevision, o.Info.Object)
 	if err != nil {
 		return err
+	}
+	if o.ShouldRecord {
+		cmdutil.PatchWithChangeCause(o.Info, o.ChangeCause)
 	}
 	cmdutil.PrintSuccess(o.Mapper, false, o.Out, o.Info.Mapping.Resource, o.Info.Name, result)
 	return nil
