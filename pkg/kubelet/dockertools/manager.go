@@ -859,10 +859,32 @@ func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
 	return err
 }
 
-// podInfraContainerChanged returns true if the pod infra container has changed.
-func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContainerStatus *kubecontainer.ContainerStatus) (bool, error) {
+func (dm *DockerManager) newPodInfraApiContainer(pod *api.Pod) *api.Container {
 	var ports []api.ContainerPort
 
+	if !kubecontainer.IsHostNetworkPod(pod) && dm.networkPlugin.Name() != "cni" && dm.networkPlugin.Name() != "kubenet" {
+		// Docker only exports ports from the pod infra container and
+		// only if docker handles networking.  Let's collect all of the
+		// relevant ports and export them.
+		for _, container := range pod.Spec.InitContainers {
+			ports = append(ports, container.Ports...)
+		}
+		for _, container := range pod.Spec.Containers {
+			ports = append(ports, container.Ports...)
+		}
+	}
+
+	return &api.Container{
+		Name:            PodInfraContainerName,
+		Image:           dm.podInfraContainerImage,
+		Ports:           ports,
+		ImagePullPolicy: podInfraContainerImagePullPolicy,
+		Env:             dm.podInfraContainerEnv,
+	}
+}
+
+// podInfraContainerChanged returns true if the pod infra container has changed.
+func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContainerStatus *kubecontainer.ContainerStatus) (bool, error) {
 	// Check network mode.
 	if kubecontainer.IsHostNetworkPod(pod) {
 		dockerPodInfraContainer, err := dm.client.InspectContainer(podInfraContainerStatus.ID.ID)
@@ -875,23 +897,9 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 			glog.V(4).Infof("host: %v, %v", pod.Spec.SecurityContext.HostNetwork, networkMode)
 			return true, nil
 		}
-	} else if dm.networkPlugin.Name() != "cni" && dm.networkPlugin.Name() != "kubenet" {
-		// Docker only exports ports from the pod infra container. Let's
-		// collect all of the relevant ports and export them.
-		for _, container := range pod.Spec.InitContainers {
-			ports = append(ports, container.Ports...)
-		}
-		for _, container := range pod.Spec.Containers {
-			ports = append(ports, container.Ports...)
-		}
 	}
-	expectedPodInfraContainer := &api.Container{
-		Name:            PodInfraContainerName,
-		Image:           dm.podInfraContainerImage,
-		Ports:           ports,
-		ImagePullPolicy: podInfraContainerImagePullPolicy,
-		Env:             dm.podInfraContainerEnv,
-	}
+
+	expectedPodInfraContainer := dm.newPodInfraApiContainer(pod)
 	return podInfraContainerStatus.Hash != kubecontainer.HashContainer(expectedPodInfraContainer), nil
 }
 
@@ -1616,30 +1624,14 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 	}()
 	// Use host networking if specified.
 	netNamespace := ""
-	var ports []api.ContainerPort
 
 	if kubecontainer.IsHostNetworkPod(pod) {
 		netNamespace = namespaceModeHost
 	} else if dm.networkPlugin.Name() == "cni" || dm.networkPlugin.Name() == "kubenet" {
 		netNamespace = "none"
-	} else {
-		// Docker only exports ports from the pod infra container.  Let's
-		// collect all of the relevant ports and export them.
-		for _, container := range pod.Spec.InitContainers {
-			ports = append(ports, container.Ports...)
-		}
-		for _, container := range pod.Spec.Containers {
-			ports = append(ports, container.Ports...)
-		}
 	}
 
-	container := &api.Container{
-		Name:            PodInfraContainerName,
-		Image:           dm.podInfraContainerImage,
-		Ports:           ports,
-		ImagePullPolicy: podInfraContainerImagePullPolicy,
-		Env:             dm.podInfraContainerEnv,
-	}
+	container := dm.newPodInfraApiContainer(pod)
 
 	// No pod secrets for the infra container.
 	// The message isn't needed for the Infra container
