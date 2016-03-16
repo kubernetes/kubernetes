@@ -19,10 +19,12 @@
 # gce/util.sh script which assumes config filename), but if some things that
 # are enabled by default should not run in hollow clusters, they should be disabled here.
 
+source "${KUBE_ROOT}/cluster/gce/config-common.sh"
+
 GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
-MASTER_SIZE=${MASTER_SIZE:-n1-standard-4}
 NUM_NODES=${NUM_NODES:-100}
+MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
