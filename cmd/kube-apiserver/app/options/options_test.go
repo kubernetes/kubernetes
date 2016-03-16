@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -32,38 +33,38 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 		legacyVersion   string
 		storageVersions string
 		defaultVersions string
-		expectedMap     map[string]string
+		expectedMap     map[string]unversioned.GroupVersion
 	}{
 		{
 			legacyVersion:   "v1",
 			storageVersions: "v1,extensions/v1beta1",
-			expectedMap: map[string]string{
-				api.GroupName:        "v1",
-				extensions.GroupName: "extensions/v1beta1",
+			expectedMap: map[string]unversioned.GroupVersion{
+				api.GroupName:        {Version: "v1"},
+				extensions.GroupName: {Group: "extensions", Version: "v1beta1"},
 			},
 		},
 		{
 			legacyVersion:   "",
 			storageVersions: "extensions/v1beta1,v1",
-			expectedMap: map[string]string{
-				api.GroupName:        "v1",
-				extensions.GroupName: "extensions/v1beta1",
+			expectedMap: map[string]unversioned.GroupVersion{
+				api.GroupName:        {Version: "v1"},
+				extensions.GroupName: {Group: "extensions", Version: "v1beta1"},
 			},
 		},
 		{
 			legacyVersion:   "",
 			storageVersions: "autoscaling=extensions/v1beta1,v1",
 			defaultVersions: "extensions/v1beta1,v1,autoscaling/v1",
-			expectedMap: map[string]string{
-				api.GroupName:         "v1",
-				autoscaling.GroupName: "extensions/v1beta1",
-				extensions.GroupName:  "extensions/v1beta1",
+			expectedMap: map[string]unversioned.GroupVersion{
+				api.GroupName:         {Version: "v1"},
+				autoscaling.GroupName: {Group: "extensions", Version: "v1beta1"},
+				extensions.GroupName:  {Group: "extensions", Version: "v1beta1"},
 			},
 		},
 		{
 			legacyVersion:   "",
 			storageVersions: "",
-			expectedMap:     map[string]string{},
+			expectedMap:     map[string]unversioned.GroupVersion{},
 		},
 	}
 	for i, test := range testCases {
@@ -72,7 +73,10 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			StorageVersions:          test.storageVersions,
 			DefaultStorageVersions:   test.defaultVersions,
 		}
-		output := s.StorageGroupsToGroupVersions()
+		output, err := s.StorageGroupsToEncodingVersion()
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", i, err)
+		}
 		if !reflect.DeepEqual(test.expectedMap, output) {
 			t.Errorf("%v: unexpected error. expect: %v, got: %v", i, test.expectedMap, output)
 		}
