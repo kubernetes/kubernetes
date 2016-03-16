@@ -122,11 +122,7 @@ type Runtime struct {
 	volumeGetter        volumeGetter
 	imagePuller         kubecontainer.ImagePuller
 
-	// Versions
-	binVersion     rktVersion
-	apiVersion     rktVersion
-	appcVersion    rktVersion
-	systemdVersion systemdVersion
+	versions versions
 }
 
 var _ kubecontainer.Runtime = &Runtime{}
@@ -187,6 +183,10 @@ func New(config *Config,
 		rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt, imageBackOff)
 	} else {
 		rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
+	}
+
+	if err := rkt.getVersions(); err != nil {
+		return nil, fmt.Errorf("rkt: error getting version info: %v", err)
 	}
 
 	return rkt, nil
@@ -1093,11 +1093,15 @@ func (r *Runtime) Type() string {
 }
 
 func (r *Runtime) Version() (kubecontainer.Version, error) {
-	return r.binVersion, nil
+	r.versions.RLock()
+	defer r.versions.RUnlock()
+	return r.versions.binVersion, nil
 }
 
 func (r *Runtime) APIVersion() (kubecontainer.Version, error) {
-	return r.apiVersion, nil
+	r.versions.RLock()
+	defer r.versions.RUnlock()
+	return r.versions.apiVersion, nil
 }
 
 // Status returns error if rkt is unhealthy, nil otherwise.
