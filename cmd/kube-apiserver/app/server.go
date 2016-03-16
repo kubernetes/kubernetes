@@ -143,6 +143,7 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 		}
 		group := apiresource[0]
 		resource := apiresource[1]
+		groupResource := unversioned.GroupResource{Group: group, Resource: resource}
 
 		apigroup, err := registered.Group(group)
 		if err != nil {
@@ -166,7 +167,7 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 			glog.Fatalf("Invalid storage version or misconfigured etcd for %s: %v", tokens[0], err)
 		}
 
-		storageDestinations.AddStorageOverride(group, resource, etcdOverrideStorage)
+		storageDestinations.AddStorageOverride(groupResource, etcdOverrideStorage)
 	}
 }
 

@@ -23,6 +23,7 @@ import (
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -78,8 +79,13 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("Unable to init etcd: %v", err)
 	}
+
+	storage, err := storageDestinations.Get(unversioned.GroupResource{Group: groupName, Resource: "testtype"})
+	if err != nil {
+		return err
+	}
 	restStorageMap := map[string]rest.Storage{
-		"testtypes": testgroupetcd.NewREST(storageDestinations.Get(groupName, "testtype"), s.StorageDecorator()),
+		"testtypes": testgroupetcd.NewREST(storage, s.StorageDecorator()),
 	}
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *groupMeta,
