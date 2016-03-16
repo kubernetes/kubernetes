@@ -183,7 +183,7 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 	return failedContainers, containerRestartNodes.List()
 }
 
-var _ = Describe("DaemonRestart [Disruptive]", func() {
+var _ = KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	framework := NewDefaultFramework("daemonrestart")
 	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(util.NewUUID())

@@ -39,7 +39,7 @@ const (
 	jobSelectorKey = "job"
 )
 
-var _ = Describe("Job", func() {
+var _ = KubeDescribe("Job", func() {
 	f := NewDefaultFramework("job")
 	parallelism := 2
 	completions := 4

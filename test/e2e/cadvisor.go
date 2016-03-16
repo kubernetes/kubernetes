@@ -31,7 +31,7 @@ const (
 	sleepDuration = 10 * time.Second
 )
 
-var _ = Describe("Cadvisor", func() {
+var _ = KubeDescribe("Cadvisor", func() {
 
 	f := NewDefaultFramework("cadvisor")
 

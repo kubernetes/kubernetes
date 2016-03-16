@@ -35,7 +35,7 @@ const (
 	probTestInitialDelaySeconds = 30
 )
 
-var _ = Describe("Probing container", func() {
+var _ = KubeDescribe("Probing container", func() {
 	framework := NewDefaultFramework("container-probe")
 	var podClient client.PodInterface
 	probe := webserverProbeBuilder{}

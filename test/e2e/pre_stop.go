@@ -158,7 +158,7 @@ func testPreStop(c *client.Client, ns string) {
 	expectNoError(err, "validating pre-stop.")
 }
 
-var _ = Describe("PreStop", func() {
+var _ = KubeDescribe("PreStop", func() {
 	f := NewDefaultFramework("prestop")
 
 	It("should call prestop when killing a pod [Conformance]", func() {

@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ReplicationController", func() {
+var _ = KubeDescribe("ReplicationController", func() {
 	framework := NewDefaultFramework("replication-controller")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {

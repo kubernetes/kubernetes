@@ -140,7 +140,7 @@ func waitForStableCluster(c *client.Client) int {
 	return len(scheduledPods)
 }
 
-var _ = Describe("SchedulerPredicates [Serial]", func() {
+var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 	var c *client.Client
 	var nodeList *api.NodeList
 	var systemPodsNo int

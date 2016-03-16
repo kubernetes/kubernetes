@@ -249,7 +249,7 @@ func createServiceSpec(serviceName string, isHeadless bool, selector map[string]
 	return headlessService
 }
 
-var _ = Describe("DNS", func() {
+var _ = KubeDescribe("DNS", func() {
 	f := NewDefaultFramework("dns")
 
 	It("should provide DNS for the cluster [Conformance]", func() {

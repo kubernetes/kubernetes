@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Etcd failure [Disruptive]", func() {
+var _ = KubeDescribe("Etcd failure [Disruptive]", func() {
 
 	framework := NewDefaultFramework("etcd-failure")
 

@@ -179,7 +179,7 @@ func verifyCPULimits(expected containersCPUSummary, actual nodesCPUSummary) {
 }
 
 // Slow by design (1 hour)
-var _ = Describe("Kubelet [Serial] [Slow]", func() {
+var _ = KubeDescribe("Kubelet [Serial] [Slow]", func() {
 	var nodeNames sets.String
 	framework := NewDefaultFramework("kubelet-perf")
 	var rm *resourceMonitor
@@ -197,7 +197,7 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 	AfterEach(func() {
 		rm.Stop()
 	})
-	Describe("regular resource usage tracking", func() {
+	KubeDescribe("regular resource usage tracking", func() {
 		// We assume that the scheduler will make reasonable scheduling choices
 		// and assign ~N pods on the node.
 		// Although we want to track N pods per node, there are N + add-on pods
@@ -248,7 +248,7 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 			})
 		}
 	})
-	Describe("experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking]", func() {
+	KubeDescribe("experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking]", func() {
 		density := []int{100}
 		for i := range density {
 			podsPerNode := density[i]

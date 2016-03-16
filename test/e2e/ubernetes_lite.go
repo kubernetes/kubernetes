@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-var _ = Describe("Ubernetes Lite", func() {
+var _ = KubeDescribe("Ubernetes Lite", func() {
 	framework := NewDefaultFramework("ubernetes-lite")
 	var zoneCount int
 	var err error

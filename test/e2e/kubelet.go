@@ -86,7 +86,7 @@ func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames sets.String, podNam
 	})
 }
 
-var _ = Describe("kubelet", func() {
+var _ = KubeDescribe("kubelet", func() {
 	var numNodes int
 	var nodeNames sets.String
 	framework := NewDefaultFramework("kubelet")
@@ -107,7 +107,7 @@ var _ = Describe("kubelet", func() {
 		resourceMonitor.Stop()
 	})
 
-	Describe("Clean up pods on node", func() {
+	KubeDescribe("Clean up pods on node", func() {
 		type DeleteTest struct {
 			podsPerNode int
 			timeout     time.Duration

@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Networking", func() {
+var _ = KubeDescribe("Networking", func() {
 	f := NewDefaultFramework("nettest")
 
 	var svcname = "nettest"
@@ -213,7 +213,7 @@ var _ = Describe("Networking", func() {
 	})
 
 	// Marked with [Flaky] until the tests prove themselves stable.
-	Describe("[Flaky] Granular Checks", func() {
+	KubeDescribe("[Flaky] Granular Checks", func() {
 
 		It("should function for pod communication on a single node", func() {
 

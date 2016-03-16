@@ -204,7 +204,7 @@ func (s *ingManager) test(path string) error {
 	})
 }
 
-var _ = Describe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
+var _ = KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var repoRoot string

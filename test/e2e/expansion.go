@@ -25,7 +25,7 @@ import (
 
 // These tests exercise the Kubernetes expansion syntax $(VAR).
 // For more information, see: docs/design/expansion.md
-var _ = Describe("Variable Expansion", func() {
+var _ = KubeDescribe("Variable Expansion", func() {
 	framework := NewDefaultFramework("var-expansion")
 
 	It("should allow composing env vars into new env vars [Conformance]", func() {

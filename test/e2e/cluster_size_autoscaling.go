@@ -37,7 +37,7 @@ const (
 // run by default.
 //
 // These tests take ~20 minutes to run each.
-var _ = Describe("Cluster size autoscaling [Feature:ClusterSizeAutoscaling] [Slow]", func() {
+var _ = KubeDescribe("Cluster size autoscaling [Feature:ClusterSizeAutoscaling] [Slow]", func() {
 	f := NewDefaultFramework("autoscaling")
 	var nodeCount int
 	var coresPerNode int

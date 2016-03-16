@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("Docker Containers", func() {
+var _ = KubeDescribe("Docker Containers", func() {
 	framework := NewDefaultFramework("containers")
 	var c *client.Client
 	var ns string

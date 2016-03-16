@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("LimitRange", func() {
+var _ = KubeDescribe("LimitRange", func() {
 	f := NewDefaultFramework("limitrange")
 
 	It("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
