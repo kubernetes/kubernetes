@@ -83,7 +83,8 @@ Guide](../admin/README.md).
 
 ## Developing against the Kubernetes API
 
-* API objects are explained at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
+* The [REST API documentation](../api-reference/README.md) explains the REST
+  API exposed by apiserver.
 
 * **Annotations** ([docs/user-guide/annotations.md](../user-guide/annotations.md)): are for attaching arbitrary non-identifying metadata to objects.
   Programs that automate Kubernetes objects may use annotations to store small amounts of their state.

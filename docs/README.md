@@ -47,7 +47,7 @@ Documentation for other releases can be found at
 * The [Kubectl Command Line Interface](user-guide/kubectl/kubectl.md) is a detailed reference on
   the `kubectl` CLI.
 
-* The [API object documentation](http://kubernetes.io/third_party/swagger-ui/)
+* The [API object documentation](api-reference/README.md)
   is a detailed description of all fields found in core API objects.
 
 * An overview of the [Design of Kubernetes](design/)

@@ -86,7 +86,7 @@ Kubernetes documentation is organized into several categories.
       or extensions, or modify the core Kubernetes code
     - in the [Kubernetes Developer Guide](docs/devel/README.md)
     - see also [notes on the API](docs/api.md)
-    - see also the [API object documentation](http://kubernetes.io/third_party/swagger-ui/), a
+    - see also the [API object documentation](docs/api-reference/README.md), a
       detailed description of all fields found in the core API objects
   - **Walkthroughs and examples**
     - hands-on introduction and example config files
