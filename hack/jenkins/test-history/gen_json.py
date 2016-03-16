@@ -111,7 +111,6 @@ def gcs_get_tests(path):
     except zlib.error:
         # Don't fail if it's not gzipped.
         pass
-    data = data.decode('utf-8')
 
     try:
         root = ET.fromstring(data)
