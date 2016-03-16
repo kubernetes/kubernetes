@@ -37,6 +37,8 @@ type wrappedSerializer struct {
 	contentType string
 }
 
+var _ runtime.NegotiatedSerializer = &wrappedSerializer{}
+
 func (s *wrappedSerializer) SupportedMediaTypes() []string {
 	return []string{s.contentType}
 }
@@ -49,9 +51,9 @@ func (s *wrappedSerializer) SerializerForMediaType(mediaType string, options map
 }
 
 func (s *wrappedSerializer) EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
-	return versioning.NewCodec(s.serializer, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), []unversioned.GroupVersion{gv}, nil)
+	return versioning.NewCodec(s.serializer, s.serializer, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), []unversioned.GroupVersion{gv}, nil)
 }
 
 func (s *wrappedSerializer) DecoderToVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder {
-	return versioning.NewCodec(s.serializer, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), nil, []unversioned.GroupVersion{gv})
+	return versioning.NewCodec(s.serializer, s.serializer, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), nil, []unversioned.GroupVersion{gv})
 }
