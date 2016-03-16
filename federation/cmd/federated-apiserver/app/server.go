@@ -21,7 +21,6 @@ package app
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/url"
 	"os"
@@ -47,9 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -79,44 +75,6 @@ func verifyClusterIPFlags(s *options.APIServer) {
 	if bits-ones > 20 {
 		glog.Fatal("Specified --service-cluster-ip-range is too large")
 	}
-}
-
-// For testing.
-type newEtcdFunc func(runtime.NegotiatedSerializer, string, string, etcdstorage.EtcdConfig) (storage.Interface, error)
-
-func newEtcd(ns runtime.NegotiatedSerializer, storageGroupVersionString, memoryGroupVersionString string, etcdConfig etcdstorage.EtcdConfig) (etcdStorage storage.Interface, err error) {
-	if storageGroupVersionString == "" {
-		return etcdStorage, fmt.Errorf("storageVersion is required to create a etcd storage")
-	}
-	storageVersion, err := unversioned.ParseGroupVersion(storageGroupVersionString)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't understand storage version %v: %v", storageGroupVersionString, err)
-	}
-	memoryVersion, err := unversioned.ParseGroupVersion(memoryGroupVersionString)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't understand memory version %v: %v", memoryGroupVersionString, err)
-	}
-
-	var storageConfig etcdstorage.EtcdStorageConfig
-	storageConfig.Config = etcdConfig
-	s, ok := ns.SerializerForMediaType("application/json", nil)
-	if !ok {
-		return nil, fmt.Errorf("unable to find serializer for JSON")
-	}
-	glog.Infof("constructing etcd storage interface.\n  sv: %v\n  mv: %v\n", storageVersion, memoryVersion)
-	encoder := ns.EncoderForVersion(s, storageVersion)
-	decoder := ns.DecoderToVersion(s, memoryVersion)
-	if memoryVersion.Group != storageVersion.Group {
-		// Allow this codec to translate between groups.
-		if err = versioning.EnableCrossGroupEncoding(encoder, memoryVersion.Group, storageVersion.Group); err != nil {
-			return nil, fmt.Errorf("error setting up encoder for %v: %v", storageGroupVersionString, err)
-		}
-		if err = versioning.EnableCrossGroupDecoding(decoder, storageVersion.Group, memoryVersion.Group); err != nil {
-			return nil, fmt.Errorf("error setting up decoder for %v: %v", storageGroupVersionString, err)
-		}
-	}
-	storageConfig.Codec = runtime.NewCodec(encoder, decoder)
-	return storageConfig.NewStorage()
 }
 
 // Run runs the specified APIServer.  This should never exit.
@@ -228,6 +186,36 @@ func Run(s *options.APIServer) error {
 
 	n := s.ServiceClusterIPRange
 
+	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
+	groupToEncoding, err := s.StorageGroupsToEncodingVersion()
+	if err != nil {
+		glog.Fatalf("error getting group encoding: %s", err)
+	}
+	for group, storageEncodingVersion := range groupToEncoding {
+		resourceEncoding.SetVersionEncoding(group, storageEncodingVersion, unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
+	}
+
+	storageFactory := genericapiserver.NewDefaultStorageFactory(s.EtcdConfig, api.Codecs, resourceEncoding, apiResourceConfigSource)
+	for _, override := range s.EtcdServersOverrides {
+		tokens := strings.Split(override, "#")
+		if len(tokens) != 2 {
+			glog.Errorf("invalid value of etcd server overrides: %s", override)
+			continue
+		}
+
+		apiresource := strings.Split(tokens[0], "/")
+		if len(apiresource) != 2 {
+			glog.Errorf("invalid resource definition: %s", tokens[0])
+			continue
+		}
+		group := apiresource[0]
+		resource := apiresource[1]
+		groupResource := unversioned.GroupResource{Group: group, Resource: resource}
+
+		servers := strings.Split(tokens[1], ";")
+		storageFactory.SetEtcdLocation(groupResource, servers)
+	}
+
 	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
 		BasicAuthFile:     s.BasicAuthFile,
 		ClientCAFile:      s.ClientCAFile,
@@ -276,13 +264,9 @@ func Run(s *options.APIServer) error {
 		}
 	}
 
-	storageDestinations := genericapiserver.NewStorageDestinations()
-	storageVersions := s.StorageGroupsToGroupVersions()
-
 	config := &master.Config{
 		Config: &genericapiserver.Config{
-			StorageDestinations:       storageDestinations,
-			StorageVersions:           storageVersions,
+			StorageFactory:            storageFactory,
 			ServiceClusterIPRange:     &n,
 			EnableLogsSupport:         s.EnableLogsSupport,
 			EnableUISupport:           true,
