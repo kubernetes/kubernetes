@@ -74,6 +74,14 @@ func parseInputVersions() (paths []string, groupVersions []unversioned.GroupVers
 func main() {
 	arguments := args.Default()
 	flag.Parse()
+	var cmdArgs string
+	flag.VisitAll(func(f *flag.Flag) {
+		if !f.Changed || f.Name == "verify-only" {
+			return
+		}
+		cmdArgs = cmdArgs + fmt.Sprintf("--%s=%s ", f.Name, f.Value)
+	})
+
 	dependencies := []string{
 		"k8s.io/kubernetes/pkg/fields",
 		"k8s.io/kubernetes/pkg/labels",
@@ -97,6 +105,7 @@ func main() {
 			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
 			false,
 			false,
+			cmdArgs,
 		}
 	} else {
 		inputPath, groupVersions, gvToPath, err := parseInputVersions()
@@ -119,6 +128,7 @@ func main() {
 			*clientsetPath,
 			*clientsetOnly,
 			*fakeClient,
+			cmdArgs,
 		}
 	}
 
