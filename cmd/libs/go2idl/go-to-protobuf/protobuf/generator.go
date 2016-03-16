@@ -271,6 +271,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 		}
 	}
 
+	// If we don't explicitly embed anything, generate fields by traversing fields.
 	if fields == nil {
 		memberFields, err := membersToFields(b.locator, b.t, b.localPackage, b.omitFieldTypes)
 		if err != nil {
@@ -399,8 +400,10 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 		if err := memberTypeToProtobufField(locator, keyField, t.Key); err != nil {
 			return err
 		}
+		// All other protobuf types has kind types.Protobuf, so setting types.Map
+		// here would be very misleading.
 		field.Type = &types.Type{
-			Kind: types.Map,
+			Kind: types.Protobuf,
 			Key:  keyField.Type,
 			Elem: valueField.Type,
 		}
@@ -450,7 +453,6 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 }
 
 // protobufTagToField extracts information from an existing protobuf tag
-// TODO: take a current package
 func protobufTagToField(tag string, field *protoField, m types.Member, t *types.Type, localPackage types.Name) error {
 	if len(tag) == 0 {
 		return nil
@@ -466,31 +468,36 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 		return fmt.Errorf("member %q of %q malformed 'protobuf' tag, field ID is %q which is not an integer: %v\n", m.Name, t.Name, parts[1], err)
 	}
 	field.Tag = protoTag
-	// TODO: we are converting a Protobuf type back into an internal type, which is questionable
-	// TODO; Allow a way to unambiguously represent a type into two systems at the same time, like Go and Protobuf.
-	if last := strings.LastIndex(parts[0], "."); last != -1 {
-		prefix := parts[0][:last]
-		field.Type = &types.Type{
-			Name: types.Name{
+
+	// In general there is doesn't make sense to parse the protobuf tags to get the type,
+	// as all auto-generated once will have wire type "bytes", "varint" or "fixed64".
+	// However, sometimes we explicitly set them to have a custom serialization, e.g.:
+	//   type Time struct {
+	//     time.Time `protobuf:"Timestamp,1,req,name=time"`
+	//   }
+	// to force the generator to use a given type (that we manually wrote serialization &
+	// deserialization methods for).
+	switch parts[0] {
+	case "varint", "fixed32", "fixed64", "bytes", "group":
+	default:
+		name := types.Name{}
+		if last := strings.LastIndex(parts[0], "."); last != -1 {
+			prefix := parts[0][:last]
+			name = types.Name{
 				Name:    parts[0][last+1:],
 				Package: prefix,
-				// TODO: this probably needs to be a lookup into a namer
-				Path: strings.Replace(prefix, ".", "/", -1),
-			},
-			Kind: types.Protobuf,
-		}
-	} else {
-		switch parts[0] {
-		case "varint", "bytes", "fixed64":
-		default:
-			field.Type = &types.Type{
-				Name: types.Name{
-					Name:    parts[0],
-					Package: localPackage.Package,
-					Path:    localPackage.Path,
-				},
-				Kind: types.Protobuf,
+				Path:    strings.Replace(prefix, ".", "/", -1),
 			}
+		} else {
+			name = types.Name{
+				Name:    parts[0],
+				Package: localPackage.Package,
+				Path:    localPackage.Path,
+			}
+		}
+		field.Type = &types.Type{
+			Name: name,
+			Kind: types.Protobuf,
 		}
 	}
 
@@ -501,11 +508,10 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			return fmt.Errorf("member %q of %q malformed 'protobuf' tag, tag %d should be key=value, got %q\n", m.Name, t.Name, i+4, extra)
 		}
 		switch parts[0] {
-		case "casttype":
+		case "casttype", "castkey", "castvalue":
 			parts[0] = fmt.Sprintf("(gogoproto.%s)", parts[0])
 			protoExtra[parts[0]] = parts[1]
 		}
-		// TODO: Should we parse castkey and castvalue too?
 	}
 
 	field.Extras = protoExtra
