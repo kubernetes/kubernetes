@@ -251,7 +251,8 @@ func AsVersionedObjects(infos []*Info, version string, encoder runtime.Encoder) 
 				if err != nil {
 					return nil, err
 				}
-				objects = append(objects, &runtime.Unknown{RawJSON: data})
+				// TODO: Set ContentEncoding and ContentType.
+				objects = append(objects, &runtime.Unknown{Raw: data})
 				continue
 			}
 		}

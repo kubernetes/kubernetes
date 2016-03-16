@@ -78,7 +78,7 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	test := obj.(*ObjectTest)
-	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.RawJSON) != "{}" {
+	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.Raw) != "{}" || unk.ContentType != runtime.ContentTypeJSON {
 		t.Fatalf("unexpected object: %#v", test.Items[0])
 	}
 	if *gvk != externalGVK {
@@ -90,7 +90,7 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	test = obj.(*ObjectTest)
-	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.RawJSON) != `{"kind":"Other","apiVersion":"v1"}` {
+	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.Raw) != `{"kind":"Other","apiVersion":"v1"}` || unk.ContentType != runtime.ContentTypeJSON {
 		t.Fatalf("unexpected object: %#v", test.Items[0])
 	}
 	if *gvk != externalGVK {
@@ -117,7 +117,10 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 		&EmbeddedTest{ID: "foo"},
 		&EmbeddedTest{ID: "bar"},
 		// TODO: until YAML is removed, this JSON must be in ascending key order to ensure consistent roundtrip serialization
-		&runtime.Unknown{RawJSON: []byte(`{"apiVersion":"unknown.group/unknown","foo":"bar","kind":"OtherTest"}`)},
+		&runtime.Unknown{
+			Raw:         []byte(`{"apiVersion":"unknown.group/unknown","foo":"bar","kind":"OtherTest"}`),
+			ContentType: runtime.ContentTypeJSON,
+		},
 		&ObjectTest{
 			Items: runtime.NewEncodableList(codec, innerItems),
 		},
@@ -208,7 +211,7 @@ func TestNestedObject(t *testing.T) {
 		t.Errorf("Expected unequal %#v %#v", e, a)
 	}
 
-	obj, err := runtime.Decode(codec, decoded.(*EmbeddedTest).Object.(*runtime.Unknown).RawJSON)
+	obj, err := runtime.Decode(codec, decoded.(*EmbeddedTest).Object.(*runtime.Unknown).Raw)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -191,10 +191,10 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 	columns := make([]string, len(parsers))
 	switch u := obj.(type) {
 	case *runtime.Unknown:
-		if len(u.RawJSON) > 0 {
+		if len(u.Raw) > 0 {
 			var err error
-			if obj, err = runtime.Decode(s.Decoder, u.RawJSON); err != nil {
-				return fmt.Errorf("can't decode object for printing: %v (%s)", err, u.RawJSON)
+			if obj, err = runtime.Decode(s.Decoder, u.Raw); err != nil {
+				return fmt.Errorf("can't decode object for printing: %v (%s)", err, u.Raw)
 			}
 		}
 	}
