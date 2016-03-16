@@ -42,6 +42,8 @@ func getMaxVols(defaultVal int) int {
 			glog.Errorf("Unable to parse maxiumum PD volumes value, using default of %v: %v", defaultVal, err)
 		} else if parsedMaxVols <= 0 {
 			glog.Errorf("Maximum PD volumes must be a positive value, using default of %v", defaultVal)
+		} else if parsedMaxVols > defaultVal {
+			glog.Errorf("Maximum PD volumes must be smaller than default max value, using default of %v", defaultVal)
 		} else {
 			return parsedMaxVols
 		}
