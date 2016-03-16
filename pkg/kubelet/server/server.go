@@ -495,7 +495,7 @@ func (s *Server) getPods(request *restful.Request, response *restful.Response) {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	response.Write(data)
+	writeJsonResponse(response, data)
 }
 
 // getRunningPods returns a list of pods running on Kubelet. The list is
@@ -512,7 +512,7 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	response.Write(data)
+	writeJsonResponse(response, data)
 }
 
 // getLogs handles logs requests against the Kubelet.
@@ -585,7 +585,7 @@ func (s *Server) getRun(request *restful.Request, response *restful.Response) {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	response.Write(data)
+	writeJsonResponse(response, data)
 }
 
 // getExec handles requests to run a command inside a container.
@@ -776,6 +776,20 @@ func getPodCoordinates(request *restful.Request) (namespace, pod string, uid typ
 		uid = types.UID(uidStr)
 	}
 	return
+}
+
+// Derived from go-restful writeJSON.
+func writeJsonResponse(response *restful.Response, data []byte) {
+	if data == nil {
+		response.WriteHeader(http.StatusOK)
+		// do not write a nil representation
+		return
+	}
+	response.Header().Set(restful.HEADER_ContentType, restful.MIME_JSON)
+	response.WriteHeader(http.StatusOK)
+	if _, err := response.Write(data); err != nil {
+		glog.Errorf("Error writing response: %v", err)
+	}
 }
 
 // PortForwarder knows how to forward content from a data stream to/from a port
