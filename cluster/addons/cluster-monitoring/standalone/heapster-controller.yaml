@@ -7,7 +7,7 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: heapster-v1.0.0
+  name: heapster
   namespace: kube-system
   labels:
     k8s-app: heapster
@@ -63,6 +63,6 @@ spec:
             - --memory=200Mi
             - --extra-memory=3Mi
             - --threshold=5
-            - --deployment=heapster-v1.0.0-beta1
+            - --deployment=heapster
             - --container=heapster
             - --poll-period=300000
