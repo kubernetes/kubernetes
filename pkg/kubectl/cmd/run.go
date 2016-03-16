@@ -69,7 +69,15 @@ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
 kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`
 )
 
+type RunOptions struct {
+	DefaultRestartAlwaysGenerator string
+	DefaultGenerator              string
+}
+
 func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+	return NewCmdRunWithOptions(f, nil, cmdIn, cmdOut, cmdErr)
+}
+func NewCmdRunWithOptions(f *cmdutil.Factory, opts *RunOptions, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
 		// run-container is deprecated
@@ -79,7 +87,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 		Example: run_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
-			err := Run(f, cmdIn, cmdOut, cmdErr, cmd, args, argsLenAtDash)
+			err := Run(f, opts, cmdIn, cmdOut, cmdErr, cmd, args, argsLenAtDash)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -116,7 +124,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("service-overrides", "", "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.")
 }
 
-func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
+func Run(f *cmdutil.Factory, opts *RunOptions, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
 	if len(os.Args) > 1 && os.Args[1] == "run-container" {
 		printDeprecationWarning("run", "run-container")
 	}
@@ -149,6 +157,14 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	}
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
+	if len(generatorName) == 0 && opts != nil {
+		switch {
+		case restartPolicy == api.RestartPolicyAlways:
+			generatorName = opts.DefaultRestartAlwaysGenerator
+		default:
+			generatorName = opts.DefaultGenerator
+		}
+	}
 	if len(generatorName) == 0 {
 		client, err := f.Client()
 		if err != nil {
