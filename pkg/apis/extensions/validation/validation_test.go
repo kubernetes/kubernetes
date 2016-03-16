@@ -980,7 +980,7 @@ func TestValidateJob(t *testing.T) {
 		MatchLabels: map[string]string{"a": "b"},
 	}
 	validGeneratedSelector := &unversioned.LabelSelector{
-		MatchLabels: map[string]string{"collection-uid": "1a2b3c"},
+		MatchLabels: map[string]string{"controller-uid": "1a2b3c", "job-name": "myjob"},
 	}
 	validPodTemplateSpecForManual := api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
@@ -1023,7 +1023,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: extensions.JobSpec{
 				Selector:       validGeneratedSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: newBool(false),
 				Template:       validPodTemplateSpecForGenerated,
 			},
 		},
