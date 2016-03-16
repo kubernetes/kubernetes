@@ -807,7 +807,7 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 			glog.V(4).Infof("host: %v, %v", pod.Spec.SecurityContext.HostNetwork, networkMode)
 			return true, nil
 		}
-	} else {
+	} else if dm.networkPlugin.Name() != "cni" && dm.networkPlugin.Name() != "kubenet" {
 		// Docker only exports ports from the pod infra container. Let's
 		// collect all of the relevant ports and export them.
 		for _, container := range pod.Spec.Containers {
