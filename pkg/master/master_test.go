@@ -36,8 +36,8 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 
-	apiutil "k8s.io/kubernetes/pkg/api/util"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -72,26 +72,27 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config := Config{
 		Config: &genericapiserver.Config{},
 	}
-	storageVersions := make(map[string]string)
-	storageDestinations := genericapiserver.NewStorageDestinations()
-	storageDestinations.AddAPIGroup(
-		api.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
-	storageDestinations.AddAPIGroup(
-		autoscaling.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Autoscaling.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
-	storageDestinations.AddAPIGroup(
-		batch.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
-	storageDestinations.AddAPIGroup(
-		apps.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Apps.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
-	storageDestinations.AddAPIGroup(
-		extensions.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
 
-	config.StorageDestinations = storageDestinations
-	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
-	storageVersions[autoscaling.GroupName] = testapi.Autoscaling.GroupVersion().String()
-	storageVersions[batch.GroupName] = testapi.Batch.GroupVersion().String()
-	storageVersions[apps.GroupName] = testapi.Apps.GroupVersion().String()
-	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
-	config.StorageVersions = storageVersions
+	etcdConfig := etcdstorage.EtcdConfig{
+		Prefix:   etcdtest.PathPrefix(),
+		CAFile:   server.CAFile,
+		KeyFile:  server.KeyFile,
+		CertFile: server.CertFile,
+	}
+	for _, url := range server.ClientURLs {
+		etcdConfig.ServerList = append(etcdConfig.ServerList, url.String())
+	}
+
+	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
+	resourceEncoding.SetVersionEncoding(api.GroupName, *testapi.Default.GroupVersion(), unversioned.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, *testapi.Autoscaling.GroupVersion(), unversioned.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), unversioned.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(apps.GroupName, *testapi.Apps.GroupVersion(), unversioned.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(extensions.GroupName, *testapi.Extensions.GroupVersion(), unversioned.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
+	storageFactory := genericapiserver.NewDefaultStorageFactory(etcdConfig, api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
+
+	config.StorageFactory = storageFactory
+	config.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.Serializer = api.Codecs
 	config.KubeletClient = client.FakeKubeletClient{}
@@ -398,7 +399,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 }
 
 func TestDiscoveryAtAPIS(t *testing.T) {
-	master, etcdserver, config, assert := newLimitedMaster(t)
+	master, etcdserver, _, assert := newLimitedMaster(t)
 	defer etcdserver.Terminate(t)
 
 	server := httptest.NewServer(master.HandlerContainer.ServeMux)
@@ -444,20 +445,20 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	}
 	expectPreferredVersion := map[string]unversioned.GroupVersionForDiscovery{
 		autoscaling.GroupName: {
-			GroupVersion: config.StorageVersions[autoscaling.GroupName],
-			Version:      apiutil.GetVersion(config.StorageVersions[autoscaling.GroupName]),
+			GroupVersion: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.String(),
+			Version:      registered.GroupOrDie(autoscaling.GroupName).GroupVersion.Version,
 		},
 		batch.GroupName: {
-			GroupVersion: config.StorageVersions[batch.GroupName],
-			Version:      apiutil.GetVersion(config.StorageVersions[batch.GroupName]),
+			GroupVersion: registered.GroupOrDie(batch.GroupName).GroupVersion.String(),
+			Version:      registered.GroupOrDie(batch.GroupName).GroupVersion.Version,
 		},
 		apps.GroupName: {
-			GroupVersion: config.StorageVersions[apps.GroupName],
-			Version:      apiutil.GetVersion(config.StorageVersions[apps.GroupName]),
+			GroupVersion: registered.GroupOrDie(apps.GroupName).GroupVersion.String(),
+			Version:      registered.GroupOrDie(apps.GroupName).GroupVersion.Version,
 		},
 		extensions.GroupName: {
-			GroupVersion: config.StorageVersions[extensions.GroupName],
-			Version:      apiutil.GetVersion(config.StorageVersions[extensions.GroupName]),
+			GroupVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String(),
+			Version:      registered.GroupOrDie(extensions.GroupName).GroupVersion.Version,
 		},
 	}
 

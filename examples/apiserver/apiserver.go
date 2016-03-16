@@ -24,7 +24,7 @@ import (
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apimachinery"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -40,20 +40,14 @@ const (
 	SecurePort   = 6444
 )
 
-func newStorageDestinations(groupName string, groupMeta *apimachinery.GroupMeta) (*genericapiserver.StorageDestinations, error) {
-	storageDestinations := genericapiserver.NewStorageDestinations()
-	var storageConfig etcdstorage.EtcdStorageConfig
-	storageConfig.Config = etcdstorage.EtcdConfig{
+func newStorageFactory() genericapiserver.StorageFactory {
+	etcdConfig := etcdstorage.EtcdConfig{
 		Prefix:     genericapiserver.DefaultEtcdPathPrefix,
 		ServerList: []string{"http://127.0.0.1:4001"},
 	}
-	storageConfig.Codec = groupMeta.Codec
-	storageInterface, err := storageConfig.NewStorage()
-	if err != nil {
-		return nil, err
-	}
-	storageDestinations.AddAPIGroup(groupName, storageInterface)
-	return &storageDestinations, nil
+	storageFactory := genericapiserver.NewDefaultStorageFactory(etcdConfig, api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(), genericapiserver.NewResourceConfig())
+
+	return storageFactory
 }
 
 func NewServerRunOptions() *genericapiserver.ServerRunOptions {
@@ -86,12 +80,14 @@ func Run(serverOptions *genericapiserver.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
-	storageDestinations, err := newStorageDestinations(groupName, groupMeta)
+	storageFactory := newStorageFactory()
+	storage, err := storageFactory.New(unversioned.GroupResource{Group: groupName, Resource: "testtype"})
 	if err != nil {
-		return fmt.Errorf("Unable to init etcd: %v", err)
+		return fmt.Errorf("Unable to get storage: %v", err)
 	}
+
 	restStorageMap := map[string]rest.Storage{
-		"testtypes": testgroupetcd.NewREST(storageDestinations.Get(groupName, "testtype"), s.StorageDecorator()),
+		"testtypes": testgroupetcd.NewREST(storage, s.StorageDecorator()),
 	}
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *groupMeta,

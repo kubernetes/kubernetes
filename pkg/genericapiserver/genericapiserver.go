@@ -43,7 +43,6 @@ import (
 	genericetcd "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/crypto"
@@ -55,7 +54,6 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -63,107 +61,6 @@ const (
 	DefaultDeserializationCacheSize = 50000
 	globalTimeout                   = time.Minute
 )
-
-// StorageDestinations is a mapping from API group & resource to
-// the underlying storage interfaces.
-type StorageDestinations struct {
-	APIGroups map[string]*StorageDestinationsForAPIGroup
-}
-
-type StorageDestinationsForAPIGroup struct {
-	Default   storage.Interface
-	Overrides map[string]storage.Interface
-}
-
-func NewStorageDestinations() StorageDestinations {
-	return StorageDestinations{
-		APIGroups: map[string]*StorageDestinationsForAPIGroup{},
-	}
-}
-
-// AddAPIGroup replaces 'group' if it's already registered.
-func (s *StorageDestinations) AddAPIGroup(group string, defaultStorage storage.Interface) {
-	glog.Infof("Adding storage destination for group %v", group)
-	s.APIGroups[group] = &StorageDestinationsForAPIGroup{
-		Default:   defaultStorage,
-		Overrides: map[string]storage.Interface{},
-	}
-}
-
-func (s *StorageDestinations) AddStorageOverride(group, resource string, override storage.Interface) {
-	if _, ok := s.APIGroups[group]; !ok {
-		s.AddAPIGroup(group, nil)
-	}
-	if s.APIGroups[group].Overrides == nil {
-		s.APIGroups[group].Overrides = map[string]storage.Interface{}
-	}
-	s.APIGroups[group].Overrides[resource] = override
-}
-
-// Get finds the storage destination for the given group and resource. It will
-// Fatalf if the group has no storage destination configured.
-func (s *StorageDestinations) Get(group, resource string) storage.Interface {
-	apigroup, ok := s.APIGroups[group]
-	if !ok {
-		// TODO: return an error like a normal function. For now,
-		// Fatalf is better than just logging an error, because this
-		// condition guarantees future problems and this is a less
-		// mysterious failure point.
-		glog.Fatalf("No storage defined for API group: '%s'. Defined groups: %#v", group, s.APIGroups)
-		return nil
-	}
-	if apigroup.Overrides != nil {
-		if client, exists := apigroup.Overrides[resource]; exists {
-			return client
-		}
-	}
-	return apigroup.Default
-}
-
-// Search is like Get, but can be used to search a list of groups. It tries the
-// groups in order (and Fatalf's if none of them exist). The intention is for
-// this to be used for resources that move between groups.
-func (s *StorageDestinations) Search(groups []string, resource string) storage.Interface {
-	for _, group := range groups {
-		apigroup, ok := s.APIGroups[group]
-		if !ok {
-			continue
-		}
-		if apigroup.Overrides != nil {
-			if client, exists := apigroup.Overrides[resource]; exists {
-				return client
-			}
-		}
-		return apigroup.Default
-	}
-	// TODO: return an error like a normal function. For now,
-	// Fatalf is better than just logging an error, because this
-	// condition guarantees future problems and this is a less
-	// mysterious failure point.
-	glog.Fatalf("No storage defined for any of the groups: %v. Defined groups: %#v", groups, s.APIGroups)
-	return nil
-}
-
-// Get all backends for all registered storage destinations.
-// Used for getting all instances for health validations.
-func (s *StorageDestinations) Backends() []string {
-	backends := sets.String{}
-	for _, group := range s.APIGroups {
-		if group.Default != nil {
-			for _, backend := range group.Default.Backends(context.TODO()) {
-				backends.Insert(backend)
-			}
-		}
-		if group.Overrides != nil {
-			for _, storage := range group.Overrides {
-				for _, backend := range storage.Backends(context.TODO()) {
-					backends.Insert(backend)
-				}
-			}
-		}
-	}
-	return backends.List()
-}
 
 // Info about an API group.
 type APIGroupInfo struct {
@@ -199,9 +96,7 @@ type APIGroupInfo struct {
 
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
-	StorageDestinations StorageDestinations
-	// StorageVersions is a map between groups and their storage versions
-	StorageVersions map[string]string
+	StorageFactory StorageFactory
 	// allow downstream consumers to disable the core controller loops
 	EnableLogsSupport bool
 	EnableUISupport   bool
