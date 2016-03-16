@@ -35,6 +35,9 @@ if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=23 ]]; then
 fi
 
 NETWORK_IF_NAME=`echo ${if_to_edit} | awk -F- '{ print $3 }'`
+if [[ -z "$NETWORK_IF_NAME" ]]; then
+  NETWORK_IF_NAME="eth0"
+fi
 
 function release_not_found() {
   echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2

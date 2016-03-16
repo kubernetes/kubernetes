@@ -65,6 +65,9 @@ EOF
     NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
     if_to_edit=$( find ${NETWORK_CONF_PATH}ifcfg-* | xargs grep -l VAGRANT-BEGIN )
     NETWORK_IF_NAME=`echo ${if_to_edit} | awk -F- '{ print $3 }'`
+    if [[ -z "$NETWORK_IF_NAME" ]]; then
+      NETWORK_IF_NAME="eth0"
+    fi
     cat <<EOF >/etc/sysconfig/flanneld
 FLANNEL_ETCD="${FLANNEL_ETCD_URL}"
 FLANNEL_ETCD_KEY="/coreos.com/network"
