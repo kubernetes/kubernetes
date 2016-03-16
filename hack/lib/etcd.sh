@@ -68,7 +68,7 @@ kube::etcd::cleanup() {
 kube::etcd::install() {
   (
     cd "${KUBE_ROOT}/third_party"
-    curl -fsSL https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
+    curl -fsSL --retry 3 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
     ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
     kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
     kube::log::info "export PATH=\${PATH}:$(pwd)/etcd"
