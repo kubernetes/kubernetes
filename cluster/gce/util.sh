@@ -689,6 +689,11 @@ function create-nodes-template() {
 
   local template_name="${NODE_INSTANCE_PREFIX}-template"
 
+  # For master on trusty, we support running nodes on ContainerVM or trusty.
+  if [[ "${OS_DISTRIBUTION}" == "trusty" ]] && \
+     [[ "${NODE_IMAGE}" == container* ]]; then
+    source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
+  fi
   create-node-instance-template $template_name
 }
 
