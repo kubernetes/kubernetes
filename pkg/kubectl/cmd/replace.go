@@ -82,6 +82,7 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("grace-period", -1, "Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object")
 	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddRecursiveFlags(cmd)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -112,10 +113,13 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		return forceReplace(f, out, cmd, args, shortOutput, options)
 	}
 
+	recursiveExpansion := cmdutil.GetFlagBool(cmd, "recursive")
+
 	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		Schema(schema).
 		ContinueOnError().
+		RecursiveExpansion(recursiveExpansion).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options.Filenames...).
 		Flatten().
