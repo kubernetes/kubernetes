@@ -61,6 +61,7 @@ For each resource, containers can specify a resource request and limit, 0 <= req
 ### Compressible Resource Guarantees
 
 - For now, we are only supporting CPU.
+- Minimum CPU limit is 10 milli cores (`10m`). This a limitation of the Linux kernel.
 - Containers are guaranteed to get the amount of CPU they request, they may or may not get additional CPU time (depending on the other jobs running).
 - Excess CPU resources will be distributed based on the amount of CPU requested. For example, suppose container A requests for 60% of the CPU, and container B requests for 30% of the CPU. Suppose that both containers are trying to use as much CPU as they can. Then the extra 10% of CPU will be distributed to A and B in a 2:1 ratio (implementation discussed in later sections).
 - Containers will be throttled if they exceed their limit. If limit is unspecified, then the containers can use excess CPU when available.

@@ -840,6 +840,21 @@ func TestMilliCPUToQuota(t *testing.T) {
 			period: int64(0),
 		},
 		{
+			input:  int64(5),
+			quota:  int64(1000),
+			period: int64(100000),
+		},
+		{
+			input:  int64(9),
+			quota:  int64(1000),
+			period: int64(100000),
+		},
+		{
+			input:  int64(10),
+			quota:  int64(1000),
+			period: int64(100000),
+		},
+		{
 			input:  int64(200),
 			quota:  int64(20000),
 			period: int64(100000),
