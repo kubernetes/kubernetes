@@ -95,7 +95,7 @@ func makeTestClaim() *api.PersistentVolumeClaim {
 func makeTestController() (*PersistentVolumeProvisionerController, *mockControllerClient, *volumetest.FakeVolumePlugin) {
 	mockClient := &mockControllerClient{}
 	mockVolumePlugin := &volumetest.FakeVolumePlugin{}
-	controller, _ := NewPersistentVolumeProvisionerController(mockClient, 1*time.Second, "fake-kubernetes", nil, mockVolumePlugin, &fake_cloud.FakeCloud{})
+	controller, _ := NewPersistentVolumeProvisionerController(mockClient, 1*time.Second, "fake-kubernetes", nil, mockVolumePlugin, &fake_cloud.FakeCloud{}, "")
 	return controller, mockClient, mockVolumePlugin
 }
 

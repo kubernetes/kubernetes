@@ -180,6 +180,9 @@ type VolumeHost interface {
 
 	// Returns the hostname of the host kubelet is running on
 	GetHostName() string
+
+	// Returns the storage config dir
+	GetStorageConfigDir() string
 }
 
 // VolumePluginMgr tracks registered plugins.

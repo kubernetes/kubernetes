@@ -321,6 +321,8 @@ type KubeletConfiguration struct {
 	// kubelet with the default overlay network (flannel). Assumes flanneld
 	// is already running in client mode.
 	ExperimentalFlannelOverlay bool `json:"experimentalFlannelOverlay"`
+
+	StorageConfigDir string `json:"storageConfigDir"`
 	// outOfDiskTransitionFrequency is duration for which the kubelet has to
 	// wait before transitioning out of out-of-disk node condition status.
 	OutOfDiskTransitionFrequency unversioned.Duration `json:"outOfDiskTransitionFrequency,omitempty"`
@@ -499,7 +501,8 @@ type KubeControllerManagerConfiguration struct {
 	AllocateNodeCIDRs bool `json:"allocateNodeCIDRs"`
 	// rootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
-	RootCAFile string `json:"rootCAFile"`
+	RootCAFile       string `json:"rootCAFile"`
+	StorageConfigDir string `json:"storageConfigDir"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
 	KubeAPIQPS float32 `json:"kubeAPIQPS"`
 	// kubeAPIBurst is the burst to use while talking with kubernetes apiserver.
@@ -520,7 +523,8 @@ type VolumeConfiguration struct {
 	// cloud provider. This allows testing and development of provisioning features. HostPath
 	// provisioning is not supported in any way, won't work in a multi-node cluster, and
 	// should not be used for anything other than testing or development.
-	EnableHostPathProvisioning bool `json:"enableHostPathProvisioning"`
+	EnableHostPathProvisioning       bool `json:"enableHostPathProvisioning"`
+	EnableNetworkStorageProvisioning bool `json:"enableNetworkStorageProvisioning"`
 	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
 	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration `json:"persitentVolumeRecyclerConfiguration"`
 }

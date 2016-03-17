@@ -252,6 +252,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		TLSOptions:                     tlsOptions,
 		Writer:                         writer,
 		VolumePlugins:                  ProbeVolumePlugins(s.VolumePluginDir),
+		StorageConfigDir:               s.StorageConfigDir,
 		OutOfDiskTransitionFrequency:   s.OutOfDiskTransitionFrequency.Duration,
 		HairpinMode:                    s.HairpinMode,
 		BabysitDaemons:                 s.BabysitDaemons,
@@ -769,6 +770,7 @@ type KubeletConfig struct {
 	OutOfDiskTransitionFrequency   time.Duration
 
 	ExperimentalFlannelOverlay bool
+	StorageConfigDir           string
 	NodeIP                     net.IP
 	ContainerRuntimeOptions    []kubecontainer.Option
 	HairpinMode                string
@@ -854,6 +856,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ContainerManager,
 		kc.OutOfDiskTransitionFrequency,
 		kc.ExperimentalFlannelOverlay,
+		kc.StorageConfigDir,
 		kc.NodeIP,
 		kc.Reservation,
 		kc.EnableCustomMetrics,

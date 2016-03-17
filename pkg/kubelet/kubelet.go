@@ -208,6 +208,7 @@ func NewMainKubelet(
 	containerManager cm.ContainerManager,
 	outOfDiskTransitionFrequency time.Duration,
 	flannelExperimentalOverlay bool,
+	storageConfigDir string,
 	nodeIP net.IP,
 	reservation kubetypes.Reservation,
 	enableCustomMetrics bool,
@@ -332,6 +333,7 @@ func NewMainKubelet(
 		containerManager:           containerManager,
 		flannelExperimentalOverlay: flannelExperimentalOverlay,
 		flannelHelper:              NewFlannelHelper(),
+		storageConfigDir:           storageConfigDir,
 		nodeIP:                     nodeIP,
 		clock:                      util.RealClock{},
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
@@ -723,6 +725,8 @@ type Kubelet struct {
 	// put the system under duress.
 	flannelHelper *FlannelHelper
 
+	//storage config dir
+	storageConfigDir string
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP
 

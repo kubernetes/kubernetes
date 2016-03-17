@@ -113,6 +113,10 @@ func (f *fakeVolumeHost) GetHostName() string {
 	return "fakeHostName"
 }
 
+func (f *fakeVolumeHost) GetStorageConfigDir() string {
+	return "/tmp"
+}
+
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
 		return []VolumePlugin{

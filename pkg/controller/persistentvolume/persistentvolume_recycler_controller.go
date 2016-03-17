@@ -408,3 +408,7 @@ func (f *PersistentVolumeRecycler) GetWriter() ioutil.Writer {
 func (f *PersistentVolumeRecycler) GetHostName() string {
 	return ""
 }
+
+func (c *PersistentVolumeRecycler) GetStorageConfigDir() string {
+	return ""
+}
