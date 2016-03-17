@@ -33,6 +33,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
+	"k8s.io/kubernetes/contrib/mesos/pkg/flagutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/minion/tasks"
@@ -177,9 +178,18 @@ func (ms *MinionServer) launchExecutorServer(containerID string) <-chan struct{}
 
 	// disable resource-container; mesos slave doesn't like sub-containers yet
 	executorArgs = append(executorArgs, "--kubelet-cgroups=")
-	if ms.cgroupRoot != "" {
-		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
+
+	appendOptional := func(name, value string) {
+		if value != "" {
+			executorArgs = append(executorArgs, "--"+name+"="+value)
+		}
 	}
+	appendOptional("cgroup-root", ms.cgroupRoot)
+
+	// forward global cadvisor flag values to the executor
+	// TODO(jdef) remove this code once cadvisor global flags have been cleaned up
+	appendOptional(flagutil.Cadvisor.HousekeepingInterval.NameValue())
+	appendOptional(flagutil.Cadvisor.GlobalHousekeepingInterval.NameValue())
 
 	// forward containerID so that the executor may pass it along to containers that it launches
 	var ctidOpt tasks.Option
