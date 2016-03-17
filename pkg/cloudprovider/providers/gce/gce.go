@@ -2185,7 +2185,7 @@ func (gce *GCECloud) findDiskByName(diskName string, zone string) (*gceDisk, err
 func (gce *GCECloud) getDiskByName(diskName string, zone string) (*gceDisk, error) {
 	disk, err := gce.findDiskByName(diskName, zone)
 	if disk == nil && err == nil {
-		return nil, fmt.Errorf("GCE persistent disk not found: %q", diskName)
+		return nil, fmt.Errorf("GCE persistent disk not found: diskName=%q zone=%q", diskName, zone)
 	}
 	return disk, err
 }
