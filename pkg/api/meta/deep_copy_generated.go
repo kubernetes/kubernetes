@@ -83,7 +83,9 @@ func DeepCopy_meta_DefaultRESTMapper(in DefaultRESTMapper, out *DefaultRESTMappe
 	} else {
 		out.pluralToSingular = nil
 	}
-	if newVal, err := c.DeepCopy(in.interfacesFunc); err != nil {
+	if in.interfacesFunc == nil {
+		out.interfacesFunc = nil
+	} else if newVal, err := c.DeepCopy(in.interfacesFunc); err != nil {
 		return err
 	} else {
 		out.interfacesFunc = newVal.(VersionInterfacesFunc)
@@ -109,17 +111,23 @@ func DeepCopy_meta_RESTMapping(in RESTMapping, out *RESTMapping, c *conversion.C
 	if err := unversioned.DeepCopy_unversioned_GroupVersionKind(in.GroupVersionKind, &out.GroupVersionKind, c); err != nil {
 		return err
 	}
-	if newVal, err := c.DeepCopy(in.Scope); err != nil {
+	if in.Scope == nil {
+		out.Scope = nil
+	} else if newVal, err := c.DeepCopy(in.Scope); err != nil {
 		return err
 	} else {
 		out.Scope = newVal.(RESTScope)
 	}
-	if newVal, err := c.DeepCopy(in.ObjectConvertor); err != nil {
+	if in.ObjectConvertor == nil {
+		out.ObjectConvertor = nil
+	} else if newVal, err := c.DeepCopy(in.ObjectConvertor); err != nil {
 		return err
 	} else {
 		out.ObjectConvertor = newVal.(runtime.ObjectConvertor)
 	}
-	if newVal, err := c.DeepCopy(in.MetadataAccessor); err != nil {
+	if in.MetadataAccessor == nil {
+		out.MetadataAccessor = nil
+	} else if newVal, err := c.DeepCopy(in.MetadataAccessor); err != nil {
 		return err
 	} else {
 		out.MetadataAccessor = newVal.(MetadataAccessor)
@@ -128,12 +136,16 @@ func DeepCopy_meta_RESTMapping(in RESTMapping, out *RESTMapping, c *conversion.C
 }
 
 func DeepCopy_meta_VersionInterfaces(in VersionInterfaces, out *VersionInterfaces, c *conversion.Cloner) error {
-	if newVal, err := c.DeepCopy(in.ObjectConvertor); err != nil {
+	if in.ObjectConvertor == nil {
+		out.ObjectConvertor = nil
+	} else if newVal, err := c.DeepCopy(in.ObjectConvertor); err != nil {
 		return err
 	} else {
 		out.ObjectConvertor = newVal.(runtime.ObjectConvertor)
 	}
-	if newVal, err := c.DeepCopy(in.MetadataAccessor); err != nil {
+	if in.MetadataAccessor == nil {
+		out.MetadataAccessor = nil
+	} else if newVal, err := c.DeepCopy(in.MetadataAccessor); err != nil {
 		return err
 	} else {
 		out.MetadataAccessor = newVal.(MetadataAccessor)
