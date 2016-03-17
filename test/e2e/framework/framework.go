@@ -32,12 +32,13 @@ import (
 	adapter_1_2 "k8s.io/kubernetes/pkg/client/unversioned/adapters/release_1_2"
 	adapter_1_3 "k8s.io/kubernetes/pkg/client/unversioned/adapters/release_1_3"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/metrics"
+	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -379,6 +380,79 @@ func (f *Framework) ReadFileViaContainer(podName, containerName string, path str
 		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return string(stdout), err
+}
+
+// CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.
+func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int, appName string, podSpec func(n api.Node) api.PodSpec, count int, block bool) (error, *api.Service) {
+	var err error = nil
+	theService := f.CreateServiceForSimpleApp(contPort, svcPort, appName)
+	f.CreatePodsPerNodeForSimpleApp(appName, podSpec, count)
+	if block {
+		err = WaitForPodsWithLabelRunning(f.Client, f.Namespace.Name, labels.SelectorFromSet(labels.Set(theService.Spec.Selector)))
+	}
+	return err, theService
+}
+
+// CreateServiceForSimpleApp returns a service that selects/exposes pods (send -1 ports if no exposure needed) with an app label.
+func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName string) *api.Service {
+	if appName == "" {
+		panic(fmt.Sprintf("no app name provided"))
+	}
+
+	serviceSelector := map[string]string{
+		"app": appName + "-pod",
+	}
+
+	// For convenience, user sending ports are optional.
+	portsFunc := func() []api.ServicePort {
+		if contPort < 1 || svcPort < 1 {
+			return nil
+		} else {
+			return []api.ServicePort{{
+				Protocol:   "TCP",
+				Port:       svcPort,
+				TargetPort: intstr.FromInt(contPort),
+			}}
+		}
+	}
+	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
+	service, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name: "service-for-" + appName,
+			Labels: map[string]string{
+				"app": appName + "-service",
+			},
+		},
+		Spec: api.ServiceSpec{
+			Ports:    portsFunc(),
+			Selector: serviceSelector,
+		},
+	})
+	ExpectNoError(err)
+	return service
+}
+
+// CreatePodsPerNodeForSimpleApp Creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
+func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n api.Node) api.PodSpec, maxCount int) map[string]string {
+	nodes := ListSchedulableNodesOrDie(f.Client)
+	labels := map[string]string{
+		"app": appName + "-pod",
+	}
+	for i, node := range nodes.Items {
+		// one per node, but no more than maxCount.
+		if i <= maxCount {
+			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
+			_, err := f.Client.Pods(f.Namespace.Name).Create(&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:   fmt.Sprintf(appName+"-pod-%v", i),
+					Labels: labels,
+				},
+				Spec: podSpec(node),
+			})
+			ExpectNoError(err)
+		}
+	}
+	return labels
 }
 
 func kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
