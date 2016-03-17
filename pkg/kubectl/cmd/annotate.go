@@ -114,6 +114,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "Filename, directory, or URL to a file identifying the resource to update the annotation"
 	kubectl.AddJsonFilenameFlag(cmd, &options.filenames, usage)
+	cmdutil.AddRecursiveFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
@@ -158,9 +159,12 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
 	o.changeCause = f.Command()
 
+	recursiveExpansion := cmdutil.GetFlagBool(cmd, "recursive")
+
 	mapper, typer := f.Object()
 	o.builder = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
+		RecursiveExpansion(recursiveExpansion).
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, o.filenames...).
 		SelectorParam(o.selector).
