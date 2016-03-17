@@ -329,14 +329,14 @@
     suffix:
         - 'gke-test':
             description: 'Run E2E tests on GKE test endpoint.'
-            timeout: 300
+            timeout: 480
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-test"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
         - 'gke-subnet':
             description: 'Run E2E tests on GKE test endpoint in a subnet.'
-            timeout: 300
+            timeout: 480
             job-env: |
                 # auto-subnet manually created - if deleted, it will need to be recreated
                 # gcloud alpha compute networks create auto-subnet --mode auto
@@ -346,7 +346,7 @@
                 export JENKINS_USE_SERVER_VERSION="y"
         - 'gke-staging':
             description: 'Run E2E tests on GKE staging endpoint.'
-            timeout: 300
+            timeout: 480
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-staging"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
