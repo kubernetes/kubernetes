@@ -32,10 +32,12 @@ import (
 // PauseConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type PauseConfig struct {
-	PauseObject func(object runtime.Object) (bool, error)
-	Mapper      meta.RESTMapper
-	Typer       runtime.ObjectTyper
-	Info        *resource.Info
+	PauseObject  func(object runtime.Object) (bool, error)
+	Mapper       meta.RESTMapper
+	Typer        runtime.ObjectTyper
+	Info         *resource.Info
+	ShouldRecord bool
+	ChangeCause  string
 
 	Out       io.Writer
 	Filenames []string
@@ -70,6 +72,7 @@ func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
 	kubectl.AddJsonFilenameFlag(cmd, &opts.Filenames, usage)
+	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
@@ -81,6 +84,7 @@ func (o *PauseConfig) CompletePause(f *cmdutil.Factory, cmd *cobra.Command, out 
 	o.Mapper, o.Typer = f.Object()
 	o.PauseObject = f.PauseObject
 	o.Out = out
+	o.ChangeCause = f.Command()
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -101,6 +105,7 @@ func (o *PauseConfig) CompletePause(f *cmdutil.Factory, cmd *cobra.Command, out 
 		return fmt.Errorf("rollout pause is only supported on individual resources - %d resources were found", len(infos))
 	}
 	o.Info = infos[0]
+	o.ShouldRecord = cmdutil.ShouldRecord(cmd, o.Info)
 	return nil
 }
 
@@ -112,6 +117,9 @@ func (o PauseConfig) RunPause() error {
 	if isAlreadyPaused {
 		cmdutil.PrintSuccess(o.Mapper, false, o.Out, o.Info.Mapping.Resource, o.Info.Name, "already paused")
 		return nil
+	}
+	if o.ShouldRecord {
+		cmdutil.PatchWithChangeCause(o.Info, o.ChangeCause)
 	}
 	cmdutil.PrintSuccess(o.Mapper, false, o.Out, o.Info.Mapping.Resource, o.Info.Name, "paused")
 	return nil
