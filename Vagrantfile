@@ -186,6 +186,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       v.customize ['set', :id, '--shf-guest-automount', 'off']
       v.customize ['set', :id, '--shf-host', 'on']
 
+      # Synchronize VM clocks to host clock (Avoid certificate invalid issue)
+      v.customize ['set', :id, '--time-sync', 'on']
+
       # Remove all auto-mounted "shared folders"; the result seems to
       # persist between runs (i.e., vagrant halt && vagrant up)
       override.vm.provision :shell, :inline => (%q{
