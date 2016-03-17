@@ -114,7 +114,7 @@ You should consider joining the [Cloud Native Computing Foundation](https://cncf
 
 Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).
 
-#### Are you ready to add to the discussion?
+### Are you ready to add to the discussion?
 
 We have presence on:
 
@@ -129,17 +129,23 @@ For Q&A, our threads are at:
  * [Stack Overflow](http://stackoverflow.com/questions/tagged/kubernetes)
  * [Slack](/docs/troubleshooting.md#slack)
 
-#### Want to do more than just 'discuss' Kubernetes?
+### Want to do more than just 'discuss' Kubernetes?
 
 If you're interested in being a contributor and want to get involved in developing Kubernetes, start in the [Kubernetes Developer Guide](docs/devel/README.md) and also review the [contributor guidelines](CONTRIBUTING.md).
 
-#### Support
+### Support
 
 While there are many different channels that you can use to get ahold of us, you can help make sure that we are efficient in getting you the help that you need.
 
 If you need support, start with the [troubleshooting guide](docs/troubleshooting.md#getting-help) and work your way through the process that we've outlined.
 
 That said, if you have questions, reach out to us one way or another.  We don't bite!
+
+### Community resources:
+
+* **Awesome-kubernetes**:
+
+You can find more projects, tools and articles related to Kubernetes on the  [awesome-kubernetes](https://github.com/ramitsurana/awesome-kubernetes) list. Add your project there and help us make it better.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()
