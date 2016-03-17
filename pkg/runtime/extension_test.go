@@ -28,7 +28,7 @@ func TestEmbeddedRawExtensionMarshal(t *testing.T) {
 		Ext runtime.RawExtension
 	}
 
-	extension := test{Ext: runtime.RawExtension{RawJSON: []byte(`{"foo":"bar"}`)}}
+	extension := test{Ext: runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)}}
 	data, err := json.Marshal(extension)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

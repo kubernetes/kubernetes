@@ -64,7 +64,10 @@ func (c codec) Decode(data []byte) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("runtime object is not a proto.Message: %v", reflect.TypeOf(obj))
 	}
-	if err := proto.Unmarshal(unknown.RawJSON, pobj); err != nil {
+	if unknown.ContentType != runtime.ContentTypeProtobuf {
+		return nil, fmt.Errorf("unmarshal non-protobuf object with protobuf decoder")
+	}
+	if err := proto.Unmarshal(unknown.Raw, pobj); err != nil {
 		return nil, err
 	}
 	if unknown.APIVersion != c.outputVersion {
@@ -90,13 +93,16 @@ func (c codec) DecodeInto(data []byte, obj runtime.Object) error {
 	if err := proto.Unmarshal(data, unknown); err != nil {
 		return err
 	}
+	if unknown.ContentType != runtime.ContentTypeProtobuf {
+		return nil, fmt.Errorf("unmarshal non-protobuf object with protobuf decoder")
+	}
 	if unknown.APIVersion == version && unknown.Kind == kind {
 		pobj, ok := obj.(proto.Message)
 		if !ok {
 			return fmt.Errorf("runtime object is not a proto.Message: %v", reflect.TypeOf(obj))
 		}
 
-		return proto.Unmarshal(unknown.RawJSON, pobj)
+		return proto.Unmarshal(unknown.Raw, pobj)
 	}
 
 	versioned, err := c.creater.New(unknown.APIVersion, unknown.Kind)
@@ -109,7 +115,7 @@ func (c codec) DecodeInto(data []byte, obj runtime.Object) error {
 		return fmt.Errorf("runtime object is not a proto.Message: %v", reflect.TypeOf(obj))
 	}
 
-	if err := proto.Unmarshal(unknown.RawJSON, pobj); err != nil {
+	if err := proto.Unmarshal(unknown.Raw, pobj); err != nil {
 		return err
 	}
 	return c.convertor.Convert(versioned, obj)
@@ -149,7 +155,8 @@ func (c codec) Encode(obj runtime.Object) (data []byte, err error) {
 			Kind:       kind,
 			APIVersion: version,
 		},
-		RawJSON: b,
+		Raw:         b,
+		ContentType: runtime.ContentTypeProtobuf,
 	}).Marshal()
 }
 
