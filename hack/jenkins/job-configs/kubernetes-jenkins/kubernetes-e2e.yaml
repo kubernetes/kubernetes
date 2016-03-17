@@ -585,7 +585,7 @@
     job-env: |
         # XXX Not a unique project
         export E2E_NAME="e2e-enormous-cluster"
-        export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Performance\]
+        export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Performance\]"
         export PROJECT="kubernetes-scale"
         export FAIL_ON_GCP_RESOURCE_LEAK="false"
         # Override GCE defaults.
