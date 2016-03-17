@@ -93,7 +93,7 @@ readonly GCS_STAGE="${LOCAL_OUTPUT_ROOT}/gcs-stage"
 # Get the set of master binaries that run in Docker (on Linux)
 # Entry format is "<name-of-binary>,<base-image>".
 # Binaries are placed in /usr/local/bin inside the image.
-# 
+#
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
   case $1 in
@@ -875,7 +875,10 @@ function kube::release::write_addon_docker_images_for_server() {
         kube::log::status "Pulling and writing Docker image for addon: ${addon_path}"
 
         local dest_name="${addon_path//\//\~}"
-        "${DOCKER[@]}" pull "${addon_path}"
+        if [[ -z $("${DOCKER[@]}" images | awk '{print ($1":"$2)}' | grep "${addon_path}") ]]; then
+          kube::log::status "Addon image ${addon_path} does not exist, pulling it..."
+          "${DOCKER[@]}" pull "${addon_path}"
+        fi
         "${DOCKER[@]}" save "${addon_path}" > "${1}/${dest_name}.tar"
       ) &
     done
