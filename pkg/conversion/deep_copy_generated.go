@@ -130,12 +130,16 @@ func DeepCopy_conversion_Converter(in Converter, out *Converter, c *Cloner) erro
 	} else {
 		out.inputDefaultFlags = nil
 	}
-	if newVal, err := c.DeepCopy(in.Debug); err != nil {
+	if in.Debug == nil {
+		out.Debug = nil
+	} else if newVal, err := c.DeepCopy(in.Debug); err != nil {
 		return err
 	} else {
 		out.Debug = newVal.(DebugLogger)
 	}
-	if newVal, err := c.DeepCopy(in.nameFunc); err != nil {
+	if in.nameFunc == nil {
+		out.nameFunc = nil
+	} else if newVal, err := c.DeepCopy(in.nameFunc); err != nil {
 		return err
 	} else {
 		out.nameFunc = newVal.(func(reflect.Type) string)
@@ -159,7 +163,9 @@ func DeepCopy_conversion_Equalities(in Equalities, out *Equalities, c *Cloner) e
 func DeepCopy_conversion_Meta(in Meta, out *Meta, c *Cloner) error {
 	out.SrcVersion = in.SrcVersion
 	out.DestVersion = in.DestVersion
-	if newVal, err := c.DeepCopy(in.KeyNameMapping); err != nil {
+	if in.KeyNameMapping == nil {
+		out.KeyNameMapping = nil
+	} else if newVal, err := c.DeepCopy(in.KeyNameMapping); err != nil {
 		return err
 	} else {
 		out.KeyNameMapping = newVal.(FieldMappingFunc)

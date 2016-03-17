@@ -48,7 +48,9 @@ func DeepCopy_serializer_CodecFactory(in CodecFactory, out *CodecFactory, c *con
 	} else {
 		out.serializers = nil
 	}
-	if newVal, err := c.DeepCopy(in.universal); err != nil {
+	if in.universal == nil {
+		out.universal = nil
+	} else if newVal, err := c.DeepCopy(in.universal); err != nil {
 		return err
 	} else {
 		out.universal = newVal.(runtime.Decoder)
@@ -60,7 +62,9 @@ func DeepCopy_serializer_CodecFactory(in CodecFactory, out *CodecFactory, c *con
 	} else {
 		out.accepts = nil
 	}
-	if newVal, err := c.DeepCopy(in.legacySerializer); err != nil {
+	if in.legacySerializer == nil {
+		out.legacySerializer = nil
+	} else if newVal, err := c.DeepCopy(in.legacySerializer); err != nil {
 		return err
 	} else {
 		out.legacySerializer = newVal.(runtime.Serializer)

@@ -26,6 +26,24 @@ import (
 	reflect "reflect"
 )
 
+func DeepCopy_runtime_RawExtension(in RawExtension, out *RawExtension, c *conversion.Cloner) error {
+	if in.RawJSON != nil {
+		in, out := in.RawJSON, &out.RawJSON
+		*out = make([]byte, len(in))
+		copy(*out, in)
+	} else {
+		out.RawJSON = nil
+	}
+	if in.Object == nil {
+		out.Object = nil
+	} else if newVal, err := c.DeepCopy(in.Object); err != nil {
+		return err
+	} else {
+		out.Object = newVal.(Object)
+	}
+	return nil
+}
+
 func DeepCopy_runtime_Scheme(in Scheme, out *Scheme, c *conversion.Cloner) error {
 	if in.gvkToType != nil {
 		in, out := in.gvkToType, &out.gvkToType
