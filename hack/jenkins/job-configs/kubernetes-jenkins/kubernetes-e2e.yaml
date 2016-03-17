@@ -320,6 +320,41 @@
         - 'kubernetes-e2e-{suffix}'
 
 - project:
+    name: kubernetes-e2e-gke-version-pinned
+    # TODO(spxtr) This should float with the current release, or something.
+    trigger-job: 'kubernetes-build-1.2'
+    test-owner: 'GKE on-call'
+    provider-env: |
+        {gke-provider-env}
+    suffix:
+        - 'gke-test':
+            description: 'Run E2E tests on GKE test endpoint.'
+            timeout: 300
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-test"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+                export JENKINS_USE_SERVER_VERSION="y"
+        - 'gke-subnet':
+            description: 'Run E2E tests on GKE test endpoint in a subnet.'
+            timeout: 300
+            job-env: |
+                # auto-subnet manually created - if deleted, it will need to be recreated
+                # gcloud alpha compute networks create auto-subnet --mode auto
+                export E2E_NAME="auto-subnet"
+                export PROJECT="k8s-jkns-e2e-gke-subnet"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+                export JENKINS_USE_SERVER_VERSION="y"
+        - 'gke-staging':
+            description: 'Run E2E tests on GKE staging endpoint.'
+            timeout: 300
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-staging"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+                export JENKINS_USE_SERVER_VERSION="y"
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+
+- project:
     name: kubernetes-e2e-gke-1.1
     trigger-job: 'kubernetes-build-1.1'
     test-owner: 'GKE on-call'
@@ -338,38 +373,6 @@
                 - provider: GKE<br>
                 - api proxy: prod<br>
                 - borg job: prod<br>
-                - client (kubectl): release/stable.txt<br>
-                - cluster (k8s): release/stable.txt<br>
-                - tests: release/stable.txt
-        - 'gke-staging':
-            timeout: 300
-            description: |
-                Run e2e tests using the following config:<br>
-                - provider: GKE<br>
-                - api proxy: staging<br>
-                - borg job: staging<br>
-                - client (kubectl): release/stable.txt<br>
-                - cluster (k8s): release/stable.txt<br>
-                - tests: release/stable.txt
-        - 'gke-subnet':
-            test-owner: 'cjcullen'
-            timeout: 300
-            description: |
-                Run e2e tests using the following config:<br>
-                - provider: GKE<br>
-                - api proxy: prod<br>
-                - borg job: prod<br>
-                - client (kubectl): release/stable.txt<br>
-                - cluster (k8s): release/stable.txt<br>
-                - tests: release/stable.txt
-            emails: 'cjcullen@google.com'
-        - 'gke-test':
-            timeout: 300
-            description: |
-                Run e2e tests using the following config:<br>
-                - provider: GKE<br>
-                - api proxy: staging<br>
-                - borg job: test<br>
                 - client (kubectl): release/stable.txt<br>
                 - cluster (k8s): release/stable.txt<br>
                 - tests: release/stable.txt
