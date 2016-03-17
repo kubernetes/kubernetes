@@ -274,7 +274,8 @@ func TestExtensionMapping(t *testing.T) {
 			},
 			&InternalExtensionType{
 				Extension: &runtime.Unknown{
-					RawJSON: []byte(`{"apiVersion":"test.group/testExternal","kind":"A","testString":"foo"}`),
+					Raw:         []byte(`{"apiVersion":"test.group/testExternal","kind":"A","testString":"foo"}`),
+					ContentType: runtime.ContentTypeJSON,
 				},
 			},
 			// apiVersion is set in the serialized object for easier consumption by clients
@@ -284,7 +285,8 @@ func TestExtensionMapping(t *testing.T) {
 			&InternalExtensionType{Extension: runtime.NewEncodable(codec, &ExtensionB{TestString: "bar"})},
 			&InternalExtensionType{
 				Extension: &runtime.Unknown{
-					RawJSON: []byte(`{"apiVersion":"test.group/testExternal","kind":"B","testString":"bar"}`),
+					Raw:         []byte(`{"apiVersion":"test.group/testExternal","kind":"B","testString":"bar"}`),
+					ContentType: runtime.ContentTypeJSON,
 				},
 			},
 			// apiVersion is set in the serialized object for easier consumption by clients
