@@ -584,9 +584,7 @@
     job-env: |
         # XXX Not a unique project
         export E2E_NAME="e2e-enormous-cluster"
-        # TODO: Currently run only density test.
-        # Once this is stable, run the whole [Performance] suite.
-        export GINKGO_TEST_ARGS="--ginkgo.focus=starting\s30\spods\sper\snode"
+        export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Performance\]
         export PROJECT="kubernetes-scale"
         export FAIL_ON_GCP_RESOURCE_LEAK="false"
         # Override GCE defaults.
@@ -594,7 +592,7 @@
         # Temporarily switch of Heapster, as this will not schedule anywhere.
         # TODO: Think of a solution to enable it.
         export KUBE_ENABLE_CLUSTER_MONITORING="none"
-        export KUBE_GCE_ZONE="asia-east1-a"
+        export KUBE_GCE_ZONE="us-central1-c"
         export MASTER_SIZE="n1-standard-32"
         export NODE_SIZE="n1-standard-1"
         export NODE_DISK_SIZE="50GB"
