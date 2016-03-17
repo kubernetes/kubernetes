@@ -1287,9 +1287,16 @@ __EOF__
   kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
   sleep 1
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
+  # Pause the deployment
+  kubectl-with-retry rollout pause deployment nginx-deployment "${kube_flags[@]}"
+  # A paused deployment cannot be rolled back
+  ! kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
+  # Resume the deployment
+  kubectl-with-retry rollout resume deployment nginx-deployment "${kube_flags[@]}"
+  # The resumed deployment can now be rolled back
+  kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
-  kubectl delete rs -l pod-template-hash "${kube_flags[@]}"
 
 
   ######################

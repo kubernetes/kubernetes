@@ -49,6 +49,10 @@ type DeploymentRollbacker struct {
 }
 
 func (r *DeploymentRollbacker) Rollback(namespace, name string, updatedAnnotations map[string]string, toRevision int64, obj runtime.Object) (string, error) {
+	d := obj.(*extensions.Deployment)
+	if d.Spec.Paused {
+		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume' and try again")
+	}
 	deploymentRollback := &extensions.DeploymentRollback{
 		Name:               name,
 		UpdatedAnnotations: updatedAnnotations,
