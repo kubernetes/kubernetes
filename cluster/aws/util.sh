@@ -240,7 +240,13 @@ function query-running-minions () {
            --query ${query}
 }
 
-function find-running-minions () {
+function detect-node-names () {
+  # If this is called directly, VPC_ID might not be set
+  # (this is case from cluster/log-dump.sh)
+  if [[ -z "${VPC_ID:-}" ]]; then
+    VPC_ID=$(get_vpc_id)
+  fi
+
   NODE_IDS=()
   NODE_NAMES=()
   for id in $(query-running-minions "Reservations[].Instances[].InstanceId"); do
@@ -251,8 +257,14 @@ function find-running-minions () {
   done
 }
 
+# Called to detect the project on GCE
+# Not needed on AWS
+function detect-project() {
+  :
+}
+
 function detect-nodes () {
-  find-running-minions
+  detect-node-names
 
   # This is inefficient, but we want NODE_NAMES / NODE_IDS to be ordered the same as KUBE_NODE_IP_ADDRESSES
   KUBE_NODE_IP_ADDRESSES=()
@@ -1225,7 +1237,7 @@ function wait-minions {
     max_attempts=90
   fi
   while true; do
-    find-running-minions > $LOG
+    detect-node-names > $LOG
     if [[ ${#NODE_IDS[@]} == ${NUM_NODES} ]]; then
       echo -e " ${color_green}${#NODE_IDS[@]} minions started; ready${color_norm}"
       break
@@ -1552,24 +1564,33 @@ function test-teardown {
 }
 
 
-# SSH to a node by name ($1) and run a command ($2).
-function ssh-to-node {
+# Gets the hostname (or IP) that we should SSH to for the given nodename
+# For the master, we use the nodename, for the nodes we use their instanceids
+function get_ssh_hostname {
   local node="$1"
-  local cmd="$2"
 
   if [[ "${node}" == "${MASTER_NAME}" ]]; then
     node=$(get_instanceid_from_name ${MASTER_NAME})
     if [[ -z "${node-}" ]]; then
-      echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
+      echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" 1>&2
       exit 1
     fi
   fi
 
   local ip=$(get_instance_public_ip ${node})
   if [[ -z "$ip" ]]; then
-    echo "Could not detect IP for ${node}."
+    echo "Could not detect IP for ${node}." 1>&2
     exit 1
   fi
+  echo ${ip}
+}
+
+# SSH to a node by name ($1) and run a command ($2).
+function ssh-to-node {
+  local node="$1"
+  local cmd="$2"
+
+  local ip=$(get_ssh_hostname ${node})
 
   for try in $(seq 1 5); do
     if ssh -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${ip} "echo test > /dev/null"; then
