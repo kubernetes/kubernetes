@@ -352,6 +352,16 @@
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
                 export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
+        - 'gke-staging-parallel':
+            description: 'Run E2E tests on GKE staging endpoint in parallel.'
+            timeout: 80
+            job-env: |
+                export PROJECT="k8s-e2e-gke-staging-parallel"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+                export JENKINS_USE_SERVER_VERSION="y"
+                export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
