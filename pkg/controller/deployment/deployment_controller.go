@@ -898,6 +898,24 @@ func setNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 	return annotationChanged
 }
 
+// skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
+// TODO: How to decide which annotations should / should not be copied?
+//       See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
+func skipCopyAnnotation(key string) bool {
+	// Skip apply annotations and revision annotations.
+	return key == kubectl.LastAppliedConfigAnnotation || key == deploymentutil.RevisionAnnotation
+}
+
+func getSkippedAnnotations(annotations map[string]string) map[string]string {
+	skippedAnnotations := make(map[string]string)
+	for k, v := range annotations {
+		if skipCopyAnnotation(k) {
+			skippedAnnotations[k] = v
+		}
+	}
+	return skippedAnnotations
+}
+
 // copyDeploymentAnnotationsToReplicaSet copies deployment's annotations to replica set's annotations,
 // and returns true if replica set's annotation is changed.
 // Note that apply and revision annotations are not copied.
@@ -907,19 +925,28 @@ func copyDeploymentAnnotationsToReplicaSet(deployment *extensions.Deployment, rs
 		rs.Annotations = make(map[string]string)
 	}
 	for k, v := range deployment.Annotations {
-		// TODO: How to decide which annotations should / should not be copied?
-		// See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
-		// Skip apply annotations and revision annotations.
 		// newRS revision is updated automatically in getNewReplicaSet, and the deployment's revision number is then updated
 		// by copying its newRS revision number. We should not copy deployment's revision to its newRS, since the update of
 		// deployment revision number may fail (revision becomes stale) and the revision number in newRS is more reliable.
-		if k == kubectl.LastAppliedConfigAnnotation || k == deploymentutil.RevisionAnnotation || rs.Annotations[k] == v {
+		if skipCopyAnnotation(k) || rs.Annotations[k] == v {
 			continue
 		}
 		rs.Annotations[k] = v
 		rsAnnotationsChanged = true
 	}
 	return rsAnnotationsChanged
+}
+
+// setDeploymentAnnotationsTo sets deployment's annotations as given RS's annotations.
+// This action should be done if and only if the deployment is rolling back to this rs.
+// Note that apply and revision annotations are not changed.
+func setDeploymentAnnotationsTo(deployment *extensions.Deployment, rollbackToRS *extensions.ReplicaSet) {
+	deployment.Annotations = getSkippedAnnotations(deployment.Annotations)
+	for k, v := range rollbackToRS.Annotations {
+		if !skipCopyAnnotation(k) {
+			deployment.Annotations[k] = v
+		}
+	}
 }
 
 func (dc *DeploymentController) updateDeploymentRevision(deployment *extensions.Deployment, revision string) error {
@@ -1237,6 +1264,18 @@ func (dc *DeploymentController) rollbackToTemplate(deployment *extensions.Deploy
 	if !reflect.DeepEqual(deploymentutil.GetNewReplicaSetTemplate(deployment), rs.Spec.Template) {
 		glog.Infof("Rolling back deployment %s to template spec %+v", deployment.Name, rs.Spec.Template.Spec)
 		deploymentutil.SetFromReplicaSetTemplate(deployment, rs.Spec.Template)
+		// set RS (the old RS we'll rolling back to) annotations back to the deployment;
+		// otherwise, the deployment's current annotations (should be the same as current new RS) will be copied to the RS after the rollback.
+		//
+		// For example,
+		// A Deployment has old RS1 with annotation {change-cause:create}, and new RS2 {change-cause:edit}.
+		// Note that both annotations are copied from Deployment, and the Deployment should be annotated {change-cause:edit} as well.
+		// Now, rollback Deployment to RS1, we should update Deployment's pod-template and also copy annotation from RS1.
+		// Deployment is now annotated {change-cause:create}, and we have new RS1 {change-cause:create}, old RS2 {change-cause:edit}.
+		//
+		// If we don't copy the annotations back from RS to deployment on rollback, the Deployment will stay as {change-cause:edit},
+		// and new RS1 becomes {change-cause:edit} (copied from deployment after rollback), old RS2 {change-cause:edit}, which is not correct.
+		setDeploymentAnnotationsTo(deployment, rs)
 		performedRollback = true
 	} else {
 		glog.V(4).Infof("Rolling back to a revision that contains the same template as current deployment %s, skipping rollback...", deployment.Name)

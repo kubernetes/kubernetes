@@ -657,6 +657,8 @@ func testRollbackDeployment(f *Framework) {
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	Logf("Creating deployment %s", deploymentName)
 	d := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)
+	createAnnotation := map[string]string{"action": "create", "author": "minion"}
+	d.Annotations = createAnnotation
 	_, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
@@ -668,12 +670,18 @@ func testRollbackDeployment(f *Framework) {
 	err = waitForDeploymentStatus(c, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, 0)
 	Expect(err).NotTo(HaveOccurred())
 
+	// Current newRS annotation should be "create"
+	err = checkNewRSAnnotations(c, ns, deploymentName, createAnnotation)
+	Expect(err).NotTo(HaveOccurred())
+
 	// 2. Update the deployment to create redis pods.
 	updatedDeploymentImage := redisImage
 	updatedDeploymentImageName := redisImageName
+	updateAnnotation := map[string]string{"action": "update", "log": "I need to update it"}
 	deployment, err := updateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
 		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
+		update.Annotations = updateAnnotation
 	})
 	Expect(err).NotTo(HaveOccurred())
 
@@ -686,6 +694,10 @@ func testRollbackDeployment(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, 0)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Current newRS annotation should be "update"
+	err = checkNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
 	Expect(err).NotTo(HaveOccurred())
 
 	// 3. Update the deploymentRollback to rollback to revision 1
@@ -707,6 +719,10 @@ func testRollbackDeployment(f *Framework) {
 	err = waitForDeploymentStatus(c, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, 0)
 	Expect(err).NotTo(HaveOccurred())
 
+	// Current newRS annotation should be "create", after the rollback
+	err = checkNewRSAnnotations(c, ns, deploymentName, createAnnotation)
+	Expect(err).NotTo(HaveOccurred())
+
 	// 4. Update the deploymentRollback to rollback to last revision
 	revision = 0
 	Logf("rolling back deployment %s to last revision", deploymentName)
@@ -722,6 +738,10 @@ func testRollbackDeployment(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, 0)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Current newRS annotation should be "update", after the rollback
+	err = checkNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
 	Expect(err).NotTo(HaveOccurred())
 }
 

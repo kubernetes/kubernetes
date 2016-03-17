@@ -2620,6 +2620,25 @@ func waitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	return nil
 }
 
+// checkNewRSAnnotations check if the new RS's annotation is as expected
+func checkNewRSAnnotations(c clientset.Interface, ns, deploymentName string, expectedAnnotations map[string]string) error {
+	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+	if err != nil {
+		return err
+	}
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	if err != nil {
+		return err
+	}
+	for k, v := range expectedAnnotations {
+		// Skip checking revision annotations
+		if k != deploymentutil.RevisionAnnotation && v != newRS.Annotations[k] {
+			return fmt.Errorf("Expected new RS annotations = %+v, got %+v", expectedAnnotations, newRS.Annotations)
+		}
+	}
+	return nil
+}
+
 func waitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	options := api.ListOptions{LabelSelector: label}
