@@ -68,6 +68,7 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddRecursiveFlags(cmd)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	return cmd
@@ -93,10 +94,13 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		return err
 	}
 
+	recursiveExpansion := cmdutil.GetFlagBool(cmd, "recursive")
+
 	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		Schema(schema).
 		ContinueOnError().
+		RecursiveExpansion(recursiveExpansion).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options.Filenames...).
 		Flatten().
