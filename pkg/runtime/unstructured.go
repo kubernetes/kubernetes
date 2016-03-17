@@ -67,7 +67,8 @@ func (unstructuredJSONScheme) EncodeToStream(obj Object, w io.Writer, overrides 
 		}
 		return json.NewEncoder(w).Encode(eList)
 	case *Unknown:
-		_, err := w.Write(t.RawJSON)
+		// TODO: Unstructured needs to deal with ContentType.
+		_, err := w.Write(t.Raw)
 		return err
 	default:
 		return json.NewEncoder(w).Encode(t)

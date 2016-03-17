@@ -69,17 +69,23 @@ func (re *Unknown) UnmarshalJSON(in []byte) error {
 		return errors.New("runtime.Unknown: UnmarshalJSON on nil pointer")
 	}
 	re.TypeMeta = TypeMeta{}
-	re.RawJSON = append(re.RawJSON[0:0], in...)
+	re.Raw = append(re.Raw[0:0], in...)
+	re.ContentEncoding = ""
+	re.ContentType = ContentTypeJSON
 	return nil
 }
 
 // Marshal may get called on pointers or values, so implement MarshalJSON on value.
 // http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
 func (re Unknown) MarshalJSON() ([]byte, error) {
-	if re.RawJSON == nil {
+	// If ContentType is unset, we assume this is JSON.
+	if re.ContentType != "" && re.ContentType != ContentTypeJSON {
+		return nil, errors.New("runtime.Unknown: MarshalJSON on non-json data")
+	}
+	if re.Raw == nil {
 		return []byte("null"), nil
 	}
-	return re.RawJSON, nil
+	return re.Raw, nil
 }
 
 func DefaultEmbeddedConversions() []interface{} {
@@ -91,8 +97,8 @@ func DefaultEmbeddedConversions() []interface{} {
 			}
 			obj := *in
 			if unk, ok := obj.(*Unknown); ok {
-				if unk.RawJSON != nil {
-					out.RawJSON = unk.RawJSON
+				if unk.Raw != nil {
+					out.RawJSON = unk.Raw
 					return nil
 				}
 				obj = out.Object
@@ -116,7 +122,10 @@ func DefaultEmbeddedConversions() []interface{} {
 				return nil
 			}
 			*out = &Unknown{
-				RawJSON: data,
+				Raw: data,
+				// TODO: Set ContentEncoding and ContentType appropriately.
+				// Currently we set ContentTypeJSON to make tests passing.
+				ContentType: ContentTypeJSON,
 			}
 			return nil
 		},

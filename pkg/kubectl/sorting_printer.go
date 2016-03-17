@@ -97,7 +97,7 @@ func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput stri
 		switch u := item.(type) {
 		case *runtime.Unknown:
 			var err error
-			if objs[ix], _, err = decoder.Decode(u.RawJSON, nil, nil); err != nil {
+			if objs[ix], _, err = decoder.Decode(u.Raw, nil, nil); err != nil {
 				return nil, err
 			}
 		}

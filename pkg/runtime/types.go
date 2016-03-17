@@ -87,6 +87,10 @@ type RawExtension struct {
 	Object Object `json:"-"`
 }
 
+// TODO; Where should it be?
+// TODO; What value it should have?
+const ContentTypeJSON string = "application/json"
+
 // Unknown allows api objects with unknown types to be passed-through. This can be used
 // to deal with the API objects from a plug-in. Unknown objects still have functioning
 // TypeMeta features-- kind, version, etc.
@@ -96,10 +100,16 @@ type RawExtension struct {
 // +protobuf=true
 type Unknown struct {
 	TypeMeta `json:",inline"`
-	// RawJSON will hold the complete JSON of the object which couldn't be matched
+	// Raw will hold the complete serialized object which couldn't be matched
 	// with a registered type. Most likely, nothing should be done with this
 	// except for passing it through the system.
-	RawJSON []byte
+	Raw []byte
+	// ContentEncoding is encoding used to encode 'Raw' data.
+	// Unspecified mean no encoding.
+	ContentEncoding string
+	// ContentType  is serialization method used to serialize 'Raw'.
+	// TODO: Define what unspecified means.
+	ContentType string
 }
 
 // Unstructured allows objects that do not have Golang structs registered to be manipulated
