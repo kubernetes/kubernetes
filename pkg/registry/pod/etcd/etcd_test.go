@@ -24,7 +24,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	etcderrors "k8s.io/kubernetes/pkg/api/errors/etcd"
+	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -422,7 +422,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
-	if !errors.IsNotFound(etcderrors.InterpretGetError(err, api.Resource("pods"), "foo")) {
+	if !errors.IsNotFound(storeerr.InterpretGetError(err, api.Resource("pods"), "foo")) {
 		t.Fatalf("Unexpected error returned: %#v", err)
 	}
 
@@ -430,7 +430,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
-	if !errors.IsNotFound(etcderrors.InterpretGetError(err, api.Resource("pods"), "foo")) {
+	if !errors.IsNotFound(storeerr.InterpretGetError(err, api.Resource("pods"), "foo")) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }

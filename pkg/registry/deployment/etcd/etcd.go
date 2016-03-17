@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
+	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
@@ -148,8 +148,8 @@ func (r *RollbackREST) Create(ctx api.Context, obj runtime.Object) (out runtime.
 
 func (r *RollbackREST) rollbackDeployment(ctx api.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) (err error) {
 	if _, err = r.setDeploymentRollback(ctx, deploymentID, config, annotations); err != nil {
-		err = etcderr.InterpretGetError(err, extensions.Resource("deployments"), deploymentID)
-		err = etcderr.InterpretUpdateError(err, extensions.Resource("deployments"), deploymentID)
+		err = storeerr.InterpretGetError(err, extensions.Resource("deployments"), deploymentID)
+		err = storeerr.InterpretUpdateError(err, extensions.Resource("deployments"), deploymentID)
 		if _, ok := err.(*errors.StatusError); !ok {
 			err = errors.NewConflict(extensions.Resource("deployments/rollback"), deploymentID, err)
 		}
