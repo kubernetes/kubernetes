@@ -193,20 +193,23 @@ install_kube_binary_config() {
     cp /tmp/kubernetes/server/bin/kube-scheduler.tar /run/kube-docker-files/
     cp -r /tmp/kubernetes/addons /run/kube-docker-files/
   fi
-  # For a testing cluster, we use kubelet, kube-proxy, and kubectl binaries
-  # from the release tarball and place them in /usr/local/bin. For a non-test
-  # cluster, we use the binaries pre-installed in the image, or pull and place
-  # them in /usr/bin if they are not pre-installed.
-  BINARY_PATH="/usr/bin/"
-  if [ "${TEST_CLUSTER:-}" = "true" ]; then
-    BINARY_PATH="/usr/local/bin/"
-  fi
-  if ! which kubelet > /dev/null || ! which kube-proxy > /dev/null || [ "${TEST_CLUSTER:-}" = "true" ]; then
-    cp /tmp/kubernetes/server/bin/kubelet "${BINARY_PATH}"
-    cp /tmp/kubernetes/server/bin/kubectl "${BINARY_PATH}"
+  # Use the binary from the release tarball if they are not preinstalled, or if this is
+  # a test cluster.
+  readonly BIN_PATH="/usr/bin"
+  if ! which kubelet > /dev/null || ! which kubectl > /dev/null; then
+    cp /tmp/kubernetes/server/bin/kubelet "${BIN_PATH}"
+    cp /tmp/kubernetes/server/bin/kubectl "${BIN_PATH}"
+  elif [ "${TEST_CLUSTER:-}" = "true" ]; then
+    mkdir -p /home/kubernetes/bin
+    cp /tmp/kubernetes/server/bin/kubelet /home/kubernetes/bin
+    cp /tmp/kubernetes/server/bin/kubectl /home/kubernetes/bin
+    mount --bind /home/kubernetes/bin/kubelet "${BIN_PATH}/kubelet"
+    mount --bind -o remount,ro,^noexec "${BIN_PATH}/kubelet" "${BIN_PATH}/kubelet"
+    mount --bind /home/kubernetes/bin/kubectl "${BIN_PATH}/kubectl"
+    mount --bind -o remount,ro,^noexec "${BIN_PATH}/kubectl" "${BIN_PATH}/kubectl"
   fi
   # Clean up.
-  rm -rf "/tmp/kubernetes"
+  rm -rf /tmp/kubernetes
   rm "/tmp/${k8s_tar}"
   rm "/tmp/${k8s_sha1}"
 
@@ -281,11 +284,7 @@ assemble_kubelet_flags() {
 }
 
 restart_docker_daemon() {
-  # Assemble docker deamon options
-  DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
-  if [ "${TEST_CLUSTER:-}" = "true" ]; then
-    DOCKER_OPTS="${DOCKER_OPTS} --log-level=debug"
-  fi
+  readonly DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
   echo "DOCKER_OPTS=\"${DOCKER_OPTS} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
   # Make sure the network interface cbr0 is created before restarting docker daemon
   while ! [ -L /sys/class/net/cbr0 ]; do
