@@ -1,9 +1,11 @@
 {% set metrics_memory = "200Mi" -%}
 {% set eventer_memory = "200Mi" -%}
+{% set metrics_memory_per_node = 4 -%}
+{% set eventer_memory_per_node = 500 -%}
 {% set num_nodes = pillar.get('num_nodes', -1) -%}
 {% if num_nodes >= 0 -%}
-  {% set metrics_memory = (200 + num_nodes * 4)|string + "Mi" -%}
-  {% set eventer_memory = (200 * 1024 + num_nodes * 500)|string + "Ki" -%}
+  {% set metrics_memory = (200 + num_nodes * metrics_memory_per_node)|string + "Mi" -%}
+  {% set eventer_memory = (200 * 1024 + num_nodes * eventer_memory_per_node)|string + "Ki" -%}
 {% endif -%}
 
 apiVersion: extensions/v1beta1
@@ -77,8 +79,8 @@ spec:
             - /pod_nanny
             - --cpu=100m
             - --extra-cpu=0m
-            - --memory=200Mi
-            - --extra-memory=3Mi
+            - --memory={{ metrics_memory }}
+            - --extra-memory={{ metrics_memory_per_node }}Mi
             - --threshold=5
             - --deployment=heapster
             - --container=heapster
@@ -105,8 +107,8 @@ spec:
             - /pod_nanny
             - --cpu=100m
             - --extra-cpu=0m
-            - --memory=200Mi
-            - --extra-memory=3Mi
+            - --memory={{ eventer_memory }}
+            - --extra-memory={{ eventer_memory_per_node }}Ki
             - --threshold=5
             - --deployment=heapster
             - --container=eventer
