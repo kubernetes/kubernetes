@@ -626,7 +626,7 @@
       "type": "v1beta1.DaemonSetList",
       "method": "GET",
       "summary": "list or watch objects of kind DaemonSet",
-      "nickname": "listDaemonSet",
+      "nickname": "listNamespacedDaemonSet",
       "parameters": [
        {
         "type": "string",
@@ -702,7 +702,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of DaemonSet",
-      "nickname": "watchDaemonSetList",
+      "nickname": "watchNamespacedDaemonSetList",
       "parameters": [
        {
         "type": "string",
@@ -1451,7 +1451,7 @@
       "type": "v1beta1.DeploymentList",
       "method": "GET",
       "summary": "list or watch objects of kind Deployment",
-      "nickname": "listDeployment",
+      "nickname": "listNamespacedDeployment",
       "parameters": [
        {
         "type": "string",
@@ -1527,7 +1527,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Deployment",
-      "nickname": "watchDeploymentList",
+      "nickname": "watchNamespacedDeploymentList",
       "parameters": [
        {
         "type": "string",
@@ -2498,7 +2498,7 @@
       "type": "v1beta1.HorizontalPodAutoscalerList",
       "method": "GET",
       "summary": "list or watch objects of kind HorizontalPodAutoscaler",
-      "nickname": "listHorizontalPodAutoscaler",
+      "nickname": "listNamespacedHorizontalPodAutoscaler",
       "parameters": [
        {
         "type": "string",
@@ -2574,7 +2574,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
-      "nickname": "watchHorizontalPodAutoscalerList",
+      "nickname": "watchNamespacedHorizontalPodAutoscalerList",
       "parameters": [
        {
         "type": "string",
@@ -3323,7 +3323,7 @@
       "type": "v1beta1.IngressList",
       "method": "GET",
       "summary": "list or watch objects of kind Ingress",
-      "nickname": "listIngress",
+      "nickname": "listNamespacedIngress",
       "parameters": [
        {
         "type": "string",
@@ -3399,7 +3399,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Ingress",
-      "nickname": "watchIngressList",
+      "nickname": "watchNamespacedIngressList",
       "parameters": [
        {
         "type": "string",
@@ -4148,7 +4148,7 @@
       "type": "v1beta1.JobList",
       "method": "GET",
       "summary": "list or watch objects of kind Job",
-      "nickname": "listJob",
+      "nickname": "listNamespacedJob",
       "parameters": [
        {
         "type": "string",
@@ -4224,7 +4224,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Job",
-      "nickname": "watchJobList",
+      "nickname": "watchNamespacedJobList",
       "parameters": [
        {
         "type": "string",
@@ -4973,7 +4973,7 @@
       "type": "v1beta1.ReplicaSetList",
       "method": "GET",
       "summary": "list or watch objects of kind ReplicaSet",
-      "nickname": "listReplicaSet",
+      "nickname": "listNamespacedReplicaSet",
       "parameters": [
        {
         "type": "string",
@@ -5049,7 +5049,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicaSet",
-      "nickname": "watchReplicaSetList",
+      "nickname": "watchNamespacedReplicaSetList",
       "parameters": [
        {
         "type": "string",
