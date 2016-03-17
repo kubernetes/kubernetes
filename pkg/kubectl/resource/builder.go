@@ -66,6 +66,8 @@ type Builder struct {
 
 	requireObject bool
 
+	recursiveExpansion bool
+
 	singleResourceType bool
 	continueOnError    bool
 
@@ -152,11 +154,21 @@ func (b *Builder) Stream(r io.Reader, name string) *Builder {
 	return b
 }
 
+// RecursiveExpansion will allow for the recursive visit of any directories
+// with more than one level
+func (b *Builder) RecursiveExpansion(recursiveExpansion bool) *Builder {
+	b.recursiveExpansion = recursiveExpansion
+	return b
+}
+
 // Path accepts a set of paths that may be files, directories (all can containing
 // one or more resources). Creates a FileVisitor for each file and then each
 // FileVisitor is streaming the content to a StreamVisitor. If ContinueOnError() is set
 // prior to this method being called, objects on the path that are unrecognized will be
-// ignored (but logged at V(2)).
+// ignored (but logged at V(2)). If RecursiveExpansion() is set prior to this
+// method being called, ExpandPathsToFileVisitors will recursively follow any directories
+// that may be in paths, rather than immediately stopping after its first
+// level.
 func (b *Builder) Path(paths ...string) *Builder {
 	for _, p := range paths {
 		_, err := os.Stat(p)
@@ -169,7 +181,7 @@ func (b *Builder) Path(paths ...string) *Builder {
 			continue
 		}
 
-		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, FileExtensions, b.schema)
+		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, b.recursiveExpansion, FileExtensions, b.schema)
 		if err != nil {
 			b.errs = append(b.errs, fmt.Errorf("error reading %q: %v", p, err))
 		}
