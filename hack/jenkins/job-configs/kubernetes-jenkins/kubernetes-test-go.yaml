@@ -73,10 +73,10 @@
     suffix:
         - 'go':
             branch: 'master'
-            timeout: 45
+            timeout: 50
         - 'go-release-1.2':
             branch: 'release-1.2'
-            timeout: 45
+            timeout: 50
         - 'go-release-1.1':
             branch: 'release-1.1'
             timeout: 30
