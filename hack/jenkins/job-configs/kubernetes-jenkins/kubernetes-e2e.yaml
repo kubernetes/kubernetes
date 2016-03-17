@@ -351,6 +351,7 @@
                 export PROJECT="k8s-jkns-e2e-gke-staging"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
+                export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
