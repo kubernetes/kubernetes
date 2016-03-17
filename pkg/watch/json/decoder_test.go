@@ -43,7 +43,7 @@ func TestDecoder(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
-			if err := encoder.Encode(&WatchEvent{eventType, runtime.RawExtension{RawJSON: json.RawMessage(data)}}); err != nil {
+			if err := encoder.Encode(&WatchEvent{eventType, runtime.RawExtension{Raw: json.RawMessage(data)}}); err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
 			in.Close()

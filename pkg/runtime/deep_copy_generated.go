@@ -27,12 +27,12 @@ import (
 )
 
 func DeepCopy_runtime_RawExtension(in RawExtension, out *RawExtension, c *conversion.Cloner) error {
-	if in.RawJSON != nil {
-		in, out := in.RawJSON, &out.RawJSON
+	if in.Raw != nil {
+		in, out := in.Raw, &out.Raw
 		*out = make([]byte, len(in))
 		copy(*out, in)
 	} else {
-		out.RawJSON = nil
+		out.Raw = nil
 	}
 	if in.Object == nil {
 		out.Object = nil

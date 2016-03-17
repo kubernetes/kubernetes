@@ -56,7 +56,7 @@ func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 		return "", nil, fmt.Errorf("got invalid watch event type: %v", got.Type)
 	}
 
-	obj, err := runtime.Decode(d.codec, got.Object.RawJSON)
+	obj, err := runtime.Decode(d.codec, got.Object.Raw)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to decode watch event: %v", err)
 	}
