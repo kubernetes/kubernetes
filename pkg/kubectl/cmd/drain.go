@@ -103,7 +103,7 @@ Then drain deletes all pods except mirror pods (which cannot be deleted through
 the API server).  If there are DaemonSet-managed pods, drain will not proceed
 without --ignore-daemonsets, and regardless it will not delete any
 DaemonSet-managed pods, because those pods would be immediately replaced by the
-DaemonSet controller, which ignores unschedulable marknigs.  If there are any
+DaemonSet controller, which ignores unschedulable markings.  If there are any
 pods that are neither mirror pods nor managed--by ReplicationController,
 DaemonSet or Job--, then drain will not delete any pods unless you use --force.
 
