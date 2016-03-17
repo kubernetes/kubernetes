@@ -102,6 +102,7 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 	// Populate request body
 	reqBody := request{FloatingIP: floatingIP{
 		FloatingNetworkID: opts.FloatingNetworkID,
+		FloatingIP:        opts.FloatingIP,
 		PortID:            opts.PortID,
 		FixedIP:           opts.FixedIP,
 		TenantID:          opts.TenantID,

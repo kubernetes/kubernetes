@@ -16,6 +16,7 @@ type ListOpts struct {
 	ID           string `q:"id"`
 	Name         string `q:"name"`
 	AdminStateUp *bool  `q:"admin_state_up"`
+	Distributed  *bool  `q:"distributed"`
 	Status       string `q:"status"`
 	TenantID     string `q:"tenant_id"`
 	Limit        int    `q:"limit"`
@@ -46,6 +47,7 @@ func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 type CreateOpts struct {
 	Name         string
 	AdminStateUp *bool
+	Distributed  *bool
 	TenantID     string
 	GatewayInfo  *GatewayInfo
 }
@@ -62,6 +64,7 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 	type router struct {
 		Name         *string      `json:"name,omitempty"`
 		AdminStateUp *bool        `json:"admin_state_up,omitempty"`
+		Distributed  *bool        `json:"distributed,omitempty"`
 		TenantID     *string      `json:"tenant_id,omitempty"`
 		GatewayInfo  *GatewayInfo `json:"external_gateway_info,omitempty"`
 	}
@@ -73,6 +76,7 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 	reqBody := request{Router: router{
 		Name:         gophercloud.MaybeString(opts.Name),
 		AdminStateUp: opts.AdminStateUp,
+		Distributed:  opts.Distributed,
 		TenantID:     gophercloud.MaybeString(opts.TenantID),
 	}}
 
@@ -96,7 +100,9 @@ func Get(c *gophercloud.ServiceClient, id string) GetResult {
 type UpdateOpts struct {
 	Name         string
 	AdminStateUp *bool
+	Distributed  *bool
 	GatewayInfo  *GatewayInfo
+	Routes       []Route
 }
 
 // Update allows routers to be updated. You can update the name, administrative
@@ -108,7 +114,9 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 	type router struct {
 		Name         *string      `json:"name,omitempty"`
 		AdminStateUp *bool        `json:"admin_state_up,omitempty"`
+		Distributed  *bool        `json:"distributed,omitempty"`
 		GatewayInfo  *GatewayInfo `json:"external_gateway_info,omitempty"`
+		Routes       []Route      `json:"routes"`
 	}
 
 	type request struct {
@@ -118,10 +126,15 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 	reqBody := request{Router: router{
 		Name:         gophercloud.MaybeString(opts.Name),
 		AdminStateUp: opts.AdminStateUp,
+		Distributed:  opts.Distributed,
 	}}
 
 	if opts.GatewayInfo != nil {
 		reqBody.Router.GatewayInfo = opts.GatewayInfo
+	}
+
+	if opts.Routes != nil {
+		reqBody.Router.Routes = opts.Routes
 	}
 
 	// Send request to API
