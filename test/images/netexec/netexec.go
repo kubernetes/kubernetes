@@ -32,6 +32,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 var (
@@ -212,7 +214,7 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func dialHTTP(request, hostPort string) (string, error) {
-	transport := &http.Transport{}
+	transport := utilnet.SetTransportDefaults(&http.Transport{})
 	httpClient := createHTTPClient(transport)
 	resp, err := httpClient.Get(fmt.Sprintf("http://%s/%s", hostPort, request))
 	defer transport.CloseIdleConnections()

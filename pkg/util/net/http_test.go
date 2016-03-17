@@ -19,6 +19,8 @@ package net
 import (
 	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -97,6 +99,70 @@ func TestGetClientIP(t *testing.T) {
 	for i, test := range testCases {
 		if a, e := GetClientIP(&test.Request), test.ExpectedIP; reflect.DeepEqual(e, a) != true {
 			t.Fatalf("test case %d failed. expected: %v, actual: %v", i+1, e, a)
+		}
+	}
+}
+
+func TestProxierWithNoProxyCIDR(t *testing.T) {
+	testCases := []struct {
+		name    string
+		noProxy string
+		url     string
+
+		expectedDelegated bool
+	}{
+		{
+			name:              "no env",
+			url:               "https://192.168.143.1/api",
+			expectedDelegated: true,
+		},
+		{
+			name:              "no cidr",
+			noProxy:           "192.168.63.1",
+			url:               "https://192.168.143.1/api",
+			expectedDelegated: true,
+		},
+		{
+			name:              "hostname",
+			noProxy:           "192.168.63.0/24,192.168.143.0/24",
+			url:               "https://my-hostname/api",
+			expectedDelegated: true,
+		},
+		{
+			name:              "match second cidr",
+			noProxy:           "192.168.63.0/24,192.168.143.0/24",
+			url:               "https://192.168.143.1/api",
+			expectedDelegated: false,
+		},
+		{
+			name:              "match second cidr with host:port",
+			noProxy:           "192.168.63.0/24,192.168.143.0/24",
+			url:               "https://192.168.143.1:8443/api",
+			expectedDelegated: false,
+		},
+	}
+
+	for _, test := range testCases {
+		os.Setenv("NO_PROXY", test.noProxy)
+		actualDelegated := false
+		proxyFunc := NewProxierWithNoProxyCIDR(func(req *http.Request) (*url.URL, error) {
+			actualDelegated = true
+			return nil, nil
+		})
+
+		req, err := http.NewRequest("GET", test.url, nil)
+		if err != nil {
+			t.Errorf("%s: unexpected err: %v", test.name, err)
+			continue
+		}
+		if _, err := proxyFunc(req); err != nil {
+			t.Errorf("%s: unexpected err: %v", test.name, err)
+			continue
+		}
+
+		if test.expectedDelegated != actualDelegated {
+			t.Errorf("%s: expected %v, got %v", test.name, test.expectedDelegated, actualDelegated)
+			continue
 		}
 	}
 }

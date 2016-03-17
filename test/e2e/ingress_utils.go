@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 const (
@@ -110,13 +111,13 @@ func buildTransport(serverName string, rootCA []byte) (*http.Transport, error) {
 	if !ok {
 		return nil, fmt.Errorf("Unable to load serverCA.")
 	}
-	return &http.Transport{
+	return utilnet.SetTransportDefaults(&http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: false,
 			ServerName:         serverName,
 			RootCAs:            pool,
 		},
-	}, nil
+	}), nil
 }
 
 // createSecret creates a secret containing TLS certificates for the given Ingress.
