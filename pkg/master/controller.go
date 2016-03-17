@@ -210,7 +210,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
-			SessionAffinity: api.ServiceAffinityNone,
+			SessionAffinity: api.ServiceAffinityClientIP,
 			Type:            serviceType,
 		},
 	}
