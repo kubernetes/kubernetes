@@ -350,6 +350,8 @@ type PersistentVolumeClaimList struct {
 type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes required
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+	// PersistentVolumeSelector is a selector which must be true for the claim to bind to a volume
+	PersistentVolumeSelector *unversioned.LabelSelector `json:"persistentVolumeSelector,omitempty"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty"`
 	// VolumeName is the binding reference to the PersistentVolume backing this claim
