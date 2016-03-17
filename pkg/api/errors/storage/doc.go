@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package etcd provides conversion of etcd errors to API errors.
-package etcd
+package storage

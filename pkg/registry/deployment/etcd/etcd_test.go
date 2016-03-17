@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	etcderrors "k8s.io/kubernetes/pkg/api/errors/etcd"
+	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
@@ -366,7 +366,7 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
-	if !errors.IsNotFound(etcderrors.InterpretGetError(err, extensions.Resource("deployments"), name)) {
+	if !errors.IsNotFound(storeerr.InterpretGetError(err, extensions.Resource("deployments"), name)) {
 		t.Fatalf("Unexpected error returned: %#v", err)
 	}
 
@@ -374,7 +374,7 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
-	if !errors.IsNotFound(etcderrors.InterpretGetError(err, extensions.Resource("deployments"), name)) {
+	if !errors.IsNotFound(storeerr.InterpretGetError(err, extensions.Resource("deployments"), name)) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }
