@@ -626,7 +626,7 @@
       "type": "v1.HorizontalPodAutoscalerList",
       "method": "GET",
       "summary": "list or watch objects of kind HorizontalPodAutoscaler",
-      "nickname": "listHorizontalPodAutoscaler",
+      "nickname": "listNamespacedHorizontalPodAutoscaler",
       "parameters": [
        {
         "type": "string",
@@ -702,7 +702,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
-      "nickname": "watchHorizontalPodAutoscalerList",
+      "nickname": "watchNamespacedHorizontalPodAutoscalerList",
       "parameters": [
        {
         "type": "string",
