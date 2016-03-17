@@ -464,7 +464,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	for _, action := range actions {
 		reqScope.Namer = action.Namer
 		namespaced := ""
-		if strings.Contains(action.Path, scope.ArgumentName()) {
+		if apiResource.Namespaced {
 			namespaced = "Namespaced"
 		}
 		switch action.Verb {
