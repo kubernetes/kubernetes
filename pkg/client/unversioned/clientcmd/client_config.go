@@ -305,6 +305,14 @@ func (config *DirectClientConfig) getCluster() clientcmdapi.Cluster {
 		mergo.Merge(&mergedClusterInfo, configClusterInfo)
 	}
 	mergo.Merge(&mergedClusterInfo, config.overrides.ClusterInfo)
+	// An override of --insecure-skip-tls-verify=true and no accompanying CA/CA data should clear already-set CA/CA data
+	// otherwise, a kubeconfig containing a CA reference would return an error that "CA and insecure-skip-tls-verify couldn't both be set"
+	caLen := len(config.overrides.ClusterInfo.CertificateAuthority)
+	caDataLen := len(config.overrides.ClusterInfo.CertificateAuthorityData)
+	if config.overrides.ClusterInfo.InsecureSkipTLSVerify && caLen == 0 && caDataLen == 0 {
+		mergedClusterInfo.CertificateAuthority = ""
+		mergedClusterInfo.CertificateAuthorityData = nil
+	}
 
 	return mergedClusterInfo
 }
