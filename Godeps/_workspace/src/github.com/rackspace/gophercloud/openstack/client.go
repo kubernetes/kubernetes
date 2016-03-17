@@ -3,6 +3,7 @@ package openstack
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/rackspace/gophercloud"
 	tokens2 "github.com/rackspace/gophercloud/openstack/identity/v2/tokens"
@@ -64,8 +65,8 @@ func AuthenticatedClient(options gophercloud.AuthOptions) (*gophercloud.Provider
 // Authenticate or re-authenticate against the most recent identity service supported at the provided endpoint.
 func Authenticate(client *gophercloud.ProviderClient, options gophercloud.AuthOptions) error {
 	versions := []*utils.Version{
-		&utils.Version{ID: v20, Priority: 20, Suffix: "/v2.0/"},
-		&utils.Version{ID: v30, Priority: 30, Suffix: "/v3/"},
+		{ID: v20, Priority: 20, Suffix: "/v2.0/"},
+		{ID: v30, Priority: 30, Suffix: "/v3/"},
 	}
 
 	chosen, endpoint, err := utils.ChooseVersion(client, versions)
@@ -110,7 +111,7 @@ func v2auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 	if options.AllowReauth {
 		client.ReauthFunc = func() error {
 			client.TokenID = ""
-			return AuthenticateV2(client, options)
+			return v2auth(client, endpoint, options)
 		}
 	}
 	client.TokenID = token.ID
@@ -167,7 +168,8 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 
 	if options.AllowReauth {
 		client.ReauthFunc = func() error {
-			return AuthenticateV3(client, options)
+			client.TokenID = ""
+			return v3auth(client, endpoint, options)
 		}
 	}
 	client.EndpointLocator = func(opts gophercloud.EndpointOpts) (string, error) {
@@ -195,6 +197,40 @@ func NewIdentityV3(client *gophercloud.ProviderClient) *gophercloud.ServiceClien
 		ProviderClient: client,
 		Endpoint:       v3Endpoint,
 	}
+}
+
+func NewIdentityAdminV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("identity")
+	eo.Availability = gophercloud.AvailabilityAdmin
+
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+
+	// Force using v2 API
+	if strings.Contains(url, "/v3") {
+		url = strings.Replace(url, "/v3", "/v2.0", -1)
+	}
+
+	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
+}
+
+func NewIdentityAdminV3(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("identity")
+	eo.Availability = gophercloud.AvailabilityAdmin
+
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+
+	// Force using v3 API
+	if strings.Contains(url, "/v2.0") {
+		url = strings.Replace(url, "/v2.0", "/v3", -1)
+	}
+
+	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
 }
 
 // NewObjectStorageV1 creates a ServiceClient that may be used with the v1 object storage package.
@@ -255,6 +291,16 @@ func NewCDNV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (
 // NewOrchestrationV1 creates a ServiceClient that may be used to access the v1 orchestration service.
 func NewOrchestrationV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	eo.ApplyDefaults("orchestration")
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
+}
+
+// NewDBV1 creates a ServiceClient that may be used to access the v1 DB service.
+func NewDBV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("database")
 	url, err := client.EndpointLocator(eo)
 	if err != nil {
 		return nil, err

@@ -1,12 +1,13 @@
 package objects
 
 import (
-	"bytes"
+	"bufio"
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/sha1"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strings"
 	"time"
 
@@ -167,7 +168,7 @@ type CreateOpts struct {
 	ObjectManifest     string `h:"X-Object-Manifest"`
 	TransferEncoding   string `h:"Transfer-Encoding"`
 	Expires            string `q:"expires"`
-	MultipartManifest  string `q:"multiple-manifest"`
+	MultipartManifest  string `q:"multipart-manifest"`
 	Signature          string `q:"signature"`
 }
 
@@ -213,19 +214,20 @@ func Create(c *gophercloud.ServiceClient, containerName, objectName string, cont
 	}
 
 	hash := md5.New()
+	bufioReader := bufio.NewReader(io.TeeReader(content, hash))
+	io.Copy(ioutil.Discard, bufioReader)
+	localChecksum := hash.Sum(nil)
 
-	contentBuffer := bytes.NewBuffer([]byte{})
-	_, err := io.Copy(contentBuffer, io.TeeReader(content, hash))
+	h["ETag"] = fmt.Sprintf("%x", localChecksum)
+
+	_, err := content.Seek(0, 0)
 	if err != nil {
 		res.Err = err
 		return res
 	}
 
-	localChecksum := hash.Sum(nil)
-	h["ETag"] = fmt.Sprintf("%x", localChecksum)
-
 	ropts := gophercloud.RequestOpts{
-		RawBody:     strings.NewReader(contentBuffer.String()),
+		RawBody:     content,
 		MoreHeaders: h,
 	}
 

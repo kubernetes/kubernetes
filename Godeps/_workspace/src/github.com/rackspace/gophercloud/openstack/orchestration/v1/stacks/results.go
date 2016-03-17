@@ -69,6 +69,7 @@ type ListedStack struct {
 	Name         string             `mapstructure:"stack_name"`
 	Status       string             `mapstructure:"stack_status"`
 	StatusReason string             `mapstructure:"stack_status_reason"`
+	Tags         []string           `mapstructure:"tags"`
 	UpdatedTime  time.Time          `mapstructure:"-"`
 }
 
@@ -81,7 +82,7 @@ func ExtractStacks(page pagination.Page) ([]ListedStack, error) {
 		Stacks []ListedStack `mapstructure:"stacks"`
 	}
 
-	err := mapstructure.Decode(page.(StackPage).Body, &res)
+	err := mapstructure.Decode(casted, &res)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +134,7 @@ type RetrievedStack struct {
 	Name                string                   `mapstructure:"stack_name"`
 	Status              string                   `mapstructure:"stack_status"`
 	StatusReason        string                   `mapstructure:"stack_status_reason"`
+	Tags                []string                 `mapstructure:"tags"`
 	TemplateDescription string                   `mapstructure:"template_description"`
 	Timeout             int                      `mapstructure:"timeout_mins"`
 	UpdatedTime         time.Time                `mapstructure:"-"`
@@ -200,21 +202,19 @@ type DeleteResult struct {
 
 // PreviewedStack represents the result of a Preview operation.
 type PreviewedStack struct {
-	Capabilities        []interface{}            `mapstructure:"capabilities"`
-	CreationTime        time.Time                `mapstructure:"-"`
-	Description         string                   `mapstructure:"description"`
-	DisableRollback     bool                     `mapstructure:"disable_rollback"`
-	ID                  string                   `mapstructure:"id"`
-	Links               []gophercloud.Link       `mapstructure:"links"`
-	Name                string                   `mapstructure:"stack_name"`
-	NotificationTopics  []interface{}            `mapstructure:"notification_topics"`
-	Parameters          map[string]string        `mapstructure:"parameters"`
-	Resources           []map[string]interface{} `mapstructure:"resources"`
-	Status              string                   `mapstructure:"stack_status"`
-	StatusReason        string                   `mapstructure:"stack_status_reason"`
-	TemplateDescription string                   `mapstructure:"template_description"`
-	Timeout             int                      `mapstructure:"timeout_mins"`
-	UpdatedTime         time.Time                `mapstructure:"-"`
+	Capabilities        []interface{}      `mapstructure:"capabilities"`
+	CreationTime        time.Time          `mapstructure:"-"`
+	Description         string             `mapstructure:"description"`
+	DisableRollback     bool               `mapstructure:"disable_rollback"`
+	ID                  string             `mapstructure:"id"`
+	Links               []gophercloud.Link `mapstructure:"links"`
+	Name                string             `mapstructure:"stack_name"`
+	NotificationTopics  []interface{}      `mapstructure:"notification_topics"`
+	Parameters          map[string]string  `mapstructure:"parameters"`
+	Resources           []interface{}      `mapstructure:"resources"`
+	TemplateDescription string             `mapstructure:"template_description"`
+	Timeout             int                `mapstructure:"timeout_mins"`
+	UpdatedTime         time.Time          `mapstructure:"-"`
 }
 
 // PreviewResult represents the result of a Preview operation.
@@ -269,12 +269,16 @@ func (r PreviewResult) Extract() (*PreviewedStack, error) {
 
 // AbandonedStack represents the result of an Abandon operation.
 type AbandonedStack struct {
-	Status    string                 `mapstructure:"status"`
-	Name      string                 `mapstructure:"name"`
-	Template  map[string]interface{} `mapstructure:"template"`
-	Action    string                 `mapstructure:"action"`
-	ID        string                 `mapstructure:"id"`
-	Resources map[string]interface{} `mapstructure:"resources"`
+	Status             string                 `mapstructure:"status"`
+	Name               string                 `mapstructure:"name"`
+	Template           map[string]interface{} `mapstructure:"template"`
+	Action             string                 `mapstructure:"action"`
+	ID                 string                 `mapstructure:"id"`
+	Resources          map[string]interface{} `mapstructure:"resources"`
+	Files              map[string]string      `mapstructure:"files"`
+	StackUserProjectID string                 `mapstructure:"stack_user_project_id"`
+	ProjectID          string                 `mapstructure:"project_id"`
+	Environment        map[string]interface{} `mapstructure:"environment"`
 }
 
 // AbandonResult represents the result of an Abandon operation.
