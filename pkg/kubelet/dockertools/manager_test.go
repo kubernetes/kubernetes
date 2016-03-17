@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -703,7 +704,14 @@ func TestSyncPodWithPodInfraCreatesContainer(t *testing.T) {
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
-				{Name: "bar"},
+				{
+					Name: "bar",
+					Resources: api.ResourceRequirements{
+						Limits: api.ResourceList{
+							api.ResourceMemory: resource.MustParse("3M"),
+						},
+					},
+				},
 			},
 		},
 	}
@@ -725,7 +733,19 @@ func TestSyncPodWithPodInfraCreatesContainer(t *testing.T) {
 		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) {
 		t.Errorf("unexpected containers created %v", fakeDocker.Created)
 	}
+	containerList := fakeDocker.ContainerList
 	fakeDocker.Unlock()
+	if len(containerList) != 2 {
+		// One for infra container, one for container "bar"
+		t.Fatalf("unexpected container list length %d", len(containerList))
+	}
+	inspectResult, err := dm.client.InspectContainer(containerList[0].ID)
+	if err != nil {
+		t.Fatalf("unexpected inspect error: %v", err)
+	}
+	if inspectResult.HostConfig.Memory != minimumDockerMemoryLimit {
+		t.Fatal("unexpected memory limit - %d", inspectResult.HostConfig.Memory)
+	}
 }
 
 func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
