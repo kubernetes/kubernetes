@@ -1442,9 +1442,9 @@ func verifyServeHostnameServiceDown(c *client.Client, host string, serviceIP str
 // This masks problems where the iptables rule has changed, but we don't see it
 // This is intended for relatively quick requests (status checks), so we set a short (5 seconds) timeout
 func httpGetNoConnectionPool(url string) (*http.Response, error) {
-	tr := &http.Transport{
+	tr := utilnet.SetTransportDefaults(&http.Transport{
 		DisableKeepAlives: true,
-	}
+	})
 	client := &http.Client{
 		Transport: tr,
 		Timeout:   5 * time.Second,

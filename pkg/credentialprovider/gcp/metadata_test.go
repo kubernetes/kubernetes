@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
@@ -60,11 +61,11 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
-	transport := &http.Transport{
+	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy: func(req *http.Request) (*url.URL, error) {
 			return url.Parse(server.URL + req.URL.Path)
 		},
-	}
+	})
 
 	keyring := &credentialprovider.BasicDockerKeyring{}
 	provider := &dockerConfigKeyProvider{
@@ -133,11 +134,11 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
-	transport := &http.Transport{
+	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy: func(req *http.Request) (*url.URL, error) {
 			return url.Parse(server.URL + req.URL.Path)
 		},
-	}
+	})
 
 	keyring := &credentialprovider.BasicDockerKeyring{}
 	provider := &dockerConfigUrlKeyProvider{
@@ -207,11 +208,11 @@ func TestContainerRegistryBasics(t *testing.T) {
 	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
-	transport := &http.Transport{
+	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy: func(req *http.Request) (*url.URL, error) {
 			return url.Parse(server.URL + req.URL.Path)
 		},
-	}
+	})
 
 	keyring := &credentialprovider.BasicDockerKeyring{}
 	provider := &containerRegistryProvider{
@@ -264,11 +265,11 @@ func TestContainerRegistryNoStorageScope(t *testing.T) {
 	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
-	transport := &http.Transport{
+	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy: func(req *http.Request) (*url.URL, error) {
 			return url.Parse(server.URL + req.URL.Path)
 		},
-	}
+	})
 
 	provider := &containerRegistryProvider{
 		metadataProvider{Client: &http.Client{Transport: transport}},
@@ -298,11 +299,11 @@ func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
 	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
-	transport := &http.Transport{
+	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy: func(req *http.Request) (*url.URL, error) {
 			return url.Parse(server.URL + req.URL.Path)
 		},
-	}
+	})
 
 	provider := &containerRegistryProvider{
 		metadataProvider{Client: &http.Client{Transport: transport}},
@@ -321,11 +322,11 @@ func TestAllProvidersNoMetadata(t *testing.T) {
 	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
-	transport := &http.Transport{
+	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy: func(req *http.Request) (*url.URL, error) {
 			return url.Parse(server.URL + req.URL.Path)
 		},
-	}
+	})
 
 	providers := []credentialprovider.DockerConfigProvider{
 		&dockerConfigKeyProvider{
