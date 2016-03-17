@@ -392,15 +392,15 @@ func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, ext
 			return err
 		}
 
+		// Don't check extension if the filepath was passed explicitly
+		if path != paths && !fi.IsDir() && ignoreFile(path, extensions) {
+			return nil
+		}
+
 		if fi.IsDir() {
 			if path != paths && !recursive {
 				return filepath.SkipDir
 			}
-			return nil
-		}
-		// Don't check extension if the filepath was passed explicitly
-		if path != paths && ignoreFile(path, extensions) {
-			return nil
 		}
 
 		visitor := &FileVisitor{
