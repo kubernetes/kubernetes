@@ -48,9 +48,9 @@
                 export USE_KUBEMARK="true"
                 export KUBEMARK_TESTS="starting\s30\spods\sper\snode"
                 # Override defaults to be independent from GCE defaults and set kubemark parameters
-                export NUM_NODES="3"
+                export NUM_NODES="1"
                 export MASTER_SIZE="n1-standard-1"
-                export NODE_SIZE="n1-standard-1"
+                export NODE_SIZE="n1-standard-2"
                 export KUBE_GCE_ZONE="us-central1-f"
                 export KUBEMARK_MASTER_SIZE="n1-standard-1"
                 export KUBEMARK_NUM_NODES="5"
