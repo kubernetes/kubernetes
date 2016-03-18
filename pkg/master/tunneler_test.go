@@ -76,6 +76,7 @@ func TestIsTunnelSyncHealthy(t *testing.T) {
 
 	// Pass case: 540 second lag
 	tunneler.lastSync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
+	tunneler.lastSSHKeySync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
 	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 9, 1, 1, time.UTC))
 	err := master.IsTunnelSyncHealthy(nil)
 	assert.NoError(err, "IsTunnelSyncHealthy() should not have returned an error.")
