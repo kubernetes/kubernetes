@@ -41,6 +41,7 @@ type Tunneler interface {
 	Stop()
 	Dial(net, addr string) (net.Conn, error)
 	SecondsSinceSync() int64
+	SecondsSinceSSHKeySync() int64
 }
 
 type SSHTunneler struct {
@@ -51,6 +52,7 @@ type SSHTunneler struct {
 
 	tunnels        *ssh.SSHTunnelList
 	lastSync       int64 // Seconds since Epoch
+	lastSSHKeySync int64 // Seconds since Epoch
 	lastSyncMetric prometheus.GaugeFunc
 	clock          util.Clock
 
@@ -101,6 +103,7 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 
 	c.tunnels = ssh.NewSSHTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.stopChan)
 	// Sync loop to ensure that the SSH key has been installed.
+	c.lastSSHKeySync = c.clock.Now().Unix()
 	c.installSSHKeySyncLoop(c.SSHUser, publicKeyFile)
 	// Sync tunnelList w/ nodes.
 	c.lastSync = c.clock.Now().Unix()
@@ -125,6 +128,12 @@ func (c *SSHTunneler) SecondsSinceSync() int64 {
 	return now - then
 }
 
+func (c *SSHTunneler) SecondsSinceSSHKeySync() int64 {
+	now := c.clock.Now().Unix()
+	then := atomic.LoadInt64(&c.lastSSHKeySync)
+	return now - then
+}
+
 func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
 	go wait.Until(func() {
 		if c.InstallSSHKey == nil {
@@ -143,7 +152,9 @@ func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
 		}
 		if err := c.InstallSSHKey(user, keyData); err != nil {
 			glog.Errorf("Failed to install ssh key: %v", err)
+			return
 		}
+		atomic.StoreInt64(&c.lastSSHKeySync, c.clock.Now().Unix())
 	}, 5*time.Minute, c.stopChan)
 }
 
