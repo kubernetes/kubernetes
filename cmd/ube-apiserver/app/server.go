@@ -491,6 +491,9 @@ func Run(s *options.APIServer) error {
 		return err
 	}
 
+	addControlplaneAPIGroup(storageDestinations, s)
+	installClusterAPI(m, storageDestinations)
+
 	m.Run(s.ServerRunOptions)
 	return nil
 }
