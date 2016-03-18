@@ -320,7 +320,7 @@
             timeout: 480
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-test"
-                export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
         - 'gke-subnet':
             description: 'Run E2E tests on GKE test endpoint in a subnet.'
@@ -330,14 +330,14 @@
                 # gcloud alpha compute networks create auto-subnet --mode auto
                 export E2E_NAME="auto-subnet"
                 export PROJECT="k8s-jkns-e2e-gke-subnet"
-                export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
         - 'gke-staging':
             description: 'Run E2E tests on GKE staging endpoint.'
             timeout: 480
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-staging"
-                export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
                 export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
         - 'gke-staging-parallel':
@@ -345,7 +345,7 @@
             timeout: 80
             job-env: |
                 export PROJECT="k8s-e2e-gke-staging-parallel"
-                export CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
                 export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
