@@ -27,10 +27,15 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/quota/evaluator/core"
+	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -564,5 +569,77 @@ func TestHasUsageStats(t *testing.T) {
 		if result := hasUsageStats(&testCase.a); result != testCase.expected {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, result)
 		}
+	}
+}
+
+// TestAdmissionSetsMissingNamespace verifies that if an object lacks a
+// namespace, it will be set.
+func TestAdmissionSetsMissingNamespace(t *testing.T) {
+	namespace := "test"
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: namespace, ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("3"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("1"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+
+	computeResources := []api.ResourceName{
+		api.ResourcePods,
+		api.ResourceCPU,
+	}
+
+	usageFunc := func(object runtime.Object) api.ResourceList {
+		pod, ok := object.(*api.Pod)
+		if !ok {
+			t.Fatalf("Expected pod, got %T", object)
+		}
+		if pod.Namespace != namespace {
+			t.Errorf("Expected pod with different namespace: %q != %q", pod.Namespace, namespace)
+		}
+		return core.PodUsageFunc(pod)
+	}
+
+	podEvaluator := &generic.GenericEvaluator{
+		Name:              "Test-Evaluator.Pod",
+		InternalGroupKind: api.Kind("Pod"),
+		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+			admission.Create: computeResources,
+		},
+		ConstraintsFunc:      core.PodConstraintsFunc,
+		MatchedResourceNames: computeResources,
+		MatchesScopeFunc:     core.PodMatchesScopeFunc,
+		UsageFunc:            usageFunc,
+	}
+
+	registry := &generic.GenericRegistry{
+		InternalEvaluators: map[unversioned.GroupKind]quota.Evaluator{
+			podEvaluator.GroupKind(): podEvaluator,
+		},
+	}
+	handler := &quotaAdmission{
+		Handler:  admission.NewHandler(admission.Create, admission.Update),
+		client:   kubeClient,
+		indexer:  indexer,
+		registry: registry,
+	}
+	handler.indexer.Add(resourceQuota)
+	newPod := validPod("pod-without-namespace", 1, getResourceRequirements(getResourceList("1", "2Gi"), getResourceList("", "")))
+
+	// unset the namespace
+	newPod.ObjectMeta.Namespace = ""
+
+	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod"), namespace, newPod.Name, api.Resource("pods"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Got unexpected error: %v", err)
+	}
+	if newPod.Namespace != namespace {
+		t.Errorf("Got unexpected pod namespace: %q != %q", newPod.Namespace, namespace)
 	}
 }
