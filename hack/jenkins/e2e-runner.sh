@@ -152,8 +152,8 @@ echo "--------------------------------------------------------------------------
 if [[ "${JENKINS_USE_TRUSTY_IMAGES:-}" =~ ^[yY]$ ]]; then
   trusty_image_project="$(get_trusty_image_project)"
   trusty_image="$(get_latest_trusty_image "${trusty_image_project}" "head")"
-  export KUBE_MASTER_IMAGE_PROJECT="${trusty_image_project}"
-  export KUBE_MASTER_IMAGE="${trusty_image}"
+  export KUBE_GCE_MASTER_PROJECT="${trusty_image_project}"
+  export KUBE_GCE_MASTER_IMAGE="${trusty_image}"
   export KUBE_OS_DISTRIBUTION="trusty"
 fi
 
