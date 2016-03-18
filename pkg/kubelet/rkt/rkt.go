@@ -85,7 +85,6 @@ const (
 	authDir            = "auth.d"
 	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
 
-	defaultImageTag          = "latest"
 	defaultRktAPIServiceAddr = "localhost:15441"
 	defaultNetworkName       = "rkt.kubernetes.io"
 
@@ -982,9 +981,10 @@ func (r *Runtime) convertRktPod(rktpod *rktapi.Pod) (*kubecontainer.Pod, error) 
 		}
 
 		kubepod.Containers = append(kubepod.Containers, &kubecontainer.Container{
-			ID:      buildContainerID(&containerID{rktpod.Id, app.Name}),
-			Name:    app.Name,
-			Image:   app.Image.Name,
+			ID:   buildContainerID(&containerID{rktpod.Id, app.Name}),
+			Name: app.Name,
+			// By default, the version returned by rkt API service will be "latest" if not specified.
+			Image:   fmt.Sprintf("%s:%s", app.Image.Name, app.Image.Version),
 			Hash:    containerHash,
 			Created: podCreated,
 			State:   appStateToContainerState(app.State),
@@ -1459,9 +1459,10 @@ func populateContainerStatus(pod rktapi.Pod, app rktapi.App, runtimeApp appcsche
 		CreatedAt: creationTime,
 		StartedAt: creationTime,
 		ExitCode:  int(app.ExitCode),
-		Image:     app.Image.Name,
-		ImageID:   "rkt://" + app.Image.Id, // TODO(yifan): Add the prefix only in api.PodStatus.
-		Hash:      hashNum,
+		// By default, the version returned by rkt API service will be "latest" if not specified.
+		Image:   fmt.Sprintf("%s:%s", app.Image.Name, app.Image.Version),
+		ImageID: "rkt://" + app.Image.Id, // TODO(yifan): Add the prefix only in api.PodStatus.
+		Hash:    hashNum,
 		// TODO(yifan): Note that now all apps share the same restart count, this might
 		// change once apps don't share the same lifecycle.
 		// See https://github.com/appc/spec/pull/547.
