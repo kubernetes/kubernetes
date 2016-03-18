@@ -255,6 +255,16 @@
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
                                          --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
                 export PROJECT="k8s-jkns-e2e-gce-serial-1-2"
+        - 'gce-ingress-release-1.2':
+            description: 'Run [Feature:Ingress] tests on GCE on the release-1.2 branch.'
+            timeout: 90
+            emails: 'beeps@google.com'
+            test-owner: 'beeps'
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Ingress\]"
+                export PROJECT="kubernetes-ingress"
+                # TODO: Enable this when we've split 1.2 tests into another project.
+                export FAIL_ON_GCP_RESOURCE_LEAK="false"
         - 'gce-scalability-release-1.2':
             timeout: 120
             description: 'Run scalability E2E tests on GCE from the release-1.2 branch.'
@@ -285,7 +295,7 @@
                 export TEST_CLUSTER_DELETE_COLLECTION_WORKERS="--delete-collection-workers=16"
     jobs:
         - 'kubernetes-e2e-{suffix}'
- 
+
 - project:
     name: kubernetes-e2e-gke-1-2
     trigger-job: 'kubernetes-build-1.2'
@@ -316,6 +326,16 @@
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
+        - 'gke-ingress-release-1.2':
+            description: 'Run [Feature:Ingress] tests on GKE on the release-1.2 branch.'
+            timeout: 90
+            emails: 'beeps@google.com'
+            test-owner: 'beeps'
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Ingress\]"
+                export PROJECT="kubernetes-gke-ingress"
+                # TODO: Enable this when we've split 1.2 tests into another project.
+                export FAIL_ON_GCP_RESOURCE_LEAK="false"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
@@ -462,6 +482,8 @@
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Ingress\]"
                 export PROJECT="kubernetes-gke-ingress"
+                # TODO: Enable this when we've split 1.2 tests into another project.
+                export FAIL_ON_GCP_RESOURCE_LEAK="false"
         - 'gce-ingress':
             description: 'Run [Feature:Ingress] tests on GCE.'
             timeout: 90
@@ -471,6 +493,8 @@
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Ingress\]"
                 export PROJECT="kubernetes-ingress"
+                # TODO: Enable this when we've split 1.2 tests into another project.
+                export FAIL_ON_GCP_RESOURCE_LEAK="false"
         - 'gce-flannel':
             description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
             # We don't really care to enforce a timeout for flannel tests. Any performance issues will show up in the other GCE builders.
