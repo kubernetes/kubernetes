@@ -858,5 +858,9 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 	if lag > 600 {
 		return fmt.Errorf("Tunnel sync is taking to long: %d", lag)
 	}
+	sshKeyLag := m.tunneler.SecondsSinceSSHKeySync()
+	if sshKeyLag > 600 {
+		return fmt.Errorf("SSHKey sync is taking to long: %d", sshKeyLag)
+	}
 	return nil
 }
