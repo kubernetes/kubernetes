@@ -583,12 +583,16 @@ func DeepCopy_api_ContainerStatus(in ContainerStatus, out *ContainerStatus, c *c
 }
 
 func DeepCopy_api_ConversionError(in ConversionError, out *ConversionError, c *conversion.Cloner) error {
-	if newVal, err := c.DeepCopy(in.In); err != nil {
+	if in.In == nil {
+		out.In = nil
+	} else if newVal, err := c.DeepCopy(in.In); err != nil {
 		return err
 	} else {
 		out.In = newVal.(interface{})
 	}
-	if newVal, err := c.DeepCopy(in.Out); err != nil {
+	if in.Out == nil {
+		out.Out = nil
+	} else if newVal, err := c.DeepCopy(in.Out); err != nil {
 		return err
 	} else {
 		out.Out = newVal.(interface{})
@@ -1182,12 +1186,16 @@ func DeepCopy_api_ListOptions(in ListOptions, out *ListOptions, c *conversion.Cl
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
-	if newVal, err := c.DeepCopy(in.LabelSelector); err != nil {
+	if in.LabelSelector == nil {
+		out.LabelSelector = nil
+	} else if newVal, err := c.DeepCopy(in.LabelSelector); err != nil {
 		return err
 	} else {
 		out.LabelSelector = newVal.(labels.Selector)
 	}
-	if newVal, err := c.DeepCopy(in.FieldSelector); err != nil {
+	if in.FieldSelector == nil {
+		out.FieldSelector = nil
+	} else if newVal, err := c.DeepCopy(in.FieldSelector); err != nil {
 		return err
 	} else {
 		out.FieldSelector = newVal.(fields.Selector)
