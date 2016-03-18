@@ -25,6 +25,20 @@ import (
 	time "time"
 )
 
+func DeepCopy_unversioned_Duration(in Duration, out *Duration, c *conversion.Cloner) error {
+	out.Duration = in.Duration
+	return nil
+}
+
+func DeepCopy_unversioned_ExportOptions(in ExportOptions, out *ExportOptions, c *conversion.Cloner) error {
+	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Export = in.Export
+	out.Exact = in.Exact
+	return nil
+}
+
 func DeepCopy_unversioned_GroupKind(in GroupKind, out *GroupKind, c *conversion.Cloner) error {
 	out.Group = in.Group
 	out.Kind = in.Kind
@@ -54,6 +68,43 @@ func DeepCopy_unversioned_GroupVersionResource(in GroupVersionResource, out *Gro
 	out.Group = in.Group
 	out.Version = in.Version
 	out.Resource = in.Resource
+	return nil
+}
+
+func DeepCopy_unversioned_LabelSelector(in LabelSelector, out *LabelSelector, c *conversion.Cloner) error {
+	if in.MatchLabels != nil {
+		in, out := in.MatchLabels, &out.MatchLabels
+		*out = make(map[string]string)
+		for key, val := range in {
+			(*out)[key] = val
+		}
+	} else {
+		out.MatchLabels = nil
+	}
+	if in.MatchExpressions != nil {
+		in, out := in.MatchExpressions, &out.MatchExpressions
+		*out = make([]LabelSelectorRequirement, len(in))
+		for i := range in {
+			if err := DeepCopy_unversioned_LabelSelectorRequirement(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func DeepCopy_unversioned_LabelSelectorRequirement(in LabelSelectorRequirement, out *LabelSelectorRequirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.Values != nil {
+		in, out := in.Values, &out.Values
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.Values = nil
+	}
 	return nil
 }
 

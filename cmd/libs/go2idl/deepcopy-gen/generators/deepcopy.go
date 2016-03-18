@@ -363,7 +363,9 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			if m.Type.Kind == types.Alias && m.Type.Underlying.Kind == types.Builtin {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 			} else {
-				sw.Do("if newVal, err := c.DeepCopy(in.$.name$); err != nil {\n", args)
+				sw.Do("if in.$.name$ == nil {\n", args)
+				sw.Do("out.$.name$ = nil\n", args)
+				sw.Do("} else if newVal, err := c.DeepCopy(in.$.name$); err != nil {\n", args)
 				sw.Do("return err\n", nil)
 				sw.Do("} else {\n", nil)
 				sw.Do("out.$.name$ = newVal.($.type|raw$)\n", args)
