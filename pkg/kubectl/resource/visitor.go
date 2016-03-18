@@ -474,14 +474,15 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 			}
 			return err
 		}
-		ext.RawJSON = bytes.TrimSpace(ext.RawJSON)
-		if len(ext.RawJSON) == 0 || bytes.Equal(ext.RawJSON, []byte("null")) {
+		// TODO: This needs to be able to handle object in other encodings and schemas.
+		ext.Raw = bytes.TrimSpace(ext.Raw)
+		if len(ext.Raw) == 0 || bytes.Equal(ext.Raw, []byte("null")) {
 			continue
 		}
-		if err := ValidateSchema(ext.RawJSON, v.Schema); err != nil {
+		if err := ValidateSchema(ext.Raw, v.Schema); err != nil {
 			return fmt.Errorf("error validating %q: %v", v.Source, err)
 		}
-		info, err := v.InfoForData(ext.RawJSON, v.Source)
+		info, err := v.InfoForData(ext.Raw, v.Source)
 		if err != nil {
 			if fnErr := fn(info, err); fnErr != nil {
 				return fnErr

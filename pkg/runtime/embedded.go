@@ -92,19 +92,19 @@ func DefaultEmbeddedConversions() []interface{} {
 	return []interface{}{
 		func(in *Object, out *RawExtension, s conversion.Scope) error {
 			if in == nil {
-				out.RawJSON = []byte("null")
+				out.Raw = []byte("null")
 				return nil
 			}
 			obj := *in
 			if unk, ok := obj.(*Unknown); ok {
 				if unk.Raw != nil {
-					out.RawJSON = unk.Raw
+					out.Raw = unk.Raw
 					return nil
 				}
 				obj = out.Object
 			}
 			if obj == nil {
-				out.RawJSON = nil
+				out.Raw = nil
 				return nil
 			}
 			out.Object = obj
@@ -116,7 +116,7 @@ func DefaultEmbeddedConversions() []interface{} {
 				*out = in.Object
 				return nil
 			}
-			data := in.RawJSON
+			data := in.Raw
 			if len(data) == 0 || (len(data) == 4 && string(data) == "null") {
 				*out = nil
 				return nil

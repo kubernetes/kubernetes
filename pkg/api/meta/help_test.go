@@ -114,8 +114,8 @@ func TestExtractListGeneric(t *testing.T) {
 func TestExtractListGenericV1(t *testing.T) {
 	pl := &v1.List{
 		Items: []runtime.RawExtension{
-			{RawJSON: []byte("foo")},
-			{RawJSON: []byte("bar")},
+			{Raw: []byte("foo")},
+			{Raw: []byte("bar")},
 			{Object: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "other"}}},
 		},
 	}
