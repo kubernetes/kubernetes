@@ -74,9 +74,6 @@ func CreateValidPod(name, namespace string) *api.Pod {
 				},
 			},
 		},
-		Status: api.PodStatus{
-			Phase: api.PodPending,
-		},
 	}
 }
 
