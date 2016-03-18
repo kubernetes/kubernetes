@@ -138,7 +138,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	if err := json.Unmarshal(wire, obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	t.Logf("exact wire is: %s", string(obj.Items[0].RawJSON))
+	t.Logf("exact wire is: %s", string(obj.Items[0].Raw))
 
 	items[3] = &ObjectTest{Items: innerItems}
 	internal.Items = items
@@ -230,7 +230,7 @@ func TestNestedObject(t *testing.T) {
 	if externalViaJSON.Kind == "" || externalViaJSON.APIVersion == "" || externalViaJSON.ID != "outer" {
 		t.Errorf("Expected objects to have type info set, got %#v", externalViaJSON)
 	}
-	if !reflect.DeepEqual(externalViaJSON.EmptyObject.RawJSON, []byte("null")) || len(externalViaJSON.Object.RawJSON) == 0 {
+	if !reflect.DeepEqual(externalViaJSON.EmptyObject.Raw, []byte("null")) || len(externalViaJSON.Object.Raw) == 0 {
 		t.Errorf("Expected deserialization of nested objects into bytes, got %#v", externalViaJSON)
 	}
 

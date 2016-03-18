@@ -36,6 +36,12 @@ type TypeMeta struct {
 	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 }
 
+const (
+	ContentTypeJSON string = "application/json"
+	// TODO: Fix the value.
+	ContentTypeProtobuf string = "application/protobuf"
+)
+
 // RawExtension is used to hold extensions in external versions.
 //
 // To use this, make a field which has RawExtension as its type in your external, versioned
@@ -80,16 +86,14 @@ type TypeMeta struct {
 //
 // +protobuf=true
 type RawExtension struct {
-	// RawJSON is the underlying serialization of this object.
-	RawJSON []byte
+	// Raw is the underlying serialization of this object.
+	//
+	// TODO: Determine how to detect ContentType and ContentEncoding of 'Raw' data.
+	Raw []byte
 	// Object can hold a representation of this extension - useful for working with versioned
 	// structs.
 	Object Object `json:"-"`
 }
-
-// TODO; Where should it be?
-// TODO; What value it should have?
-const ContentTypeJSON string = "application/json"
 
 // Unknown allows api objects with unknown types to be passed-through. This can be used
 // to deal with the API objects from a plug-in. Unknown objects still have functioning
@@ -105,10 +109,10 @@ type Unknown struct {
 	// except for passing it through the system.
 	Raw []byte
 	// ContentEncoding is encoding used to encode 'Raw' data.
-	// Unspecified mean no encoding.
+	// Unspecified means no encoding.
 	ContentEncoding string
 	// ContentType  is serialization method used to serialize 'Raw'.
-	// TODO: Define what unspecified means.
+	// Unspecified means ContentTypeJSON.
 	ContentType string
 }
 
