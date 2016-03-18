@@ -57,6 +57,38 @@ command_exists() {
     command -v "$@" > /dev/null 2>&1
 }
 
+# Compare semvers
+vercomp () {
+    if [[ $1 == $2 ]]
+    then
+        return 0
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+    do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++))
+    do
+        if [[ -z ${ver2[i]} ]]
+        then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]}))
+        then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]}))
+        then
+            return 2
+        fi
+    done
+    return 0
+}
+
 lsb_dist=""
 
 # Detect the OS distro, we support ubuntu, debian, mint, centos, fedora dist
@@ -205,6 +237,13 @@ start_k8s(){
     # sleep a little bit
     sleep 5
 
+    # If we're using k8 greater than 1.1.8, we need the arch argument
+    if [ vercomp K8S_VERSION '1.1.8' -gt 1 ]; then
+        HYPERKUBE_VERSION="-${ARCH}:v${K8S_VERSION}"
+    else
+        HYPERKUBE_VERSION=":v${K8S_VERSION}"
+    fi
+
     # Start kubelet and then start master components as pods
     docker run \
         --net=host \
@@ -217,7 +256,7 @@ start_k8s(){
         -v /:/rootfs:ro \
         -v /var/lib/docker/:/var/lib/docker:rw \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
-        gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
+        gcr.io/google_containers/hyperkube${HYPERKUBE_VERSION} \
         /hyperkube kubelet \
             --address=0.0.0.0 \
             --allow-privileged=true \
