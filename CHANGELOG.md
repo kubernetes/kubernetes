@@ -14,7 +14,7 @@ binary | hash alg | hash
 ## Major Themes
 
   * <strong>Significant scale improvements</strong>. Increased cluster scale by 400% to 1000 nodes with 30,000 pods per cluster.
-Kubelet supports 100 pods per node.
+Kubelet supports 100 pods per node with 4x reduced system overhead.
   * <strong>Simplified application deployment and management. </strong>
      * Dynamic Configuration (ConfigMap API in the core API group) enables application
 configuration to be stored as a Kubernetes API object and pulled dynamically on
@@ -113,6 +113,7 @@ Pod’s SELinux context, if specified
   * A stable client library release\_1\_2 is added. The library is [here](https://github.com/kubernetes/kubernetes/tree/master/pkg/client/clientset_generated/release_1_2), and detailed doc is [here](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/generating-clientset.md#released-clientsets). We will keep the interface of this go client stable.
   * New Azure File Service Volume Plugin enables mounting Microsoft Azure File
 Volumes (SMB 2.1 and 3.0) into a Pod. See [example](https://github.com/kubernetes/kubernetes/blob/release-1.2/examples/azure_file/README.md) for details.
+  * Logs usage and root filesystem usage of a container, volumes usage of a pod and node disk usage are exposed through Kubelet new metrics API.
 
 ## Experimental Features
 
@@ -144,6 +145,7 @@ every node, instead of being compiled into the Kubernetes binary. See [example](
   * vendor volumes into a pod. It expects vendor drivers are installed in the
 volume plugin path on each kubelet node. This is an alpha feature and may
 change in future.
+  * Kubelet exposes a new Alpha metrics API - /stats/summary in a user friendly format with reduced system overhead. The measurement is done in PR [#22542](https://github.com/kubernetes/kubernetes/pull/22542).
 
 ## Action required
 
