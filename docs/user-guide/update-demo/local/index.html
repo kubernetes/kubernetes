@@ -23,14 +23,26 @@ limitations under the License.
 <body ng-controller="ButtonsCtrl">
   <div ng-repeat="server in servers" class="pod">
     <img src="/api/v1/proxy/namespaces/default/pods/{{server.podName}}/{{server.image}}" height="100px" width="100px" />
-    <b>ID:</b> {{server.podName}}<br>
-    <b>Host:</b> <a href="/api/v1/proxy/namespaces/default/pods/{{server.podName}}/data.json">{{server.host}}</a><br>
-    <b>Status:</b> {{server.status}}<br>
-    <b>Image:</b> {{server.dockerImage}}<br>
-    <b>Labels:</b>
-    <ul>
-      <li ng-repeat="(key,value) in server.labels">{{key}}={{value}}</li>
-    </ul>
+    <div class="k8s-example-update-demo-card-section">
+      <span class="k8s-title">ID</span> <span>{{server.podName}}</span>
+    </div>
+    <div class="k8s-example-update-demo-card-section">
+      <span class="k8s-title">Host</span> <span><a href="/api/v1/proxy/namespaces/default/pods/{{server.podName}}/data.json">{{server.host}}</a></span>
+    </div>
+    <div class="k8s-example-update-demo-card-section">
+      <span class="k8s-title">Status</span> <span>{{server.status}}</span>
+    </div>
+    <div class="k8s-example-update-demo-card-section">
+      <span class="k8s-title">Image</span> <span>{{server.dockerImage}}</span>
+    </div>
+    <div class="k8s-example-update-demo-card-section">
+      <span class="k8s-title">Labels</span>
+      <span>
+        <ul>
+          <li ng-repeat="(key,value) in server.labels">{{key}}={{value}}</li>
+        </ul>
+      </span>
+    </div>
   </div>
 </body>
 </html>
