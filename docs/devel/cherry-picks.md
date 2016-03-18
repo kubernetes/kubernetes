@@ -55,14 +55,14 @@ If you are cherrypicking a change which adds a doc, then you also need to run
 Ideally, just running `hack/cherry_pick_pull.sh` should be enough, but we are not there
 yet: [#18861](https://github.com/kubernetes/kubernetes/issues/18861)
 
-To cherrypick PR 123456 to release-1.1, run the following commands after running `hack/cherry_pick_pull.sh` and before merging the PR:
+To cherrypick PR 123456 to release-1.2, run the following commands after running `hack/cherry_pick_pull.sh` and before merging the PR:
 
 ```
-$ git checkout -b automated-cherry-pick-of-#123456-upstream-release-1.1
-  origin/automated-cherry-pick-of-#123456-upstream-release-1.1
-$ ./build/versionize-docs.sh release-1.1
+$ git checkout -b automated-cherry-pick-of-#123456-upstream-release-1.2
+  origin/automated-cherry-pick-of-#123456-upstream-release-1.2
+$ ./build/versionize-docs.sh release-1.2
 $ git commit -a -m "Running versionize docs"
-$ git push origin automated-cherry-pick-of-#123456-upstream-release-1.1
+$ git push origin automated-cherry-pick-of-#123456-upstream-release-1.2
 ```
 
 ## Cherry Pick Review
