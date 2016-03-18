@@ -52,7 +52,6 @@ fi
 
 BASH_TARGETS="codecgen
 	generated-conversions
-	generated-deep-copies
 	generated-docs
 	generated-swagger-docs
 	swagger-spec
