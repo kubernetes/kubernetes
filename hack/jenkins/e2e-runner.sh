@@ -94,10 +94,68 @@ function unpack_binaries() {
     tar -xzf kubernetes-test.tar.gz
 }
 
+# GCP Project to fetch Trusty images.
+function get_trusty_image_project() {
+  local project=""
+  # Retry the gsutil command a couple times to mitigate the effect of
+  # transient server errors.
+  for n in $(seq 3); do
+    project="$(gsutil cat "gs://trusty-images/image-project.txt")" && break || sleep 1
+  done
+  if [[ -z "${project}" ]]; then
+    echo "Failed to find the image project for Trusty images."
+    exit 1
+  fi
+  echo "${project}"
+  # Clean up gsutil artifacts otherwise the later test stage will complain.
+  rm -rf .config &> /dev/null
+  rm -rf .gsutil &> /dev/null
+}
+
+# Get the latest Trusty image for a Jenkins job.
+function get_latest_trusty_image() {
+    local image_project="$1"
+    local image_type="$2"
+    local image_index=""
+    if [[ "${image_type}" == head ]]; then
+      image_index="trusty-head"
+    elif [[ "${image_type}" == dev ]]; then
+      image_index="trusty-dev"
+    elif [[ "${image_type}" == beta ]]; then
+      image_index="trusty-beta"
+    elif [[ "${image_type}" == stable ]]; then
+      image_index="trusty-stable"
+    fi
+
+    local image=""
+    # Retry the gsutil command a couple times to mitigate the effect of
+    # transient server errors.
+    for n in $(seq 3); do
+      image="$(gsutil cat "gs://${image_project}/image-indices/latest-test-image-${image_index}")" && break || sleep 1
+    done
+    if [[ -z "${image}" ]]; then
+      echo "Failed to find Trusty image for ${image_type}"
+      exit 1
+    fi
+    echo "${image}"
+    # Clean up gsutil artifacts otherwise the later test stage will complain.
+    rm -rf .config &> /dev/null
+    rm -rf .gsutil &> /dev/null
+}
+
 echo "--------------------------------------------------------------------------------"
 echo "Test Environment:"
 printenv | sort
 echo "--------------------------------------------------------------------------------"
+
+# We get the image project and name for Trusty dynamically.
+if [[ "${JENKINS_USE_TRUSTY_IMAGES:-}" =~ ^[yY]$ ]]; then
+  trusty_image_project="$(get_trusty_image_project)"
+  trusty_image="$(get_latest_trusty_image "${trusty_image_project}" "head")"
+  export KUBE_MASTER_IMAGE_PROJECT="${trusty_image_project}"
+  export KUBE_MASTER_IMAGE="${trusty_image}"
+  export KUBE_OS_DISTRIBUTION="trusty"
+fi
 
 # We get the Kubernetes tarballs unless we are going to use old ones
 if [[ "${JENKINS_USE_EXISTING_BINARIES:-}" =~ ^[yY]$ ]]; then
