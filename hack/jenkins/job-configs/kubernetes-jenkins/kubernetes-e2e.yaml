@@ -240,6 +240,12 @@
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export PROJECT="k8s-jkns-e2e-gce-1-2"
+        - 'gce-reboot-release-1.2':
+            description: 'Run [Feature:Reboot] tests on GCE on the release-1.2 branch.'
+            timeout: 180
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Reboot\]"
+                export PROJECT="k8s-jkns-e2e-gce-reboot-1-2"
         - 'gce-slow-release-1.2':
             description: 'Runs slow tests on GCE, sequentially on the release-1.2 branch.'
             timeout: 60
