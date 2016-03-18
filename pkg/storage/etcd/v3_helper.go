@@ -31,11 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-var (
-	ErrNotFound = errors.New("etcd: key not found")
-	ErrTestFail = errors.New("etcd: test failed")
-)
-
 type v3Helper struct {
 	// etcd interfaces
 	client *clientv3.Client
@@ -106,7 +101,7 @@ func (h *v3Helper) Set(ctx context.Context, key string, obj, out runtime.Object,
 		return err
 	}
 	if !txnResp.Succeeded {
-		return ErrTestFail
+		return storage.NewResourceVersionConflictsError(key, rev)
 	}
 
 	if out != nil {
@@ -139,7 +134,7 @@ func (h *v3Helper) Get(ctx context.Context, key string, out runtime.Object, igno
 		if ignoreNotFound {
 			return setZeroValue(out)
 		} else {
-			return ErrNotFound
+			return storage.NewKeyNotFoundError(key, 0)
 		}
 	}
 
