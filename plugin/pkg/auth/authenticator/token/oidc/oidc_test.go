@@ -557,15 +557,30 @@ func TestNewOIDCHttpHandler(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		auth := OIDCAuthenticator{
-			clientConfig: oidc.ClientConfig{
-				Credentials: oidc.ClientCredentials{
-					Secret: tt.clientSecret,
-				},
+		ccfg := oidc.ClientConfig{
+			ProviderConfig: oidc.ProviderConfig{
+				Issuer:        mustParseURL(t, "https://auth.example.com"),
+				AuthEndpoint:  mustParseURL(t, "https://auth.example.com"),
+				TokenEndpoint: mustParseURL(t, "https://auth.example.com"),
+			},
+
+			Credentials: oidc.ClientCredentials{
+				ID:     "client_id",
+				Secret: tt.clientSecret,
 			},
 		}
 
-		hdlr, err := auth.NewOIDCHTTPHandler()
+		client, err := oidc.NewClient(ccfg)
+		if err != nil {
+			panic(err)
+		}
+
+		auth := OIDCAuthenticator{
+			clientConfig: ccfg,
+			client:       client,
+		}
+
+		hdlr, err := auth.NewOIDCHTTPHandler("http://auth.example.com")
 		gotErr := err != nil
 		if tt.wantErr != gotErr {
 			t.Errorf("#%d: wantErr: %v, gotErr %v, err: %v", i, tt.wantErr, gotErr, err)

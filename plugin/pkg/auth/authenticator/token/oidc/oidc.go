@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/jose"
+	"github.com/coreos/go-oidc/oauth2"
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
 
@@ -74,13 +75,37 @@ type OIDCAuthenticator struct {
 }
 
 type OIDCHTTPHandler struct {
-	client OIDCClient
+	client       OIDCClient
+	apiServerURL url.URL
 }
 
 // OIDCClient peforms the subset of OIDC related operations necessary for the HTTP Handler.
 type OIDCClient interface {
 	// RefreshToken exchanges a refresh token for an ID token.
 	RefreshToken(rt string) (jose.JWT, error)
+
+	// AuthCode URL generates the authorization URL for the authorization code flow.
+	AuthCodeURL(state, accessType, prompt string) string
+
+	// RequestToken requests a token from the Token Endpoint with the specified grantType.
+	RequestToken(grantType, value string) (oauth2.TokenResponse, error)
+}
+
+type oidcClient struct {
+	oidc *oidc.Client
+	oac  *oauth2.Client
+}
+
+func (o *oidcClient) RefreshToken(rt string) (jose.JWT, error) {
+	return o.oidc.RefreshToken(rt)
+}
+
+func (o *oidcClient) AuthCodeURL(state, accessType, prompt string) string {
+	return o.oac.AuthCodeURL(state, accessType, prompt)
+}
+
+func (o *oidcClient) RequestToken(grantType, value string) (oauth2.TokenResponse, error) {
+	return o.oac.RequestToken(grantType, value)
 }
 
 // New creates a new request Authenticator which uses OpenID Connect ID Tokens for authentication.
@@ -93,18 +118,19 @@ type OIDCClient interface {
 //
 // NOTE(yifan): For now we assume the server provides the "jwks_uri" so we don't
 // need to manager the key sets by ourselves.
-func New(issuerURL, clientID, clientSecret, caFile, usernameClaim, groupsClaim string) (*OIDCAuthenticator, error) {
+func New(issuer, clientID, clientSecret, caFile, usernameClaim, groupsClaim string) (*OIDCAuthenticator, error) {
 	var cfg oidc.ProviderConfig
 	var err error
 	var roots *x509.CertPool
 
-	url, err := url.Parse(issuerURL)
+	issuerURL, err := url.Parse(issuer)
 	if err != nil {
 		return nil, err
 	}
 
-	if url.Scheme != "https" {
-		return nil, fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'", issuerURL, url.Scheme)
+	if issuerURL.Scheme != "https" {
+		return nil, fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'",
+			issuer, issuerURL.Scheme)
 	}
 
 	if caFile != "" {
@@ -132,7 +158,7 @@ func New(issuerURL, clientID, clientSecret, caFile, usernameClaim, groupsClaim s
 			return nil, fmt.Errorf("failed to fetch provider config after %v retries", maxRetries)
 		}
 
-		cfg, err = oidc.FetchProviderConfig(hc, strings.TrimSuffix(issuerURL, "/"))
+		cfg, err = oidc.FetchProviderConfig(hc, strings.TrimSuffix(issuer, "/"))
 		if err == nil {
 			break
 		}
@@ -140,7 +166,7 @@ func New(issuerURL, clientID, clientSecret, caFile, usernameClaim, groupsClaim s
 		time.Sleep(retryBackoff)
 	}
 
-	glog.Infof("Fetched provider config from %s: %#v", issuerURL, cfg)
+	glog.Infof("Fetched provider config from %s: %#v", issuer, cfg)
 
 	ccfg := oidc.ClientConfig{
 		HTTPClient: hc,
@@ -148,6 +174,7 @@ func New(issuerURL, clientID, clientSecret, caFile, usernameClaim, groupsClaim s
 			ID:     clientID,
 			Secret: clientSecret,
 		},
+		Scope:          append(oidc.DefaultScope, "offline_access"),
 		ProviderConfig: cfg,
 	}
 
@@ -159,7 +186,7 @@ func New(issuerURL, clientID, clientSecret, caFile, usernameClaim, groupsClaim s
 	// SyncProviderConfig will start a goroutine to periodically synchronize the provider config.
 	// The synchronization interval is set by the expiration length of the config, and has a mininum
 	// and maximum threshold.
-	stop := client.SyncProviderConfig(issuerURL)
+	stop := client.SyncProviderConfig(issuer)
 
 	authn := &OIDCAuthenticator{
 		clientConfig:     ccfg,
@@ -187,11 +214,30 @@ func (a *OIDCAuthenticator) SetHandlersAttached(attached bool) {
 //
 // An OIDCAuthenticator created with a client-secret is necessary, or else an
 // error is returned.
-func (a *OIDCAuthenticator) NewOIDCHTTPHandler() (*OIDCHTTPHandler, error) {
+func (a *OIDCAuthenticator) NewOIDCHTTPHandler(apiHostPort string) (*OIDCHTTPHandler, error) {
+	apiServerURL := url.URL{
+		Host:   apiHostPort,
+		Scheme: "https",
+	}
+
+	oac, err := a.client.OAuthClient()
+	if err != nil {
+		return nil, err
+	}
+
+	client := &oidcClient{
+		oidc: a.client,
+		oac:  oac,
+	}
+
 	if a.clientConfig.Credentials.Secret == "" {
 		return nil, errors.New("OIDCHTTPHandler requires a client config with a client secret")
 	}
-	return NewOIDCHTTPHandler(a.client), nil
+
+	return &OIDCHTTPHandler{
+		client:       client,
+		apiServerURL: apiServerURL,
+	}, nil
 }
 
 func NewOIDCHTTPHandler(o OIDCClient) *OIDCHTTPHandler {
@@ -270,6 +316,8 @@ func (a *OIDCAuthenticator) Close() {
 }
 
 func (t *OIDCHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	glog.Errorf("SERVE IT:")
+
 	switch r.URL.Path {
 	case PathExchangeRefreshToken:
 		t.handleExchangeRefreshToken(w, r)
@@ -291,15 +339,13 @@ func (t *OIDCHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleExchangeRefreshToken exchanges a refresh token, passed through the "refresh_token" parameter, for an ID Token, which can be used for authentication.
 func (t *OIDCHTTPHandler) handleExchangeRefreshToken(w http.ResponseWriter, r *http.Request) {
-	// Only post is allowed
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
-	err := r.ParseForm()
-	if err != nil {
-		glog.Errorf("Could not parse form: %v", err)
+	if err := r.ParseForm(); err != nil {
+		glog.Errorf("could not parse form: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -332,11 +378,160 @@ func (t *OIDCHTTPHandler) handleExchangeRefreshToken(w http.ResponseWriter, r *h
 	return
 }
 
+// handleAuth redirects the user-agent to the identity-provider for authentication.
+// A 'callback' parameter must be present in the query string, and it must be
+// URL with a host of either "localhost" or 127.0.0.1.
+// After authenticating, the user will be redirected back to the API Server to
+// be handled by the "handleAuthCallback" handler, which redirects the
+// user-agent back to the URL that was specified in the 'callback' parameter
+// passed to this handler.
 func (t *OIDCHTTPHandler) handleAuth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get the URL, ensure that it is localhost
+	cb := r.URL.Query().Get("callback")
+	if cb == "" {
+		glog.Errorf("Missing 'callback' parameter in request: %v")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	cbURL, err := url.Parse(cb)
+	if err != nil {
+		glog.Errorf("%s not parseable as URL: %v", cb, err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if !isLocalAddr(cbURL.Host) {
+		glog.Errorf("'callback' must be localhost, not %v", cbURL.Host)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	redirect := t.apiServerURL
+	redirect.Path = PathAuthCallback
+
+	authURL, err := t.getAuthURL(cb, redirect.String())
+	if err != nil {
+		glog.Errorf("Could not get an auth URL: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, authURL, http.StatusSeeOther)
+	return
 }
 
+// handleAuthCallback is the callback handler that the user-agent is redirected to after authentication.
+// This handler verifies that the 'state' paramter contains a valid URL to a
+// loopback address and then redirects the user there along with their
+// authorization code from the Idp, where it is expected that they will then
+// make a request back to the API Server to exchange the code for an ID token
+// via the handleExchangeToken handler.
 func (t *OIDCHTTPHandler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		glog.Errorf("Missing 'code' paramter in request")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	state := r.URL.Query().Get("state")
+	if state == "" {
+		glog.Errorf("Missing 'state' paramter in request")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	redirURL, err := url.Parse(state)
+	if err != nil {
+		glog.Errorf("'state' paramter not parseable as URL")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if !isLocalAddr(redirURL.Host) {
+		glog.Errorf("URL in 'state' must be localhost, not %v", redirURL.Host)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	q := redirURL.Query()
+	q.Set("code", code)
+	redirURL.RawQuery = q.Encode()
+
+	http.Redirect(w, r, redirURL.String(), http.StatusSeeOther)
 }
 
+// handleExchangeCode exchanges an authorization code (passed through the 'code' parameter) for an ID Token and refresh token, which are then written to the body of the response in a url-encoded form.
 func (t *OIDCHTTPHandler) handleExchangeCode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		glog.Errorf("could not parse form: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	code := r.PostForm.Get("code")
+	if code == "" {
+		glog.Errorf("Missing 'code' paramter in request")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	tokRes, err := t.client.RequestToken(oauth2.GrantTypeAuthCode, code)
+	if err != nil {
+		glog.Errorf("Could not exchange token: %v  ", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	idToken, err := jose.ParseJWT(tokRes.IDToken)
+	if err != nil {
+		glog.Errorf("Unable to parse JWT %v:  ", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	refreshToken := tokRes.RefreshToken
+
+	params := url.Values{}
+	params.Set("refresh_token", refreshToken)
+	params.Set("id_token", idToken.Encode())
+	_, err = w.Write([]byte(params.Encode()))
+	if err != nil {
+		glog.Errorf("Could not write response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (t *OIDCHTTPHandler) getAuthURL(cb string, redirect string) (string, error) {
+	acURLStr := t.client.AuthCodeURL(cb, "offline", "")
+	acURL, err := url.Parse(acURLStr)
+	if err != nil {
+		return "", err
+	}
+	q := acURL.Query()
+	q.Set("redirect_uri", redirect)
+	acURL.RawQuery = q.Encode()
+	return acURL.String(), nil
+}
+
+func isLocalAddr(host string) bool {
+	host = strings.Split(host, ":")[0]
+	return host == "localhost" || host == "127.0.0.1"
 }

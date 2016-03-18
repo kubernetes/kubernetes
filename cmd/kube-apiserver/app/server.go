@@ -393,26 +393,6 @@ func Run(s *options.APIServer) error {
 		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(etcdStorage)
 	}
 
-	var oAuth *oidc.OIDCAuthenticator
-	if len(s.OIDCIssuerURL) > 0 && len(s.OIDCClientID) > 0 {
-		oAuth, err = oidc.New(s.OIDCIssuerURL,
-			s.OIDCClientID,
-			s.OIDCClientSecret,
-			s.OIDCCAFile,
-			s.OIDCUsernameClaim,
-			s.OIDCGroupsClaim)
-	}
-	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
-		BasicAuthFile:             s.BasicAuthFile,
-		ClientCAFile:              s.ClientCAFile,
-		TokenAuthFile:             s.TokenAuthFile,
-		OIDCAuthenticator:         oAuth,
-		ServiceAccountKeyFile:     s.ServiceAccountKeyFile,
-		ServiceAccountLookup:      s.ServiceAccountLookup,
-		ServiceAccountTokenGetter: serviceAccountGetter,
-		KeystoneURL:               s.KeystoneURL,
-	})
-
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
@@ -448,6 +428,34 @@ func Run(s *options.APIServer) error {
 				}
 			}
 		}
+	}
+
+	var oAuth *oidc.OIDCAuthenticator
+	if len(s.OIDCIssuerURL) > 0 && len(s.OIDCClientID) > 0 {
+		oAuth, err = oidc.New(
+			s.OIDCIssuerURL,
+			s.OIDCClientID,
+			s.OIDCClientSecret,
+			s.OIDCCAFile,
+			s.OIDCUsernameClaim,
+			s.OIDCGroupsClaim)
+		if err != nil {
+			glog.Fatalf("Failed to create OIDC authenticator %v", err)
+		}
+
+	}
+	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+		BasicAuthFile:             s.BasicAuthFile,
+		ClientCAFile:              s.ClientCAFile,
+		TokenAuthFile:             s.TokenAuthFile,
+		OIDCAuthenticator:         oAuth,
+		ServiceAccountKeyFile:     s.ServiceAccountKeyFile,
+		ServiceAccountLookup:      s.ServiceAccountLookup,
+		ServiceAccountTokenGetter: serviceAccountGetter,
+		KeystoneURL:               s.KeystoneURL,
+	})
+	if err != nil {
+		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
 
 	config := &master.Config{
@@ -502,7 +510,8 @@ func Run(s *options.APIServer) error {
 	// should belong in GenericAPIServer.init() but couldn't think of a clean
 	// way to do that at the time. Would like feedback.
 	if oAuth != nil && s.OIDCClientSecret != "" {
-		oidcHandler, err := oAuth.NewOIDCHTTPHandler()
+		apiHostPort := net.JoinHostPort(s.ExternalHost, strconv.Itoa(s.SecurePort))
+		oidcHandler, err := oAuth.NewOIDCHTTPHandler(apiHostPort)
 		if err != nil {
 			return err
 		}

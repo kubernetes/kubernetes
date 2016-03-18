@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-oidc/jose"
+	"github.com/coreos/go-oidc/oauth2"
 )
 
 // FakeClient implements OIDCClient with canned responses.
@@ -20,4 +21,12 @@ func (f *FakeClient) RefreshToken(rt string) (jose.JWT, error) {
 		return jose.JWT{}, fmt.Errorf("Unexpected RT: expected %v, got %v", f.ExpectRefreshToken, rt)
 	}
 	return f.IDToken, f.Err
+}
+
+func (f *FakeClient) AuthCodeURL(state, accessType, prompt string) string {
+	return ""
+}
+
+func (f *FakeClient) RequestToken(grantType, value string) (oauth2.TokenResponse, error) {
+	return oauth2.TokenResponse{}, nil
 }
