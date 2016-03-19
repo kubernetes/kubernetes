@@ -462,7 +462,7 @@ var _ = KubeDescribe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("executing a command with run and attach with stdin")
-			runOutput := newKubectlCommand(nsFlag, "run", "run-test", "--image=busybox", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput := newKubectlCommand(nsFlag, "run", "run-test", "--image=gcr.io/google_containers/busybox:1.24", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				withStdinData("abcd1234").
 				execOrDie()
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
@@ -470,7 +470,7 @@ var _ = KubeDescribe("Kubectl client", func() {
 			Expect(c.Extensions().Jobs(ns).Delete("run-test", nil)).To(BeNil())
 
 			By("executing a command with run and attach without stdin")
-			runOutput = newKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput = newKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image=gcr.io/google_containers/busybox:1.24", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				withStdinData("abcd1234").
 				execOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("abcd1234"))
@@ -478,7 +478,7 @@ var _ = KubeDescribe("Kubectl client", func() {
 			Expect(c.Extensions().Jobs(ns).Delete("run-test-2", nil)).To(BeNil())
 
 			By("executing a command with run and attach with stdin with open stdin should remain running")
-			runOutput = newKubectlCommand(nsFlag, "run", "run-test-3", "--image=busybox", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput = newKubectlCommand(nsFlag, "run", "run-test-3", "--image=gcr.io/google_containers/busybox:1.24", "--restart=Never", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				withStdinData("abcd1234\n").
 				execOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
@@ -1079,7 +1079,7 @@ var _ = KubeDescribe("Kubectl client", func() {
 			By("executing a command with run --rm and attach with stdin")
 			t := time.NewTimer(runJobTimeout)
 			defer t.Stop()
-			runOutput := newKubectlCommand(nsFlag, "run", jobName, "--image=busybox", "--rm=true", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput := newKubectlCommand(nsFlag, "run", jobName, "--image=gcr.io/google_containers/busybox:1.24", "--rm=true", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				withStdinData("abcd1234").
 				withTimeout(t.C).
 				execOrDie()
