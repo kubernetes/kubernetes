@@ -251,6 +251,8 @@ failure.
   * “kubectl rolling-update” only supports Replication Controllers (it doesn’t
 support Replica Sets). It’s recommended to use Deployment 1.2 with “kubectl
 rollout” commands instead, if you want to rolling update Replica Sets. 
+  * When live upgrading Kubelet to 1.2 without draining the pods running on the node,
+the containers will be restarted by Kubelet (see details in [#23104](https://github.com/kubernetes/kubernetes/issues/23104)).
 
 ### Docker Known Issues
 
