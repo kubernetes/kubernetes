@@ -155,6 +155,11 @@
 			"Rev": "5e6eb7e19d6385adfabb1f1caea03e732f9348ad"
 		},
 		{
+			"ImportPath": "github.com/coreos/etcd/clientv3",
+			"Comment": "v2.3.0",
+			"Rev": "5e6eb7e19d6385adfabb1f1caea03e732f9348ad"
+		},
+		{
 			"ImportPath": "github.com/coreos/etcd/compactor",
 			"Comment": "v2.3.0",
 			"Rev": "5e6eb7e19d6385adfabb1f1caea03e732f9348ad"
@@ -171,6 +176,11 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver",
+			"Comment": "v2.3.0",
+			"Rev": "5e6eb7e19d6385adfabb1f1caea03e732f9348ad"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/integration",
 			"Comment": "v2.3.0",
 			"Rev": "5e6eb7e19d6385adfabb1f1caea03e732f9348ad"
 		},
