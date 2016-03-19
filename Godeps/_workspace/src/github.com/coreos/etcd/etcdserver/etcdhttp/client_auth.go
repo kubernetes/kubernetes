@@ -23,7 +23,6 @@ import (
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/auth"
 	"github.com/coreos/etcd/etcdserver/etcdhttp/httptypes"
-	"github.com/coreos/etcd/pkg/netutil"
 )
 
 type authHandler struct {
@@ -46,7 +45,7 @@ func hasRootAccess(sec auth.Store, r *http.Request) bool {
 	if !sec.AuthEnabled() {
 		return true
 	}
-	username, password, ok := netutil.BasicAuth(r)
+	username, password, ok := r.BasicAuth()
 	if !ok {
 		return false
 	}
@@ -54,7 +53,8 @@ func hasRootAccess(sec auth.Store, r *http.Request) bool {
 	if err != nil {
 		return false
 	}
-	ok = rootUser.CheckPassword(password)
+
+	ok = sec.CheckPassword(rootUser, password)
 	if !ok {
 		plog.Warningf("auth: wrong password for user %s", username)
 		return false
@@ -80,7 +80,7 @@ func hasKeyPrefixAccess(sec auth.Store, r *http.Request, key string, recursive b
 		plog.Warningf("auth: no authorization provided, checking guest access")
 		return hasGuestAccess(sec, r, key)
 	}
-	username, password, ok := netutil.BasicAuth(r)
+	username, password, ok := r.BasicAuth()
 	if !ok {
 		plog.Warningf("auth: malformed basic auth encoding")
 		return false
@@ -90,7 +90,7 @@ func hasKeyPrefixAccess(sec auth.Store, r *http.Request, key string, recursive b
 		plog.Warningf("auth: no such user: %s.", username)
 		return false
 	}
-	authAsUser := user.CheckPassword(password)
+	authAsUser := sec.CheckPassword(user, password)
 	if !authAsUser {
 		plog.Warningf("auth: incorrect password for user: %s.", username)
 		return false
@@ -126,9 +126,11 @@ func hasGuestAccess(sec auth.Store, r *http.Request, key string) bool {
 	return false
 }
 
-func writeNoAuth(w http.ResponseWriter) {
+func writeNoAuth(w http.ResponseWriter, r *http.Request) {
 	herr := httptypes.NewHTTPError(http.StatusUnauthorized, "Insufficient credentials")
-	herr.WriteTo(w)
+	if err := herr.WriteTo(w); err != nil {
+		plog.Debugf("error writing HTTPError (%v) to %s", err, r.RemoteAddr)
+	}
 }
 
 func handleAuth(mux *http.ServeMux, sh *authHandler) {
@@ -144,27 +146,46 @@ func (sh *authHandler) baseRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !hasRootAccess(sh.sec, r) {
-		writeNoAuth(w)
+		writeNoAuth(w, r)
 		return
 	}
+
 	w.Header().Set("X-Etcd-Cluster-ID", sh.cluster.ID().String())
 	w.Header().Set("Content-Type", "application/json")
-	var rolesCollections struct {
-		Roles []string `json:"roles"`
-	}
+
 	roles, err := sh.sec.AllRoles()
 	if err != nil {
-		writeError(w, err)
+		writeError(w, r, err)
 		return
 	}
 	if roles == nil {
 		roles = make([]string, 0)
 	}
 
-	rolesCollections.Roles = roles
+	err = r.ParseForm()
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+
+	var rolesCollections struct {
+		Roles []auth.Role `json:"roles"`
+	}
+	for _, roleName := range roles {
+		var role auth.Role
+		role, err = sh.sec.GetRole(roleName)
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+		rolesCollections.Roles = append(rolesCollections.Roles, role)
+	}
 	err = json.NewEncoder(w).Encode(rolesCollections)
+
 	if err != nil {
 		plog.Warningf("baseRoles error encoding on %s", r.URL)
+		writeError(w, r, err)
+		return
 	}
 }
 
@@ -178,7 +199,7 @@ func (sh *authHandler) handleRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(pieces) != 3 {
-		writeError(w, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid path"))
+		writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid path"))
 		return
 	}
 	sh.forRole(w, r, pieces[2])
@@ -189,7 +210,7 @@ func (sh *authHandler) forRole(w http.ResponseWriter, r *http.Request, role stri
 		return
 	}
 	if !hasRootAccess(sh.sec, r) {
-		writeNoAuth(w)
+		writeNoAuth(w, r)
 		return
 	}
 	w.Header().Set("X-Etcd-Cluster-ID", sh.cluster.ID().String())
@@ -199,7 +220,7 @@ func (sh *authHandler) forRole(w http.ResponseWriter, r *http.Request, role stri
 	case "GET":
 		data, err := sh.sec.GetRole(role)
 		if err != nil {
-			writeError(w, err)
+			writeError(w, r, err)
 			return
 		}
 		err = json.NewEncoder(w).Encode(data)
@@ -212,11 +233,11 @@ func (sh *authHandler) forRole(w http.ResponseWriter, r *http.Request, role stri
 		var in auth.Role
 		err := json.NewDecoder(r.Body).Decode(&in)
 		if err != nil {
-			writeError(w, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid JSON in request body."))
+			writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid JSON in request body."))
 			return
 		}
 		if in.Role != role {
-			writeError(w, httptypes.NewHTTPError(http.StatusBadRequest, "Role JSON name does not match the name in the URL"))
+			writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "Role JSON name does not match the name in the URL"))
 			return
 		}
 
@@ -226,19 +247,19 @@ func (sh *authHandler) forRole(w http.ResponseWriter, r *http.Request, role stri
 		if in.Grant.IsEmpty() && in.Revoke.IsEmpty() {
 			err = sh.sec.CreateRole(in)
 			if err != nil {
-				writeError(w, err)
+				writeError(w, r, err)
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
 			out = in
 		} else {
 			if !in.Permissions.IsEmpty() {
-				writeError(w, httptypes.NewHTTPError(http.StatusBadRequest, "Role JSON contains both permissions and grant/revoke"))
+				writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "Role JSON contains both permissions and grant/revoke"))
 				return
 			}
 			out, err = sh.sec.UpdateRole(in)
 			if err != nil {
-				writeError(w, err)
+				writeError(w, r, err)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -253,10 +274,15 @@ func (sh *authHandler) forRole(w http.ResponseWriter, r *http.Request, role stri
 	case "DELETE":
 		err := sh.sec.DeleteRole(role)
 		if err != nil {
-			writeError(w, err)
+			writeError(w, r, err)
 			return
 		}
 	}
+}
+
+type userWithRoles struct {
+	User  string      `json:"user"`
+	Roles []auth.Role `json:"roles,omitempty"`
 }
 
 func (sh *authHandler) baseUsers(w http.ResponseWriter, r *http.Request) {
@@ -264,27 +290,57 @@ func (sh *authHandler) baseUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !hasRootAccess(sh.sec, r) {
-		writeNoAuth(w)
+		writeNoAuth(w, r)
 		return
 	}
 	w.Header().Set("X-Etcd-Cluster-ID", sh.cluster.ID().String())
 	w.Header().Set("Content-Type", "application/json")
-	var usersCollections struct {
-		Users []string `json:"users"`
-	}
+
 	users, err := sh.sec.AllUsers()
 	if err != nil {
-		writeError(w, err)
+		writeError(w, r, err)
 		return
 	}
 	if users == nil {
 		users = make([]string, 0)
 	}
 
-	usersCollections.Users = users
+	err = r.ParseForm()
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+
+	var usersCollections struct {
+		Users []userWithRoles `json:"users"`
+	}
+	for _, userName := range users {
+		var user auth.User
+		user, err = sh.sec.GetUser(userName)
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+
+		uwr := userWithRoles{User: user.User}
+		for _, roleName := range user.Roles {
+			var role auth.Role
+			role, err = sh.sec.GetRole(roleName)
+			if err != nil {
+				writeError(w, r, err)
+				return
+			}
+			uwr.Roles = append(uwr.Roles, role)
+		}
+
+		usersCollections.Users = append(usersCollections.Users, uwr)
+	}
 	err = json.NewEncoder(w).Encode(usersCollections)
+
 	if err != nil {
 		plog.Warningf("baseUsers error encoding on %s", r.URL)
+		writeError(w, r, err)
+		return
 	}
 }
 
@@ -298,7 +354,7 @@ func (sh *authHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(pieces) != 3 {
-		writeError(w, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid path"))
+		writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid path"))
 		return
 	}
 	sh.forUser(w, r, pieces[2])
@@ -309,7 +365,7 @@ func (sh *authHandler) forUser(w http.ResponseWriter, r *http.Request, user stri
 		return
 	}
 	if !hasRootAccess(sh.sec, r) {
-		writeNoAuth(w)
+		writeNoAuth(w, r)
 		return
 	}
 	w.Header().Set("X-Etcd-Cluster-ID", sh.cluster.ID().String())
@@ -319,12 +375,28 @@ func (sh *authHandler) forUser(w http.ResponseWriter, r *http.Request, user stri
 	case "GET":
 		u, err := sh.sec.GetUser(user)
 		if err != nil {
-			writeError(w, err)
+			writeError(w, r, err)
 			return
 		}
-		u.Password = ""
 
-		err = json.NewEncoder(w).Encode(u)
+		err = r.ParseForm()
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+
+		uwr := userWithRoles{User: u.User}
+		for _, roleName := range u.Roles {
+			var role auth.Role
+			role, err = sh.sec.GetRole(roleName)
+			if err != nil {
+				writeError(w, r, err)
+				return
+			}
+			uwr.Roles = append(uwr.Roles, role)
+		}
+		err = json.NewEncoder(w).Encode(uwr)
+
 		if err != nil {
 			plog.Warningf("forUser error encoding on %s", r.URL)
 			return
@@ -334,11 +406,11 @@ func (sh *authHandler) forUser(w http.ResponseWriter, r *http.Request, user stri
 		var u auth.User
 		err := json.NewDecoder(r.Body).Decode(&u)
 		if err != nil {
-			writeError(w, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid JSON in request body."))
+			writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid JSON in request body."))
 			return
 		}
 		if u.User != user {
-			writeError(w, httptypes.NewHTTPError(http.StatusBadRequest, "User JSON name does not match the name in the URL"))
+			writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "User JSON name does not match the name in the URL"))
 			return
 		}
 
@@ -358,18 +430,18 @@ func (sh *authHandler) forUser(w http.ResponseWriter, r *http.Request, user stri
 			}
 
 			if err != nil {
-				writeError(w, err)
+				writeError(w, r, err)
 				return
 			}
 		} else {
 			// update case
 			if len(u.Roles) != 0 {
-				writeError(w, httptypes.NewHTTPError(http.StatusBadRequest, "User JSON contains both roles and grant/revoke"))
+				writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "User JSON contains both roles and grant/revoke"))
 				return
 			}
 			out, err = sh.sec.UpdateUser(u)
 			if err != nil {
-				writeError(w, err)
+				writeError(w, r, err)
 				return
 			}
 		}
@@ -391,7 +463,7 @@ func (sh *authHandler) forUser(w http.ResponseWriter, r *http.Request, user stri
 	case "DELETE":
 		err := sh.sec.DeleteUser(user)
 		if err != nil {
-			writeError(w, err)
+			writeError(w, r, err)
 			return
 		}
 	}
@@ -406,7 +478,7 @@ func (sh *authHandler) enableDisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !hasWriteRootAccess(sh.sec, r) {
-		writeNoAuth(w)
+		writeNoAuth(w, r)
 		return
 	}
 	w.Header().Set("X-Etcd-Cluster-ID", sh.cluster.ID().String())
@@ -422,13 +494,13 @@ func (sh *authHandler) enableDisable(w http.ResponseWriter, r *http.Request) {
 	case "PUT":
 		err := sh.sec.EnableAuth()
 		if err != nil {
-			writeError(w, err)
+			writeError(w, r, err)
 			return
 		}
 	case "DELETE":
 		err := sh.sec.DisableAuth()
 		if err != nil {
-			writeError(w, err)
+			writeError(w, r, err)
 			return
 		}
 	}

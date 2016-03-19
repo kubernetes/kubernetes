@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// error package describes errors in etcd project.
-// When any change happens, Documentation/errorcode.md needs to be updated
-// correspondingly.
+// error package describes errors in etcd project. When any change happens,
+// Documentation/errorcode.md needs to be updated correspondingly.
 package error
 
 import (
@@ -49,6 +48,8 @@ var errors = map[int]string{
 	ecodeIndexValueMutex:      "Index and value cannot both be specified",
 	EcodeInvalidField:         "Invalid field",
 	EcodeInvalidForm:          "Invalid POST form",
+	EcodeRefreshValue:         "Value provided on refresh",
+	EcodeRefreshTTLRequired:   "A TTL must be provided on refresh",
 
 	// raft related errors
 	EcodeRaftInternal: "Raft Internal Error",
@@ -100,6 +101,8 @@ const (
 	ecodeIndexValueMutex      = 208
 	EcodeInvalidField         = 209
 	EcodeInvalidForm          = 210
+	EcodeRefreshValue         = 211
+	EcodeRefreshTTLRequired   = 212
 
 	EcodeRaftInternal = 300
 	EcodeLeaderElect  = 301
@@ -133,7 +136,7 @@ func NewError(errorCode int, cause string, index uint64) *Error {
 	}
 }
 
-// Only for error interface
+// Error is for the error interface
 func (e Error) Error() string {
 	return e.Message + " (" + e.Cause + ")"
 }
@@ -143,7 +146,7 @@ func (e Error) toJsonString() string {
 	return string(b)
 }
 
-func (e Error) statusCode() int {
+func (e Error) StatusCode() int {
 	status, ok := errorStatus[e.ErrorCode]
 	if !ok {
 		status = http.StatusBadRequest
@@ -154,6 +157,6 @@ func (e Error) statusCode() int {
 func (e Error) WriteTo(w http.ResponseWriter) {
 	w.Header().Add("X-Etcd-Index", fmt.Sprint(e.Index))
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(e.statusCode())
+	w.WriteHeader(e.StatusCode())
 	fmt.Fprintln(w, e.toJsonString())
 }

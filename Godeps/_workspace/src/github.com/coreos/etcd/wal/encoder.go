@@ -68,7 +68,7 @@ func (e *encoder) encode(rec *walpb.Record) error {
 		}
 		data = e.buf[:n]
 	}
-	if err := writeInt64(e.bw, int64(len(data)), e.uint64buf); err != nil {
+	if err = writeInt64(e.bw, int64(len(data)), e.uint64buf); err != nil {
 		return err
 	}
 	_, err = e.bw.Write(data)

@@ -27,7 +27,7 @@ var (
 
 type srvDiscover struct{}
 
-// NewSRVDiscover constructs a new Dicoverer that uses the stdlib to lookup SRV records.
+// NewSRVDiscover constructs a new Discoverer that uses the stdlib to lookup SRV records.
 func NewSRVDiscover() Discoverer {
 	return &srvDiscover{}
 }
@@ -50,8 +50,8 @@ func (d *srvDiscover) Discover(domain string) ([]string, error) {
 		return nil
 	}
 
-	errHTTPS := updateURLs("etcd-server-ssl", "https")
-	errHTTP := updateURLs("etcd-server", "http")
+	errHTTPS := updateURLs("etcd-client-ssl", "https")
+	errHTTP := updateURLs("etcd-client", "http")
 
 	if errHTTPS != nil && errHTTP != nil {
 		return nil, fmt.Errorf("dns lookup errors: %s and %s", errHTTPS, errHTTP)
