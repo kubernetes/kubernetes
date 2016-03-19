@@ -191,6 +191,7 @@ func NewMainKubelet(
 	cgroupRoot string,
 	containerRuntime string,
 	rktPath string,
+	rktAPIEndpoint string,
 	rktStage1Image string,
 	mounter mount.Interface,
 	writer kubeio.Writer,
@@ -416,6 +417,7 @@ func NewMainKubelet(
 			InsecureOptions: "image,ondisk",
 		}
 		rktRuntime, err := rkt.New(
+			rktAPIEndpoint,
 			conf,
 			klet,
 			recorder,

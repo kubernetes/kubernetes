@@ -339,6 +339,7 @@ resource-container
 resource-quota-sync-period
 resource-version
 retry_time
+rkt-api-endpoint
 rkt-path
 rkt-stage1-image
 root-ca-file

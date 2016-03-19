@@ -243,6 +243,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Reservation:                    *reservation,
 		KubeletCgroups:                 s.KubeletCgroups,
 		RktPath:                        s.RktPath,
+		RktAPIEndpoint:                 s.RktAPIEndpoint,
 		RktStage1Image:                 s.RktStage1Image,
 		RootDirectory:                  s.RootDirectory,
 		Runonce:                        s.RunOnce,
@@ -757,6 +758,7 @@ type KubeletConfig struct {
 	ResolverConfig                 string
 	KubeletCgroups                 string
 	RktPath                        string
+	RktAPIEndpoint                 string
 	RktStage1Image                 string
 	RootDirectory                  string
 	Runonce                        bool
@@ -839,6 +841,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
 		kc.RktPath,
+		kc.RktAPIEndpoint,
 		kc.RktStage1Image,
 		kc.Mounter,
 		kc.Writer,

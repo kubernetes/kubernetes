@@ -1109,7 +1109,6 @@ func TestGenerateRunCommand(t *testing.T) {
 	}
 
 	rkt := &Runtime{
-		rktBinAbsPath: "/bin/rkt/rkt",
 		config: &Config{
 			Path:            "/bin/rkt/rkt",
 			Stage1Image:     "/bin/rkt/stage1-coreos.aci",
