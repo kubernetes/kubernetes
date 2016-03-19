@@ -146,18 +146,6 @@ else
 fi
 echo "${reset}"
 
-echo -ne "Checking for deep-copies that need updating... "
-if ! hack/after-build/verify-generated-deep-copies.sh > /dev/null; then
-  echo "${red}ERROR!"
-  echo "Some deep-copy functions need regeneration."
-  echo "To regenerate deep-copies, run:"
-  echo "  hack/update-generated-deep-copies.sh"
-  exit_code=1
-else
-  echo "${green}OK"
-fi
-echo "${reset}"
-
 echo -ne "Checking for swagger type documentation that need updating... "
 if ! hack/after-build/verify-generated-swagger-docs.sh > /dev/null; then
   echo "${red}ERROR!"
