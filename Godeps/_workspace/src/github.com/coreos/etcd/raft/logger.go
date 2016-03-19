@@ -53,7 +53,7 @@ const (
 	calldepth = 2
 )
 
-// DefaultLogger is a defualt implementation of the Logger interface.
+// DefaultLogger is a default implementation of the Logger interface.
 type DefaultLogger struct {
 	*log.Logger
 	debug bool

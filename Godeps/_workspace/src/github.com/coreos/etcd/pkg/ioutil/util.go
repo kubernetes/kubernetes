@@ -19,7 +19,7 @@ import (
 	"os"
 )
 
-// WriteAndSyncFile behaviors just like ioutil.WriteFile in standard library
+// WriteAndSyncFile behaves just like ioutil.WriteFile in the standard library,
 // but calls Sync before closing the file. WriteAndSyncFile guarantees the data
 // is synced if there is no error returned.
 func WriteAndSyncFile(filename string, data []byte, perm os.FileMode) error {

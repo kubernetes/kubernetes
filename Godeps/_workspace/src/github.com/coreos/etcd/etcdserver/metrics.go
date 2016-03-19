@@ -23,11 +23,12 @@ import (
 
 var (
 	// TODO: with label in v3?
-	proposeDurations = prometheus.NewSummary(prometheus.SummaryOpts{
+	proposeDurations = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "etcd",
 		Subsystem: "server",
-		Name:      "proposal_durations_milliseconds",
+		Name:      "proposal_durations_seconds",
 		Help:      "The latency distributions of committing proposal.",
+		Buckets:   prometheus.ExponentialBuckets(0.001, 2, 14),
 	})
 	proposePending = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "etcd",

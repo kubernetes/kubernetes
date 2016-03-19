@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package snap stores raft nodes' states with snapshots.
 package snap
 
 import (
@@ -74,12 +75,12 @@ func (s *Snapshotter) save(snapshot *raftpb.Snapshot) error {
 	if err != nil {
 		return err
 	} else {
-		marshallingDurations.Observe(float64(time.Since(start).Nanoseconds() / int64(time.Microsecond)))
+		marshallingDurations.Observe(float64(time.Since(start)) / float64(time.Second))
 	}
 
 	err = ioutil.WriteFile(path.Join(s.dir, fname), d, 0666)
 	if err == nil {
-		saveDurations.Observe(float64(time.Since(start).Nanoseconds() / int64(time.Microsecond)))
+		saveDurations.Observe(float64(time.Since(start)) / float64(time.Second))
 	}
 	return err
 }
