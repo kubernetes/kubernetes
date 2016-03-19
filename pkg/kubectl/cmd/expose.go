@@ -62,7 +62,10 @@ kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
 kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
 
 # Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.
-kubectl expose rs nginx --port=80 --target-port=8000`
+kubectl expose rs nginx --port=80 --target-port=8000
+
+# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.
+kubectl expose deployment nginx --port=80 --target-port=8000`
 )
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
