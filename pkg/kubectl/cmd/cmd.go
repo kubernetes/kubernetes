@@ -18,6 +18,8 @@ package cmd
 
 import (
 	"io"
+	"sort"
+	"text/template"
 
 	"github.com/golang/glog"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
@@ -137,6 +139,32 @@ __custom_func() {
    * serviceaccounts
    * services (aka 'svc')
 `
+
+	usageTmpl = `Usage:{{if .Runnable}}
+  {{.UseLine}}{{if .HasFlags}} [flags]{{end}}{{end}}{{if .HasSubCommands}}
+  {{ .CommandPath}} [command]{{end}}{{if gt .Aliases 0}}
+
+Aliases:
+  {{.NameAndAliases}}
+{{end}}{{if .HasExample}}
+
+Examples:
+{{ .Example }}{{end}}{{ if .HasAvailableSubCommands}}
+
+Available Commands:{{range sort .Commands}}{{if .IsAvailableCommand}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{ if .HasLocalFlags}}
+
+Flags:
+{{.LocalFlags.FlagUsages | trimRightSpace}}{{end}}{{ if .HasInheritedFlags}}
+
+Global Flags:
+{{.InheritedFlags.FlagUsages | trimRightSpace}}{{end}}{{if .HasHelpSubCommands}}
+
+Additional help topics:{{range .Commands}}{{if .IsHelpCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{ if .HasSubCommands }}
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
 )
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
@@ -154,6 +182,13 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 
 	f.BindFlags(cmds.PersistentFlags())
 	f.BindExternalFlags(cmds.PersistentFlags())
+
+	tmplFuncs := template.FuncMap{
+		"sort": sortCommands,
+	}
+	cobra.AddTemplateFuncs(tmplFuncs)
+
+	cmds.SetUsageTemplate(usageTmpl)
 
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(util.WarnWordSepNormalizeFunc)
@@ -206,3 +241,19 @@ func runHelp(cmd *cobra.Command, args []string) {
 func printDeprecationWarning(command, alias string) {
 	glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
 }
+
+// commands returns a slice of child commands in an alphabetically sorted order.
+func sortCommands(commands []*cobra.Command) []*cobra.Command {
+	// Since the sorting utility sorts in-place, make a copy of the returned slice.
+	newCommands := make([]*cobra.Command, len(commands))
+	copy(newCommands, commands)
+	sort.Sort(ByName(newCommands))
+	return newCommands
+}
+
+// ByName implements sort.Interface for []*cobra.Command based on the command name field.
+type ByName []*cobra.Command
+
+func (c ByName) Len() int           { return len(c) }
+func (c ByName) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
+func (c ByName) Less(i, j int) bool { return c[i].Name() < c[j].Name() }
