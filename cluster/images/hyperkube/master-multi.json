@@ -1,7 +1,10 @@
 {
 "apiVersion": "v1",
 "kind": "Pod",
-"metadata": {"name":"k8s-master"},
+"metadata": {
+  "name": "k8s-master",
+  "namespace": "kube-system"
+},
 "spec":{
   "hostNetwork": true,
   "containers":[
