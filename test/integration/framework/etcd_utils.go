@@ -48,10 +48,6 @@ func NewEtcdClient() etcd.Client {
 	return client
 }
 
-func NewEtcdStorage() storage.Interface {
-	return etcdstorage.NewEtcdStorage(NewEtcdClient(), testapi.Default.Codec(), etcdtest.PathPrefix(), false)
-}
-
 func NewAutoscalingEtcdStorage(client etcd.Client) storage.Interface {
 	if client == nil {
 		client = NewEtcdClient()
