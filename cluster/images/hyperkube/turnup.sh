@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-K8S_VERSION=${K8S_VERSION:-"1.2.0-alpha.7"}
+K8S_VERSION=${K8S_VERSION:-"1.2.0"}
 
 docker run \
   --volume=/:/rootfs:ro \
@@ -41,3 +41,9 @@ docker run \
     --cluster-dns=10.0.0.10 \
     --cluster-domain=cluster.local \
     --allow-privileged=true --v=2
+
+until $(kubectl cluster-info &> /dev/null); do
+    sleep 1
+done
+
+kubectl create ns kube-system
