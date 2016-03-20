@@ -624,7 +624,7 @@ func (r *Request) tryThrottle() {
 		r.throttle.Accept()
 	}
 	if latency := time.Since(now); latency > longThrottleLatency {
-		glog.Warningf("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
+		glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
 }
 
