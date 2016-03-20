@@ -74,6 +74,9 @@ kubectl describe pods frontend`
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DescribeOptions{}
 
+	validArgs := kubectl.DescribableResources()
+	argAliases := kubectl.ResourceAliases(validArgs)
+
 	cmd := &cobra.Command{
 		Use:     "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		Short:   "Show details of a specific resource or group of resources",
@@ -83,7 +86,8 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunDescribe(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
-		ValidArgs: kubectl.DescribableResources(),
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	usage := "Filename, directory, or URL to a file containing the resource to describe"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
