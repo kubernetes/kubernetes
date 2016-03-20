@@ -176,11 +176,5 @@ func createConfig(s *options.SchedulerServer, configFactory *factory.ConfigFacto
 	}
 
 	// if the config file isn't provided, use the specified (or default) provider
-	// check of algorithm provider is registered and fail fast
-	_, err := factory.GetAlgorithmProvider(s.AlgorithmProvider)
-	if err != nil {
-		return nil, err
-	}
-
 	return configFactory.CreateFromProvider(s.AlgorithmProvider)
 }
