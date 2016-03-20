@@ -74,11 +74,12 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &GetOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
-	validArgs := []string{}
+	validArgs, argAliases := []string{}, []string{}
 	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
+		argAliases = kubectl.ResourceAliases(validArgs)
 	}
 
 	cmd := &cobra.Command{
@@ -90,7 +91,8 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunGet(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
-		ValidArgs: validArgs,
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
