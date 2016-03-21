@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	serviceCreateTimeout = 2 * time.Minute
+	retryTimeout = 4 * time.Minute
+	pollInterval = time.Second * 5
 )
 
 var _ = Describe("Container Conformance Test", func() {
@@ -97,7 +98,7 @@ var _ = Describe("Container Conformance Test", func() {
 		})
 		Context("when running a container that terminates", func() {
 			var terminateCase ConformanceContainer
-			It("it should start successfully [Conformance]", func() {
+			It("it should run successfully to completion [Conformance]", func() {
 				terminateCase = ConformanceContainer{
 					Container: api.Container{
 						Image:           "gcr.io/google_containers/busybox",
@@ -112,15 +113,11 @@ var _ = Describe("Container Conformance Test", func() {
 				err := terminateCase.Create()
 				Expect(err).NotTo(HaveOccurred())
 
-				phase := api.PodPending
-				for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(time.Second * 30) {
-					ccontainer, err := terminateCase.Get()
-					if err != nil || ccontainer.Phase != api.PodPending {
-						phase = ccontainer.Phase
-						break
-					}
-				}
-				Expect(phase).Should(Equal(terminateCase.Phase))
+				// TODO: Check that the container enters running state by sleeping in the container #23309
+				Eventually(func() (api.PodPhase, error) {
+					pod, err := terminateCase.Get()
+					return pod.Phase, err
+				}, retryTimeout, pollInterval).Should(Equal(terminateCase.Phase))
 			})
 			It("it should report its phase as 'succeeded' [Conformance]", func() {
 				ccontainer, err := terminateCase.Get()
@@ -148,16 +145,10 @@ var _ = Describe("Container Conformance Test", func() {
 				}
 				err := invalidImageCase.Create()
 				Expect(err).NotTo(HaveOccurred())
-
-				phase := api.PodPending
-				for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(time.Second * 30) {
-					ccontainer, err := invalidImageCase.Get()
-					if err != nil || ccontainer.Phase != api.PodPending {
-						phase = ccontainer.Phase
-						break
-					}
-				}
-				Expect(phase).Should(Equal(invalidImageCase.Phase))
+				Eventually(func() (api.PodPhase, error) {
+					pod, err := invalidImageCase.Get()
+					return pod.Phase, err
+				}, retryTimeout, pollInterval).Should(Equal(invalidImageCase.Phase))
 			})
 			It("it should report its phase as 'pending' [Conformance]", func() {
 				ccontainer, err := invalidImageCase.Get()
