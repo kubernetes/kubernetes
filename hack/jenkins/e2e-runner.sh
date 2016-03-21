@@ -143,19 +143,19 @@ function get_latest_trusty_image() {
     rm -rf .gsutil &> /dev/null
 }
 
-echo "--------------------------------------------------------------------------------"
-echo "Test Environment:"
-printenv | sort
-echo "--------------------------------------------------------------------------------"
-
 # We get the image project and name for Trusty dynamically.
 if [[ "${JENKINS_USE_TRUSTY_IMAGES:-}" =~ ^[yY]$ ]]; then
   trusty_image_project="$(get_trusty_image_project)"
-  trusty_image="$(get_latest_trusty_image "${trusty_image_project}" "head")"
+  trusty_image="$(get_latest_trusty_image "${trusty_image_project}" "dev")"
   export KUBE_GCE_MASTER_PROJECT="${trusty_image_project}"
   export KUBE_GCE_MASTER_IMAGE="${trusty_image}"
   export KUBE_OS_DISTRIBUTION="trusty"
 fi
+
+echo "--------------------------------------------------------------------------------"
+echo "Test Environment:"
+printenv | sort
+echo "--------------------------------------------------------------------------------"
 
 # We get the Kubernetes tarballs unless we are going to use old ones
 if [[ "${JENKINS_USE_EXISTING_BINARIES:-}" =~ ^[yY]$ ]]; then
