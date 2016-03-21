@@ -34,8 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilcache "k8s.io/kubernetes/pkg/util/cache"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/watch"
 
 	etcd "github.com/coreos/etcd/client"
