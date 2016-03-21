@@ -224,7 +224,7 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 	server := configureTestCluster(t, "foo")
 	err := server.launch(t)
 	if err != nil {
-		t.Fatal("Failed to start etcd server error=%v", err)
+		t.Fatalf("Failed to start etcd server error=%v", err)
 		return nil
 	}
 	cfg := etcd.Config{
