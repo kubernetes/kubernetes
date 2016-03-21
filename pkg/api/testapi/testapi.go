@@ -235,6 +235,16 @@ func (g TestGroup) RESTMapper() meta.RESTMapper {
 	return registered.RESTMapper()
 }
 
+// ExternalGroupVersions returns all external group versions allowed for the server.
+func ExternalGroupVersions() []unversioned.GroupVersion {
+	versions := []unversioned.GroupVersion{}
+	for _, g := range Groups {
+		gv := g.GroupVersion()
+		versions = append(versions, *gv)
+	}
+	return versions
+}
+
 // Get codec based on runtime.Object
 func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	kind, err := api.Scheme.ObjectKind(obj)

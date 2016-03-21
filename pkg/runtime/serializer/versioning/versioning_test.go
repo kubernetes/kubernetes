@@ -169,7 +169,7 @@ func TestDecode(t *testing.T) {
 
 	for i, test := range testCases {
 		t.Logf("%d", i)
-		s := NewCodec(test.serializer, test.convertor, test.creater, test.copier, test.typer, test.encodes, test.decodes)
+		s := NewCodec(test.serializer, test.serializer, test.convertor, test.creater, test.copier, test.typer, test.encodes, test.decodes)
 		obj, gvk, err := s.Decode([]byte(`{}`), test.defaultGVK, test.into)
 
 		if !reflect.DeepEqual(test.expectedGVK, gvk) {

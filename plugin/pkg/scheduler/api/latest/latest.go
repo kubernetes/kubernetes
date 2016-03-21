@@ -39,9 +39,15 @@ var Versions = []string{"v1"}
 
 // Codec is the default codec for serializing input that should use
 // the latest supported version. It supports JSON by default.
-var Codec = versioning.NewCodecForScheme(
-	api.Scheme,
-	json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), true),
-	[]unversioned.GroupVersion{{Version: Version}},
-	[]unversioned.GroupVersion{{Version: runtime.APIVersionInternal}},
-)
+var Codec runtime.Codec
+
+func init() {
+	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), true)
+	Codec = versioning.NewCodecForScheme(
+		api.Scheme,
+		jsonSerializer,
+		jsonSerializer,
+		[]unversioned.GroupVersion{{Version: Version}},
+		[]unversioned.GroupVersion{{Version: runtime.APIVersionInternal}},
+	)
+}
