@@ -221,7 +221,7 @@ func etcdGetInitialWatchState(ctx context.Context, client etcd.KeysAPI, key stri
 	if err != nil {
 		if !etcdutil.IsEtcdNotFound(err) {
 			utilruntime.HandleError(fmt.Errorf("watch was unable to retrieve the current index for the provided key (%q): %v", key, err))
-			return resourceVersion, err
+			return resourceVersion, toStorageErr(err, key, 0)
 		}
 		if etcdError, ok := err.(etcd.Error); ok {
 			resourceVersion = etcdError.Index
