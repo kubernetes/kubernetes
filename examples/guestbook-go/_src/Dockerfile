@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:latest
+FROM golang:1.6.0
 
 ADD . /go/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/_src
 
