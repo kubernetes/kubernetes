@@ -150,6 +150,8 @@ func (f *fakeSystemd) Reload() error {
 type fakeRuntimeHelper struct {
 	dnsServers  []string
 	dnsSearches []string
+	hostName    string
+	hostDomain  string
 	err         error
 }
 
@@ -159,4 +161,8 @@ func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *api.Pod, container 
 
 func (f *fakeRuntimeHelper) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	return f.dnsServers, f.dnsSearches, f.err
+}
+
+func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
+	return f.hostName, f.hostDomain
 }

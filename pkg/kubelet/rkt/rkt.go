@@ -760,6 +760,10 @@ func (r *Runtime) generateRunCommand(pod *api.Pod, uuid string) (string, error) 
 	if len(dnsServers) > 0 || len(dnsSearches) > 0 {
 		runPrepared = append(runPrepared, fmt.Sprintf("--dns-opt=%s", defaultDNSOption))
 	}
+
+	// TODO(yifan): host domain is not being used.
+	hostname, _ := r.runtimeHelper.GeneratePodHostNameAndDomain(pod)
+	runPrepared = append(runPrepared, fmt.Sprintf("--hostname=%s", hostname))
 	runPrepared = append(runPrepared, uuid)
 	return strings.Join(runPrepared, " "), nil
 }

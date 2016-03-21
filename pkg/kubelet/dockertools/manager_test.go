@@ -84,6 +84,11 @@ func (f *fakeRuntimeHelper) GetClusterDNS(pod *api.Pod) ([]string, []string, err
 	return nil, nil, fmt.Errorf("not implemented")
 }
 
+// This is not used by docker runtime.
+func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
+	return "", ""
+}
+
 func newTestDockerManagerWithHTTPClientWithVersion(fakeHTTPClient *fakeHTTP, version, apiVersion string) (*DockerManager, *FakeDockerClient) {
 	fakeDocker := NewFakeDockerClientWithVersion(version, apiVersion)
 	fakeRecorder := &record.FakeRecorder{}
