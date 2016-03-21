@@ -173,7 +173,7 @@ func GetTestScheme() (*runtime.Scheme, runtime.Codec) {
 
 	s.AddUnversionedTypes(externalGV, &unversioned.Status{})
 
-	cf := newCodecFactory(s, testMetaFactory{})
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
 	codec := cf.LegacyCodec(unversioned.GroupVersion{Version: "v1"})
 	return s, codec
 }
@@ -263,7 +263,7 @@ func TestVersionedEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cf := newCodecFactory(s, testMetaFactory{})
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
 	encoder, _ := cf.SerializerForFileExtension("json")
 
 	// codec that is unversioned uses the target version
@@ -326,7 +326,7 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	}
 	expect := &TestType1{A: "test"}
 
-	codec := newCodecFactory(s, testMetaFactory{}).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
+	codec := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{})).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
 
 	obj, err := runtime.Decode(codec, data)
 	if err != nil {
