@@ -259,7 +259,17 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
-	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	meta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return nil, false, kubeerr.NewInternalError(err)
+	}
+	var preconditions *storage.Preconditions
+	// If the UID of the new object is specified, we use it as an Update precondition.
+	if len(meta.UID) != 0 {
+		UIDCopy := meta.UID
+		preconditions = &storage.Preconditions{UID: &UIDCopy}
+	}
+	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, preconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		// Since we return 'obj' from this function and it can be modified outside this
 		// function, we are resetting resourceVersion to the initial value here.
 		//
@@ -395,6 +405,10 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	if options == nil {
 		options = api.NewDeleteOptions(0)
 	}
+	var preconditions storage.Preconditions
+	if options.Preconditions != nil {
+		preconditions.UID = options.Preconditions.UID
+	}
 	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
 	if err != nil {
 		return nil, err
@@ -408,7 +422,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		out := e.NewFunc()
 		lastGraceful := int64(0)
 		err := e.Storage.GuaranteedUpdate(
-			ctx, key, out, false,
+			ctx, key, out, false, &preconditions,
 			storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
 				graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
 				if err != nil {
@@ -451,7 +465,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
-	if err := e.Storage.Delete(ctx, key, out); err != nil {
+	if err := e.Storage.Delete(ctx, key, out, &preconditions); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
 		// why we ignore the NotFound error .
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {

@@ -55,7 +55,7 @@ func TestErrorsToAPIStatus(t *testing.T) {
 			Status:  unversioned.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "Conflict",
-			Message: "foos \"bar\" cannot be updated: failure",
+			Message: "Operation cannot be fulfilled on foos \"bar\": failure",
 			Details: &unversioned.StatusDetails{
 				Group: "",
 				Kind:  "foos",

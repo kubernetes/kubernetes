@@ -21,6 +21,7 @@ import (
 
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -69,6 +70,18 @@ func Everything(runtime.Object) bool {
 // See the comment for GuaranteedUpdate for more details.
 type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
 
+// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+type Preconditions struct {
+	// Specifies the target UID.
+	UID *types.UID `json:"uid,omitempty"`
+}
+
+// NewUIDPreconditions returns a Preconditions with UID set.
+func NewUIDPreconditions(uid string) *Preconditions {
+	u := types.UID(uid)
+	return &Preconditions{UID: &u}
+}
+
 // Interface offers a common interface for object marshaling/unmarshling operations and
 // hides all the storage-related operations behind it.
 type Interface interface {
@@ -91,7 +104,7 @@ type Interface interface {
 	Set(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error
 
 	// Delete removes the specified key and returns the value that existed at that spot.
-	Delete(ctx context.Context, key string, out runtime.Object) error
+	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items passing 'filter' are sent down to returned watch.Interface.
@@ -146,7 +159,7 @@ type Interface interface {
 	//       return cur, nil, nil
 	//    }
 	// })
-	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate UpdateFunc) error
+	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, precondtions *Preconditions, tryUpdate UpdateFunc) error
 
 	// Codec provides access to the underlying codec being used by the implementation.
 	Codec() runtime.Codec

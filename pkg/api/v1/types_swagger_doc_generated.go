@@ -296,6 +296,7 @@ func (DaemonEndpoint) SwaggerDoc() map[string]string {
 var map_DeleteOptions = map[string]string{
 	"":                   "DeleteOptions may be provided when deleting an API object",
 	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+	"preconditions":      "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
 }
 
 func (DeleteOptions) SwaggerDoc() map[string]string {
@@ -1235,6 +1236,15 @@ var map_PodTemplateSpec = map[string]string{
 
 func (PodTemplateSpec) SwaggerDoc() map[string]string {
 	return map_PodTemplateSpec
+}
+
+var map_Preconditions = map[string]string{
+	"":    "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
+	"uid": "Specifies the target UID.",
+}
+
+func (Preconditions) SwaggerDoc() map[string]string {
+	return map_Preconditions
 }
 
 var map_PreferredSchedulingTerm = map[string]string{

@@ -70,6 +70,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 		// Used to validate autoscaler updates
 		UpdateStrategy: horizontalpodautoscaler.Strategy,
+		DeleteStrategy: horizontalpodautoscaler.Strategy,
 
 		Storage: storageInterface,
 	}

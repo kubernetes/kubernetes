@@ -59,6 +59,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 		CreateStrategy: podtemplate.Strategy,
 		UpdateStrategy: podtemplate.Strategy,
+		DeleteStrategy: podtemplate.Strategy,
 		ExportStrategy: podtemplate.Strategy,
 
 		ReturnDeletedObject: true,

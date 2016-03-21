@@ -72,6 +72,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 		// Used to validate job updates
 		UpdateStrategy: job.Strategy,
+		DeleteStrategy: job.Strategy,
 
 		Storage: storageInterface,
 	}

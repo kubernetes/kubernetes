@@ -286,7 +286,7 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 		}
 	}
 	if len(errors) > 0 {
-		return fmt.Errorf("errors in package %q:\n%v\n", p.Name(), strings.Join(errs2strings(errors), "\n"))
+		return fmt.Errorf("errors in package %q:\n%v\n", p.Path(), strings.Join(errs2strings(errors), "\n"))
 	}
 	return nil
 }
