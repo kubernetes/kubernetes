@@ -96,6 +96,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 		// Used to validate ReplicaSet updates
 		UpdateStrategy: replicaset.Strategy,
+		DeleteStrategy: replicaset.Strategy,
 
 		Storage: storageInterface,
 	}

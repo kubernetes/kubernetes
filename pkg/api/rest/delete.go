@@ -17,9 +17,11 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -28,7 +30,11 @@ import (
 // API conventions.
 type RESTDeleteStrategy interface {
 	runtime.ObjectTyper
+}
 
+// RESTGracefulDeleteStrategy must be implemented by the registry that supports
+// graceful deletion.
+type RESTGracefulDeleteStrategy interface {
 	// CheckGracefulDelete should return true if the object can be gracefully deleted and set
 	// any default values on the DeleteOptions.
 	CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool
@@ -40,14 +46,18 @@ type RESTDeleteStrategy interface {
 // condition cannot be checked or the gracePeriodSeconds is invalid. The options argument may be updated with
 // default values if graceful is true.
 func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Object, options *api.DeleteOptions) (graceful, gracefulPending bool, err error) {
-	if strategy == nil {
-		return false, false, nil
-	}
-	objectMeta, _, kerr := objectMetaAndKind(strategy, obj)
+	objectMeta, gvk, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return false, false, kerr
 	}
-
+	// Checking the Preconditions here to fail early. They'll be enforced later on when we actually do the deletion, too.
+	if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != objectMeta.UID {
+		return false, false, errors.NewConflict(unversioned.GroupResource{gvk.Group, gvk.Kind}, objectMeta.Name, fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *options.Preconditions.UID, objectMeta.UID))
+	}
+	gracefulStrategy, ok := strategy.(RESTGracefulDeleteStrategy)
+	if !ok {
+		return false, false, nil
+	}
 	// if the object is already being deleted
 	if objectMeta.DeletionTimestamp != nil {
 		// if we are already being deleted, we may only shorten the deletion grace period
@@ -73,7 +83,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 		return false, true, nil
 	}
 
-	if !strategy.CheckGracefulDelete(obj, options) {
+	if !gracefulStrategy.CheckGracefulDelete(obj, options) {
 		return false, false, nil
 	}
 	now := unversioned.NewTime(unversioned.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))

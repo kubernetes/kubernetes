@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/davecgh/go-spew/spew"
@@ -202,6 +203,19 @@ func IsIntegerResourceName(str string) bool {
 // use &api.DeleteOptions{} directly.
 func NewDeleteOptions(grace int64) *DeleteOptions {
 	return &DeleteOptions{GracePeriodSeconds: &grace}
+}
+
+// NewPreconditionDeleteOptions returns a DeleteOptions with a UID precondition set.
+func NewPreconditionDeleteOptions(uid string) *DeleteOptions {
+	u := types.UID(uid)
+	p := Preconditions{UID: &u}
+	return &DeleteOptions{Preconditions: &p}
+}
+
+// NewUIDPreconditions returns a Preconditions with UID set.
+func NewUIDPreconditions(uid string) *Preconditions {
+	u := types.UID(uid)
+	return &Preconditions{UID: &u}
 }
 
 // this function aims to check if the service's ClusterIP is set or not

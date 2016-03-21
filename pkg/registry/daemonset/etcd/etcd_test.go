@@ -110,11 +110,6 @@ func TestUpdate(t *testing.T) {
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.DaemonSet)
-			object.UID = "newUID"
-			return object
-		},
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.DaemonSet)
 			object.Name = ""
 			return object
 		},

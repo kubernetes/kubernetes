@@ -26,6 +26,7 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	types "k8s.io/kubernetes/pkg/types"
 )
 
 func autoConvert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource(in *api.AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
@@ -566,6 +567,15 @@ func autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, ou
 		*out.GracePeriodSeconds = *in.GracePeriodSeconds
 	} else {
 		out.GracePeriodSeconds = nil
+	}
+	// unable to generate simple pointer conversion for api.Preconditions -> v1.Preconditions
+	if in.Preconditions != nil {
+		out.Preconditions = new(Preconditions)
+		if err := Convert_api_Preconditions_To_v1_Preconditions(in.Preconditions, out.Preconditions, s); err != nil {
+			return err
+		}
+	} else {
+		out.Preconditions = nil
 	}
 	return nil
 }
@@ -2451,6 +2461,23 @@ func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, 
 	return autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in, out, s)
 }
 
+func autoConvert_api_Preconditions_To_v1_Preconditions(in *api.Preconditions, out *Preconditions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.Preconditions))(in)
+	}
+	if in.UID != nil {
+		out.UID = new(types.UID)
+		*out.UID = *in.UID
+	} else {
+		out.UID = nil
+	}
+	return nil
+}
+
+func Convert_api_Preconditions_To_v1_Preconditions(in *api.Preconditions, out *Preconditions, s conversion.Scope) error {
+	return autoConvert_api_Preconditions_To_v1_Preconditions(in, out, s)
+}
+
 func autoConvert_api_Probe_To_v1_Probe(in *api.Probe, out *Probe, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Probe))(in)
@@ -3871,6 +3898,15 @@ func autoConvert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *a
 		*out.GracePeriodSeconds = *in.GracePeriodSeconds
 	} else {
 		out.GracePeriodSeconds = nil
+	}
+	// unable to generate simple pointer conversion for v1.Preconditions -> api.Preconditions
+	if in.Preconditions != nil {
+		out.Preconditions = new(api.Preconditions)
+		if err := Convert_v1_Preconditions_To_api_Preconditions(in.Preconditions, out.Preconditions, s); err != nil {
+			return err
+		}
+	} else {
+		out.Preconditions = nil
 	}
 	return nil
 }
@@ -5692,6 +5728,23 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 	return autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s)
 }
 
+func autoConvert_v1_Preconditions_To_api_Preconditions(in *Preconditions, out *api.Preconditions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Preconditions))(in)
+	}
+	if in.UID != nil {
+		out.UID = new(types.UID)
+		*out.UID = *in.UID
+	} else {
+		out.UID = nil
+	}
+	return nil
+}
+
+func Convert_v1_Preconditions_To_api_Preconditions(in *Preconditions, out *api.Preconditions, s conversion.Scope) error {
+	return autoConvert_v1_Preconditions_To_api_Preconditions(in, out, s)
+}
+
 func autoConvert_v1_Probe_To_api_Probe(in *Probe, out *api.Probe, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Probe))(in)
@@ -6616,6 +6669,7 @@ func init() {
 		autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec,
 		autoConvert_api_PodTemplate_To_v1_PodTemplate,
 		autoConvert_api_Pod_To_v1_Pod,
+		autoConvert_api_Preconditions_To_v1_Preconditions,
 		autoConvert_api_Probe_To_v1_Probe,
 		autoConvert_api_RBDVolumeSource_To_v1_RBDVolumeSource,
 		autoConvert_api_RangeAllocation_To_v1_RangeAllocation,
@@ -6748,6 +6802,7 @@ func init() {
 		autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec,
 		autoConvert_v1_PodTemplate_To_api_PodTemplate,
 		autoConvert_v1_Pod_To_api_Pod,
+		autoConvert_v1_Preconditions_To_api_Preconditions,
 		autoConvert_v1_Probe_To_api_Probe,
 		autoConvert_v1_RBDVolumeSource_To_api_RBDVolumeSource,
 		autoConvert_v1_RangeAllocation_To_api_RangeAllocation,

@@ -59,6 +59,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 		CreateStrategy:      serviceaccount.Strategy,
 		UpdateStrategy:      serviceaccount.Strategy,
+		DeleteStrategy:      serviceaccount.Strategy,
 		ReturnDeletedObject: true,
 
 		Storage: storageInterface,

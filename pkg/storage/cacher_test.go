@@ -107,7 +107,7 @@ func TestList(t *testing.T) {
 	_ = updatePod(t, etcdStorage, podFooPrime, fooCreated)
 
 	deleted := api.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/bar"), &deleted); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/bar"), &deleted, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -315,7 +315,7 @@ func TestFiltering(t *testing.T) {
 	_ = updatePod(t, etcdStorage, podFooPrime, fooUnfiltered)
 
 	deleted := api.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/foo"), &deleted); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/foo"), &deleted, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 

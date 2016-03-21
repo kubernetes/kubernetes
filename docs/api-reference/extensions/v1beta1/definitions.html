@@ -597,6 +597,40 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="_v1_preconditions">v1.Preconditions</h3>
+<div class="paragraph">
+<p>Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the target UID.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_types_uid">types.UID</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_objectfieldselector">v1.ObjectFieldSelector</h3>
 <div class="paragraph">
 <p>ObjectFieldSelector selects an APIVersioned field of an object.</p>
@@ -830,6 +864,61 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="_v1beta1_replicasetlist">v1beta1.ReplicaSetList</h3>
+<div class="paragraph">
+<p>ReplicaSetList is a collection of ReplicaSets.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">apiVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_listmeta">unversioned.ListMeta</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of ReplicaSets. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md">http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_replicaset">v1beta1.ReplicaSet</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_cephfsvolumesource">v1.CephFSVolumeSource</h3>
 <div class="paragraph">
 <p>Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.</p>
@@ -893,61 +982,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
-<h3 id="_v1beta1_replicasetlist">v1beta1.ReplicaSetList</h3>
-<div class="paragraph">
-<p>ReplicaSetList is a collection of ReplicaSets.</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">apiVersion</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_listmeta">unversioned.ListMeta</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">List of ReplicaSets. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md">http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_replicaset">v1beta1.ReplicaSet</a> array</p></td>
-<td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
 </table>
@@ -1801,6 +1835,10 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 
 </div>
 <div class="sect2">
+<h3 id="_types_uid">types.UID</h3>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_iscsivolumesource">v1.ISCSIVolumeSource</h3>
 <div class="paragraph">
 <p>Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.</p>
@@ -2579,8 +2617,15 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">gracePeriodSeconds</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">preconditions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_preconditions">v1.Preconditions</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -4845,40 +4890,6 @@ Both these may change in the future. Incoming requests are matched against the h
 
 </div>
 <div class="sect2">
-<h3 id="_v1_hostpathvolumesource">v1.HostPathVolumeSource</h3>
-<div class="paragraph">
-<p>Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Path of the directory on the host. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
 <h3 id="_v1beta1_replicaset">v1beta1.ReplicaSet</h3>
 <div class="paragraph">
 <p>ReplicaSet represents the configuration of a ReplicaSet.</p>
@@ -4934,6 +4945,40 @@ Both these may change in the future. Incoming requests are matched against the h
 <td class="tableblock halign-left valign-top"><p class="tableblock">Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_replicasetstatus">v1beta1.ReplicaSetStatus</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_hostpathvolumesource">v1.HostPathVolumeSource</h3>
+<div class="paragraph">
+<p>Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Path of the directory on the host. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath">http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -5865,7 +5910,7 @@ Both these may change in the future. Incoming requests are matched against the h
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-03-22 18:43:10 UTC
+Last updated 2016-03-25 18:19:00 UTC
 </div>
 </div>
 </body>

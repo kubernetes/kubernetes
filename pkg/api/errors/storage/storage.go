@@ -71,6 +71,8 @@ func InterpretUpdateError(err error, qualifiedResource unversioned.GroupResource
 		return errors.NewServerTimeout(qualifiedResource, "update", 2) // TODO: make configurable or handled at a higher level
 	case storage.IsNotFound(err):
 		return errors.NewNotFound(qualifiedResource, name)
+	case storage.IsInternalError(err):
+		return errors.NewInternalError(err)
 	default:
 		return err
 	}
@@ -84,6 +86,22 @@ func InterpretDeleteError(err error, qualifiedResource unversioned.GroupResource
 		return errors.NewNotFound(qualifiedResource, name)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "delete", 2) // TODO: make configurable or handled at a higher level
+	case storage.IsTestFailed(err), storage.IsNodeExist(err):
+		return errors.NewConflict(qualifiedResource, name, err)
+	case storage.IsInternalError(err):
+		return errors.NewInternalError(err)
+	default:
+		return err
+	}
+}
+
+// InterpretWatchError converts a generic error on a watch
+// operation into the appropriate API error.
+func InterpretWatchError(err error, resource unversioned.GroupResource, name string) error {
+	switch {
+	case storage.IsInvalidError(err):
+		invalidError, _ := err.(storage.InvalidError)
+		return errors.NewInvalid(unversioned.GroupKind{resource.Group, resource.Resource}, name, invalidError.Errs)
 	default:
 		return err
 	}
