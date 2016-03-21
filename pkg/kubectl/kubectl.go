@@ -116,6 +116,7 @@ var shortForms = map[string]string{
 	// and add an entry to valid_resources when appropriate.
 	"cs":     "componentstatuses",
 	"ds":     "daemonsets",
+	"dep":    "deployments",
 	"ep":     "endpoints",
 	"ev":     "events",
 	"hpa":    "horizontalpodautoscalers",
