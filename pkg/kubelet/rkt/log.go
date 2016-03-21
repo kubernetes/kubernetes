@@ -23,6 +23,7 @@ import (
 	"io"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -100,7 +101,8 @@ func pipeLog(wg *sync.WaitGroup, logOptions *api.PodLogOptions, r io.ReadCloser,
 // stream the log. Set |follow| to false and specify the number of lines (e.g.
 // "100" or "all") to tail the log.
 //
-// In rkt runtime's implementation, per container log is get via 'journalctl -m _HOSTNAME=[rkt-$UUID] -u [APP_NAME]'.
+// In rkt runtime's implementation, per container log is get via 'journalctl -m _MACHINE_ID=[MACHINE_ID] -u [APP_NAME]'.
+// Where MACHINE_ID is the rkt id without dash.
 // See https://github.com/coreos/rkt/blob/master/Documentation/commands.md#logging for more details.
 //
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
@@ -110,8 +112,7 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 		return err
 	}
 
-	cmd := exec.Command("journalctl", "-m", fmt.Sprintf("_HOSTNAME=rkt-%s", id.uuid), "-u", id.appName, "-a")
-
+	cmd := exec.Command("journalctl", "-m", fmt.Sprintf("_MACHINE_ID=%s", strings.Replace(id.uuid, "-", "", -1)), "-u", id.appName, "-a")
 	// Get the json structured logs.
 	cmd.Args = append(cmd.Args, "-o", "json")
 
