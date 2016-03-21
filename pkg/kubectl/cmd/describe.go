@@ -49,11 +49,7 @@ $ kubectl describe TYPE NAME_PREFIX
 will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
 exists, it will output details for every resource that has a name prefixed with NAME_PREFIX
 
-Possible resource types include (case insensitive): pods (po), services (svc),
-replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
-persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota),
-namespaces (ns), serviceaccounts, horizontalpodautoscalers (hpa),
-endpoints (ep) or secrets.`
+` + kubectl.PossibleResourceTypes
 	describe_example = `# Describe a node
 kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 

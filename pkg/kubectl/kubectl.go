@@ -28,7 +28,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
+const (
+	kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
+	// TODO: auto-generate this
+	PossibleResourceTypes = `Possible resource types include (case insensitive): pods (po), services (svc), deployments,
+replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
+persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
+serviceaccounts, ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
+componentstatuses (cs), endpoints (ep), and secrets.`
+)
 
 type NamespaceInfo struct {
 	Namespace string
