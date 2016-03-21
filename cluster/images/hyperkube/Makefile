@@ -37,9 +37,10 @@ endif
 	cp ../../saltbase/salt/helpers/safe_format_and_mount ${TEMP_DIR}
 	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
-	cd ${TEMP_DIR} && sed -i "s/VERSION/${VERSION}/g" master-multi.json master.json kube-proxy.json
-	cd ${TEMP_DIR} && sed -i "s/ARCH/${ARCH}/g" master-multi.json master.json kube-proxy.json
-	cd ${TEMP_DIR} && sed -i "s/BASEIMAGE/${BASEIMAGE}/g" Dockerfile
+	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" master-multi.json master.json kube-proxy.json
+	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" master-multi.json master.json kube-proxy.json
+	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+	rm ${TEMP_DIR}/*.back
 	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 	# Backward compatibility.  TODO: deprecate this image tag
 ifeq ($(ARCH),amd64)
