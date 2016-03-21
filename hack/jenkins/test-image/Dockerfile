@@ -15,7 +15,7 @@
 # This file creates a build environment for building and running kubernetes
 # unit and integration tests
 
-FROM golang:1.5.3
+FROM golang:1.6
 MAINTAINER  Jeff Lowdermilk <jeffml@google.com>
 
 ENV WORKSPACE               /workspace
