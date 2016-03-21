@@ -23768,6 +23768,12 @@ the --go_out argument to protoc:
 
 	protoc --go_out=plugins=grpc:. *.proto
 
+## Plugins ##
+
+The `protoc-gen-go/generator` package exposes a plugin interface,
+which is used by the gRPC code generation. This interface is not
+supported and is subject to incompatible changes without notice.
+
 ================================================================================
 = Godeps/_workspace/src/github.com/google/btree licensed under: =
 
