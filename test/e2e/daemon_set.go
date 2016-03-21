@@ -73,7 +73,7 @@ var _ = KubeDescribe("Daemon set [Serial]", func() {
 
 	f = NewDefaultFramework("daemonsets")
 
-	image := "gcr.io/google_containers/serve_hostname:1.1"
+	image := "gcr.io/google_containers/serve_hostname:v1.4"
 	dsName := "daemon-set"
 
 	var ns string
