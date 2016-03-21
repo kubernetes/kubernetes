@@ -57,7 +57,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:1.1
+      - image: pwittrock/serve_hostname:rc1_4
         name: addon-test
         ports:
         - containerPort: 9376
@@ -87,7 +87,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:1.1
+      - image: pwittrock/serve_hostname:rc1_4
         name: addon-test
         ports:
         - containerPort: 9376
@@ -155,7 +155,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:1.1
+      - image: pwittrock/serve_hostname:rc1_4
         name: invalid-addon-test
         ports:
         - containerPort: 9376

@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	serveHostnameImage        = "gcr.io/google_containers/serve_hostname:1.1"
+	serveHostnameImage        = "pwittrock/serve_hostname:rc1_4"
 	resizeNodeReadyTimeout    = 2 * time.Minute
 	resizeNodeNotReadyTimeout = 2 * time.Minute
 	nodeReadinessTimeout      = 3 * time.Minute
