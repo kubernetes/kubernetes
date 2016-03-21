@@ -17,9 +17,18 @@ limitations under the License.
 package limitranger
 
 import (
+	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// LimitFunc is a pluggable function to enforce limits on the object
-type LimitFunc func(limitRange *api.LimitRange, kind string, obj runtime.Object) error
+type LimitRangerActions interface {
+	// Limit is a pluggable function to enforce limits on the object.
+	Limit(limitRange *api.LimitRange, kind string, obj runtime.Object) error
+	// SupportsAttributes is a pluggable function to allow overridding what resources the limitranger
+	// supports.
+	SupportsAttributes(attr admission.Attributes) bool
+	// SupportsLimit is a pluggable function to allow ignoring limits that should not be applied
+	// for any reason.
+	SupportsLimit(limitRange *api.LimitRange) bool
+}
