@@ -289,7 +289,7 @@ elif [[ ${JOB_NAME} =~ ^kubernetes-.*-gke ]]; then
   : ${E2E_ZONE:="us-central1-f"}
   # By default, GKE tests run against the GKE test endpoint using CI Cloud SDK.
   # Release jobs (e.g. prod, staging, and test) override these two variables.
-  : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
+  : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-testing/ci/staging"}
   : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
 elif [[ ${JOB_NAME} =~ ^kubernetes-.*-aws ]]; then
   KUBERNETES_PROVIDER="aws"
@@ -783,7 +783,7 @@ case ${JOB_NAME} in
 
   kubernetes-e2e-gke-staging)
     # Override GKE default to use rc Cloud SDK and staging endpoint
-    CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+    CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
     GKE_API_ENDPOINT="https://staging-container.sandbox.googleapis.com/"
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-staging"}
     : ${E2E_NETWORK:="e2e-gke-staging"}
@@ -800,7 +800,7 @@ case ${JOB_NAME} in
 
   kubernetes-e2e-gke-test)
     # Override GKE default to use rc Cloud SDK
-    CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+    CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-test"}
     : ${E2E_NETWORK:="e2e-gke-test"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
@@ -850,7 +850,7 @@ case ${JOB_NAME} in
 
   kubernetes-e2e-gke-trusty-staging)
     # Override GKE default to use rc Cloud SDK and staging endpoint
-    CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+    CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
     GKE_API_ENDPOINT="https://staging-container.sandbox.googleapis.com/"
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-staging-trusty"}
     : ${E2E_NETWORK:="e2e-gke-trusty-staging"}
@@ -868,7 +868,7 @@ case ${JOB_NAME} in
 
   kubernetes-e2e-gke-trusty-test)
     # Override GKE default to use rc Cloud SDK
-    CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+    CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-test-trusty"}
     : ${E2E_NETWORK:="e2e-gke-trusty-test"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
