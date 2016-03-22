@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 
 ## kubectl expose
 
-Take a replication controller, service, or pod and expose it as a new Kubernetes Service
+Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service
 
 ### Synopsis
 

@@ -92,7 +92,7 @@ kubectl
 * [kubectl edit](kubectl_edit.md)	 - Edit a resource on the server
 * [kubectl exec](kubectl_exec.md)	 - Execute a command in a container.
 * [kubectl explain](kubectl_explain.md)	 - Documentation of resources.
-* [kubectl expose](kubectl_expose.md)	 - Take a replication controller, service, or pod and expose it as a new Kubernetes Service
+* [kubectl expose](kubectl_expose.md)	 - Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service
 * [kubectl get](kubectl_get.md)	 - Display one or many resources
 * [kubectl label](kubectl_label.md)	 - Update the labels on a resource
 * [kubectl logs](kubectl_logs.md)	 - Print the logs for a container in a pod.
