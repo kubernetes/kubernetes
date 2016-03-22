@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
@@ -239,7 +239,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
 		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
-			t.Errorf("%d: unexpected objects:\n%s", i, util.ObjectGoPrintSideBySide(e, a))
+			t.Errorf("%d: unexpected objects:\n%s", i, diff.ObjectGoPrintSideBySide(e, a))
 		}
 	}
 }
@@ -314,7 +314,7 @@ func TestExtensionMapping(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
 		} else if e, a := item.expected, gotDecoded; !reflect.DeepEqual(e, a) {
-			t.Errorf("%d: unexpected objects:\n%s", i, util.ObjectGoPrintSideBySide(e, a))
+			t.Errorf("%d: unexpected objects:\n%s", i, diff.ObjectGoPrintSideBySide(e, a))
 		}
 	}
 }

@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -155,7 +155,7 @@ func TestScheduler(t *testing.T) {
 			t.Errorf("%v: error: wanted %v, got %v", i, e, a)
 		}
 		if e, a := item.expectBind, gotBinding; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: error: %s", i, util.ObjectDiff(e, a))
+			t.Errorf("%v: error: %s", i, diff.ObjectDiff(e, a))
 		}
 		<-called
 		events.Stop()
@@ -268,7 +268,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 		Target:     api.ObjectReference{Kind: "Node", Name: "machine1"},
 	}
 	if ex, ac := expectBind, gotBinding; !reflect.DeepEqual(ex, ac) {
-		t.Errorf("Expected exact match on binding: %s", util.ObjectDiff(ex, ac))
+		t.Errorf("Expected exact match on binding: %s", diff.ObjectDiff(ex, ac))
 	}
 
 	<-called
@@ -318,7 +318,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 		Target:     api.ObjectReference{Kind: "Node", Name: "machine1"},
 	}
 	if ex, ac := expectBind, gotBinding; !reflect.DeepEqual(ex, ac) {
-		t.Errorf("Expected exact match on binding: %s", util.ObjectDiff(ex, ac))
+		t.Errorf("Expected exact match on binding: %s", diff.ObjectDiff(ex, ac))
 	}
 	<-called
 	events.Stop()

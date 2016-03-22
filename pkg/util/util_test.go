@@ -18,10 +18,12 @@ package util
 
 import (
 	"testing"
+
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func TestStringDiff(t *testing.T) {
-	diff := StringDiff("aaabb", "aaacc")
+	diff := diff.StringDiff("aaabb", "aaacc")
 	expect := "aaa\n\nA: bb\n\nB: cc\n\n"
 	if diff != expect {
 		t.Errorf("diff returned %v", diff)

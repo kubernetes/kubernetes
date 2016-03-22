@@ -31,7 +31,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/protobuf"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func init() {
@@ -53,7 +53,7 @@ func TestProtobufRoundTrip(t *testing.T) {
 	}
 	if !api.Semantic.Equalities.DeepEqual(out, obj) {
 		t.Logf("marshal\n%s", hex.Dump(data))
-		t.Fatalf("Unmarshal is unequal\n%s", util.ObjectGoPrintSideBySide(out, obj))
+		t.Fatalf("Unmarshal is unequal\n%s", diff.ObjectGoPrintSideBySide(out, obj))
 	}
 }
 
