@@ -286,6 +286,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/explorer": {
 			"pod": &api.Pod{},
 		},
+		"../examples/haproxy": {
+			"haproxy-controller": &api.ReplicationController{},
+			"haproxy-service":    &api.Service{},
+		},
 		"../examples/hazelcast": {
 			"hazelcast-controller": &api.ReplicationController{},
 			"hazelcast-service":    &api.Service{},
@@ -360,6 +364,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"admin-service":  &api.Service{},
 			"driver-service": &api.Service{},
 			"rc":             &api.ReplicationController{},
+		},
+		"../examples/rsyslog": {
+			"rsyslog-controller": &api.ReplicationController{},
+			"rsyslog-service":    &api.Service{},
+			"rsyslog-pvc":        &api.PersistentVolumeClaim{},
 		},
 		"../docs/user-guide/secrets": {
 			"secret-pod":     &api.Pod{},

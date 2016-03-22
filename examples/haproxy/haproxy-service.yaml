@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy-example
+  labels:
+    app: haproxy
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: haproxy

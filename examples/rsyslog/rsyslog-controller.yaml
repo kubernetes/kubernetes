@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: rsyslog-controller
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: rsyslog
+    spec:
+      volumes:
+      - name: rsyslog-cfg
+        secret:
+          secretName: rsyslog-cfg
+      - name: log-volume
+        PersistentVolumeClaim:
+          claimName: rsyslog-volume
+      containers:
+      - name: rsyslog
+        image: verb/rsyslog
+        args:
+        - rsyslogd
+        - -n
+        - -f
+        - /etc/rsyslog/rsyslog.conf
+        ports:
+        - name: syslog-tcp
+          containerPort: 514
+        - name: syslog-udp
+          containerPort: 514
+          protocol: UDP
+        volumeMounts:
+        - mountPath: /etc/rsyslog
+          name: rsyslog-cfg
+        - mountPath: /log
+          name: log-volume
