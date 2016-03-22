@@ -218,7 +218,8 @@ type Container struct {
 	// The name of the container, which should be the same as specified by
 	// api.Container.
 	Name string
-	// The image name of the container.
+	// The image name of the container, this also includes the tag of the image,
+	// the expected form is "NAME:TAG".
 	Image string
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
@@ -261,7 +262,8 @@ type ContainerStatus struct {
 	FinishedAt time.Time
 	// Exit code of the container.
 	ExitCode int
-	// Name of the image.
+	// Name of the image, this also includes the tag of the image,
+	// the expected form is "NAME:TAG".
 	Image string
 	// ID of the image.
 	ImageID string
