@@ -41,6 +41,8 @@ const (
 )
 
 type kubenetNetworkPlugin struct {
+	network.NoopNetworkPlugin
+
 	host      network.Host
 	netConfig *libcni.NetworkConfig
 	cniConfig *libcni.CNIConfig
