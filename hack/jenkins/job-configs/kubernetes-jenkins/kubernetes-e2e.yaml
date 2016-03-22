@@ -111,6 +111,8 @@
         - 'gce-scalability':
             description: 'Run the performance/scalability tests on GCE. A larger cluster is used.'
             timeout: 120
+            # TODO: Run this twice a day after we make kubemark-500 a blocking suite.
+            # cron-string: 'H H/12 * * *'
             job-env: |
                 export E2E_NAME="e2e-scalability"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Performance\] \
@@ -118,6 +120,7 @@
                                          --gather-metrics-at-teardown=true \
                                          --gather-logs-sizes=true \
                                          --output-print-type=json"
+                # Create a project k8s-jenkins-scalability-head and move this test there
                 export PROJECT="google.com:k8s-jenkins-scalability"
                 export FAIL_ON_GCP_RESOURCE_LEAK="false"
                 # Override GCE defaults.
@@ -256,6 +259,8 @@
         - 'gce-scalability-release-1.2':
             timeout: 120
             description: 'Run scalability E2E tests on GCE from the release-1.2 branch.'
+            # Run on Saturday 8 am
+            cron-string: 'H 8 * * 6'
             job-env: |
                 export E2E_NAME="e2e-scalability-1-2"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Performance\] \
@@ -264,12 +269,13 @@
                                          --gather-logs-sizes=true \
                                          --output-print-type=json"
                 # Use the 1.1 project for now, since it has quota.
+                # TODO: create a project k8s-e2e-gce-scalability-release and move this test there
                 export PROJECT="k8s-e2e-gce-scalability-1-1"
                 export FAIL_ON_GCP_RESOURCE_LEAK="false"
                 # Override GCE defaults.
                 export KUBE_GCE_ZONE="us-east1-b"
                 export MASTER_SIZE="n1-standard-4"
-                export NODE_SIZE="n1-standard-2"
+                export NODE_SIZE="n1-standard-1"
                 export NODE_DISK_SIZE="50GB"
                 export NUM_NODES="100"
                 export REGISTER_MASTER="true"
@@ -518,7 +524,8 @@
     name: kubernetes-e2e-gce-enormous-cluster
     test-owner: 'gmarek'
     emails: 'gmarek@google.com'
-    cron-string: 'H 8 * * *'
+    # Run only on Sunday and Wednesday at 8 am MTV time.
+    cron-string: 'H 8 * * 0,4'
     trigger-job: ''
     description: 'Starts and deletes empty 1000 node cluster and runs Density 30 test on it. Does allow few Nodes to fail during startup.'
     timeout: 480
