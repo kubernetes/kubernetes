@@ -767,8 +767,16 @@ func baseApp(t *testing.T) *appctypes.App {
 
 func baseImageManifest(t *testing.T) *appcschema.ImageManifest {
 	img := &appcschema.ImageManifest{App: baseApp(t)}
-	img.Annotations.Set(*appctypes.MustACIdentifier(appcDockerEntrypoint), "/bin/foo")
-	img.Annotations.Set(*appctypes.MustACIdentifier(appcDockerCmd), "bar")
+	entrypoint, err := json.Marshal([]string{"/bin/foo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd, err := json.Marshal([]string{"bar"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	img.Annotations.Set(*appctypes.MustACIdentifier(appcDockerEntrypoint), string(entrypoint))
+	img.Annotations.Set(*appctypes.MustACIdentifier(appcDockerCmd), string(cmd))
 	return img
 }
 
