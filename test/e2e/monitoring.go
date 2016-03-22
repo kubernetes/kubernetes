@@ -102,16 +102,36 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 	for _, rcLabel := range rcLabels {
 		selector := labels.Set{"k8s-app": rcLabel}.AsSelector()
 		options := api.ListOptions{LabelSelector: selector}
+		deploymentList, err := c.Deployments(api.NamespaceSystem).List(options)
+		if err != nil {
+			return nil, err
+		}
 		rcList, err := c.ReplicationControllers(api.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}
-		if len(rcList.Items) != 1 {
-			return nil, fmt.Errorf("expected to find one replica for RC with label %s but got %d",
+		if (len(rcList.Items) + len(deploymentList.Items)) != 1 {
+			return nil, fmt.Errorf("expected to find one replica for RC or deployment with label %s but got %d",
 				rcLabel, len(rcList.Items))
 		}
+		// Check all the replication controllers.
 		for _, rc := range rcList.Items {
 			selector := labels.Set(rc.Spec.Selector).AsSelector()
+			options := api.ListOptions{LabelSelector: selector}
+			podList, err := c.Pods(api.NamespaceSystem).List(options)
+			if err != nil {
+				return nil, err
+			}
+			for _, pod := range podList.Items {
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
+				expectedPods = append(expectedPods, string(pod.UID))
+			}
+		}
+		// Do the same for all deployments.
+		for _, rc := range deploymentList.Items {
+			selector := labels.Set(rc.Spec.Selector.MatchLabels).AsSelector()
 			options := api.ListOptions{LabelSelector: selector}
 			podList, err := c.Pods(api.NamespaceSystem).List(options)
 			if err != nil {
