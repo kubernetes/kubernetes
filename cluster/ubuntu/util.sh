@@ -44,14 +44,14 @@ function setClusterInfo() {
   for i in $nodes; do
     nodeIP=${i#*@}
 
-    if [[ "${roles[${ii}]}" == "ai" ]]; then
+    if [[ "${roles_array[${ii}]}" == "ai" ]]; then
       MASTER_IP=$nodeIP
       MASTER=$i
       NODE_IPS="$nodeIP"
-    elif [[ "${roles[${ii}]}" == "a" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "a" ]]; then
       MASTER_IP=$nodeIP
       MASTER=$i
-    elif [[ "${roles[${ii}]}" == "i" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "i" ]]; then
       if [[ -z "${NODE_IPS}" ]];then
         NODE_IPS="$nodeIP"
       else
@@ -140,11 +140,11 @@ function verify-cluster() {
 
   for i in ${nodes}
   do
-    if [ "${roles[${ii}]}" == "a" ]; then
+    if [ "${roles_array[${ii}]}" == "a" ]; then
       verify-master
-    elif [ "${roles[${ii}]}" == "i" ]; then
+    elif [ "${roles_array[${ii}]}" == "i" ]; then
       verify-node "$i"
-    elif [ "${roles[${ii}]}" == "ai" ]; then
+    elif [ "${roles_array[${ii}]}" == "ai" ]; then
       verify-master
       verify-node "$i"
     else
@@ -343,7 +343,7 @@ function detect-nodes() {
   local ii=0
   for i in ${nodes}
   do
-    if [ "${roles[${ii}]}" == "i" ] || [ "${roles[${ii}]}" == "ai" ]; then
+    if [ "${roles_array[${ii}]}" == "i" ] || [ "${roles_array[${ii}]}" == "ai" ]; then
       KUBE_NODE_IP_ADDRESSES+=("${i#*@}")
     fi
 
@@ -378,11 +378,11 @@ function kube-up() {
   for i in ${nodes}
   do
     {
-      if [ "${roles[${ii}]}" == "a" ]; then
+      if [ "${roles_array[${ii}]}" == "a" ]; then
         provision-master
-      elif [ "${roles[${ii}]}" == "ai" ]; then
+      elif [ "${roles_array[${ii}]}" == "ai" ]; then
         provision-masterandnode
-      elif [ "${roles[${ii}]}" == "i" ]; then
+      elif [ "${roles_array[${ii}]}" == "i" ]; then
         provision-node "$i"
       else
         echo "unsupported role for ${i}. Please check"
@@ -698,7 +698,7 @@ function kube-down() {
 
   local ii=0
   for i in ${nodes}; do
-      if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
+      if [[ "${roles_array[${ii}]}" == "ai" || "${roles_array[${ii}]}" == "a" ]]; then
         echo "Cleaning on master ${i#*@}"
         ssh $SSH_OPTS -t "$i" "
           pgrep etcd && \
@@ -716,11 +716,11 @@ function kube-down() {
             '
         " || echo "Cleaning on master ${i#*@} failed"
 
-        if [[ "${roles[${ii}]}" == "ai" ]]; then
+        if [[ "${roles_array[${ii}]}" == "ai" ]]; then
           ssh $SSH_OPTS -t "$i" "sudo rm -rf /var/lib/kubelet"
         fi
 
-      elif [[ "${roles[${ii}]}" == "i" ]]; then
+      elif [[ "${roles_array[${ii}]}" == "i" ]]; then
         echo "Cleaning on node ${i#*@}"
         ssh $SSH_OPTS -t "$i" "
           pgrep flanneld && \
@@ -786,7 +786,7 @@ function push-master() {
 
   local ii=0
   for i in ${nodes}; do
-    if [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]]; then
+    if [[ "${roles_array[${ii}]}" == "a" || "${roles_array[${ii}]}" == "ai" ]]; then
       echo "Cleaning master ${i#*@}"
       ssh $SSH_OPTS -t "$i" "
         pgrep etcd && sudo -p '[sudo] stop the all process: ' -- /bin/bash -c '
@@ -811,11 +811,11 @@ function push-master() {
       '" || echo "Cleaning master ${i#*@} failed"
     fi
 
-    if [[ "${roles[${ii}]}" == "a" ]]; then
+    if [[ "${roles_array[${ii}]}" == "a" ]]; then
       provision-master
-    elif [[ "${roles[${ii}]}" == "ai" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "ai" ]]; then
       provision-masterandnode
-    elif [[ "${roles[${ii}]}" == "i" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "i" ]]; then
       ((ii=ii+1))
       continue
     else
@@ -846,7 +846,7 @@ function push-node() {
   local existing=false
 
   for i in ${nodes}; do
-    if [[ "${roles[${ii}]}" == "i" && ${i#*@} == "$node_ip" ]]; then
+    if [[ "${roles_array[${ii}]}" == "i" && ${i#*@} == "$node_ip" ]]; then
       echo "Cleaning node ${i#*@}"
       ssh $SSH_OPTS -t "$i" "
         sudo -p '[sudo] stop the all process: ' -- /bin/bash -c '
@@ -869,10 +869,10 @@ function push-node() {
         '" || echo "Cleaning node ${i#*@} failed"
       provision-node "$i"
       existing=true
-    elif [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]] && [[ ${i#*@} == "$node_ip" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "a" || "${roles_array[${ii}]}" == "ai" ]] && [[ ${i#*@} == "$node_ip" ]]; then
       echo "${i} is master node, please try ./kube-push -m instead"
       existing=true
-    elif [[ "${roles[${ii}]}" == "i" || "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "i" || "${roles_array[${ii}]}" == "a" || "${roles_array[${ii}]}" == "ai" ]]; then
       ((ii=ii+1))
       continue
     else
@@ -904,7 +904,7 @@ function kube-push() {
   #stop all the kube's process & etcd
   local ii=0
   for i in ${nodes}; do
-     if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
+     if [[ "${roles_array[${ii}]}" == "ai" || "${roles_array[${ii}]}" == "a" ]]; then
        echo "Cleaning on master ${i#*@}"
        ssh $SSH_OPTS -t "$i" "
         pgrep etcd && \
@@ -917,7 +917,7 @@ function kube-push() {
             /etc/init.d/etcd \
             /etc/default/etcd
         '" || echo "Cleaning on master ${i#*@} failed"
-      elif [[ "${roles[${ii}]}" == "i" ]]; then
+      elif [[ "${roles_array[${ii}]}" == "i" ]]; then
         echo "Cleaning on node ${i#*@}"
         ssh $SSH_OPTS -t $i "
         pgrep flanneld && \
@@ -952,11 +952,11 @@ function kube-push() {
 
   local ii=0
   for i in ${nodes}; do
-    if [[ "${roles[${ii}]}" == "a" ]]; then
+    if [[ "${roles_array[${ii}]}" == "a" ]]; then
       provision-master
-    elif [[ "${roles[${ii}]}" == "i" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "i" ]]; then
       provision-node "$i"
-    elif [[ "${roles[${ii}]}" == "ai" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "ai" ]]; then
       provision-masterandnode
     else
       echo "unsupported role for ${i}. please check"
