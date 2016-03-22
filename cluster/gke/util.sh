@@ -171,7 +171,7 @@ function test-setup() {
   "${KUBE_ROOT}/cluster/kube-up.sh"
 
   detect-nodes >&2
- 
+
   # At this point, CLUSTER_NAME should have been used, so its value is final.
   NODE_TAG=$($GCLOUD compute instances describe ${NODE_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
   OLD_NODE_TAG="k8s-${CLUSTER_NAME}-node"
@@ -270,18 +270,6 @@ function ssh-to-node() {
   done
   # Then actually try the command.
   gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --ssh-flag="-o ConnectTimeout=30" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
-}
-
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy() {
-  echo "... in gke:restart-kube-proxy()"  >&2
-  ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
-}
-
-# Restart the kube-proxy on master ($1)
-function restart-apiserver() {
-  echo "... in gke:restart-apiserver()"  >&2
-  ssh-to-node "$1" "sudo docker ps | grep /kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
 }
 
 # Execute after running tests to perform any required clean-up.  This is called
