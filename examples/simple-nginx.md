@@ -42,7 +42,7 @@ to Kubernetes and running your first containers on the cluster.
 
 From this point onwards, it is assumed that `kubectl` is on your path from one of the getting started guides.
 
-The [`kubectl run`](../docs/user-guide/kubectl/kubectl_run.md) line below will create two [nginx](https://registry.hub.docker.com/_/nginx/) [pods](../docs/user-guide/pods.md) listening on port 80. It will also create a [replication controller](../docs/user-guide/replication-controller.md) named `my-nginx` to ensure that there are always two pods running.
+The [`kubectl run`](../docs/user-guide/kubectl/kubectl_run.md) line below will create two [nginx](https://registry.hub.docker.com/_/nginx/) [pods](../docs/user-guide/pods.md) listening on port 80. It will also create a [deployment](../docs/user-guide/deployments.md) named `my-nginx` to ensure that there are always two pods running.
 
 ```bash
 kubectl run my-nginx --image=nginx --replicas=2 --port=80
@@ -54,16 +54,10 @@ Once the pods are created, you can list them to see what is up and running:
 kubectl get pods
 ```
 
-You can also see the replication controller that was created:
+You can also see the deployment that was created:
 
 ```bash
-kubectl get rc
-```
-
-To delete the two replicated containers, delete the replication controller:
-
-```bash
-kubectl delete rc my-nginx
+kubectl get deployment
 ```
 
 ### Exposing your pods to the internet.
@@ -72,7 +66,7 @@ On some platforms (for example Google Compute Engine) the kubectl command can in
 to do this run:
 
 ```bash
-kubectl expose rc my-nginx --port=80 --type=LoadBalancer
+kubectl expose deployment my-nginx --port=80 --type=LoadBalancer
 ```
 
 This should print the service that has been created, and map an external IP address to the service. Where to find this external IP address will depend on the environment you run in.  For instance, for Google Compute Engine the external IP address is listed as part of the newly created service and can be retrieved by running
@@ -82,6 +76,14 @@ kubectl get services
 ```
 
 In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a firewall to allow traffic on port 80.
+
+### Cleanup
+
+To delete the two replicated containers, delete the deployment:
+
+```bash
+kubectl delete deployment my-nginx
+```
 
 ### Next: Configuration files
 
