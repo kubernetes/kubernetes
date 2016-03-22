@@ -45,6 +45,13 @@ var specialVerbs = sets.NewString("proxy", "redirect", "watch")
 // specialVerbsNoSubresources contains root verbs which do not allow subresources
 var specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
 
+// namespaceSubresources contains subresources of namespace
+// this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
+var namespaceSubresources = sets.NewString("status", "finalize")
+
+// NamespaceSubResourcesForTest exports namespaceSubresources for testing in pkg/master/master_test.go, so we never drift
+var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
+
 // Constant for the retry-after interval on rate limiting.
 // TODO: maybe make this dynamic? or user-adjustable?
 const RetryAfter = "1"
@@ -549,7 +556,7 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 
 			// if there is another step after the namespace name and it is not a known namespace subresource
 			// move currentParts to include it as a resource in its own right
-			if len(currentParts) > 2 {
+			if len(currentParts) > 2 && !namespaceSubresources.Has(currentParts[2]) {
 				currentParts = currentParts[2:]
 			}
 		}
