@@ -391,6 +391,7 @@
         - 'gke-1.1':
             timeout: 150
             description: 'Run E2E tests on GKE from the current release branch.'
+            cron-string: 'H */6 * * *'
         - 'gke-prod':
             timeout: 180
             description: |
@@ -412,6 +413,7 @@
     branch: 'release-1.1'
     runner: '{old-runner-1-1}'
     post-env: ''
+    cron-string: 'H */6 * * *'
     suffix:
         - 'gce-release-1.1':
             timeout: 175
@@ -429,6 +431,7 @@
     branch: 'release-1.0'
     runner: '{old-runner-1-0}'
     post-env: ''
+    cron-string: 'H */12 * * *'
     suffix:
         - 'gce-release-1.0':
             timeout: 150
