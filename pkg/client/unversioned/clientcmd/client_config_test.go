@@ -65,6 +65,31 @@ func createValidTestConfig() *clientcmdapi.Config {
 	return config
 }
 
+func createCAValidTestConfig() *clientcmdapi.Config {
+
+	config := createValidTestConfig()
+	config.Clusters["clean"].CertificateAuthorityData = []byte{0, 0}
+	return config
+}
+
+func TestInsecureOverridesCA(t *testing.T) {
+	config := createCAValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			InsecureSkipTLSVerify: true,
+		},
+	})
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	matchBoolArg(true, actualCfg.Insecure, t)
+	matchStringArg("", actualCfg.TLSClientConfig.CAFile, t)
+	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
+}
+
 func TestMergeContext(t *testing.T) {
 	const namespace = "overriden-namespace"
 
