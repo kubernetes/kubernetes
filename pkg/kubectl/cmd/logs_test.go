@@ -130,7 +130,6 @@ func TestValidateLogFlags(t *testing.T) {
 		cmd.Run = func(cmd *cobra.Command, args []string) {
 			o.Complete(f, os.Stdout, cmd, args)
 			out = o.Validate().Error()
-			o.RunLogs()
 		}
 		cmd.Run(cmd, []string{"foo"})
 
