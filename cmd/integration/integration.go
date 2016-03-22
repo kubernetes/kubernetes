@@ -388,7 +388,7 @@ func runStaticPodTest(c *client.Client, configFilePath string) {
 id: static-pod-from-manifest
 containers:
   - name: static-container
-    image: kubernetes/pause`,
+    image: gcr.io/google_containers/pause:2.0`,
 		},
 		{
 			desc: "static-pod-from-spec",
@@ -401,7 +401,7 @@ containers:
 				"spec": {
 					"containers": [{
 						"name": "static-container",
-						"image": "kubernetes/pause"
+						"image": "gcr.io/google_containers/pause:2.0"
 					}]
 				}
 			}`,
@@ -1108,7 +1108,7 @@ const (
 			"containers": [
 				{
 					"name": "redis",
-					"image": "redis",
+					"image": "gcr.io/google_containers/redis:e2e",
 					"volumeMounts": [{
 						"name": "redis-data",
 						"mountPath": "/data"
@@ -1116,7 +1116,7 @@ const (
 				},
 				{
 					"name": "guestbook",
-					"image": "google/guestbook-python-redis",
+					"image": "gcr.io/google_samples/gb-frontend:v3",
 					"ports": [{
 						"name": "www",
 						"hostPort": 80,
