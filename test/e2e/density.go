@@ -537,7 +537,13 @@ var _ = KubeDescribe("Density", func() {
 					float64(nodeCount)/(e2eLag[len(e2eLag)-1].Latency.Minutes()))
 			}
 
+<<<<<<< Updated upstream
 			By("Deleting ReplicationController")
+=======
+			time.Sleep(time.Hour * 3)
+
+			By("Deleting ReplicationController and all additional Pods")
+>>>>>>> Stashed changes
 			// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
 			rc, err := c.ReplicationControllers(ns).Get(RCName)
 			if err == nil && rc.Spec.Replicas != 0 {
