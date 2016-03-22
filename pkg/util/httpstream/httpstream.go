@@ -114,20 +114,24 @@ func negotiateProtocol(clientProtocols, serverProtocols []string) string {
 	return ""
 }
 
-// Handshake performs a subprotocol negotiation. If the client did not request
-// a specific subprotocol, defaultProtocol is used. If the client did request a
+// Handshake performs a subprotocol negotiation. If the client did request a
 // subprotocol, Handshake will select the first common value found in
 // serverProtocols. If a match is found, Handshake adds a response header
 // indicating the chosen subprotocol. If no match is found, HTTP forbidden is
 // returned, along with a response header containing the list of protocols the
 // server can accept.
-func Handshake(req *http.Request, w http.ResponseWriter, serverProtocols []string, defaultProtocol string) (string, error) {
+func Handshake(req *http.Request, w http.ResponseWriter, serverProtocols []string) (string, error) {
 	clientProtocols := req.Header[http.CanonicalHeaderKey(HeaderProtocolVersion)]
 	if len(clientProtocols) == 0 {
-		// Kube 1.0 client that didn't support subprotocol negotiation
-		// TODO remove this defaulting logic once Kube 1.0 is no longer supported
-		w.Header().Add(HeaderProtocolVersion, defaultProtocol)
-		return defaultProtocol, nil
+		// Kube 1.0 clients didn't support subprotocol negotiation.
+		// TODO require clientProtocols once Kube 1.0 is no longer supported
+		return "", nil
+	}
+
+	if len(serverProtocols) == 0 {
+		// Kube 1.0 servers didn't support subprotocol negotiation. This is mainly for testing.
+		// TODO require serverProtocols once Kube 1.0 is no longer supported
+		return "", nil
 	}
 
 	negotiatedProtocol := negotiateProtocol(clientProtocols, serverProtocols)
