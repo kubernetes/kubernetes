@@ -19,7 +19,7 @@ import (
 )
 
 import (
-	"github.com/scalingdata/gcfg/token"
+	"gopkg.in/gcfg.v1/token"
 )
 
 // An ErrorHandler may be provided to Scanner.Init. If a syntax error is
