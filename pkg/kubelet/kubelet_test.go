@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -2771,7 +2772,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 
 	if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
+		t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 	}
 }
 
@@ -2846,7 +2847,7 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(expectedNodeOutOfDiskCondition, oodCondition) {
-		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNodeOutOfDiskCondition, oodCondition))
+		t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNodeOutOfDiskCondition, oodCondition))
 	}
 }
 
@@ -3282,7 +3283,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			LastTransitionTime: unversioned.Time{},
 		}
 		if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
-			t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
+			t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 		}
 	}
 

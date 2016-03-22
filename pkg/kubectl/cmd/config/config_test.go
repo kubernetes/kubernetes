@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func newRedFederalCowHammerConfig() clientcmdapi.Config {
@@ -725,7 +725,7 @@ func (test configCommandTest) run(t *testing.T) string {
 	testClearLocationOfOrigin(&actualConfig)
 
 	if !api.Semantic.DeepEqual(test.expectedConfig, actualConfig) {
-		t.Errorf("diff: %v", util.ObjectDiff(test.expectedConfig, actualConfig))
+		t.Errorf("diff: %v", diff.ObjectDiff(test.expectedConfig, actualConfig))
 		t.Errorf("expected: %#v\n actual:   %#v", test.expectedConfig, actualConfig)
 	}
 
