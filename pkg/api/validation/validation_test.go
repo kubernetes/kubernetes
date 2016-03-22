@@ -1124,18 +1124,19 @@ func TestValidateVolumeMounts(t *testing.T) {
 
 	successCase := []api.VolumeMount{
 		{Name: "abc", MountPath: "/foo"},
-		{Name: "123", MountPath: "/foo"},
-		{Name: "abc-123", MountPath: "/bar"},
+		{Name: "123", MountPath: "/bar"},
+		{Name: "abc-123", MountPath: "/baz"},
 	}
 	if errs := validateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	errorCases := map[string][]api.VolumeMount{
-		"empty name":      {{Name: "", MountPath: "/foo"}},
-		"name not found":  {{Name: "", MountPath: "/foo"}},
-		"empty mountpath": {{Name: "abc", MountPath: ""}},
-		"colon mountpath": {{Name: "abc", MountPath: "foo:bar"}},
+		"empty name":          {{Name: "", MountPath: "/foo"}},
+		"name not found":      {{Name: "", MountPath: "/foo"}},
+		"empty mountpath":     {{Name: "abc", MountPath: ""}},
+		"colon mountpath":     {{Name: "abc", MountPath: "foo:bar"}},
+		"mountpath collision": {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
 	}
 	for k, v := range errorCases {
 		if errs := validateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
