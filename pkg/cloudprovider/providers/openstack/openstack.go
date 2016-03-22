@@ -40,7 +40,7 @@ import (
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/pools"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/vips"
 	"github.com/rackspace/gophercloud/pagination"
-	"github.com/scalingdata/gcfg"
+	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"

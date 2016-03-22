@@ -921,10 +921,6 @@
 			"Rev": "177002e16a0061912f02377e2dd8951a8b3551bc"
 		},
 		{
-			"ImportPath": "github.com/scalingdata/gcfg",
-			"Rev": "37aabad69cfd3d20b8390d902a8b10e245c615ff"
-		},
-		{
 			"ImportPath": "github.com/seccomp/libseccomp-golang",
 			"Rev": "1b506fc7c24eec5a3693cdcbed40d9c226cfc6a1"
 		},
@@ -1072,6 +1068,10 @@
 		{
 			"ImportPath": "google.golang.org/grpc",
 			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
+		},
+		{
+			"ImportPath": "gopkg.in/gcfg.v1",
+			"Rev": "083575c3955c85df16fe9590cceab64d03f5eb6e"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",

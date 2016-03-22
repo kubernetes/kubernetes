@@ -9,8 +9,8 @@ import (
 )
 
 import (
-	"github.com/scalingdata/gcfg/scanner"
-	"github.com/scalingdata/gcfg/token"
+	"gopkg.in/gcfg.v1/scanner"
+	"gopkg.in/gcfg.v1/token"
 )
 
 var unescape = map[rune]rune{'\\': '\\', '"': '"', 'n': '\n', 't': '\t'}
@@ -99,6 +99,13 @@ func readInto(config interface{}, fset *token.FileSet, file *token.File, src []b
 			pos, tok, lit = s.Scan()
 			if tok != token.EOL && tok != token.EOF && tok != token.COMMENT {
 				return errfn("expected EOL, EOF, or comment")
+			}
+			// If a section/subsection header was found, ensure a
+			// container object is created, even if there are no
+			// variables further down.
+			err := set(config, sect, sectsub, "", true, "")
+			if err != nil {
+				return err
 			}
 		case token.IDENT:
 			if sect == "" {

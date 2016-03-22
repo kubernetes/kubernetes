@@ -29,7 +29,7 @@ import (
 	"github.com/rackspace/gophercloud/pagination"
 	"github.com/rackspace/gophercloud/rackspace"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
-	"github.com/scalingdata/gcfg"
+	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
