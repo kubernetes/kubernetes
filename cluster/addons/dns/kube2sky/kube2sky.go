@@ -32,10 +32,11 @@ import (
 	"syscall"
 	"time"
 
-	etcd "github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	skymsg "github.com/skynetservices/skydns/msg"
 	flag "github.com/spf13/pflag"
+	"golang.org/x/net/context"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -45,7 +46,7 @@ import (
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kframework "k8s.io/kubernetes/pkg/controller/framework"
 	kselector "k8s.io/kubernetes/pkg/fields"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -57,15 +58,21 @@ const kubernetesSvcName = "kubernetes"
 var (
 	argDomain              = flag.String("domain", "cluster.local", "domain under which to create names")
 	argEtcdMutationTimeout = flag.Duration("etcd-mutation-timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
-	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
+	argEtcdServers         = flag.StringSlice("etcd-servers", []string{"http://127.0.0.1:4001"}, "List of etcd servers to watch (http://ip:port), comma separated")
+	argEtcdCAFile          = flag.String("etcd-cafile", "", "SSL Certificate Authority file used to secure etcd communication")
+	argEtcdCertFile        = flag.String("etcd-certfile", "", "SSL certification file used to secure etcd communication")
+	argEtcdKeyFile         = flag.String("etcd-keyfile", "", "SSL key file used to secure etcd communication")
+	argEtcdQuorum          = flag.Bool("etcd-quorum-read", false, "If true, enable quorum read")
 	argKubecfgFile         = flag.String("kubecfg-file", "", "Location of kubecfg file for access to kubernetes master service; --kube-master-url overrides the URL part of this; if neither this nor --kube-master-url are provided, defaults to service account tokens")
 	argKubeMasterURL       = flag.String("kube-master-url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 	healthzPort            = flag.Int("healthz-port", 8081, "port on which to serve a kube2sky HTTP readiness probe.")
 )
 
 const (
-	// Maximum number of attempts to connect to etcd server.
-	maxConnectAttempts = 12
+	// pollInterval defines the amount of time between etcd connection attempts
+	pollInterval = 5 * time.Second
+	// pollTimeout defines the total amount of time to attempt connecting to etcd
+	pollTimeout = 60 * time.Second
 	// Resync period for the kube controller loop.
 	resyncPeriod = 30 * time.Minute
 	// A subdomain added to the user specified domain for all services.
@@ -74,10 +81,10 @@ const (
 	podSubdomain = "pod"
 )
 
-type etcdClient interface {
-	Set(path, value string, ttl uint64) (*etcd.Response, error)
-	RawGet(key string, sort, recursive bool) (*etcd.RawResponse, error)
-	Delete(path string, recursive bool) (*etcd.Response, error)
+type etcdKeysAPI interface {
+	Set(context context.Context, key, value string, options *etcd.SetOptions) (*etcd.Response, error)
+	Get(context context.Context, key string, options *etcd.GetOptions) (*etcd.Response, error)
+	Delete(context context.Context, key string, options *etcd.DeleteOptions) (*etcd.Response, error)
 }
 
 type nameNamespace struct {
@@ -85,9 +92,26 @@ type nameNamespace struct {
 	namespace string
 }
 
+// newKube2Sky creates a new instance of Kubernetes to SkyDNS bridge
+func newKube2Sky(config *etcdstorage.EtcdConfig, domain string, mutationTimeout time.Duration) (ks *kube2sky, err error) {
+	ks = &kube2sky{
+		domain:              domain,
+		etcdMutationTimeout: mutationTimeout,
+		quorum:              config.Quorum,
+	}
+
+	if ks.etcdClient, err = newEtcdClient(config); err != nil {
+		return nil, fmt.Errorf("Failed to create etcd client: %v", err)
+	}
+	ks.etcdKeysAPI = etcd.NewKeysAPI(ks.etcdClient)
+	return ks, nil
+}
+
 type kube2sky struct {
 	// Etcd client.
-	etcdClient etcdClient
+	etcdClient etcd.Client
+	// Etcd key/value interaction API.
+	etcdKeysAPI etcdKeysAPI
 	// DNS domain name.
 	domain string
 	// Etcd mutation timeout.
@@ -100,26 +124,30 @@ type kube2sky struct {
 	podsStore kcache.Store
 	// Lock for controlling access to headless services.
 	mlock sync.Mutex
+	// If true, perform quorum read.
+	quorum bool
 }
 
 // Removes 'subdomain' from etcd.
 func (ks *kube2sky) removeDNS(subdomain string) error {
 	glog.V(2).Infof("Removing %s from DNS", subdomain)
-	resp, err := ks.etcdClient.RawGet(skymsg.Path(subdomain), false, true)
+
+	opts := &etcd.DeleteOptions{
+		Recursive: true,
+	}
+	_, err := ks.etcdKeysAPI.Delete(context.TODO(), skymsg.Path(subdomain), opts)
 	if err != nil {
-		return err
-	}
-	if resp.StatusCode == http.StatusNotFound {
+		if !isNotExist(err) {
+			return err
+		}
 		glog.V(2).Infof("Subdomain %q does not exist in etcd", subdomain)
-		return nil
 	}
-	_, err = ks.etcdClient.Delete(skymsg.Path(subdomain), true)
-	return err
+	return nil
 }
 
 func (ks *kube2sky) writeSkyRecord(subdomain string, data string) error {
 	// Set with no TTL, and hope that kubernetes events are accurate.
-	_, err := ks.etcdClient.Set(skymsg.Path(subdomain), data, uint64(0))
+	_, err := ks.etcdKeysAPI.Set(context.TODO(), skymsg.Path(subdomain), data, nil)
 	return err
 }
 
@@ -148,6 +176,16 @@ func (ks *kube2sky) newHeadlessService(subdomain string, service *kapi.Service) 
 		return ks.generateRecordsForHeadlessService(subdomain, e, service)
 	}
 	return nil
+}
+
+func isNotExist(err error) bool {
+	switch err := err.(type) {
+	case etcd.Error:
+		return err.Code == etcd.ErrorCodeKeyNotFound
+	case *etcd.Error:
+		return err.Code == etcd.ErrorCodeKeyNotFound
+	}
+	return false
 }
 
 func getSkyMsg(ip string, port int) *skymsg.Service {
@@ -441,40 +479,17 @@ func (ks *kube2sky) updateService(oldObj, newObj interface{}) {
 	ks.newService(newObj)
 }
 
-func newEtcdClient(etcdServer string) (*etcd.Client, error) {
-	var (
-		client *etcd.Client
-		err    error
-	)
-	for attempt := 1; attempt <= maxConnectAttempts; attempt++ {
-		if _, err = etcdutil.GetEtcdVersion(etcdServer); err == nil {
-			break
-		}
-		if attempt == maxConnectAttempts {
-			break
-		}
-		glog.Infof("[Attempt: %d] Attempting access to etcd after 5 second sleep", attempt)
-		time.Sleep(5 * time.Second)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to etcd server: %v, error: %v", etcdServer, err)
-	}
-	glog.Infof("Etcd server found: %v", etcdServer)
-
-	// loop until we have > 0 machines && machines[0] != ""
-	poll, timeout := 1*time.Second, 10*time.Second
+func newEtcdClient(config *etcdstorage.EtcdConfig) (client etcd.Client, err error) {
+	// loop until we have an etcd client
+	poll, timeout := pollInterval, pollTimeout
 	if err := wait.Poll(poll, timeout, func() (bool, error) {
-		if client = etcd.NewClient([]string{etcdServer}); client == nil {
-			return false, fmt.Errorf("etcd.NewClient returned nil")
-		}
-		client.SyncCluster()
-		machines := client.GetCluster()
-		if len(machines) == 0 || len(machines[0]) == 0 {
+		if client, err = config.NewEtcdClient(); err != nil {
+			glog.Infof("cannot create etcd client: %v", err)
 			return false, nil
 		}
 		return true, nil
 	}); err != nil {
-		return nil, fmt.Errorf("Timed out after %s waiting for at least 1 synchronized etcd server in the cluster. Error: %v", timeout, err)
+		return nil, fmt.Errorf("Timed out after %s waiting for etcd client. Error: %v", timeout, err)
 	}
 	return client, nil
 }
@@ -633,22 +648,41 @@ func setupHealthzHandlers(ks *kube2sky) {
 	})
 }
 
+func validateArgs() error {
+	if len(*argEtcdServers) == 0 {
+		return fmt.Errorf("etcd server required")
+	}
+	if *argDomain == "" {
+		return fmt.Errorf("cluster domain required")
+	}
+	// TODO: Validate other input flags.
+	return nil
+}
+
 func main() {
 	flag.CommandLine.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc)
 	flag.Parse()
 	var err error
 	setupSignalHandlers()
-	// TODO: Validate input flags.
+	if err = validateArgs(); err != nil {
+		glog.Fatalf("Error parsing command line: %v", err)
+	}
 	domain := *argDomain
 	if !strings.HasSuffix(domain, ".") {
 		domain = fmt.Sprintf("%s.", domain)
 	}
-	ks := kube2sky{
-		domain:              domain,
-		etcdMutationTimeout: *argEtcdMutationTimeout,
+
+	etcdConfig := &etcdstorage.EtcdConfig{
+		ServerList: *argEtcdServers,
+		Quorum:     *argEtcdQuorum,
+		CAFile:     *argEtcdCAFile,
+		CertFile:   *argEtcdCertFile,
+		KeyFile:    *argEtcdKeyFile,
 	}
-	if ks.etcdClient, err = newEtcdClient(*argEtcdServer); err != nil {
-		glog.Fatalf("Failed to create etcd client - %v", err)
+
+	ks, err := newKube2Sky(etcdConfig, domain, *argEtcdMutationTimeout)
+	if err != nil {
+		glog.Fatalf("Failed to create kube2sky: %v", err)
 	}
 
 	kubeClient, err := newKubeClient()
@@ -659,9 +693,9 @@ func main() {
 	ks.newService(waitForKubernetesService(kubeClient))
 	glog.Infof("Successfully added DNS record for Kubernetes service.")
 
-	ks.endpointsStore = watchEndpoints(kubeClient, &ks)
-	ks.servicesStore = watchForServices(kubeClient, &ks)
-	ks.podsStore = watchPods(kubeClient, &ks)
+	ks.endpointsStore = watchEndpoints(kubeClient, ks)
+	ks.servicesStore = watchForServices(kubeClient, ks)
+	ks.podsStore = watchPods(kubeClient, ks)
 
 	// We declare kube2sky ready when:
 	// 1. It has retrieved the Kubernetes master service from the apiserver. If this
@@ -669,6 +703,6 @@ func main() {
 	//    perform any cluster local DNS lookups.
 	// 2. It has setup the 3 watches above.
 	// Once ready this container never flips to not-ready.
-	setupHealthzHandlers(&ks)
+	setupHealthzHandlers(ks)
 	glog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *healthzPort), nil))
 }

@@ -19,15 +19,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"path"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/context"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -37,29 +37,35 @@ type fakeEtcdClient struct {
 	writes map[string]string
 }
 
-func (ec *fakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, error) {
+func (ec *fakeEtcdClient) Set(context context.Context, key, value string, options *etcd.SetOptions) (*etcd.Response, error) {
 	ec.writes[key] = value
 	return nil, nil
 }
 
-func (ec *fakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, error) {
+func (ec *fakeEtcdClient) Delete(context context.Context, key string, options *etcd.DeleteOptions) (*etcd.Response, error) {
+	found := false
 	for p := range ec.writes {
-		if (recursive && strings.HasPrefix(p, key)) || (!recursive && p == key) {
+		if (options.Recursive && strings.HasPrefix(p, key)) || (!options.Recursive && p == key) {
 			delete(ec.writes, p)
+			found = true
 		}
+	}
+	if !found {
+		return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
 	}
 	return nil, nil
 }
 
-func (ec *fakeEtcdClient) RawGet(key string, sort, recursive bool) (*etcd.RawResponse, error) {
-	values := ec.Get(key)
+func (ec *fakeEtcdClient) Get(context context.Context, key string, options *etcd.GetOptions) (*etcd.Response, error) {
+	values := ec.GetAll(key)
 	if len(values) == 0 {
-		return &etcd.RawResponse{StatusCode: http.StatusNotFound}, nil
+		return nil, nil
 	}
-	return &etcd.RawResponse{StatusCode: http.StatusOK}, nil
+	node := &etcd.Node{Key: key, Value: values[0]}
+	return &etcd.Response{Node: node}, nil
 }
 
-func (ec *fakeEtcdClient) Get(key string) []string {
+func (ec *fakeEtcdClient) GetAll(key string) []string {
 	values := make([]string, 0, 10)
 	minSeparatorCount := 0
 	key = strings.ToLower(key)
@@ -85,9 +91,9 @@ const (
 	podSubDomain     = "pod"
 )
 
-func newKube2Sky(ec etcdClient) *kube2sky {
+func newTestKube2Sky(ec etcdKeysAPI) *kube2sky {
 	return &kube2sky{
-		etcdClient:          ec,
+		etcdKeysAPI:         ec,
 		domain:              testDomain,
 		etcdMutationTimeout: time.Second,
 		endpointsStore:      cache.NewStore(cache.MetaNamespaceKeyFunc),
@@ -123,7 +129,7 @@ func getHostPortFromString(data string) (*hostPort, error) {
 
 func assertDnsServiceEntryInEtcd(t *testing.T, ec *fakeEtcdClient, serviceName, namespace string, expectedHostPort *hostPort) {
 	key := getEtcdPathForA(serviceName, namespace, serviceSubDomain)
-	values := ec.Get(key)
+	values := ec.GetAll(key)
 	//require.True(t, exists)
 	require.True(t, len(values) > 0, "entry not found.")
 	actualHostPort, err := getHostPortFromString(values[0])
@@ -133,21 +139,21 @@ func assertDnsServiceEntryInEtcd(t *testing.T, ec *fakeEtcdClient, serviceName, 
 
 func assertDnsPodEntryInEtcd(t *testing.T, ec *fakeEtcdClient, podIP, namespace string) {
 	key := getEtcdPathForA(podIP, namespace, podSubDomain)
-	values := ec.Get(key)
+	values := ec.GetAll(key)
 	//require.True(t, exists)
 	require.True(t, len(values) > 0, "entry not found.")
 }
 
 func assertDnsPodEntryNotInEtcd(t *testing.T, ec *fakeEtcdClient, podIP, namespace string) {
 	key := getEtcdPathForA(podIP, namespace, podSubDomain)
-	values := ec.Get(key)
+	values := ec.GetAll(key)
 	//require.True(t, exists)
 	require.True(t, len(values) == 0, "entry found.")
 }
 
 func assertSRVEntryInEtcd(t *testing.T, ec *fakeEtcdClient, portName, protocol, serviceName, namespace string, expectedPortNumber, expectedEntriesCount int) {
 	srvKey := getEtcdPathForSRV(portName, protocol, serviceName, namespace)
-	values := ec.Get(srvKey)
+	values := ec.GetAll(srvKey)
 	assert.Equal(t, expectedEntriesCount, len(values))
 	for i := range values {
 		actualHostPort, err := getHostPortFromString(values[i])
@@ -243,7 +249,7 @@ func TestHeadlessService(t *testing.T) {
 		testNamespace = "default"
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
+	k2s := newTestKube2Sky(ec)
 	service := newHeadlessService(testNamespace, testService)
 	assert.NoError(t, k2s.servicesStore.Add(&service))
 	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, "10.0.0.1", "10.0.0.2"), newSubsetWithOnePort("", 8080, "10.0.0.3", "10.0.0.4"))
@@ -263,7 +269,7 @@ func TestHeadlessServiceWithNamedPorts(t *testing.T) {
 		testNamespace = "default"
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
+	k2s := newTestKube2Sky(ec)
 	service := newHeadlessService(testNamespace, testService)
 	assert.NoError(t, k2s.servicesStore.Add(&service))
 	endpoints := newEndpoints(service, newSubsetWithTwoPorts("http1", 80, "http2", 81, "10.0.0.1", "10.0.0.2"), newSubsetWithOnePort("https", 443, "10.0.0.3", "10.0.0.4"))
@@ -295,7 +301,7 @@ func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
 		testNamespace = "default"
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
+	k2s := newTestKube2Sky(ec)
 	service := newHeadlessService(testNamespace, testService)
 	assert.NoError(t, k2s.servicesStore.Add(&service))
 	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, "10.0.0.1", "10.0.0.2"))
@@ -321,7 +327,7 @@ func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
 		testNamespace = "default"
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
+	k2s := newTestKube2Sky(ec)
 	service := newHeadlessService(testNamespace, testService)
 	assert.NoError(t, k2s.servicesStore.Add(&service))
 	// Headless service DNS records should not be created since
@@ -346,7 +352,7 @@ func TestAddSinglePortService(t *testing.T) {
 		testNamespace = "default"
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
+	k2s := newTestKube2Sky(ec)
 	service := newService(testNamespace, testService, "1.2.3.4", "", 0)
 	k2s.newService(&service)
 	expectedValue := getHostPort(&service)
@@ -359,7 +365,7 @@ func TestUpdateSinglePortService(t *testing.T) {
 		testNamespace = "default"
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
+	k2s := newTestKube2Sky(ec)
 	service := newService(testNamespace, testService, "1.2.3.4", "", 0)
 	k2s.newService(&service)
 	assert.Len(t, ec.writes, 1)
@@ -376,7 +382,7 @@ func TestDeleteSinglePortService(t *testing.T) {
 		testNamespace = "default"
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
+	k2s := newTestKube2Sky(ec)
 	service := newService(testNamespace, testService, "1.2.3.4", "", 80)
 	// Add the service
 	k2s.newService(&service)
@@ -392,7 +398,7 @@ func TestServiceWithNamePort(t *testing.T) {
 		testNamespace = "default"
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
+	k2s := newTestKube2Sky(ec)
 
 	// create service
 	service := newService(testNamespace, testService, "1.2.3.4", "http1", 80)
@@ -431,7 +437,7 @@ func TestPodDns(t *testing.T) {
 		testPodName    = "testPod"
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
+	k2s := newTestKube2Sky(ec)
 
 	// create pod without ip address yet
 	pod := newPod(testNamespace, testPodName, "")
