@@ -114,11 +114,14 @@ type bicycle struct {
 	Price float32
 }
 
+type empName string
+type job string
 type store struct {
-	Book    []book
-	Bicycle bicycle
-	Name    string
-	Labels  map[string]int
+	Book      []book
+	Bicycle   bicycle
+	Name      string
+	Labels    map[string]int
+	Employees map[empName]job
 }
 
 func TestStructInput(t *testing.T) {
@@ -136,6 +139,10 @@ func TestStructInput(t *testing.T) {
 			"web/html": 15,
 			"k8s-app":  20,
 		},
+		Employees: map[empName]job{
+			"jason": "manager",
+			"dan":   "clerk",
+		},
 	}
 
 	storeTests := []jsonpathTest{
@@ -147,6 +154,8 @@ func TestStructInput(t *testing.T) {
 		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday"},
 		{"variable", "hello {.Name}", storeData, "hello jsonpath"},
 		{"dict/", "{$.Labels.web/html}", storeData, "15"},
+		{"dict/", "{$.Employees.jason}", storeData, "manager"},
+		{"dict/", "{$.Employees.dan}", storeData, "clerk"},
 		{"dict-", "{.Labels.k8s-app}", storeData, "20"},
 		{"nest", "{.Bicycle.Color}", storeData, "red"},
 		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville"},

@@ -95,7 +95,7 @@ func (t *TextNode) String() string {
 	return fmt.Sprintf("%s: %s", t.Type(), t.Text)
 }
 
-// FieldNode holds filed of struct
+// FieldNode holds field of struct
 type FieldNode struct {
 	NodeType
 	Value string
