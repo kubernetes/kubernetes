@@ -2679,12 +2679,7 @@ var _third_party_swagger_ui_index_html = []byte(`<!DOCTYPE html>
   <script src='lib/swagger-oauth.js' type='text/javascript'></script>
   <script type="text/javascript">
     $(function () {
-      var url = window.location.search.match(/url=([^&]+)/);
-      if (url && url.length > 1) {
-        url = decodeURIComponent(url[1]);
-      } else {
-        url = "../../swaggerapi";
-      }
+      var url = "../../swaggerapi";
       window.swaggerUi = new SwaggerUi({
         url: url,
         dom_id: "swagger-ui-container",
@@ -2763,7 +2758,7 @@ func third_party_swagger_ui_index_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/index.html", size: 3720, mode: os.FileMode(416), modTime: time.Unix(1458251987, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/index.html", size: 3561, mode: os.FileMode(416), modTime: time.Unix(1458347707, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
