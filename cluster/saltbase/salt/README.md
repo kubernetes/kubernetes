@@ -24,7 +24,6 @@ Config                                              | GCE   | Vagrant | AWS |
 [kubelet](kubelet/)                                 | M n   | M n     | M n |
 [logrotate](logrotate/)                             | M n   |   n     | M n |
 [supervisord](supervisor/)                          | M n   | M n     | M n |
-[static-routes](static-routes/) (vsphere only)      |       |         |     |
 [base](base.sls)                                    | M n   | M n     | M n |
 [kube-client-tools](kube-client-tools.sls)          | M     | M       | M   |
 
