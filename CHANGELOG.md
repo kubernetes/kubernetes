@@ -44,10 +44,9 @@ API group): The Horizontal Pod Autoscaling feature now supports custom metrics
 trigger scaling up and down the number of pods in your application.
   * <strong>New GUI</strong> (dashboard) allows you to get started quickly and enables the same
 functionality found in the CLI as a more approachable and discoverable way of
-interacting with the system. Note: the GUI is eanbled by default for new
-cluster creation, however, it does not 
+interacting with the system. Note: the GUI is enabled by default in 1.2 clusters.
 
-<img src="docs/images/newgui.png" width="" alt="XXX image" title="XXX image tooltip">
+<img src="docs/images/newgui.png" width="" alt="Dashboard UI screenshot showing cards that represent applications that run inside a cluster" title="Dashboard UI apps screen">
 
 ## Other notable improvements 
 
