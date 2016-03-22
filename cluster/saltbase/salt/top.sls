@@ -19,7 +19,6 @@ base:
     - cni
 {% endif %}
     - helpers
-    - cadvisor
     - kube-client-tools
     - kube-node-unpacker
     - kubelet
@@ -55,7 +54,6 @@ base:
     - kube-controller-manager
     - kube-scheduler
     - supervisor
-    - cadvisor
     - kube-client-tools
     - kube-master-addons
     - kube-admission-controls
