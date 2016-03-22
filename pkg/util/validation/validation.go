@@ -155,9 +155,9 @@ func IsValidPortName(port string) bool {
 	return false
 }
 
-// IsValidIPv4 tests that the argument is a valid IPv4 address.
-func IsValidIPv4(value string) bool {
-	return net.ParseIP(value) != nil && net.ParseIP(value).To4() != nil
+// IsValidIP tests that the argument is a valid IP address.
+func IsValidIP(value string) bool {
+	return net.ParseIP(value) != nil
 }
 
 const percentFmt string = "[0-9]+%"

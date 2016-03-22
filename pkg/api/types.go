@@ -1628,6 +1628,8 @@ type EndpointSubset struct {
 // EndpointAddress is a tuple that describes single IP address.
 type EndpointAddress struct {
 	// The IP of this endpoint.
+	// IPv6 is also accepted but not fully supported on all platforms. Also, certain
+	// kubernetes components, like kube-proxy, are not IPv6 ready.
 	// TODO: This should allow hostname or IP, see #4447.
 	IP string
 
