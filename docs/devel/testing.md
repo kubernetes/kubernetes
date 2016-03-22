@@ -174,55 +174,7 @@ hack/test-integration.sh  # Run all integration tests.
 
 ## End-to-End tests
 
-* e2e tests build kubernetes and deploy a cluster of nodes.
-  - Generally on a specific cloud provider.
-* Access gcr.io images
-* Access a specific, non-latest image tag (unless testing pulling).
-* Tests may not flake due to intermittent issues.
-* Use ginko to desribe steps.
-  - See [should run a job to completion when tasks succeed](../../test/e2e/job.go)
-* Use [NewDefaultFramework](../../test/e2e/framework.go)
-  - Contains clients, namespace and auto resource cleanup
-* See [coding conventions](coding-conventions.md).
-
-### e2e test philosophy
-
-In general passing unit and integration tests should provide sufficient
-confidence to allow code to merge.  If that is not the case,
-please *invest more time adding unit and integration test coverage*.
-These tests run faster and have a smaller failure domain.
-
-However, end-to-end (e2e) tests provide maximum confidence that
-the system is working in exchange for reduced performance and a
-higher debugging cost.
-
-e2e tests deploy a real kubernetes cluster of real nodes on a concrete provider
-such as GCE. The tests then manipulate the cluster in certain ways and
-assert the expected results.
-
-For a more in depth discussion please read [End-to-End Testing in Kubernetes](e2e-tests.md).
-
-### Running e2e tests
-
-```sh
-cd kubernetes
-go run hack/e2e.go -v --build --up --test --down
-
-# Change code, run unit and integration tests
-# Push to an existing cluster, or bring up a cluster if it's down.
-go run hack/e2e.go -v --pushup
-
-# Run all tests on an already up cluster
-go run hack/e2e.go -v --test
-
-# Run only conformance tests
-go run hack/e2e.go -v -test --test_args="--ginkgo.focus=\[Conformance\]"
-
-# Run tests on a specific provider
-KUBERNETES_PROVIDER=aws go run hack/e2e.go --build --pushup --test --down
-```
-
-For a more in depth discussion please read [End-to-End Testing in Kubernetes](e2e-tests.md).
+Please refer to [End-to-End Testing in Kubernetes](e2e-tests.md).
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/testing.md?pixel)]()
