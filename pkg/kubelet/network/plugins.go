@@ -29,6 +29,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilsets "k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -39,6 +40,12 @@ const DefaultPluginName = "kubernetes.io/no-op"
 // controller manager's --allocate-node-cidrs=true option
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE = "pod-cidr-change"
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
+
+// Plugin capabilities
+const (
+	// Indicates the plugin handles Kubernetes bandwidth shaping annotations internally
+	NET_PLUGIN_CAPABILITY_SHAPING int = 1
+)
 
 // Plugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
@@ -53,6 +60,9 @@ type NetworkPlugin interface {
 	// Name returns the plugin's name. This will be used when searching
 	// for a plugin by name, e.g.
 	Name() string
+
+	// Returns a set of NET_PLUGIN_CAPABILITY_*
+	Capabilities() utilsets.Int
 
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
@@ -164,6 +174,10 @@ func (plugin *NoopNetworkPlugin) Event(name string, details map[string]interface
 
 func (plugin *NoopNetworkPlugin) Name() string {
 	return DefaultPluginName
+}
+
+func (plugin *NoopNetworkPlugin) Capabilities() utilsets.Int {
+	return utilsets.NewInt()
 }
 
 func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.DockerID) error {
