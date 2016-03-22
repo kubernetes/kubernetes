@@ -41,6 +41,8 @@ func main() {
 		"k8s.io/kubernetes/pkg/apis/autoscaling/v1",
 		"k8s.io/kubernetes/pkg/apis/batch",
 		"k8s.io/kubernetes/pkg/apis/batch/v1",
+		"k8s.io/kubernetes/pkg/apis/controlplane",
+		"k8s.io/kubernetes/pkg/apis/controlplane/v1alpha1",
 		"k8s.io/kubernetes/pkg/apis/componentconfig",
 		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1",
 		"k8s.io/kubernetes/pkg/apis/extensions",
