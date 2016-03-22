@@ -58,21 +58,21 @@ func (vh *volumeHost) GetKubeClient() clientset.Interface {
 	return vh.kubelet.kubeClient
 }
 
-func (vh *volumeHost) NewWrapperBuilder(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+func (vh *volumeHost) NewWrapperMounter(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
 		spec.Volume.Name = wrapperVolumeName
 	}
 
-	b, err := vh.kubelet.newVolumeBuilderFromPlugins(&spec, pod, opts)
+	b, err := vh.kubelet.newVolumeMounterFromPlugins(&spec, pod, opts)
 	if err == nil && b == nil {
 		return nil, errUnsupportedVolumeType
 	}
 	return b, nil
 }
 
-func (vh *volumeHost) NewWrapperCleaner(volName string, spec volume.Spec, podUID types.UID) (volume.Cleaner, error) {
+func (vh *volumeHost) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
@@ -87,7 +87,7 @@ func (vh *volumeHost) NewWrapperCleaner(volName string, spec volume.Spec, podUID
 		// Not found but not an error
 		return nil, nil
 	}
-	c, err := plugin.NewCleaner(spec.Name(), podUID)
+	c, err := plugin.NewUnmounter(spec.Name(), podUID)
 	if err == nil && c == nil {
 		return nil, errUnsupportedVolumeType
 	}
@@ -127,7 +127,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 
 		// Try to use a plugin for this volume.
 		internal := volume.NewSpecFromVolume(volSpec)
-		builder, err := kl.newVolumeBuilderFromPlugins(internal, pod, volume.VolumeOptions{RootContext: rootContext})
+		builder, err := kl.newVolumeMounterFromPlugins(internal, pod, volume.VolumeOptions{RootContext: rootContext})
 		if err != nil {
 			glog.Errorf("Could not create volume builder for pod %s: %v", pod.UID, err)
 			return nil, err
@@ -138,7 +138,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 
 		// some volumes require attachment before builder's setup.
 		// The plugin can be nil, but non-nil errors are legitimate errors.
-		// For non-nil plugins, Attachment to a node is required before Builder's setup.
+		// For non-nil plugins, Attachment to a node is required before Mounter's setup.
 		attacher, err := kl.newVolumeAttacherFromPlugins(internal, pod, volume.VolumeOptions{RootContext: rootContext})
 		if err != nil {
 			glog.Errorf("Could not create volume attacher for pod %s: %v", pod.UID, err)
@@ -155,7 +155,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		if err != nil {
 			return nil, err
 		}
-		podVolumes[volSpec.Name] = kubecontainer.VolumeInfo{Builder: builder}
+		podVolumes[volSpec.Name] = kubecontainer.VolumeInfo{Mounter: builder}
 	}
 	return podVolumes, nil
 }
@@ -173,7 +173,7 @@ func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume
 		return result, false
 	}
 	for name, info := range vm {
-		result[name] = info.Builder
+		result[name] = info.Mounter
 	}
 	return result, true
 }
@@ -206,14 +206,14 @@ func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
 }
 
 // cleanerTuple is a union struct to allow separating detaching from the cleaner.
-// some volumes require detachment but not all.  Cleaner cannot be nil but Detacher is optional.
+// some volumes require detachment but not all.  Unmounter cannot be nil but Detacher is optional.
 type cleanerTuple struct {
-	Cleaner  volume.Cleaner
-	Detacher *volume.Detacher
+	Unmounter volume.Unmounter
+	Detacher  *volume.Detacher
 }
 
 // getPodVolumesFromDisk examines directory structure to determine volumes that
-// are presently active and mounted. Returns a union struct containing a volume.Cleaner
+// are presently active and mounted. Returns a union struct containing a volume.Unmounter
 // and potentially a volume.Detacher.
 func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleanerTuple {
 	currentVolumes := make(map[string]cleanerTuple)
@@ -231,13 +231,13 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleanerTuple {
 		}
 		for _, volume := range volumes {
 			identifier := fmt.Sprintf("%s/%s", podUID, volume.Name)
-			glog.V(4).Infof("Making a volume.Cleaner for volume %s/%s of pod %s", volume.Kind, volume.Name, podUID)
+			glog.V(4).Infof("Making a volume.Unmounter for volume %s/%s of pod %s", volume.Kind, volume.Name, podUID)
 			// TODO(thockin) This should instead return a reference to an extant
 			// volume object, except that we don't actually hold on to pod specs
 			// or volume objects.
 
 			// Try to use a plugin for this volume.
-			cleaner, err := kl.newVolumeCleanerFromPlugins(volume.Kind, volume.Name, podUID)
+			cleaner, err := kl.newVolumeUnmounterFromPlugins(volume.Kind, volume.Name, podUID)
 			if err != nil {
 				glog.Errorf("Could not create volume cleaner for %s: %v", volume.Name, err)
 				continue
@@ -247,7 +247,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleanerTuple {
 				continue
 			}
 
-			tuple := cleanerTuple{Cleaner: cleaner}
+			tuple := cleanerTuple{Unmounter: cleaner}
 			detacher, err := kl.newVolumeDetacherFromPlugins(volume.Kind, volume.Name, podUID)
 			// plugin can be nil but a non-nil error is a legitimate error
 			if err != nil {
@@ -263,7 +263,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleanerTuple {
 	return currentVolumes
 }
 
-func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name(), err)
@@ -272,7 +272,7 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, 
 		// Not found but not an error
 		return nil, nil
 	}
-	builder, err := plugin.NewBuilder(spec, pod, opts)
+	builder, err := plugin.NewMounter(spec, pod, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume builder for %s: %v", spec.Name(), err)
 	}
@@ -298,7 +298,7 @@ func (kl *Kubelet) newVolumeAttacherFromPlugins(spec *volume.Spec, pod *api.Pod,
 	return attacher, nil
 }
 
-func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID types.UID) (volume.Cleaner, error) {
+func (kl *Kubelet) newVolumeUnmounterFromPlugins(kind string, name string, podUID types.UID) (volume.Unmounter, error) {
 	plugName := strings.UnescapeQualifiedNameForDisk(kind)
 	plugin, err := kl.volumePluginMgr.FindPluginByName(plugName)
 	if err != nil {
@@ -309,7 +309,7 @@ func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID 
 		// Not found but not an error.
 		return nil, nil
 	}
-	cleaner, err := plugin.NewCleaner(name, podUID)
+	cleaner, err := plugin.NewUnmounter(name, podUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume plugin for %s/%s: %v", podUID, kind, err)
 	}

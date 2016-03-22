@@ -99,7 +99,7 @@ func (fake *fakeDiskManager) Cleanup() {
 func (fake *fakeDiskManager) MakeGlobalPDName(disk fcDisk) string {
 	return fake.tmpDir
 }
-func (fake *fakeDiskManager) AttachDisk(b fcDiskBuilder) error {
+func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) error {
 	globalPath := b.manager.MakeGlobalPDName(*b.fcDisk)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
@@ -113,7 +113,7 @@ func (fake *fakeDiskManager) AttachDisk(b fcDiskBuilder) error {
 	return nil
 }
 
-func (fake *fakeDiskManager) DetachDisk(c fcDiskCleaner, mntPath string) error {
+func (fake *fakeDiskManager) DetachDisk(c fcDiskUnmounter, mntPath string) error {
 	globalPath := c.manager.MakeGlobalPDName(*c.fcDisk)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
@@ -140,21 +140,21 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	fakeManager := NewFakeDiskManager()
 	defer fakeManager.Cleanup()
 	fakeMounter := &mount.FakeMounter{}
-	builder, err := plug.(*fcPlugin).newBuilderInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
+	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
-		t.Errorf("Failed to make a new Builder: %v", err)
+		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
-	if builder == nil {
-		t.Errorf("Got a nil Builder: %v", err)
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter: %v", err)
 	}
 
-	path := builder.GetPath()
+	path := mounter.GetPath()
 	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~fc/vol1", tmpDir)
 	if path != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
 
-	if err := builder.SetUp(nil); err != nil {
+	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -177,15 +177,15 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 
 	fakeManager2 := NewFakeDiskManager()
 	defer fakeManager2.Cleanup()
-	cleaner, err := plug.(*fcPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager2, fakeMounter)
+	unmounter, err := plug.(*fcPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager2, fakeMounter)
 	if err != nil {
-		t.Errorf("Failed to make a new Cleaner: %v", err)
+		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
-	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner: %v", err)
+	if unmounter == nil {
+		t.Errorf("Got a nil Unmounter: %v", err)
 	}
 
-	if err := cleaner.TearDown(); err != nil {
+	if err := unmounter.TearDown(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -277,12 +277,12 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(fcPluginName)
 
-	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
+	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{})
+	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
 
-	if !builder.GetAttributes().ReadOnly {
-		t.Errorf("Expected true for builder.IsReadOnly")
+	if !mounter.GetAttributes().ReadOnly {
+		t.Errorf("Expected true for mounter.IsReadOnly")
 	}
 }
