@@ -141,4 +141,13 @@ export MASTER_IP_RANGE="100.65.0.0/24"
 export CLUSTER_IP_RANGE="100.66.0.0/16"
 ```
 
+**KUBE_VPC_CIDR_BASE**
+
+By default `kube-up.sh` will create a VPC with CIDR 172.20.0.0/16. `KUBE_VPC_CIDR_BASE` allows to configure
+this CIDR. For example you may choose to use `172.21.0.0/16`:
+
+```
+export KUBE_VPC_CIDR_BASE=172.21
+```
+
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/aws/options.md?pixel)]()
