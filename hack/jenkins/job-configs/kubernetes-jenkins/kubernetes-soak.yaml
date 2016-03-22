@@ -57,7 +57,7 @@
         - junit-publisher
         - log-parser
     triggers:
-        - timed: 'H/30 * * * *'
+        - timed: '{cron-string}'
     wrappers:
         - ansicolor:
             colormap: xterm
@@ -145,6 +145,7 @@
             post-env: ''
             soak-deploy: ''
             soak-continuous: ''
+            cron-string: 'H */6 * * *'
         - 'gke':
             deploy-description: |
                 Deploy Kubernetes to a GKE soak cluster using the staging GKE
