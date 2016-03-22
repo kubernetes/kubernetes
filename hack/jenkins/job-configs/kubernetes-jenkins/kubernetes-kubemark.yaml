@@ -73,7 +73,7 @@
         - 'high-density-100-gce':
             description: 'Run Kubemark high-density (100 pods/node) test on a fake 100 node cluster.'
             timeout: 160
-            cron-string: '@hourly'
+            cron-string: 'H 20 * * 6'
             job-env: |
                 export E2E_NAME="kubemark-100pods"
                 export PROJECT="k8s-jenkins-kubemark"
@@ -107,10 +107,10 @@
                 export KUBEMARK_MASTER_SIZE="n1-standard-16"
                 export KUBEMARK_NUM_NODES="500"
         - 'gce-scale':
-            description: 'Run Density test on Kubemark in very large cluster. Currently only scheduled to run every 6 hours so as not to waste too many resources.'
+            description: 'Run Density test on Kubemark in very large cluster. Currently only scheduled to run every 12 hours so as not to waste too many resources.'
             # 12h - load tests take really, really, really long time.
             timeout: 720
-            cron-string: 'H H/8 * * *'
+            cron-string: 'H H/12 * * *'
             job-env: |
                 # XXX Not a unique project
                 export E2E_NAME="kubemark-1000"
