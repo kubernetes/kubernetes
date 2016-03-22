@@ -257,6 +257,7 @@ no-headers
 no-suggestions
 node-instance-group
 node-ip
+node-label
 node-labels
 node-monitor-grace-period
 node-monitor-period
@@ -414,3 +415,5 @@ leader-elect-retry-period
 watch-cache-sizes
 lock-file
 hairpin-mode
+creation-timeout
+deletion-timeout
