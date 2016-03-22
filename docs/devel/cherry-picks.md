@@ -35,11 +35,27 @@ Documentation for other releases can be found at
 # Overview
 
 This document explains cherry picks are managed on release branches within the
-Kubernetes projects.
+Kubernetes projects.  Patches are either applied in batches or individually
+depending on the point in the release cycle.
 
 ## Propose a Cherry Pick
 
-Any contributor can propose a cherry pick of any pull request, like so:
+### BATCHING: After branching during code slush up to X.X.0
+
+Starting with the release-1.2 branch, we shifted to a new cherrypick model
+where the branch 'OWNERS' cherry pick batches of patches into the branch
+to control the order and also vet what is or is not cherrypicked to a branch.
+
+Contributors that want to include a cherrypick for a branch should label
+their PR with the `cherrypick-candidate` label **AND** mark it
+with the appropriate milestone (or the bot will unlabel it).
+
+These cherrypick-candidate's will be triaged, batched up and submitted
+to the release branch by the branch OWNERS.
+
+There is an [issue](https://github.com/kubernetes/kubernetes/issues/23347) open to automate this new procedure.
+
+### INDIVIDUAL CHERRYPICKS: Post X.X.0
 
 ```sh
 hack/cherry_pick_pull.sh upstream/release-3.14 98765
@@ -48,7 +64,7 @@ hack/cherry_pick_pull.sh upstream/release-3.14 98765
 This will walk you through the steps to propose an automated cherry pick of pull
  #98765 for remote branch `upstream/release-3.14`.
 
-### Cherrypicking a doc change
+#### Cherrypicking a doc change
 
 If you are cherrypicking a change which adds a doc, then you also need to run
 `build/versionize-docs.sh` in the release branch to versionize that doc.
@@ -72,15 +88,14 @@ particular, they may be self-merged by the release branch owner without fanfare,
 in the case the release branch owner knows the cherry pick was already
 requested - this should not be the norm, but it may happen.
 
+## Searching for Cherry Picks
+
+See the [cherrypick queue dashboard](http://cherrypick.k8s.io/#/queue) for
+status of PRs labeled as `cherrypick-candidate`.
+
 [Contributor License Agreements](http://releases.k8s.io/HEAD/CONTRIBUTING.md) is considered implicit
 for all code within cherry-pick pull requests, ***unless there is a large
 conflict***.
-
-## Searching for Cherry Picks
-
-Now that we've structured cherry picks as PRs, searching for all cherry-picks
-against a release is a GitHub query: For example,
-[this query is all of the v0.21.x cherry-picks](https://github.com/kubernetes/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Apr+%22automated+cherry+pick%22+base%3Arelease-0.21)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
