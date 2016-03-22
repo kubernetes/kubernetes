@@ -21,13 +21,18 @@ package abac
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
-	"os"
+	"io/ioutil"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 
+	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
 	api "k8s.io/kubernetes/pkg/apis/abac"
 	_ "k8s.io/kubernetes/pkg/apis/abac/latest"
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
@@ -51,17 +56,78 @@ func (p policyLoadError) Error() string {
 
 type policyList []*api.Policy
 
+func getPolicyFile(policyFile string) (*bufio.Scanner, error) {
+
+	arr := strings.Split(policyFile, "@")
+	if len(arr) == 1 {
+		// This is a local file
+		glog.V(1).Infof("Loading policy file from a local file: %s\n", policyFile)
+		fileContent, err := ioutil.ReadFile(policyFile)
+		if err != nil {
+			return nil, err
+		}
+		return bufio.NewScanner(bytes.NewReader(fileContent)), nil
+	} else if len(arr) > 2 {
+		return nil, fmt.Errorf("Policy file is not correctly specified: %s\n", policyFile)
+	}
+
+	storageType := strings.ToLower(arr[0])
+	policyFile = arr[1]
+
+	switch storageType {
+	case "etcd":
+		glog.V(1).Infof("Loading policy file from etcd\n")
+
+		serverList := []string{}
+		path := ""
+
+		re := regexp.MustCompile(`(http[s]?://[a-zA-Z0-9\.]+:[0-9]+)/(.+)`)
+		locations := strings.Split(policyFile, ",")
+		for _, location := range locations {
+			result := re.FindStringSubmatch(location)
+			if result == nil || len(result) != 3 {
+				return nil, fmt.Errorf("etcd location is not recognized: %s\n", location)
+			}
+
+			serverList = append(serverList, result[1])
+			if path == "" {
+				path = result[2]
+			} else if path != result[2] {
+				return nil, fmt.Errorf("All etcd path should be the same, %s does not match others\n", result[2])
+			}
+		}
+		path = "/" + path
+
+		cfg := etcd.Config{
+			Endpoints:               serverList,
+			Transport:               etcd.DefaultTransport,
+			HeaderTimeoutPerRequest: time.Second,
+		}
+
+		client, err := etcd.New(cfg)
+		if err != nil {
+			return nil, err
+		}
+
+		kapi := etcd.NewKeysAPI(client)
+		if resp, err := kapi.Get(context.Background(), path, nil); err != nil {
+			return nil, err
+		} else {
+			return bufio.NewScanner(strings.NewReader(resp.Node.Value)), nil
+		}
+	}
+	return nil, fmt.Errorf("Storage type %s is not currently supported\n", storageType)
+}
+
 // TODO: Have policies be created via an API call and stored in REST storage.
 func NewFromFile(path string) (policyList, error) {
 	// File format is one map per line.  This allows easy concatentation of files,
 	// comments in files, and identification of errors by line number.
-	file, err := os.Open(path)
+
+	scanner, err := getPolicyFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
 	pl := make(policyList, 0)
 
 	decoder := api.Codecs.UniversalDecoder()
