@@ -210,10 +210,10 @@ We are working on implementing clearer partitioning of our e2e tests to make run
 
 Finally, `[Conformance]` tests represent a subset of the e2e-tests we expect to pass on **any** Kubernetes cluster.  The `[Conformance]` label does not supersede any other labels.
 
-As each new release of Kubernetes providers new functionality, the subset of tests necessary to demonstrate conformance grows with each release.  Conformance is thus considered versioned with an eye towards backwards compatibility.  Conformance tests for a given version should be run off of the release branch that corresponds to that version.  Thus `v1.2` conformance tests would be run from the head of the `release-1.2` branch. eg:
+As each new release of Kubernetes providers new functionality, the subset of tests necessary to demonstrate conformance grows with each release.  Conformance is thus considered versioned, with the same backwards compatibility guarantees as laid out in [our versioning policy](../design/versioning.md#supported-releases).  Conformance tests for a given version should be run off of the release branch that corresponds to that version.  Thus `v1.2` conformance tests would be run from the head of the `release-1.2` branch. eg:
 
- - A v1.3 development cluster should pass v1.0, v1.1, v1.2 conformance tests
- - A v1.2 cluster should pass v1.0, v1.1, v1.2 conformance tests
+ - A v1.3 development cluster should pass v1.1, v1.2 conformance tests
+ - A v1.2 cluster should pass v1.1, v1.2 conformance tests
  - A v1.1 cluster should pass v1.0, v1.1 conformance tests, and fail v1.2 conformance tests
 
 Conformance tests are designed to be run with no cloud provider configured.  Conformance tests can be run against clusters that have not been created with `hack/e2e.go`, just provide a kubeconfig with the appropriate endpoint and credentials.
