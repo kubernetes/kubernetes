@@ -334,16 +334,6 @@ function ssh-to-node {
   echo "TODO: ssh-to-node" 1>&2
 }
 
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  echo "TODO: restart-kube-proxy" 1>&2
-}
-
-# Restart the apiserver
-function restart-apiserver {
-  echo "TODO: restart-apiserver" 1>&2
-}
-
 # Waits for a kube-system pod (of the provided name) to have the phase/status "Running".
 function cluster::mesos::docker::await_ready {
   local pod_name="$1"
