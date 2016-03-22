@@ -405,7 +405,7 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
-			hairpinMode == componentconfig.HairpinVeth,
+			klet.hairpinMode == componentconfig.HairpinVeth,
 			containerRuntimeOptions...,
 		)
 	case "rkt":
