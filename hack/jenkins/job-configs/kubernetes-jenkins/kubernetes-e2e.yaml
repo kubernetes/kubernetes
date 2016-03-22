@@ -112,7 +112,7 @@
             description: 'Run the performance/scalability tests on GCE. A larger cluster is used.'
             timeout: 120
             # TODO: Run this twice a day after we make kubemark-500 a blocking suite.
-            # cron-string: 'H H/12 * * *'
+            # cron-string: '@hourly'
             job-env: |
                 export E2E_NAME="e2e-scalability"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Performance\] \
