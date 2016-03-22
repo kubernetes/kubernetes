@@ -208,7 +208,7 @@ func TestAttachWarnings(t *testing.T) {
 			pod:         attachPod(),
 			stdin:       true,
 			tty:         true,
-			expectedErr: "Unable to use a TTY - container bar doesn't allocate one",
+			expectedErr: "Unable to use a TTY - container bar did not allocate one",
 		},
 	}
 	for _, test := range tests {
