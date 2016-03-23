@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
@@ -251,7 +250,7 @@ func TestGetNotFoundErr(t *testing.T) {
 
 	var got api.Pod
 	err := helper.Get(context.TODO(), boguskey, &got, false)
-	if !etcdutil.IsEtcdNotFound(err) {
+	if !storage.IsNotFound(err) {
 		t.Errorf("Unexpected reponse on key=%v, err=%v", key, err)
 	}
 }
