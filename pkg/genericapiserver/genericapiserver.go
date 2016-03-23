@@ -507,8 +507,8 @@ func New(c *Config) (*GenericAPIServer, error) {
 
 func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolver {
 	return &apiserver.RequestInfoResolver{
-		sets.NewString(strings.Trim(s.APIPrefix, "/"), strings.Trim(s.APIGroupPrefix, "/")), // all possible API prefixes
-		sets.NewString(strings.Trim(s.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
+		APIPrefixes:          sets.NewString(strings.Trim(s.APIPrefix, "/"), strings.Trim(s.APIGroupPrefix, "/")), // all possible API prefixes
+		GrouplessAPIPrefixes: sets.NewString(strings.Trim(s.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
 	}
 }
 

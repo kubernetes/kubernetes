@@ -82,7 +82,7 @@ func (ci *ConformanceImage) List() ([]string, error) {
 }
 
 func (ci *ConformanceImage) Remove() error {
-	ci.Runtime.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Second * 30, 1, 0})
+	ci.Runtime.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Second * 30, MaxPerPodContainer: 1, MaxContainers: 0})
 
 	var err error
 	for start := time.Now(); time.Since(start) < time.Minute*2; time.Sleep(time.Second * 30) {

@@ -789,7 +789,7 @@ func TestGetContainerInfo(t *testing.T) {
 			Containers: []*kubecontainer.Container{
 				{
 					Name: "foo",
-					ID:   kubecontainer.ContainerID{"test", containerID},
+					ID:   kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
 		},
@@ -871,7 +871,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 			Namespace: "ns",
 			Containers: []*kubecontainer.Container{
 				{Name: "foo",
-					ID: kubecontainer.ContainerID{"test", containerID},
+					ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
 		},
@@ -995,7 +995,7 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 			Namespace: "ns",
 			Containers: []*kubecontainer.Container{
 				{Name: "bar",
-					ID: kubecontainer.ContainerID{"test", "fakeID"},
+					ID: kubecontainer.ContainerID{Type: "test", ID: "fakeID"},
 				},
 			}},
 	}
@@ -1078,7 +1078,7 @@ func TestRunInContainer(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
 
-	containerID := kubecontainer.ContainerID{"test", "abc1234"}
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	fakeRuntime.PodList = []*kubecontainer.Pod{
 		{
 			ID:        "12345678",
@@ -2152,7 +2152,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 			Namespace: podNamespace,
 			Containers: []*kubecontainer.Container{
 				{Name: "bar",
-					ID: kubecontainer.ContainerID{"test", "barID"}},
+					ID: kubecontainer.ContainerID{Type: "test", ID: "barID"}},
 			},
 		},
 	}
@@ -2215,7 +2215,7 @@ func TestExecInContainer(t *testing.T) {
 			Namespace: podNamespace,
 			Containers: []*kubecontainer.Container{
 				{Name: containerID,
-					ID: kubecontainer.ContainerID{"test", containerID},
+					ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
 		},
@@ -2300,7 +2300,7 @@ func TestPortForward(t *testing.T) {
 			Containers: []*kubecontainer.Container{
 				{
 					Name: "foo",
-					ID:   kubecontainer.ContainerID{"test", "containerFoo"},
+					ID:   kubecontainer.ContainerID{Type: "test", ID: "containerFoo"},
 				},
 			},
 		},
@@ -3523,7 +3523,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 			Containers: []*kubecontainer.Container{
 				{
 					Name: "foo",
-					ID:   kubecontainer.ContainerID{"test", containerID},
+					ID:   kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
 		},

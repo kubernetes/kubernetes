@@ -31,13 +31,13 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		{
 			groupMetas: []apimachinery.GroupMeta{
 				{
-					GroupVersion: unversioned.GroupVersion{"group1", "v1"},
+					GroupVersion: unversioned.GroupVersion{Group: "group1", Version: "v1"},
 				},
 				{
-					GroupVersion: unversioned.GroupVersion{"group2", "v2"},
+					GroupVersion: unversioned.GroupVersion{Group: "group2", Version: "v2"},
 				},
 				{
-					GroupVersion: unversioned.GroupVersion{"", "v1"},
+					GroupVersion: unversioned.GroupVersion{Group: "", Version: "v1"},
 				},
 			},
 			expect: "group1/v1,group2/v2,v1",
@@ -45,7 +45,7 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		{
 			groupMetas: []apimachinery.GroupMeta{
 				{
-					GroupVersion: unversioned.GroupVersion{"", "v1"},
+					GroupVersion: unversioned.GroupVersion{Group: "", Version: "v1"},
 				},
 			},
 			expect: "v1",

@@ -631,7 +631,7 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(
-		generic.RESTOptions{m.thirdPartyStorage, generic.UndecoratedStorage, m.deleteCollectionWorkers}, group, kind)
+		generic.RESTOptions{Storage: m.thirdPartyStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: m.deleteCollectionWorkers}, group, kind)
 
 	apiRoot := makeThirdPartyPath("")
 
@@ -692,7 +692,7 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	if isEnabled("horizontalpodautoscalers") {
 		m.constructHPAResources(c, storage)
 		controllerStorage := expcontrolleretcd.NewStorage(
-			generic.RESTOptions{c.StorageDestinations.Get("", "replicationControllers"), m.StorageDecorator(), m.deleteCollectionWorkers})
+			generic.RESTOptions{Storage: c.StorageDestinations.Get("", "replicationControllers"), Decorator: m.StorageDecorator(), DeleteCollectionWorkers: m.deleteCollectionWorkers})
 		storage["replicationcontrollers"] = controllerStorage.ReplicationController
 		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}

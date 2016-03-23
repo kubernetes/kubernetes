@@ -109,7 +109,7 @@ func TestUpdateStatusTestType(t *testing.T) {
 				"name": "baz",
 			},
 		},
-		Status: testgroup.TestTypeStatus{"I'm in good status"},
+		Status: testgroup.TestTypeStatus{Blah: "I'm in good status"},
 	}
 	c := DecoratedSimpleClient{
 		simpleClient: simple.Client{

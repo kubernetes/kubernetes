@@ -109,7 +109,7 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, pod
 		},
 		fsType:      fsType,
 		readOnly:    readOnly,
-		diskMounter: &mount.SafeFormatAndMount{mounter, exec.New()}}, nil
+		diskMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}}, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
