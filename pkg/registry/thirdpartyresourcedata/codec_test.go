@@ -173,7 +173,7 @@ func TestCreater(t *testing.T) {
 			t.Errorf("[%s] unexpected non-error", test.name)
 		}
 		if !reflect.DeepEqual(test.expectedObj, out) {
-			t.Errorf("[%s] unexpected error: expect: %v, got: %v", test.expectedObj, out)
+			t.Errorf("[%s] unexpected error: expect: %v, got: %v", test.name, test.expectedObj, out)
 		}
 
 	}

@@ -165,7 +165,7 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 			prefix = "Retrieving log for the last terminated container"
 		}
 		if err != nil {
-			Logf("%s %s, err: %v:\n%s\n", prefix, id, log)
+			Logf("%s %s, err: %v:\n%s\n", prefix, id, err, log)
 		} else {
 			Logf("%s %s:\n%s\n", prefix, id, log)
 		}

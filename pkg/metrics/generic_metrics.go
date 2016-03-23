@@ -141,7 +141,6 @@ func parseMetrics(data string, knownMetrics map[string][]string, output *Metrics
 			}
 		}
 	}
-	return nil
 }
 
 func (g *MetricsGrabber) getMetricsFromPod(podName string, namespace string, port int) (string, error) {

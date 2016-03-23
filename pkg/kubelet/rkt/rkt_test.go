@@ -713,7 +713,7 @@ func TestGetPodStatus(t *testing.T) {
 func generateCapRetainIsolator(t *testing.T, caps ...string) appctypes.Isolator {
 	retain, err := appctypes.NewLinuxCapabilitiesRetainSet(caps...)
 	if err != nil {
-		t.Fatalf("Error generating cap retain isolator", err)
+		t.Fatalf("Error generating cap retain isolator: %v", err)
 	}
 	return retain.AsIsolator()
 }
@@ -721,7 +721,7 @@ func generateCapRetainIsolator(t *testing.T, caps ...string) appctypes.Isolator 
 func generateCapRevokeIsolator(t *testing.T, caps ...string) appctypes.Isolator {
 	revoke, err := appctypes.NewLinuxCapabilitiesRevokeSet(caps...)
 	if err != nil {
-		t.Fatalf("Error generating cap revoke isolator", err)
+		t.Fatalf("Error generating cap revoke isolator: %v", err)
 	}
 	return revoke.AsIsolator()
 }
@@ -729,7 +729,7 @@ func generateCapRevokeIsolator(t *testing.T, caps ...string) appctypes.Isolator 
 func generateCPUIsolator(t *testing.T, request, limit string) appctypes.Isolator {
 	cpu, err := appctypes.NewResourceCPUIsolator(request, limit)
 	if err != nil {
-		t.Fatalf("Error generating cpu resource isolator", err)
+		t.Fatalf("Error generating cpu resource isolator: %v", err)
 	}
 	return cpu.AsIsolator()
 }
@@ -737,7 +737,7 @@ func generateCPUIsolator(t *testing.T, request, limit string) appctypes.Isolator
 func generateMemoryIsolator(t *testing.T, request, limit string) appctypes.Isolator {
 	memory, err := appctypes.NewResourceMemoryIsolator(request, limit)
 	if err != nil {
-		t.Fatalf("Error generating memory resource isolator", err)
+		t.Fatalf("Error generating memory resource isolator: %v", err)
 	}
 	return memory.AsIsolator()
 }
