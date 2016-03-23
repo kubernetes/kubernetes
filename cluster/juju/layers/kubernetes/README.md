@@ -65,7 +65,7 @@ cluster is operational.
 
  - [Kubernetes github project](https://github.com/kubernetes/kubernetes)
  - [Kubernetes issue tracker](https://github.com/kubernetes/kubernetes/issues)
- - [Kubernetes Documenation](https://github.com/kubernetes/kubernetes/tree/master/docs)
+ - [Kubernetes Documenation](http://kubernetes.io/docs/)
  - [Kubernetes releases](https://github.com/kubernetes/kubernetes/releases)
 
 # Contact
