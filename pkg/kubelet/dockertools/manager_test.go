@@ -394,7 +394,7 @@ func apiContainerToContainer(c docker.APIContainers) kubecontainer.Container {
 		return kubecontainer.Container{}
 	}
 	return kubecontainer.Container{
-		ID:   kubecontainer.ContainerID{"docker", c.ID},
+		ID:   kubecontainer.ContainerID{Type: "docker", ID: c.ID},
 		Name: dockerName.ContainerName,
 		Hash: hash,
 	}
@@ -408,7 +408,7 @@ func dockerContainersToPod(containers []*docker.APIContainers) kubecontainer.Pod
 			continue
 		}
 		pod.Containers = append(pod.Containers, &kubecontainer.Container{
-			ID:    kubecontainer.ContainerID{"docker", c.ID},
+			ID:    kubecontainer.ContainerID{Type: "docker", ID: c.ID},
 			Name:  dockerName.ContainerName,
 			Hash:  hash,
 			Image: c.Image,
@@ -1064,8 +1064,8 @@ func TestSyncPodBackoff(t *testing.T) {
 
 	startCalls := []string{"create", "start", "inspect_container"}
 	backOffCalls := []string{}
-	startResult := &kubecontainer.SyncResult{kubecontainer.StartContainer, "bad", nil, ""}
-	backoffResult := &kubecontainer.SyncResult{kubecontainer.StartContainer, "bad", kubecontainer.ErrCrashLoopBackOff, ""}
+	startResult := &kubecontainer.SyncResult{Action: kubecontainer.StartContainer, Target: "bad", Error: nil, Message: ""}
+	backoffResult := &kubecontainer.SyncResult{Action: kubecontainer.StartContainer, Target: "bad", Error: kubecontainer.ErrCrashLoopBackOff, Message: ""}
 	tests := []struct {
 		tick      int
 		backoff   int

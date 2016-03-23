@@ -213,7 +213,7 @@ func TestFakeDBus(t *testing.T) {
 			if method == "org.freedesktop.DBus.GetNameOwner" {
 				checkName := args[0].(string)
 				if checkName != ownedName {
-					return nil, godbus.Error{"org.freedesktop.DBus.Error.NameHasNoOwner", nil}
+					return nil, godbus.Error{Name: "org.freedesktop.DBus.Error.NameHasNoOwner", Body: nil}
 				} else {
 					return []interface{}{uniqueName}, nil
 				}

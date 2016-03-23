@@ -335,9 +335,9 @@ func (l *LeaderElector) maybeReportTransition() {
 func DefaultLeaderElectionConfiguration() componentconfig.LeaderElectionConfiguration {
 	return componentconfig.LeaderElectionConfiguration{
 		LeaderElect:   false,
-		LeaseDuration: unversioned.Duration{DefaultLeaseDuration},
-		RenewDeadline: unversioned.Duration{DefaultRenewDeadline},
-		RetryPeriod:   unversioned.Duration{DefaultRetryPeriod},
+		LeaseDuration: unversioned.Duration{Duration: DefaultLeaseDuration},
+		RenewDeadline: unversioned.Duration{Duration: DefaultRenewDeadline},
+		RetryPeriod:   unversioned.Duration{Duration: DefaultRetryPeriod},
 	}
 }
 

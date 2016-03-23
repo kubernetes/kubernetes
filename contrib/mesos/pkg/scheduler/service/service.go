@@ -874,7 +874,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	broadcaster := record.NewBroadcaster()
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
 	broadcaster.StartLogging(log.Infof)
-	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{eventsClient.Events("")})
+	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: eventsClient.Events("")})
 
 	lw := cache.NewListWatchFromClient(s.client.CoreClient, "pods", api.NamespaceAll, fields.Everything())
 

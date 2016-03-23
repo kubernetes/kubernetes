@@ -73,7 +73,7 @@ func machine1PrioritizerExtender(pod *api.Pod, nodes *api.NodeList) (*schedulera
 		if node.Name == "machine1" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{node.Name, score})
+		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: score})
 	}
 	return &result, nil
 }
@@ -85,7 +85,7 @@ func machine2PrioritizerExtender(pod *api.Pod, nodes *api.NodeList) (*schedulera
 		if node.Name == "machine2" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{node.Name, score})
+		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: score})
 	}
 	return &result, nil
 }
@@ -102,7 +102,7 @@ func machine2Prioritizer(_ *api.Pod, nodeNameToInfo map[string]*schedulercache.N
 		if node.Name == "machine2" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{node.Name, score})
+		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: score})
 	}
 	return result, nil
 }

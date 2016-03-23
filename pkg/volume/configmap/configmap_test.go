@@ -199,7 +199,7 @@ func TestCanSupport(t *testing.T) {
 	if plugin.Name() != configMapPluginName {
 		t.Errorf("Wrong name: %s", plugin.Name())
 	}
-	if !plugin.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{""}}}}}) {
+	if !plugin.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: ""}}}}}) {
 		t.Errorf("Expected true")
 	}
 	if plugin.CanSupport(&volume.Spec{}) {

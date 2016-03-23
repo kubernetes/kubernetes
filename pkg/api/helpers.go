@@ -342,13 +342,13 @@ func containsAccessMode(modes []PersistentVolumeAccessMode, mode PersistentVolum
 // ParseRFC3339 parses an RFC3339 date in either RFC3339Nano or RFC3339 format.
 func ParseRFC3339(s string, nowFn func() unversioned.Time) (unversioned.Time, error) {
 	if t, timeErr := time.Parse(time.RFC3339Nano, s); timeErr == nil {
-		return unversioned.Time{t}, nil
+		return unversioned.Time{Time: t}, nil
 	}
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
 		return unversioned.Time{}, err
 	}
-	return unversioned.Time{t}, nil
+	return unversioned.Time{Time: t}, nil
 }
 
 // NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
