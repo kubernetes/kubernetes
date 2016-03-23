@@ -946,6 +946,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/kube-addons/namespace.yaml" "${release_stage}/trusty"
   cp "${salt_dir}/kube-addons/kube-addons.sh" "${release_stage}/trusty"
   cp "${salt_dir}/kube-addons/kube-addon-update.sh" "${release_stage}/trusty"
+  cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${release_stage}/trusty"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${release_stage}/trusty"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)

@@ -13,7 +13,7 @@ cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/gce/coreos/helper.sh:# cloud_config yaml file should be passed
-cluster/gce/trusty/configure.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
 cluster/juju/layers/kubernetes/reactive/k8s.py:        check_call(split(cmd.format(directory, cluster_name, public_address,
 cluster/juju/layers/kubernetes/reactive/k8s.py:        check_call(split(cmd.format(directory, context, cluster_name, user)))
@@ -23,7 +23,6 @@ cluster/juju/layers/kubernetes/templates/skydns-rc.yml:        - -kube_master_ur
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
 cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do
-cluster/log-dump.sh:    local -r node_name="${1}"
 cluster/log-dump.sh:    local -r node_name="${1}"
 cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
 cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
