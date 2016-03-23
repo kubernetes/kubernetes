@@ -23,14 +23,14 @@ type ValidateOptsBuilder interface {
 
 // ValidateOpts specifies the template validation parameters.
 type ValidateOpts struct {
-	Template    map[string]interface{}
+	Template    string
 	TemplateURL string
 }
 
 // ToStackTemplateValidateMap assembles a request body based on the contents of a ValidateOpts.
 func (opts ValidateOpts) ToStackTemplateValidateMap() (map[string]interface{}, error) {
 	vo := make(map[string]interface{})
-	if opts.Template != nil {
+	if opts.Template != "" {
 		vo["template"] = opts.Template
 		return vo, nil
 	}

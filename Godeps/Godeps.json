@@ -908,8 +908,8 @@
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",
-			"Comment": "v1.0.0-665-gf928634",
-			"Rev": "f92863476c034f851073599c09d90cd61ee95b3d"
+			"Comment": "v1.0.0-842-g8992d74",
+			"Rev": "8992d7483a06748dea706e4716d042a4a9e73918"
 		},
 		{
 			"ImportPath": "github.com/russross/blackfriday",

@@ -2,6 +2,7 @@ package apiversions
 
 import (
 	"strings"
+	"net/url"
 
 	"github.com/rackspace/gophercloud"
 )
@@ -11,5 +12,7 @@ func getURL(c *gophercloud.ServiceClient, version string) string {
 }
 
 func listURL(c *gophercloud.ServiceClient) string {
-	return c.ServiceURL("")
+	u, _ := url.Parse(c.ServiceURL(""))
+	u.Path = "/"
+	return u.String()
 }
