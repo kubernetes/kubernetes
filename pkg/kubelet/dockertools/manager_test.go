@@ -1146,7 +1146,7 @@ func TestGetRestartCount(t *testing.T) {
 		}
 		cs := status.FindContainerStatusByName(containerName)
 		if cs == nil {
-			t.Fatal("Can't find status for container %q", containerName)
+			t.Fatalf("Can't find status for container %q", containerName)
 		}
 		restartCount := cs.RestartCount
 		if restartCount != expectedCount {
@@ -1161,7 +1161,7 @@ func TestGetRestartCount(t *testing.T) {
 		}
 		cs := status.FindContainerStatusByName(containerName)
 		if cs == nil {
-			t.Fatal("Can't find status for container %q", containerName)
+			t.Fatalf("Can't find status for container %q", containerName)
 		}
 		dm.KillContainerInPod(cs.ID, &pod.Spec.Containers[0], pod, "test container restart count.")
 	}

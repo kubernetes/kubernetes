@@ -224,7 +224,7 @@ func expectWebSocketFrames(r *Reader, t *testing.T, fn func(*websocket.Conn), fr
 			return err
 		}
 		if !reflect.DeepEqual(frames[i], data) {
-			return fmt.Errorf("frame %d did not match expected: %v", data)
+			return fmt.Errorf("frame %d did not match expected: %v", data, err)
 		}
 	}
 	var data []byte

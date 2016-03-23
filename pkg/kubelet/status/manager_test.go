@@ -674,7 +674,7 @@ func TestReconcilePodStatus(t *testing.T) {
 
 	podStatus, ok := syncer.GetPodStatus(testPod.UID)
 	if !ok {
-		t.Fatal("Should find pod status for pod: %+v", testPod)
+		t.Fatalf("Should find pod status for pod: %+v", testPod)
 	}
 	testPod.Status = podStatus
 

@@ -121,16 +121,16 @@ func TestAdmission(t *testing.T) {
 	// verify create/update/delete of object in non-existent namespace throws error
 	err = handler.Admit(admission.NewAttributesRecord(&badPod, api.Kind("Pod"), badPod.Namespace, badPod.Name, api.Resource("pods"), "", admission.Create, nil))
 	if err == nil {
-		t.Errorf("Expected an aerror that objects cannot be created in non-existant namespaces", err)
+		t.Errorf("Expected, but didn't get, an error (%v) that objects cannot be created in non-existant namespaces", err)
 	}
 
 	err = handler.Admit(admission.NewAttributesRecord(&badPod, api.Kind("Pod"), badPod.Namespace, badPod.Name, api.Resource("pods"), "", admission.Update, nil))
 	if err == nil {
-		t.Errorf("Expected an aerror that objects cannot be updated in non-existant namespaces", err)
+		t.Errorf("Expected, but didn't get, an error (%v) that objects cannot be updated in non-existant namespaces", err)
 	}
 
 	err = handler.Admit(admission.NewAttributesRecord(&badPod, api.Kind("Pod"), badPod.Namespace, badPod.Name, api.Resource("pods"), "", admission.Delete, nil))
 	if err == nil {
-		t.Errorf("Expected an aerror that objects cannot be deleted in non-existant namespaces", err)
+		t.Errorf("Expected, but didn't get, an error (%v) that objects cannot be deleted in non-existant namespaces", err)
 	}
 }

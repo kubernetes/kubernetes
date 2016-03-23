@@ -377,7 +377,7 @@ func (ks *kube2sky) mutateEtcdOrDie(mutator func() error) {
 	for {
 		select {
 		case <-timeout:
-			glog.Fatalf("Failed to mutate etcd for %v using mutator: %v", ks.etcdMutationTimeout, mutator)
+			glog.Fatalf("Failed to mutate etcd for %v using mutator: %v", ks.etcdMutationTimeout, mutator())
 		default:
 			if err := mutator(); err != nil {
 				delay := 50 * time.Millisecond

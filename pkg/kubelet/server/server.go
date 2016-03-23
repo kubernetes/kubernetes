@@ -926,11 +926,11 @@ func (h *portForwardStreamHandler) getStreamPair(requestID string) (*portForward
 func (h *portForwardStreamHandler) monitorStreamPair(p *portForwardStreamPair, timeout <-chan time.Time) {
 	select {
 	case <-timeout:
-		err := fmt.Errorf("(conn=%p, request=%s) timed out waiting for streams", h.conn, p.requestID)
+		err := fmt.Errorf("(conn=%v, request=%s) timed out waiting for streams", h.conn, p.requestID)
 		utilruntime.HandleError(err)
 		p.printError(err.Error())
 	case <-p.complete:
-		glog.V(5).Infof("(conn=%p, request=%s) successfully received error and data streams", h.conn, p.requestID)
+		glog.V(5).Infof("(conn=%v, request=%s) successfully received error and data streams", h.conn, p.requestID)
 	}
 	h.removeStreamPair(p.requestID)
 }

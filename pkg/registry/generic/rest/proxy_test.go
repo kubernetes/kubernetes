@@ -638,7 +638,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 		// Dial the proxy server
 		conn, err := net.Dial(proxyServer.Listener.Addr().Network(), proxyServer.Listener.Addr().String())
 		if err != nil {
-			t.Errorf("%s: unexpected error %v", err)
+			t.Errorf("unexpected error %v", err)
 			continue
 		}
 		defer conn.Close()
@@ -652,28 +652,28 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 
 		// Write the request headers
 		if _, err := fmt.Fprint(conn, "POST / HTTP/1.1\r\n"); err != nil {
-			t.Fatalf("%s: unexpected error %v", err)
+			t.Fatalf("%s unexpected error %v", k, err)
 		}
 		for header, values := range item.reqHeaders {
 			for _, value := range values {
 				if _, err := fmt.Fprintf(conn, "%s: %s\r\n", header, value); err != nil {
-					t.Fatalf("%s: unexpected error %v", err)
+					t.Fatalf("%s: unexpected error %v", k, err)
 				}
 			}
 		}
 		// Header separator
 		if _, err := fmt.Fprint(conn, "\r\n"); err != nil {
-			t.Fatalf("%s: unexpected error %v", err)
+			t.Fatalf("%s: unexpected error %v", k, err)
 		}
 		// Body
 		if _, err := conn.Write(item.reqBody); err != nil {
-			t.Fatalf("%s: unexpected error %v", err)
+			t.Fatalf("%s: unexpected error %v", k, err)
 		}
 
 		// Read response
 		response, err := ioutil.ReadAll(conn)
 		if err != nil {
-			t.Errorf("%s: unexpected error %v", err)
+			t.Errorf("%s: unexpected error %v", k, err)
 			continue
 		}
 		if !strings.HasSuffix(string(response), successfulResponse) {

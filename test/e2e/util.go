@@ -1011,7 +1011,7 @@ func waitForPodTerminatedInNamespace(c *client.Client, podName, reason, namespac
 			if pod.Status.Reason == reason {
 				return true, nil
 			} else {
-				return true, fmt.Errorf("Expected pod %n/%n to be terminated with reason %v, got reason: ", namespace, podName, reason, pod.Status.Reason)
+				return true, fmt.Errorf("Expected pod %v in namespace %v to be terminated with reason %v, got reason: %v", podName, namespace, reason, pod.Status.Reason)
 			}
 		}
 

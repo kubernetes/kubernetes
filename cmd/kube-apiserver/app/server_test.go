@@ -211,13 +211,13 @@ func TestParseRuntimeConfig(t *testing.T) {
 		apiGroupVersionOverrides, err := parseRuntimeConfig(s)
 
 		if err == nil && test.err {
-			t.Fatalf("expected error for test: %q", test)
+			t.Fatalf("expected error for test: %v", test)
 		} else if err != nil && !test.err {
-			t.Fatalf("unexpected error: %s, for test: %q", err, test)
+			t.Fatalf("unexpected error: %s, for test: %v", err, test)
 		}
 
 		if err == nil && !reflect.DeepEqual(apiGroupVersionOverrides, test.apiGroupVersionOverrides) {
-			t.Fatalf("unexpected apiGroupVersionOverrides. Actual: %q, expected: %q", apiGroupVersionOverrides, test.apiGroupVersionOverrides)
+			t.Fatalf("unexpected apiGroupVersionOverrides. Actual: %v, expected: %v", apiGroupVersionOverrides, test.apiGroupVersionOverrides)
 		}
 	}
 

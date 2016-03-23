@@ -91,7 +91,7 @@ func findMinMTU() (*net.Interface, error) {
 	}
 
 	if mtu >= 999999 || mtu < 576 || defIntfIndex < 0 {
-		return nil, fmt.Errorf("no suitable interface", BridgeName)
+		return nil, fmt.Errorf("no suitable interface: %v", BridgeName)
 	}
 
 	return &intfs[defIntfIndex], nil

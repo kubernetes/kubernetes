@@ -234,7 +234,7 @@ func TestControllerSyncJob(t *testing.T) {
 		// run
 		err := manager.syncJob(getKey(job, t))
 		if err != nil {
-			t.Errorf("%s: unexpected error when syncing jobs %v", err)
+			t.Errorf("%s: unexpected error when syncing jobs %v", name, err)
 		}
 
 		// validate created/deleted pods
@@ -332,7 +332,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		// run
 		err := manager.syncJob(getKey(job, t))
 		if err != nil {
-			t.Errorf("%s: unexpected error when syncing jobs %v", err)
+			t.Errorf("%s: unexpected error when syncing jobs %v", name, err)
 		}
 
 		// validate created/deleted pods

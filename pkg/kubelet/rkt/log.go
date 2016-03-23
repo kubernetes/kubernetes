@@ -143,12 +143,12 @@ func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID kubecontainer.Conta
 
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		glog.Errorf("rkt: cannot create pipe for journalctl's stdout", err)
+		glog.Errorf("rkt: cannot create pipe for journalctl's stdout: %v", err)
 		return err
 	}
 	errPipe, err := cmd.StderrPipe()
 	if err != nil {
-		glog.Errorf("rkt: cannot create pipe for journalctl's stderr", err)
+		glog.Errorf("rkt: cannot create pipe for journalctl's stderr: %v", err)
 		return err
 	}
 
