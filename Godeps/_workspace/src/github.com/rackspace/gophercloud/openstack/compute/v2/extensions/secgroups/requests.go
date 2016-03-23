@@ -2,6 +2,7 @@ package secgroups
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
@@ -181,10 +182,10 @@ func (opts CreateRuleOpts) ToRuleCreateMap() (map[string]interface{}, error) {
 	if opts.ParentGroupID == "" {
 		return rule, errors.New("A ParentGroupID must be set")
 	}
-	if opts.FromPort == 0 {
+	if opts.FromPort == 0 && strings.ToUpper(opts.IPProtocol) != "ICMP" {
 		return rule, errors.New("A FromPort must be set")
 	}
-	if opts.ToPort == 0 {
+	if opts.ToPort == 0 && strings.ToUpper(opts.IPProtocol) != "ICMP" {
 		return rule, errors.New("A ToPort must be set")
 	}
 	if opts.IPProtocol == "" {

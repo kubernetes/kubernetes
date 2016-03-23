@@ -2,6 +2,7 @@ package defsecrules
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
@@ -42,10 +43,10 @@ type CreateOptsBuilder interface {
 func (opts CreateOpts) ToRuleCreateMap() (map[string]interface{}, error) {
 	rule := make(map[string]interface{})
 
-	if opts.FromPort == 0 {
+	if opts.FromPort == 0 && strings.ToUpper(opts.IPProtocol) != "ICMP" {
 		return rule, errors.New("A FromPort must be set")
 	}
-	if opts.ToPort == 0 {
+	if opts.ToPort == 0 && strings.ToUpper(opts.IPProtocol) != "ICMP" {
 		return rule, errors.New("A ToPort must be set")
 	}
 	if opts.IPProtocol == "" {

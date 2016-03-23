@@ -15,9 +15,9 @@ type Scope struct {
 }
 
 func subjectTokenHeaders(c *gophercloud.ServiceClient, subjectToken string) map[string]string {
-	h := c.AuthenticatedHeaders()
-	h["X-Subject-Token"] = subjectToken
-	return h
+	return map[string]string{
+		"X-Subject-Token": subjectToken,
+	}
 }
 
 // Create authenticates and either generates a new token, or changes the Scope of an existing token.

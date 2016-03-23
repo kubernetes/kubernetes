@@ -72,6 +72,41 @@ func mockCreateRuleResponse(t *testing.T) {
 	})
 }
 
+func mockCreateRuleResponseICMPZero(t *testing.T) {
+	th.Mux.HandleFunc(rootPath, func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "POST")
+		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
+
+		th.TestJSONRequest(t, r, `
+{
+  "security_group_default_rule": {
+    "ip_protocol": "ICMP",
+    "from_port": 0,
+    "to_port": 0,
+    "cidr": "10.10.12.0/24"
+  }
+}
+	`)
+
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		fmt.Fprintf(w, `
+{
+  "security_group_default_rule": {
+    "from_port": 0,
+    "id": "{ruleID}",
+    "ip_protocol": "ICMP",
+    "ip_range": {
+      "cidr": "10.10.12.0/24"
+    },
+    "to_port": 0
+  }
+}
+`)
+	})
+}
+
 func mockGetRuleResponse(t *testing.T, ruleID string) {
 	url := rootPath + "/" + ruleID
 	th.Mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {

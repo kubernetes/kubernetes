@@ -10,29 +10,7 @@ import (
 )
 
 // GetExpected represents the expected object from a Get request.
-var GetExpected = &Template{
-	Description:         "Simple template to test heat commands",
-	HeatTemplateVersion: "2013-05-23",
-	Parameters: map[string]interface{}{
-		"flavor": map[string]interface{}{
-			"default": "m1.tiny",
-			"type":    "string",
-		},
-	},
-	Resources: map[string]interface{}{
-		"hello_world": map[string]interface{}{
-			"type": "OS::Nova::Server",
-			"properties": map[string]interface{}{
-				"key_name": "heat_key",
-				"flavor": map[string]interface{}{
-					"get_param": "flavor",
-				},
-				"image":     "ad091b52-742f-469e-8f3c-fd81cadf0743",
-				"user_data": "#!/bin/bash -xv\necho \"hello world\" &gt; /root/hello-world.txt\n",
-			},
-		},
-	},
-}
+var GetExpected = "{\n  \"description\": \"Simple template to test heat commands\",\n  \"heat_template_version\": \"2013-05-23\",\n  \"parameters\": {\n    \"flavor\": {\n      \"default\": \"m1.tiny\",\n      \"type\": \"string\"\n    }\n  },\n  \"resources\": {\n    \"hello_world\": {\n      \"properties\": {\n        \"flavor\": {\n          \"get_param\": \"flavor\"\n        },\n        \"image\": \"ad091b52-742f-469e-8f3c-fd81cadf0743\",\n        \"key_name\": \"heat_key\"\n      },\n      \"type\": \"OS::Nova::Server\"\n    }\n  }\n}"
 
 // GetOutput represents the response body from a Get request.
 const GetOutput = `
@@ -53,8 +31,7 @@ const GetOutput = `
         "flavor": {
           "get_param": "flavor"
         },
-        "image": "ad091b52-742f-469e-8f3c-fd81cadf0743",
-        "user_data": "#!/bin/bash -xv\necho \"hello world\" &gt; /root/hello-world.txt\n"
+        "image": "ad091b52-742f-469e-8f3c-fd81cadf0743"
       }
     }
   }
