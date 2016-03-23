@@ -21,8 +21,12 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-func ValidateSubjectAccessReviewSpec(spec authorizationapi.SubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
+func ValidateSubjectAccessReviewSpec(spec *authorizationapi.SubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if spec == nil {
+		return allErrs
+	}
+
 	if spec.ResourceAttributes != nil && spec.NonResourceAttributes != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceAttributes"), spec.NonResourceAttributes, `cannot be specified in combination with resourceAttributes`))
 	}
@@ -36,8 +40,12 @@ func ValidateSubjectAccessReviewSpec(spec authorizationapi.SubjectAccessReviewSp
 	return allErrs
 }
 
-func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
+func ValidateSelfSubjectAccessReviewSpec(spec *authorizationapi.SelfSubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if spec == nil {
+		return allErrs
+	}
+
 	if spec.ResourceAttributes != nil && spec.NonResourceAttributes != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceAttributes"), spec.NonResourceAttributes, `cannot be specified in combination with resourceAttributes`))
 	}

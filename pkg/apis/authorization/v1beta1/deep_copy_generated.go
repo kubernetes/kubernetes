@@ -46,11 +46,23 @@ func DeepCopy_v1beta1_LocalSubjectAccessReview(in LocalSubjectAccessReview, out 
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_v1beta1_SubjectAccessReviewSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
+	if in.Spec != nil {
+		in, out := in.Spec, &out.Spec
+		*out = new(SubjectAccessReviewSpec)
+		if err := DeepCopy_v1beta1_SubjectAccessReviewSpec(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Spec = nil
 	}
-	if err := DeepCopy_v1beta1_SubjectAccessReviewStatus(in.Status, &out.Status, c); err != nil {
-		return err
+	if in.Status != nil {
+		in, out := in.Status, &out.Status
+		*out = new(SubjectAccessReviewStatus)
+		if err := DeepCopy_v1beta1_SubjectAccessReviewStatus(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Status = nil
 	}
 	return nil
 }
@@ -76,11 +88,23 @@ func DeepCopy_v1beta1_SelfSubjectAccessReview(in SelfSubjectAccessReview, out *S
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_v1beta1_SelfSubjectAccessReviewSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
+	if in.Spec != nil {
+		in, out := in.Spec, &out.Spec
+		*out = new(SelfSubjectAccessReviewSpec)
+		if err := DeepCopy_v1beta1_SelfSubjectAccessReviewSpec(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Spec = nil
 	}
-	if err := DeepCopy_v1beta1_SubjectAccessReviewStatus(in.Status, &out.Status, c); err != nil {
-		return err
+	if in.Status != nil {
+		in, out := in.Status, &out.Status
+		*out = new(SubjectAccessReviewStatus)
+		if err := DeepCopy_v1beta1_SubjectAccessReviewStatus(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Status = nil
 	}
 	return nil
 }
@@ -111,11 +135,23 @@ func DeepCopy_v1beta1_SubjectAccessReview(in SubjectAccessReview, out *SubjectAc
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_v1beta1_SubjectAccessReviewSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
+	if in.Spec != nil {
+		in, out := in.Spec, &out.Spec
+		*out = new(SubjectAccessReviewSpec)
+		if err := DeepCopy_v1beta1_SubjectAccessReviewSpec(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Spec = nil
 	}
-	if err := DeepCopy_v1beta1_SubjectAccessReviewStatus(in.Status, &out.Status, c); err != nil {
-		return err
+	if in.Status != nil {
+		in, out := in.Status, &out.Status
+		*out = new(SubjectAccessReviewStatus)
+		if err := DeepCopy_v1beta1_SubjectAccessReviewStatus(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Status = nil
 	}
 	return nil
 }

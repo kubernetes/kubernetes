@@ -25,7 +25,7 @@ import (
 )
 
 func TestValidateSARSpec(t *testing.T) {
-	successCases := []authorizationapi.SubjectAccessReviewSpec{
+	successCases := []*authorizationapi.SubjectAccessReviewSpec{
 		{ResourceAttributes: &authorizationapi.ResourceAttributes{}, User: "me"},
 		{NonResourceAttributes: &authorizationapi.NonResourceAttributes{}, Groups: []string{"my-group"}},
 	}
@@ -37,17 +37,17 @@ func TestValidateSARSpec(t *testing.T) {
 
 	errorCases := []struct {
 		name string
-		obj  authorizationapi.SubjectAccessReviewSpec
+		obj  *authorizationapi.SubjectAccessReviewSpec
 		msg  string
 	}{
 		{
 			name: "neither request",
-			obj:  authorizationapi.SubjectAccessReviewSpec{User: "me"},
+			obj:  &authorizationapi.SubjectAccessReviewSpec{User: "me"},
 			msg:  "exactly one of nonResourceAttributes or resourceAttributes must be specified",
 		},
 		{
 			name: "both requests",
-			obj: authorizationapi.SubjectAccessReviewSpec{
+			obj: &authorizationapi.SubjectAccessReviewSpec{
 				ResourceAttributes:    &authorizationapi.ResourceAttributes{},
 				NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
 				User: "me",
@@ -56,7 +56,7 @@ func TestValidateSARSpec(t *testing.T) {
 		},
 		{
 			name: "no subject",
-			obj: authorizationapi.SubjectAccessReviewSpec{
+			obj: &authorizationapi.SubjectAccessReviewSpec{
 				ResourceAttributes: &authorizationapi.ResourceAttributes{},
 			},
 			msg: `spec.user: Invalid value: "": at least one of user or group must be specified`,
@@ -88,7 +88,7 @@ func TestValidateSARSpec(t *testing.T) {
 }
 
 func TestValidateSelfSAR(t *testing.T) {
-	successCases := []authorizationapi.SelfSubjectAccessReviewSpec{
+	successCases := []*authorizationapi.SelfSubjectAccessReviewSpec{
 		{ResourceAttributes: &authorizationapi.ResourceAttributes{}},
 	}
 	for _, successCase := range successCases {
@@ -99,17 +99,17 @@ func TestValidateSelfSAR(t *testing.T) {
 
 	errorCases := []struct {
 		name string
-		obj  authorizationapi.SelfSubjectAccessReviewSpec
+		obj  *authorizationapi.SelfSubjectAccessReviewSpec
 		msg  string
 	}{
 		{
 			name: "neither request",
-			obj:  authorizationapi.SelfSubjectAccessReviewSpec{},
+			obj:  &authorizationapi.SelfSubjectAccessReviewSpec{},
 			msg:  "exactly one of nonResourceAttributes or resourceAttributes must be specified",
 		},
 		{
 			name: "both requests",
-			obj: authorizationapi.SelfSubjectAccessReviewSpec{
+			obj: &authorizationapi.SelfSubjectAccessReviewSpec{
 				ResourceAttributes:    &authorizationapi.ResourceAttributes{},
 				NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
 			},

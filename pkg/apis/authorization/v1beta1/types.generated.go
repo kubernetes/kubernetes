@@ -82,14 +82,15 @@ func (x *SubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq2 [4]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
-			yyq2[1] = true
+			yyq2[0] = x.Spec != nil
+			yyq2[1] = x.Status != nil
 			yyq2[2] = x.Kind != ""
 			yyq2[3] = x.APIVersion != ""
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn2 = 1
+				yynn2 = 0
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -100,20 +101,35 @@ func (x *SubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yy4 := &x.Spec
-				yy4.CodecEncodeSelf(e)
+				if yyq2[0] {
+					if x.Spec == nil {
+						r.EncodeNil()
+					} else {
+						x.Spec.CodecEncodeSelf(e)
+					}
+				} else {
+					r.EncodeNil()
+				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("spec"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yy6 := &x.Spec
-				yy6.CodecEncodeSelf(e)
+				if yyq2[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("spec"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Spec == nil {
+						r.EncodeNil()
+					} else {
+						x.Spec.CodecEncodeSelf(e)
+					}
+				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[1] {
-					yy9 := &x.Status
-					yy9.CodecEncodeSelf(e)
+					if x.Status == nil {
+						r.EncodeNil()
+					} else {
+						x.Status.CodecEncodeSelf(e)
+					}
 				} else {
 					r.EncodeNil()
 				}
@@ -122,15 +138,18 @@ func (x *SubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("status"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy11 := &x.Status
-					yy11.CodecEncodeSelf(e)
+					if x.Status == nil {
+						r.EncodeNil()
+					} else {
+						x.Status.CodecEncodeSelf(e)
+					}
 				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[2] {
-					yym14 := z.EncBinary()
-					_ = yym14
+					yym10 := z.EncBinary()
+					_ = yym10
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -143,8 +162,8 @@ func (x *SubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym15 := z.EncBinary()
-					_ = yym15
+					yym11 := z.EncBinary()
+					_ = yym11
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -154,8 +173,8 @@ func (x *SubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[3] {
-					yym17 := z.EncBinary()
-					_ = yym17
+					yym13 := z.EncBinary()
+					_ = yym13
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -168,8 +187,8 @@ func (x *SubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym18 := z.EncBinary()
-					_ = yym18
+					yym14 := z.EncBinary()
+					_ = yym14
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -239,17 +258,25 @@ func (x *SubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 		switch yys3 {
 		case "spec":
 			if r.TryDecodeAsNil() {
-				x.Spec = SubjectAccessReviewSpec{}
+				if x.Spec != nil {
+					x.Spec = nil
+				}
 			} else {
-				yyv4 := &x.Spec
-				yyv4.CodecDecodeSelf(d)
+				if x.Spec == nil {
+					x.Spec = new(SubjectAccessReviewSpec)
+				}
+				x.Spec.CodecDecodeSelf(d)
 			}
 		case "status":
 			if r.TryDecodeAsNil() {
-				x.Status = SubjectAccessReviewStatus{}
+				if x.Status != nil {
+					x.Status = nil
+				}
 			} else {
-				yyv5 := &x.Status
-				yyv5.CodecDecodeSelf(d)
+				if x.Status == nil {
+					x.Status = new(SubjectAccessReviewStatus)
+				}
+				x.Status.CodecDecodeSelf(d)
 			}
 		case "kind":
 			if r.TryDecodeAsNil() {
@@ -289,10 +316,14 @@ func (x *SubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Spec = SubjectAccessReviewSpec{}
+		if x.Spec != nil {
+			x.Spec = nil
+		}
 	} else {
-		yyv9 := &x.Spec
-		yyv9.CodecDecodeSelf(d)
+		if x.Spec == nil {
+			x.Spec = new(SubjectAccessReviewSpec)
+		}
+		x.Spec.CodecDecodeSelf(d)
 	}
 	yyj8++
 	if yyhl8 {
@@ -306,10 +337,14 @@ func (x *SubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Status = SubjectAccessReviewStatus{}
+		if x.Status != nil {
+			x.Status = nil
+		}
 	} else {
-		yyv10 := &x.Status
-		yyv10.CodecDecodeSelf(d)
+		if x.Status == nil {
+			x.Status = new(SubjectAccessReviewStatus)
+		}
+		x.Status.CodecDecodeSelf(d)
 	}
 	yyj8++
 	if yyhl8 {
@@ -376,14 +411,15 @@ func (x *SelfSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq2 [4]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
-			yyq2[1] = true
+			yyq2[0] = x.Spec != nil
+			yyq2[1] = x.Status != nil
 			yyq2[2] = x.Kind != ""
 			yyq2[3] = x.APIVersion != ""
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn2 = 1
+				yynn2 = 0
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -394,20 +430,35 @@ func (x *SelfSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yy4 := &x.Spec
-				yy4.CodecEncodeSelf(e)
+				if yyq2[0] {
+					if x.Spec == nil {
+						r.EncodeNil()
+					} else {
+						x.Spec.CodecEncodeSelf(e)
+					}
+				} else {
+					r.EncodeNil()
+				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("spec"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yy6 := &x.Spec
-				yy6.CodecEncodeSelf(e)
+				if yyq2[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("spec"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Spec == nil {
+						r.EncodeNil()
+					} else {
+						x.Spec.CodecEncodeSelf(e)
+					}
+				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[1] {
-					yy9 := &x.Status
-					yy9.CodecEncodeSelf(e)
+					if x.Status == nil {
+						r.EncodeNil()
+					} else {
+						x.Status.CodecEncodeSelf(e)
+					}
 				} else {
 					r.EncodeNil()
 				}
@@ -416,15 +467,18 @@ func (x *SelfSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("status"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy11 := &x.Status
-					yy11.CodecEncodeSelf(e)
+					if x.Status == nil {
+						r.EncodeNil()
+					} else {
+						x.Status.CodecEncodeSelf(e)
+					}
 				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[2] {
-					yym14 := z.EncBinary()
-					_ = yym14
+					yym10 := z.EncBinary()
+					_ = yym10
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -437,8 +491,8 @@ func (x *SelfSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym15 := z.EncBinary()
-					_ = yym15
+					yym11 := z.EncBinary()
+					_ = yym11
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -448,8 +502,8 @@ func (x *SelfSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[3] {
-					yym17 := z.EncBinary()
-					_ = yym17
+					yym13 := z.EncBinary()
+					_ = yym13
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -462,8 +516,8 @@ func (x *SelfSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym18 := z.EncBinary()
-					_ = yym18
+					yym14 := z.EncBinary()
+					_ = yym14
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -533,17 +587,25 @@ func (x *SelfSubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 		switch yys3 {
 		case "spec":
 			if r.TryDecodeAsNil() {
-				x.Spec = SelfSubjectAccessReviewSpec{}
+				if x.Spec != nil {
+					x.Spec = nil
+				}
 			} else {
-				yyv4 := &x.Spec
-				yyv4.CodecDecodeSelf(d)
+				if x.Spec == nil {
+					x.Spec = new(SelfSubjectAccessReviewSpec)
+				}
+				x.Spec.CodecDecodeSelf(d)
 			}
 		case "status":
 			if r.TryDecodeAsNil() {
-				x.Status = SubjectAccessReviewStatus{}
+				if x.Status != nil {
+					x.Status = nil
+				}
 			} else {
-				yyv5 := &x.Status
-				yyv5.CodecDecodeSelf(d)
+				if x.Status == nil {
+					x.Status = new(SubjectAccessReviewStatus)
+				}
+				x.Status.CodecDecodeSelf(d)
 			}
 		case "kind":
 			if r.TryDecodeAsNil() {
@@ -583,10 +645,14 @@ func (x *SelfSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.D
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Spec = SelfSubjectAccessReviewSpec{}
+		if x.Spec != nil {
+			x.Spec = nil
+		}
 	} else {
-		yyv9 := &x.Spec
-		yyv9.CodecDecodeSelf(d)
+		if x.Spec == nil {
+			x.Spec = new(SelfSubjectAccessReviewSpec)
+		}
+		x.Spec.CodecDecodeSelf(d)
 	}
 	yyj8++
 	if yyhl8 {
@@ -600,10 +666,14 @@ func (x *SelfSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.D
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Status = SubjectAccessReviewStatus{}
+		if x.Status != nil {
+			x.Status = nil
+		}
 	} else {
-		yyv10 := &x.Status
-		yyv10.CodecDecodeSelf(d)
+		if x.Status == nil {
+			x.Status = new(SubjectAccessReviewStatus)
+		}
+		x.Status.CodecDecodeSelf(d)
 	}
 	yyj8++
 	if yyhl8 {
@@ -670,14 +740,15 @@ func (x *LocalSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq2 [4]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
-			yyq2[1] = true
+			yyq2[0] = x.Spec != nil
+			yyq2[1] = x.Status != nil
 			yyq2[2] = x.Kind != ""
 			yyq2[3] = x.APIVersion != ""
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn2 = 1
+				yynn2 = 0
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -688,20 +759,35 @@ func (x *LocalSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yy4 := &x.Spec
-				yy4.CodecEncodeSelf(e)
+				if yyq2[0] {
+					if x.Spec == nil {
+						r.EncodeNil()
+					} else {
+						x.Spec.CodecEncodeSelf(e)
+					}
+				} else {
+					r.EncodeNil()
+				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("spec"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yy6 := &x.Spec
-				yy6.CodecEncodeSelf(e)
+				if yyq2[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("spec"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Spec == nil {
+						r.EncodeNil()
+					} else {
+						x.Spec.CodecEncodeSelf(e)
+					}
+				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[1] {
-					yy9 := &x.Status
-					yy9.CodecEncodeSelf(e)
+					if x.Status == nil {
+						r.EncodeNil()
+					} else {
+						x.Status.CodecEncodeSelf(e)
+					}
 				} else {
 					r.EncodeNil()
 				}
@@ -710,15 +796,18 @@ func (x *LocalSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("status"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy11 := &x.Status
-					yy11.CodecEncodeSelf(e)
+					if x.Status == nil {
+						r.EncodeNil()
+					} else {
+						x.Status.CodecEncodeSelf(e)
+					}
 				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[2] {
-					yym14 := z.EncBinary()
-					_ = yym14
+					yym10 := z.EncBinary()
+					_ = yym10
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -731,8 +820,8 @@ func (x *LocalSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym15 := z.EncBinary()
-					_ = yym15
+					yym11 := z.EncBinary()
+					_ = yym11
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -742,8 +831,8 @@ func (x *LocalSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[3] {
-					yym17 := z.EncBinary()
-					_ = yym17
+					yym13 := z.EncBinary()
+					_ = yym13
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -756,8 +845,8 @@ func (x *LocalSubjectAccessReview) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym18 := z.EncBinary()
-					_ = yym18
+					yym14 := z.EncBinary()
+					_ = yym14
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -827,17 +916,25 @@ func (x *LocalSubjectAccessReview) codecDecodeSelfFromMap(l int, d *codec1978.De
 		switch yys3 {
 		case "spec":
 			if r.TryDecodeAsNil() {
-				x.Spec = SubjectAccessReviewSpec{}
+				if x.Spec != nil {
+					x.Spec = nil
+				}
 			} else {
-				yyv4 := &x.Spec
-				yyv4.CodecDecodeSelf(d)
+				if x.Spec == nil {
+					x.Spec = new(SubjectAccessReviewSpec)
+				}
+				x.Spec.CodecDecodeSelf(d)
 			}
 		case "status":
 			if r.TryDecodeAsNil() {
-				x.Status = SubjectAccessReviewStatus{}
+				if x.Status != nil {
+					x.Status = nil
+				}
 			} else {
-				yyv5 := &x.Status
-				yyv5.CodecDecodeSelf(d)
+				if x.Status == nil {
+					x.Status = new(SubjectAccessReviewStatus)
+				}
+				x.Status.CodecDecodeSelf(d)
 			}
 		case "kind":
 			if r.TryDecodeAsNil() {
@@ -877,10 +974,14 @@ func (x *LocalSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Spec = SubjectAccessReviewSpec{}
+		if x.Spec != nil {
+			x.Spec = nil
+		}
 	} else {
-		yyv9 := &x.Spec
-		yyv9.CodecDecodeSelf(d)
+		if x.Spec == nil {
+			x.Spec = new(SubjectAccessReviewSpec)
+		}
+		x.Spec.CodecDecodeSelf(d)
 	}
 	yyj8++
 	if yyhl8 {
@@ -894,10 +995,14 @@ func (x *LocalSubjectAccessReview) codecDecodeSelfFromArray(l int, d *codec1978.
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Status = SubjectAccessReviewStatus{}
+		if x.Status != nil {
+			x.Status = nil
+		}
 	} else {
-		yyv10 := &x.Status
-		yyv10.CodecDecodeSelf(d)
+		if x.Status == nil {
+			x.Status = new(SubjectAccessReviewStatus)
+		}
+		x.Status.CodecDecodeSelf(d)
 	}
 	yyj8++
 	if yyhl8 {

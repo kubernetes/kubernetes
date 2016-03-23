@@ -144,7 +144,7 @@ func New(kubeConfigFile string) (*WebhookAuthorizer, error) {
 //
 func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
 	r := &v1beta1.SubjectAccessReview{
-		Spec: v1beta1.SubjectAccessReviewSpec{
+		Spec: &v1beta1.SubjectAccessReviewSpec{
 			User:   attr.GetUserName(),
 			Groups: attr.GetGroups(),
 		},

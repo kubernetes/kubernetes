@@ -25,10 +25,10 @@ type SubjectAccessReview struct {
 	unversioned.TypeMeta `json:",inline"`
 
 	// Spec holds information about the request being evaluated
-	Spec SubjectAccessReviewSpec `json:"spec"`
+	Spec *SubjectAccessReviewSpec `json:"spec,omitempty"`
 
 	// Status is filled in by the server and indicates whether the request is allowed or not
-	Status SubjectAccessReviewStatus `json:"status,omitempty"`
+	Status *SubjectAccessReviewStatus `json:"status,omitempty"`
 }
 
 // SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a
@@ -38,10 +38,10 @@ type SelfSubjectAccessReview struct {
 	unversioned.TypeMeta `json:",inline"`
 
 	// Spec holds information about the request being evaluated.  user and groups must be empty
-	Spec SelfSubjectAccessReviewSpec `json:"spec"`
+	Spec *SelfSubjectAccessReviewSpec `json:"spec,omitempty"`
 
 	// Status is filled in by the server and indicates whether the request is allowed or not
-	Status SubjectAccessReviewStatus `json:"status,omitempty"`
+	Status *SubjectAccessReviewStatus `json:"status,omitempty"`
 }
 
 // LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace.
@@ -52,10 +52,10 @@ type LocalSubjectAccessReview struct {
 
 	// Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
 	// you made the request against.  If empty, it is defaulted.
-	Spec SubjectAccessReviewSpec `json:"spec"`
+	Spec *SubjectAccessReviewSpec `json:"spec,omitempty"`
 
 	// Status is filled in by the server and indicates whether the request is allowed or not
-	Status SubjectAccessReviewStatus `json:"status,omitempty"`
+	Status *SubjectAccessReviewStatus `json:"status,omitempty"`
 }
 
 // ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface
