@@ -217,6 +217,76 @@ var _ = KubeDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	It("should create a ResourceQuota and capture the life of a replication controller.", func() {
+		By("Creating a ResourceQuota")
+		quotaName := "test-quota"
+		resourceQuota := newTestResourceQuota(quotaName)
+		resourceQuota, err := createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status is calculated")
+		usedResources := api.ResourceList{}
+		usedResources[api.ResourceQuotas] = resource.MustParse("1")
+		usedResources[api.ResourceReplicationControllers] = resource.MustParse("0")
+		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a ReplicationController")
+		replicationController := newTestReplicationControllerForQuota("test-rc", "nginx", 0)
+		replicationController, err = f.Client.ReplicationControllers(f.Namespace.Name).Create(replicationController)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status captures replication controller creation")
+		usedResources = api.ResourceList{}
+		usedResources[api.ResourceReplicationControllers] = resource.MustParse("1")
+		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting a ReplicationController")
+		err = f.Client.ReplicationControllers(f.Namespace.Name).Delete(replicationController.Name)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released usage")
+		usedResources[api.ResourceReplicationControllers] = resource.MustParse("0")
+		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create a ResourceQuota and capture the life of a persistent volume claim.", func() {
+		By("Creating a ResourceQuota")
+		quotaName := "test-quota"
+		resourceQuota := newTestResourceQuota(quotaName)
+		resourceQuota, err := createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status is calculated")
+		usedResources := api.ResourceList{}
+		usedResources[api.ResourceQuotas] = resource.MustParse("1")
+		usedResources[api.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a PersistentVolumeClaim")
+		pvc := newTestPersistentVolumeClaimForQuota("test-claim")
+		pvc, err = f.Client.PersistentVolumeClaims(f.Namespace.Name).Create(pvc)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status captures persistent volume claimcreation")
+		usedResources = api.ResourceList{}
+		usedResources[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting a PersistentVolumeClaim")
+		err = f.Client.PersistentVolumeClaims(f.Namespace.Name).Delete(pvc.Name)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released usage")
+		usedResources[api.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	It("should verify ResourceQuota with terminating scopes.", func() {
 		By("Creating a ResourceQuota with terminating scope")
 		quotaTerminatingName := "quota-terminating"
@@ -423,7 +493,8 @@ func newTestResourceQuota(name string) *api.ResourceQuota {
 	hard[api.ResourceCPU] = resource.MustParse("1")
 	hard[api.ResourceMemory] = resource.MustParse("500Mi")
 	hard[api.ResourceConfigMaps] = resource.MustParse("2")
-	hard[api.ResourceSecrets] = resource.MustParse("2")
+	hard[api.ResourceSecrets] = resource.MustParse("10")
+	hard[api.ResourcePersistentVolumeClaims] = resource.MustParse("10")
 	return &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Spec:       api.ResourceQuotaSpec{Hard: hard},
@@ -444,6 +515,55 @@ func newTestPodForQuota(name string, requests api.ResourceList, limits api.Resou
 					Resources: api.ResourceRequirements{
 						Requests: requests,
 						Limits:   limits,
+					},
+				},
+			},
+		},
+	}
+}
+
+// newTestPersistentVolumeClaimForQuota returns a simple persistent volume claim
+func newTestPersistentVolumeClaimForQuota(name string) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+				api.ReadOnlyMany,
+				api.ReadWriteMany,
+			},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+}
+
+// newTestReplicationControllerForQuota returns a simple replication controller
+func newTestReplicationControllerForQuota(name, image string, replicas int) *api.ReplicationController {
+	return &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: replicas,
+			Selector: map[string]string{
+				"name": name,
+			},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"name": name},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  name,
+							Image: image,
+						},
 					},
 				},
 			},
