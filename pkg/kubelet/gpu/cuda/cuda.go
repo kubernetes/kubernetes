@@ -3,10 +3,10 @@ package cuda
 import (
 	"fmt"
 	"github.com/golang/glog"
-	cudaTools "github.com/haniceboy/nvidia-docker/tools/src/cuda"
-	"github.com/haniceboy/nvidia-docker/tools/src/docker"
-	"github.com/haniceboy/nvidia-docker/tools/src/nvidia"
-	"github.com/haniceboy/nvidia-docker/tools/src/nvml"
+	cudaTools "github.com/hui-zhi/nvidia-docker/tools/src/cuda"
+	"github.com/hui-zhi/nvidia-docker/tools/src/docker"
+	"github.com/hui-zhi/nvidia-docker/tools/src/nvidia"
+	"github.com/hui-zhi/nvidia-docker/tools/src/nvml"
 	"k8s.io/kubernetes/pkg/api"
 	gpuTypes "k8s.io/kubernetes/pkg/kubelet/gpu/types"
 	gpuUtil "k8s.io/kubernetes/pkg/kubelet/gpu/util"
@@ -219,7 +219,7 @@ func (cuda *Cuda) createLocalVolumes() error {
 				docker.RemoveVolume(n)
 				return err
 			}
-			if err := v.CreateAt(path); err != nil {
+			if err := v.CreateAt(path, nvidia.LinkOrCopyStrategy{}); err != nil {
 				docker.RemoveVolume(n)
 				return err
 			}

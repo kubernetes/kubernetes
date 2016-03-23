@@ -675,22 +675,22 @@
 			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
 		},
 		{
-			"ImportPath": "github.com/haniceboy/nvidia-docker/tools/src/cuda",
+			"ImportPath": "github.com/hui-zhi/nvidia-docker/tools/src/cuda",
 			"Comment": "v0.0.0-poc-61-g0b6b044",
 			"Rev": "0b6b04480546943459f40b9b25ad77200917f1dd"
 		},
 		{
-			"ImportPath": "github.com/haniceboy/nvidia-docker/tools/src/ldcache",
+			"ImportPath": "github.com/hui-zhi/nvidia-docker/tools/src/ldcache",
 			"Comment": "v0.0.0-poc-61-g0b6b044",
 			"Rev": "0b6b04480546943459f40b9b25ad77200917f1dd"
 		},
 		{
-			"ImportPath": "github.com/haniceboy/nvidia-docker/tools/src/nvidia",
+			"ImportPath": "github.com/hui-zhi/nvidia-docker/tools/src/nvidia",
 			"Comment": "v0.0.0-poc-61-g0b6b044",
 			"Rev": "0b6b04480546943459f40b9b25ad77200917f1dd"
 		},
 		{
-			"ImportPath": "github.com/haniceboy/nvidia-docker/tools/src/nvml",
+			"ImportPath": "github.com/hui-zhi/nvidia-docker/tools/src/nvml",
 			"Comment": "v0.0.0-poc-61-g0b6b044",
 			"Rev": "0b6b04480546943459f40b9b25ad77200917f1dd"
 		},
