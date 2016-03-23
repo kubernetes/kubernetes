@@ -28,12 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 )
 
 type ViewOptions struct {
 	ConfigAccess ConfigAccess
-	Merge        util.BoolFlag
+	Merge        flag.Tristate
 	Flatten      bool
 	Minify       bool
 	RawByteData  bool

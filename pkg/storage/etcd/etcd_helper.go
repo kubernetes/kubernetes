@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
+	utilcache "k8s.io/kubernetes/pkg/util/cache"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -128,7 +129,7 @@ func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quor
 		copier:         api.Scheme,
 		pathPrefix:     path.Join("/", prefix),
 		quorum:         quorum,
-		cache:          util.NewCache(maxEtcdCacheEntries),
+		cache:          utilcache.NewCache(maxEtcdCacheEntries),
 	}
 }
 
@@ -155,7 +156,7 @@ type etcdHelper struct {
 	// support multi-object transaction that will result in many objects with the same index.
 	// Number of entries stored in the cache is controlled by maxEtcdCacheEntries constant.
 	// TODO: Measure how much this cache helps after the conversion code is optimized.
-	cache util.Cache
+	cache utilcache.Cache
 }
 
 func init() {
