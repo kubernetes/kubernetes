@@ -105,7 +105,7 @@ func (u *flexVolumeUtil) init(plugin *flexVolumePlugin) error {
 }
 
 // Attach exposes a volume on the host.
-func (u *flexVolumeUtil) attach(f *flexVolumeBuilder) (string, error) {
+func (u *flexVolumeUtil) attach(f *flexVolumeMounter) (string, error) {
 	execPath := f.execPath
 
 	var options string
@@ -141,7 +141,7 @@ func (u *flexVolumeUtil) attach(f *flexVolumeBuilder) (string, error) {
 }
 
 // Detach detaches a volume from the host.
-func (u *flexVolumeUtil) detach(f *flexVolumeCleaner, mntDevice string) error {
+func (u *flexVolumeUtil) detach(f *flexVolumeUnmounter, mntDevice string) error {
 	execPath := f.execPath
 
 	// Executable provider command.
@@ -163,7 +163,7 @@ func (u *flexVolumeUtil) detach(f *flexVolumeCleaner, mntDevice string) error {
 }
 
 // Mount mounts the volume on the host.
-func (u *flexVolumeUtil) mount(f *flexVolumeBuilder, mntDevice, dir string) error {
+func (u *flexVolumeUtil) mount(f *flexVolumeMounter, mntDevice, dir string) error {
 	execPath := f.execPath
 
 	var options string
@@ -199,7 +199,7 @@ func (u *flexVolumeUtil) mount(f *flexVolumeBuilder, mntDevice, dir string) erro
 }
 
 // Unmount unmounts the volume on the host.
-func (u *flexVolumeUtil) unmount(f *flexVolumeCleaner, dir string) error {
+func (u *flexVolumeUtil) unmount(f *flexVolumeUnmounter, dir string) error {
 	execPath := f.execPath
 
 	// Executable provider command.

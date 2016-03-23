@@ -155,7 +155,7 @@ func searchDisk(wwns []string, lun string, io ioHandler) (string, string) {
 	return disk, dm
 }
 
-func (util *FCUtil) AttachDisk(b fcDiskBuilder) error {
+func (util *FCUtil) AttachDisk(b fcDiskMounter) error {
 	devicePath := ""
 	wwns := b.wwns
 	lun := b.lun
@@ -192,7 +192,7 @@ func (util *FCUtil) AttachDisk(b fcDiskBuilder) error {
 	return err
 }
 
-func (util *FCUtil) DetachDisk(c fcDiskCleaner, mntPath string) error {
+func (util *FCUtil) DetachDisk(c fcDiskUnmounter, mntPath string) error {
 	if err := c.mounter.Unmount(mntPath); err != nil {
 		return fmt.Errorf("fc detach disk: failed to unmount: %s\nError: %v", mntPath, err)
 	}
