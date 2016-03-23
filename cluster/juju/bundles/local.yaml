@@ -7,7 +7,7 @@ services:
     expose: true
     num_units: 2
   etcd:
-    charm: cs:~lazypower/trusty/etcd
+    charm: cs:~containers/trusty/etcd
     annotations:
       "gui-x": "300"
       "gui-y": "0"
