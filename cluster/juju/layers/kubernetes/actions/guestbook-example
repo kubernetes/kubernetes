@@ -24,13 +24,12 @@
 #
 # Lifted from github.com/kubernetes/kubernetes/examples/guestbook-example
 
-kubectl create -f files/guestbook-example/redis-master-service.yaml
-kubectl create -f files/guestbook-example/frontend-service.yaml
+set -e
 
-kubectl create -f files/guestbook-example/frontend-controller.yaml
+if [ ! -d files/guestbook-example ]; then
+  mkdir -p files/guestbook-example
+  curl -o $CHARM_DIR/files/guestbook-example/guestbook-all-in-one.yaml https://raw.githubusercontent.com/kubernetes/kubernetes/master/examples/guestbook/all-in-one/guestbook-all-in-one.yaml
+fi
 
-kubectl create -f files/guestbook-example/redis-master-controller.yaml
-kubectl create -f files/guestbook-example/redis-master-controller.yaml
+kubectl create -f files/guestbook-example/guestbook-all-in-one.yaml
 
-kubectl create -f files/guestbook-example/redis-slave-service.yaml
-kubectl create -f files/guestbook-example/redis-slave-controller.yaml
