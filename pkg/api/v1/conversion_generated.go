@@ -1298,7 +1298,7 @@ func autoConvert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope
 	if in.Items != nil {
 		out.Items = make([]runtime.RawExtension, len(in.Items))
 		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+			if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
 			}
 		}
@@ -4571,7 +4571,7 @@ func autoConvert_v1_List_To_api_List(in *List, out *api.List, s conversion.Scope
 	if in.Items != nil {
 		out.Items = make([]runtime.Object, len(in.Items))
 		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+			if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
 			}
 		}
