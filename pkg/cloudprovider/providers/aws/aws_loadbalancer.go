@@ -29,6 +29,7 @@ import (
 )
 
 func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB bool) (*elb.LoadBalancerDescription, error) {
+	glog.V(2).Infof("ensureLoadBalancer(%v, %v, %v, %v, %v, %v)", namespacedName, loadBalancerName, listeners, subnetIDs, securityGroupIDs, internalELB)
 	loadBalancer, err := s.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return nil, err
