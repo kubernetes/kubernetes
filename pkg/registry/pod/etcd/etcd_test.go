@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -140,7 +139,7 @@ type FailDeletionStorage struct {
 
 func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime.Object) error {
 	*f.Called = true
-	return etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
+	return storage.NewKeyNotFoundError(key, 0)
 }
 
 func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdTestServer) {
