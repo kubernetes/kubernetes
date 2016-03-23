@@ -1295,7 +1295,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	maxContainerFailures := 0
 	config := RCConfig{
 		Client:               c,
-		Image:                "gcr.io/google_containers/serve_hostname:1.1",
+		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,
