@@ -221,7 +221,7 @@ Conformance tests are designed to be run with no cloud provider configured.  Con
 ```sh
 # setup for conformance tests
 export KUBECONFIG=/path/to/kubeconfig
-export KUBE_CONFORMANCE_TEST=y
+export KUBERNETES_CONFORMANCE_TEST=y
 
 # run all conformance tests
 go run hack/e2e.go -v --test_args="--ginkgo.focus=\[Conformance\]"
