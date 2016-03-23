@@ -27,11 +27,11 @@ will first check for an exact match on TYPE and NAME\_PREFIX. If no such resourc
 exists, it will output details for every resource that has a name prefixed with NAME\_PREFIX
 
 .PP
-Possible resource types include (case insensitive): pods (po), services (svc),
-replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
-persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota),
-namespaces (ns), serviceaccounts, horizontalpodautoscalers (hpa),
-endpoints (ep) or secrets.
+Possible resource types include (case insensitive): pods (po), services (svc), deployments,
+replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
+persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
+serviceaccounts, ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
+componentstatuses (cs), endpoints (ep), and secrets.
 
 
 .SH OPTIONS
