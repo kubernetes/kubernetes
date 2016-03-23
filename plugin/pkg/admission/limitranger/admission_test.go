@@ -435,10 +435,10 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	handler := &limitRanger{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		client:    client,
-		limitFunc: Limit,
-		indexer:   indexer,
+		Handler: admission.NewHandler(admission.Create, admission.Update),
+		client:  client,
+		actions: &DefaultLimitRangerActions{},
+		indexer: indexer,
 	}
 
 	limitRange := validLimitRangeNoDefaults()
@@ -468,7 +468,7 @@ func TestLimitRangerCacheMisses(t *testing.T) {
 	handler := &limitRanger{
 		Handler:         admission.NewHandler(admission.Create, admission.Update),
 		client:          client,
-		limitFunc:       Limit,
+		actions:         &DefaultLimitRangerActions{},
 		indexer:         indexer,
 		liveLookupCache: liveLookupCache,
 	}
@@ -502,7 +502,7 @@ func TestLimitRangerCacheAndLRUMisses(t *testing.T) {
 	handler := &limitRanger{
 		Handler:         admission.NewHandler(admission.Create, admission.Update),
 		client:          client,
-		limitFunc:       Limit,
+		actions:         &DefaultLimitRangerActions{},
 		indexer:         indexer,
 		liveLookupCache: liveLookupCache,
 	}
@@ -532,7 +532,7 @@ func TestLimitRangerCacheAndLRUExpiredMisses(t *testing.T) {
 	handler := &limitRanger{
 		Handler:         admission.NewHandler(admission.Create, admission.Update),
 		client:          client,
-		limitFunc:       Limit,
+		actions:         &DefaultLimitRangerActions{},
 		indexer:         indexer,
 		liveLookupCache: liveLookupCache,
 	}
