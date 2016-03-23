@@ -24,7 +24,10 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"regexp"
 	goruntime "runtime"
+	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -124,45 +127,86 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 
 // internalPackages are packages that ignored when creating a default reflector name.  These packages are in the common
 // call chains to NewReflector, so they'd be low entropy names for reflectors
-var internalPackages = []string{"kubernetes/pkg/client/cache/", "kubernetes/pkg/controller/framework/"}
+var internalPackages = []string{"kubernetes/pkg/client/cache/", "kubernetes/pkg/controller/framework/", "/runtime/asm_"}
 
 // getDefaultReflectorName walks back through the call stack until we find a caller from outside of the ignoredPackages
 // it returns back a shortpath/filename:line to aid in identification of this reflector when it starts logging
 func getDefaultReflectorName(ignoredPackages ...string) string {
 	name := "????"
-outer:
-	for i := 1; i < 10; i++ {
+	const maxStack = 10
+	for i := 1; i < maxStack; i++ {
 		_, file, line, ok := goruntime.Caller(i)
 		if !ok {
-			break
-		}
-		for _, ignoredPackage := range ignoredPackages {
-			if strings.Contains(file, ignoredPackage) {
-				continue outer
+			file, line, ok = extractStackCreator()
+			if !ok {
+				break
 			}
-
+			i += maxStack
+		}
+		if hasPackage(file, ignoredPackages) {
+			continue
 		}
 
-		pkgLocation := strings.LastIndex(file, "/pkg/")
-		if pkgLocation >= 0 {
-			file = file[pkgLocation+1:]
-		}
+		file = trimPackagePrefix(file)
 		name = fmt.Sprintf("%s:%d", file, line)
 		break
 	}
-
 	return name
+}
+
+// hasPackage returns true if the file is in one of the ignored packages.
+func hasPackage(file string, ignoredPackages []string) bool {
+	for _, ignoredPackage := range ignoredPackages {
+		if strings.Contains(file, ignoredPackage) {
+			return true
+		}
+	}
+	return false
+}
+
+// trimPackagePrefix reduces dulpicate values off the front of a package name.
+func trimPackagePrefix(file string) string {
+	if l := strings.LastIndex(file, "k8s.io/kubernetes/pkg/"); l >= 0 {
+		return file[l+len("k8s.io/kubernetes/"):]
+	}
+	if l := strings.LastIndex(file, "/src/"); l >= 0 {
+		return file[l+5:]
+	}
+	if l := strings.LastIndex(file, "/pkg/"); l >= 0 {
+		return file[l+1:]
+	}
+	return file
+}
+
+var stackCreator = regexp.MustCompile(`(?m)^created by (.*)\n\s+(.*):(\d+) \+0x[[:xdigit:]]+$`)
+
+// extractStackCreator retrieves the goroutine file and line that launched this stack. Returns false
+// if the creator cannot be located.
+// TODO: Go does not expose this via runtime https://github.com/golang/go/issues/11440
+func extractStackCreator() (string, int, bool) {
+	stack := debug.Stack()
+	matches := stackCreator.FindStringSubmatch(string(stack))
+	if matches == nil || len(matches) != 4 {
+		return "", 0, false
+	}
+	line, err := strconv.Atoi(matches[3])
+	if err != nil {
+		return "", 0, false
+	}
+	return matches[2], line, true
 }
 
 // Run starts a watch and handles watch events. Will restart the watch if it is closed.
 // Run starts a goroutine and returns immediately.
 func (r *Reflector) Run() {
+	glog.V(3).Infof("Starting reflector %v (%s) from %s", r.expectedType, r.resyncPeriod, r.name)
 	go wait.Until(func() { r.ListAndWatch(wait.NeverStop) }, r.period, wait.NeverStop)
 }
 
 // RunUntil starts a watch and handles watch events. Will restart the watch if it is closed.
 // RunUntil starts a goroutine and returns immediately. It will exit when stopCh is closed.
 func (r *Reflector) RunUntil(stopCh <-chan struct{}) {
+	glog.V(3).Infof("Starting reflector %v (%s) from %s", r.expectedType, r.resyncPeriod, r.name)
 	go wait.Until(func() { r.ListAndWatch(stopCh) }, r.period, stopCh)
 }
 
@@ -227,6 +271,7 @@ func (r *Reflector) canForceResyncNow() bool {
 // and then use the resource version to watch.
 // It returns error if ListAndWatch didn't even try to initialize watch.
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
+	glog.V(3).Infof("Listing and watching %v from %s", r.expectedType, r.name)
 	var resourceVersion string
 	resyncCh, cleanup := r.resyncChan()
 	defer cleanup()
