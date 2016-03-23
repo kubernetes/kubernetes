@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -64,6 +65,51 @@ func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err 
 // Pods is taking baby steps to be more like the api in pkg/client
 func (s *StoreToPodLister) Pods(namespace string) storePodsNamespacer {
 	return storePodsNamespacer{s.Store, namespace}
+}
+
+
+type StoreToClusterLister struct {
+	Store
+}
+
+// Please note that selector is filtering among the pods that have gotten into
+// the store; there may have been some filtering that already happened before
+// that.
+//
+// TODO: converge on the interface in pkg/client.
+func (s *StoreToClusterLister) List(selector labels.Selector) (clusters []*controlplane.Cluster, err error) {
+	// TODO: it'd be great to just call
+	// s.Pods(api.NamespaceAll).List(selector), however then we'd have to
+	// remake the list.Items as a []*api.Pod. So leave this separate for
+	// now.
+	for _, m := range s.Store.List() {
+		cluster := m.(*controlplane.Cluster)
+		if selector.Matches(labels.Set(cluster.Labels)) {
+			clusters = append(clusters, cluster)
+		}
+	}
+	return clusters, nil
+}
+
+// Pods is taking baby steps to be more like the api in pkg/client
+func (s *StoreToClusterLister) Clusters(namespace string) storePodsNamespacer {
+	return storePodsNamespacer{s.Store, namespace}
+}
+// ClusterConditionPredicate is a function that indicates whether the given node's conditions meet
+// some set of criteria defined by the function.
+type ClusterConditionPredicate func(cluster controlplane.Cluster) bool
+
+// ClusterCondition returns a storeToClusterConditionLister
+func (s *StoreToClusterLister) ClusterCondition(predicate ClusterConditionPredicate) storeToClusterConditionLister {
+	// TODO: Move this filtering server side. Currently our selectors don't facilitate searching through a list so we
+	// have the reflector filter out the Unschedulable field and sift through node conditions in the lister.
+	return storeToClusterConditionLister{s.Store, predicate}
+}
+
+// storeToClusterConditionLister filters and returns nodes matching the given type and status from the store.
+type storeToClusterConditionLister struct {
+	store     Store
+	predicate ClusterConditionPredicate
 }
 
 type storePodsNamespacer struct {
