@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/spf13/pflag"
 )
@@ -70,7 +71,7 @@ func (s *Server) Flags() *pflag.FlagSet {
 	if s.flags == nil {
 		s.flags = pflag.NewFlagSet(s.Name(), pflag.ContinueOnError)
 		s.flags.SetOutput(ioutil.Discard)
-		s.flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+		s.flags.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 	}
 	return s.flags
 }

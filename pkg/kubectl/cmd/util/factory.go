@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
-	"k8s.io/kubernetes/pkg/util"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
 const (
@@ -186,7 +186,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	mapper := kubectl.ShortcutExpander{RESTMapper: registered.RESTMapper()}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
+	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
@@ -639,7 +639,7 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 }
 
 // BindCommonFlags adds any flags defined by external projects (not part of pflags)
