@@ -35,7 +35,7 @@ var _ = KubeDescribe("Ubernetes Lite", func() {
 	framework := NewDefaultFramework("ubernetes-lite")
 	var zoneCount int
 	var err error
-	image := "gcr.io/google_containers/serve_hostname:1.1"
+	image := "gcr.io/google_containers/serve_hostname:v1.4"
 	BeforeEach(func() {
 		if zoneCount <= 0 {
 			zoneCount, err = getZoneCount(framework.Client)
