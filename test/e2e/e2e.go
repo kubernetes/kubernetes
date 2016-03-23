@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -245,8 +245,8 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 // This function is called on each Ginkgo node in parallel mode.
 func RunE2ETests(t *testing.T) {
 	runtime.ReallyCrash = true
-	util.InitLogs()
-	defer util.FlushLogs()
+	log.InitLogs()
+	defer log.FlushLogs()
 
 	// We must call setupProviderConfig first since SynchronizedBeforeSuite needs
 	// cloudConfig to be set up already.
