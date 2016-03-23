@@ -1816,6 +1816,7 @@ type ServiceSpec struct {
 	// API for compatibility until at least 8/20/2016.  It will be removed from
 	// any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
 	// set, deprecatedPublicIPs is used.
+	// +genconversion=false
 	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
 
 	// Supports "ClientIP" and "None". Used to maintain session affinity.
