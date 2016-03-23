@@ -5,7 +5,7 @@
     logrotate:
         numToKeep: 200
     builders:
-        - shell: 'bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")'
+        - shell: 'JENKINS_BUILD_STARTED=true bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh")'
         - shell: |
             timeout -k {kill-timeout}m 30m ./hack/jenkins/build.sh && rc=$? || rc=$?
             {report-rc}
