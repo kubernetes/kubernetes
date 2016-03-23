@@ -115,7 +115,7 @@ func TestGetFlockerVolumeSource(t *testing.T) {
 	assert.Equal(spec.PersistentVolume.Spec.Flocker, vs)
 }
 
-func TestNewBuilder(t *testing.T) {
+func TestNewMounter(t *testing.T) {
 	assert := assert.New(t)
 
 	plugMgr, _ := newInitializedVolumePlugMgr(t)
@@ -132,22 +132,22 @@ func TestNewBuilder(t *testing.T) {
 		},
 	}
 
-	_, err = plug.NewBuilder(spec, &api.Pod{}, volume.VolumeOptions{})
+	_, err = plug.NewMounter(spec, &api.Pod{}, volume.VolumeOptions{})
 	assert.NoError(err)
 }
 
-func TestNewCleaner(t *testing.T) {
+func TestNewUnmounter(t *testing.T) {
 	assert := assert.New(t)
 
 	p := flockerPlugin{}
 
-	cleaner, err := p.NewCleaner("", types.UID(""))
-	assert.Nil(cleaner)
+	unmounter, err := p.NewUnmounter("", types.UID(""))
+	assert.Nil(unmounter)
 	assert.NoError(err)
 }
 
 func TestIsReadOnly(t *testing.T) {
-	b := &flockerBuilder{readOnly: true}
+	b := &flockerMounter{readOnly: true}
 	assert.True(t, b.GetAttributes().ReadOnly)
 }
 
@@ -156,7 +156,7 @@ func TestGetPath(t *testing.T) {
 
 	assert := assert.New(t)
 
-	b := flockerBuilder{flocker: &flocker{path: expectedPath}}
+	b := flockerMounter{flocker: &flocker{path: expectedPath}}
 	assert.Equal(expectedPath, b.GetPath())
 }
 
@@ -209,7 +209,7 @@ func TestSetUpAtInternal(t *testing.T) {
 	assert.NoError(err)
 
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	b := flockerBuilder{flocker: &flocker{pod: pod, plugin: plug.(*flockerPlugin)}}
+	b := flockerMounter{flocker: &flocker{pod: pod, plugin: plug.(*flockerPlugin)}}
 	b.client = newMockFlockerClient("dataset-id", "primary-uid", mockPath)
 
 	assert.NoError(b.SetUpAt(dir, nil))
