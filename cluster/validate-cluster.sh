@@ -89,7 +89,7 @@ while true; do
   # Echo the output and gather 2 counts:
   #  - Total number of componentstatuses.
   #  - Number of "healthy" components.
-  cs_status=$("${KUBE_ROOT}/cluster/kubectl.sh" get componentstatuses -o template --template='{{range .items}}{{with index .conditions 0}}{{.type}}:{{.status}},{{end}}{{end}}' --api-version=v1) || true
+  cs_status=$("${KUBE_ROOT}/cluster/kubectl.sh" get componentstatuses -o template --template='{{range .items}}{{with index .conditions 0}}{{.type}}:{{.status}},{{end}}{{end}}') || true
   componentstatuses=$(echo "${cs_status}" | tr "," "\n" | grep -c 'Healthy:') || true
   healthy=$(echo "${cs_status}" | tr "," "\n" | grep -c 'Healthy:True') || true
 
