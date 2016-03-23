@@ -31,7 +31,7 @@ import (
 const (
 	kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
 	// TODO: auto-generate this
-	PossibleResourceTypes = `Possible resource types include (case insensitive): pods (po), services (svc), deployments,
+	PossibleResourceTypes = `Possible resource types include (case insensitive): pods (po), services (svc), deployments (de),
 replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
 persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
 serviceaccounts, ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
@@ -123,6 +123,7 @@ var shortForms = map[string]string{
 	// If you add an entry here, please also take a look at pkg/kubectl/cmd/cmd.go
 	// and add an entry to valid_resources when appropriate.
 	"cs":     "componentstatuses",
+	"de":     "deployments",
 	"ds":     "daemonsets",
 	"ep":     "endpoints",
 	"ev":     "events",
