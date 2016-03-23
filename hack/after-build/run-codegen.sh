@@ -24,6 +24,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 clientgen=$(kube::util::find-binary "client-gen")
+conversiongen=$(kube::util::find-binary "conversion-gen")
 deepcopygen=$(kube::util::find-binary "deepcopy-gen")
 setgen=$(kube::util::find-binary "set-gen")
 
@@ -34,6 +35,8 @@ setgen=$(kube::util::find-binary "set-gen")
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} -t "$@"
+# TODO: Enable when conversion generator is ready.
+# ${conversiongen} "$@"
 ${deepcopygen} "$@"
 ${setgen} "$@"
 
