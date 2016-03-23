@@ -313,6 +313,19 @@ func (f *FakeRuntime) IsImagePresent(image ImageSpec) (bool, error) {
 	return false, f.InspectErr
 }
 
+func (f *FakeRuntime) GetImagePullProgress(image ImageSpec, watch bool, w io.Writer) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetImagePullProgress")
+	for _, i := range f.ImageList {
+		if i.ID == image.Image {
+			return nil
+		}
+	}
+	return f.InspectErr
+}
+
 func (f *FakeRuntime) ListImages() ([]Image, error) {
 	f.Lock()
 	defer f.Unlock()

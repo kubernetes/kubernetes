@@ -304,6 +304,10 @@ func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 	return
 }
 
+func (dm *DockerManager) GetImagePullProgress(image kubecontainer.ImageSpec, watch bool, stdout io.Writer) error {
+	return dm.dockerPuller.GetPullProgress(image.Image, watch, stdout)
+}
+
 var (
 	// ErrNoContainersInPod is returned when there are no containers for a given pod
 	ErrNoContainersInPod = errors.New("NoContainersInPod")

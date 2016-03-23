@@ -23,6 +23,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"io"
+	"sync"
 
 	"github.com/docker/docker/pkg/jsonmessage"
 	dockerapi "github.com/docker/engine-api/client"
@@ -65,7 +67,7 @@ type DockerInterface interface {
 	RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error
 	InspectImage(image string) (*dockertypes.ImageInspect, error)
 	ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error)
-	PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error
+	PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) (io.ReadCloser, error)
 	RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error)
 	ImageHistory(id string) ([]dockertypes.ImageHistory, error)
 	Logs(string, dockertypes.ContainerLogsOptions, StreamOptions) error
@@ -99,12 +101,15 @@ func SetContainerNamePrefix(prefix string) {
 type DockerPuller interface {
 	Pull(image string, secrets []api.Secret) error
 	IsImagePresent(image string) (bool, error)
+	GetPullProgress(image string, watch bool, out io.Writer) error
 }
 
 // dockerPuller is the default implementation of DockerPuller.
 type dockerPuller struct {
 	client  DockerInterface
 	keyring credentialprovider.DockerKeyring
+	pullsInProgress map[string]*ImagePullStatus
+	lock sync.Mutex
 }
 
 type throttledDockerPuller struct {
@@ -117,11 +122,13 @@ func newDockerPuller(client DockerInterface, qps float32, burst int) DockerPulle
 	dp := dockerPuller{
 		client:  client,
 		keyring: credentialprovider.NewDockerKeyring(),
+		pullsInProgress: make(map[string]*ImagePullStatus),
 	}
 
 	if qps == 0.0 {
 		return dp
 	}
+
 	return &throttledDockerPuller{
 		puller:  dp,
 		limiter: flowcontrol.NewTokenBucketRateLimiter(qps, burst),
@@ -144,6 +151,49 @@ func filterHTTPError(err error, image string) error {
 	}
 }
 
+// Writes the progress of the image pull to out
+// If watch is true, blocks until the pull is complete, and sends periodic updatess
+func (p dockerPuller) GetPullProgress(image string, watch bool, out io.Writer) error {
+	p.lock.Lock()
+	ips, pulling := p.pullsInProgress[image]
+	p.lock.Unlock()
+
+	if !pulling {
+		// The image may have already been pulled, or something else may be blocking it from starting
+		present, err := p.IsImagePresent(image)
+		if err != nil {
+			return err
+		}
+		// Clients using this interface expect JSON, so that's what we'll send
+		if !present {
+			fmt.Fprintf(out, "{\"error\":\"Image not being pulled and not present on machine\"}\n")
+			return nil
+		} else {
+			fmt.Fprintf(out, "{\"status\":\"Pull complete\"}\n")
+			return nil
+		}
+	} else if watch {
+		return ips.Watch(out)
+	} else {
+		return ips.Get(out)
+	}
+}
+
+// Called in a new thread when a pull is started
+// Tracks the progress of the pull and sends updates to interested parties
+func (p dockerPuller) monitorPullProgress(image string, r io.ReadCloser) {
+	ips := NewImagePullStatus()
+	p.lock.Lock()
+	p.pullsInProgress[image] = ips
+	p.lock.Unlock()
+
+	ips.MonitorPull(r)
+
+	p.lock.Lock()
+	delete(p.pullsInProgress, image)
+	p.lock.Unlock()
+}
+
 func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 	// If no tag was specified, use the default "latest".
 	imageID, tag, err := parsers.ParseImageName(image)
@@ -151,20 +201,21 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 		return err
 	}
 
+	opts := dockertypes.ImagePullOptions{
+		ImageID:    imageID,
+		Tag:        tag,
+	}
+
 	keyring, err := credentialprovider.MakeDockerKeyring(secrets, p.keyring)
 	if err != nil {
 		return err
 	}
 
-	opts := dockertypes.ImagePullOptions{
-		Tag: tag,
-	}
-
 	creds, haveCredentials := keyring.Lookup(imageID)
 	if !haveCredentials {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
-
-		err := p.client.PullImage(imageID, dockertypes.AuthConfig{}, opts)
+		progressReader, err := p.client.PullImage(imageID, dockertypes.AuthConfig{}, opts)
+		go p.monitorPullProgress(image, progressReader)
 		if err == nil {
 			// Sometimes PullImage failed with no error returned.
 			exist, ierr := p.IsImagePresent(image)
@@ -191,7 +242,8 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		err = p.client.PullImage(imageID, credentialprovider.LazyProvide(currentCreds), opts)
+		progressReader, err := p.client.PullImage(imageID, credentialprovider.LazyProvide(currentCreds), opts)
+		go p.monitorPullProgress(image, progressReader)
 		// If there was no error, return success
 		if err == nil {
 			return nil
@@ -223,6 +275,10 @@ func (p dockerPuller) IsImagePresent(image string) (bool, error) {
 
 func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 	return p.puller.IsImagePresent(name)
+}
+
+func (p throttledDockerPuller) GetPullProgress(image string, watch bool, out io.Writer) error {
+	return p.puller.GetPullProgress(image, watch, out)
 }
 
 // Creates a name which can be reversed to identify both full pod name and container name.

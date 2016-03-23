@@ -163,6 +163,7 @@ type HostInterface interface {
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	GetKubeletContainerLogs(podFullName, containerName string, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error
+	GetKubeletContainerImageProgress(namespace, podName, containerName string, watch bool, w io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
 	StreamingConnectionIdleTimeout() time.Duration
@@ -345,6 +346,15 @@ func (s *Server) InstallDebuggingHandlers() {
 		Operation("getContainerLogs"))
 	s.restfulCont.Add(ws)
 
+	// The pullprogess endpoint allows retrieving the amount downloaded of an image from docker (rkt not yet supported)
+	ws = new(restful.WebService)
+	ws.
+		Path("/pullprogress")
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+		To(s.getPullProgress).
+		Operation("getPullProgress"))
+	s.restfulCont.Add(ws)
+
 	configz.InstallHandler(s.restfulCont)
 
 	handlePprofEndpoint := func(req *restful.Request, resp *restful.Response) {
@@ -407,6 +417,35 @@ func (s *Server) plegHealthCheck(req *http.Request) error {
 		return fmt.Errorf("PLEG took longer than expected: %v", err)
 	}
 	return nil
+}
+
+// Gets the amount downloaded of an image & optionally watches the progress
+func (s *Server) getPullProgress(request *restful.Request, response *restful.Response) {
+	podNamespace := request.PathParameter("podNamespace")
+	podID := request.PathParameter("podID")
+	containerName := request.PathParameter("containerName")
+
+	query := request.Request.URL.Query()
+
+	// Should we watch the progress?
+	var watch bool
+	if q, ok := query["watch"]; ok {
+		if len(q) == 0 { // i.e. query string was "watch" with no value
+			watch = true
+		} else {
+			str := q[0]
+			watch = (strings.ToLower(str) != "false") && (strings.ToLower(str) != "no")
+		}
+	} else {
+		watch = false
+	}
+
+	writer := flushwriter.Wrap(response)
+
+	// Get the progress
+	if err := s.host.GetKubeletContainerImageProgress(podNamespace, podID, containerName, watch, writer); err != nil {
+		response.WriteError(http.StatusNotFound, err)
+	}
 }
 
 // getContainerLogs handles containerLogs request against the Kubelet

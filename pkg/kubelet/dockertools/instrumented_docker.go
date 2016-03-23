@@ -18,6 +18,7 @@ package dockertools
 
 import (
 	"time"
+	"io"
 
 	dockertypes "github.com/docker/engine-api/types"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -120,12 +121,12 @@ func (in instrumentedDockerInterface) ListImages(opts dockertypes.ImageListOptio
 	return out, err
 }
 
-func (in instrumentedDockerInterface) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
+func (in instrumentedDockerInterface) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) (io.ReadCloser, error) {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
-	err := in.client.PullImage(imageID, auth, opts)
+	resp, err := in.client.PullImage(imageID, auth, opts)
 	recordError(operation, err)
-	return err
+	return resp, err
 }
 
 func (in instrumentedDockerInterface) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
