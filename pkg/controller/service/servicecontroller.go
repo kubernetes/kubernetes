@@ -339,14 +339,23 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 
 		// TODO: We could do a dry-run here if wanted to avoid the spurious cloud-calls & events when we restart
 
-		// The load balancer doesn't exist yet, so create it.
-		s.eventRecorder.Event(service, api.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
-
-		err := s.createLoadBalancer(service, namespacedName)
+		_, exists, err := s.balancer.GetLoadBalancer(s.loadBalancerName(service), s.zone.Region)
 		if err != nil {
-			return fmt.Errorf("Failed to create load balancer for service %s: %v", namespacedName, err), retryable
+			return fmt.Errorf("Error getting LB for service %s: %v", namespacedName, err), retryable
 		}
-		s.eventRecorder.Event(service, api.EventTypeNormal, "CreatedLoadBalancer", "Created load balancer")
+		if exists {
+			// The load balancer already exists, no need to create.
+			s.eventRecorder.Event(service, api.EventTypeNormal, "LoadBalancerExists", "Load balancer already exists")
+		} else {
+			// The load balancer doesn't exist yet, so create it.
+			s.eventRecorder.Event(service, api.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
+
+			err := s.createLoadBalancer(service, namespacedName)
+			if err != nil {
+				return fmt.Errorf("Failed to create load balancer for service %s: %v", namespacedName, err), retryable
+			}
+			s.eventRecorder.Event(service, api.EventTypeNormal, "CreatedLoadBalancer", "Created load balancer")
+		}
 	}
 
 	// Write the state if changed
