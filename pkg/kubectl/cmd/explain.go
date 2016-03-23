@@ -36,11 +36,7 @@ kubectl explain pods.spec.containers`
 
 	explainLong = `Documentation of resources.
 
-Possible resource types include: pods (po), services (svc),
-replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
-limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota), namespaces (ns), horizontalpodautoscalers (hpa)
-or endpoints (ep).`
+` + kubectl.PossibleResourceTypes
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
