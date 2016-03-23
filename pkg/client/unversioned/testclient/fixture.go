@@ -98,8 +98,6 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 		default:
 			return false, nil, fmt.Errorf("no reaction implemented for %s", action)
 		}
-
-		return true, nil, nil
 	}
 }
 
