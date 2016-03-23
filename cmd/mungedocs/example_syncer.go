@@ -36,14 +36,14 @@ var exampleMungeTagRE = regexp.MustCompile(beginMungeTag(fmt.Sprintf("%s %s", ex
 // the content of the example, thereby syncing it.
 //
 // For example,
-// <!-- BEGIN MUNGE: EXAMPLE ../../examples/guestbook/frontend-controller.yaml -->
+// <!-- BEGIN MUNGE: EXAMPLE ../../examples/guestbook/frontend-service.yaml -->
 //
 // ```yaml
 // foo:
 //    bar:
 // ```
 //
-// [Download example](../../examples/guestbook/frontend-controller.yaml?raw=true)
+// [Download example](../../examples/guestbook/frontend-service.yaml?raw=true)
 // <!-- END MUNGE: EXAMPLE -->
 func syncExamples(filePath string, mlines mungeLines) (mungeLines, error) {
 	var err error

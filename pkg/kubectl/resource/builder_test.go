@@ -343,7 +343,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 	}{
 		{"pod", &api.Pod{}, false, "../../../examples/pod", []string{"nginx"}},
 		{"recursive-pod", &api.Pod{}, true, fmt.Sprintf("%s/recursive/pod", tmpDir), []string{"busybox0", "busybox1"}},
-		{"rc", &api.ReplicationController{}, false, "../../../examples/guestbook/redis-master-controller.yaml", []string{"redis-master"}},
+		{"rc", &api.ReplicationController{}, false, "../../../examples/guestbook/legacy/redis-master-controller.yaml", []string{"redis-master"}},
 		{"recursive-rc", &api.ReplicationController{}, true, fmt.Sprintf("%s/recursive/rc", tmpDir), []string{"busybox0", "busybox1"}},
 		{"hardlink", &api.Pod{}, false, fmt.Sprintf("%s/inode/hardlink/busybox-link.json", tmpDir), []string{"busybox0"}},
 		{"hardlink", &api.Pod{}, true, fmt.Sprintf("%s/inode/hardlink/busybox-link.json", tmpDir), []string{"busybox0"}},
@@ -425,14 +425,14 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 
 func TestDirectoryBuilder(t *testing.T) {
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
-		FilenameParam(false, false, "../../../examples/guestbook").
+		FilenameParam(false, false, "../../../examples/guestbook/legacy").
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
 	singular := false
 
 	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || singular || len(test.Infos) < 4 {
+	if err != nil || singular || len(test.Infos) < 3 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 
@@ -916,7 +916,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 func TestSingularObject(t *testing.T) {
 	obj, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam(false, false, "../../../examples/guestbook/redis-master-controller.yaml").
+		FilenameParam(false, false, "../../../examples/guestbook/legacy/redis-master-controller.yaml").
 		Flatten().
 		Do().Object()
 
@@ -1074,8 +1074,8 @@ func TestWatch(t *testing.T) {
 func TestWatchMultipleError(t *testing.T) {
 	_, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam(false, false, "../../../examples/guestbook/redis-master-controller.yaml").Flatten().
-		FilenameParam(false, false, "../../../examples/guestbook/redis-master-controller.yaml").Flatten().
+		FilenameParam(false, false, "../../../examples/guestbook/legacy/redis-master-controller.yaml").Flatten().
+		FilenameParam(false, false, "../../../examples/guestbook/legacy/redis-master-controller.yaml").Flatten().
 		Do().Watch("")
 
 	if err == nil {

@@ -1106,8 +1106,8 @@ __EOF__
   kubectl delete rc frontend "${kube_flags[@]}"
 
   ### Scale multiple replication controllers
-  kubectl create -f examples/guestbook/redis-master-controller.yaml "${kube_flags[@]}"
-  kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/legacy/redis-master-controller.yaml "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/legacy/redis-slave-controller.yaml "${kube_flags[@]}"
   # Command
   kubectl scale rc/redis-master rc/redis-slave --replicas=4 "${kube_flags[@]}"
   # Post-condition: 4 replicas each
@@ -1217,7 +1217,7 @@ __EOF__
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
-  kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/legacy/redis-slave-controller.yaml "${kube_flags[@]}"
   # Post-condition: frontend and redis-slave
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
 
