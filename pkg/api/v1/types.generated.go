@@ -33155,11 +33155,12 @@ func (x *NodeStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 			yyq2[4] = len(x.Addresses) != 0
 			yyq2[5] = true
 			yyq2[6] = true
+			yyq2[7] = len(x.Images) != 0
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(8)
 			} else {
-				yynn2 = 1
+				yynn2 = 0
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -33331,28 +33332,34 @@ func (x *NodeStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.Images == nil {
-					r.EncodeNil()
-				} else {
-					yym29 := z.EncBinary()
-					_ = yym29
-					if false {
+				if yyq2[7] {
+					if x.Images == nil {
+						r.EncodeNil()
 					} else {
-						h.encSliceContainerImage(([]ContainerImage)(x.Images), e)
+						yym29 := z.EncBinary()
+						_ = yym29
+						if false {
+						} else {
+							h.encSliceContainerImage(([]ContainerImage)(x.Images), e)
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("images"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.Images == nil {
-					r.EncodeNil()
-				} else {
-					yym30 := z.EncBinary()
-					_ = yym30
-					if false {
+				if yyq2[7] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("images"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Images == nil {
+						r.EncodeNil()
 					} else {
-						h.encSliceContainerImage(([]ContainerImage)(x.Images), e)
+						yym30 := z.EncBinary()
+						_ = yym30
+						if false {
+						} else {
+							h.encSliceContainerImage(([]ContainerImage)(x.Images), e)
+						}
 					}
 				}
 			}

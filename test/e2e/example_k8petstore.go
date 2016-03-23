@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -90,13 +89,13 @@ func runK8petstore(restServers int, loadGenerators int, c *client.Client, ns str
 	// Run the k8petstore app, and log / fail if it returns any errors.
 	// This should return quickly, assuming containers are downloaded.
 	if err = cmd.Start(); err != nil {
-		log.Fatal(err)
+		Failf("%v", err)
 	}
 	// Make sure there are no command errors.
 	if err = cmd.Wait(); err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				log.Printf("Exit Status: %d", status.ExitStatus())
+				Logf("Exit Status: %d", status.ExitStatus())
 			}
 		}
 	}

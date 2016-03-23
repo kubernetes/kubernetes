@@ -488,7 +488,7 @@ func (k *Executor) bindAndWatchTask(driver bindings.ExecutorDriver, task *mesos.
 	// within the launch timeout window we should see a pod-task update via the registry.
 	// if we see a Running update then we need to generate a TASK_RUNNING status update for mesos.
 	handlerFinished := false
-	handler := watchHandler{
+	handler := &watchHandler{
 		expiration: watchExpiration{
 			timeout: launchTimer.C,
 			onEvent: func(taskID string) {

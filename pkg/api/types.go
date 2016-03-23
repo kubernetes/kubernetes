@@ -1671,8 +1671,14 @@ type NodeSpec struct {
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
 type DaemonEndpoint struct {
+	/*
+		The port tag was not properly in quotes in earlier releases, so it must be
+		uppercased for backwards compat (since it was falling back to var name of
+		'Port').
+	*/
+
 	// Port number of the given endpoint.
-	Port int `json:port`
+	Port int `json:"Port"`
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.
@@ -1718,7 +1724,7 @@ type NodeStatus struct {
 	// Set of ids/uuids to uniquely identify the node.
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 	// List of container images on this node
-	Images []ContainerImage `json:"images",omitempty`
+	Images []ContainerImage `json:"images,omitempty"`
 }
 
 // Describe a container image

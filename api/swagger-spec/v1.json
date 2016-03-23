@@ -15627,9 +15627,6 @@
    "v1.NodeStatus": {
     "id": "v1.NodeStatus",
     "description": "NodeStatus is information about the current status of a node.",
-    "required": [
-     "images"
-    ],
     "properties": {
      "capacity": {
       "type": "any",

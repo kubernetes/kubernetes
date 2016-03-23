@@ -21,7 +21,7 @@ import (
 	"os"
 )
 
-func ExampleTrailingNewline() {
+func Example_trailingNewline() {
 	ld := NewLineDelimiter(os.Stdout, "|")
 	defer ld.Flush()
 	fmt.Fprint(ld, "  Hello  \n  World  \n")
@@ -30,7 +30,7 @@ func ExampleTrailingNewline() {
 	// |  World  |
 	// ||
 }
-func ExampleNoTrailingNewline() {
+func Example_noTrailingNewline() {
 	ld := NewLineDelimiter(os.Stdout, "|")
 	defer ld.Flush()
 	fmt.Fprint(ld, "  Hello  \n  World  ")
