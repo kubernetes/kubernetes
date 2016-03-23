@@ -376,6 +376,24 @@
                 export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
+        - 'gke-prod':
+            description: 'Run E2E tests on GKE prod endpoint.'
+            timeout: 480
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-prod"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
+                export JENKINS_USE_SERVER_VERSION="y"
+                export KUBE_GCE_ZONE="asia-east1-b"
+        - 'gke-prod-parallel':
+            description: 'Run E2E tests on GKE prod endpoint in parallel.'
+            timeout: 80
+            job-env: |
+                export PROJECT="k8s-e2e-gke-prod-parallel"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
+                export JENKINS_USE_SERVER_VERSION="y"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export KUBE_GCE_ZONE="asia-east1-b"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
@@ -390,18 +408,8 @@
     suffix:
         - 'gke-1.1':
             timeout: 150
-            description: 'Run E2E tests on GKE from the current release branch.'
+            description: 'Run E2E tests on GKE from the 1.1 release branch.'
             cron-string: 'H */6 * * *'
-        - 'gke-prod':
-            timeout: 180
-            description: |
-                Run e2e tests using the following config:<br>
-                - provider: GKE<br>
-                - api proxy: prod<br>
-                - borg job: prod<br>
-                - client (kubectl): release/stable.txt<br>
-                - cluster (k8s): release/stable.txt<br>
-                - tests: release/stable.txt
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
