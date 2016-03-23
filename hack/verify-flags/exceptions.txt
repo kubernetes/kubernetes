@@ -15,41 +15,11 @@ cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/gce/coreos/helper.sh:# cloud_config yaml file should be passed
 cluster/gce/trusty/configure.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
-cluster/juju/charms/trusty/kubernetes-master/files/controller-manager.upstart.tmpl:     --address=%(bind_address)s \
-cluster/juju/charms/trusty/kubernetes-master/files/scheduler.upstart.tmpl:     --address=%(bind_address)s \
-cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes-master/hooks/etcd-relation-changed:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes-master/hooks/minions-api-relation-changed:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
-cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        api_info = api_servers.pop()
-cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
-cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
-cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
-cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
-cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    if api_servers:
-cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
-cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        api_info = api_servers.pop()
-cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
-cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
-cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
-cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
-cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    if api_servers:
-cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
-cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        api_info = api_servers.pop()
-cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
-cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
-cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
-cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    for k in ('etcd_servers', 'kubeapi_server'):
-cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    if api_servers:
-cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
-cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        api_info = api_servers.pop()
-cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
-cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
-cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
-cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
-cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    if api_servers:
+cluster/juju/layers/kubernetes/reactive/k8s.py:        check_call(split(cmd.format(directory, cluster_name, public_address,
+cluster/juju/layers/kubernetes/reactive/k8s.py:        check_call(split(cmd.format(directory, context, cluster_name, user)))
+cluster/juju/layers/kubernetes/reactive/k8s.py:    cluster_name = 'kubernetes'
+cluster/juju/layers/kubernetes/templates/master.json:              "--client_ca_file=/srv/kubernetes/ca.crt",
+cluster/juju/layers/kubernetes/templates/skydns-rc.yml:        - -kube_master_url=http://{{ private_address }}:8080
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
 cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do

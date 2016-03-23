@@ -88,6 +88,9 @@ doc_tmp/
 # CoreOS stuff
 cluster/libvirt-coreos/coreos_*.img
 
+# Juju Stuff
+cluster/juju/charms/*
+
 # Downloaded Kubernetes binary release
 kubernetes/
 
