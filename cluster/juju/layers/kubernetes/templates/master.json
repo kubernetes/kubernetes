@@ -1,0 +1,61 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {"name":"k8s-master"},
+"spec":{
+  "hostNetwork": true,
+  "containers":[
+    {
+      "name": "controller-manager",
+      "image": "gcr.io/google_containers/hyperkube:{{version}}",
+      "command": [
+              "/hyperkube",
+              "controller-manager",
+              "--master=127.0.0.1:8080",
+              "--v=2"
+        ]
+    },
+    {
+      "name": "apiserver",
+      "image": "gcr.io/google_containers/hyperkube:{{version}}",
+      "command": [
+              "/hyperkube",
+              "apiserver",
+              "--address=0.0.0.0",
+              "--client_ca_file=/srv/kubernetes/ca.crt",
+              "--cluster-name=kubernetes",
+              "--etcd-servers={{connection_string}}",
+              "--service-cluster-ip-range={{cidr}}",
+              "--tls-cert-file=/srv/kubernetes/server.crt",
+              "--tls-private-key-file=/srv/kubernetes/server.key",
+              "--v=2"
+        ],
+      "volumeMounts": [
+          {
+              "mountPath": "/srv/kubernetes",
+              "name": "certs-kubernetes",
+              "readOnly": true
+          }
+        ]
+    },
+    {
+      "name": "scheduler",
+      "image": "gcr.io/google_containers/hyperkube:{{version}}",
+      "command": [
+              "/hyperkube",
+              "scheduler",
+              "--master=127.0.0.1:8080",
+              "--v=2"
+        ]
+    }
+  ],
+  "volumes": [
+      {
+          "hostPath": {
+              "path": "/srv/kubernetes"
+          },
+          "name": "certs-kubernetes"
+      }
+    ]
+ }
+}

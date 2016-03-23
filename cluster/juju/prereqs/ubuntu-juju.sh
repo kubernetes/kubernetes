@@ -43,6 +43,6 @@ function gather_installation_reqs() {
         sudo apt-get update
     fi
 
-    package_status 'juju-quickstart'
-    package_status 'juju-deployer'
+    package_status 'juju'
+    package_status 'charm-tools'
 }
