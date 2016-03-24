@@ -253,7 +253,7 @@
             test-owner: 'beeps'
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Ingress\]"
-                export PROJECT="kubernetes-ingress"
+                export PROJECT="kubernetes-ingress-1-2"
                 # TODO: Enable this when we've split 1.2 tests into another project.
                 export FAIL_ON_GCP_RESOURCE_LEAK="false"
         - 'gce-scalability-release-1.2':
@@ -327,7 +327,7 @@
             test-owner: 'beeps'
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:Ingress\]"
-                export PROJECT="kubernetes-gke-ingress"
+                export PROJECT="kubernetes-gke-ingress-1-2"
                 # TODO: Enable this when we've split 1.2 tests into another project.
                 export FAIL_ON_GCP_RESOURCE_LEAK="false"
     jobs:
