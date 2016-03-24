@@ -219,8 +219,11 @@ script
 	export TOKEN_DIR="/etc/srv/kubernetes"
 	export kubelet_kubeconfig_file="/var/lib/kubelet/kubeconfig"
 	export TRUSTY_MASTER="true"
+	if [ -n "${TEST_ADDON_CHECK_INTERVAL_SEC:-}" ]; then
+		export TEST_ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC}
+	fi
 	# Run the script to start and monitoring addon manifest changes.
-	exec /var/lib/cloud/scripts/kubernetes/kube-addons.sh
+	exec /var/lib/cloud/scripts/kubernetes/kube-addons.sh 1>>/var/log/kube-addons.log 2>&1
 end script
 
 # Wait for 10s to start it again.
