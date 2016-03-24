@@ -56,7 +56,7 @@ Documentation for other releases can be found at
   folder.
 
 * If something went wrong, see the [troubleshooting](troubleshooting.md) document for how to debug.
-You should also check the [known issues](user-guide/known-issues.md) for the release you're using.
+You should also check the [known issues for the release](../CHANGELOG.md) you're using.
 
 * To report a security issue, see [Reporting a Security Issue](reporting-security-issues.md).
 
