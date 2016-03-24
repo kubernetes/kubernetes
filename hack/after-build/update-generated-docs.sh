@@ -58,4 +58,15 @@ elif [[ $ret -gt 1 ]]; then
   exit 1
 fi
 
+"${mungedocs}" "--skip-munges=unversioned-warning,analytics" \
+               "--norecurse" \
+               "--root-dir=${KUBE_ROOT}/" && ret=0 || ret=$?
+if [[ $ret -eq 1 ]]; then
+  echo "${KUBE_ROOT}/ requires manual changes.  See preceding errors."
+  exit 1
+elif [[ $ret -gt 1 ]]; then
+  echo "Error running mungedocs."
+  exit 1
+fi
+
 # ex: ts=2 sw=2 et filetype=sh
