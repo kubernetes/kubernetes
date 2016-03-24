@@ -73,7 +73,7 @@ kubelet
       --chaos-chance=0: If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]
       --cloud-config="": The path to the cloud provider configuration file.  Empty string for no configuration file.
       --cloud-provider="": The provider for cloud services.  Empty string for no provider.
-      --cluster-dns="": IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers
+      --cluster-dns="": IP address for a cluster DNS server.  This value is used for containers' DNS server in case of Pods with "dnsPolicy=ClusterFirst"
       --cluster-domain="": Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains
       --config="": Path to the config file or directory of files
       --configure-cbr0[=false]: If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.
