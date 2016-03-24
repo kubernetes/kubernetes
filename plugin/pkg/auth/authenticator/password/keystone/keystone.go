@@ -26,12 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
-// Keystone authenticator contacts openstack keystone to validate user's credentials passed in the request.
+// KeystoneAuthenticator contacts openstack keystone to validate user's credentials passed in the request.
 // The keystone endpoint is passed during apiserver startup
 type KeystoneAuthenticator struct {
 	authURL string
 }
 
+// AuthenticatePassword checks the username, password via keystone call
 func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(username string, password string) (user.Info, bool, error) {
 	opts := gophercloud.AuthOptions{
 		IdentityEndpoint: keystoneAuthenticator.authURL,
@@ -48,7 +49,7 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(usernam
 	return &user.DefaultInfo{Name: username}, true, nil
 }
 
-// New returns a request authenticator that validates credentials using openstack keystone
+// NewKeystoneAuthenticator returns a password authenticator that validates credentials using openstack keystone
 func NewKeystoneAuthenticator(authURL string) (*KeystoneAuthenticator, error) {
 	if !strings.HasPrefix(authURL, "https") {
 		return nil, errors.New("Auth URL should be secure and start with https")

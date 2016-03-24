@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//Package keystone provide authentication via keystone.
-// For details //about keystone and how to use the plugin, refer to
-// https://github.com/kubernetes/kubernetes/blob/oidc/docs/admin/authentication.md
+// Package keystone provides authentication via keystone.
+// For details about keystone and how to use the plugin, refer to
+// https://github.com/kubernetes/kubernetes.github.io/blob/master/docs/admin/authentication.md
 package keystone
