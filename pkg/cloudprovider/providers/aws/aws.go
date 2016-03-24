@@ -76,6 +76,10 @@ const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-lo
 // future we could adjust this to allow setting the proxy protocol only on certain backends.
 const ServiceAnnotationLoadBalancerProxyProtocol = "service.beta.kubernetes.io/aws-load-balancer-proxy-protocol"
 
+// Annotation used on the service to indicate that we want the load balancer to get a cname
+// based on the service name and namespace.
+const ServiceAnnotationLoadBalancerCnameZone = "service.beta.kubernetes.io/aws-lb-cname-zone"
+
 // Service annotation requesting a secure listener. Value is a valid certificate ARN.
 // For more, see http://docs.aws.amazon.com/ElasticLoadBalancing/latest/DeveloperGuide/elb-listener-config.html
 // CertARN is an IAM or CM certificate ARN, e.g. arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012

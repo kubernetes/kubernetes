@@ -450,7 +450,7 @@ func proxyProtocolEnabled(backend *elb.BackendServerDescription) bool {
 }
 
 func getLoadBalancerHostedZone(service *api.Service) string {
-	if zone, ok := service.Labels[LabelLoadBalancerCnameZone]; ok {
+	if zone, ok := service.Annotations[ServiceAnnotationLoadBalancerCnameZone]; ok {
 		return zone + "."
 	} else {
 		return ""
