@@ -97,13 +97,13 @@ func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volu
 	if spec.Volume != nil && spec.Volume.HostPath != nil {
 		path := spec.Volume.HostPath.Path
 		return &hostPathBuilder{
-			hostPath: &hostPath{path: path, MetricsProvider: volume.NewMetricsDu(path)},
+			hostPath: &hostPath{path: path},
 			readOnly: false,
 		}, nil
 	} else {
 		path := spec.PersistentVolume.Spec.HostPath.Path
 		return &hostPathBuilder{
-			hostPath: &hostPath{path: path, MetricsProvider: volume.NewMetricsDu(path)},
+			hostPath: &hostPath{path: path},
 			readOnly: spec.ReadOnly,
 		}, nil
 	}
@@ -111,8 +111,7 @@ func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volu
 
 func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	return &hostPathCleaner{&hostPath{
-		path:            "",
-		MetricsProvider: volume.NewMetricsDu(""),
+		path: "",
 	}}, nil
 }
 
@@ -137,12 +136,11 @@ func newRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.Volume
 	}
 	path := spec.PersistentVolume.Spec.HostPath.Path
 	return &hostPathRecycler{
-		name:            spec.Name(),
-		path:            path,
-		host:            host,
-		config:          config,
-		timeout:         volume.CalculateTimeoutForVolume(config.RecyclerMinimumTimeout, config.RecyclerTimeoutIncrement, spec.PersistentVolume),
-		MetricsProvider: volume.NewMetricsDu(path),
+		name:    spec.Name(),
+		path:    path,
+		host:    host,
+		config:  config,
+		timeout: volume.CalculateTimeoutForVolume(config.RecyclerMinimumTimeout, config.RecyclerTimeoutIncrement, spec.PersistentVolume),
 	}, nil
 }
 
@@ -151,7 +149,7 @@ func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, erro
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
 	path := spec.PersistentVolume.Spec.HostPath.Path
-	return &hostPathDeleter{spec.Name(), path, host, volume.NewMetricsDu(path)}, nil
+	return &hostPathDeleter{name: spec.Name(), path: path, host: host}, nil
 }
 
 func newProvisioner(options volume.VolumeOptions, host volume.VolumeHost) (volume.Provisioner, error) {
@@ -162,7 +160,7 @@ func newProvisioner(options volume.VolumeOptions, host volume.VolumeHost) (volum
 // The direct at the specified path will be directly exposed to the container.
 type hostPath struct {
 	path string
-	volume.MetricsProvider
+	volume.MetricsNil
 }
 
 func (hp *hostPath) GetPath() string {
@@ -222,7 +220,7 @@ type hostPathRecycler struct {
 	host    volume.VolumeHost
 	config  volume.VolumeConfig
 	timeout int64
-	volume.MetricsProvider
+	volume.MetricsNil
 }
 
 func (r *hostPathRecycler) GetPath() string {
@@ -291,7 +289,7 @@ type hostPathDeleter struct {
 	name string
 	path string
 	host volume.VolumeHost
-	volume.MetricsProvider
+	volume.MetricsNil
 }
 
 func (r *hostPathDeleter) GetPath() string {
