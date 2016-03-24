@@ -702,16 +702,13 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 			master: m,
 			thirdPartyResourceRegistry: thirdPartyResourceStorage,
 		}
-		go func() {
-			wait.Forever(func() {
-				if m.disableThirdPartyControllerForTesting {
-					return
-				}
+		if !m.disableThirdPartyControllerForTesting {
+			go wait.Forever(func() {
 				if err := thirdPartyControl.SyncResources(); err != nil {
 					glog.Warningf("third party resource sync failed: %v", err)
 				}
 			}, 10*time.Second)
-		}()
+		}
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
 	}
 
