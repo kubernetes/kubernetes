@@ -210,8 +210,12 @@ type Config struct {
 	// allow downstream consumers to disable the core controller loops
 	EnableLogsSupport bool
 	EnableUISupport   bool
-	// allow downstream consumers to disable swagger
+	// Allow downstream consumers to disable swagger.
+	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
 	EnableSwaggerSupport bool
+	// Allow downstream consumers to disable swagger ui.
+	// Note that this is ignored if either EnableSwaggerSupport or EnableUISupport is false.
+	EnableSwaggerUI bool
 	// Allows api group versions or specific resources to be conditionally enabled/disabled.
 	APIGroupVersionOverrides map[string]APIGroupVersionOverride
 	// allow downstream consumers to disable the index route
@@ -307,6 +311,7 @@ type GenericAPIServer struct {
 	enableLogsSupport        bool
 	enableUISupport          bool
 	enableSwaggerSupport     bool
+	enableSwaggerUI          bool
 	enableProfiling          bool
 	enableWatchCache         bool
 	APIPrefix                string
@@ -451,6 +456,7 @@ func New(c *Config) (*GenericAPIServer, error) {
 		enableLogsSupport:        c.EnableLogsSupport,
 		enableUISupport:          c.EnableUISupport,
 		enableSwaggerSupport:     c.EnableSwaggerSupport,
+		enableSwaggerUI:          c.EnableSwaggerUI,
 		enableProfiling:          c.EnableProfiling,
 		enableWatchCache:         c.EnableWatchCache,
 		APIPrefix:                c.APIPrefix,
@@ -553,7 +559,7 @@ func (s *GenericAPIServer) init(c *Config) {
 		apiserver.InstallLogsSupport(s.MuxHelper)
 	}
 	if c.EnableUISupport {
-		ui.InstallSupport(s.MuxHelper, s.enableSwaggerSupport)
+		ui.InstallSupport(s.MuxHelper, s.enableSwaggerSupport && s.enableSwaggerUI)
 	}
 
 	if c.EnableProfiling {

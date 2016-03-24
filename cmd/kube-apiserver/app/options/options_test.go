@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -74,5 +76,24 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 		if !reflect.DeepEqual(test.expectedMap, output) {
 			t.Errorf("%v: unexpected error. expect: %v, got: %v", i, test.expectedMap, output)
 		}
+	}
+}
+
+func TestAddFlagsFlag(t *testing.T) {
+	// TODO: This only tests the enable-swagger-ui flag for now.
+	// Expand the test to include other flags as well.
+	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	s := NewAPIServer()
+	s.AddFlags(f)
+	if s.EnableSwaggerUI {
+		t.Errorf("Expected s.EnableSwaggerUI to be false by default")
+	}
+
+	args := []string{
+		"--enable-swagger-ui=true",
+	}
+	f.Parse(args)
+	if !s.EnableSwaggerUI {
+		t.Errorf("Expected s.EnableSwaggerUI to be true")
 	}
 }
