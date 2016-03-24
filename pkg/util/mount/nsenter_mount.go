@@ -170,6 +170,12 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		return true, err
 	}
 
+	// Check the directory exists
+	if _, err = os.Stat(file); os.IsNotExist(err) {
+		glog.V(5).Infof("findmnt: directory %s does not exist", file)
+		return true, err
+	}
+
 	args := []string{"--mount=/rootfs/proc/1/ns/mnt", "--", n.absHostPath("findmnt"), "-o", "target", "--noheadings", "--target", file}
 	glog.V(5).Infof("findmnt command: %v %v", nsenterPath, args)
 
