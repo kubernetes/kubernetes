@@ -418,11 +418,11 @@ var _ = Describe("Kubectl client", func() {
 
 		It("should support port-forward", func() {
 			By("forwarding the container port to a local port")
-			cmd, listenPort := runPortForward(ns, simplePodName, simplePodPort)
-			defer tryKill(cmd)
+			cmd := runPortForward(ns, simplePodName, simplePodPort)
+			defer cmd.Stop()
 
 			By("curling local port output")
-			localAddr := fmt.Sprintf("http://localhost:%d", listenPort)
+			localAddr := fmt.Sprintf("http://localhost:%d", cmd.port)
 			body, err := curl(localAddr)
 			Logf("got: %s", body)
 			if err != nil {
