@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -41,12 +40,13 @@ const (
 
 type resourceTest struct {
 	podsPerNode int
-	limits      containersCPUSummary
+	cpuLimits   containersCPUSummary
+	memLimits   resourceUsagePerContainer
 }
 
 func logPodsOnNodes(c *client.Client, nodeNames []string) {
 	for _, n := range nodeNames {
-		podList, err := GetKubeletPods(c, n)
+		podList, err := GetKubeletRunningPods(c, n)
 		if err != nil {
 			Logf("Unable to retrieve kubelet pods for node %v", n)
 			continue
@@ -55,7 +55,8 @@ func logPodsOnNodes(c *client.Client, nodeNames []string) {
 	}
 }
 
-func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames sets.String, rm *resourceMonitor, expected map[string]map[float64]float64) {
+func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames sets.String, rm *resourceMonitor,
+	expectedCPU map[string]map[float64]float64, expectedMemory resourceUsagePerContainer) {
 	numNodes := nodeNames.Len()
 	totalPods := podsPerNode * numNodes
 	By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
@@ -94,25 +95,20 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 
 	By("Reporting overall resource usage")
 	logPodsOnNodes(framework.Client, nodeNames.List())
-	rm.LogLatest()
 	usageSummary, err := rm.GetLatest()
 	Expect(err).NotTo(HaveOccurred())
 	Logf("%s", rm.FormatResourceUsage(usageSummary))
-	// TODO(yujuhong): Set realistic values after gathering enough data.
-	verifyMemoryLimits(resourceUsagePerContainer{
-		"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
-		"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
-	}, usageSummary)
+	verifyMemoryLimits(framework.Client, expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
 	Logf("%s", rm.FormatCPUSummary(cpuSummary))
-	verifyCPULimits(expected, cpuSummary)
+	verifyCPULimits(expectedCPU, cpuSummary)
 
 	By("Deleting the RC")
 	DeleteRC(framework.Client, framework.Namespace.Name, rcName)
 }
 
-func verifyMemoryLimits(expected resourceUsagePerContainer, actual resourceUsagePerNode) {
+func verifyMemoryLimits(c *client.Client, expected resourceUsagePerContainer, actual resourceUsagePerNode) {
 	if expected == nil {
 		return
 	}
@@ -135,10 +131,16 @@ func verifyMemoryLimits(expected resourceUsagePerContainer, actual resourceUsage
 		}
 		if len(nodeErrs) > 0 {
 			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
+			heapStats, err := getKubeletHeapStats(c, nodeName)
+			if err != nil {
+				Logf("Unable to get heap stats from %q", nodeName)
+			} else {
+				Logf("Heap stats on %q\n:%v", nodeName, heapStats)
+			}
 		}
 	}
 	if len(errList) > 0 {
-		Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+		Failf("Memory usage exceeding limits:\n %s", strings.Join(errList, "\n"))
 	}
 }
 
@@ -177,15 +179,13 @@ func verifyCPULimits(expected containersCPUSummary, actual nodesCPUSummary) {
 }
 
 // Slow by design (1 hour)
-var _ = Describe("Kubelet [Serial] [Slow]", func() {
+var _ = KubeDescribe("Kubelet [Serial] [Slow]", func() {
 	var nodeNames sets.String
-	framework := NewFramework("kubelet-perf")
+	framework := NewDefaultFramework("kubelet-perf")
 	var rm *resourceMonitor
 
 	BeforeEach(func() {
-		// It should be OK to list unschedulable Nodes here.
-		nodes, err := framework.Client.Nodes().List(api.ListOptions{})
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(framework.Client)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
@@ -197,7 +197,7 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 	AfterEach(func() {
 		rm.Stop()
 	})
-	Describe("regular resource usage tracking", func() {
+	KubeDescribe("regular resource usage tracking", func() {
 		// We assume that the scheduler will make reasonable scheduling choices
 		// and assign ~N pods on the node.
 		// Although we want to track N pods per node, there are N + add-on pods
@@ -207,17 +207,35 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 		// deliberately set higher resource usage limits to account for the
 		// noise.
 		rTests := []resourceTest{
-			{podsPerNode: 0,
-				limits: containersCPUSummary{
+			{
+				podsPerNode: 0,
+				cpuLimits: containersCPUSummary{
 					"/kubelet":       {0.50: 0.06, 0.95: 0.08},
 					"/docker-daemon": {0.50: 0.05, 0.95: 0.06},
 				},
+				// We set the memory limits generously because the distribution
+				// of the addon pods affect the memory usage on each node.
+				memLimits: resourceUsagePerContainer{
+					"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
+					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 85 * 1024 * 1024},
+				},
 			},
-			{podsPerNode: 35,
-				limits: containersCPUSummary{
+			{
+				podsPerNode: 35,
+				cpuLimits: containersCPUSummary{
 					"/kubelet":       {0.50: 0.12, 0.95: 0.14},
 					"/docker-daemon": {0.50: 0.06, 0.95: 0.08},
 				},
+				// We set the memory limits generously because the distribution
+				// of the addon pods affect the memory usage on each node.
+				memLimits: resourceUsagePerContainer{
+					"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 75 * 1024 * 1024},
+					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+				},
+			},
+			{
+				// TODO(yujuhong): Set the limits after collecting enough data.
+				podsPerNode: 100,
 			},
 		}
 		for _, testArg := range rTests {
@@ -226,18 +244,18 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 			name := fmt.Sprintf(
 				"for %d pods per node over %v", podsPerNode, monitoringTime)
 			It(name, func() {
-				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, itArg.limits)
+				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, itArg.cpuLimits, itArg.memLimits)
 			})
 		}
 	})
-	Describe("experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking]", func() {
+	KubeDescribe("experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking]", func() {
 		density := []int{100}
 		for i := range density {
 			podsPerNode := density[i]
 			name := fmt.Sprintf(
 				"for %d pods per node over %v", podsPerNode, monitoringTime)
 			It(name, func() {
-				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, nil)
+				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, nil, nil)
 			})
 		}
 	})

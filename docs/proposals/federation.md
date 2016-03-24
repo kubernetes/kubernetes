@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/proposals/federation.md).
+[here](http://releases.k8s.io/release-1.2/docs/proposals/federation.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -111,7 +111,7 @@ and cheap network within each cluster.
 There is also assumed to be some degree of failure correlation across
 a cluster, i.e.  whole clusters are expected to fail, at least
 occasionally (due to cluster-wide power and network failures, natural
-disasters etc). Clusters are often relatively homogenous in that all
+disasters etc). Clusters are often relatively homogeneous in that all
 compute nodes are typically provided by a single cloud provider or
 hardware vendor, and connected by a common, unified network fabric.
 But these are not hard requirements of Kubernetes.

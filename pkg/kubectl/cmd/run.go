@@ -25,6 +25,9 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -36,34 +39,34 @@ const (
 	run_long = `Create and run a particular image, possibly replicated.
 Creates a deployment or job to manage the created container(s).`
 	run_example = `# Start a single instance of nginx.
-$ kubectl run nginx --image=nginx
+kubectl run nginx --image=nginx
 
 # Start a single instance of hazelcast and let the container expose port 5701 .
-$ kubectl run hazelcast --image=hazelcast --port=5701
+kubectl run hazelcast --image=hazelcast --port=5701
 
 # Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
-$ kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
+kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
 # Start a replicated instance of nginx.
-$ kubectl run nginx --image=nginx --replicas=5
+kubectl run nginx --image=nginx --replicas=5
 
 # Dry run. Print the corresponding API objects without creating them.
-$ kubectl run nginx --image=nginx --dry-run
+kubectl run nginx --image=nginx --dry-run
 
 # Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.
-$ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
+kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
 # Start a single instance of busybox and keep it in the foreground, don't restart it if it exits.
-$ kubectl run -i --tty busybox --image=busybox --restart=Never
+kubectl run -i --tty busybox --image=busybox --restart=Never
 
 # Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
-$ kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
+kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
 
 # Start the nginx container using a different command and custom arguments.
-$ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
+kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
 
 # Start the perl container to compute π to 2000 places and print it out.
-$ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`
+kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`
 )
 
 func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -88,7 +91,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 }
 
 func addRunFlags(cmd *cobra.Command) {
-	cmd.Flags().String("generator", "", "The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1beta1'.")
+	cmd.Flags().String("generator", "", "The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1'.  This will happen only for cluster version at least 1.2, for olders we will fallback to 'run/v1' for --restart=Always, 'run-pod/v1' for others.")
 	cmd.Flags().String("image", "", "The image for the container to run.")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
@@ -146,10 +149,29 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	if len(generatorName) == 0 {
+		client, err := f.Client()
+		if err != nil {
+			return err
+		}
+		resourcesList, err := client.Discovery().ServerResources()
+		if err != nil {
+			// this cover the cases where old servers do not expose discovery
+			resourcesList = nil
+		}
 		if restartPolicy == api.RestartPolicyAlways {
-			generatorName = "deployment/v1beta1"
+			if contains(resourcesList, v1beta1.SchemeGroupVersion.WithResource("deployments")) {
+				generatorName = "deployment/v1beta1"
+			} else {
+				generatorName = "run/v1"
+			}
 		} else {
-			generatorName = "job/v1beta1"
+			if contains(resourcesList, batchv1.SchemeGroupVersion.WithResource("jobs")) {
+				generatorName = "job/v1"
+			} else if contains(resourcesList, v1beta1.SchemeGroupVersion.WithResource("jobs")) {
+				generatorName = "job/v1beta1"
+			} else {
+				generatorName = "run-pod/v1"
+			}
 		}
 	}
 	generators := f.Generators("run")
@@ -252,6 +274,23 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	}
 	cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], "created")
 	return nil
+}
+
+// TODO turn this into reusable method checking available resources
+func contains(resourcesList map[string]*unversioned.APIResourceList, resource unversioned.GroupVersionResource) bool {
+	if resourcesList == nil {
+		return false
+	}
+	resourcesGroup, ok := resourcesList[resource.GroupVersion().String()]
+	if !ok {
+		return false
+	}
+	for _, item := range resourcesGroup.APIResources {
+		if resource.Resource == item.Name {
+			return true
+		}
+	}
+	return false
 }
 
 func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) (status api.PodPhase, err error) {
@@ -441,7 +480,7 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
 			Decoder:      f.Decoder(true),
 		}
-		info, err := resourceMapper.InfoForObject(obj)
+		info, err := resourceMapper.InfoForObject(obj, nil)
 		if err != nil {
 			return nil, "", nil, nil, err
 		}

@@ -49,12 +49,7 @@ func (e *Event) IsCreated() bool {
 	if e.Action == Create {
 		return true
 	}
-
-	if e.Action == Set && e.PrevNode == nil {
-		return true
-	}
-
-	return false
+	return e.Action == Set && e.PrevNode == nil
 }
 
 func (e *Event) Index() uint64 {

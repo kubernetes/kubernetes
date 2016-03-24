@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/user-guide/kubectl/kubectl_expose.md).
+[here](http://releases.k8s.io/release-1.2/docs/user-guide/kubectl/kubectl_expose.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -34,19 +34,19 @@ Documentation for other releases can be found at
 
 ## kubectl expose
 
-Take a replication controller, service or pod and expose it as a new Kubernetes Service
+Take a replication controller, service, or pod and expose it as a new Kubernetes Service
 
 ### Synopsis
 
 
-Take a replication controller, service, replica set or pod and expose it as a new Kubernetes service.
+Take a deployment, service, replica set, replication controller, or pod and expose it as a new Kubernetes service.
 
-Looks up a replication controller, service, replica set or pod by name and uses the selector for that
-resource as the selector for a new service on the specified port. A replica set will be exposed as a
-service only if it's selector is convertible to a selector that service supports, i.e. when the
-replica set selector contains only the matchLabels component. Note that if no port is specified
-via --port and the exposed resource has multiple ports, all will be re-used by the new service. Also
-if no labels are specified, the new service will re-use the labels from the resource it exposes.
+Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
+for that resource as the selector for a new service on the specified port. A deployment or replica set
+will be exposed as a service only if its selector is convertible to a selector that service supports,
+i.e. when the selector contains only the matchLabels component. Note that if no port is specified via
+--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no
+labels are specified, the new service will re-use the labels from the resource it exposes.
 
 ```
 kubectl expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]
@@ -56,22 +56,25 @@ kubectl expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--t
 
 ```
 # Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
-$ kubectl expose rc nginx --port=80 --target-port=8000
+kubectl expose rc nginx --port=80 --target-port=8000
 
 # Create a service for a replication controller identified by type and name specified in "nginx-controller.yaml", which serves on port 80 and connects to the containers on port 8000.
-$ kubectl expose -f nginx-controller.yaml --port=80 --target-port=8000
+kubectl expose -f nginx-controller.yaml --port=80 --target-port=8000
 
 # Create a service for a pod valid-pod, which serves on port 444 with the name "frontend"
-$ kubectl expose pod valid-pod --port=444 --name=frontend
+kubectl expose pod valid-pod --port=444 --name=frontend
 
 # Create a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
-$ kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
+kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
 
 # Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-$ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
+kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
 
 # Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.
-$ kubectl expose rs nginx --port=80 --target-port=8000
+kubectl expose rs nginx --port=80 --target-port=8000
+
+# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.
+kubectl expose deployment nginx --port=80 --target-port=8000
 ```
 
 ### Options
@@ -87,7 +90,7 @@ $ kubectl expose rs nginx --port=80 --target-port=8000
       --name="": The name for the newly created object.
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].
-      --output-version="": Output the formatted object with the given version (default api-version).
+      --output-version="": Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
       --port="": The port that the service should serve on. Copied from the resource being exposed, if unspecified
       --protocol="TCP": The network protocol for the service to be created. Default is 'tcp'.
@@ -107,7 +110,6 @@ $ kubectl expose rs nginx --port=80 --target-port=8000
 
 ```
       --alsologtostderr[=false]: log to standard error as well as files
-      --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client certificate file for TLS.
       --client-key="": Path to a client key file for TLS.
@@ -135,7 +137,7 @@ $ kubectl expose rs nginx --port=80 --target-port=8000
 
 * [kubectl](kubectl.md)	 - kubectl controls the Kubernetes cluster manager
 
-###### Auto generated by spf13/cobra on 14-Feb-2016
+###### Auto generated by spf13/cobra on 22-Mar-2016
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_expose.md?pixel)]()

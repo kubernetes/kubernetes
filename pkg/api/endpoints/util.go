@@ -28,6 +28,16 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
+const (
+	// Its value is the json representation of map[string(IP)][HostRecord]
+	// example: '{"10.245.1.6":{"HostName":"my-webserver"}}'
+	PodHostnamesAnnotation = "endpoints.beta.kubernetes.io/hostnames-map"
+)
+
+type HostRecord struct {
+	HostName string
+}
+
 // RepackSubsets takes a slice of EndpointSubset objects, expands it to the full
 // representation, and then repacks that into the canonical layout.  This
 // ensures that code which operates on these objects can rely on the common

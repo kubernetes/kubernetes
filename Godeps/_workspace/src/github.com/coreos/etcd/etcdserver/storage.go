@@ -35,6 +35,9 @@ type Storage interface {
 	Save(st raftpb.HardState, ents []raftpb.Entry) error
 	// SaveSnap function saves snapshot to the underlying stable storage.
 	SaveSnap(snap raftpb.Snapshot) error
+	// DBFilePath returns the file path of database snapshot saved with given
+	// id.
+	DBFilePath(id uint64) (string, error)
 	// Close closes the Storage and performs finalization.
 	Close() error
 }
@@ -104,7 +107,7 @@ func readWAL(waldir string, snap walpb.Snapshot) (w *wal.WAL, id, cid types.ID, 
 	return
 }
 
-// upgradeWAL converts an older version of the etcdServer data to the newest version.
+// upgradeDataDir converts an older version of the etcdServer data to the newest version.
 // It must ensure that, after upgrading, the most recent version is present.
 func upgradeDataDir(baseDataDir string, name string, ver version.DataDirVersion) error {
 	switch ver {

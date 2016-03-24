@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 type EmbeddedTest struct {
@@ -78,7 +78,7 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	test := obj.(*ObjectTest)
-	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.RawJSON) != "{}" {
+	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.Raw) != "{}" || unk.ContentType != runtime.ContentTypeJSON {
 		t.Fatalf("unexpected object: %#v", test.Items[0])
 	}
 	if *gvk != externalGVK {
@@ -90,7 +90,7 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	test = obj.(*ObjectTest)
-	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.RawJSON) != `{"kind":"Other","apiVersion":"v1"}` {
+	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.Raw) != `{"kind":"Other","apiVersion":"v1"}` || unk.ContentType != runtime.ContentTypeJSON {
 		t.Fatalf("unexpected object: %#v", test.Items[0])
 	}
 	if *gvk != externalGVK {
@@ -117,7 +117,10 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 		&EmbeddedTest{ID: "foo"},
 		&EmbeddedTest{ID: "bar"},
 		// TODO: until YAML is removed, this JSON must be in ascending key order to ensure consistent roundtrip serialization
-		&runtime.Unknown{RawJSON: []byte(`{"apiVersion":"unknown.group/unknown","foo":"bar","kind":"OtherTest"}`)},
+		&runtime.Unknown{
+			Raw:         []byte(`{"apiVersion":"unknown.group/unknown","foo":"bar","kind":"OtherTest"}`),
+			ContentType: runtime.ContentTypeJSON,
+		},
 		&ObjectTest{
 			Items: runtime.NewEncodableList(codec, innerItems),
 		},
@@ -135,7 +138,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	if err := json.Unmarshal(wire, obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	t.Logf("exact wire is: %s", string(obj.Items[0].RawJSON))
+	t.Logf("exact wire is: %s", string(obj.Items[0].Raw))
 
 	items[3] = &ObjectTest{Items: innerItems}
 	internal.Items = items
@@ -166,7 +169,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	// we want DecodeList to set type meta if possible, even on runtime.Unknown objects
 	internal.Items[2].(*runtime.Unknown).TypeMeta = runtime.TypeMeta{Kind: "OtherTest", APIVersion: "unknown.group/unknown"}
 	if e, a := internal.Items, list; !reflect.DeepEqual(e, a) {
-		t.Errorf("mismatched decoded: %s", util.ObjectGoPrintSideBySide(e, a))
+		t.Errorf("mismatched decoded: %s", diff.ObjectGoPrintSideBySide(e, a))
 	}
 }
 
@@ -208,7 +211,7 @@ func TestNestedObject(t *testing.T) {
 		t.Errorf("Expected unequal %#v %#v", e, a)
 	}
 
-	obj, err := runtime.Decode(codec, decoded.(*EmbeddedTest).Object.(*runtime.Unknown).RawJSON)
+	obj, err := runtime.Decode(codec, decoded.(*EmbeddedTest).Object.(*runtime.Unknown).Raw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +230,7 @@ func TestNestedObject(t *testing.T) {
 	if externalViaJSON.Kind == "" || externalViaJSON.APIVersion == "" || externalViaJSON.ID != "outer" {
 		t.Errorf("Expected objects to have type info set, got %#v", externalViaJSON)
 	}
-	if !reflect.DeepEqual(externalViaJSON.EmptyObject.RawJSON, []byte("null")) || len(externalViaJSON.Object.RawJSON) == 0 {
+	if !reflect.DeepEqual(externalViaJSON.EmptyObject.Raw, []byte("null")) || len(externalViaJSON.Object.Raw) == 0 {
 		t.Errorf("Expected deserialization of nested objects into bytes, got %#v", externalViaJSON)
 	}
 

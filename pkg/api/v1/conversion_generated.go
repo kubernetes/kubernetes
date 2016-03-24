@@ -403,15 +403,15 @@ func autoConvert_api_ContainerImage_To_v1_ContainerImage(in *api.ContainerImage,
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ContainerImage))(in)
 	}
-	if in.RepoTags != nil {
-		out.RepoTags = make([]string, len(in.RepoTags))
-		for i := range in.RepoTags {
-			out.RepoTags[i] = in.RepoTags[i]
+	if in.Names != nil {
+		out.Names = make([]string, len(in.Names))
+		for i := range in.Names {
+			out.Names[i] = in.Names[i]
 		}
 	} else {
-		out.RepoTags = nil
+		out.Names = nil
 	}
-	out.Size = in.Size
+	out.SizeBytes = in.SizeBytes
 	return nil
 }
 
@@ -1298,7 +1298,7 @@ func autoConvert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope
 	if in.Items != nil {
 		out.Items = make([]runtime.RawExtension, len(in.Items))
 		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+			if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
 			}
 		}
@@ -1562,6 +1562,18 @@ func autoConvert_api_NodeList_To_v1_NodeList(in *api.NodeList, out *NodeList, s 
 
 func Convert_api_NodeList_To_v1_NodeList(in *api.NodeList, out *NodeList, s conversion.Scope) error {
 	return autoConvert_api_NodeList_To_v1_NodeList(in, out, s)
+}
+
+func autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in *api.NodeProxyOptions, out *NodeProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.NodeProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in *api.NodeProxyOptions, out *NodeProxyOptions, s conversion.Scope) error {
+	return autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions(in, out, s)
 }
 
 func autoConvert_api_NodeSpec_To_v1_NodeSpec(in *api.NodeSpec, out *NodeSpec, s conversion.Scope) error {
@@ -2586,6 +2598,7 @@ func autoConvert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStat
 		defaulting.(func(*api.ReplicationControllerStatus))(in)
 	}
 	out.Replicas = int32(in.Replicas)
+	out.FullyLabeledReplicas = int32(in.FullyLabeledReplicas)
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -2653,6 +2666,14 @@ func autoConvert_api_ResourceQuotaSpec_To_v1_ResourceQuotaSpec(in *api.ResourceQ
 		}
 	} else {
 		out.Hard = nil
+	}
+	if in.Scopes != nil {
+		out.Scopes = make([]ResourceQuotaScope, len(in.Scopes))
+		for i := range in.Scopes {
+			out.Scopes[i] = ResourceQuotaScope(in.Scopes[i])
+		}
+	} else {
+		out.Scopes = nil
 	}
 	return nil
 }
@@ -3009,6 +3030,18 @@ func autoConvert_api_ServicePort_To_v1_ServicePort(in *api.ServicePort, out *Ser
 
 func Convert_api_ServicePort_To_v1_ServicePort(in *api.ServicePort, out *ServicePort, s conversion.Scope) error {
 	return autoConvert_api_ServicePort_To_v1_ServicePort(in, out, s)
+}
+
+func autoConvert_api_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *api.ServiceProxyOptions, out *ServiceProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ServiceProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_api_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *api.ServiceProxyOptions, out *ServiceProxyOptions, s conversion.Scope) error {
+	return autoConvert_api_ServiceProxyOptions_To_v1_ServiceProxyOptions(in, out, s)
 }
 
 func autoConvert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
@@ -3675,15 +3708,15 @@ func autoConvert_v1_ContainerImage_To_api_ContainerImage(in *ContainerImage, out
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerImage))(in)
 	}
-	if in.RepoTags != nil {
-		out.RepoTags = make([]string, len(in.RepoTags))
-		for i := range in.RepoTags {
-			out.RepoTags[i] = in.RepoTags[i]
+	if in.Names != nil {
+		out.Names = make([]string, len(in.Names))
+		for i := range in.Names {
+			out.Names[i] = in.Names[i]
 		}
 	} else {
-		out.RepoTags = nil
+		out.Names = nil
 	}
-	out.Size = in.Size
+	out.SizeBytes = in.SizeBytes
 	return nil
 }
 
@@ -4538,7 +4571,7 @@ func autoConvert_v1_List_To_api_List(in *List, out *api.List, s conversion.Scope
 	if in.Items != nil {
 		out.Items = make([]runtime.Object, len(in.Items))
 		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+			if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
 			}
 		}
@@ -4802,6 +4835,18 @@ func autoConvert_v1_NodeList_To_api_NodeList(in *NodeList, out *api.NodeList, s 
 
 func Convert_v1_NodeList_To_api_NodeList(in *NodeList, out *api.NodeList, s conversion.Scope) error {
 	return autoConvert_v1_NodeList_To_api_NodeList(in, out, s)
+}
+
+func autoConvert_v1_NodeProxyOptions_To_api_NodeProxyOptions(in *NodeProxyOptions, out *api.NodeProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*NodeProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_v1_NodeProxyOptions_To_api_NodeProxyOptions(in *NodeProxyOptions, out *api.NodeProxyOptions, s conversion.Scope) error {
+	return autoConvert_v1_NodeProxyOptions_To_api_NodeProxyOptions(in, out, s)
 }
 
 func autoConvert_v1_NodeSpec_To_api_NodeSpec(in *NodeSpec, out *api.NodeSpec, s conversion.Scope) error {
@@ -5792,6 +5837,7 @@ func autoConvert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStat
 		defaulting.(func(*ReplicationControllerStatus))(in)
 	}
 	out.Replicas = int(in.Replicas)
+	out.FullyLabeledReplicas = int(in.FullyLabeledReplicas)
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -5850,6 +5896,14 @@ func autoConvert_v1_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *ResourceQuota
 	}
 	if err := s.Convert(&in.Hard, &out.Hard, 0); err != nil {
 		return err
+	}
+	if in.Scopes != nil {
+		out.Scopes = make([]api.ResourceQuotaScope, len(in.Scopes))
+		for i := range in.Scopes {
+			out.Scopes[i] = api.ResourceQuotaScope(in.Scopes[i])
+		}
+	} else {
+		out.Scopes = nil
 	}
 	return nil
 }
@@ -6170,6 +6224,18 @@ func autoConvert_v1_ServicePort_To_api_ServicePort(in *ServicePort, out *api.Ser
 
 func Convert_v1_ServicePort_To_api_ServicePort(in *ServicePort, out *api.ServicePort, s conversion.Scope) error {
 	return autoConvert_v1_ServicePort_To_api_ServicePort(in, out, s)
+}
+
+func autoConvert_v1_ServiceProxyOptions_To_api_ServiceProxyOptions(in *ServiceProxyOptions, out *api.ServiceProxyOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ServiceProxyOptions))(in)
+	}
+	out.Path = in.Path
+	return nil
+}
+
+func Convert_v1_ServiceProxyOptions_To_api_ServiceProxyOptions(in *ServiceProxyOptions, out *api.ServiceProxyOptions, s conversion.Scope) error {
+	return autoConvert_v1_ServiceProxyOptions_To_api_ServiceProxyOptions(in, out, s)
 }
 
 func autoConvert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
@@ -6519,6 +6585,7 @@ func init() {
 		autoConvert_api_NodeCondition_To_v1_NodeCondition,
 		autoConvert_api_NodeDaemonEndpoints_To_v1_NodeDaemonEndpoints,
 		autoConvert_api_NodeList_To_v1_NodeList,
+		autoConvert_api_NodeProxyOptions_To_v1_NodeProxyOptions,
 		autoConvert_api_NodeSpec_To_v1_NodeSpec,
 		autoConvert_api_NodeStatus_To_v1_NodeStatus,
 		autoConvert_api_NodeSystemInfo_To_v1_NodeSystemInfo,
@@ -6572,6 +6639,7 @@ func init() {
 		autoConvert_api_ServiceAccount_To_v1_ServiceAccount,
 		autoConvert_api_ServiceList_To_v1_ServiceList,
 		autoConvert_api_ServicePort_To_v1_ServicePort,
+		autoConvert_api_ServiceProxyOptions_To_v1_ServiceProxyOptions,
 		autoConvert_api_ServiceSpec_To_v1_ServiceSpec,
 		autoConvert_api_ServiceStatus_To_v1_ServiceStatus,
 		autoConvert_api_Service_To_v1_Service,
@@ -6649,6 +6717,7 @@ func init() {
 		autoConvert_v1_NodeCondition_To_api_NodeCondition,
 		autoConvert_v1_NodeDaemonEndpoints_To_api_NodeDaemonEndpoints,
 		autoConvert_v1_NodeList_To_api_NodeList,
+		autoConvert_v1_NodeProxyOptions_To_api_NodeProxyOptions,
 		autoConvert_v1_NodeSpec_To_api_NodeSpec,
 		autoConvert_v1_NodeStatus_To_api_NodeStatus,
 		autoConvert_v1_NodeSystemInfo_To_api_NodeSystemInfo,
@@ -6702,6 +6771,7 @@ func init() {
 		autoConvert_v1_ServiceAccount_To_api_ServiceAccount,
 		autoConvert_v1_ServiceList_To_api_ServiceList,
 		autoConvert_v1_ServicePort_To_api_ServicePort,
+		autoConvert_v1_ServiceProxyOptions_To_api_ServiceProxyOptions,
 		autoConvert_v1_ServiceSpec_To_api_ServiceSpec,
 		autoConvert_v1_ServiceStatus_To_api_ServiceStatus,
 		autoConvert_v1_Service_To_api_Service,

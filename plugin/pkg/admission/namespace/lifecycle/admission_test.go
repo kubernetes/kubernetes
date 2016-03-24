@@ -24,8 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -118,7 +118,7 @@ func TestAdmission(t *testing.T) {
 		t.Errorf("Did not expect an error %v", err)
 	}
 
-	// verify create/update/delete of object in non-existant namespace throws error
+	// verify create/update/delete of object in non-existent namespace throws error
 	err = handler.Admit(admission.NewAttributesRecord(&badPod, api.Kind("Pod"), badPod.Namespace, badPod.Name, api.Resource("pods"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an aerror that objects cannot be created in non-existant namespaces", err)

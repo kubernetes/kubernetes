@@ -32,7 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/registry/job"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -111,7 +113,10 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = expvalidation.ValidateJob(t)
+		// Job needs generateSelector called before validation, and job.Validate does this.
+		// See: https://github.com/kubernetes/kubernetes/issues/20951#issuecomment-187787040
+		t.ObjectMeta.UID = types.UID("fakeuid")
+		errors = job.Strategy.Validate(nil, t)
 	case *extensions.Ingress:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault

@@ -469,9 +469,9 @@ func NewSelectorMatchPredicate(info NodeInfo) algorithm.FitPredicate {
 	return selector.PodSelectorMatches
 }
 
-// NodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
+// nodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
 // terms are ORed, and an emtpy a list of terms will match nothing.
-func NodeMatchesNodeSelectorTerms(node *api.Node, nodeSelectorTerms []api.NodeSelectorTerm) bool {
+func nodeMatchesNodeSelectorTerms(node *api.Node, nodeSelectorTerms []api.NodeSelectorTerm) bool {
 	for _, req := range nodeSelectorTerms {
 		nodeSelector, err := api.NodeSelectorRequirementsAsSelector(req.MatchExpressions)
 		if err != nil {
@@ -524,14 +524,14 @@ func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 		// if nodeAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
 		// 	nodeSelectorTerms := nodeAffinity.RequiredDuringSchedulingRequiredDuringExecution.NodeSelectorTerms
 		// 	glog.V(10).Infof("Match for RequiredDuringSchedulingRequiredDuringExecution node selector terms %+v", nodeSelectorTerms)
-		// 	nodeAffinityMatches = NodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
+		// 	nodeAffinityMatches = nodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
 		// }
 
 		// Match node selector for requiredDuringSchedulingIgnoredDuringExecution.
 		if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 			nodeSelectorTerms := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
 			glog.V(10).Infof("Match for RequiredDuringSchedulingIgnoredDuringExecution node selector terms %+v", nodeSelectorTerms)
-			nodeAffinityMatches = nodeAffinityMatches && NodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
+			nodeAffinityMatches = nodeAffinityMatches && nodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
 		}
 
 	}

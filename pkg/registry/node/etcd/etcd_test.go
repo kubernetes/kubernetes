@@ -39,8 +39,9 @@ func (fakeConnectionInfoGetter) GetConnectionInfo(ctx api.Context, nodeName stri
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	storage, _ := NewREST(etcdStorage, generic.UndecoratedStorage, fakeConnectionInfoGetter{}, nil)
-	return storage, server
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	storage := NewStorage(restOptions, fakeConnectionInfoGetter{}, nil)
+	return storage.Node, server
 }
 
 func validNewNode() *api.Node {

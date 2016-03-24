@@ -21,15 +21,6 @@ import (
 	"time"
 )
 
-func NewFakeBackOff(initial, max time.Duration, tc *FakeClock) *Backoff {
-	return &Backoff{
-		perItemBackoff:  map[string]*backoffEntry{},
-		Clock:           tc,
-		defaultDuration: initial,
-		maxDuration:     max,
-	}
-}
-
 func TestSlowBackoff(t *testing.T) {
 	id := "_idSlow"
 	tc := NewFakeClock(time.Now())

@@ -27,7 +27,9 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	mesosmeta "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
 	"k8s.io/kubernetes/pkg/api"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
@@ -53,9 +55,22 @@ const (
 
 var starRole = []string{"*"}
 
+// Config represents elements that are used or required in order to
+// create a pod task that may be scheduled.
+type Config struct {
+	ID                           string              // ID is an optional, unique task ID; auto-generated if not specified
+	DefaultPodRoles              []string            // DefaultPodRoles lists preferred resource groups, prioritized in order
+	FrameworkRoles               []string            // FrameworkRoles identify resource groups from which the framework may consume
+	Prototype                    *mesos.ExecutorInfo // Prototype is required
+	HostPortStrategy             hostport.Strategy   // HostPortStrategy is used as the port mapping strategy, unless overridden by the pod
+	GenerateTaskDiscoveryEnabled bool
+	mapper                       hostport.Mapper // host-port mapping func, derived from pod and default strategy
+	podKey                       string          // k8s key for this pod; managed internally
+}
+
 // A struct that describes a pod task.
 type T struct {
-	ID  string
+	Config
 	Pod api.Pod
 
 	// Stores the final procurement result, once set read-only.
@@ -68,26 +83,16 @@ type T struct {
 	CreateTime  time.Time
 	UpdatedTime time.Time // time of the most recent StatusUpdate we've seen from the mesos master
 
-	podStatus       api.PodStatus
-	prototype       *mesos.ExecutorInfo // readonly
-	frameworkRoles  []string            // Mesos framework roles, pods are allowed to be launched with those
-	defaultPodRoles []string            // roles under which pods are scheduled if none are specified in labels
-	podKey          string
-	launchTime      time.Time
-	bindTime        time.Time
-	mapper          HostPortMapper
-}
-
-type Port struct {
-	Port uint64
-	Role string
+	podStatus  api.PodStatus
+	launchTime time.Time
+	bindTime   time.Time
 }
 
 type Spec struct {
 	SlaveID       string
 	AssignedSlave string
 	Resources     []*mesos.Resource
-	PortMap       []HostPortMapping
+	PortMap       []hostport.Mapping
 	Data          []byte
 	Executor      *mesos.ExecutorInfo
 }
@@ -129,9 +134,6 @@ func generateTaskName(pod *api.Pod) string {
 	}
 	return fmt.Sprintf("%s.%s.pod", pod.Name, ns)
 }
-
-// GenerateTaskDiscoveryEnabled turns on/off the generation of DiscoveryInfo for TaskInfo records
-var GenerateTaskDiscoveryEnabled = false
 
 func generateTaskDiscovery(pod *api.Pod) *mesos.DiscoveryInfo {
 	di := &mesos.DiscoveryInfo{
@@ -195,7 +197,7 @@ func (t *T) BuildTaskInfo() (*mesos.TaskInfo, error) {
 		SlaveId:   mutil.NewSlaveID(t.Spec.SlaveID),
 	}
 
-	if GenerateTaskDiscoveryEnabled {
+	if t.GenerateTaskDiscoveryEnabled {
 		info.Discovery = generateTaskDiscovery(&t.Pod)
 	}
 
@@ -237,46 +239,45 @@ func (t *T) Roles() (result []string) {
 
 		return filterRoles(
 			roles,
-			not(emptyRole), not(seenRole()), inRoles(t.frameworkRoles...),
+			not(emptyRole), not(seenRole()), inRoles(t.FrameworkRoles...),
 		)
 	}
 
 	// no roles label defined, return defaults
-	return t.defaultPodRoles
+	return t.DefaultPodRoles
 }
 
-func New(ctx api.Context, id string, pod *api.Pod, prototype *mesos.ExecutorInfo, frameworkRoles, defaultPodRoles []string) (*T, error) {
-	if prototype == nil {
-		return nil, fmt.Errorf("illegal argument: executor is nil")
+func New(ctx api.Context, config Config, pod *api.Pod) (*T, error) {
+	if config.Prototype == nil {
+		return nil, fmt.Errorf("illegal argument: executor-info prototype is nil")
 	}
 
-	if len(frameworkRoles) == 0 {
-		frameworkRoles = starRole
+	if len(config.FrameworkRoles) == 0 {
+		config.FrameworkRoles = starRole
 	}
 
-	if len(defaultPodRoles) == 0 {
-		defaultPodRoles = starRole
+	if len(config.DefaultPodRoles) == 0 {
+		config.DefaultPodRoles = starRole
 	}
 
 	key, err := MakePodKey(ctx, pod.Name)
 	if err != nil {
 		return nil, err
 	}
+	config.podKey = key
 
-	if id == "" {
-		id = "pod." + uuid.NewUUID().String()
+	if config.ID == "" {
+		config.ID = "pod." + uuid.NewUUID().String()
 	}
 
+	// the scheduler better get the fallback strategy right, otherwise we panic here
+	config.mapper = config.HostPortStrategy.NewMapper(pod)
+
 	task := &T{
-		ID:              id,
-		Pod:             *pod,
-		State:           StatePending,
-		podKey:          key,
-		mapper:          NewHostPortMapper(pod),
-		Flags:           make(map[FlagType]struct{}),
-		prototype:       prototype,
-		frameworkRoles:  frameworkRoles,
-		defaultPodRoles: defaultPodRoles,
+		Pod:    *pod,
+		Config: config,
+		State:  StatePending,
+		Flags:  make(map[FlagType]struct{}),
 	}
 	task.CreateTime = time.Now()
 
@@ -305,8 +306,14 @@ func (t *T) SaveRecoveryInfo(dict map[string]string) {
 func RecoverFrom(pod api.Pod) (*T, bool, error) {
 	// we only expect annotations if pod has been bound, which implies that it has already
 	// been scheduled and launched
-	if pod.Spec.NodeName == "" && len(pod.Annotations) == 0 {
+	if len(pod.Annotations) == 0 {
 		log.V(1).Infof("skipping recovery for unbound pod %v/%v", pod.Namespace, pod.Name)
+		return nil, false, nil
+	}
+
+	// we don't track mirror pods, they're considered part of the executor
+	if _, isMirrorPod := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]; isMirrorPod {
+		log.V(1).Infof("skipping recovery for mirror pod %v/%v", pod.Namespace, pod.Name)
 		return nil, false, nil
 	}
 
@@ -328,12 +335,13 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 
 	now := time.Now()
 	t := &T{
+		Config: Config{
+			podKey: key,
+		},
 		Pod:        pod,
 		CreateTime: now,
-		podKey:     key,
 		State:      StatePending, // possibly running? mesos will tell us during reconciliation
 		Flags:      make(map[FlagType]struct{}),
-		mapper:     NewHostPortMapper(&pod),
 		launchTime: now,
 		bindTime:   now,
 		Spec:       &Spec{},

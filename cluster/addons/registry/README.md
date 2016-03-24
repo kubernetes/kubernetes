@@ -60,7 +60,7 @@ created independently - this is not something Kubernetes manages for you (yet).
 ### I don't want or don't have persistent storage
 
 If you are running in a place that doesn't have networked storage, or if you
-just want to kick the tires on this without commiting to it, you can easily
+just want to kick the tires on this without committing to it, you can easily
 adapt the `ReplicationController` specification below to use a simple
 `emptyDir` volume instead of a `persistentVolumeClaim`.
 

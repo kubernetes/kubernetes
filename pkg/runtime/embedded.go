@@ -69,56 +69,68 @@ func (re *Unknown) UnmarshalJSON(in []byte) error {
 		return errors.New("runtime.Unknown: UnmarshalJSON on nil pointer")
 	}
 	re.TypeMeta = TypeMeta{}
-	re.RawJSON = append(re.RawJSON[0:0], in...)
+	re.Raw = append(re.Raw[0:0], in...)
+	re.ContentEncoding = ""
+	re.ContentType = ContentTypeJSON
 	return nil
 }
 
 // Marshal may get called on pointers or values, so implement MarshalJSON on value.
 // http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
 func (re Unknown) MarshalJSON() ([]byte, error) {
-	if re.RawJSON == nil {
+	// If ContentType is unset, we assume this is JSON.
+	if re.ContentType != "" && re.ContentType != ContentTypeJSON {
+		return nil, errors.New("runtime.Unknown: MarshalJSON on non-json data")
+	}
+	if re.Raw == nil {
 		return []byte("null"), nil
 	}
-	return re.RawJSON, nil
+	return re.Raw, nil
+}
+
+func Convert_runtime_Object_To_runtime_RawExtension(in *Object, out *RawExtension, s conversion.Scope) error {
+	if in == nil {
+		out.Raw = []byte("null")
+		return nil
+	}
+	obj := *in
+	if unk, ok := obj.(*Unknown); ok {
+		if unk.Raw != nil {
+			out.Raw = unk.Raw
+			return nil
+		}
+		obj = out.Object
+	}
+	if obj == nil {
+		out.Raw = nil
+		return nil
+	}
+	out.Object = obj
+	return nil
+}
+
+func Convert_runtime_RawExtension_To_runtime_Object(in *RawExtension, out *Object, s conversion.Scope) error {
+	if in.Object != nil {
+		*out = in.Object
+		return nil
+	}
+	data := in.Raw
+	if len(data) == 0 || (len(data) == 4 && string(data) == "null") {
+		*out = nil
+		return nil
+	}
+	*out = &Unknown{
+		Raw: data,
+		// TODO: Set ContentEncoding and ContentType appropriately.
+		// Currently we set ContentTypeJSON to make tests passing.
+		ContentType: ContentTypeJSON,
+	}
+	return nil
 }
 
 func DefaultEmbeddedConversions() []interface{} {
 	return []interface{}{
-		func(in *Object, out *RawExtension, s conversion.Scope) error {
-			if in == nil {
-				out.RawJSON = []byte("null")
-				return nil
-			}
-			obj := *in
-			if unk, ok := obj.(*Unknown); ok {
-				if unk.RawJSON != nil {
-					out.RawJSON = unk.RawJSON
-					return nil
-				}
-				obj = out.Object
-			}
-			if obj == nil {
-				out.RawJSON = nil
-				return nil
-			}
-			out.Object = obj
-			return nil
-		},
-
-		func(in *RawExtension, out *Object, s conversion.Scope) error {
-			if in.Object != nil {
-				*out = in.Object
-				return nil
-			}
-			data := in.RawJSON
-			if len(data) == 0 || (len(data) == 4 && string(data) == "null") {
-				*out = nil
-				return nil
-			}
-			*out = &Unknown{
-				RawJSON: data,
-			}
-			return nil
-		},
+		Convert_runtime_Object_To_runtime_RawExtension,
+		Convert_runtime_RawExtension_To_runtime_Object,
 	}
 }

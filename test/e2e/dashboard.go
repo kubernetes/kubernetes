@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Kubernetes Dashboard", func() {
+var _ = KubeDescribe("Kubernetes Dashboard", func() {
 	const (
 		uiServiceName = "kubernetes-dashboard"
 		uiAppName     = uiServiceName
@@ -37,7 +37,7 @@ var _ = Describe("Kubernetes Dashboard", func() {
 		serverStartTimeout = 1 * time.Minute
 	)
 
-	f := NewFramework(uiServiceName)
+	f := NewDefaultFramework(uiServiceName)
 
 	It("should check that the kubernetes-dashboard instance is alive", func() {
 		By("Checking whether the kubernetes-dashboard service exists.")
@@ -52,11 +52,12 @@ var _ = Describe("Kubernetes Dashboard", func() {
 		By("Checking to make sure we get a response from the kubernetes-dashboard.")
 		err = wait.Poll(poll, serverStartTimeout, func() (bool, error) {
 			var status int
+			proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+			if errProxy != nil {
+				Logf("Get services proxy request failed: %v", errProxy)
+			}
 			// Query against the proxy URL for the kube-ui service.
-			err := f.Client.Get().
-				Namespace(uiNamespace).
-				Prefix("proxy").
-				Resource("services").
+			err := proxyRequest.Namespace(uiNamespace).
 				Name(uiServiceName).
 				Timeout(singleCallTimeout).
 				Do().

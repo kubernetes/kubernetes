@@ -28,9 +28,16 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/node"
+	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
+
+// NodeStorage includes storage for nodes and all sub resources
+type NodeStorage struct {
+	Node   *REST
+	Status *StatusREST
+	Proxy  *noderest.ProxyREST
+}
 
 type REST struct {
 	*etcdgeneric.Etcd
@@ -53,12 +60,12 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 }
 
 // NewREST returns a RESTStorage object that will work against nodes.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) (*REST, *StatusREST) {
+func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) NodeStorage {
 	prefix := "/minions"
 
 	newListFunc := func() runtime.Object { return &api.NodeList{} }
-	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.Nodes), &api.Node{}, prefix, node.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.Nodes), &api.Node{}, prefix, node.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
@@ -72,8 +79,9 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, con
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil
 		},
-		PredicateFunc:     node.MatchNode,
-		QualifiedResource: api.Resource("nodes"),
+		PredicateFunc:           node.MatchNode,
+		QualifiedResource:       api.Resource("nodes"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,
@@ -85,7 +93,13 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, con
 	statusStore := *store
 	statusStore.UpdateStrategy = node.StatusStrategy
 
-	return &REST{store, connection, proxyTransport}, &StatusREST{store: &statusStore}
+	nodeREST := &REST{store, connection, proxyTransport}
+
+	return NodeStorage{
+		Node:   nodeREST,
+		Status: &StatusREST{store: &statusStore},
+		Proxy:  &noderest.ProxyREST{Store: store, Connection: client.ConnectionInfoGetter(nodeREST), ProxyTransport: proxyTransport},
+	}
 }
 
 // Implement Redirector.

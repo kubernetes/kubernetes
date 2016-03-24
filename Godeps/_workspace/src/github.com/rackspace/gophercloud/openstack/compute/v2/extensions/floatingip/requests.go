@@ -26,6 +26,18 @@ type CreateOpts struct {
 	Pool string
 }
 
+// AssociateOpts specifies the required information to associate or disassociate a floating IP to an instance
+type AssociateOpts struct {
+	// ServerID is the UUID of the server
+	ServerID string
+
+	// FixedIP is an optional fixed IP address of the server
+	FixedIP string
+
+	// FloatingIP is the floating IP to associate with an instance
+	FloatingIP string
+}
+
 // ToFloatingIPCreateMap constructs a request body from CreateOpts.
 func (opts CreateOpts) ToFloatingIPCreateMap() (map[string]interface{}, error) {
 	if opts.Pool == "" {
@@ -33,6 +45,26 @@ func (opts CreateOpts) ToFloatingIPCreateMap() (map[string]interface{}, error) {
 	}
 
 	return map[string]interface{}{"pool": opts.Pool}, nil
+}
+
+// ToAssociateMap constructs a request body from AssociateOpts.
+func (opts AssociateOpts) ToAssociateMap() (map[string]interface{}, error) {
+	if opts.ServerID == "" {
+		return nil, errors.New("Required field missing for floating IP association: ServerID")
+	}
+
+	if opts.FloatingIP == "" {
+		return nil, errors.New("Required field missing for floating IP association: FloatingIP")
+	}
+
+	associateInfo := map[string]interface{}{
+		"serverId":   opts.ServerID,
+		"floatingIp": opts.FloatingIP,
+		"fixedIp":    opts.FixedIP,
+	}
+
+	return associateInfo, nil
+
 }
 
 // Create requests the creation of a new floating IP
@@ -68,6 +100,7 @@ func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 // association / disassociation
 
 // Associate pairs an allocated floating IP with an instance
+// Deprecated. Use AssociateInstance.
 func Associate(client *gophercloud.ServiceClient, serverId, fip string) AssociateResult {
 	var res AssociateResult
 
@@ -79,13 +112,59 @@ func Associate(client *gophercloud.ServiceClient, serverId, fip string) Associat
 	return res
 }
 
+// AssociateInstance pairs an allocated floating IP with an instance.
+func AssociateInstance(client *gophercloud.ServiceClient, opts AssociateOpts) AssociateResult {
+	var res AssociateResult
+
+	associateInfo, err := opts.ToAssociateMap()
+	if err != nil {
+		res.Err = err
+		return res
+	}
+
+	addFloatingIp := make(map[string]interface{})
+	addFloatingIp["address"] = associateInfo["floatingIp"].(string)
+
+	// fixedIp is not required
+	if associateInfo["fixedIp"] != "" {
+		addFloatingIp["fixed_address"] = associateInfo["fixedIp"].(string)
+	}
+
+	serverId := associateInfo["serverId"].(string)
+
+	reqBody := map[string]interface{}{"addFloatingIp": addFloatingIp}
+	_, res.Err = client.Post(associateURL(client, serverId), reqBody, nil, nil)
+	return res
+}
+
 // Disassociate decouples an allocated floating IP from an instance
+// Deprecated. Use DisassociateInstance.
 func Disassociate(client *gophercloud.ServiceClient, serverId, fip string) DisassociateResult {
 	var res DisassociateResult
 
 	removeFloatingIp := make(map[string]interface{})
 	removeFloatingIp["address"] = fip
 	reqBody := map[string]interface{}{"removeFloatingIp": removeFloatingIp}
+
+	_, res.Err = client.Post(disassociateURL(client, serverId), reqBody, nil, nil)
+	return res
+}
+
+// DisassociateInstance decouples an allocated floating IP from an instance
+func DisassociateInstance(client *gophercloud.ServiceClient, opts AssociateOpts) DisassociateResult {
+	var res DisassociateResult
+
+	associateInfo, err := opts.ToAssociateMap()
+	if err != nil {
+		res.Err = err
+		return res
+	}
+
+	removeFloatingIp := make(map[string]interface{})
+	removeFloatingIp["address"] = associateInfo["floatingIp"].(string)
+	reqBody := map[string]interface{}{"removeFloatingIp": removeFloatingIp}
+
+	serverId := associateInfo["serverId"].(string)
 
 	_, res.Err = client.Post(disassociateURL(client, serverId), reqBody, nil, nil)
 	return res

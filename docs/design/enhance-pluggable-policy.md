@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/design/enhance-pluggable-policy.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -54,7 +59,7 @@ An API request has the following attributes that can be considered for authoriza
   - resourceVersion - the API version of the resource being accessed
   - resource - which resource is being accessed
     - applies only to the API endpoints, such as
-        `/api/v1beta1/pods`.  For miscelaneous endpoints, like `/version`, the kind is the empty string.
+        `/api/v1beta1/pods`.  For miscellaneous endpoints, like `/version`, the kind is the empty string.
   - resourceName - the name of the resource during a get, update, or delete action.
   - subresource - which subresource is being accessed
 

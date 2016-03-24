@@ -25,6 +25,7 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-master
+  cbr-cidr: $MASTER_IP_RANGE
   cloud: vsphere
 EOF
 

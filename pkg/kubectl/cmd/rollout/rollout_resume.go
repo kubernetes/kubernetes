@@ -49,7 +49,7 @@ resource, we allow it to be reconciled again.
 Currently only deployments support being resumed.`
 
 	resume_example = `# Resume an already paused deployment
-$ kubectl rollout resume deployment/nginx`
+kubectl rollout resume deployment/nginx`
 )
 
 func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {

@@ -76,7 +76,7 @@ func pipeLog(wg *sync.WaitGroup, logOptions *api.PodLogOptions, r io.ReadCloser,
 		var result string
 		if logOptions.Timestamps {
 			// Use the same time format as docker.
-			result = fmt.Sprintf("%s %s\n", t, msg)
+			result = fmt.Sprintf("%s %s\n", t.Format(time.RFC3339), msg)
 		} else {
 			result = fmt.Sprintf("%s\n", msg)
 		}

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -30,7 +31,8 @@ import (
 
 func newStorage(t *testing.T) (*ScaleREST, *etcdtesting.EtcdTestServer, storage.Interface) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	return NewStorage(etcdStorage, generic.UndecoratedStorage).Scale, server, etcdStorage
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	return NewStorage(restOptions).Scale, server, etcdStorage
 }
 
 var validPodTemplate = api.PodTemplate{
@@ -72,7 +74,9 @@ var validScale = extensions.Scale{
 	},
 	Status: extensions.ScaleStatus{
 		Replicas: 0,
-		Selector: validPodTemplate.Template.Labels,
+		Selector: &unversioned.LabelSelector{
+			MatchLabels: validPodTemplate.Template.Labels,
+		},
 	},
 }
 

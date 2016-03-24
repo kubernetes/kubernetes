@@ -1,0 +1,78 @@
+# https://github.com/kubernetes/kubernetes/blob/master/docs/getting-started-guides/docker.md
+
+# docker run \
+#     --volume=/:/rootfs:ro \
+#     --volume=/sys:/sys:ro \
+#     --volume=/dev:/dev \
+#     --volume=/var/lib/docker/:/var/lib/docker:rw \
+#     --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+#     --volume=/var/run:/var/run:rw \
+#     --volume=/var/lib/juju/agents/unit-k8s-0/charm/files/manifests:/etc/kubernetes/manifests:rw \
+#     --volume=/srv/kubernetes:/srv/kubernetes \
+#     --net=host \
+#     --pid=host \
+#     --privileged=true \
+#     -ti \
+#     gcr.io/google_containers/hyperkube:v1.0.6 \
+#     /hyperkube kubelet --containerized --hostname-override="127.0.0.1" \
+#     --address="0.0.0.0" --api-servers=http://localhost:8080 \
+#     --config=/etc/kubernetes/manifests
+
+kubelet:
+  image: gcr.io/google_containers/hyperkube:{{version}}
+  net: host
+  pid: host
+  privileged: true
+  restart: always
+  volumes:
+    - /:/rootfs:ro
+    - /sys:/sys:ro
+    - /dev:/dev
+    - /var/lib/docker/:/var/lib/docker:rw
+    - /var/lib/kubelet/:/var/lib/kubelet:rw
+    - /var/run:/var/run:rw
+    - {{manifest_directory}}:/etc/kubernetes/manifests:rw
+    - /srv/kubernetes:/srv/kubernetes
+  command: |
+    /hyperkube kubelet --containerized --hostname-override="{{private_address}}"
+    --address="0.0.0.0" --api-servers=http://localhost:8080
+    --config=/etc/kubernetes/manifests {% if dns_server %}
+    --cluster-dns={{dns_server}} --cluster-domain=cluster.local {% endif %}
+    --tls-cert-file="/srv/kubernetes/server.crt"
+    --tls-private-key-file="/srv/kubernetes/server.key"
+
+# docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 \
+#   /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 \
+#   --data-dir=/var/etcd/data
+etcd:
+  net: host
+  image: gcr.io/google_containers/etcd:2.0.12
+  command: |
+    /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001
+    --data-dir=/var/etcd/data
+
+# docker run \
+#     -d \
+#     --net=host \
+#     --privileged \
+#     gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+#     /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+proxy:
+  net: host
+  privileged: true
+  restart: always
+  image: gcr.io/google_containers/hyperkube:{{version}}
+  command: /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+
+# cAdvisor (Container Advisor) provides container users an understanding of
+# the resource usage and performance characteristics of their running containers.
+cadvisor:
+  image: google/cadvisor:latest
+  volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker:/var/lib/docker:ro
+  ports:
+    - 8088:8080
+  restart: always

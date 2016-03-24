@@ -63,6 +63,7 @@ var ListExpected = []ListedStack{
 		CreationTime: time.Date(2015, 2, 3, 20, 7, 39, 0, time.UTC),
 		Status:       "CREATE_COMPLETE",
 		ID:           "16ef0584-4458-41eb-87c8-0dc8d5f66c87",
+		Tags:         []string{"rackspace", "atx"},
 	},
 	ListedStack{
 		Description: "Simple template to test heat commands",
@@ -78,6 +79,7 @@ var ListExpected = []ListedStack{
 		UpdatedTime:  time.Date(2014, 12, 11, 17, 40, 37, 0, time.UTC),
 		Status:       "UPDATE_COMPLETE",
 		ID:           "db6977b2-27aa-4775-9ae7-6213212d4ada",
+		Tags:         []string{"sfo", "satx"},
 	},
 }
 
@@ -98,7 +100,8 @@ const FullListOutput = `
     "creation_time": "2015-02-03T20:07:39",
     "updated_time": null,
     "stack_status": "CREATE_COMPLETE",
-    "id": "16ef0584-4458-41eb-87c8-0dc8d5f66c87"
+    "id": "16ef0584-4458-41eb-87c8-0dc8d5f66c87",
+	"tags": ["rackspace", "atx"]
   },
   {
     "description": "Simple template to test heat commands",
@@ -113,7 +116,8 @@ const FullListOutput = `
     "creation_time": "2014-12-11T17:39:16",
     "updated_time": "2014-12-11T17:40:37",
     "stack_status": "UPDATE_COMPLETE",
-    "id": "db6977b2-27aa-4775-9ae7-6213212d4ada"
+    "id": "db6977b2-27aa-4775-9ae7-6213212d4ada",
+	"tags": ["sfo", "satx"]
   }
   ]
 }
@@ -165,6 +169,7 @@ var GetExpected = &RetrievedStack{
 	Status:              "CREATE_COMPLETE",
 	ID:                  "16ef0584-4458-41eb-87c8-0dc8d5f66c87",
 	TemplateDescription: "Simple template to test heat commands",
+	Tags:                []string{"rackspace", "atx"},
 }
 
 // GetOutput represents the response body from a Get request.
@@ -194,7 +199,8 @@ const GetOutput = `
     "stack_status": "CREATE_COMPLETE",
     "updated_time": null,
     "id": "16ef0584-4458-41eb-87c8-0dc8d5f66c87",
-    "template_description": "Simple template to test heat commands"
+    "template_description": "Simple template to test heat commands",
+	"tags": ["rackspace", "atx"]
   }
 }
 `
@@ -248,7 +254,6 @@ var PreviewExpected = &PreviewedStack{
 		"OS::stack_name": "postman_stack",
 		"OS::stack_id":   "16ef0584-4458-41eb-87c8-0dc8d5f66c87",
 	},
-	StatusReason: "Stack CREATE completed successfully",
 	Name:         "postman_stack",
 	CreationTime: time.Date(2015, 2, 3, 20, 7, 39, 0, time.UTC),
 	Links: []gophercloud.Link{
@@ -259,7 +264,6 @@ var PreviewExpected = &PreviewedStack{
 	},
 	Capabilities:        []interface{}{},
 	NotificationTopics:  []interface{}{},
-	Status:              "CREATE_COMPLETE",
 	ID:                  "16ef0584-4458-41eb-87c8-0dc8d5f66c87",
 	TemplateDescription: "Simple template to test heat commands",
 }
@@ -316,6 +320,20 @@ var AbandonExpected = &AbandonedStack{
 			"type":        "OS::Nova::Server",
 		},
 	},
+	Files: map[string]string{
+		"file:///Users/prat8228/go/src/github.com/rackspace/rack/my_nova.yaml": "heat_template_version: 2014-10-16\nparameters:\n  flavor:\n    type: string\n    description: Flavor for the server to be created\n    default: 4353\n    hidden: true\nresources:\n  test_server:\n    type: \"OS::Nova::Server\"\n    properties:\n      name: test-server\n      flavor: 2 GB General Purpose v1\n image: Debian 7 (Wheezy) (PVHVM)\n",
+	},
+	StackUserProjectID: "897686",
+	ProjectID:          "897686",
+	Environment: map[string]interface{}{
+		"encrypted_param_names": make([]map[string]interface{}, 0),
+		"parameter_defaults":    make(map[string]interface{}),
+		"parameters":            make(map[string]interface{}),
+		"resource_registry": map[string]interface{}{
+			"file:///Users/prat8228/go/src/github.com/rackspace/rack/my_nova.yaml": "file:///Users/prat8228/go/src/github.com/rackspace/rack/my_nova.yaml",
+			"resources": make(map[string]interface{}),
+		},
+	},
 }
 
 // AbandonOutput represents the response body from an Abandon request.
@@ -354,21 +372,233 @@ const AbandonOutput = `
       "name": "hello_world",
       "resource_id": "8a310d36-46fc-436f-8be4-37a696b8ac63",
       "action": "CREATE",
-      "type": "OS::Nova::Server",
+      "type": "OS::Nova::Server"
     }
-  }
+  },
+  "files": {
+    "file:///Users/prat8228/go/src/github.com/rackspace/rack/my_nova.yaml": "heat_template_version: 2014-10-16\nparameters:\n  flavor:\n    type: string\n    description: Flavor for the server to be created\n    default: 4353\n    hidden: true\nresources:\n  test_server:\n    type: \"OS::Nova::Server\"\n    properties:\n      name: test-server\n      flavor: 2 GB General Purpose v1\n image: Debian 7 (Wheezy) (PVHVM)\n"
+},
+  "environment": {
+	"encrypted_param_names": [],
+	"parameter_defaults": {},
+	"parameters": {},
+	"resource_registry": {
+		"file:///Users/prat8228/go/src/github.com/rackspace/rack/my_nova.yaml": "file:///Users/prat8228/go/src/github.com/rackspace/rack/my_nova.yaml",
+		"resources": {}
+	}
+  },
+  "stack_user_project_id": "897686",
+  "project_id": "897686"
 }`
 
 // HandleAbandonSuccessfully creates an HTTP handler at `/stacks/postman_stack/16ef0584-4458-41eb-87c8-0dc8d5f66c87/abandon`
 // on the test handler mux that responds with an `Abandon` response.
-func HandleAbandonSuccessfully(t *testing.T) {
-	th.Mux.HandleFunc("/stacks/postman_stack/16ef0584-4458-41eb-87c8-0dc8d5f66c87/abandon", func(w http.ResponseWriter, r *http.Request) {
+func HandleAbandonSuccessfully(t *testing.T, output string) {
+	th.Mux.HandleFunc("/stacks/postman_stack/16ef0584-4458-41eb-87c8-0dc8d5f66c8/abandon", func(w http.ResponseWriter, r *http.Request) {
 		th.TestMethod(t, r, "DELETE")
 		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
 		th.TestHeader(t, r, "Accept", "application/json")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, AbandonOutput)
+		fmt.Fprintf(w, output)
 	})
 }
+
+// ValidJSONTemplate is a valid OpenStack Heat template in JSON format
+const ValidJSONTemplate = `
+{
+  "heat_template_version": "2014-10-16",
+  "parameters": {
+    "flavor": {
+      "default": 4353,
+      "description": "Flavor for the server to be created",
+      "hidden": true,
+      "type": "string"
+    }
+  },
+  "resources": {
+    "test_server": {
+      "properties": {
+        "flavor": "2 GB General Purpose v1",
+        "image": "Debian 7 (Wheezy) (PVHVM)",
+        "name": "test-server"
+      },
+      "type": "OS::Nova::Server"
+    }
+  }
+}
+`
+
+// ValidJSONTemplateParsed is the expected parsed version of ValidJSONTemplate
+var ValidJSONTemplateParsed = map[string]interface{}{
+	"heat_template_version": "2014-10-16",
+	"parameters": map[string]interface{}{
+		"flavor": map[string]interface{}{
+			"default":     4353,
+			"description": "Flavor for the server to be created",
+			"hidden":      true,
+			"type":        "string",
+		},
+	},
+	"resources": map[string]interface{}{
+		"test_server": map[string]interface{}{
+			"properties": map[string]interface{}{
+				"flavor": "2 GB General Purpose v1",
+				"image":  "Debian 7 (Wheezy) (PVHVM)",
+				"name":   "test-server",
+			},
+			"type": "OS::Nova::Server",
+		},
+	},
+}
+
+// ValidYAMLTemplate is a valid OpenStack Heat template in YAML format
+const ValidYAMLTemplate = `
+heat_template_version: 2014-10-16
+parameters:
+  flavor:
+    type: string
+    description: Flavor for the server to be created
+    default: 4353
+    hidden: true
+resources:
+  test_server:
+    type: "OS::Nova::Server"
+    properties:
+      name: test-server
+      flavor: 2 GB General Purpose v1
+      image: Debian 7 (Wheezy) (PVHVM)
+`
+
+// InvalidTemplateNoVersion is an invalid template as it has no `version` section
+const InvalidTemplateNoVersion = `
+parameters:
+  flavor:
+    type: string
+    description: Flavor for the server to be created
+    default: 4353
+    hidden: true
+resources:
+  test_server:
+    type: "OS::Nova::Server"
+    properties:
+      name: test-server
+      flavor: 2 GB General Purpose v1
+      image: Debian 7 (Wheezy) (PVHVM)
+`
+
+// ValidJSONEnvironment is a valid environment for a stack in JSON format
+const ValidJSONEnvironment = `
+{
+  "parameters": {
+    "user_key": "userkey"
+  },
+  "resource_registry": {
+    "My::WP::Server": "file:///home/shardy/git/heat-templates/hot/F18/WordPress_Native.yaml",
+    "OS::Quantum*": "OS::Neutron*",
+    "AWS::CloudWatch::Alarm": "file:///etc/heat/templates/AWS_CloudWatch_Alarm.yaml",
+    "OS::Metering::Alarm": "OS::Ceilometer::Alarm",
+    "AWS::RDS::DBInstance": "file:///etc/heat/templates/AWS_RDS_DBInstance.yaml",
+    "resources": {
+      "my_db_server": {
+        "OS::DBInstance": "file:///home/mine/all_my_cool_templates/db.yaml"
+      },
+      "my_server": {
+        "OS::DBInstance": "file:///home/mine/all_my_cool_templates/db.yaml",
+        "hooks": "pre-create"
+      },
+      "nested_stack": {
+        "nested_resource": {
+          "hooks": "pre-update"
+        },
+        "another_resource": {
+          "hooks": [
+            "pre-create",
+            "pre-update"
+          ]
+        }
+      }
+    }
+  }
+}
+`
+
+// ValidJSONEnvironmentParsed is the expected parsed version of ValidJSONEnvironment
+var ValidJSONEnvironmentParsed = map[string]interface{}{
+	"parameters": map[string]interface{}{
+		"user_key": "userkey",
+	},
+	"resource_registry": map[string]interface{}{
+		"My::WP::Server":         "file:///home/shardy/git/heat-templates/hot/F18/WordPress_Native.yaml",
+		"OS::Quantum*":           "OS::Neutron*",
+		"AWS::CloudWatch::Alarm": "file:///etc/heat/templates/AWS_CloudWatch_Alarm.yaml",
+		"OS::Metering::Alarm":    "OS::Ceilometer::Alarm",
+		"AWS::RDS::DBInstance":   "file:///etc/heat/templates/AWS_RDS_DBInstance.yaml",
+		"resources": map[string]interface{}{
+			"my_db_server": map[string]interface{}{
+				"OS::DBInstance": "file:///home/mine/all_my_cool_templates/db.yaml",
+			},
+			"my_server": map[string]interface{}{
+				"OS::DBInstance": "file:///home/mine/all_my_cool_templates/db.yaml",
+				"hooks":          "pre-create",
+			},
+			"nested_stack": map[string]interface{}{
+				"nested_resource": map[string]interface{}{
+					"hooks": "pre-update",
+				},
+				"another_resource": map[string]interface{}{
+					"hooks": []interface{}{
+						"pre-create",
+						"pre-update",
+					},
+				},
+			},
+		},
+	},
+}
+
+// ValidYAMLEnvironment is a valid environment for a stack in YAML format
+const ValidYAMLEnvironment = `
+parameters:
+  user_key: userkey
+resource_registry:
+  My::WP::Server: file:///home/shardy/git/heat-templates/hot/F18/WordPress_Native.yaml
+  # allow older templates with Quantum in them.
+  "OS::Quantum*": "OS::Neutron*"
+  # Choose your implementation of AWS::CloudWatch::Alarm
+  "AWS::CloudWatch::Alarm": "file:///etc/heat/templates/AWS_CloudWatch_Alarm.yaml"
+  #"AWS::CloudWatch::Alarm": "OS::Heat::CWLiteAlarm"
+  "OS::Metering::Alarm": "OS::Ceilometer::Alarm"
+  "AWS::RDS::DBInstance": "file:///etc/heat/templates/AWS_RDS_DBInstance.yaml"
+  resources:
+    my_db_server:
+      "OS::DBInstance": file:///home/mine/all_my_cool_templates/db.yaml
+    my_server:
+      "OS::DBInstance": file:///home/mine/all_my_cool_templates/db.yaml
+      hooks: pre-create
+    nested_stack:
+      nested_resource:
+        hooks: pre-update
+      another_resource:
+        hooks: [pre-create, pre-update]
+`
+
+// InvalidEnvironment is an invalid environment as it has an extra section called `resources`
+const InvalidEnvironment = `
+parameters:
+  flavor:
+    type: string
+    description: Flavor for the server to be created
+    default: 4353
+    hidden: true
+resources:
+  test_server:
+    type: "OS::Nova::Server"
+    properties:
+      name: test-server
+      flavor: 2 GB General Purpose v1
+      image: Debian 7 (Wheezy) (PVHVM)
+parameter_defaults:
+  KeyName: heat_key
+`

@@ -14,4 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// e2e_node contains e2e tests specific to the node
+// TODO: rename this package e2e-node
 package e2e_node

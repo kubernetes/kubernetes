@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	probeTimeOut = time.Minute
+	probeTimeOut = 20 * time.Second
 )
 
 // TODO: this basic interface is duplicated in N places.  consolidate?

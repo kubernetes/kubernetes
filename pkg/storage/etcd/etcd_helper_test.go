@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
@@ -125,6 +124,7 @@ func TestList(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
+
 	if e, a := list.Items, got.Items; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
@@ -250,7 +250,7 @@ func TestGetNotFoundErr(t *testing.T) {
 
 	var got api.Pod
 	err := helper.Get(context.TODO(), boguskey, &got, false)
-	if !etcdutil.IsEtcdNotFound(err) {
+	if !storage.IsNotFound(err) {
 		t.Errorf("Unexpected reponse on key=%v, err=%v", key, err)
 	}
 }
@@ -349,22 +349,6 @@ func TestSetWithVersion(t *testing.T) {
 	}
 	if returnedObj.Name != "bar" {
 		t.Fatalf("Unexpected error %#v", returnedObj)
-	}
-}
-
-func TestSetWithoutResourceVersioner(t *testing.T) {
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	server := etcdtesting.NewEtcdTestClientServer(t)
-	defer server.Terminate(t)
-	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
-	helper.versioner = nil
-	returnedObj := &api.Pod{}
-	err := helper.Set(context.TODO(), "/some/key", obj, returnedObj, 3)
-	if err != nil {
-		t.Errorf("Unexpected error %#v", err)
-	}
-	if returnedObj.ResourceVersion != "" {
-		t.Errorf("Resource revision should not be set on returned objects")
 	}
 }
 

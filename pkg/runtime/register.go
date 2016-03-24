@@ -30,8 +30,9 @@ func (obj *TypeMeta) GroupVersionKind() *unversioned.GroupVersionKind {
 	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
-func (obj *Unknown) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
-func (obj *Unstructured) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *Unknown) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
+func (obj *Unstructured) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *UnstructuredList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 // GetObjectKind implements Object for VersionedObjects, returning an empty ObjectKind
 // interface if no objects are provided, or the ObjectKind interface of the object in the

@@ -23,16 +23,16 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubemark"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -48,6 +48,10 @@ type HollowNodeConfig struct {
 	NodeName            string
 	ServerPort          int
 }
+
+const (
+	maxPods = 110
+)
 
 var knownMorphs = sets.NewString("kubelet", "proxy")
 
@@ -81,7 +85,7 @@ func main() {
 
 	config := HollowNodeConfig{}
 	config.addFlags(pflag.CommandLine)
-	util.InitFlags()
+	flag.InitFlags()
 
 	if !knownMorphs.Has(config.Morph) {
 		glog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
@@ -95,7 +99,7 @@ func main() {
 	}
 
 	if config.Morph == "kubelet" {
-		cadvisorInterface := new(cadvisor.Fake)
+		cadvisorInterface := new(cadvisortest.Fake)
 		containerManager := cm.NewStubContainerManager()
 
 		fakeDockerClient := dockertools.NewFakeDockerClient()
@@ -110,6 +114,7 @@ func main() {
 			config.KubeletPort,
 			config.KubeletReadOnlyPort,
 			containerManager,
+			maxPods,
 		)
 		hollowKubelet.Run()
 	}

@@ -34,7 +34,6 @@ const (
 	CNIPluginName        = "cni"
 	DefaultNetDir        = "/etc/cni/net.d"
 	DefaultCNIDir        = "/opt/cni/bin"
-	DefaultInterfaceName = "eth0"
 	VendorCNIDirTemplate = "%s/opt/%s/bin"
 )
 
@@ -143,7 +142,7 @@ func (plugin *cniNetworkPlugin) Status(namespace string, name string, id kubecon
 	if !ok {
 		return nil, fmt.Errorf("CNI execution called on non-docker runtime")
 	}
-	ipStr, err := runtime.GetContainerIP(string(id), DefaultInterfaceName)
+	ipStr, err := runtime.GetContainerIP(string(id), network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +195,7 @@ func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubec
 	rt := &libcni.RuntimeConf{
 		ContainerID: podInfraContainerID.ID,
 		NetNS:       podNetnsPath,
-		IfName:      DefaultInterfaceName,
+		IfName:      network.DefaultInterfaceName,
 		Args: [][2]string{
 			{"K8S_POD_NAMESPACE", podNs},
 			{"K8S_POD_NAME", podName},

@@ -15,8 +15,6 @@
 package rafthttp
 
 import (
-	"net/http"
-
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/raft/raftpb"
 )
@@ -27,7 +25,7 @@ type remote struct {
 	pipeline *pipeline
 }
 
-func startRemote(tr http.RoundTripper, urls types.URLs, local, to, cid types.ID, r Raft, errorc chan error) *remote {
+func startRemote(tr *Transport, urls types.URLs, local, to, cid types.ID, r Raft, errorc chan error) *remote {
 	picker := newURLPicker(urls)
 	status := newPeerStatus(to)
 	return &remote{
@@ -37,18 +35,17 @@ func startRemote(tr http.RoundTripper, urls types.URLs, local, to, cid types.ID,
 	}
 }
 
-func (g *remote) Send(m raftpb.Message) {
+func (g *remote) send(m raftpb.Message) {
 	select {
 	case g.pipeline.msgc <- m:
 	default:
 		if g.status.isActive() {
-			plog.Warningf("dropped %s to %s since sending buffer is full", m.Type, g.id)
-		} else {
-			plog.Debugf("dropped %s to %s since sending buffer is full", m.Type, g.id)
+			plog.MergeWarningf("dropped internal raft message to %s since sending buffer is full (bad/overloaded network)", g.id)
 		}
+		plog.Debugf("dropped %s to %s since sending buffer is full", m.Type, g.id)
 	}
 }
 
-func (g *remote) Stop() {
+func (g *remote) stop() {
 	g.pipeline.stop()
 }

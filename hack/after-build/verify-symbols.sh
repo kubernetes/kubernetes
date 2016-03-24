@@ -24,12 +24,24 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 # add other BADSYMBOLS here.
-BADSYMBOLS="testing[.]"
+BADSYMBOLS=(
+  "httptest"
+  "testify"
+  "testing[.]"
+)
 
 # b/c hyperkube binds everything simply check that for bad symbols
-if [[ $(nm ${KUBE_OUTPUT_HOSTBIN}/hyperkube | grep "${BADSYMBOLS}") ]]; then
-  echo "output binaries contain bad symbols \"${BADSYMBOLS}\""
-  exit 1
-fi
+SYMBOLS="$(nm ${KUBE_OUTPUT_HOSTBIN}/hyperkube)"
+
+RESULT=0
+for BADSYMBOL in "${BADSYMBOLS[@]}"; do
+  if FOUND=$(echo "$SYMBOLS" | grep "$BADSYMBOL"); then
+    echo "Found bad symbol '${BADSYMBOL}':"
+    echo "$FOUND"
+    RESULT=1
+  fi
+done
+
+exit $RESULT
 
 # ex: ts=2 sw=2 et filetype=sh

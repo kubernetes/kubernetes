@@ -29,8 +29,9 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/wait"
 
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -42,7 +43,7 @@ import (
 )
 
 const (
-	serveHostnameImage        = "gcr.io/google_containers/serve_hostname:1.1"
+	serveHostnameImage        = "gcr.io/google_containers/serve_hostname:v1.4"
 	resizeNodeReadyTimeout    = 2 * time.Minute
 	resizeNodeNotReadyTimeout = 2 * time.Minute
 	nodeReadinessTimeout      = 3 * time.Minute
@@ -66,13 +67,11 @@ func resizeGroup(size int) error {
 			Logf("Failed to resize node instance group: %v", string(output))
 		}
 		return err
+	} else if testContext.Provider == "aws" {
+		client := autoscaling.New(session.New())
+		return awscloud.ResizeInstanceGroup(client, testContext.CloudConfig.NodeInstanceGroup, size)
 	} else {
-		// Supported by aws
-		instanceGroups, ok := testContext.CloudConfig.Provider.(awscloud.InstanceGroups)
-		if !ok {
-			return fmt.Errorf("Provider does not support InstanceGroups")
-		}
-		return instanceGroups.ResizeInstanceGroup(testContext.CloudConfig.NodeInstanceGroup, size)
+		return fmt.Errorf("Provider does not support InstanceGroups")
 	}
 }
 
@@ -88,13 +87,9 @@ func groupSize() (int, error) {
 		}
 		re := regexp.MustCompile("RUNNING")
 		return len(re.FindAllString(string(output), -1)), nil
-	} else {
-		// Supported by aws
-		instanceGroups, ok := testContext.CloudConfig.Provider.(awscloud.InstanceGroups)
-		if !ok {
-			return -1, fmt.Errorf("provider does not support InstanceGroups")
-		}
-		instanceGroup, err := instanceGroups.DescribeInstanceGroup(testContext.CloudConfig.NodeInstanceGroup)
+	} else if testContext.Provider == "aws" {
+		client := autoscaling.New(session.New())
+		instanceGroup, err := awscloud.DescribeInstanceGroup(client, testContext.CloudConfig.NodeInstanceGroup)
 		if err != nil {
 			return -1, fmt.Errorf("error describing instance group: %v", err)
 		}
@@ -102,6 +97,8 @@ func groupSize() (int, error) {
 			return -1, fmt.Errorf("instance group not found: %s", testContext.CloudConfig.NodeInstanceGroup)
 		}
 		return instanceGroup.CurrentSize()
+	} else {
+		return -1, fmt.Errorf("provider does not support InstanceGroups")
 	}
 }
 
@@ -240,102 +237,6 @@ func resizeRC(c *client.Client, ns, name string, replicas int) error {
 	return err
 }
 
-func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList, error) {
-	timeout := 2 * time.Minute
-	// List the pods, making sure we observe all the replicas.
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		options := api.ListOptions{LabelSelector: label}
-		pods, err := c.Pods(ns).List(options)
-		if err != nil {
-			return nil, err
-		}
-
-		created := []api.Pod{}
-		for _, pod := range pods.Items {
-			if pod.DeletionTimestamp != nil {
-				continue
-			}
-			created = append(created, pod)
-		}
-		Logf("Pod name %s: Found %d pods out of %d", name, len(created), replicas)
-
-		if len(created) == replicas {
-			pods.Items = created
-			return pods, nil
-		}
-	}
-	return nil, fmt.Errorf("Pod name %s: Gave up waiting %v for %d pods to come up", name, timeout, replicas)
-}
-
-func podsRunning(c *client.Client, pods *api.PodList) []error {
-	// Wait for the pods to enter the running state. Waiting loops until the pods
-	// are running so non-running pods cause a timeout for this test.
-	By("ensuring each pod is running")
-	e := []error{}
-	for _, pod := range pods.Items {
-		// TODO: make waiting parallel.
-		err := waitForPodRunningInNamespace(c, pod.Name, pod.Namespace)
-		if err != nil {
-			e = append(e, err)
-		}
-	}
-	return e
-}
-
-func verifyPods(c *client.Client, ns, name string, wantName bool, replicas int) error {
-	pods, err := podsCreated(c, ns, name, replicas)
-	if err != nil {
-		return err
-	}
-	e := podsRunning(c, pods)
-	if len(e) > 0 {
-		return fmt.Errorf("failed to wait for pods running: %v", e)
-	}
-	err = podsResponding(c, ns, name, wantName, pods)
-	if err != nil {
-		return fmt.Errorf("failed to wait for pods responding: %v", err)
-	}
-	return nil
-}
-
-func blockNetwork(from string, to string) {
-	Logf("block network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if result, err := SSH(dropCmd, from, testContext.Provider); result.Code != 0 || err != nil {
-		LogSSHResult(result)
-		Failf("Unexpected error: %v", err)
-	}
-}
-
-func unblockNetwork(from string, to string) {
-	Logf("Unblock network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	undropCmd := fmt.Sprintf("sudo iptables --delete %s", iptablesRule)
-	// Undrop command may fail if the rule has never been created.
-	// In such case we just lose 30 seconds, but the cluster is healthy.
-	// But if the rule had been created and removing it failed, the node is broken and
-	// not coming back. Subsequent tests will run or fewer nodes (some of the tests
-	// may fail). Manual intervention is required in such case (recreating the
-	// cluster solves the problem too).
-	err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-		result, err := SSH(undropCmd, from, testContext.Provider)
-		if result.Code == 0 && err == nil {
-			return true, nil
-		}
-		LogSSHResult(result)
-		if err != nil {
-			Logf("Unexpected error: %v", err)
-		}
-		return false, nil
-	})
-	if err != nil {
-		Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
-			"required on host %s: remove rule %s, if exists", from, iptablesRule)
-	}
-}
-
 func getMaster(c *client.Client) string {
 	master := ""
 	switch testContext.Provider {
@@ -439,8 +340,8 @@ func expectNodeReadiness(isReady bool, newNode chan *api.Node) {
 	}
 }
 
-var _ = Describe("Nodes [Disruptive]", func() {
-	framework := NewFramework("resize-nodes")
+var _ = KubeDescribe("Nodes [Disruptive]", func() {
+	framework := NewDefaultFramework("resize-nodes")
 	var systemPodsNo int
 	var c *client.Client
 	var ns string
@@ -453,7 +354,7 @@ var _ = Describe("Nodes [Disruptive]", func() {
 	})
 
 	// Slow issue #13323 (8 min)
-	Describe("Resize [Slow]", func() {
+	KubeDescribe("Resize [Slow]", func() {
 		var skipped bool
 
 		BeforeEach(func() {
@@ -547,7 +448,7 @@ var _ = Describe("Nodes [Disruptive]", func() {
 		})
 	})
 
-	Describe("Network", func() {
+	KubeDescribe("Network", func() {
 		Context("when a node becomes unreachable", func() {
 			BeforeEach(func() {
 				SkipUnlessProviderIs("gce", "gke", "aws")
@@ -628,7 +529,7 @@ var _ = Describe("Nodes [Disruptive]", func() {
 					if !isNodeConditionSetAsExpected(&node, api.NodeReady, true) {
 						return false
 					}
-					podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(client.PodHost, node.Name)}
+					podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
 					pods, err := c.Pods(api.NamespaceAll).List(podOpts)
 					if err != nil || len(pods.Items) <= 0 {
 						return false
@@ -639,7 +540,7 @@ var _ = Describe("Nodes [Disruptive]", func() {
 					Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
-				podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(client.PodHost, node.Name)}
+				podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
 				if err = waitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, podRunningReady); err != nil {
 					Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}

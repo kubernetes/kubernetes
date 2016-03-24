@@ -45,7 +45,7 @@ const (
 	rebootPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = Describe("Reboot [Disruptive] [Feature:Reboot]", func() {
+var _ = KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	var f *Framework
 
 	BeforeEach(func() {
@@ -82,7 +82,7 @@ var _ = Describe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		}
 	})
 
-	f = NewFramework("reboot")
+	f = NewDefaultFramework("reboot")
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
@@ -208,7 +208,7 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := api.NamespaceSystem
-	ps := newPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
+	ps := newPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
 	defer ps.Stop()
 
 	// Get the node initially.

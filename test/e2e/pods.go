@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -199,15 +198,15 @@ func getRestartDelay(c *client.Client, pod *api.Pod, ns string, name string, con
 		if status.State.Waiting == nil && status.State.Running != nil && status.LastTerminationState.Terminated != nil && status.State.Running.StartedAt.Time.After(beginTime) {
 			startedAt := status.State.Running.StartedAt.Time
 			finishedAt := status.LastTerminationState.Terminated.FinishedAt.Time
-			Logf("getRestartDelay: finishedAt=%s restartedAt=%s (%s)", finishedAt, startedAt, startedAt.Sub(finishedAt))
+			Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, finishedAt, startedAt, startedAt.Sub(finishedAt))
 			return startedAt.Sub(finishedAt), nil
 		}
 	}
 	return 0, fmt.Errorf("timeout getting pod restart delay")
 }
 
-var _ = Describe("Pods", func() {
-	framework := NewFramework("pods")
+var _ = KubeDescribe("Pods", func() {
+	framework := NewDefaultFramework("pods")
 
 	It("should get a host IP [Conformance]", func() {
 		name := "pod-hostip-" + string(util.NewUUID())
@@ -351,6 +350,28 @@ var _ = Describe("Pods", func() {
 		if err := podClient.Delete(pod.Name, api.NewDeleteOptions(30)); err != nil {
 			Failf("Failed to delete pod: %v", err)
 		}
+
+		By("verifying the kubelet observed the termination notice")
+		pod, err = podClient.Get(pod.Name)
+		Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
+			podList, err := GetKubeletPods(framework.Client, pod.Spec.NodeName)
+			if err != nil {
+				Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
+				return false, nil
+			}
+			for _, kubeletPod := range podList.Items {
+				if pod.Name != kubeletPod.Name {
+					continue
+				}
+				if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
+					Logf("deletion has not yet been observed")
+					return false, nil
+				}
+				return true, nil
+			}
+			Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
+			return true, nil
+		})).NotTo(HaveOccurred(), "kubelet never observed the termination notice")
 
 		By("verifying pod deletion was observed")
 		deleted := false
@@ -563,7 +584,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "srv",
-						Image: "gcr.io/google_containers/serve_hostname:1.1",
+						Image: "gcr.io/google_containers/serve_hostname:v1.4",
 						Ports: []api.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
@@ -701,7 +722,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/liveness",
+						Image:   "gcr.io/google_containers/liveness:e2e",
 						Command: []string{"/server"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -730,7 +751,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "gcr.io/google_containers/liveness",
+						Image:   "gcr.io/google_containers/liveness:e2e",
 						Command: []string{"/server"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -963,7 +984,7 @@ var _ = Describe("Pods", func() {
 		if err != nil {
 			Failf("failed to get pod: %v", err)
 		}
-		pod.Spec.Containers[0].Image = "nginx"
+		pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx:1.7.9"
 		pod, err = podClient.Update(pod)
 		if err != nil {
 			Failf("error updating pod=%s/%s %v", podName, containerName, err)
@@ -979,46 +1000,6 @@ var _ = Describe("Pods", func() {
 
 		if delayAfterUpdate > 2*delay2 || delayAfterUpdate > 2*delay1 {
 			Failf("updating image did not reset the back-off value in pod=%s/%s d3=%s d2=%s d1=%s", podName, containerName, delayAfterUpdate, delay1, delay2)
-		}
-	})
-
-	It("should not back-off restarting a container on LivenessProbe failure [Serial]", func() {
-		podClient := framework.Client.Pods(framework.Namespace.Name)
-		podName := "pod-back-off-liveness"
-		containerName := "back-off-liveness"
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:   podName,
-				Labels: map[string]string{"test": "liveness"},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
-						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 5; rm -rf /tmp/health; sleep 600"},
-						LivenessProbe: &api.Probe{
-							Handler: api.Handler{
-								Exec: &api.ExecAction{
-									Command: []string{"cat", "/tmp/health"},
-								},
-							},
-							InitialDelaySeconds: 5,
-						},
-					},
-				},
-			},
-		}
-
-		defer func() {
-			By("deleting the pod")
-			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-		}()
-
-		delay1, delay2 := startPodAndGetBackOffs(framework, pod, podName, containerName, buildBackOffDuration)
-
-		if math.Abs(float64(delay2-delay1)) > float64(syncLoopFrequency) {
-			Failf("back-off increasing on LivenessProbe failure delay1=%s delay2=%s", delay1, delay2)
 		}
 	})
 

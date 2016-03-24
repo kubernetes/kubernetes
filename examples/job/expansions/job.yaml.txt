@@ -1,18 +1,15 @@
-apiVersion: extensions/v1beta1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: process-item-$ITEM
+  labels:
+    jobgroup: jobexample
 spec:
-  selector:
-    matchLabels:
-      app: jobexample
-      item: $ITEM
   template:
     metadata:
       name: jobexample
       labels:
-        app: jobexample
-        item: $ITEM
+        jobgroup: jobexample
     spec:
       containers:
       - name: c

@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/proposals/selinux.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -194,7 +199,7 @@ From the above, we know that label management must be applied:
 3.  To some volume types *sometimes*
 
 Volumes should be relabeled with the correct SELinux context.  Docker has this capability today; it
-is desireable for other container runtime implementations to provide similar functionality.
+is desirable for other container runtime implementations to provide similar functionality.
 
 Relabeling should be an optional aspect of a volume plugin to accommodate:
 

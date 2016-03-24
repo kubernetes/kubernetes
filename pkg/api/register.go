@@ -66,8 +66,10 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&ReplicationController{},
 		&ServiceList{},
 		&Service{},
+		&ServiceProxyOptions{},
 		&NodeList{},
 		&Node{},
+		&NodeProxyOptions{},
 		&Endpoints{},
 		&EndpointsList{},
 		&Binding{},
@@ -133,6 +135,7 @@ func (obj *EndpointsList) GetObjectKind() unversioned.ObjectKind             { r
 func (obj *Node) GetObjectMeta() meta.Object                                 { return &obj.ObjectMeta }
 func (obj *Node) GetObjectKind() unversioned.ObjectKind                      { return &obj.TypeMeta }
 func (obj *NodeList) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
+func (obj *NodeProxyOptions) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
 func (obj *Binding) GetObjectMeta() meta.Object                              { return &obj.ObjectMeta }
 func (obj *Binding) GetObjectKind() unversioned.ObjectKind                   { return &obj.TypeMeta }
 func (obj *Event) GetObjectMeta() meta.Object                                { return &obj.ObjectMeta }
@@ -166,6 +169,7 @@ func (obj *PodAttachOptions) GetObjectKind() unversioned.ObjectKind          { r
 func (obj *PodLogOptions) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
 func (obj *PodExecOptions) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
 func (obj *PodProxyOptions) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *ServiceProxyOptions) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
 func (obj *ComponentStatus) GetObjectMeta() meta.Object                      { return &obj.ObjectMeta }
 func (obj *ComponentStatus) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
 func (obj *ComponentStatusList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }

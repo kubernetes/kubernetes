@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
@@ -27,12 +28,17 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
+
+const defaultReplicas = 100
 
 func newStorage(t *testing.T) (*ReplicaSetStorage, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
-	replicaSetStorage := NewStorage(etcdStorage, generic.UndecoratedStorage)
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	replicaSetStorage := NewStorage(restOptions)
 	return &replicaSetStorage, server
 }
 
@@ -55,7 +61,7 @@ func validNewReplicaSet() *extensions.ReplicaSet {
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
@@ -234,4 +240,123 @@ func TestWatch(t *testing.T) {
 			{"status.replicas": "0", "metadata.name": "bar"},
 		},
 	)
+}
+
+func TestScaleGet(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+
+	name := "foo"
+
+	var rs extensions.ReplicaSet
+	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
+	key := etcdtest.AddPrefix("/replicasets/" + api.NamespaceDefault + "/" + name)
+	if err := storage.ReplicaSet.Storage.Set(ctx, key, &validReplicaSet, &rs, 0); err != nil {
+		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
+	}
+
+	want := &extensions.Scale{
+		ObjectMeta: api.ObjectMeta{
+			Name:              name,
+			Namespace:         api.NamespaceDefault,
+			UID:               rs.UID,
+			ResourceVersion:   rs.ResourceVersion,
+			CreationTimestamp: rs.CreationTimestamp,
+		},
+		Spec: extensions.ScaleSpec{
+			Replicas: validReplicaSet.Spec.Replicas,
+		},
+		Status: extensions.ScaleStatus{
+			Replicas: validReplicaSet.Status.Replicas,
+			Selector: validReplicaSet.Spec.Selector,
+		},
+	}
+	obj, err := storage.Scale.Get(ctx, name)
+	got := obj.(*extensions.Scale)
+	if err != nil {
+		t.Fatalf("error fetching scale for %s: %v", name, err)
+	}
+	if !api.Semantic.DeepEqual(got, want) {
+		t.Errorf("unexpected scale: %s", diff.ObjectDiff(got, want))
+	}
+}
+
+func TestScaleUpdate(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+
+	name := "foo"
+
+	var rs extensions.ReplicaSet
+	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
+	key := etcdtest.AddPrefix("/replicasets/" + api.NamespaceDefault + "/" + name)
+	if err := storage.ReplicaSet.Storage.Set(ctx, key, &validReplicaSet, &rs, 0); err != nil {
+		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
+	}
+	replicas := 12
+	update := extensions.Scale{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: extensions.ScaleSpec{
+			Replicas: replicas,
+		},
+	}
+
+	if _, _, err := storage.Scale.Update(ctx, &update); err != nil {
+		t.Fatalf("error updating scale %v: %v", update, err)
+	}
+
+	obj, err := storage.Scale.Get(ctx, name)
+	if err != nil {
+		t.Fatalf("error fetching scale for %s: %v", name, err)
+	}
+	scale := obj.(*extensions.Scale)
+	if scale.Spec.Replicas != replicas {
+		t.Errorf("wrong replicas count expected: %d got: %d", replicas, scale.Spec.Replicas)
+	}
+
+	update.ResourceVersion = rs.ResourceVersion
+	update.Spec.Replicas = 15
+
+	if _, _, err = storage.Scale.Update(ctx, &update); err != nil && !errors.IsConflict(err) {
+		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
+	}
+}
+
+func TestStatusUpdate(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+
+	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
+	key := etcdtest.AddPrefix("/replicasets/" + api.NamespaceDefault + "/foo")
+	if err := storage.ReplicaSet.Storage.Set(ctx, key, &validReplicaSet, nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	update := extensions.ReplicaSet{
+		ObjectMeta: validReplicaSet.ObjectMeta,
+		Spec: extensions.ReplicaSetSpec{
+			Replicas: defaultReplicas,
+		},
+		Status: extensions.ReplicaSetStatus{
+			Replicas: defaultReplicas,
+		},
+	}
+
+	if _, _, err := storage.Status.Update(ctx, &update); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	obj, err := storage.ReplicaSet.Get(ctx, "foo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	rs := obj.(*extensions.ReplicaSet)
+	if rs.Spec.Replicas != 7 {
+		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", rs.Spec.Replicas)
+	}
+	if rs.Status.Replicas != defaultReplicas {
+		t.Errorf("we expected .status.replicas to be updated to %d but it was %v", defaultReplicas, rs.Status.Replicas)
+	}
 }

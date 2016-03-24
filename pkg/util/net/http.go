@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -55,8 +56,10 @@ var defaultTransport = http.DefaultTransport.(*http.Transport)
 // SetTransportDefaults applies the defaults from http.DefaultTransport
 // for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
 func SetTransportDefaults(t *http.Transport) *http.Transport {
-	if t.Proxy == nil {
-		t.Proxy = defaultTransport.Proxy
+	if t.Proxy == nil || isDefault(t.Proxy) {
+		// http.ProxyFromEnvironment doesn't respect CIDRs and that makes it impossible to exclude things like pod and service IPs from proxy settings
+		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
+		t.Proxy = NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 	if t.Dial == nil {
 		t.Dial = defaultTransport.Dial
@@ -119,4 +122,90 @@ func GetHTTPClient(req *http.Request) string {
 		}
 	}
 	return "unknown"
+}
+
+// Extracts and returns the clients IP from the given request.
+// Looks at X-Forwarded-For header, X-Real-Ip header and request.RemoteAddr in that order.
+// Returns nil if none of them are set or is set to an invalid value.
+func GetClientIP(req *http.Request) net.IP {
+	hdr := req.Header
+	// First check the X-Forwarded-For header for requests via proxy.
+	hdrForwardedFor := hdr.Get("X-Forwarded-For")
+	if hdrForwardedFor != "" {
+		// X-Forwarded-For can be a csv of IPs in case of multiple proxies.
+		// Use the first valid one.
+		parts := strings.Split(hdrForwardedFor, ",")
+		for _, part := range parts {
+			ip := net.ParseIP(strings.TrimSpace(part))
+			if ip != nil {
+				return ip
+			}
+		}
+	}
+
+	// Try the X-Real-Ip header.
+	hdrRealIp := hdr.Get("X-Real-Ip")
+	if hdrRealIp != "" {
+		ip := net.ParseIP(hdrRealIp)
+		if ip != nil {
+			return ip
+		}
+	}
+
+	// Fallback to Remote Address in request, which will give the correct client IP when there is no proxy.
+	ip := net.ParseIP(req.RemoteAddr)
+	return ip
+}
+
+var defaultProxyFuncPointer = fmt.Sprintf("%p", http.ProxyFromEnvironment)
+
+// isDefault checks to see if the transportProxierFunc is pointing to the default one
+func isDefault(transportProxier func(*http.Request) (*url.URL, error)) bool {
+	transportProxierPointer := fmt.Sprintf("%p", transportProxier)
+	return transportProxierPointer == defaultProxyFuncPointer
+}
+
+// NewProxierWithNoProxyCIDR constructs a Proxier function that respects CIDRs in NO_PROXY and delegates if
+// no matching CIDRs are found
+func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error)) func(req *http.Request) (*url.URL, error) {
+	// we wrap the default method, so we only need to perform our check if the NO_PROXY envvar has a CIDR in it
+	noProxyEnv := os.Getenv("NO_PROXY")
+	noProxyRules := strings.Split(noProxyEnv, ",")
+
+	cidrs := []*net.IPNet{}
+	for _, noProxyRule := range noProxyRules {
+		_, cidr, _ := net.ParseCIDR(noProxyRule)
+		if cidr != nil {
+			cidrs = append(cidrs, cidr)
+		}
+	}
+
+	if len(cidrs) == 0 {
+		return delegate
+	}
+
+	return func(req *http.Request) (*url.URL, error) {
+		host := req.URL.Host
+		// for some urls, the Host is already the host, not the host:port
+		if net.ParseIP(host) == nil {
+			var err error
+			host, _, err = net.SplitHostPort(req.URL.Host)
+			if err != nil {
+				return delegate(req)
+			}
+		}
+
+		ip := net.ParseIP(host)
+		if ip == nil {
+			return delegate(req)
+		}
+
+		for _, cidr := range cidrs {
+			if cidr.Contains(ip) {
+				return nil, nil
+			}
+		}
+
+		return delegate(req)
+	}
 }

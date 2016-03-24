@@ -28,12 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 )
 
 type ViewOptions struct {
 	ConfigAccess ConfigAccess
-	Merge        util.BoolFlag
+	Merge        flag.Tristate
 	Flatten      bool
 	Minify       bool
 	RawByteData  bool
@@ -44,10 +44,10 @@ const (
 
 You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`
 	view_example = `# Show Merged kubeconfig settings.
-$ kubectl config view
+kubectl config view
 
 # Get the password for the e2e user
-$ kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`
+kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`
 )
 
 func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {

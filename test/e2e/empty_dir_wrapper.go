@@ -28,11 +28,11 @@ import (
 
 // This test will create a pod with a secret volume and gitRepo volume
 // Thus requests a secret, a git server pod, and a git server service
-var _ = Describe("EmptyDir wrapper volumes", func() {
-	f := NewFramework("secrets")
+var _ = KubeDescribe("EmptyDir wrapper volumes", func() {
+	f := NewDefaultFramework("emptydir-wrapper")
 
 	It("should becomes running", func() {
-		name := "secret-test-" + string(util.NewUUID())
+		name := "emptydir-wrapper-test-" + string(util.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
 
@@ -134,7 +134,7 @@ var _ = Describe("EmptyDir wrapper volumes", func() {
 				Containers: []api.Container{
 					{
 						Name:  "secret-test",
-						Image: "gcr.io/google_containers/test-webserver",
+						Image: "gcr.io/google_containers/test-webserver:e2e",
 						VolumeMounts: []api.VolumeMount{
 							{
 								Name:      volumeName,

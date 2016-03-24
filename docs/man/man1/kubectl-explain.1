@@ -16,11 +16,11 @@ kubectl explain \- Documentation of resources.
 Documentation of resources.
 
 .PP
-Possible resource types include: pods (po), services (svc),
-replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
-limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota), namespaces (ns), horizontalpodautoscalers (hpa)
-or endpoints (ep).
+Possible resource types include (case insensitive): pods (po), services (svc), deployments,
+replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
+persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
+serviceaccounts, ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
+componentstatuses (cs), endpoints (ep), and secrets.
 
 
 .SH OPTIONS
@@ -36,7 +36,7 @@ or endpoints (ep).
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    DEPRECATED: The API version to use when talking to the server
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -129,10 +129,10 @@ or endpoints (ep).
 
 .nf
 # Get the documentation of the resource and its fields
-$ kubectl explain pods
+kubectl explain pods
 
 # Get the documentation of a specific field of a resource
-$ kubectl explain pods.spec.containers
+kubectl explain pods.spec.containers
 
 .fi
 .RE

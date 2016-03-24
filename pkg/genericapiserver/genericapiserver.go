@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/crypto"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -58,6 +59,7 @@ import (
 
 const (
 	DefaultEtcdPathPrefix = "/registry"
+	globalTimeout         = time.Minute
 )
 
 // StorageDestinations is a mapping from API group & resource to
@@ -77,7 +79,9 @@ func NewStorageDestinations() StorageDestinations {
 	}
 }
 
+// AddAPIGroup replaces 'group' if it's already registered.
 func (s *StorageDestinations) AddAPIGroup(group string, defaultStorage storage.Interface) {
+	glog.Infof("Adding storage destination for group %v", group)
 	s.APIGroups[group] = &StorageDestinationsForAPIGroup{
 		Default:   defaultStorage,
 		Overrides: map[string]storage.Interface{},
@@ -94,10 +98,16 @@ func (s *StorageDestinations) AddStorageOverride(group, resource string, overrid
 	s.APIGroups[group].Overrides[resource] = override
 }
 
+// Get finds the storage destination for the given group and resource. It will
+// Fatalf if the group has no storage destination configured.
 func (s *StorageDestinations) Get(group, resource string) storage.Interface {
 	apigroup, ok := s.APIGroups[group]
 	if !ok {
-		glog.Errorf("No storage defined for API group: '%s'", apigroup)
+		// TODO: return an error like a normal function. For now,
+		// Fatalf is better than just logging an error, because this
+		// condition guarantees future problems and this is a less
+		// mysterious failure point.
+		glog.Fatalf("No storage defined for API group: '%s'. Defined groups: %#v", group, s.APIGroups)
 		return nil
 	}
 	if apigroup.Overrides != nil {
@@ -106,6 +116,30 @@ func (s *StorageDestinations) Get(group, resource string) storage.Interface {
 		}
 	}
 	return apigroup.Default
+}
+
+// Search is like Get, but can be used to search a list of groups. It tries the
+// groups in order (and Fatalf's if none of them exist). The intention is for
+// this to be used for resources that move between groups.
+func (s *StorageDestinations) Search(groups []string, resource string) storage.Interface {
+	for _, group := range groups {
+		apigroup, ok := s.APIGroups[group]
+		if !ok {
+			continue
+		}
+		if apigroup.Overrides != nil {
+			if client, exists := apigroup.Overrides[resource]; exists {
+				return client
+			}
+		}
+		return apigroup.Default
+	}
+	// TODO: return an error like a normal function. For now,
+	// Fatalf is better than just logging an error, because this
+	// condition guarantees future problems and this is a less
+	// mysterious failure point.
+	glog.Fatalf("No storage defined for any of the groups: %v. Defined groups: %#v", groups, s.APIGroups)
+	return nil
 }
 
 // Get all backends for all registered storage destinations.
@@ -160,6 +194,12 @@ type APIGroupInfo struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
+
+	// SubresourceGroupVersionKind contains the GroupVersionKind overrides for each subresource that is
+	// accessible from this API group version. The GroupVersionKind is that of the external version of
+	// the subresource. The key of this map should be the path of the subresource. The keys here should
+	// match the keys in the Storage map above for subresources.
+	SubresourceGroupVersionKind map[string]unversioned.GroupVersionKind
 }
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -170,8 +210,12 @@ type Config struct {
 	// allow downstream consumers to disable the core controller loops
 	EnableLogsSupport bool
 	EnableUISupport   bool
-	// allow downstream consumers to disable swagger
+	// Allow downstream consumers to disable swagger.
+	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
 	EnableSwaggerSupport bool
+	// Allow downstream consumers to disable swagger ui.
+	// Note that this is ignored if either EnableSwaggerSupport or EnableUISupport is false.
+	EnableSwaggerUI bool
 	// Allows api group versions or specific resources to be conditionally enabled/disabled.
 	APIGroupVersionOverrides map[string]APIGroupVersionOverride
 	// allow downstream consumers to disable the index route
@@ -224,8 +268,11 @@ type Config struct {
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
 	ServiceClusterIPRange *net.IPNet
 
-	// The IP address for the GenericAPIServer service (must be inside ServiceClusterIPRange
+	// The IP address for the GenericAPIServer service (must be inside ServiceClusterIPRange)
 	ServiceReadWriteIP net.IP
+
+	// Port for the apiserver service.
+	ServiceReadWritePort int
 
 	// The range of ports to be assigned to services with type=NodePort or greater
 	ServiceNodePortRange utilnet.PortRange
@@ -264,6 +311,7 @@ type GenericAPIServer struct {
 	enableLogsSupport        bool
 	enableUISupport          bool
 	enableSwaggerSupport     bool
+	enableSwaggerUI          bool
 	enableProfiling          bool
 	enableWatchCache         bool
 	APIPrefix                string
@@ -276,8 +324,9 @@ type GenericAPIServer struct {
 	ApiGroupVersionOverrides map[string]APIGroupVersionOverride
 	RequestContextMapper     api.RequestContextMapper
 
-	// External host is the name that should be used in external (public internet) URLs for this GenericAPIServer
-	externalHost string
+	// ExternalAddress is the address (hostname or IP and port) that should be used in
+	// external (public internet) URLs for this GenericAPIServer.
+	ExternalAddress string
 	// ClusterIP is the IP address of the GenericAPIServer within the cluster.
 	ClusterIP            net.IP
 	PublicReadWritePort  int
@@ -338,6 +387,9 @@ func setDefaults(c *Config) {
 		glog.V(4).Infof("Setting GenericAPIServer service IP to %q (read-write).", serviceReadWriteIP)
 		c.ServiceReadWriteIP = serviceReadWriteIP
 	}
+	if c.ServiceReadWritePort == 0 {
+		c.ServiceReadWritePort = 443
+	}
 	if c.ServiceNodePortRange.Size == 0 {
 		// TODO: Currently no way to specify an empty range (do we need to allow this?)
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
@@ -359,6 +411,13 @@ func setDefaults(c *Config) {
 	}
 	if c.RequestContextMapper == nil {
 		c.RequestContextMapper = api.NewRequestContextMapper()
+	}
+	if len(c.ExternalHost) == 0 && c.PublicAddress != nil {
+		hostAndPort := c.PublicAddress.String()
+		if c.ReadWritePort != 0 {
+			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ServiceReadWritePort))
+		}
+		c.ExternalHost = hostAndPort
 	}
 }
 
@@ -397,6 +456,7 @@ func New(c *Config) (*GenericAPIServer, error) {
 		enableLogsSupport:        c.EnableLogsSupport,
 		enableUISupport:          c.EnableUISupport,
 		enableSwaggerSupport:     c.EnableSwaggerSupport,
+		enableSwaggerUI:          c.EnableSwaggerUI,
 		enableProfiling:          c.EnableProfiling,
 		enableWatchCache:         c.EnableWatchCache,
 		APIPrefix:                c.APIPrefix,
@@ -412,13 +472,12 @@ func New(c *Config) (*GenericAPIServer, error) {
 		cacheTimeout:      c.CacheTimeout,
 		MinRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
-		MasterCount:         c.MasterCount,
-		externalHost:        c.ExternalHost,
-		ClusterIP:           c.PublicAddress,
-		PublicReadWritePort: c.ReadWritePort,
-		ServiceReadWriteIP:  c.ServiceReadWriteIP,
-		// TODO: ServiceReadWritePort should be passed in as an argument, it may not always be 443
-		ServiceReadWritePort: 443,
+		MasterCount:          c.MasterCount,
+		ExternalAddress:      c.ExternalHost,
+		ClusterIP:            c.PublicAddress,
+		PublicReadWritePort:  c.ReadWritePort,
+		ServiceReadWriteIP:   c.ServiceReadWriteIP,
+		ServiceReadWritePort: c.ServiceReadWritePort,
 		ExtraServicePorts:    c.ExtraServicePorts,
 		ExtraEndpointPorts:   c.ExtraEndpointPorts,
 
@@ -500,7 +559,7 @@ func (s *GenericAPIServer) init(c *Config) {
 		apiserver.InstallLogsSupport(s.MuxHelper)
 	}
 	if c.EnableUISupport {
-		ui.InstallSupport(s.MuxHelper, s.enableSwaggerSupport)
+		ui.InstallSupport(s.MuxHelper, s.enableSwaggerSupport && s.enableSwaggerUI)
 	}
 
 	if c.EnableProfiling {
@@ -571,7 +630,7 @@ func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
 
 // Installs handler at /apis to list all group versions for discovery
 func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
-	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.APIGroupPrefix, func() []unversioned.APIGroup {
+	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.APIGroupPrefix, func(req *restful.Request) []unversioned.APIGroup {
 		// Return the list of supported groups in sorted order (to have a deterministic order).
 		groups := []unversioned.APIGroup{}
 		groupNames := make([]string, len(s.apiGroupsForDiscovery))
@@ -582,7 +641,10 @@ func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
 		}
 		sort.Strings(groupNames)
 		for _, groupName := range groupNames {
-			groups = append(groups, s.apiGroupsForDiscovery[groupName])
+			apiGroup := s.apiGroupsForDiscovery[groupName]
+			// Add ServerAddressByClientCIDRs.
+			apiGroup.ServerAddressByClientCIDRs = s.getServerAddressByClientCIDRs(req.Request)
+			groups = append(groups, apiGroup)
 		}
 		return groups
 	})
@@ -602,19 +664,20 @@ func (s *GenericAPIServer) Run(options *ServerRunOptions) {
 	}
 
 	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
+	longRunningRequestCheck := apiserver.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
 	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
 		// TODO unify this with apiserver.MaxInFlightLimit
-		if longRunningRE.MatchString(req.URL.Path) || req.URL.Query().Get("watch") == "true" {
+		if longRunningRequestCheck(req) {
 			return nil, ""
 		}
-		return time.After(time.Minute), ""
+		return time.After(globalTimeout), ""
 	}
 
 	if secureLocation != "" {
 		handler := apiserver.TimeoutHandler(s.Handler, longRunningTimeout)
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(handler)),
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, apiserver.RecoverPanics(handler)),
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
@@ -623,7 +686,7 @@ func (s *GenericAPIServer) Run(options *ServerRunOptions) {
 		}
 
 		if len(options.ClientCAFile) > 0 {
-			clientCAs, err := util.CertPoolFromFile(options.ClientCAFile)
+			clientCAs, err := crypto.CertPoolFromFile(options.ClientCAFile)
 			if err != nil {
 				glog.Fatalf("Unable to load client CA file: %v", err)
 			}
@@ -643,10 +706,10 @@ func (s *GenericAPIServer) Run(options *ServerRunOptions) {
 			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
 			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-			if err := util.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
+			if err := crypto.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
 				glog.Errorf("Unable to generate self signed cert: %v", err)
 			} else {
-				glog.Infof("Using self-signed cert (%options, %options)", options.TLSCertFile, options.TLSPrivateKeyFile)
+				glog.Infof("Using self-signed cert (%v, %v)", options.TLSCertFile, options.TLSPrivateKeyFile)
 			}
 		}
 
@@ -706,7 +769,13 @@ func (s *GenericAPIServer) installAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	// Install the version handler.
 	if apiGroupInfo.IsLegacyGroup {
 		// Add a handler at /api to enumerate the supported api versions.
-		apiserver.AddApiWebService(s.Serializer, s.HandlerContainer, apiPrefix, apiVersions)
+		apiserver.AddApiWebService(s.Serializer, s.HandlerContainer, apiPrefix, func(req *restful.Request) *unversioned.APIVersions {
+			apiVersionsForDiscovery := unversioned.APIVersions{
+				ServerAddressByClientCIDRs: s.getServerAddressByClientCIDRs(req.Request),
+				Versions:                   apiVersions,
+			}
+			return &apiVersionsForDiscovery
+		})
 	} else {
 		// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
 		// Catching these here places the error  much closer to its origin
@@ -749,6 +818,27 @@ func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 	delete(s.apiGroupsForDiscovery, groupName)
 }
 
+func (s *GenericAPIServer) getServerAddressByClientCIDRs(req *http.Request) []unversioned.ServerAddressByClientCIDR {
+	addressCIDRMap := []unversioned.ServerAddressByClientCIDR{
+		{
+			ClientCIDR: "0.0.0.0/0",
+
+			ServerAddress: s.ExternalAddress,
+		},
+	}
+
+	// Add internal CIDR if the request came from internal IP.
+	clientIP := utilnet.GetClientIP(req)
+	clusterCIDR := s.ServiceClusterIPRange
+	if clusterCIDR.Contains(clientIP) {
+		addressCIDRMap = append(addressCIDRMap, unversioned.ServerAddressByClientCIDR{
+			ClientCIDR:    clusterCIDR.String(),
+			ServerAddress: net.JoinHostPort(s.ServiceReadWriteIP.String(), strconv.Itoa(s.ServiceReadWritePort)),
+		})
+	}
+	return addressCIDRMap
+}
+
 func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {
 	storage := make(map[string]rest.Storage)
 	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
@@ -762,6 +852,7 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	version.Creater = apiGroupInfo.Scheme
 	version.Convertor = apiGroupInfo.Scheme
 	version.Typer = apiGroupInfo.Scheme
+	version.SubresourceGroupVersionKind = apiGroupInfo.SubresourceGroupVersionKind
 	return version, err
 }
 
@@ -785,17 +876,8 @@ func (s *GenericAPIServer) newAPIGroupVersion(groupMeta apimachinery.GroupMeta, 
 // register their own web services into the Kubernetes mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
 func (s *GenericAPIServer) InstallSwaggerAPI() {
-	hostAndPort := s.externalHost
+	hostAndPort := s.ExternalAddress
 	protocol := "https://"
-
-	// TODO: this is kind of messed up, we should just pipe in the full URL from the outside, rather
-	// than guessing at it.
-	if len(s.externalHost) == 0 && s.ClusterIP != nil {
-		host := s.ClusterIP.String()
-		if s.PublicReadWritePort != 0 {
-			hostAndPort = net.JoinHostPort(host, strconv.Itoa(s.PublicReadWritePort))
-		}
-	}
 	webServicesUrl := protocol + hostAndPort
 
 	// Enable swagger UI and discovery API

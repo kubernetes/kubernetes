@@ -16,6 +16,7 @@ limitations under the License.
 
 package unversioned
 
-const LabelZoneFailureDomain = "failure-domain.alpha.kubernetes.io/zone"
-const LabelZoneRegion = "failure-domain.alpha.kubernetes.io/region"
+const LabelHostname = "kubernetes.io/hostname"
+const LabelZoneFailureDomain = "failure-domain.beta.kubernetes.io/zone"
+const LabelZoneRegion = "failure-domain.beta.kubernetes.io/region"
 const LabelInstanceType = "beta.kubernetes.io/instance-type"

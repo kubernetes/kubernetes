@@ -48,7 +48,7 @@ func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registryte
 
 	storage := NewStorage(registry, endpointRegistry, r, portAllocator, nil)
 
-	return storage, registry
+	return storage.Service, registry
 }
 
 func makeIPNet(t *testing.T) *net.IPNet {

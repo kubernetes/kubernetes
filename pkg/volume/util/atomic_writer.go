@@ -37,11 +37,7 @@ const (
 )
 
 // AtomicWriter handles atomically projecting content for a set of files into
-// a target directory.  AtomicWriter maintains a sentinel file named
-// "..sentinel" in the target directory which is updated after new data is
-// projected into the target directory, allowing consumers of the data to
-// listen for updates by monitoring the sentinel file with inotify or
-// fanotify.
+// a target directory.
 //
 // Note:
 //
@@ -55,6 +51,10 @@ const (
 // data directory symlink are created in the writer's target dir.  This scheme
 // allows the files to be atomically updated by changing the target of the
 // data directory symlink.
+//
+// Consumers of the target directory can monitor the ..data symlink using
+// inotify or fanotify to receive events when the content in the volume is
+// updated.
 type AtomicWriter struct {
 	targetDir  string
 	logContext string
@@ -72,9 +72,8 @@ func NewAtomicWriter(targetDir, logContext string) (*AtomicWriter, error) {
 }
 
 const (
-	sentinelFileName = "..sentinel"
-	dataDirName      = "..data"
-	newDataDirName   = "..data_tmp"
+	dataDirName    = "..data"
+	newDataDirName = "..data_tmp"
 )
 
 // Write does an atomic projection of the given payload into the writer's target
@@ -112,10 +111,8 @@ const (
 //  8.  A symlink to the new timestamped directory ..data_tmp is created that will
 //      become the new data directory
 //  9.  The new data directory symlink is renamed to the data directory; rename is atomic
-// 10.  The sentinel file modification and access times are updated (file is created if it does not
-//      already exist)
-// 11.  Old paths are removed from the user-visible portion of the target directory
-// 12.  The previous timestamped directory is removed, if it exists
+// 10.  Old paths are removed from the user-visible portion of the target directory
+// 11.  The previous timestamped directory is removed, if it exists
 func (w *AtomicWriter) Write(payload map[string][]byte) error {
 	// (1)
 	cleanPayload, err := validatePayload(payload)
@@ -136,14 +133,16 @@ func (w *AtomicWriter) Write(payload map[string][]byte) error {
 		glog.Errorf("%s: error determining whether payload should be written to disk: %v", w.logContext, err)
 		return err
 	} else if !should && len(pathsToRemove) == 0 {
-		glog.V(5).Infof("%s: no update required for target directory %v", w.logContext, w.targetDir)
+		glog.V(4).Infof("%s: no update required for target directory %v", w.logContext, w.targetDir)
 		return nil
+	} else {
+		glog.V(4).Infof("%s: write required for target directory %v", w.logContext, w.targetDir)
 	}
 
 	// (4)
 	tsDir, err := w.newTimestampDir()
 	if err != nil {
-		glog.V(5).Infof("%s: error creating new ts data directory: %v", w.logContext, err)
+		glog.V(4).Infof("%s: error creating new ts data directory: %v", w.logContext, err)
 		return err
 	}
 
@@ -151,6 +150,8 @@ func (w *AtomicWriter) Write(payload map[string][]byte) error {
 	if err = w.writePayloadToDir(cleanPayload, tsDir); err != nil {
 		glog.Errorf("%s: error writing payload to ts data directory %s: %v", w.logContext, tsDir, err)
 		return err
+	} else {
+		glog.V(4).Infof("%s: performed write of new data to ts data directory: %s", w.logContext, tsDir)
 	}
 
 	// (6)
@@ -185,18 +186,12 @@ func (w *AtomicWriter) Write(payload map[string][]byte) error {
 	}
 
 	// (10)
-	if err = w.touchSentinelFile(); err != nil {
-		glog.Errorf("%s: error touching sentinel file: %v", w.logContext, err)
-		return err
-	}
-
-	// (11)
 	if err = w.removeUserVisiblePaths(pathsToRemove); err != nil {
 		glog.Errorf("%s: error removing old visible symlinks: %v", w.logContext, err)
 		return err
 	}
 
-	// (12)
+	// (11)
 	if len(oldTsDir) > 0 {
 		if err = os.RemoveAll(path.Join(w.targetDir, oldTsDir)); err != nil {
 			glog.Errorf("%s: error removing old data directory %s: %v", w.logContext, oldTsDir, err)
@@ -426,31 +421,6 @@ func (w *AtomicWriter) removeUserVisiblePaths(paths sets.String) error {
 			glog.Errorf("%s: error pruning old user-visible path %s: %v", w.logContext, orderedPaths[ii], err)
 			return err
 		}
-	}
-
-	return nil
-}
-
-// touchSentinelFile touches the sentinel file or creates it if it doesn't exist.
-func (w *AtomicWriter) touchSentinelFile() error {
-	sentinelFilePath := path.Join(w.targetDir, sentinelFileName)
-	_, err := os.Stat(sentinelFilePath)
-	if err != nil && os.IsNotExist(err) {
-		file, err := os.Create(sentinelFilePath)
-		if err != nil {
-			glog.Errorf("%s: unexpected error creating sentinel file %s: %v", w.logContext, sentinelFilePath, err)
-			return err
-		}
-		file.Close()
-	} else if err != nil {
-		return err
-	}
-
-	ts := time.Now()
-	err = os.Chtimes(sentinelFilePath, ts, ts)
-	if err != nil {
-		glog.Errorf("%s: error updating sentinel file mod time: %v", w.logContext, err)
-		return err
 	}
 
 	return nil

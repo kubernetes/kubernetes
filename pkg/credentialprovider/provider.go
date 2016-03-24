@@ -88,7 +88,7 @@ func (d *CachingDockerConfigProvider) Provide() DockerConfig {
 		return d.cacheDockerConfig
 	}
 
-	glog.Infof("Refreshing cache for provider: %v", reflect.TypeOf(d.Provider).String())
+	glog.V(2).Infof("Refreshing cache for provider: %v", reflect.TypeOf(d.Provider).String())
 	d.cacheDockerConfig = d.Provider.Provide()
 	d.expiration = time.Now().Add(d.Lifetime)
 	return d.cacheDockerConfig

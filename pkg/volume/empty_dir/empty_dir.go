@@ -200,7 +200,7 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 
 // setupTmpfs creates a tmpfs mount at the specified directory with the
 // specified SELinux context.
-func (ed *emptyDir) setupTmpfs(dir string, selinuxContext string) error {
+func (ed *emptyDir) setupTmpfs(dir string, selinux string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
@@ -221,8 +221,8 @@ func (ed *emptyDir) setupTmpfs(dir string, selinuxContext string) error {
 	// By default a tmpfs mount will receive a different SELinux context
 	// which is not readable from the SELinux context of a docker container.
 	var opts []string
-	if selinuxContext != "" {
-		opts = []string{fmt.Sprintf("rootcontext=\"%v\"", selinuxContext)}
+	if selinux != "" {
+		opts = []string{fmt.Sprintf("rootcontext=\"%v\"", selinux)}
 	} else {
 		opts = []string{}
 	}

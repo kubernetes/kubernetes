@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -36,7 +37,7 @@ type PodInterface interface {
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	Bind(binding *api.Binding) error
 	UpdateStatus(pod *api.Pod) (*api.Pod, error)
-	GetLogs(name string, opts *api.PodLogOptions) *Request
+	GetLogs(name string, opts *api.PodLogOptions) *restclient.Request
 }
 
 // pods implements PodsNamespacer interface
@@ -109,6 +110,6 @@ func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
 }
 
 // Get constructs a request for getting the logs for a pod
-func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *Request {
+func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *restclient.Request {
 	return c.r.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.ParameterCodec)
 }

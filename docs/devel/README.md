@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/devel/README.md).
+[here](http://releases.k8s.io/release-1.2/docs/devel/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -64,7 +64,7 @@ Guide](../admin/README.md).
 * **Hunting flaky tests** ([flaky-tests.md](flaky-tests.md)): We have a goal of 99.9% flake free tests.
   Here's how to run your tests many times.
 
-* **Logging Conventions** ([logging.md](logging.md)]: Glog levels.
+* **Logging Conventions** ([logging.md](logging.md)): Glog levels.
 
 * **Profiling Kubernetes** ([profiling.md](profiling.md)): How to plug in go pprof profiler to Kubernetes.
 
@@ -79,11 +79,12 @@ Guide](../admin/README.md).
   Document style advice for contributors.
 
 * **Running a cluster locally** ([running-locally.md](running-locally.md)):
-  A fast and lightweight local cluster deployment for developement.
+  A fast and lightweight local cluster deployment for development.
 
 ## Developing against the Kubernetes API
 
-* API objects are explained at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
+* The [REST API documentation](../api-reference/README.md) explains the REST
+  API exposed by apiserver.
 
 * **Annotations** ([docs/user-guide/annotations.md](../user-guide/annotations.md)): are for attaching arbitrary non-identifying metadata to objects.
   Programs that automate Kubernetes objects may use annotations to store small amounts of their state.

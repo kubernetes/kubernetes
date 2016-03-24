@@ -18,6 +18,7 @@ package deployment
 
 import (
 	"fmt"
+	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -48,6 +49,7 @@ func (deploymentStrategy) NamespaceScoped() bool {
 func (deploymentStrategy) PrepareForCreate(obj runtime.Object) {
 	deployment := obj.(*extensions.Deployment)
 	deployment.Status = extensions.DeploymentStatus{}
+	deployment.Generation = 1
 }
 
 // Validate validates a new deployment.
@@ -70,6 +72,14 @@ func (deploymentStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newDeployment := obj.(*extensions.Deployment)
 	oldDeployment := old.(*extensions.Deployment)
 	newDeployment.Status = oldDeployment.Status
+
+	// Spec updates bump the generation so that we can distinguish between
+	// scaling events and template changes, annotation updates bump the generation
+	// because annotations are copied from deployments to their replica sets.
+	if !reflect.DeepEqual(newDeployment.Spec, oldDeployment.Spec) ||
+		!reflect.DeepEqual(newDeployment.Annotations, oldDeployment.Annotations) {
+		newDeployment.Generation = oldDeployment.Generation + 1
+	}
 }
 
 // ValidateUpdate is the default update validation for an end user.
@@ -97,7 +107,7 @@ func (deploymentStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user updating status
 func (deploymentStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateDeploymentUpdate(obj.(*extensions.Deployment), old.(*extensions.Deployment))
+	return validation.ValidateDeploymentStatusUpdate(obj.(*extensions.Deployment), old.(*extensions.Deployment))
 }
 
 // DeploymentToSelectableFields returns a field set that represents the object.

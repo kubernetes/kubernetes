@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
@@ -165,6 +166,7 @@ type HostInterface interface {
 	DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
+	PLEGHealthCheck() (bool, error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -222,6 +224,7 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
+		healthz.NamedCheck("pleg", s.plegHealthCheck),
 	)
 	var ws *restful.WebService
 	ws = new(restful.WebService)
@@ -328,6 +331,8 @@ func (s *Server) InstallDebuggingHandlers() {
 		Operation("getContainerLogs"))
 	s.restfulCont.Add(ws)
 
+	configz.InstallHandler(s.restfulCont)
+
 	handlePprofEndpoint := func(req *restful.Request, resp *restful.Response) {
 		name := strings.TrimPrefix(req.Request.URL.Path, pprofBasePath)
 		switch name {
@@ -378,6 +383,14 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 	enterLoopTime := s.host.LatestLoopEntryTime()
 	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
 		return fmt.Errorf("Sync Loop took longer than expected.")
+	}
+	return nil
+}
+
+// Checks if pleg, which lists pods periodically, is healthy.
+func (s *Server) plegHealthCheck(req *http.Request) error {
+	if ok, err := s.host.PLEGHealthCheck(); !ok {
+		return fmt.Errorf("PLEG took longer than expected: %v", err)
 	}
 	return nil
 }
@@ -482,7 +495,7 @@ func (s *Server) getPods(request *restful.Request, response *restful.Response) {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	response.Write(data)
+	writeJsonResponse(response, data)
 }
 
 // getRunningPods returns a list of pods running on Kubelet. The list is
@@ -499,7 +512,7 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	response.Write(data)
+	writeJsonResponse(response, data)
 }
 
 // getLogs handles logs requests against the Kubelet.
@@ -572,7 +585,7 @@ func (s *Server) getRun(request *restful.Request, response *restful.Response) {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	response.Write(data)
+	writeJsonResponse(response, data)
 }
 
 // getExec handles requests to run a command inside a container.
@@ -763,6 +776,20 @@ func getPodCoordinates(request *restful.Request) (namespace, pod string, uid typ
 		uid = types.UID(uidStr)
 	}
 	return
+}
+
+// Derived from go-restful writeJSON.
+func writeJsonResponse(response *restful.Response, data []byte) {
+	if data == nil {
+		response.WriteHeader(http.StatusOK)
+		// do not write a nil representation
+		return
+	}
+	response.Header().Set(restful.HEADER_ContentType, restful.MIME_JSON)
+	response.WriteHeader(http.StatusOK)
+	if _, err := response.Write(data); err != nil {
+		glog.Errorf("Error writing response: %v", err)
+	}
 }
 
 // PortForwarder knows how to forward content from a data stream to/from a port

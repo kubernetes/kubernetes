@@ -13,7 +13,7 @@ kubectl rollout undo \- undoes a previous rollout
 
 .SH DESCRIPTION
 .PP
-undo rolls back to a previous rollout.
+Rollback to a previous rollout.
 
 
 .SH OPTIONS
@@ -33,7 +33,7 @@ undo rolls back to a previous rollout.
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    DEPRECATED: The API version to use when talking to the server
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -126,7 +126,10 @@ undo rolls back to a previous rollout.
 
 .nf
 # Rollback to the previous deployment
-$ kubectl rollout undo deployment/abc
+kubectl rollout undo deployment/abc
+
+# Rollback to deployment revision 3
+kubectl rollout undo deployment/abc \-\-to\-revision=3
 
 .fi
 .RE

@@ -22,7 +22,7 @@ var (
 	plugins        = map[string]PluginFactory{}
 	EmptySpecError = errors.New("empty master specification")
 
-	defaultFactory = PluginFactory(func(spec string) (Master, error) {
+	defaultFactory = PluginFactory(func(spec string, _ ...Option) (Master, error) {
 		if len(spec) == 0 {
 			return nil, EmptySpecError
 		}
@@ -37,7 +37,7 @@ var (
 	})
 )
 
-type PluginFactory func(string) (Master, error)
+type PluginFactory func(string, ...Option) (Master, error)
 
 // associates a plugin implementation with a Master specification prefix.
 // packages that provide plugins are expected to invoke this func within
@@ -76,7 +76,7 @@ func Register(prefix string, f PluginFactory) error {
 // are not yet running and will only begin to spawn requisite background
 // processing upon, or some time after, the first invocation of their Detect.
 //
-func New(spec string) (m Master, err error) {
+func New(spec string, options ...Option) (m Master, err error) {
 	if strings.HasPrefix(spec, "file://") {
 		var body []byte
 		path := spec[7:]
@@ -84,12 +84,12 @@ func New(spec string) (m Master, err error) {
 		if err != nil {
 			log.V(1).Infof("failed to read from file at '%s'", path)
 		} else {
-			m, err = New(string(body))
+			m, err = New(string(body), options...)
 		}
 	} else if f, ok := MatchingPlugin(spec); ok {
-		m, err = f(spec)
+		m, err = f(spec, options...)
 	} else {
-		m, err = defaultFactory(spec)
+		m, err = defaultFactory(spec, options...)
 	}
 
 	return

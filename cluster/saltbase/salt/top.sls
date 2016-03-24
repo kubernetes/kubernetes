@@ -55,9 +55,6 @@ base:
     - kube-controller-manager
     - kube-scheduler
     - supervisor
-{% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere'] %}
-    - nginx
-{% endif %}
     - cadvisor
     - kube-client-tools
     - kube-master-addons
@@ -80,7 +77,3 @@ base:
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
 {% endif %}
-
-  'roles:kubernetes-pool-vsphere':
-    - match: grain
-    - static-routes

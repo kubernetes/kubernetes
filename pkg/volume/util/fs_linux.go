@@ -19,7 +19,12 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	"os/exec"
+	"strings"
 	"syscall"
+
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 // FSInfo linux returns (available bytes, byte capacity, error) for the filesystem that
@@ -38,4 +43,19 @@ func FsInfo(path string) (int64, int64, error) {
 	capacity := int64(statfs.Blocks) * int64(statfs.Frsize)
 
 	return available, capacity, nil
+}
+
+func Du(path string) (*resource.Quantity, error) {
+	// Uses the same niceness level as cadvisor.fs does when running du
+	// Uses -B 1 to always scale to a blocksize of 1 byte
+	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", path).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -s -B 1) on path %s with error %v", path, err)
+	}
+	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
+	}
+	used.Format = resource.BinarySI
+	return used, nil
 }

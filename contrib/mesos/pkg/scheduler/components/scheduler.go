@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -65,10 +65,9 @@ func New(
 	terminate <-chan struct{},
 	mux *http.ServeMux,
 	lw *cache.ListWatch,
-	prototype *mesos.ExecutorInfo,
-	frameworkRoles, defaultPodRoles []string,
-	defaultCpus mresource.CPUShares,
-	defaultMem mresource.MegaBytes,
+	taskConfig podtask.Config,
+	defaultCpus resources.CPUShares,
+	defaultMem resources.MegaBytes,
 ) scheduler.Scheduler {
 	core := &sched{
 		framework:    fw,
@@ -82,7 +81,7 @@ func New(
 
 	q := queuer.New(queue.NewDelayFIFO(), podUpdates)
 
-	algorithm := algorithm.New(core, podUpdates, ps, prototype, frameworkRoles, defaultPodRoles, defaultCpus, defaultMem)
+	algorithm := algorithm.New(core, podUpdates, ps, taskConfig, defaultCpus, defaultMem)
 
 	podDeleter := deleter.New(core, q)
 

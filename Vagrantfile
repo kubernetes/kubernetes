@@ -108,6 +108,14 @@ $vm_master_mem = (ENV['KUBERNETES_MASTER_MEMORY'] || ENV['KUBERNETES_MEMORY'] ||
 $vm_node_mem = (ENV['KUBERNETES_NODE_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1024).to_i
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  if Vagrant.has_plugin?("vagrant-proxyconf")
+    $http_proxy = ENV['KUBERNETES_HTTP_PROXY'] || ""
+    $https_proxy = ENV['KUBERNETES_HTTPS_PROXY'] || ""
+    $no_proxy = ENV['KUBERNETES_NO_PROXY'] || "127.0.0.1"
+    config.proxy.http     = $http_proxy
+    config.proxy.https    = $https_proxy
+    config.proxy.no_proxy = $no_proxy
+  end
   def setvmboxandurl(config, provider)
     if ENV['KUBERNETES_BOX_NAME'] then
       config.vm.box = ENV['KUBERNETES_BOX_NAME']
@@ -177,6 +185,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       v.customize ['set', :id, '--shf-guest', 'off']
       v.customize ['set', :id, '--shf-guest-automount', 'off']
       v.customize ['set', :id, '--shf-host', 'on']
+
+      # Synchronize VM clocks to host clock (Avoid certificate invalid issue)
+      v.customize ['set', :id, '--time-sync', 'on']
 
       # Remove all auto-mounted "shared folders"; the result seems to
       # persist between runs (i.e., vagrant halt && vagrant up)

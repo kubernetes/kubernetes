@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/proposals/federated-api-servers.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -47,7 +52,7 @@ federated servers.
   developers to expose their APIs as a separate server and enabling the cluster
   admin to use it without any change to the core kubernetes reporsitory, we
   unblock these APIs.
-* Place for staging experimental APIs: New APIs can remain in seperate
+* Place for staging experimental APIs: New APIs can remain in separate
   federated servers until they become stable, at which point, they can be moved
   to the core kubernetes master, if appropriate.
 * Ensure that new APIs follow kubernetes conventions: Without the mechanism

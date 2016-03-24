@@ -28,13 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // Construct an instance of a plugin, by name.
 func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumePlugin {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(basePath, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(basePath, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {
@@ -87,7 +88,7 @@ func TestPluginRootContextSet(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
 		medium:                 api.StorageMediumDefault,
 		rootContext:            "user:role:type:range",
-		expectedSELinuxContext: "user:role:type:range",
+		expectedSELinux:        "user:role:type:range",
 		expectedSetupMounts:    0,
 		expectedTeardownMounts: 0})
 }
@@ -100,7 +101,7 @@ func TestPluginTmpfs(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
 		medium:                        api.StorageMediumMemory,
 		rootContext:                   "user:role:type:range",
-		expectedSELinuxContext:        "user:role:type:range",
+		expectedSELinux:               "user:role:type:range",
 		expectedSetupMounts:           1,
 		shouldBeMountedBeforeTeardown: true,
 		expectedTeardownMounts:        1})
@@ -111,7 +112,7 @@ type pluginTestConfig struct {
 	rootContext                   string
 	SELinuxOptions                *api.SELinuxOptions
 	idempotent                    bool
-	expectedSELinuxContext        string
+	expectedSELinux               string
 	expectedSetupMounts           int
 	shouldBeMountedBeforeTeardown bool
 	expectedTeardownMounts        int
@@ -300,7 +301,7 @@ func TestMetrics(t *testing.T) {
 	// Need to create the subdirectory
 	os.MkdirAll(builder.GetPath(), 0755)
 
-	expectedEmptyDirUsage, err := volume.FindEmptyDirectoryUsageOnTmpfs()
+	expectedEmptyDirUsage, err := volumetest.FindEmptyDirectoryUsageOnTmpfs()
 	if err != nil {
 		t.Errorf("Unexpected error finding expected empty directory usage on tmpfs: %v", err)
 	}

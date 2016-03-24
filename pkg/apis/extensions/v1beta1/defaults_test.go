@@ -374,45 +374,107 @@ func TestSetDefaultJobParallelismAndCompletions(t *testing.T) {
 }
 
 func TestSetDefaultJobSelector(t *testing.T) {
-	expected := &Job{
-		Spec: JobSpec{
-			Selector: &LabelSelector{
-				MatchLabels: map[string]string{"job": "selector"},
-			},
-			Completions: newInt32(1),
-			Parallelism: newInt32(1),
-		},
-	}
-	tests := []*Job{
-		// selector set explicitly, completions and parallelism - default
+	tests := []struct {
+		original         *Job
+		expectedSelector *LabelSelector
+	}{
+		// selector set explicitly, nil autoSelector
 		{
-			Spec: JobSpec{
-				Selector: &LabelSelector{
-					MatchLabels: map[string]string{"job": "selector"},
-				},
-			},
-		},
-		// selector from template labels, completions and parallelism - default
-		{
-			Spec: JobSpec{
-				Template: v1.PodTemplateSpec{
-					ObjectMeta: v1.ObjectMeta{
-						Labels: map[string]string{"job": "selector"},
+			original: &Job{
+				Spec: JobSpec{
+					Selector: &LabelSelector{
+						MatchLabels: map[string]string{"job": "selector"},
 					},
 				},
 			},
+			expectedSelector: &LabelSelector{
+				MatchLabels: map[string]string{"job": "selector"},
+			},
+		},
+		// selector set explicitly, autoSelector=true
+		{
+			original: &Job{
+				Spec: JobSpec{
+					Selector: &LabelSelector{
+						MatchLabels: map[string]string{"job": "selector"},
+					},
+					AutoSelector: newBool(true),
+				},
+			},
+			expectedSelector: &LabelSelector{
+				MatchLabels: map[string]string{"job": "selector"},
+			},
+		},
+		// selector set explicitly, autoSelector=false
+		{
+			original: &Job{
+				Spec: JobSpec{
+					Selector: &LabelSelector{
+						MatchLabels: map[string]string{"job": "selector"},
+					},
+					AutoSelector: newBool(false),
+				},
+			},
+			expectedSelector: &LabelSelector{
+				MatchLabels: map[string]string{"job": "selector"},
+			},
+		},
+		// selector from template labels
+		{
+			original: &Job{
+				Spec: JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: v1.ObjectMeta{
+							Labels: map[string]string{"job": "selector"},
+						},
+					},
+				},
+			},
+			expectedSelector: &LabelSelector{
+				MatchLabels: map[string]string{"job": "selector"},
+			},
+		},
+		// selector from template labels, autoSelector=false
+		{
+			original: &Job{
+				Spec: JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: v1.ObjectMeta{
+							Labels: map[string]string{"job": "selector"},
+						},
+					},
+					AutoSelector: newBool(false),
+				},
+			},
+			expectedSelector: &LabelSelector{
+				MatchLabels: map[string]string{"job": "selector"},
+			},
+		},
+		// selector not copied from template labels, autoSelector=true
+		{
+			original: &Job{
+				Spec: JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: v1.ObjectMeta{
+							Labels: map[string]string{"job": "selector"},
+						},
+					},
+					AutoSelector: newBool(true),
+				},
+			},
+			expectedSelector: nil,
 		},
 	}
 
-	for _, original := range tests {
-		obj2 := roundTrip(t, runtime.Object(original))
+	for i, testcase := range tests {
+		obj2 := roundTrip(t, runtime.Object(testcase.original))
 		got, ok := obj2.(*Job)
 		if !ok {
-			t.Errorf("unexpected object: %v", got)
+			t.Errorf("%d: unexpected object: %v", i, got)
 			t.FailNow()
 		}
-		if !reflect.DeepEqual(got.Spec.Selector, expected.Spec.Selector) {
-			t.Errorf("got different selectors %#v %#v", got.Spec.Selector, expected.Spec.Selector)
+		if !reflect.DeepEqual(got.Spec.Selector, testcase.expectedSelector) {
+			t.Errorf("%d: got different selectors %#v %#v", i, got.Spec.Selector, testcase.expectedSelector)
 		}
 	}
 }
@@ -426,7 +488,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 		{
 			rs: &ReplicaSet{
 				Spec: ReplicaSetSpec{
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -446,7 +508,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 					},
 				},
 				Spec: ReplicaSetSpec{
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -471,7 +533,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 							"some": "other",
 						},
 					},
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -491,7 +553,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 							"some": "other",
 						},
 					},
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -538,7 +600,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 		{
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -553,7 +615,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
 					Replicas: newInt32(0),
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -568,7 +630,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
 					Replicas: newInt32(3),
-					Template: &v1.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
@@ -611,7 +673,7 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	rs := &ReplicaSet{
 		Spec: ReplicaSetSpec{
 			Replicas: newInt32(3),
-			Template: &v1.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
@@ -660,4 +722,10 @@ func newString(val string) *string {
 	p := new(string)
 	*p = val
 	return p
+}
+
+func newBool(val bool) *bool {
+	b := new(bool)
+	*b = val
+	return b
 }

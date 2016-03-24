@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/design/nodeaffinity.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -37,7 +42,7 @@ intended to be used only for selecting nodes.
 
 In addition, we propose to replace the `map[string]string` in `PodSpec` that the scheduler
 currently uses as part of restricting the set of nodes onto which a pod is
-eligible to schedule, with a field of type `Affinity` that contains contains one or
+eligible to schedule, with a field of type `Affinity` that contains one or
 more affinity specifications. In this document we discuss `NodeAffinity`, which
 contains one or more of the following
 * a field called `RequiredDuringSchedulingRequiredDuringExecution` that will be

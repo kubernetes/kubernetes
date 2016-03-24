@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/user-guide/kubectl/kubectl_run.md).
+[here](http://releases.k8s.io/release-1.2/docs/user-guide/kubectl/kubectl_run.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -50,34 +50,34 @@ kubectl run NAME --image=image [--env="key=value"] [--port=port] [--replicas=rep
 
 ```
 # Start a single instance of nginx.
-$ kubectl run nginx --image=nginx
+kubectl run nginx --image=nginx
 
 # Start a single instance of hazelcast and let the container expose port 5701 .
-$ kubectl run hazelcast --image=hazelcast --port=5701
+kubectl run hazelcast --image=hazelcast --port=5701
 
 # Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
-$ kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
+kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
 # Start a replicated instance of nginx.
-$ kubectl run nginx --image=nginx --replicas=5
+kubectl run nginx --image=nginx --replicas=5
 
 # Dry run. Print the corresponding API objects without creating them.
-$ kubectl run nginx --image=nginx --dry-run
+kubectl run nginx --image=nginx --dry-run
 
 # Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.
-$ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
+kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
 # Start a single instance of busybox and keep it in the foreground, don't restart it if it exits.
-$ kubectl run -i --tty busybox --image=busybox --restart=Never
+kubectl run -i --tty busybox --image=busybox --restart=Never
 
 # Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
-$ kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
+kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
 
 # Start the nginx container using a different command and custom arguments.
-$ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
+kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
 
 # Start the perl container to compute π to 2000 places and print it out.
-$ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'
+kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'
 ```
 
 ### Options
@@ -88,7 +88,7 @@ $ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'pri
       --dry-run[=false]: If true, only print the object that would be sent, without sending it.
       --env=[]: Environment variables to set in the container
       --expose[=false]: If true, a public, external service is created for the container(s) which are run
-      --generator="": The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1beta1'.
+      --generator="": The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, otherwise the default is 'job/v1'.  This will happen only for cluster version at least 1.2, for olders we will fallback to 'run/v1' for --restart=Always, 'run-pod/v1' for others.
       --hostport=-1: The host port mapping for the container port. To demonstrate a single-machine container.
       --image="": The image for the container to run.
   -l, --labels="": Labels to apply to the pod(s).
@@ -96,7 +96,7 @@ $ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'pri
       --limits="": The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].
-      --output-version="": Output the formatted object with the given version (default api-version).
+      --output-version="": Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
       --port=-1: The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.
       --record[=false]: Record current kubectl command in the resource annotation.
@@ -119,7 +119,6 @@ $ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'pri
 
 ```
       --alsologtostderr[=false]: log to standard error as well as files
-      --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client certificate file for TLS.
       --client-key="": Path to a client key file for TLS.
@@ -147,7 +146,7 @@ $ kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'pri
 
 * [kubectl](kubectl.md)	 - kubectl controls the Kubernetes cluster manager
 
-###### Auto generated by spf13/cobra on 14-Feb-2016
+###### Auto generated by spf13/cobra on 11-Mar-2016
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_run.md?pixel)]()

@@ -445,7 +445,7 @@ func (c *cinderVolumeProvisioner) NewPersistentVolumeTemplate() (*api.Persistent
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				Cinder: &api.CinderVolumeSource{
-					VolumeID: "dummy",
+					VolumeID: volume.ProvisionedVolumeName,
 					FSType:   "ext4",
 					ReadOnly: false,
 				},

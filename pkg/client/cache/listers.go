@@ -252,7 +252,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.Rep
 			continue
 		}
 
-		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}

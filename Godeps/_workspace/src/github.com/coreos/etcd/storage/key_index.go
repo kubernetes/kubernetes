@@ -1,3 +1,17 @@
+// Copyright 2015 CoreOS, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storage
 
 import (
@@ -13,7 +27,7 @@ var (
 	ErrRevisionNotFound = errors.New("stroage: revision not found")
 )
 
-// keyIndex stores the revision of an key in the backend.
+// keyIndex stores the revisions of a key in the backend.
 // Each keyIndex has at least one key generation.
 // Each generation might have several key versions.
 // Tombstone on a key appends an tombstone version at the end
@@ -30,9 +44,9 @@ var (
 //    {1.0, 2.0, 3.0(t)}
 //
 // Compact a keyIndex removes the versions with smaller or equal to
-// rev except the largest one. If the generations becomes empty
+// rev except the largest one. If the generation becomes empty
 // during compaction, it will be removed. if all the generations get
-// removed, the keyIndex Should be removed.
+// removed, the keyIndex should be removed.
 
 // For example:
 // compact(2) on the previous example
@@ -132,6 +146,46 @@ func (ki *keyIndex) get(atRev int64) (modified, created revision, ver int64, err
 	return revision{}, revision{}, 0, ErrRevisionNotFound
 }
 
+// since returns revisions since the given rev. Only the revision with the
+// largest sub revision will be returned if multiple revisions have the same
+// main revision.
+func (ki *keyIndex) since(rev int64) []revision {
+	if ki.isEmpty() {
+		log.Panicf("store.keyindex: unexpected get on empty keyIndex %s", string(ki.key))
+	}
+	since := revision{rev, 0}
+	var gi int
+	// find the generations to start checking
+	for gi = len(ki.generations) - 1; gi > 0; gi-- {
+		g := ki.generations[gi]
+		if g.isEmpty() {
+			continue
+		}
+		if since.GreaterThan(g.created) {
+			break
+		}
+	}
+
+	var revs []revision
+	var last int64
+	for ; gi < len(ki.generations); gi++ {
+		for _, r := range ki.generations[gi].revs {
+			if since.GreaterThan(r) {
+				continue
+			}
+			if r.main == last {
+				// replace the revision with a new one that has higher sub value,
+				// because the original one should not be seen by external
+				revs[len(revs)-1] = r
+				continue
+			}
+			revs = append(revs, r)
+			last = r.main
+		}
+	}
+	return revs
+}
+
 // compact compacts a keyIndex by removing the versions with smaller or equal
 // revision than the given atRev except the largest one (If the largest one is
 // a tombstone, it will not be kept).
@@ -142,7 +196,7 @@ func (ki *keyIndex) compact(atRev int64, available map[revision]struct{}) {
 	}
 
 	// walk until reaching the first revision that has an revision smaller or equal to
-	// the atRevision.
+	// the atRev.
 	// add it to the available map
 	f := func(rev revision) bool {
 		if rev.main <= atRev {
@@ -183,7 +237,7 @@ func (ki *keyIndex) isEmpty() bool {
 	return len(ki.generations) == 1 && ki.generations[0].isEmpty()
 }
 
-// findGeneartion finds out the generation of the keyIndex that the
+// findGeneration finds out the generation of the keyIndex that the
 // given rev belongs to. If the given rev is at the gap of two generations,
 // which means that the key does not exist at the given rev, it returns nil.
 func (ki *keyIndex) findGeneration(rev int64) *generation {
@@ -240,6 +294,7 @@ func (ki *keyIndex) String() string {
 	return s
 }
 
+// generation contains multiple revisions of a key.
 type generation struct {
 	ver     int64
 	created revision // when the generation is created (put in first revision).
@@ -250,7 +305,7 @@ func (g *generation) isEmpty() bool { return g == nil || len(g.revs) == 0 }
 
 // walk walks through the revisions in the generation in descending order.
 // It passes the revision to the given function.
-// walk returns until: 1. it finishs walking all pairs 2. the function returns false.
+// walk returns until: 1. it finishes walking all pairs 2. the function returns false.
 // walk returns the position at where it stopped. If it stopped after
 // finishing walking, -1 will be returned.
 func (g *generation) walk(f func(rev revision) bool) int {

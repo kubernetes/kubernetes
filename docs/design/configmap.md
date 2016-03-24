@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/design/configmap.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -222,7 +227,7 @@ kind: ConfigMap
 metadata:
   name: etcd-env-config
 data:
-  number-of-members: 1
+  number-of-members: "1"
   initial-cluster-state: new
   initial-cluster-token: DUMMY_ETCD_INITIAL_CLUSTER_TOKEN
   discovery-token: DUMMY_ETCD_DISCOVERY_TOKEN

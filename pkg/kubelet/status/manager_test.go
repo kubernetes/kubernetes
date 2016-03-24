@@ -24,8 +24,8 @@ import (
 	"time"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
 
 	"github.com/stretchr/testify/assert"
 
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -68,7 +69,7 @@ func (m *manager) testSyncBatch() {
 }
 
 func newTestManager(kubeClient clientset.Interface) *manager {
-	podManager := kubepod.NewBasicPodManager(kubepod.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
 	podManager.AddPod(getTestPod())
 	return NewManager(kubeClient, podManager).(*manager)
 }
@@ -205,8 +206,9 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 	if finalStatus.StartTime.IsZero() {
 		t.Errorf("StartTime should not be zero")
 	}
-	if !finalStatus.StartTime.Time.Equal(now.Time) {
-		t.Errorf("Expected %v, but got %v", now.Time, finalStatus.StartTime.Time)
+	expected := now.Rfc3339Copy()
+	if !finalStatus.StartTime.Equal(expected) {
+		t.Errorf("Expected %v, but got %v", expected, finalStatus.StartTime)
 	}
 }
 
@@ -464,8 +466,10 @@ func TestStatusEquality(t *testing.T) {
 		oldPodStatus := api.PodStatus{
 			ContainerStatuses: shuffle(podStatus.ContainerStatuses),
 		}
+		normalizeStatus(&oldPodStatus)
+		normalizeStatus(&podStatus)
 		if !isStatusEqual(&oldPodStatus, &podStatus) {
-			t.Fatalf("Order of container statuses should not affect equality.")
+			t.Fatalf("Order of container statuses should not affect normalized equality.")
 		}
 	}
 }
@@ -494,6 +498,7 @@ func TestStaticPodStatus(t *testing.T) {
 
 	m.SetPodStatus(staticPod, status)
 	retrievedStatus := expectPodStatus(t, m, staticPod)
+	normalizeStatus(&status)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)

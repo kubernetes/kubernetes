@@ -37,8 +37,8 @@ const (
 // run by default.
 //
 // These tests take ~20 minutes to run each.
-var _ = Describe("Cluster size autoscaling [Feature:ClusterSizeAutoscaling] [Slow]", func() {
-	f := NewFramework("autoscaling")
+var _ = KubeDescribe("Cluster size autoscaling [Feature:ClusterSizeAutoscaling] [Slow]", func() {
+	f := NewDefaultFramework("autoscaling")
 	var nodeCount int
 	var coresPerNode int
 	var memCapacityMb int
@@ -127,7 +127,7 @@ func createConsumingRCs(f *Framework, name string, count, cpuPerReplica, memPerR
 	var res []*ResourceConsumer
 	for i := 1; i <= count; i++ {
 		name := fmt.Sprintf("%s-%d", name, i)
-		res = append(res, NewStaticResourceConsumer(name, 1, cpuPerReplica, memPerReplica, int64(cpuPerReplica), int64(memPerReplica+100), f))
+		res = append(res, NewStaticResourceConsumer(name, 1, cpuPerReplica, memPerReplica, 0, int64(cpuPerReplica), int64(memPerReplica+100), f))
 	}
 	return res
 }

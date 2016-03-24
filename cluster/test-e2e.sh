@@ -22,7 +22,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 echo "Testing cluster with provider: ${KUBERNETES_PROVIDER}" 1>&2
 

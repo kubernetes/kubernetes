@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/devel/kubemark-guide.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -89,7 +94,7 @@ to update docker image address if you’re not using GCR and default image name*
 - Waits until all HollowNodes are in the Running phase (*will work exactly the same everywhere*)
 
 <sub>\* Port 443 is a secured port on the master machine which is used for all external communication with the API server. In the last sentence *external* means all traffic
-comming from other machines, including all the Nodes, not only from outside of the cluster. Currently local components, i.e. ControllerManager and Scheduler talk with API server using insecure port 8080.</sub>
+coming from other machines, including all the Nodes, not only from outside of the cluster. Currently local components, i.e. ControllerManager and Scheduler talk with API server using insecure port 8080.</sub>
 
 ### Running e2e tests on Kubemark cluster
 

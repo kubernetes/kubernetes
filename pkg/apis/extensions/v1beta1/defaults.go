@@ -86,7 +86,14 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			labels := obj.Spec.Template.Labels
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
-				if obj.Spec.Selector == nil {
+				// if an autoselector is requested, we'll build the selector later with controller-uid and job-name
+				autoSelector := bool(obj.Spec.AutoSelector != nil && *obj.Spec.AutoSelector)
+
+				// otherwise, we are using a manual selector
+				manualSelector := !autoSelector
+
+				// and default behavior for an unspecified manual selector is to use the pod template labels
+				if manualSelector && obj.Spec.Selector == nil {
 					obj.Spec.Selector = &LabelSelector{
 						MatchLabels: labels,
 					}
@@ -118,10 +125,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 			}
 		},
 		func(obj *ReplicaSet) {
-			var labels map[string]string
-			if obj.Spec.Template != nil {
-				labels = obj.Spec.Template.Labels
-			}
+			labels := obj.Spec.Template.Labels
+
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
 				if obj.Spec.Selector == nil {

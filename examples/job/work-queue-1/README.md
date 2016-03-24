@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/examples/job/work-queue-1/README.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -262,21 +267,16 @@ image to match the name you used, and call it `./job.yaml`.
 <!-- BEGIN MUNGE: EXAMPLE job.yaml -->
 
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: job-wq-1
 spec:
-  selector:
-    matchLabels:
-      app: job-wq-1
   completions: 8
   parallelism: 2
   template:
     metadata:
       name: job-wq-1
-      labels:
-        app: job-wq-1
     spec:
       containers:
       - name: c

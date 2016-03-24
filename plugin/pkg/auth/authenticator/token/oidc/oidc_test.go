@@ -31,6 +31,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -70,8 +71,16 @@ func newOIDCProvider(t *testing.T) *oidcProvider {
 
 }
 
+func mustParseURL(t *testing.T, s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		t.Fatalf("Failed to parse url: %v", err)
+	}
+	return u
+}
+
 func (op *oidcProvider) handleConfig(w http.ResponseWriter, req *http.Request) {
-	b, err := json.Marshal(op.pcfg)
+	b, err := json.Marshal(&op.pcfg)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -128,7 +137,7 @@ func (op *oidcProvider) generateExpiredToken(t *testing.T, iss, sub, aud string,
 }
 
 // generateSelfSignedCert generates a self-signed cert/key pairs and writes to the certPath/keyPath.
-// This method is mostly identical to util.GenerateSelfSignedCert except for the 'IsCA' and 'KeyUsage'
+// This method is mostly identical to crypto.GenerateSelfSignedCert except for the 'IsCA' and 'KeyUsage'
 // in the certificate template. (Maybe we can merge these two methods).
 func generateSelfSignedCert(t *testing.T, host, certPath, keyPath string) {
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -203,7 +212,7 @@ func TestOIDCDiscoveryTimeout(t *testing.T) {
 
 func TestOIDCDiscoveryNoKeyEndpoint(t *testing.T) {
 	var err error
-	expectErr := fmt.Errorf("OIDC provider must provide 'jwks_uri' for public key discovery")
+	expectErr := fmt.Errorf("failed to fetch provider config after 3 retries")
 
 	cert := path.Join(os.TempDir(), "oidc-cert")
 	key := path.Join(os.TempDir(), "oidc-key")
@@ -221,10 +230,11 @@ func TestOIDCDiscoveryNoKeyEndpoint(t *testing.T) {
 		t.Fatalf("Cannot load cert/key pair: %v", err)
 	}
 	srv.StartTLS()
-	defer srv.Close()
+	// TODO: Uncomment when fix #19254
+	// defer srv.Close()
 
 	op.pcfg = oidc.ProviderConfig{
-		Issuer: srv.URL,
+		Issuer: mustParseURL(t, srv.URL), // An invalid ProviderConfig. Keys endpoint is required.
 	}
 
 	_, err = New(srv.URL, "client-foo", cert, "sub", "")
@@ -244,8 +254,8 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 	// defer srv.Close()
 
 	op.pcfg = oidc.ProviderConfig{
-		Issuer:       srv.URL,
-		KeysEndpoint: srv.URL + "/keys",
+		Issuer:       mustParseURL(t, srv.URL),
+		KeysEndpoint: mustParseURL(t, srv.URL+"/keys"),
 	}
 
 	expectErr := fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'", srv.URL, "http")
@@ -277,11 +287,12 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 		t.Fatalf("Cannot load cert/key pair: %v", err)
 	}
 	tlsSrv.StartTLS()
-	defer tlsSrv.Close()
+	// TODO: Uncomment when fix #19254
+	// defer tlsSrv.Close()
 
 	op.pcfg = oidc.ProviderConfig{
-		Issuer:       tlsSrv.URL,
-		KeysEndpoint: tlsSrv.URL + "/keys",
+		Issuer:       mustParseURL(t, tlsSrv.URL),
+		KeysEndpoint: mustParseURL(t, tlsSrv.URL+"/keys"),
 	}
 
 	// Create a client using cert2, should fail.
@@ -315,9 +326,15 @@ func TestOIDCAuthentication(t *testing.T) {
 	// TODO: Uncomment when fix #19254
 	// defer srv.Close()
 
+	// A provider config with all required fields.
 	op.pcfg = oidc.ProviderConfig{
-		Issuer:       srv.URL,
-		KeysEndpoint: srv.URL + "/keys",
+		Issuer:                  mustParseURL(t, srv.URL),
+		AuthEndpoint:            mustParseURL(t, srv.URL+"/auth"),
+		TokenEndpoint:           mustParseURL(t, srv.URL+"/token"),
+		KeysEndpoint:            mustParseURL(t, srv.URL+"/keys"),
+		ResponseTypesSupported:  []string{"code"},
+		SubjectTypesSupported:   []string{"public"},
+		IDTokenSigningAlgValues: []string{"RS256"},
 	}
 
 	tests := []struct {
@@ -369,7 +386,7 @@ func TestOIDCAuthentication(t *testing.T) {
 			op.generateMalformedToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
 			nil,
 			false,
-			"malformed JWS, unable to decode signature",
+			"oidc: unable to verify JWT signature: no matching keys",
 		},
 		{
 			// Invalid 'aud'.
@@ -402,7 +419,8 @@ func TestOIDCAuthentication(t *testing.T) {
 	for i, tt := range tests {
 		client, err := New(srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim)
 		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
+			t.Errorf("Unexpected error: %v", err)
+			continue
 		}
 
 		user, result, err := client.AuthenticateToken(tt.token)

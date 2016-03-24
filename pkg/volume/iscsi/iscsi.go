@@ -59,15 +59,8 @@ func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
 	if (spec.Volume != nil && spec.Volume.ISCSI == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ISCSI == nil) {
 		return false
 	}
-	// TODO:  turn this into a func so CanSupport can be unit tested without
-	// having to make system calls
-	// see if iscsiadm is there
-	_, err := plugin.execCommand("iscsiadm", []string{"-h"})
-	if err == nil {
-		return true
-	}
 
-	return false
+	return true
 }
 
 func (plugin *iscsiPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {

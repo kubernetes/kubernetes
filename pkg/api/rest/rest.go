@@ -57,7 +57,7 @@ type Storage interface {
 
 // KindProvider specifies a different kind for its API than for its internal storage.  This is necessary for external
 // objects that are not compiled into the api server.  For such objects, there is no in-memory representation for
-// the object, so they must be represented as generic objects (e.g. RawJSON), but when we present the object as part of
+// the object, so they must be represented as generic objects (e.g. runtime.Unknown), but when we present the object as part of
 // API discovery we want to present the specific kind, not the generic internal representation.
 type KindProvider interface {
 	Kind() string
@@ -104,7 +104,7 @@ type GetterWithOptions interface {
 	// value of the request path below the object will be included as the named
 	// string in the serialization of the runtime object. E.g., returning "path"
 	// will convert the trailing request scheme value to "path" in the map[string][]string
-	// passed to the convertor.
+	// passed to the converter.
 	NewGetOptions() (runtime.Object, bool, string)
 }
 

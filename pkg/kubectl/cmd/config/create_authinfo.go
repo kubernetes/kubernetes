@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 )
 
 type createAuthInfoOptions struct {
@@ -40,7 +41,7 @@ type createAuthInfoOptions struct {
 	token             util.StringFlag
 	username          util.StringFlag
 	password          util.StringFlag
-	embedCertData     util.BoolFlag
+	embedCertData     flag.Tristate
 }
 
 var create_authinfo_long = fmt.Sprintf(`Sets a user entry in kubeconfig
@@ -60,13 +61,13 @@ Specifying a name that already exists will merge new fields on top of existing v
 
 const create_authinfo_example = `# Set only the "client-key" field on the "cluster-admin"
 # entry, without touching other values:
-$ kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
+kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
 
 # Set basic auth for the "cluster-admin" entry
-$ kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
+kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
 
 # Embed client certificate data in the "cluster-admin" entry
-$ kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`
+kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`
 
 func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Command {
 	options := &createAuthInfoOptions{configAccess: configAccess}

@@ -6,11 +6,14 @@ metadata:
   labels:
     k8s-app: fluentd-logging
 spec:
+  dnsPolicy: Default
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.16
+    image: gcr.io/google_containers/fluentd-gcp:1.18
     resources:
       limits:
+        memory: 200Mi
+      requests:
         cpu: 100m
         memory: 200Mi
     env:

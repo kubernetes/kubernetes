@@ -109,3 +109,68 @@ func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
 		}
 	}
 }
+
+func TestGetValueFromIntOrPercent(t *testing.T) {
+	tests := []struct {
+		input     IntOrString
+		total     int
+		roundUp   bool
+		expectErr bool
+		expectVal int
+	}{
+		{
+			input:     FromInt(123),
+			expectErr: false,
+			expectVal: 123,
+		},
+		{
+			input:     FromString("90%"),
+			total:     100,
+			roundUp:   true,
+			expectErr: false,
+			expectVal: 90,
+		},
+		{
+			input:     FromString("90%"),
+			total:     95,
+			roundUp:   true,
+			expectErr: false,
+			expectVal: 86,
+		},
+		{
+			input:     FromString("90%"),
+			total:     95,
+			roundUp:   false,
+			expectErr: false,
+			expectVal: 85,
+		},
+		{
+			input:     FromString("%"),
+			expectErr: true,
+		},
+		{
+			input:     FromString("90#"),
+			expectErr: true,
+		},
+		{
+			input:     FromString("#%"),
+			expectErr: true,
+		},
+	}
+
+	for i, test := range tests {
+		t.Logf("test case %d", i)
+		value, err := GetValueFromIntOrPercent(&test.input, test.total, test.roundUp)
+		if test.expectErr && err == nil {
+			t.Errorf("expected error, but got none")
+			continue
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected err: %v", err)
+			continue
+		}
+		if test.expectVal != value {
+			t.Errorf("expected %v, but got %v", test.expectVal, value)
+		}
+	}
+}

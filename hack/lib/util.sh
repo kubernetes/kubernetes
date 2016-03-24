@@ -27,8 +27,8 @@ kube::util::realpath() {
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
-  local wait=${3:-0.5}
-  local times=${4:-25}
+  local wait=${3:-1}
+  local times=${4:-30}
 
   which curl >/dev/null || {
     kube::log::usage "curl must be installed"
@@ -310,6 +310,42 @@ kube::util::gv-to-swagger-name() {
       echo "${group_version%/*}_${group_version#*/}"
       ;;
   esac
+}
+
+# Returns the name of the upstream remote repository name for the local git
+# repo, e.g. "upstream" or "origin".
+kube::util::git_upstream_remote_name() {
+  git remote -v | grep fetch |\
+    grep -E 'github.com/kubernetes/kubernetes|k8s.io/kubernetes' |\
+    head -n 1 | awk '{print $1}'
+}
+
+# Checks whether there are any files matching pattern $2 changed between the
+# current branch and upstream branch named by $1.
+# Returns 1 (false) if there are no changes, 0 (true) if there are changes
+# detected.
+kube::util::has_changes_against_upstream_branch() {
+  local -r git_branch=$1
+  local -r pattern=$2
+
+  readonly full_branch="$(kube::util::git_upstream_remote_name)/${git_branch}"
+  echo "Checking for '${pattern}' changes against '${full_branch}'"
+  # make sure the branch is valid, otherwise the check will pass erroneously.
+  if ! git describe "${full_branch}" >/dev/null; then
+    # abort!
+    exit 1
+  fi
+  # notice this uses ... to find the first shared ancestor
+  if git diff --name-only "${full_branch}...HEAD" | grep "${pattern}" > /dev/null; then
+    return 0
+  fi
+  # also check for pending changes
+  if git status --porcelain | grep "${pattern}" > /dev/null; then
+    echo "Detected '${pattern}' uncommitted changes."
+    return 0
+  fi
+  echo "No '${pattern}' changes detected."
+  return 1
 }
 
 # ex: ts=2 sw=2 et filetype=sh

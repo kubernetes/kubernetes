@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/union"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
 
 // Attributes implements authorizer.Attributes interface.
@@ -60,15 +61,28 @@ const (
 	ModeAlwaysAllow string = "AlwaysAllow"
 	ModeAlwaysDeny  string = "AlwaysDeny"
 	ModeABAC        string = "ABAC"
+	ModeWebhook     string = "Webhook"
 )
 
 // Keep this list in sync with constant list above.
-var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC}
+var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook}
+
+type AuthorizationConfig struct {
+	// Options for ModeABAC
+
+	// Path to a ABAC policy file.
+	PolicyFile string
+
+	// Options for ModeWebhook
+
+	// Kubeconfig file for Webhook authorization plugin.
+	WebhookConfigFile string
+}
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
 // based on the authorizationMode or an error.  authorizationMode should be a comma separated values
 // of AuthorizationModeChoices.
-func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, authorizationPolicyFile string) (authorizer.Authorizer, error) {
+func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config AuthorizationConfig) (authorizer.Authorizer, error) {
 
 	if len(authorizationModes) == 0 {
 		return nil, errors.New("Atleast one authorization mode should be passed")
@@ -88,22 +102,34 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, authoriza
 		case ModeAlwaysDeny:
 			authorizers = append(authorizers, NewAlwaysDenyAuthorizer())
 		case ModeABAC:
-			if authorizationPolicyFile == "" {
+			if config.PolicyFile == "" {
 				return nil, errors.New("ABAC's authorization policy file not passed")
 			}
-			abacAuthorizer, err := abac.NewFromFile(authorizationPolicyFile)
+			abacAuthorizer, err := abac.NewFromFile(config.PolicyFile)
 			if err != nil {
 				return nil, err
 			}
 			authorizers = append(authorizers, abacAuthorizer)
+		case ModeWebhook:
+			if config.WebhookConfigFile == "" {
+				return nil, errors.New("Webhook's configuration file not passed")
+			}
+			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile)
+			if err != nil {
+				return nil, err
+			}
+			authorizers = append(authorizers, webhookAuthorizer)
 		default:
 			return nil, fmt.Errorf("Unknown authorization mode %s specified", authorizationMode)
 		}
 		authorizerMap[authorizationMode] = true
 	}
 
-	if !authorizerMap[ModeABAC] && authorizationPolicyFile != "" {
+	if !authorizerMap[ModeABAC] && config.PolicyFile != "" {
 		return nil, errors.New("Cannot specify --authorization-policy-file without mode ABAC")
+	}
+	if !authorizerMap[ModeWebhook] && config.WebhookConfigFile != "" {
+		return nil, errors.New("Cannot specify --authorization-webhook-config-file without mode Webhook")
 	}
 
 	return union.New(authorizers...), nil

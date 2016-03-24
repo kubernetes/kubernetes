@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/configz"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -122,6 +123,11 @@ with the apiserver API to configure the proxy.`,
 
 // NewProxyServerDefault creates a new ProxyServer object with default parameters.
 func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, error) {
+	if c, err := configz.New("componentconfig"); err == nil {
+		c.Set(config.KubeProxyConfiguration)
+	} else {
+		glog.Errorf("unable to register configz: %s", err)
+	}
 	protocol := utiliptables.ProtocolIpv4
 	if net.ParseIP(config.BindAddress).To4() == nil {
 		protocol = utiliptables.ProtocolIpv6
@@ -280,6 +286,7 @@ func (s *ProxyServer) Run() error {
 		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
+		configz.InstallHandler(http.DefaultServeMux)
 		go wait.Until(func() {
 			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(s.Config.HealthzPort), nil)
 			if err != nil {

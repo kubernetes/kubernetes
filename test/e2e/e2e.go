@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -33,9 +32,9 @@ import (
 	"github.com/onsi/gomega"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -124,21 +123,8 @@ func setupProviderConfig() error {
 		}
 
 	case "aws":
-		awsConfig := "[Global]\n"
 		if cloudConfig.Zone == "" {
 			return fmt.Errorf("gce-zone must be specified for AWS")
-		}
-		awsConfig += fmt.Sprintf("Zone=%s\n", cloudConfig.Zone)
-
-		if cloudConfig.ClusterTag == "" {
-			return fmt.Errorf("--cluster-tag must be specified for AWS")
-		}
-		awsConfig += fmt.Sprintf("KubernetesClusterTag=%s\n", cloudConfig.ClusterTag)
-
-		var err error
-		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(testContext.Provider, strings.NewReader(awsConfig))
-		if err != nil {
-			return fmt.Errorf("Error building AWS provider: %v", err)
 		}
 
 	}
@@ -180,6 +166,13 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
 	if err := waitForPodsRunningReady(api.NamespaceSystem, testContext.MinStartupPods, podStartupTimeout); err != nil {
+		if c, errClient := loadClient(); errClient != nil {
+			Logf("Unable to dump cluster information because: %v", errClient)
+		} else {
+			dumpAllNamespaceInfo(c, api.NamespaceSystem)
+		}
+		logFailedContainers(api.NamespaceSystem)
+		runKubernetesServiceTestContainer(testContext.RepoRoot, api.NamespaceDefault)
 		Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 

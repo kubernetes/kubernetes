@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Verifies that api reference docs are upto date.
+# Verifies that api reference docs are up to date.
 
 set -o errexit
 set -o nounset
@@ -35,7 +35,7 @@ TMP_ROOT="${KUBE_ROOT}/_tmp"
 
 echo "diffing ${API_REFERENCE_DOCS_ROOT} against freshly generated docs"
 ret=0
-diff -NauprBZ -I 'Last update' --exclude=*.md "${API_REFERENCE_DOCS_ROOT}" "${OUTPUT_DIR}" || ret=$?
+diff -NauprB -I 'Last update' --exclude=*.md "${API_REFERENCE_DOCS_ROOT}" "${OUTPUT_DIR}" || ret=$?
 rm -rf "${TMP_ROOT}"
 if [[ $ret -eq 0 ]]
 then

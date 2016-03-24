@@ -18,7 +18,6 @@ package queue
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
@@ -352,30 +351,22 @@ func (f *HistoricalFIFO) gc() {
 // Assumes that the caller has acquired the state lock.
 func (f *HistoricalFIFO) merge(id string, obj UniqueCopyable) (notifications []Entry) {
 	item, exists := f.items[id]
-	now := time.Now()
-	if !exists {
+	if !exists || item.Is(POP_EVENT|DELETE_EVENT) {
+		// no prior history for this UID, or else it was popped/removed by the client.
 		e := &entry{obj.Copy().(UniqueCopyable), ADD_EVENT}
 		f.items[id] = e
 		notifications = append(notifications, e)
+	} else if item.Value().GetUID() != obj.GetUID() {
+		// sanity check, please
+		panic(fmt.Sprintf("historical UID %q != current UID %v", item.Value().GetUID(), obj.GetUID()))
 	} else {
-		if !item.Is(DELETE_EVENT) && item.Value().GetUID() != obj.GetUID() {
-			// hidden DELETE!
-			// (1) append a DELETE
-			// (2) append an ADD
-			// .. and notify listeners in that order
-			ent := item.(*entry)
-			ent.event = DELETE_EVENT
-			e1 := &deletedEntry{ent, now.Add(f.lingerTTL)}
-			e2 := &entry{obj.Copy().(UniqueCopyable), ADD_EVENT}
-			f.items[id] = e2
-			notifications = append(notifications, e1, e2)
-		} else if !reflect.DeepEqual(obj, item.Value()) {
-			//TODO(jdef): it would be nice if we could rely on resource versions
-			//instead of doing a DeepEqual. Maybe someday we'll be able to.
-			e := &entry{obj.Copy().(UniqueCopyable), UPDATE_EVENT}
-			f.items[id] = e
-			notifications = append(notifications, e)
-		}
+		// exists && !(popped | deleted). so either the prior event was an add or an
+		// update. reflect.DeepEqual is expensive. it won't help us determine if
+		// we missed a hidden delete along the way.
+		e := &entry{obj.Copy().(UniqueCopyable), UPDATE_EVENT}
+		f.items[id] = e
+		notifications = append(notifications, e)
+		// else objects are the same, no work to do.
 	}
 	// check for garbage collection
 	f.gcc++

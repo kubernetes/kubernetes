@@ -29,8 +29,8 @@ import (
 
 // isMemberBootstrapped tries to check if the given member has been bootstrapped
 // in the given cluster.
-func isMemberBootstrapped(cl *cluster, member string, tr *http.Transport) bool {
-	rcl, err := getClusterFromRemotePeers(getRemotePeerURLs(cl, member), time.Second, false, tr)
+func isMemberBootstrapped(cl *cluster, member string, rt http.RoundTripper, timeout time.Duration) bool {
+	rcl, err := getClusterFromRemotePeers(getRemotePeerURLs(cl, member), timeout, false, rt)
 	if err != nil {
 		return false
 	}
@@ -52,14 +52,14 @@ func isMemberBootstrapped(cl *cluster, member string, tr *http.Transport) bool {
 // response, an error is returned.
 // Each request has a 10-second timeout. Because the upper limit of TTL is 5s,
 // 10 second is enough for building connection and finishing request.
-func GetClusterFromRemotePeers(urls []string, tr *http.Transport) (*cluster, error) {
-	return getClusterFromRemotePeers(urls, 10*time.Second, true, tr)
+func GetClusterFromRemotePeers(urls []string, rt http.RoundTripper) (*cluster, error) {
+	return getClusterFromRemotePeers(urls, 10*time.Second, true, rt)
 }
 
 // If logerr is true, it prints out more error messages.
-func getClusterFromRemotePeers(urls []string, timeout time.Duration, logerr bool, tr *http.Transport) (*cluster, error) {
+func getClusterFromRemotePeers(urls []string, timeout time.Duration, logerr bool, rt http.RoundTripper) (*cluster, error) {
 	cc := &http.Client{
-		Transport: tr,
+		Transport: rt,
 		Timeout:   timeout,
 	}
 	for _, u := range urls {
@@ -78,7 +78,7 @@ func getClusterFromRemotePeers(urls []string, timeout time.Duration, logerr bool
 			continue
 		}
 		var membs []*Member
-		if err := json.Unmarshal(b, &membs); err != nil {
+		if err = json.Unmarshal(b, &membs); err != nil {
 			if logerr {
 				plog.Warningf("could not unmarshal cluster response: %v", err)
 			}
@@ -114,7 +114,7 @@ func getRemotePeerURLs(cl Cluster, local string) []string {
 // The key of the returned map is the member's ID. The value of the returned map
 // is the semver versions string, including server and cluster.
 // If it fails to get the version of a member, the key will be nil.
-func getVersions(cl Cluster, local types.ID, tr *http.Transport) map[string]*version.Versions {
+func getVersions(cl Cluster, local types.ID, rt http.RoundTripper) map[string]*version.Versions {
 	members := cl.Members()
 	vers := make(map[string]*version.Versions)
 	for _, m := range members {
@@ -126,7 +126,7 @@ func getVersions(cl Cluster, local types.ID, tr *http.Transport) map[string]*ver
 			vers[m.ID.String()] = &version.Versions{Server: version.Version, Cluster: cv}
 			continue
 		}
-		ver, err := getVersion(m, tr)
+		ver, err := getVersion(m, rt)
 		if err != nil {
 			plog.Warningf("cannot get the version of member %s (%v)", m.ID, err)
 			vers[m.ID.String()] = nil
@@ -166,14 +166,14 @@ func decideClusterVersion(vers map[string]*version.Versions) *semver.Version {
 	return cv
 }
 
-// isCompatibleWithCluster return true if the local member has a compitable version with
+// isCompatibleWithCluster return true if the local member has a compatible version with
 // the current running cluster.
-// The version is considered as compitable when at least one of the other members in the cluster has a
+// The version is considered as compatible when at least one of the other members in the cluster has a
 // cluster version in the range of [MinClusterVersion, Version] and no known members has a cluster version
 // out of the range.
 // We set this rule since when the local member joins, another member might be offline.
-func isCompatibleWithCluster(cl Cluster, local types.ID, tr *http.Transport) bool {
-	vers := getVersions(cl, local, tr)
+func isCompatibleWithCluster(cl Cluster, local types.ID, rt http.RoundTripper) bool {
+	vers := getVersions(cl, local, rt)
 	minV := semver.Must(semver.NewVersion(version.MinClusterVersion))
 	maxV := semver.Must(semver.NewVersion(version.Version))
 	maxV = &semver.Version{
@@ -187,7 +187,7 @@ func isCompatibleWithCluster(cl Cluster, local types.ID, tr *http.Transport) boo
 func isCompatibleWithVers(vers map[string]*version.Versions, local types.ID, minV, maxV *semver.Version) bool {
 	var ok bool
 	for id, v := range vers {
-		// ignore comparasion with local version
+		// ignore comparison with local version
 		if id == local.String() {
 			continue
 		}
@@ -214,9 +214,9 @@ func isCompatibleWithVers(vers map[string]*version.Versions, local types.ID, min
 
 // getVersion returns the Versions of the given member via its
 // peerURLs. Returns the last error if it fails to get the version.
-func getVersion(m *Member, tr *http.Transport) (*version.Versions, error) {
+func getVersion(m *Member, rt http.RoundTripper) (*version.Versions, error) {
 	cc := &http.Client{
-		Transport: tr,
+		Transport: rt,
 	}
 	var (
 		err  error
@@ -246,7 +246,7 @@ func getVersion(m *Member, tr *http.Transport) (*version.Versions, error) {
 			continue
 		}
 		var vers version.Versions
-		if err := json.Unmarshal(b, &vers); err != nil {
+		if err = json.Unmarshal(b, &vers); err != nil {
 			plog.Warningf("failed to unmarshal the response body got from the peerURL(%s) of member %s (%v)", u, m.ID, err)
 			continue
 		}

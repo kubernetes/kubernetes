@@ -24,7 +24,7 @@ host="redis"
 
 q = rediswq.RedisWQ(name="job2", host="redis")
 print("Worker with sessionID: " +  q.sessionID())
-print("Inital queue state: empty=" + str(q.empty()))
+print("Initial queue state: empty=" + str(q.empty()))
 while not q.empty():
   item = q.lease(lease_secs=10, block=True, timeout=2) 
   if item is not None:

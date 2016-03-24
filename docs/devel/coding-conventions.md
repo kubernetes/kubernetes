@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/devel/coding-conventions.md).
+[here](http://releases.k8s.io/release-1.2/docs/devel/coding-conventions.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -64,6 +64,7 @@ Testing conventions
   - Significant features should come with integration (test/integration) and/or [end-to-end (test/e2e) tests](e2e-tests.md)
     - Including new kubectl commands and major features of existing commands
   - Unit tests must pass on OS X and Windows platforms - if you use Linux specific features, your test case must either be skipped on windows or compiled out (skipped is better when running Linux specific commands, compiled out is required when your code does not compile on Windows).
+  - See the [testing guide](testing.md) for additional testing advice.
 
 Directory and file conventions
   - Avoid package sprawl. Find an appropriate subdirectory for new packages. (See [#4851](http://issues.k8s.io/4851) for discussion.)

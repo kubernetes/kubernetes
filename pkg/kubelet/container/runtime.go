@@ -57,7 +57,10 @@ type Runtime interface {
 	Version() (Version, error)
 	// APIVersion returns the API version information of the container
 	// runtime. This may be different from the runtime engine's version.
+	// TODO(random-liu): We should fold this into Version()
 	APIVersion() (Version, error)
+	// Status returns error if the runtime is unhealthy; nil otherwise.
+	Status() error
 	// GetPods returns a list containers group by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
@@ -215,7 +218,8 @@ type Container struct {
 	// The name of the container, which should be the same as specified by
 	// api.Container.
 	Name string
-	// The image name of the container.
+	// The image name of the container, this also includes the tag of the image,
+	// the expected form is "NAME:TAG".
 	Image string
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
@@ -258,7 +262,8 @@ type ContainerStatus struct {
 	FinishedAt time.Time
 	// Exit code of the container.
 	ExitCode int
-	// Name of the image.
+	// Name of the image, this also includes the tag of the image,
+	// the expected form is "NAME:TAG".
 	Image string
 	// ID of the image.
 	ImageID string
@@ -356,6 +361,8 @@ type RunContainerOptions struct {
 	CgroupParent string
 	// The type of container rootfs
 	ReadOnly bool
+	// hostname for pod containers
+	Hostname string
 }
 
 // VolumeInfo contains information about the volume.
@@ -470,3 +477,12 @@ func ParsePodFullName(podFullName string) (string, string, error) {
 // Option is a functional option type for Runtime, useful for
 // completely optional settings.
 type Option func(Runtime)
+
+// Sort the container statuses by creation time.
+type SortContainerStatusesByCreationTime []*ContainerStatus
+
+func (s SortContainerStatusesByCreationTime) Len() int      { return len(s) }
+func (s SortContainerStatusesByCreationTime) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s SortContainerStatusesByCreationTime) Less(i, j int) bool {
+	return s[i].CreatedAt.Before(s[j].CreatedAt)
+}

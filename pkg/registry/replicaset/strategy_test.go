@@ -50,7 +50,7 @@ func TestReplicaSetStrategy(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-			Template: &validPodTemplate.Template,
+			Template: validPodTemplate.Template,
 		},
 		Status: extensions.ReplicaSetStatus{
 			Replicas:           1,
@@ -109,7 +109,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: 3,
 			Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-			Template: &validPodTemplate.Template,
+			Template: validPodTemplate.Template,
 		},
 		Status: extensions.ReplicaSetStatus{
 			Replicas:           1,
@@ -121,7 +121,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: 1,
 			Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
-			Template: &validPodTemplate.Template,
+			Template: validPodTemplate.Template,
 		},
 		Status: extensions.ReplicaSetStatus{
 			Replicas:           3,

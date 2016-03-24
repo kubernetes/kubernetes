@@ -57,7 +57,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:1.1
+      - image: gcr.io/google_containers/serve_hostname:v1.4
         name: addon-test
         ports:
         - containerPort: 9376
@@ -87,7 +87,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:1.1
+      - image: gcr.io/google_containers/serve_hostname:v1.4
         name: addon-test
         ports:
         - containerPort: 9376
@@ -155,7 +155,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:1.1
+      - image: gcr.io/google_containers/serve_hostname:v1.4
         name: invalid-addon-test
         ports:
         - containerPort: 9376
@@ -188,11 +188,11 @@ type stringPair struct {
 	data, fileName string
 }
 
-var _ = Describe("Addon update", func() {
+var _ = KubeDescribe("Addon update", func() {
 
 	var dir string
 	var sshClient *ssh.Client
-	f := NewFramework("addon-update-test")
+	f := NewDefaultFramework("addon-update-test")
 
 	BeforeEach(func() {
 		// This test requires:

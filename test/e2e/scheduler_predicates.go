@@ -28,65 +28,29 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/system"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	_ "github.com/stretchr/testify/assert"
 )
 
+// variable set in BeforeEach, never modified afterwards
+var masterNodes sets.String
+
 // Returns a number of currently scheduled and not scheduled Pods.
 func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.Pod) {
 	for _, pod := range pods.Items {
-		if pod.Spec.NodeName != "" {
-			scheduledPods = append(scheduledPods, pod)
-		} else {
-			notScheduledPods = append(notScheduledPods, pod)
+		if !masterNodes.Has(pod.Spec.NodeName) {
+			if pod.Spec.NodeName != "" {
+				scheduledPods = append(scheduledPods, pod)
+			} else {
+				notScheduledPods = append(notScheduledPods, pod)
+			}
 		}
 	}
 	return
-}
-
-// Simplified version of RunRC, that does not create RC, but creates plain Pods and
-// requires passing whole Pod definition, which is needed to test various Scheduler predicates.
-func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, pod api.Pod) {
-	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-	expectNoError(err)
-	podsScheduledBefore, _ := getPodsScheduled(allPods)
-
-	for i := 0; i < replicas; i++ {
-		podName := fmt.Sprintf("%v-%v", podNamePrefix, i)
-		pod.ObjectMeta.Name = podName
-		pod.ObjectMeta.Labels["name"] = podName
-		pod.Spec.Containers[0].Name = podName
-		_, err = c.Pods(ns).Create(&pod)
-		expectNoError(err)
-	}
-
-	// Wait for pods to start running.  Note: this is a functional
-	// test, not a performance test, so the timeout needs to be
-	// sufficiently long that it's only triggered if things are
-	// completely broken vs. running slowly.
-	timeout := 10 * time.Minute
-	startTime := time.Now()
-	currentlyScheduledPods := 0
-	for len(podsScheduledBefore)+replicas != currentlyScheduledPods {
-		allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-		expectNoError(err)
-		scheduledPods := 0
-		for _, pod := range allPods.Items {
-			if pod.Spec.NodeName != "" {
-				scheduledPods += 1
-			}
-		}
-		currentlyScheduledPods = scheduledPods
-		Logf("%v pods running", currentlyScheduledPods)
-		if startTime.Add(timeout).Before(time.Now()) {
-			Logf("Timed out after %v waiting for pods to start running.", timeout)
-			break
-		}
-		time.Sleep(5 * time.Second)
-	}
-	Expect(currentlyScheduledPods).To(Equal(len(podsScheduledBefore) + replicas))
 }
 
 func getRequestedCPU(pod api.Pod) int64 {
@@ -176,7 +140,7 @@ func waitForStableCluster(c *client.Client) int {
 	return len(scheduledPods)
 }
 
-var _ = Describe("SchedulerPredicates [Serial]", func() {
+var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 	var c *client.Client
 	var nodeList *api.NodeList
 	var systemPodsNo int
@@ -193,22 +157,45 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		}
 	})
 
-	framework := NewFramework("sched-pred")
+	framework := NewDefaultFramework("sched-pred")
 
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		nodeList = ListSchedulableNodesOrDie(c)
+		nodeList = &api.NodeList{}
+		nodes, err := c.Nodes().List(api.ListOptions{})
+		masterNodes = sets.NewString()
+		for _, node := range nodes.Items {
+			if system.IsMasterNode(&node) {
+				masterNodes.Insert(node.Name)
+			} else {
+				nodeList.Items = append(nodeList.Items, node)
+			}
+		}
+
+		err = checkTestingNSDeletedExcept(c, ns)
+		expectNoError(err)
 
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
 		// cannot be run in parallel with any other test that touches Nodes or Pods.
 		// It is so because we need to have precise control on what's running in the cluster.
 		systemPods, err := c.Pods(api.NamespaceSystem).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		systemPodsNo = len(systemPods.Items)
+		systemPodsNo = 0
+		for _, pod := range systemPods.Items {
+			if !masterNodes.Has(pod.Spec.NodeName) && pod.DeletionTimestamp == nil {
+				systemPodsNo++
+			}
+		}
 
 		err = waitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, podReadyBeforeTimeout)
 		Expect(err).NotTo(HaveOccurred())
+
+		for _, node := range nodeList.Items {
+			Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
+			PrintAllKubeletPods(c, node.Name)
+		}
+
 	})
 
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
@@ -220,10 +207,10 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {
+			Logf("Node: %v", node)
 			podCapacity, found := node.Status.Capacity["pods"]
 			Expect(found).To(Equal(true))
 			totalPodCapacity += podCapacity.Value()
-			Logf("Node: %v", node)
 		}
 
 		currentlyScheduledPods := waitForStableCluster(c)
@@ -247,7 +234,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 					},
 				},
 			},
-		})
+		}, true)
 
 		podName := "additional-pod"
 		_, err := c.Pods(ns).Create(&api.Pod{
@@ -293,8 +280,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		expectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
-			Expect(found).To(Equal(true))
-			if pod.Status.Phase == api.PodRunning {
+			if found && pod.Status.Phase == api.PodRunning {
 				Logf("Pod %v requesting resource %v on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
@@ -333,7 +319,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 					},
 				},
 			},
-		})
+		}, true)
 
 		podName := "additional-pod"
 		_, err = c.Pods(ns).Create(&api.Pod{

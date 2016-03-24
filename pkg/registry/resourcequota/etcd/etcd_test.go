@@ -27,12 +27,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	resourceQuotaStorage, statusStorage := NewREST(etcdStorage, generic.UndecoratedStorage)
+	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	resourceQuotaStorage, statusStorage := NewREST(restOptions)
 	return resourceQuotaStorage, statusStorage, server
 }
 
@@ -184,6 +185,6 @@ func TestUpdateStatus(t *testing.T) {
 	rqOut := obj.(*api.ResourceQuota)
 	// only compare the meaningful update b/c we can't compare due to metadata
 	if !api.Semantic.DeepEqual(resourcequotaIn.Status, rqOut.Status) {
-		t.Errorf("unexpected object: %s", util.ObjectDiff(resourcequotaIn, rqOut))
+		t.Errorf("unexpected object: %s", diff.ObjectDiff(resourcequotaIn, rqOut))
 	}
 }

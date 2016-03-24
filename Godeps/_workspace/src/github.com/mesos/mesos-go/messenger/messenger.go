@@ -30,6 +30,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/mesos/mesos-go/mesosproto/scheduler"
 	"github.com/mesos/mesos-go/mesosutil/process"
+	"github.com/mesos/mesos-go/messenger/sessionid"
 	"github.com/mesos/mesos-go/upid"
 	"golang.org/x/net/context"
 )
@@ -52,16 +53,19 @@ type Messenger interface {
 	UPID() upid.UPID
 }
 
+type errorHandlerFunc func(context.Context, *Message, error) error
+type dispatchFunc func(errorHandlerFunc)
+
 // MesosMessenger is an implementation of the Messenger interface.
 type MesosMessenger struct {
 	upid              upid.UPID
-	encodingQueue     chan *Message
-	sendingQueue      chan *Message
+	sendingQueue      chan dispatchFunc
 	installedMessages map[string]reflect.Type
 	installedHandlers map[string]MessageHandler
 	stop              chan struct{}
 	stopOnce          sync.Once
 	tr                Transporter
+	guardHandlers     sync.RWMutex // protect simultaneous changes to messages/handlers maps
 }
 
 // ForHostname creates a new default messenger (HTTP), using UPIDBindingAddress to
@@ -137,18 +141,17 @@ func UPIDBindingAddress(hostname string, bindingAddress net.IP) (string, error) 
 }
 
 // NewMesosMessenger creates a new mesos messenger.
-func NewHttp(upid upid.UPID) *MesosMessenger {
-	return NewHttpWithBindingAddress(upid, nil)
+func NewHttp(upid upid.UPID, opts ...httpOpt) *MesosMessenger {
+	return NewHttpWithBindingAddress(upid, nil, opts...)
 }
 
-func NewHttpWithBindingAddress(upid upid.UPID, address net.IP) *MesosMessenger {
-	return New(upid, NewHTTPTransporter(upid, address))
+func NewHttpWithBindingAddress(upid upid.UPID, address net.IP, opts ...httpOpt) *MesosMessenger {
+	return New(NewHTTPTransporter(upid, address, opts...))
 }
 
-func New(upid upid.UPID, t Transporter) *MesosMessenger {
+func New(t Transporter) *MesosMessenger {
 	return &MesosMessenger{
-		encodingQueue:     make(chan *Message, defaultQueueSize),
-		sendingQueue:      make(chan *Message, defaultQueueSize),
+		sendingQueue:      make(chan dispatchFunc, defaultQueueSize),
 		installedMessages: make(map[string]reflect.Type),
 		installedHandlers: make(map[string]MessageHandler),
 		tr:                t,
@@ -168,6 +171,10 @@ func (m *MesosMessenger) Install(handler MessageHandler, msg proto.Message) erro
 	if _, ok := m.installedMessages[name]; ok {
 		return fmt.Errorf("Message %v is already installed", name)
 	}
+
+	m.guardHandlers.Lock()
+	defer m.guardHandlers.Unlock()
+
 	m.installedMessages[name] = mtype.Elem()
 	m.installedHandlers[name] = handler
 	m.tr.Install(name)
@@ -184,12 +191,27 @@ func (m *MesosMessenger) Send(ctx context.Context, upid *upid.UPID, msg proto.Me
 	} else if *upid == m.upid {
 		return fmt.Errorf("Send the message to self")
 	}
+
+	b, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
 	name := getMessageName(msg)
 	log.V(2).Infof("Sending message %v to %v\n", name, upid)
+
+	wrapped := &Message{upid, name, msg, b}
+	d := dispatchFunc(func(rf errorHandlerFunc) {
+		err := m.tr.Send(ctx, wrapped)
+		err = rf(ctx, wrapped, err)
+		if err != nil {
+			m.reportError("send", wrapped, err)
+		}
+	})
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case m.encodingQueue <- &Message{upid, name, msg, nil}:
+	case m.sendingQueue <- d:
 		return nil
 	}
 }
@@ -206,14 +228,18 @@ func (m *MesosMessenger) Route(ctx context.Context, upid *upid.UPID, msg proto.M
 		return m.Send(ctx, upid, msg)
 	}
 
-	// TODO(jdef) this has an unfortunate performance impact for self-messaging. implement
-	// something more reasonable here.
-	data, err := proto.Marshal(msg)
-	if err != nil {
-		return err
-	}
 	name := getMessageName(msg)
-	return m.tr.Inject(ctx, &Message{upid, name, msg, data})
+	log.V(2).Infof("routing message %q to self", name)
+
+	_, handler, ok := m.messageBinding(name)
+	if !ok {
+		return fmt.Errorf("failed to route message, no message binding for %q", name)
+	}
+
+	// the implication of this is that messages can be delivered to self even if the
+	// messenger has been stopped. is that OK?
+	go handler(upid, msg)
+	return nil
 }
 
 // Start starts the messenger; expects to be called once and only once.
@@ -231,7 +257,6 @@ func (m *MesosMessenger) Start() error {
 	m.upid = pid
 
 	go m.sendLoop()
-	go m.encodeLoop()
 	go m.decodeLoop()
 
 	// wait for a listener error or a stop signal; either way stop the messenger
@@ -267,7 +292,7 @@ func (m *MesosMessenger) Stop() (err error) {
 			defer close(m.stop)
 		}
 
-		log.Info("stopping messenger..")
+		log.Infof("stopping messenger %v..", m.upid)
 
 		//TODO(jdef) don't hardcode the graceful flag here
 		if err2 := m.tr.Stop(true); err2 != nil && err2 != errTerminal {
@@ -283,53 +308,14 @@ func (m *MesosMessenger) UPID() upid.UPID {
 	return m.upid
 }
 
-func (m *MesosMessenger) encodeLoop() {
-	for {
-		select {
-		case <-m.stop:
-			return
-		case msg := <-m.encodingQueue:
-			e := func() error {
-				//TODO(jdef) implement timeout for context
-				ctx, cancel := context.WithCancel(context.TODO())
-				defer cancel()
-
-				b, err := proto.Marshal(msg.ProtoMessage)
-				if err != nil {
-					return err
-				}
-				msg.Bytes = b
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case m.sendingQueue <- msg:
-					return nil
-				}
-			}()
-			if e != nil {
-				m.reportError(fmt.Errorf("Failed to enqueue message %v: %v", msg, e))
-			}
-		}
+func (m *MesosMessenger) reportError(action string, msg *Message, err error) {
+	// log message transmission errors but don't shoot the messenger.
+	// this approach essentially drops all undelivered messages on the floor.
+	name := ""
+	if msg != nil {
+		name = msg.Name
 	}
-}
-
-func (m *MesosMessenger) reportError(err error) {
-	log.V(2).Info(err)
-	//TODO(jdef) implement timeout for context
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
-
-	c := make(chan error, 1)
-	pid := m.upid
-	go func() { c <- m.Route(ctx, &pid, &mesos.FrameworkErrorMessage{Message: proto.String(err.Error())}) }()
-	select {
-	case <-ctx.Done():
-		<-c // wait for Route to return
-	case e := <-c:
-		if e != nil {
-			log.Errorf("failed to report error %v due to: %v", err, e)
-		}
-	}
+	log.Errorf("failed to %s message %q: %+v", action, name, err)
 }
 
 func (m *MesosMessenger) sendLoop() {
@@ -337,27 +323,28 @@ func (m *MesosMessenger) sendLoop() {
 		select {
 		case <-m.stop:
 			return
-		case msg := <-m.sendingQueue:
-			e := func() error {
-				//TODO(jdef) implement timeout for context
-				ctx, cancel := context.WithCancel(context.TODO())
-				defer cancel()
-
-				c := make(chan error, 1)
-				go func() { c <- m.tr.Send(ctx, msg) }()
-
-				select {
-				case <-ctx.Done():
-					// Transport layer must use the context to detect cancelled requests.
-					<-c // wait for Send to return
-					return ctx.Err()
-				case err := <-c:
-					return err
+		case f := <-m.sendingQueue:
+			f(errorHandlerFunc(func(ctx context.Context, msg *Message, err error) error {
+				if _, ok := err.(*networkError); ok {
+					// if transport reports a network error, then
+					// we're probably disconnected from the remote process?
+					pid := msg.UPID.String()
+					neterr := &mesos.InternalNetworkError{Pid: &pid}
+					sessionID, ok := sessionid.FromContext(ctx)
+					if ok {
+						neterr.Session = &sessionID
+					}
+					log.V(1).Infof("routing network error for pid %q session %q", pid, sessionID)
+					err2 := m.Route(ctx, &m.upid, neterr)
+					if err2 != nil {
+						log.Error(err2)
+					} else {
+						log.V(1).Infof("swallowing raw error because we're reporting a networkError: %v", err)
+						return nil
+					}
 				}
-			}()
-			if e != nil {
-				m.reportError(fmt.Errorf("Failed to send message %v: %v", msg.Name, e))
-			}
+				return err
+			}))
 		}
 	}
 }
@@ -379,15 +366,40 @@ func (m *MesosMessenger) decodeLoop() {
 				panic(fmt.Sprintf("unexpected transport error: %v", err))
 			}
 		}
+
 		log.V(2).Infof("Receiving message %v from %v\n", msg.Name, msg.UPID)
-		msg.ProtoMessage = reflect.New(m.installedMessages[msg.Name]).Interface().(proto.Message)
+		protoMessage, handler, found := m.messageBinding(msg.Name)
+		if !found {
+			log.Warningf("no message binding for message %q", msg.Name)
+			continue
+		}
+
+		msg.ProtoMessage = protoMessage
 		if err := proto.Unmarshal(msg.Bytes, msg.ProtoMessage); err != nil {
 			log.Errorf("Failed to unmarshal message %v: %v\n", msg, err)
 			continue
 		}
-		// TODO(yifan): Catch panic.
-		m.installedHandlers[msg.Name](msg.UPID, msg.ProtoMessage)
+
+		handler(msg.UPID, msg.ProtoMessage)
 	}
+}
+
+func (m *MesosMessenger) messageBinding(name string) (proto.Message, MessageHandler, bool) {
+	m.guardHandlers.RLock()
+	defer m.guardHandlers.RUnlock()
+
+	gotype, ok := m.installedMessages[name]
+	if !ok {
+		return nil, nil, false
+	}
+
+	handler, ok := m.installedHandlers[name]
+	if !ok {
+		return nil, nil, false
+	}
+
+	protoMessage := reflect.New(gotype).Interface().(proto.Message)
+	return protoMessage, handler, true
 }
 
 // getMessageName returns the name of the message in the mesos manner.

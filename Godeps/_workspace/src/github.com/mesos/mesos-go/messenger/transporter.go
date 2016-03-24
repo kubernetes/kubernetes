@@ -33,11 +33,6 @@ type Transporter interface {
 	//Will stop receiving when transport is stopped.
 	Recv() (*Message, error)
 
-	//Inject injects a message to the incoming queue. Must use context to
-	//determine cancelled requests. Injection is aborted if the transport
-	//is stopped.
-	Inject(ctx context.Context, msg *Message) error
-
 	//Install mount an handler based on incoming message name.
 	Install(messageName string)
 

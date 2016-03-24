@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/examples/rbd/README.md).
+[here](http://releases.k8s.io/release-1.2/examples/rbd/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -38,7 +38,7 @@ Install Ceph on the Kubernetes host. For example, on Fedora 21
 
     # yum -y install ceph-common
 
-If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](https://github.com/rootfs/docker-ceph)
+If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](https://github.com/ceph/ceph-docker)
 
 Then get the keyring from the Ceph cluster and copy it to */etc/ceph/keyring*.
 

@@ -21,7 +21,10 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# TODO: preinstall protobuf
+kube::golang::setup_env
+
+hack/build-go.sh cmd/libs/go2idl/go-to-protobuf cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
+
 if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3.0."* ]]; then
   echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
   echo "install the platform appropriate Protobuf package for your OS: "
@@ -29,7 +32,6 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3.0."* ]]; the
   echo "  https://github.com/google/protobuf/releases"
   echo
   echo "WARNING: Protobuf changes are not being validated"
-  # TODO: make error when protobuf is installed
   exit 0
 fi
 
@@ -38,7 +40,8 @@ gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 # requires the 'proto' tag to build (will remove when ready)
 # searches for the protoc-gen-gogo extension in the output directory
 # satisfies import of github.com/gogo/protobuf/gogoproto/gogo.proto and the core Google protobuf types
-PATH="${KUBE_ROOT}/_output/local/go/bin:${PATH}" "${gotoprotobuf}" \
+PATH="${KUBE_ROOT}/_output/local/go/bin:${PATH}" \
+  "${gotoprotobuf}" \
   --conditional="proto" \
   --proto-import="${KUBE_ROOT}/Godeps/_workspace/src" \
   --proto-import="${KUBE_ROOT}/third_party/protobuf"

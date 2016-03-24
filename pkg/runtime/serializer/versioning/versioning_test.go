@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 type testDecodable struct {
@@ -201,11 +201,11 @@ func TestDecode(t *testing.T) {
 		switch {
 		case test.expectedObject != nil:
 			if !reflect.DeepEqual(test.expectedObject, obj) {
-				t.Errorf("%d: unexpected object:\n%s", i, util.ObjectGoPrintSideBySide(test.expectedObject, obj))
+				t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintSideBySide(test.expectedObject, obj))
 			}
 		case test.sameObject != nil:
 			if test.sameObject != obj {
-				t.Errorf("%d: unexpected object:\n%s", i, util.ObjectGoPrintSideBySide(test.sameObject, obj))
+				t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintSideBySide(test.sameObject, obj))
 			}
 		case obj != nil:
 			t.Errorf("%d: unexpected object: %#v", i, obj)

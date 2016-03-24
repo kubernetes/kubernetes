@@ -25,8 +25,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 const (
@@ -35,11 +37,13 @@ const (
 
 type TestGenericPLEG struct {
 	pleg    *GenericPLEG
-	runtime *kubecontainer.FakeRuntime
+	runtime *containertest.FakeRuntime
+	clock   *util.FakeClock
 }
 
 func newTestGenericPLEG() *TestGenericPLEG {
-	fakeRuntime := &kubecontainer.FakeRuntime{}
+	fakeRuntime := &containertest.FakeRuntime{}
+	clock := util.NewFakeClock(time.Time{})
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
 	pleg := &GenericPLEG{
@@ -47,8 +51,9 @@ func newTestGenericPLEG() *TestGenericPLEG {
 		runtime:      fakeRuntime,
 		eventChannel: make(chan *PodLifecycleEvent, 100),
 		podRecords:   make(podRecords),
+		clock:        clock,
 	}
-	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime}
+	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
 }
 
 func getEventsFromChannel(ch <-chan *PodLifecycleEvent) []*PodLifecycleEvent {
@@ -82,7 +87,7 @@ func verifyEvents(t *testing.T, expected, actual []*PodLifecycleEvent) {
 	sort.Sort(sortableEvents(expected))
 	sort.Sort(sortableEvents(actual))
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("Actual events differ from the expected; diff:\n %v", util.ObjectDiff(expected, actual))
+		t.Errorf("Actual events differ from the expected; diff:\n %v", diff.ObjectDiff(expected, actual))
 	}
 }
 
@@ -149,7 +154,17 @@ func TestRelisting(t *testing.T) {
 	verifyEvents(t, expected, actual)
 }
 
-func TestReportMissingContainers(t *testing.T) {
+func TestDetectingContainerDeaths(t *testing.T) {
+	// Vary the number of relists after the container started and before the
+	// container died to account for the changes in pleg's internal states.
+	testReportMissingContainers(t, 1)
+	testReportMissingPods(t, 1)
+
+	testReportMissingContainers(t, 3)
+	testReportMissingPods(t, 3)
+}
+
+func testReportMissingContainers(t *testing.T, numRelists int) {
 	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
@@ -163,9 +178,11 @@ func TestReportMissingContainers(t *testing.T) {
 			},
 		},
 	}
-	// Drain the events from the channel
-	pleg.relist()
-	getEventsFromChannel(ch)
+	// Relist and drain the events from the channel.
+	for i := 0; i < numRelists; i++ {
+		pleg.relist()
+		getEventsFromChannel(ch)
+	}
 
 	// Container c2 was stopped and removed between relists. We should report
 	// the event. The exited container c3 was garbage collected (i.e., removed)
@@ -186,7 +203,7 @@ func TestReportMissingContainers(t *testing.T) {
 	verifyEvents(t, expected, actual)
 }
 
-func TestReportMissingPods(t *testing.T) {
+func testReportMissingPods(t *testing.T, numRelists int) {
 	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
@@ -198,9 +215,11 @@ func TestReportMissingPods(t *testing.T) {
 			},
 		},
 	}
-	// Drain the events from the channel
-	pleg.relist()
-	getEventsFromChannel(ch)
+	// Relist and drain the events from the channel.
+	for i := 0; i < numRelists; i++ {
+		pleg.relist()
+		getEventsFromChannel(ch)
+	}
 
 	// Container c2 was stopped and removed between relists. We should report
 	// the event.
@@ -213,14 +232,15 @@ func TestReportMissingPods(t *testing.T) {
 	verifyEvents(t, expected, actual)
 }
 
-func newTestGenericPLEGWithRuntimeMock() (*GenericPLEG, *kubecontainer.Mock) {
-	runtimeMock := &kubecontainer.Mock{}
+func newTestGenericPLEGWithRuntimeMock() (*GenericPLEG, *containertest.Mock) {
+	runtimeMock := &containertest.Mock{}
 	pleg := &GenericPLEG{
 		relistPeriod: time.Hour,
 		runtime:      runtimeMock,
 		eventChannel: make(chan *PodLifecycleEvent, 100),
 		podRecords:   make(podRecords),
 		cache:        kubecontainer.NewCache(),
+		clock:        util.RealClock{},
 	}
 	return pleg, runtimeMock
 }
@@ -316,4 +336,23 @@ func TestRemoveCacheEntry(t *testing.T) {
 	actualStatus, actualErr := pleg.cache.Get(pods[0].ID)
 	assert.Equal(t, &kubecontainer.PodStatus{ID: pods[0].ID}, actualStatus)
 	assert.Equal(t, nil, actualErr)
+}
+
+func TestHealthy(t *testing.T) {
+	testPleg := newTestGenericPLEG()
+	pleg, _, clock := testPleg.pleg, testPleg.runtime, testPleg.clock
+	ok, _ := pleg.Healthy()
+	assert.True(t, ok, "pleg should be healthy")
+
+	// Advance the clock without any relisting.
+	clock.Step(time.Minute * 10)
+	ok, _ = pleg.Healthy()
+	assert.False(t, ok, "pleg should be unhealthy")
+
+	// Relist and than advance the time by 1 minute. pleg should be healthy
+	// because this is within the allowed limit.
+	pleg.relist()
+	clock.Step(time.Minute * 1)
+	ok, _ = pleg.Healthy()
+	assert.True(t, ok, "pleg should be healthy")
 }
