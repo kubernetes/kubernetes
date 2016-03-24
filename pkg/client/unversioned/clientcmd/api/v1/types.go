@@ -28,7 +28,11 @@ type Config struct {
 	// Legacy field from pkg/api/types.go TypeMeta.
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
 	Kind string `json:"kind,omitempty"`
-	// Version of the schema for this config object.
+	// DEPRECATED: APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
+	// Because a cluster can run multiple API groups and potentially multiple versions of each, it no longer makes sense to specify
+	// a single value for the cluster version.
+	// This field isnt really needed anyway, so we are deprecating it without replacement.
+	// It will be ignored if it is present.
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
 	Preferences Preferences `json:"preferences"`

@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/proposals/performance-related-monitoring.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -40,7 +45,7 @@ Main reason behind doing this is to understand what kind of monitoring needs to 
 
 Issue https://github.com/kubernetes/kubernetes/issues/14216 was opened because @spiffxp observed a regression in scheduler performance in 1.1 branch in comparison to `old` 1.0
 cut. In the end it turned out the be caused by `--v=4` (instead of default `--v=2`) flag in the scheduler together with the flag `--logtostderr` which disables batching of
-log lines and a number of loging without explicit V level. This caused weird behavior of the whole component.
+log lines and a number of logging without explicit V level. This caused weird behavior of the whole component.
 
 Because we now know that logging may have big performance impact we should consider instrumenting logging mechanism and compute statistics such as number of logged messages,
 total and average size of them. Each binary should be responsible for exposing its metrics. An unaccounted but way too big number of days, if not weeks, of engineering time was
@@ -137,7 +142,7 @@ Basic ideas:
 We should monitor other aspects of the system, which may indicate saturation of some component.
 
 Basic ideas:
-- queue lenght for queues in the system,
+- queue length for queues in the system,
 - wait time for WaitGroups.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

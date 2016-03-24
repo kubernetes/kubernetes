@@ -27,7 +27,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -371,7 +370,6 @@ IAAAAAAAsDyZDwU=`
 		}
 
 		checkVolumeContents(targetDir, tc.name, tc.payload, t)
-		checkSentinelFile(targetDir, t)
 	}
 }
 
@@ -547,8 +545,6 @@ func TestUpdate(t *testing.T) {
 			continue
 		}
 
-		oldTs := checkSentinelFile(targetDir, t)
-
 		err = writer.Write(tc.next)
 		if err != nil {
 			if tc.shouldWrite {
@@ -561,19 +557,13 @@ func TestUpdate(t *testing.T) {
 		}
 
 		checkVolumeContents(targetDir, tc.name, tc.next, t)
-
-		ts := checkSentinelFile(targetDir, t)
-		if !ts.After(oldTs) {
-			t.Errorf("Unexpected timestamp on sentinel file; expected %v to be after %v", ts, oldTs)
-		}
 	}
 }
 
 func TestMultipleUpdates(t *testing.T) {
 	cases := []struct {
-		name          string
-		payloads      []map[string][]byte
-		clearSentinel bool
+		name     string
+		payloads []map[string][]byte
 	}{
 		{
 			name: "update 1",
@@ -625,7 +615,6 @@ func TestMultipleUpdates(t *testing.T) {
 					"bar": []byte("bar4"),
 				},
 			},
-			clearSentinel: true,
 		},
 		{
 			name: "subdirectories 2",
@@ -710,84 +699,12 @@ func TestMultipleUpdates(t *testing.T) {
 			continue
 		}
 
-		var oldTs *time.Time = nil
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 
-		for ii, payload := range tc.payloads {
+		for _, payload := range tc.payloads {
 			writer.Write(payload)
 
 			checkVolumeContents(targetDir, tc.name, payload, t)
-			ts := checkSentinelFile(targetDir, t)
-
-			if oldTs != nil && !ts.After(*oldTs) {
-				t.Errorf("%v[%v] unexpected timestamp on sentinel file; expected %v to be after %v", tc.name, ii, ts, oldTs)
-			}
-			oldTs = &ts
-
-			if tc.clearSentinel {
-				clearSentinelFile(targetDir, t)
-			}
-		}
-	}
-}
-
-func TestSentinelFileModTimeIncreasing(t *testing.T) {
-	cases := []struct {
-		name              string
-		iterations        int
-		clearSentinelFile bool
-	}{
-		{
-			name:       "5 iters",
-			iterations: 5,
-		},
-		{
-			name:       "50 iters",
-			iterations: 50,
-		},
-		{
-			name:       "1000 iters",
-			iterations: 1000,
-		},
-		{
-			name:              "1000 clear sentinel",
-			iterations:        1000,
-			clearSentinelFile: true,
-		},
-		{
-			name:              "10000 clear sentinel",
-			iterations:        10000,
-			clearSentinelFile: true,
-		},
-	}
-
-	for _, tc := range cases {
-		targetDir, err := utiltesting.MkTmpdir("atomic-write")
-		if err != nil {
-			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
-			continue
-		}
-
-		var oldTs *time.Time = nil
-		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
-
-		for i := 0; i < tc.iterations; i++ {
-			err = writer.touchSentinelFile()
-			if err != nil {
-				t.Errorf("%v: unexpected error touching sentinel file: %v", tc.name, err)
-				continue
-			}
-
-			ts := checkSentinelFile(targetDir, t)
-			if oldTs != nil && !ts.After(*oldTs) {
-				t.Errorf("%v: unexpected timestamp on sentinel file; expected %v to be after %v", tc.name, ts, oldTs)
-				continue
-			}
-			oldTs = &ts
-
-			if tc.clearSentinelFile {
-				clearSentinelFile(targetDir, t)
-			}
 		}
 	}
 }
@@ -827,28 +744,5 @@ func checkVolumeContents(targetDir, tcName string, payload map[string][]byte, t 
 
 	if !reflect.DeepEqual(cleanPathPayload, observedPayload) {
 		t.Errorf("%v: payload and observed payload do not match.", tcName)
-	}
-}
-
-func checkSentinelFile(targetDir string, t *testing.T) time.Time {
-	sentinelFilePath := filepath.Join(targetDir, sentinelFileName)
-	info, err := os.Stat(sentinelFilePath)
-	if err != nil {
-		t.Errorf("Couldn't stat sentinel file for dir %v: %v", targetDir, err)
-		return time.Now()
-	}
-
-	return info.ModTime()
-}
-
-func clearSentinelFile(targetDir string, t *testing.T) {
-	sentinelFilePath := filepath.Join(targetDir, sentinelFileName)
-	_, err := os.Stat(sentinelFilePath)
-	if err != nil {
-		t.Errorf("Couldn't stat sentinel file for dir %v: %v", targetDir, err)
-	}
-	err = os.Remove(sentinelFilePath)
-	if err != nil {
-		t.Errorf("Error removing sentinel file: %v", err)
 	}
 }

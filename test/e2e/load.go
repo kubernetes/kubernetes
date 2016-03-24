@@ -47,7 +47,7 @@ const (
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
-var _ = Describe("Load capacity", func() {
+var _ = KubeDescribe("Load capacity", func() {
 	var c *client.Client
 	var nodeCount int
 	var ns string
@@ -64,17 +64,15 @@ var _ = Describe("Load capacity", func() {
 
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	framework := NewFramework("load")
+	options := FrameworkOptions{
+		clientQPS:   50,
+		clientBurst: 100,
+	}
+	framework := NewFramework("load", options)
 	framework.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		// Explicitly create a client with higher QPS limits.
-		config, err := loadConfig()
-		Expect(err).NotTo(HaveOccurred())
-		config.QPS = 50
-		config.Burst = 100
-		c, err = loadClientFromConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		c = framework.Client
 
 		ns = framework.Namespace.Name
 		nodes := ListSchedulableNodesOrDie(c)
@@ -84,7 +82,7 @@ var _ = Describe("Load capacity", func() {
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err = checkTestingNSDeletedExcept(c, ns)
+		err := checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
 		expectNoError(resetMetrics(c))
@@ -99,7 +97,7 @@ var _ = Describe("Load capacity", func() {
 	loadTests := []Load{
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}},
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:1.1"},
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4"},
 	}
 
 	for _, testArg := range loadTests {
@@ -183,13 +181,15 @@ func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, cou
 	configs := make([]*RCConfig, 0, count)
 	for i := 1; i <= count; i++ {
 		config := &RCConfig{
-			Client:    c,
-			Name:      groupName + "-" + strconv.Itoa(i),
-			Namespace: ns,
-			Timeout:   10 * time.Minute,
-			Image:     image,
-			Command:   command,
-			Replicas:  size,
+			Client:     c,
+			Name:       groupName + "-" + strconv.Itoa(i),
+			Namespace:  ns,
+			Timeout:    10 * time.Minute,
+			Image:      image,
+			Command:    command,
+			Replicas:   size,
+			CpuRequest: 10,       // 0.01 core
+			MemRequest: 26214400, // 25MB
 		}
 		configs = append(configs, config)
 	}

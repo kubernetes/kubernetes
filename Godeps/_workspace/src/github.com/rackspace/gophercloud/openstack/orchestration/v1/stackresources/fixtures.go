@@ -28,10 +28,13 @@ var FindExpected = []Resource{
 		LogicalID:    "hello_world",
 		StatusReason: "state changed",
 		UpdatedTime:  time.Date(2015, 2, 5, 21, 33, 11, 0, time.UTC),
+		CreationTime: time.Date(2015, 2, 5, 21, 33, 10, 0, time.UTC),
 		RequiredBy:   []interface{}{},
 		Status:       "CREATE_IN_PROGRESS",
 		PhysicalID:   "49181cd6-169a-4130-9455-31185bbfc5bf",
 		Type:         "OS::Nova::Server",
+		Attributes:   map[string]interface{}{"SXSW": "atx"},
+		Description:  "Some resource",
 	},
 }
 
@@ -40,6 +43,8 @@ const FindOutput = `
 {
   "resources": [
   {
+  	"description": "Some resource",
+  	"attributes": {"SXSW": "atx"},
     "resource_name": "hello_world",
     "links": [
       {
@@ -54,6 +59,7 @@ const FindOutput = `
     "logical_resource_id": "hello_world",
     "resource_status_reason": "state changed",
     "updated_time": "2015-02-05T21:33:11",
+	"creation_time": "2015-02-05T21:33:10",
     "required_by": [],
     "resource_status": "CREATE_IN_PROGRESS",
     "physical_resource_id": "49181cd6-169a-4130-9455-31185bbfc5bf",
@@ -93,10 +99,13 @@ var ListExpected = []Resource{
 		LogicalID:    "hello_world",
 		StatusReason: "state changed",
 		UpdatedTime:  time.Date(2015, 2, 5, 21, 33, 11, 0, time.UTC),
+		CreationTime: time.Date(2015, 2, 5, 21, 33, 10, 0, time.UTC),
 		RequiredBy:   []interface{}{},
 		Status:       "CREATE_IN_PROGRESS",
 		PhysicalID:   "49181cd6-169a-4130-9455-31185bbfc5bf",
 		Type:         "OS::Nova::Server",
+		Attributes:   map[string]interface{}{"SXSW": "atx"},
+		Description:  "Some resource",
 	},
 }
 
@@ -121,7 +130,10 @@ const ListOutput = `{
     "required_by": [],
     "resource_status": "CREATE_IN_PROGRESS",
     "physical_resource_id": "49181cd6-169a-4130-9455-31185bbfc5bf",
-    "resource_type": "OS::Nova::Server"
+	"creation_time": "2015-02-05T21:33:10",
+    "resource_type": "OS::Nova::Server",
+	"attributes": {"SXSW": "atx"},
+	"description": "Some resource"
   }
 ]
 }`
@@ -162,6 +174,7 @@ var GetExpected = &Resource{
 		},
 	},
 	LogicalID:    "wordpress_instance",
+	Attributes:   map[string]interface{}{"SXSW": "atx"},
 	StatusReason: "state changed",
 	UpdatedTime:  time.Date(2014, 12, 10, 18, 34, 35, 0, time.UTC),
 	RequiredBy:   []interface{}{},
@@ -174,6 +187,8 @@ var GetExpected = &Resource{
 const GetOutput = `
 {
   "resource": {
+    "description": "Some resource",
+    "attributes": {"SXSW": "atx"},
     "resource_name": "wordpress_instance",
     "description": "",
     "links": [
@@ -240,7 +255,7 @@ func HandleMetadataSuccessfully(t *testing.T, output string) {
 }
 
 // ListTypesExpected represents the expected object from a ListTypes request.
-var ListTypesExpected = []string{
+var ListTypesExpected = ResourceTypes{
 	"OS::Nova::Server",
 	"OS::Heat::RandomString",
 	"OS::Swift::Container",
@@ -249,6 +264,18 @@ var ListTypesExpected = []string{
 	"OS::Cinder::VolumeAttachment",
 	"OS::Nova::FloatingIP",
 	"OS::Nova::KeyPair",
+}
+
+// same as above, but sorted
+var SortedListTypesExpected = ResourceTypes{
+	"OS::Cinder::VolumeAttachment",
+	"OS::Heat::RandomString",
+	"OS::Nova::FloatingIP",
+	"OS::Nova::FloatingIPAssociation",
+	"OS::Nova::KeyPair",
+	"OS::Nova::Server",
+	"OS::Swift::Container",
+	"OS::Trove::Instance",
 }
 
 // ListTypesOutput represents the response body from a ListTypes request.
@@ -296,6 +323,11 @@ var GetSchemaExpected = &TypeSchema{
 		},
 	},
 	ResourceType: "OS::Heat::AResourceName",
+	SupportStatus: map[string]interface{}{
+		"message": "A status message",
+		"status":  "SUPPORTED",
+		"version": "2014.1",
+	},
 }
 
 // GetSchemaOutput represents the response body from a Schema request.
@@ -314,7 +346,12 @@ const GetSchemaOutput = `
       "description": "A resource description."
     }
   },
-  "resource_type": "OS::Heat::AResourceName"
+  "resource_type": "OS::Heat::AResourceName",
+  "support_status": {
+	"message": "A status message",
+	"status": "SUPPORTED",
+	"version": "2014.1"
+  }
 }`
 
 // HandleGetSchemaSuccessfully creates an HTTP handler at `/resource_types/OS::Heat::AResourceName`
@@ -332,56 +369,7 @@ func HandleGetSchemaSuccessfully(t *testing.T, output string) {
 }
 
 // GetTemplateExpected represents the expected object from a Template request.
-var GetTemplateExpected = &TypeTemplate{
-	HeatTemplateFormatVersion: "2012-12-12",
-	Outputs: map[string]interface{}{
-		"private_key": map[string]interface{}{
-			"Description": "The private key if it has been saved.",
-			"Value":       "{\"Fn::GetAtt\": [\"KeyPair\", \"private_key\"]}",
-		},
-		"public_key": map[string]interface{}{
-			"Description": "The public key.",
-			"Value":       "{\"Fn::GetAtt\": [\"KeyPair\", \"public_key\"]}",
-		},
-	},
-	Parameters: map[string]interface{}{
-		"name": map[string]interface{}{
-			"Description": "The name of the key pair.",
-			"Type":        "String",
-		},
-		"public_key": map[string]interface{}{
-			"Description": "The optional public key. This allows users to supply the public key from a pre-existing key pair. If not supplied, a new key pair will be generated.",
-			"Type":        "String",
-		},
-		"save_private_key": map[string]interface{}{
-			"AllowedValues": []string{
-				"True",
-				"true",
-				"False",
-				"false",
-			},
-			"Default":     false,
-			"Description": "True if the system should remember a generated private key; False otherwise.",
-			"Type":        "String",
-		},
-	},
-	Resources: map[string]interface{}{
-		"KeyPair": map[string]interface{}{
-			"Properties": map[string]interface{}{
-				"name": map[string]interface{}{
-					"Ref": "name",
-				},
-				"public_key": map[string]interface{}{
-					"Ref": "public_key",
-				},
-				"save_private_key": map[string]interface{}{
-					"Ref": "save_private_key",
-				},
-			},
-			"Type": "OS::Nova::KeyPair",
-		},
-	},
-}
+var GetTemplateExpected = "{\n  \"HeatTemplateFormatVersion\": \"2012-12-12\",\n  \"Outputs\": {\n    \"private_key\": {\n      \"Description\": \"The private key if it has been saved.\",\n      \"Value\": \"{\\\"Fn::GetAtt\\\": [\\\"KeyPair\\\", \\\"private_key\\\"]}\"\n    },\n    \"public_key\": {\n      \"Description\": \"The public key.\",\n      \"Value\": \"{\\\"Fn::GetAtt\\\": [\\\"KeyPair\\\", \\\"public_key\\\"]}\"\n    }\n  },\n  \"Parameters\": {\n    \"name\": {\n      \"Description\": \"The name of the key pair.\",\n      \"Type\": \"String\"\n    },\n    \"public_key\": {\n      \"Description\": \"The optional public key. This allows users to supply the public key from a pre-existing key pair. If not supplied, a new key pair will be generated.\",\n      \"Type\": \"String\"\n    },\n    \"save_private_key\": {\n      \"AllowedValues\": [\n        \"True\",\n        \"true\",\n        \"False\",\n        \"false\"\n      ],\n      \"Default\": false,\n      \"Description\": \"True if the system should remember a generated private key; False otherwise.\",\n      \"Type\": \"String\"\n    }\n  },\n  \"Resources\": {\n    \"KeyPair\": {\n      \"Properties\": {\n        \"name\": {\n          \"Ref\": \"name\"\n        },\n        \"public_key\": {\n          \"Ref\": \"public_key\"\n        },\n        \"save_private_key\": {\n          \"Ref\": \"save_private_key\"\n        }\n      },\n      \"Type\": \"OS::Nova::KeyPair\"\n    }\n  }\n}"
 
 // GetTemplateOutput represents the response body from a Template request.
 const GetTemplateOutput = `

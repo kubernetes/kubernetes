@@ -23,8 +23,7 @@
 # exit on any error
 set -e
 
-source $(dirname $0)/../kube-env.sh
-source $(dirname $0)/../$KUBERNETES_PROVIDER/util.sh
+source $(dirname $0)/../kube-util.sh
 
 echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
 

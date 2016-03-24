@@ -58,13 +58,8 @@ func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
 	if (spec.Volume != nil && spec.Volume.RBD == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil) {
 		return false
 	}
-	// see if rbd is there
-	_, err := plugin.execCommand("rbd", []string{"-h"})
-	if err == nil {
-		return true
-	}
 
-	return false
+	return true
 }
 
 func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {

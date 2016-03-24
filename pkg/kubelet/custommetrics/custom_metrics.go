@@ -37,7 +37,7 @@ func GetCAdvisorCustomMetricsDefinitionPath(container *api.Container) (*string, 
 	if container.VolumeMounts != nil {
 		for _, volumeMount := range container.VolumeMounts {
 			if path.Clean(volumeMount.MountPath) == path.Clean(CustomMetricsDefinitionDir) {
-				// TODO: add defintion file validation.
+				// TODO: add definition file validation.
 				definitionPath := path.Clean(path.Join(volumeMount.MountPath, CustomMetricsDefinitionContainerFile))
 				return &definitionPath, nil
 			}

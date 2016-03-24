@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
@@ -71,44 +72,11 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 	}
 }
 
-func TestGenerateStorageVersionMap(t *testing.T) {
-	testCases := []struct {
-		legacyVersion   string
-		storageVersions string
-		expectedMap     map[string]string
-	}{
-		{
-			legacyVersion:   "v1",
-			storageVersions: "v1,extensions/v1beta1",
-			expectedMap: map[string]string{
-				api.GroupName:        "v1",
-				extensions.GroupName: "extensions/v1beta1",
-			},
-		},
-		{
-			legacyVersion:   "",
-			storageVersions: "extensions/v1beta1,v1",
-			expectedMap: map[string]string{
-				api.GroupName:        "v1",
-				extensions.GroupName: "extensions/v1beta1",
-			},
-		},
-		{
-			legacyVersion:   "",
-			storageVersions: "",
-			expectedMap:     map[string]string{},
-		},
-	}
-	for _, test := range testCases {
-		output := generateStorageVersionMap(test.legacyVersion, test.storageVersions)
-		if !reflect.DeepEqual(test.expectedMap, output) {
-			t.Errorf("unexpected error. expect: %v, got: %v", test.expectedMap, output)
-		}
-	}
-}
-
 func TestUpdateEtcdOverrides(t *testing.T) {
-	storageVersions := generateStorageVersionMap("", "v1,extensions/v1beta1")
+	storageVersions := map[string]string{
+		"":           "v1",
+		"extensions": "extensions/v1beta1",
+	}
 
 	testCases := []struct {
 		apigroup string
@@ -133,15 +101,19 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		newEtcd := func(serverList []string, _ runtime.NegotiatedSerializer, _, _ string, _ bool) (storage.Interface, error) {
-			if !reflect.DeepEqual(test.servers, serverList) {
-				t.Errorf("unexpected server list, expected: %#v, got: %#v", test.servers, serverList)
+		newEtcd := func(_ runtime.NegotiatedSerializer, _, _ string, etcdConfig etcdstorage.EtcdConfig) (storage.Interface, error) {
+			if !reflect.DeepEqual(test.servers, etcdConfig.ServerList) {
+				t.Errorf("unexpected server list, expected: %#v, got: %#v", test.servers, etcdConfig.ServerList)
 			}
 			return nil, nil
 		}
 		storageDestinations := genericapiserver.NewStorageDestinations()
 		override := test.apigroup + "/" + test.resource + "#" + strings.Join(test.servers, ";")
-		updateEtcdOverrides([]string{override}, storageVersions, "", false, &storageDestinations, newEtcd)
+		defaultEtcdConfig := etcdstorage.EtcdConfig{
+			Prefix:     genericapiserver.DefaultEtcdPathPrefix,
+			ServerList: []string{"http://127.0.0.1"},
+		}
+		updateEtcdOverrides([]string{override}, storageVersions, defaultEtcdConfig, &storageDestinations, newEtcd)
 		apigroup, ok := storageDestinations.APIGroups[test.apigroup]
 		if !ok {
 			t.Errorf("apigroup: %s not created", test.apigroup)

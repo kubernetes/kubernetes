@@ -27,18 +27,18 @@ import (
 	"strings"
 	"syscall"
 
-	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
-	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
-	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
-	"k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
-	"k8s.io/kubernetes/contrib/mesos/pkg/minion/tasks"
-	"k8s.io/kubernetes/pkg/api/resource"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-
 	log "github.com/golang/glog"
 	"github.com/kardianos/osext"
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
+	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
+	"k8s.io/kubernetes/contrib/mesos/pkg/flagutil"
+	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
+	"k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/minion/tasks"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 const (
@@ -53,7 +53,7 @@ type MinionServer struct {
 
 	privateMountNS bool
 	hks            hyperkube.Interface
-	clientConfig   *client.Config
+	clientConfig   *restclient.Config
 	kmBinary       string
 	tasks          []*tasks.Task
 
@@ -69,6 +69,7 @@ type MinionServer struct {
 	logVerbosity    int32 // see glog.Level
 
 	runProxy                       bool
+	proxyKubeconfig                string
 	proxyLogV                      int
 	proxyBindall                   bool
 	proxyMode                      string
@@ -143,12 +144,16 @@ func (ms *MinionServer) launchProxyServer() {
 		fmt.Sprintf("--bind-address=%s", bindAddress),
 		fmt.Sprintf("--v=%d", ms.proxyLogV),
 		"--logtostderr=true",
-		"--resource-container=" + path.Join("/", ms.mesosCgroup, "kube-proxy"),
+		// TODO(jdef) resource-container is going away completely at some point, but
+		// we need to override it here to disable the current default behavior
+		"--resource-container=", // disable this; mesos slave doesn't like sub-containers yet
 		"--proxy-mode=" + ms.proxyMode,
 		"--conntrack-max=" + strconv.Itoa(ms.conntrackMax),
 		"--conntrack-tcp-timeout-established=" + strconv.Itoa(ms.conntrackTCPTimeoutEstablished),
 	}
-
+	if ms.proxyKubeconfig != "" {
+		args = append(args, fmt.Sprintf("--kubeconfig=%s", ms.proxyKubeconfig))
+	}
 	if ms.clientConfig.Host != "" {
 		args = append(args, fmt.Sprintf("--master=%s", ms.clientConfig.Host))
 	}
@@ -163,7 +168,7 @@ func (ms *MinionServer) launchProxyServer() {
 // executor doesn't support failover right now, the right thing to do is to fail completely since all
 // pods will be lost upon restart and we want mesos to recover the resources from them.
 func (ms *MinionServer) launchExecutorServer(containerID string) <-chan struct{} {
-	allArgs := os.Args[1:]
+	allArgs := os.Args[2:]
 
 	// filter out minion flags, leaving those for the executor
 	executorFlags := pflag.NewFlagSet("executor", pflag.ContinueOnError)
@@ -171,10 +176,20 @@ func (ms *MinionServer) launchExecutorServer(containerID string) <-chan struct{}
 	ms.AddExecutorFlags(executorFlags)
 	executorArgs, _ := filterArgsByFlagSet(allArgs, executorFlags)
 
-	executorArgs = append(executorArgs, "--resource-container="+path.Join("/", ms.mesosCgroup, "kubelet"))
-	if ms.cgroupRoot != "" {
-		executorArgs = append(executorArgs, "--cgroup-root="+ms.cgroupRoot)
+	// disable resource-container; mesos slave doesn't like sub-containers yet
+	executorArgs = append(executorArgs, "--kubelet-cgroups=")
+
+	appendOptional := func(name, value string) {
+		if value != "" {
+			executorArgs = append(executorArgs, "--"+name+"="+value)
+		}
 	}
+	appendOptional("cgroup-root", ms.cgroupRoot)
+
+	// forward global cadvisor flag values to the executor
+	// TODO(jdef) remove this code once cadvisor global flags have been cleaned up
+	appendOptional(flagutil.Cadvisor.HousekeepingInterval.NameValue())
+	appendOptional(flagutil.Cadvisor.GlobalHousekeepingInterval.NameValue())
 
 	// forward containerID so that the executor may pass it along to containers that it launches
 	var ctidOpt tasks.Option
@@ -357,6 +372,7 @@ func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
 
 	// proxy flags
 	fs.BoolVar(&ms.runProxy, "run-proxy", ms.runProxy, "Maintain a running kube-proxy instance as a child proc of this kubelet-executor.")
+	fs.StringVar(&ms.proxyKubeconfig, "proxy-kubeconfig", ms.proxyKubeconfig, "Path to kubeconfig file used by the child kube-proxy.")
 	fs.IntVar(&ms.proxyLogV, "proxy-logv", ms.proxyLogV, "Log verbosity of the child kube-proxy.")
 	fs.BoolVar(&ms.proxyBindall, "proxy-bindall", ms.proxyBindall, "When true will cause kube-proxy to bind to 0.0.0.0.")
 	fs.StringVar(&ms.proxyMode, "proxy-mode", ms.proxyMode, "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")

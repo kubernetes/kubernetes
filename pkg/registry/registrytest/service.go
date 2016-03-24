@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -111,4 +112,11 @@ func (r *ServiceRegistry) WatchServices(ctx api.Context, options *api.ListOption
 	defer r.mu.Unlock()
 
 	return nil, r.Err
+}
+
+func (r *ServiceRegistry) ExportService(ctx api.Context, name string, options unversioned.ExportOptions) (*api.Service, error) {
+	r.mu.Lock()
+	defer r.mu.Lock()
+
+	return r.Service, r.Err
 }

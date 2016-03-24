@@ -126,10 +126,12 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 	return nil
 }
 
-func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volumeID string, volumeSizeGB int, err error) {
+// CreateVolume creates an AWS EBS volume.
+// Returns: volumeID, volumeSizeGB, labels, error
+func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (string, int, map[string]string, error) {
 	cloud, err := getCloudProvider()
 	if err != nil {
-		return "", 0, err
+		return "", 0, nil, err
 	}
 
 	// AWS volumes don't have Name field, store the name in Name tag
@@ -146,21 +148,30 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volum
 	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
 	volumeOptions := &aws.VolumeOptions{
 		CapacityGB: requestGB,
-		Tags:       &tags,
+		Tags:       tags,
 	}
 
 	name, err := cloud.CreateDisk(volumeOptions)
 	if err != nil {
 		glog.V(2).Infof("Error creating EBS Disk volume: %v", err)
-		return "", 0, err
+		return "", 0, nil, err
 	}
 	glog.V(2).Infof("Successfully created EBS Disk volume %s", name)
-	return name, int(requestGB), nil
+
+	labels, err := cloud.GetVolumeLabels(name)
+	if err != nil {
+		// We don't really want to leak the volume here...
+		glog.Errorf("error building labels for new EBS volume %q: %v", name, err)
+	}
+
+	return name, int(requestGB), labels, nil
 }
 
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
 func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.String) (string, error) {
 	var awsCloud *aws.AWSCloud
+	var attachError error
+
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
 		var err error
 		if awsCloud == nil {
@@ -177,9 +188,10 @@ func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.Strin
 			glog.Warningf("Retrying attach for EBS Disk %q (retry count=%v).", b.volumeID, numRetries)
 		}
 
-		devicePath, err := awsCloud.AttachDisk(b.volumeID, b.plugin.host.GetHostName(), b.readOnly)
-		if err != nil {
-			glog.Errorf("Error attaching PD %q: %v", b.volumeID, err)
+		var devicePath string
+		devicePath, attachError = awsCloud.AttachDisk(b.volumeID, "", b.readOnly)
+		if attachError != nil {
+			glog.Errorf("Error attaching PD %q: %v", b.volumeID, attachError)
 			time.Sleep(errorSleepDuration)
 			continue
 		}
@@ -203,6 +215,9 @@ func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.Strin
 		}
 	}
 
+	if attachError != nil {
+		return "", fmt.Errorf("Could not attach EBS Disk %q: %v", b.volumeID, attachError)
+	}
 	return "", fmt.Errorf("Could not attach EBS Disk %q. Timeout waiting for mount paths to be created.", b.volumeID)
 }
 
@@ -248,7 +263,7 @@ func detachDiskAndVerify(c *awsElasticBlockStoreCleaner) {
 			glog.Warningf("Retrying detach for EBS Disk %q (retry count=%v).", c.volumeID, numRetries)
 		}
 
-		devicePath, err := awsCloud.DetachDisk(c.volumeID, c.plugin.host.GetHostName())
+		devicePath, err := awsCloud.DetachDisk(c.volumeID, "")
 		if err != nil {
 			glog.Errorf("Error detaching PD %q: %v", c.volumeID, err)
 			time.Sleep(errorSleepDuration)

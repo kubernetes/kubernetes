@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -167,7 +168,7 @@ type testFactory struct {
 	Printer      kubectl.ResourcePrinter
 	Validator    validation.Schema
 	Namespace    string
-	ClientConfig *client.Config
+	ClientConfig *restclient.Config
 	Err          error
 }
 
@@ -180,7 +181,16 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	}
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
-			return t.Mapper, t.Typer
+			priorityRESTMapper := meta.PriorityRESTMapper{
+				Delegate: t.Mapper,
+				ResourcePriority: []unversioned.GroupVersionResource{
+					{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
+				},
+				KindPriority: []unversioned.GroupVersionKind{
+					{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
+				},
+			}
+			return priorityRESTMapper, t.Typer
 		},
 		ClientForMapping: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
@@ -203,7 +213,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		DefaultNamespace: func() (string, bool, error) {
 			return t.Namespace, false, t.Err
 		},
-		ClientConfig: func() (*client.Config, error) {
+		ClientConfig: func() (*restclient.Config, error) {
 			return t.ClientConfig, t.Err
 		},
 	}, t, codec
@@ -212,7 +222,16 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	f, t, c := NewTestFactory()
 	f.Object = func() (meta.RESTMapper, runtime.ObjectTyper) {
-		return meta.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
+		priorityRESTMapper := meta.PriorityRESTMapper{
+			Delegate: meta.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()},
+			ResourcePriority: []unversioned.GroupVersionResource{
+				{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
+			},
+			KindPriority: []unversioned.GroupVersionKind{
+				{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
+			},
+		}
+		return priorityRESTMapper, runtime.MultiObjectTyper{t.Typer, api.Scheme}
 	}
 	f.ClientForMapping = func(m *meta.RESTMapping) (resource.RESTClient, error) {
 		if m.ObjectConvertor == api.Scheme {
@@ -261,13 +280,13 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		DefaultNamespace: func() (string, bool, error) {
 			return t.Namespace, false, t.Err
 		},
-		ClientConfig: func() (*client.Config, error) {
+		ClientConfig: func() (*restclient.Config, error) {
 			return t.ClientConfig, t.Err
 		},
 		Generators: func(cmdName string) map[string]kubectl.Generator {
 			return cmdutil.DefaultGenerators(cmdName)
 		},
-		LogsForObject: func(object, options runtime.Object) (*client.Request, error) {
+		LogsForObject: func(object, options runtime.Object) (*restclient.Request, error) {
 			fakeClient := t.Client.(*fake.RESTClient)
 			c := client.NewOrDie(t.ClientConfig)
 			c.Client = fakeClient.Client
@@ -357,17 +376,20 @@ func ExamplePrintReplicationControllerWithNamespace() {
 				},
 			},
 		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
 	}
 	err := f.PrintObject(cmd, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAMESPACE   CONTROLLER   REPLICAS   AGE
-	// beep        foo          1          10y
+	// NAMESPACE   NAME      DESIRED   CURRENT   AGE
+	// beep        foo       1         1         10y
 }
 
-func ExamplePrintReplicationControllerWithWide() {
+func ExamplePrintMultiContainersReplicationControllerWithWide() {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
@@ -394,9 +416,16 @@ func ExamplePrintReplicationControllerWithWide() {
 							Name:  "foo",
 							Image: "someimage",
 						},
+						{
+							Name:  "foo2",
+							Image: "someimage2",
+						},
 					},
 				},
 			},
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
 		},
 	}
 	err := f.PrintObject(cmd, ctrl, os.Stdout)
@@ -404,8 +433,56 @@ func ExamplePrintReplicationControllerWithWide() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// CONTROLLER   REPLICAS   AGE       CONTAINER(S)   IMAGE(S)    SELECTOR
-	// foo          1          10y       foo            someimage   foo=bar
+	// NAME      DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)               SELECTOR
+	// foo       1         1         10y       foo,foo2       someimage,someimage2   foo=bar
+}
+
+func ExamplePrintReplicationController() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
+	tf.Client = &fake.RESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "foo",
+			Labels:            map[string]string{"foo": "bar"},
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+						{
+							Name:  "foo2",
+							Image: "someimage",
+						},
+					},
+				},
+			},
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
+	}
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      DESIRED   CURRENT   AGE
+	// foo       1         1         10y
 }
 
 func ExamplePrintPodWithWideFormat() {

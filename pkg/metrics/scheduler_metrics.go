@@ -23,20 +23,19 @@ import (
 )
 
 var KnownSchedulerMetrics = map[string][]string{
-	"rest_client_request_latency_microseconds":                  {"url", "verb", "quantile"},
-	"rest_client_request_latency_microseconds_count":            {"url", "verb"},
-	"rest_client_request_latency_microseconds_sum":              {"url", "verb"},
-	"rest_client_request_status_codes":                          {"code", "host", "method"},
-	"scheduler_binding_latency_microseconds":                    {"quantile"},
-	"scheduler_binding_latency_microseconds_count":              {},
-	"scheduler_binding_latency_microseconds_sum":                {},
-	"scheduler_binding_ratelimiter_saturation":                  {},
-	"scheduler_e2e_scheduling_latency_microseconds":             {"quantile"},
-	"scheduler_e2e_scheduling_latency_microseconds_count":       {},
-	"scheduler_e2e_scheduling_latency_microseconds_sum":         {},
-	"scheduler_scheduling_algorithm_latency_microseconds":       {"quantile"},
-	"scheduler_scheduling_algorithm_latency_microseconds_count": {},
-	"scheduler_scheduling_algorithm_latency_microseconds_sum":   {},
+	"rest_client_request_latency_microseconds":                   {"url", "verb", "quantile"},
+	"rest_client_request_latency_microseconds_count":             {"url", "verb"},
+	"rest_client_request_latency_microseconds_sum":               {"url", "verb"},
+	"rest_client_request_status_codes":                           {"code", "host", "method"},
+	"scheduler_binding_latency_microseconds_bucket":              {"le"},
+	"scheduler_binding_latency_microseconds_count":               {},
+	"scheduler_binding_latency_microseconds_sum":                 {},
+	"scheduler_e2e_scheduling_latency_microseconds_bucket":       {"le"},
+	"scheduler_e2e_scheduling_latency_microseconds_count":        {},
+	"scheduler_e2e_scheduling_latency_microseconds_sum":          {},
+	"scheduler_scheduling_algorithm_latency_microseconds_bucket": {"le"},
+	"scheduler_scheduling_algorithm_latency_microseconds_count":  {},
+	"scheduler_scheduling_algorithm_latency_microseconds_sum":    {},
 }
 
 type SchedulerMetrics Metrics

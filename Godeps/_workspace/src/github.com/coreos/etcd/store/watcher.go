@@ -85,3 +85,11 @@ func (w *watcher) Remove() {
 		w.remove()
 	}
 }
+
+// nopWatcher is a watcher that receives nothing, always blocking.
+type nopWatcher struct{}
+
+func NewNopWatcher() Watcher                 { return &nopWatcher{} }
+func (w *nopWatcher) EventChan() chan *Event { return nil }
+func (w *nopWatcher) StartIndex() uint64     { return 0 }
+func (w *nopWatcher) Remove()                {}

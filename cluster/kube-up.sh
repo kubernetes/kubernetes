@@ -25,13 +25,11 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-EXIT_ON_WEAK_ERROR="${EXIT_ON_WEAK_ERROR:-true}"
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
     source "${KUBE_ROOT}/cluster/env.sh"
 fi
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 
@@ -53,17 +51,17 @@ echo "... calling kube-up" >&2
 kube-up
 
 echo "... calling validate-cluster" >&2
-if [[ "${EXIT_ON_WEAK_ERROR}" == "true" ]]; then
-	validate-cluster
-else
-	if ! validate-cluster; then
-		validate_result="$?"
-		if [[ "${validate_result}" == "1" ]]; then
-			exit 1
-		elif [[ "${validate_result}" == "2" ]]; then
-			echo "...ignoring non-fatal errors in validate-cluster" >&2
-		fi
-	fi
+# Override errexit
+(validate-cluster) && validate_result="$?" || validate_result="$?"
+
+# We have two different failure modes from validate cluster:
+# - 1: fatal error - cluster won't be working correctly
+# - 2: weak error - something went wrong, but cluster probably will be working correctly
+# We just print an error message in case 2).
+if [[ "${validate_result}" == "1" ]]; then
+	exit 1
+elif [[ "${validate_result}" == "2" ]]; then
+	echo "...ignoring non-fatal errors in validate-cluster" >&2
 fi
 
 echo -e "Done, listing cluster services:\n" >&2

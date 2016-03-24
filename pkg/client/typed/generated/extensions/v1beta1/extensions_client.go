@@ -19,7 +19,7 @@ package v1beta1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
-	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type ExtensionsInterface interface {
@@ -35,7 +35,7 @@ type ExtensionsInterface interface {
 
 // ExtensionsClient is used to interact with features provided by the Extensions group.
 type ExtensionsClient struct {
-	*unversioned.RESTClient
+	*restclient.RESTClient
 }
 
 func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
@@ -71,12 +71,12 @@ func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResou
 }
 
 // NewForConfig creates a new ExtensionsClient for the given config.
-func NewForConfig(c *unversioned.Config) (*ExtensionsClient, error) {
+func NewForConfig(c *restclient.Config) (*ExtensionsClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := unversioned.RESTClientFor(&config)
+	client, err := restclient.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func NewForConfig(c *unversioned.Config) (*ExtensionsClient, error) {
 
 // NewForConfigOrDie creates a new ExtensionsClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *unversioned.Config) *ExtensionsClient {
+func NewForConfigOrDie(c *restclient.Config) *ExtensionsClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -94,11 +94,11 @@ func NewForConfigOrDie(c *unversioned.Config) *ExtensionsClient {
 }
 
 // New creates a new ExtensionsClient for the given RESTClient.
-func New(c *unversioned.RESTClient) *ExtensionsClient {
+func New(c *restclient.RESTClient) *ExtensionsClient {
 	return &ExtensionsClient{c}
 }
 
-func setConfigDefaults(config *unversioned.Config) error {
+func setConfigDefaults(config *restclient.Config) error {
 	// if extensions group is not registered, return an error
 	g, err := registered.Group("extensions")
 	if err != nil {
@@ -106,7 +106,7 @@ func setConfigDefaults(config *unversioned.Config) error {
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = unversioned.DefaultKubernetesUserAgent()
+		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {

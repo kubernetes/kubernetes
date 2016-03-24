@@ -16,30 +16,91 @@ limitations under the License.
 
 package storage
 
-import (
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+import "fmt"
+
+const (
+	ErrCodeKeyNotFound int = iota + 1
+	ErrCodeKeyExists
+	ErrCodeResourceVersionConflicts
+	ErrCodeUnreachable
 )
+
+var errCodeToMessage = map[int]string{
+	ErrCodeKeyNotFound:              "key not found",
+	ErrCodeKeyExists:                "key exists",
+	ErrCodeResourceVersionConflicts: "resource version conflicts",
+	ErrCodeUnreachable:              "server unreachable",
+}
+
+func NewKeyNotFoundError(key string, rv int64) *StorageError {
+	return &StorageError{
+		Code:            ErrCodeKeyNotFound,
+		Key:             key,
+		ResourceVersion: rv,
+	}
+}
+
+func NewKeyExistsError(key string, rv int64) *StorageError {
+	return &StorageError{
+		Code:            ErrCodeKeyExists,
+		Key:             key,
+		ResourceVersion: rv,
+	}
+}
+
+func NewResourceVersionConflictsError(key string, rv int64) *StorageError {
+	return &StorageError{
+		Code:            ErrCodeResourceVersionConflicts,
+		Key:             key,
+		ResourceVersion: rv,
+	}
+}
+
+func NewUnreachableError(key string, rv int64) *StorageError {
+	return &StorageError{
+		Code:            ErrCodeUnreachable,
+		Key:             key,
+		ResourceVersion: rv,
+	}
+}
+
+type StorageError struct {
+	Code            int
+	Key             string
+	ResourceVersion int64
+}
+
+func (e *StorageError) Error() string {
+	return fmt.Sprintf("StorageError: %s, Code: %d, Key: %s, ResourceVersion: %d",
+		errCodeToMessage[e.Code], e.Code, e.Key, e.ResourceVersion)
+}
 
 // IsNotFound returns true if and only if err is "key" not found error.
 func IsNotFound(err error) bool {
-	// TODO: add alternate storage error here
-	return etcdutil.IsEtcdNotFound(err)
+	return isErrCode(err, ErrCodeKeyNotFound)
 }
 
 // IsNodeExist returns true if and only if err is an node already exist error.
 func IsNodeExist(err error) bool {
-	// TODO: add alternate storage error here
-	return etcdutil.IsEtcdNodeExist(err)
+	return isErrCode(err, ErrCodeKeyExists)
 }
 
 // IsUnreachable returns true if and only if err indicates the server could not be reached.
 func IsUnreachable(err error) bool {
-	// TODO: add alternate storage error here
-	return etcdutil.IsEtcdUnreachable(err)
+	return isErrCode(err, ErrCodeUnreachable)
 }
 
 // IsTestFailed returns true if and only if err is a write conflict.
 func IsTestFailed(err error) bool {
-	// TODO: add alternate storage error here
-	return etcdutil.IsEtcdTestFailed(err)
+	return isErrCode(err, ErrCodeResourceVersionConflicts)
+}
+
+func isErrCode(err error, code int) bool {
+	if err == nil {
+		return false
+	}
+	if e, ok := err.(*StorageError); ok {
+		return e.Code == code
+	}
+	return false
 }

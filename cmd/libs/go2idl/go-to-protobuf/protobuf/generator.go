@@ -17,13 +17,9 @@ limitations under the License.
 package protobuf
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -39,7 +35,7 @@ type genProtoIDL struct {
 	generator.DefaultGen
 	localPackage   types.Name
 	localGoPackage types.Name
-	imports        *ImportTracker
+	imports        namer.ImportTracker
 
 	generateAll    bool
 	omitGogo       bool
@@ -191,7 +187,7 @@ func (p protobufLocator) CastTypeName(name types.Name) string {
 func (p protobufLocator) ProtoTypeFor(t *types.Type) (*types.Type, error) {
 	switch {
 	// we've already converted the type, or it's a map
-	case t.Kind == typesKindProtobuf || t.Kind == types.Map:
+	case t.Kind == types.Protobuf || t.Kind == types.Map:
 		p.tracker.AddType(t)
 		return t, nil
 	}
@@ -204,7 +200,7 @@ func (p protobufLocator) ProtoTypeFor(t *types.Type) (*types.Type, error) {
 	if t.Kind == types.Struct {
 		t := &types.Type{
 			Name: p.namer.GoNameToProtoName(t.Name),
-			Kind: typesKindProtobuf,
+			Kind: types.Protobuf,
 
 			CommentLines: t.CommentLines,
 		}
@@ -231,7 +227,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 	if len(b.t.Name.Name) == 0 {
 		return nil
 	}
-	if isPrivateGoName(b.t.Name.Name) {
+	if namer.IsPrivateGoName(b.t.Name.Name) {
 		return nil
 	}
 
@@ -275,6 +271,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 		}
 	}
 
+	// If we don't explicitly embed anything, generate fields by traversing fields.
 	if fields == nil {
 		memberFields, err := membersToFields(b.locator, b.t, b.localPackage, b.omitFieldTypes)
 		if err != nil {
@@ -347,8 +344,6 @@ type protoField struct {
 	Extras   map[string]string
 
 	CommentLines string
-
-	OptionalSet bool
 }
 
 var (
@@ -360,29 +355,29 @@ func isFundamentalProtoType(t *types.Type) (*types.Type, bool) {
 	// switch {
 	// case t.Kind == types.Struct && t.Name == types.Name{Package: "time", Name: "Time"}:
 	// 	return &types.Type{
-	// 		Kind: typesKindProtobuf,
+	// 		Kind: types.Protobuf,
 	// 		Name: types.Name{Path: "google/protobuf/timestamp.proto", Package: "google.protobuf", Name: "Timestamp"},
 	// 	}, true
 	// }
 	switch t.Kind {
 	case types.Slice:
 		if t.Elem.Name.Name == "byte" && len(t.Elem.Name.Package) == 0 {
-			return &types.Type{Name: types.Name{Name: "bytes"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "bytes"}, Kind: types.Protobuf}, true
 		}
 	case types.Builtin:
 		switch t.Name.Name {
 		case "string", "uint32", "int32", "uint64", "int64", "bool":
-			return &types.Type{Name: types.Name{Name: t.Name.Name}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: t.Name.Name}, Kind: types.Protobuf}, true
 		case "int":
-			return &types.Type{Name: types.Name{Name: "int64"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "int64"}, Kind: types.Protobuf}, true
 		case "uint":
-			return &types.Type{Name: types.Name{Name: "uint64"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "uint64"}, Kind: types.Protobuf}, true
 		case "float64", "float":
-			return &types.Type{Name: types.Name{Name: "double"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "double"}, Kind: types.Protobuf}, true
 		case "float32":
-			return &types.Type{Name: types.Name{Name: "float"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "float"}, Kind: types.Protobuf}, true
 		case "uintptr":
-			return &types.Type{Name: types.Name{Name: "uint64"}, Kind: typesKindProtobuf}, true
+			return &types.Type{Name: types.Name{Name: "uint64"}, Kind: types.Protobuf}, true
 		}
 		// TODO: complex?
 	}
@@ -392,7 +387,7 @@ func isFundamentalProtoType(t *types.Type) (*types.Type, bool) {
 func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *types.Type) error {
 	var err error
 	switch t.Kind {
-	case typesKindProtobuf:
+	case types.Protobuf:
 		field.Type, err = locator.ProtoTypeFor(t)
 	case types.Builtin:
 		field.Type, err = locator.ProtoTypeFor(t)
@@ -405,8 +400,10 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 		if err := memberTypeToProtobufField(locator, keyField, t.Key); err != nil {
 			return err
 		}
+		// All other protobuf types has kind types.Protobuf, so setting types.Map
+		// here would be very misleading.
 		field.Type = &types.Type{
-			Kind: types.Map,
+			Kind: types.Protobuf,
 			Key:  keyField.Type,
 			Elem: valueField.Type,
 		}
@@ -436,7 +433,7 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 		field.Extras["(gogoproto.casttype)"] = strconv.Quote(locator.CastTypeName(t.Name))
 	case types.Slice:
 		if t.Elem.Name.Name == "byte" && len(t.Elem.Name.Package) == 0 {
-			field.Type = &types.Type{Name: types.Name{Name: "bytes"}, Kind: typesKindProtobuf}
+			field.Type = &types.Type{Name: types.Name{Name: "bytes"}, Kind: types.Protobuf}
 			return nil
 		}
 		if err := memberTypeToProtobufField(locator, field, t.Elem); err != nil {
@@ -456,7 +453,6 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 }
 
 // protobufTagToField extracts information from an existing protobuf tag
-// TODO: take a current package
 func protobufTagToField(tag string, field *protoField, m types.Member, t *types.Type, localPackage types.Name) error {
 	if len(tag) == 0 {
 		return nil
@@ -472,33 +468,38 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 		return fmt.Errorf("member %q of %q malformed 'protobuf' tag, field ID is %q which is not an integer: %v\n", m.Name, t.Name, parts[1], err)
 	}
 	field.Tag = protoTag
-	// TODO: we are converting a Protobuf type back into an internal type, which is questionable
-	if last := strings.LastIndex(parts[0], "."); last != -1 {
-		prefix := parts[0][:last]
-		field.Type = &types.Type{
-			Name: types.Name{
+
+	// In general there is doesn't make sense to parse the protobuf tags to get the type,
+	// as all auto-generated once will have wire type "bytes", "varint" or "fixed64".
+	// However, sometimes we explicitly set them to have a custom serialization, e.g.:
+	//   type Time struct {
+	//     time.Time `protobuf:"Timestamp,1,req,name=time"`
+	//   }
+	// to force the generator to use a given type (that we manually wrote serialization &
+	// deserialization methods for).
+	switch parts[0] {
+	case "varint", "fixed32", "fixed64", "bytes", "group":
+	default:
+		name := types.Name{}
+		if last := strings.LastIndex(parts[0], "."); last != -1 {
+			prefix := parts[0][:last]
+			name = types.Name{
 				Name:    parts[0][last+1:],
 				Package: prefix,
-				// TODO: this probably needs to be a lookup into a namer
-				Path: strings.Replace(prefix, ".", "/", -1),
-			},
-			Kind: typesKindProtobuf,
-		}
-	} else {
-		switch parts[0] {
-		case "varint", "bytes", "fixed64":
-		default:
-			field.Type = &types.Type{
-				Name: types.Name{
-					Name:    parts[0],
-					Package: localPackage.Package,
-					Path:    localPackage.Path,
-				},
-				Kind: typesKindProtobuf,
+				Path:    strings.Replace(prefix, ".", "/", -1),
+			}
+		} else {
+			name = types.Name{
+				Name:    parts[0],
+				Package: localPackage.Package,
+				Path:    localPackage.Path,
 			}
 		}
+		field.Type = &types.Type{
+			Name: name,
+			Kind: types.Protobuf,
+		}
 	}
-	field.OptionalSet = true
 
 	protoExtra := make(map[string]string)
 	for i, extra := range parts[3:] {
@@ -507,7 +508,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			return fmt.Errorf("member %q of %q malformed 'protobuf' tag, tag %d should be key=value, got %q\n", m.Name, t.Name, i+4, extra)
 		}
 		switch parts[0] {
-		case "casttype":
+		case "casttype", "castkey", "castvalue":
 			parts[0] = fmt.Sprintf("(gogoproto.%s)", parts[0])
 			protoExtra[parts[0]] = parts[1]
 		}
@@ -526,7 +527,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 	fields := []protoField{}
 
 	for _, m := range t.Members {
-		if isPrivateGoName(m.Name) {
+		if namer.IsPrivateGoName(m.Name) {
 			// skip private fields
 			continue
 		}
@@ -562,7 +563,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 			}
 		}
 		if len(field.Name) == 0 {
-			field.Name = strings.ToLower(m.Name[:1]) + m.Name[1:]
+			field.Name = namer.IL(m.Name)
 		}
 
 		if field.Map && field.Repeated {
@@ -574,7 +575,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 		if !field.Nullable {
 			field.Extras["(gogoproto.nullable)"] = "false"
 		}
-		if (field.Type.Name.Name == "bytes" && field.Type.Name.Package == "") || (field.Repeated && field.Type.Name.Package == "" && isPrivateGoName(field.Type.Name.Name)) {
+		if (field.Type.Name.Name == "bytes" && field.Type.Name.Package == "") || (field.Repeated && field.Type.Name.Package == "" && namer.IsPrivateGoName(field.Type.Name.Name)) {
 			delete(field.Extras, "(gogoproto.nullable)")
 		}
 		if field.Name != m.Name {
@@ -628,61 +629,12 @@ func genComment(out io.Writer, comment, indent string) {
 	}
 }
 
-type protoIDLFileType struct{}
-
-func (ft protoIDLFileType) AssembleFile(f *generator.File, pathname string) error {
-	log.Printf("Assembling IDL file %q", pathname)
-	destFile, err := os.Create(pathname)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	b := &bytes.Buffer{}
-	et := generator.NewErrorTracker(b)
-	ft.assemble(et, f)
-	if et.Error() != nil {
-		return et.Error()
-	}
-
-	// TODO: is there an IDL formatter?
-	_, err = destFile.Write(b.Bytes())
-	return err
+func formatProtoFile(source []byte) ([]byte, error) {
+	// TODO; Is there any protobuf formatter?
+	return source, nil
 }
 
-func (ft protoIDLFileType) VerifyFile(f *generator.File, pathname string) error {
-	log.Printf("Verifying IDL file %q", pathname)
-	friendlyName := filepath.Join(f.PackageName, f.Name)
-	b := &bytes.Buffer{}
-	et := generator.NewErrorTracker(b)
-	ft.assemble(et, f)
-	if et.Error() != nil {
-		return et.Error()
-	}
-	formatted := b.Bytes()
-	existing, err := ioutil.ReadFile(pathname)
-	if err != nil {
-		return fmt.Errorf("unable to read file %q for comparison: %v", friendlyName, err)
-	}
-	if bytes.Compare(formatted, existing) == 0 {
-		return nil
-	}
-	// Be nice and find the first place where they differ
-	i := 0
-	for i < len(formatted) && i < len(existing) && formatted[i] == existing[i] {
-		i++
-	}
-	eDiff, fDiff := existing[i:], formatted[i:]
-	if len(eDiff) > 100 {
-		eDiff = eDiff[:100]
-	}
-	if len(fDiff) > 100 {
-		fDiff = fDiff[:100]
-	}
-	return fmt.Errorf("output for %q differs; first existing/expected diff: \n  %q\n  %q", friendlyName, string(eDiff), string(fDiff))
-}
-
-func (ft protoIDLFileType) assemble(w io.Writer, f *generator.File) {
+func assembleProtoFile(w io.Writer, f *generator.File) {
 	w.Write(f.Header)
 
 	fmt.Fprint(w, "syntax = 'proto2';\n\n")
@@ -710,21 +662,9 @@ func (ft protoIDLFileType) assemble(w io.Writer, f *generator.File) {
 	w.Write(f.Body.Bytes())
 }
 
-func isPackable(t *types.Type) bool {
-	if t.Kind != typesKindProtobuf {
-		return false
+func NewProtoFile() *generator.DefaultFileType {
+	return &generator.DefaultFileType{
+		Format:   formatProtoFile,
+		Assemble: assembleProtoFile,
 	}
-	switch t.Name.Name {
-	case "int32", "int64", "varint":
-		return true
-	default:
-		return false
-	}
-}
-
-func isPrivateGoName(name string) bool {
-	if len(name) == 0 {
-		return true
-	}
-	return strings.ToLower(name[:1]) == name[:1]
 }

@@ -16,7 +16,10 @@ coreos:
         ExecStart=/opt/kubernetes/bin/kubelet \
         --address=0.0.0.0 \
         --hostname-override=${NODE_IPS[$i]} \
+        --cluster-domain=cluster.local \
         --api-servers=http://${MASTER_IP}:8080 \
+        --tls-cert-file=/opt/kubernetes/certs/${NODE_NAMES[$i]}-node.pem \ \
+        --tls-private-key-file=/opt/kubernetes/certs/${NODE_NAMES[$i]}-node-key.pem \
         $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-dns=${DNS_SERVER_IP}" ) \
         $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-domain=${DNS_DOMAIN}" ) \
         --config=/opt/kubernetes/manifests

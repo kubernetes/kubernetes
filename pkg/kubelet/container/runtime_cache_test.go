@@ -14,42 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container
+package container_test
 
 import (
 	"reflect"
 	"testing"
 	"time"
+
+	. "k8s.io/kubernetes/pkg/kubelet/container"
+	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
-// testRunTimeCache embeds runtimeCache with some additional methods for
-// testing.
-type testRuntimeCache struct {
-	runtimeCache
-}
-
-func (r *testRuntimeCache) updateCacheWithLock() error {
-	r.Lock()
-	defer r.Unlock()
-	return r.updateCache()
-}
-
-func (r *testRuntimeCache) getCachedPods() []*Pod {
-	r.Lock()
-	defer r.Unlock()
-	return r.pods
-}
-
-func newTestRuntimeCache(getter podsGetter) *testRuntimeCache {
-	c, _ := NewRuntimeCache(getter)
-	return &testRuntimeCache{*c.(*runtimeCache)}
-}
-
 func TestGetPods(t *testing.T) {
-	runtime := &FakeRuntime{}
+	runtime := &ctest.FakeRuntime{}
 	expected := []*Pod{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
 	runtime.PodList = expected
-	cache := newTestRuntimeCache(runtime)
+	cache := NewTestRuntimeCache(runtime)
 	actual, err := cache.GetPods()
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -60,13 +40,13 @@ func TestGetPods(t *testing.T) {
 }
 
 func TestForceUpdateIfOlder(t *testing.T) {
-	runtime := &FakeRuntime{}
-	cache := newTestRuntimeCache(runtime)
+	runtime := &ctest.FakeRuntime{}
+	cache := NewTestRuntimeCache(runtime)
 
 	// Cache old pods.
 	oldpods := []*Pod{{ID: "1111"}}
 	runtime.PodList = oldpods
-	cache.updateCacheWithLock()
+	cache.UpdateCacheWithLock()
 
 	// Update the runtime to new pods.
 	newpods := []*Pod{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
@@ -74,14 +54,14 @@ func TestForceUpdateIfOlder(t *testing.T) {
 
 	// An older timestamp should not force an update.
 	cache.ForceUpdateIfOlder(time.Now().Add(-20 * time.Minute))
-	actual := cache.getCachedPods()
+	actual := cache.GetCachedPods()
 	if !reflect.DeepEqual(oldpods, actual) {
 		t.Errorf("expected %#v, got %#v", oldpods, actual)
 	}
 
 	// A newer timestamp should force an update.
 	cache.ForceUpdateIfOlder(time.Now().Add(20 * time.Second))
-	actual = cache.getCachedPods()
+	actual = cache.GetCachedPods()
 	if !reflect.DeepEqual(newpods, actual) {
 		t.Errorf("expected %#v, got %#v", newpods, actual)
 	}

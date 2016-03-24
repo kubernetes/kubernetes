@@ -567,11 +567,11 @@ func patchResource(ctx api.Context, admit updateAdmissionFunc, timeout time.Dura
 				return nil, err
 			}
 
-			currentPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, currentObjectJS, patcher.New())
+			currentPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, currentObjectJS, versionedObj)
 			if err != nil {
 				return nil, err
 			}
-			originalPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, originalPatchedObjJS, patcher.New())
+			originalPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
 			if err != nil {
 				return nil, err
 			}
@@ -589,6 +589,7 @@ func patchResource(ctx api.Context, admit updateAdmissionFunc, timeout time.Dura
 				return nil, err
 			}
 			if hasConflicts {
+				glog.V(4).Infof("patchResource failed for resource %s, becauase there is a meaningful conflict.\n diff1=%v\n, diff2=%v\n", name, diff1, diff2)
 				return updateObject, updateErr
 			}
 

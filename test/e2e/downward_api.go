@@ -25,8 +25,8 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("Downward API", func() {
-	framework := NewFramework("downward-api")
+var _ = KubeDescribe("Downward API", func() {
+	framework := NewDefaultFramework("downward-api")
 
 	It("should provide pod name and namespace as env vars [Conformance]", func() {
 		podName := "downward-api-" + string(util.NewUUID())

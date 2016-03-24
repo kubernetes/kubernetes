@@ -53,7 +53,7 @@ type Cluster interface {
 	// IsIDRemoved checks whether the given ID has been removed from this
 	// cluster at some point in the past
 	IsIDRemoved(id types.ID) bool
-	// ClusterVersion is the cluster-wide minimum major.minor version.
+	// Version is the cluster-wide minimum major.minor version.
 	Version() *semver.Version
 }
 
@@ -226,6 +226,13 @@ func (c *cluster) Recover() {
 	c.members, c.removed = membersFromStore(c.store)
 	c.version = clusterVersionFromStore(c.store)
 	MustDetectDowngrade(c.version)
+
+	for _, m := range c.members {
+		plog.Infof("added member %s %v to cluster %s from store", m.ID, m.PeerURLs, c.id)
+	}
+	if c.version != nil {
+		plog.Infof("set the cluster version to %v from store", version.Cluster(c.version.String()))
+	}
 }
 
 // ValidateConfigurationChange takes a proposed ConfChange and
@@ -299,7 +306,7 @@ func (c *cluster) AddMember(m *Member) {
 		plog.Panicf("marshal raftAttributes should never fail: %v", err)
 	}
 	p := path.Join(memberStoreKey(m.ID), raftAttributesSuffix)
-	if _, err := c.store.Create(p, false, string(b), false, store.Permanent); err != nil {
+	if _, err := c.store.Create(p, false, string(b), false, store.TTLOptionSet{ExpireTime: store.Permanent}); err != nil {
 		plog.Panicf("create raftAttributes should never fail: %v", err)
 	}
 	c.members[m.ID] = m
@@ -314,26 +321,27 @@ func (c *cluster) RemoveMember(id types.ID) {
 		plog.Panicf("delete member should never fail: %v", err)
 	}
 	delete(c.members, id)
-	if _, err := c.store.Create(removedMemberStoreKey(id), false, "", false, store.Permanent); err != nil {
+	if _, err := c.store.Create(removedMemberStoreKey(id), false, "", false, store.TTLOptionSet{ExpireTime: store.Permanent}); err != nil {
 		plog.Panicf("create removedMember should never fail: %v", err)
 	}
 	c.removed[id] = true
 }
 
-func (c *cluster) UpdateAttributes(id types.ID, attr Attributes) {
+func (c *cluster) UpdateAttributes(id types.ID, attr Attributes) bool {
 	c.Lock()
 	defer c.Unlock()
 	if m, ok := c.members[id]; ok {
 		m.Attributes = attr
-		return
+		return true
 	}
 	_, ok := c.removed[id]
 	if ok {
-		plog.Debugf("skipped updating attributes of removed member %s", id)
+		plog.Warningf("skipped updating attributes of removed member %s", id)
 	} else {
 		plog.Panicf("error updating attributes of unknown member %s", id)
 	}
 	// TODO: update store in this function
+	return false
 }
 
 func (c *cluster) UpdateRaftAttributes(id types.ID, raftAttr RaftAttributes) {
@@ -344,7 +352,7 @@ func (c *cluster) UpdateRaftAttributes(id types.ID, raftAttr RaftAttributes) {
 		plog.Panicf("marshal raftAttributes should never fail: %v", err)
 	}
 	p := path.Join(memberStoreKey(id), raftAttributesSuffix)
-	if _, err := c.store.Update(p, string(b), store.Permanent); err != nil {
+	if _, err := c.store.Update(p, string(b), store.TTLOptionSet{ExpireTime: store.Permanent}); err != nil {
 		plog.Panicf("update raftAttributes should never fail: %v", err)
 	}
 	c.members[id].RaftAttributes = raftAttr
@@ -369,6 +377,58 @@ func (c *cluster) SetVersion(ver *semver.Version) {
 	}
 	c.version = ver
 	MustDetectDowngrade(c.version)
+}
+
+func (c *cluster) isReadyToAddNewMember() bool {
+	nmembers := 1
+	nstarted := 0
+
+	for _, member := range c.members {
+		if member.IsStarted() {
+			nstarted++
+		}
+		nmembers++
+	}
+
+	if nstarted == 1 && nmembers == 2 {
+		// a case of adding a new node to 1-member cluster for restoring cluster data
+		// https://github.com/coreos/etcd/blob/master/Documentation/admin_guide.md#restoring-the-cluster
+
+		plog.Debugf("The number of started member is 1. This cluster can accept add member request.")
+		return true
+	}
+
+	nquorum := nmembers/2 + 1
+	if nstarted < nquorum {
+		plog.Warningf("Reject add member request: the number of started member (%d) will be less than the quorum number of the cluster (%d)", nstarted, nquorum)
+		return false
+	}
+
+	return true
+}
+
+func (c *cluster) isReadyToRemoveMember(id uint64) bool {
+	nmembers := 0
+	nstarted := 0
+
+	for _, member := range c.members {
+		if uint64(member.ID) == id {
+			continue
+		}
+
+		if member.IsStarted() {
+			nstarted++
+		}
+		nmembers++
+	}
+
+	nquorum := nmembers/2 + 1
+	if nstarted < nquorum {
+		plog.Warningf("Reject remove member request: the number of started member (%d) will be less than the quorum number of the cluster (%d)", nstarted, nquorum)
+		return false
+	}
+
+	return true
 }
 
 func membersFromStore(st store.Store) (map[types.ID]*Member, map[types.ID]bool) {

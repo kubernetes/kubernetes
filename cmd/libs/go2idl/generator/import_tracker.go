@@ -20,48 +20,23 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 )
 
-// ImportTracker may be passed to a namer.RawNamer, to track the imports needed
-// for the types it names.
-//
-// TODO: pay attention to the package name (instead of renaming every package).
-// TODO: Figure out the best way to make names for packages that collide.
-type ImportTracker struct {
-	pathToName map[string]string
-	// forbidden names are in here. (e.g. "go" is a directory in which
-	// there is code, but "go" is not a legal name for a package, so we put
-	// it here to prevent us from naming any package "go")
-	nameToPath map[string]string
+func NewImportTracker(typesToAdd ...*types.Type) namer.ImportTracker {
+	tracker := namer.NewDefaultImportTracker(types.Name{})
+	tracker.IsInvalidType = func(*types.Type) bool { return false }
+	tracker.LocalName = func(name types.Name) string { return golangTrackerLocalName(&tracker, name) }
+	tracker.PrintImport = func(path, name string) string { return name + " \"" + path + "\"" }
+
+	tracker.AddTypes(typesToAdd...)
+	return &tracker
+
 }
 
-func NewImportTracker(types ...*types.Type) *ImportTracker {
-	tracker := &ImportTracker{
-		pathToName: map[string]string{},
-		nameToPath: map[string]string{
-			"go": "",
-			// Add other forbidden keywords that also happen to be
-			// package names here.
-		},
-	}
-	tracker.AddTypes(types...)
-	return tracker
-}
-
-func (tracker *ImportTracker) AddTypes(types ...*types.Type) {
-	for _, t := range types {
-		tracker.AddType(t)
-	}
-}
-func (tracker *ImportTracker) AddType(t *types.Type) {
-	path := t.Name.Package
-	if path == "" {
-		return
-	}
-	if _, ok := tracker.pathToName[path]; ok {
-		return
-	}
+func golangTrackerLocalName(tracker namer.ImportTracker, t types.Name) string {
+	path := t.Package
 	dirs := strings.Split(path, string(filepath.Separator))
 	for n := len(dirs) - 1; n >= 0; n-- {
 		// TODO: bikeshed about whether it's more readable to have an
@@ -71,27 +46,11 @@ func (tracker *ImportTracker) AddType(t *types.Type) {
 		// packages, but aren't legal go names. So we'll sanitize.
 		name = strings.Replace(name, ".", "_", -1)
 		name = strings.Replace(name, "-", "_", -1)
-		if _, found := tracker.nameToPath[name]; found {
+		if _, found := tracker.PathOf(name); found {
 			// This name collides with some other package
 			continue
 		}
-		tracker.nameToPath[name] = path
-		tracker.pathToName[path] = name
-		return
+		return name
 	}
 	panic("can't find import for " + path)
-}
-
-func (tracker *ImportTracker) ImportLines() []string {
-	out := []string{}
-	for path, name := range tracker.pathToName {
-		out = append(out, name+" \""+path+"\"")
-	}
-	return out
-}
-
-// LocalNameOf returns the name you would use to refer to the package at the
-// specified path within the body of a file.
-func (tracker *ImportTracker) LocalNameOf(path string) string {
-	return tracker.pathToName[path]
 }

@@ -40,20 +40,22 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -135,12 +137,12 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
-	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	clientset := clientset.NewForConfigOrDie(&client.Config{Host: apiServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	cl := client.NewOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	cl.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()}})
+	cl.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()}})
 
 	// Master
 	host, port, err := net.SplitHostPort(strings.TrimLeft(apiServer.URL, "http://"))
@@ -196,13 +198,13 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		Run(3, wait.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
-	go replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
+	go replicationcontroller.NewReplicationManager(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas, 4096).
 		Run(3, wait.NeverStop)
 
 	nodeController := nodecontroller.NewNodeController(nil, clientset, 5*time.Minute, util.NewFakeAlwaysRateLimiter(), util.NewFakeAlwaysRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
-	cadvisorInterface := new(cadvisor.Fake)
+	cadvisorInterface := new(cadvisortest.Fake)
 
 	// Kubelet (localhost)
 	testRootDir := integration.MakeTempDirOrDie("kubelet_integ_1.", "")
@@ -224,7 +226,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		cadvisorInterface,
 		configFilePath,
 		nil,
-		kubecontainer.FakeOS{},
+		containertest.FakeOS{},
 		1*time.Second,  /* FileCheckFrequency */
 		1*time.Second,  /* HTTPCheckFrequency */
 		10*time.Second, /* MinimumGCAge */
@@ -256,7 +258,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		cadvisorInterface,
 		"",
 		nil,
-		kubecontainer.FakeOS{},
+		containertest.FakeOS{},
 		1*time.Second,  /* FileCheckFrequency */
 		1*time.Second,  /* HTTPCheckFrequency */
 		10*time.Second, /* MinimumGCAge */
@@ -387,7 +389,7 @@ func runStaticPodTest(c *client.Client, configFilePath string) {
 id: static-pod-from-manifest
 containers:
   - name: static-container
-    image: kubernetes/pause`,
+    image: gcr.io/google_containers/pause:2.0`,
 		},
 		{
 			desc: "static-pod-from-spec",
@@ -400,7 +402,7 @@ containers:
 				"spec": {
 					"containers": [{
 						"name": "static-container",
-						"image": "kubernetes/pause"
+						"image": "gcr.io/google_containers/pause:2.0"
 					}]
 				}
 			}`,
@@ -492,7 +494,7 @@ func runAPIVersionsTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to get api versions: %v", err)
 	}
-	versions := client.ExtractGroupVersions(g)
+	versions := unversioned.ExtractGroupVersions(g)
 
 	// Verify that the server supports the API version used by the client.
 	for _, version := range versions {
@@ -971,7 +973,7 @@ func main() {
 	gruntime.GOMAXPROCS(gruntime.NumCPU())
 	addFlags(pflag.CommandLine)
 
-	util.InitFlags()
+	flag.InitFlags()
 	utilruntime.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
@@ -993,10 +995,22 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	kubeClient := client.NewOrDie(
+		&restclient.Config{
+			Host:          apiServerURL,
+			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
+			QPS:           20,
+			Burst:         50,
+		})
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServerURL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()}})
+	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(
+		&restclient.Config{
+			Host:          apiServerURL,
+			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
+			QPS:           20,
+			Burst:         50,
+		})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{
@@ -1095,7 +1109,7 @@ const (
 			"containers": [
 				{
 					"name": "redis",
-					"image": "redis",
+					"image": "gcr.io/google_containers/redis:e2e",
 					"volumeMounts": [{
 						"name": "redis-data",
 						"mountPath": "/data"
@@ -1103,7 +1117,7 @@ const (
 				},
 				{
 					"name": "guestbook",
-					"image": "google/guestbook-python-redis",
+					"image": "gcr.io/google_samples/gb-frontend:v3",
 					"ports": [{
 						"name": "www",
 						"hostPort": 80,

@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1
 
-// This file contains a collection of methods that can be used from go-resful to
+// This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
 // information on the implementation: https://github.com/emicklei/go-restful/pull/215
 //
@@ -28,7 +28,7 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_AWSElasticBlockStoreVolumeSource = map[string]string{
-	"":          "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist and be formatted before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
+	"":          "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
 	"volumeID":  "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore",
 	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore",
 	"partition": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty).",
@@ -201,9 +201,9 @@ func (Container) SwaggerDoc() map[string]string {
 }
 
 var map_ContainerImage = map[string]string{
-	"":         "Describe a container image",
-	"repoTags": "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
-	"size":     "The size of the image in bytes.",
+	"":          "Describe a container image",
+	"names":     "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
+	"sizeBytes": "The size of the image in bytes.",
 }
 
 func (ContainerImage) SwaggerDoc() map[string]string {
@@ -495,7 +495,7 @@ func (FlockerVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_GCEPersistentDiskVolumeSource = map[string]string{
-	"":          "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist and be formatted before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once. GCE PDs support ownership management and SELinux relabeling.",
+	"":          "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.",
 	"pdName":    "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
 	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
 	"partition": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
@@ -813,6 +813,15 @@ func (NodeList) SwaggerDoc() map[string]string {
 	return map_NodeList
 }
 
+var map_NodeProxyOptions = map[string]string{
+	"":     "NodeProxyOptions is the query options to a Node's proxy call.",
+	"path": "Path is the URL path to use for the current proxy request to node.",
+}
+
+func (NodeProxyOptions) SwaggerDoc() map[string]string {
+	return map_NodeProxyOptions
+}
+
 var map_NodeSelector = map[string]string{
 	"":                  "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
 	"nodeSelectorTerms": "Required. A list of node selector terms. The terms are ORed.",
@@ -904,7 +913,7 @@ var map_ObjectMeta = map[string]string{
 	"selfLink":                   "SelfLink is a URL representing this object. Populated by the system. Read-only.",
 	"uid":                        "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids",
 	"resourceVersion":            "An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. They may only be valid for a particular resource or set of resources.\n\nPopulated by the system. Read-only. Value must be treated as opaque by clients and . More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency",
-	"generation":                 "A sequence number representing a specific generation of the desired state. Currently only implemented by replication controllers. Populated by the system. Read-only.",
+	"generation":                 "A sequence number representing a specific generation of the desired state. Populated by the system. Read-only.",
 	"creationTimestamp":          "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"deletionTimestamp":          "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet will send a hard termination signal to the container. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"deletionGracePeriodSeconds": "Number of seconds allowed for this object to gracefully terminate before it will be removed from the system. Only set when deletionTimestamp is also set. May only be shortened. Read-only.",
@@ -1117,7 +1126,7 @@ var map_PodLogOptions = map[string]string{
 	"follow":       "Follow the log stream of the pod. Defaults to false.",
 	"previous":     "Return previous terminated container logs. Defaults to false.",
 	"sinceSeconds": "A relative time in seconds before the current time from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
-	"sinceTime":    "An RFC3339 timestamp from which to show logs. If this value preceeds the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
+	"sinceTime":    "An RFC3339 timestamp from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
 	"timestamps":   "If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.",
 	"tailLines":    "If set, the number of lines from the end of the logs to show. If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime",
 	"limitBytes":   "If set, the number of bytes to read from the server before terminating the log output. This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.",
@@ -1311,9 +1320,10 @@ func (ReplicationControllerSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicationControllerStatus = map[string]string{
-	"":                   "ReplicationControllerStatus represents the current status of a replication controller.",
-	"replicas":           "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller",
-	"observedGeneration": "ObservedGeneration reflects the generation of the most recently observed replication controller.",
+	"":                     "ReplicationControllerStatus represents the current status of a replication controller.",
+	"replicas":             "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller",
+	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replication controller.",
+	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed replication controller.",
 }
 
 func (ReplicationControllerStatus) SwaggerDoc() map[string]string {
@@ -1342,8 +1352,9 @@ func (ResourceQuotaList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceQuotaSpec = map[string]string{
-	"":     "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
-	"hard": "Hard is the set of desired hard limits for each named resource. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota",
+	"":       "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
+	"hard":   "Hard is the set of desired hard limits for each named resource. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota",
+	"scopes": "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.",
 }
 
 func (ResourceQuotaSpec) SwaggerDoc() map[string]string {
@@ -1487,16 +1498,25 @@ func (ServiceList) SwaggerDoc() map[string]string {
 }
 
 var map_ServicePort = map[string]string{
-	"":           "ServicePort conatins information on service's port.",
+	"":           "ServicePort contains information on service's port.",
 	"name":       "The name of this port within the service. This must be a DNS_LABEL. All ports within a ServiceSpec must have unique names. This maps to the 'Name' field in EndpointPort objects. Optional if only one ServicePort is defined on this service.",
 	"protocol":   "The IP protocol for this port. Supports \"TCP\" and \"UDP\". Default is TCP.",
 	"port":       "The port that will be exposed by this service.",
-	"targetPort": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of Port is used (an identity map). Defaults to the service port. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service",
+	"targetPort": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service",
 	"nodePort":   "The port on each node on which this service is exposed when type=NodePort or LoadBalancer. Usually assigned by the system. If specified, it will be allocated to the service if unused or else creation of the service will fail. Default is to auto-allocate a port if the ServiceType of this Service requires one. More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#type--nodeport",
 }
 
 func (ServicePort) SwaggerDoc() map[string]string {
 	return map_ServicePort
+}
+
+var map_ServiceProxyOptions = map[string]string{
+	"":     "ServiceProxyOptions is the query options to a Service's proxy call.",
+	"path": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+}
+
+func (ServiceProxyOptions) SwaggerDoc() map[string]string {
+	return map_ServiceProxyOptions
 }
 
 var map_ServiceSpec = map[string]string{
@@ -1546,7 +1566,7 @@ var map_VolumeMount = map[string]string{
 	"":          "VolumeMount describes a mounting of a Volume within a container.",
 	"name":      "This must match the Name of a Volume.",
 	"readOnly":  "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
-	"mountPath": "Path within the container at which the volume should be mounted.",
+	"mountPath": "Path within the container at which the volume should be mounted.  Must not contain ':'.",
 }
 
 func (VolumeMount) SwaggerDoc() map[string]string {

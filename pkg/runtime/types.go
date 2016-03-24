@@ -36,6 +36,12 @@ type TypeMeta struct {
 	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 }
 
+const (
+	ContentTypeJSON string = "application/json"
+	// TODO: Fix the value.
+	ContentTypeProtobuf string = "application/protobuf"
+)
+
 // RawExtension is used to hold extensions in external versions.
 //
 // To use this, make a field which has RawExtension as its type in your external, versioned
@@ -80,8 +86,10 @@ type TypeMeta struct {
 //
 // +protobuf=true
 type RawExtension struct {
-	// RawJSON is the underlying serialization of this object.
-	RawJSON []byte
+	// Raw is the underlying serialization of this object.
+	//
+	// TODO: Determine how to detect ContentType and ContentEncoding of 'Raw' data.
+	Raw []byte
 	// Object can hold a representation of this extension - useful for working with versioned
 	// structs.
 	Object Object `json:"-"`
@@ -96,10 +104,16 @@ type RawExtension struct {
 // +protobuf=true
 type Unknown struct {
 	TypeMeta `json:",inline"`
-	// RawJSON will hold the complete JSON of the object which couldn't be matched
+	// Raw will hold the complete serialized object which couldn't be matched
 	// with a registered type. Most likely, nothing should be done with this
 	// except for passing it through the system.
-	RawJSON []byte
+	Raw []byte
+	// ContentEncoding is encoding used to encode 'Raw' data.
+	// Unspecified means no encoding.
+	ContentEncoding string
+	// ContentType  is serialization method used to serialize 'Raw'.
+	// Unspecified means ContentTypeJSON.
+	ContentType string
 }
 
 // Unstructured allows objects that do not have Golang structs registered to be manipulated
@@ -109,16 +123,30 @@ type Unknown struct {
 // metadata and field mutatation.
 type Unstructured struct {
 	TypeMeta `json:",inline"`
+
+	// Name is populated from metadata (if present) upon deserialization
+	Name string
+
 	// Object is a JSON compatible map with string, float, int, []interface{}, or map[string]interface{}
 	// children.
 	Object map[string]interface{}
+}
+
+// UnstructuredList allows lists that do not have Golang structs
+// registered to be manipulated generically. This can be used to deal
+// with the API lists from a plug-in.
+type UnstructuredList struct {
+	TypeMeta `json:",inline"`
+
+	// Items is a list of unstructured objects.
+	Items []*Unstructured `json:"items"`
 }
 
 // VersionedObjects is used by Decoders to give callers a way to access all versions
 // of an object during the decoding process.
 type VersionedObjects struct {
 	// Objects is the set of objects retrieved during decoding, in order of conversion.
-	// The 0 index is the object as serialized on the wire. If conversion has occured,
+	// The 0 index is the object as serialized on the wire. If conversion has occurred,
 	// other objects may be present. The right most object is the same as would be returned
 	// by a normal Decode call.
 	Objects []Object

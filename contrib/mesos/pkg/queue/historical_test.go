@@ -119,6 +119,32 @@ func TestFIFO_addUpdate(t *testing.T) {
 	}
 }
 
+func TestFIFO_addDeleteAdd(t *testing.T) {
+	f := NewHistorical(nil)
+	testobj := &testObj{"foo", 10}
+	f.Add(testobj)
+	f.Delete(testobj)
+	f.Add(testobj)
+
+	_, exists, _ := f.GetByKey("foo")
+	if !exists {
+		t.Errorf("item did not get readded")
+	}
+}
+
+func TestFIFO_addPopAdd(t *testing.T) {
+	f := NewHistorical(nil)
+	testobj := &testObj{"foo", 10}
+	f.Add(testobj)
+	f.Pop(nil)
+	f.Add(testobj)
+
+	_, exists, _ := f.GetByKey("foo")
+	if !exists {
+		t.Errorf("item did not get readded")
+	}
+}
+
 func TestFIFO_addReplace(t *testing.T) {
 	f := NewHistorical(nil)
 	f.Add(&testObj{"foo", 10})

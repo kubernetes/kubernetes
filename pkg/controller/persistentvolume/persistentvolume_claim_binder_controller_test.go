@@ -27,12 +27,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func TestRunStop(t *testing.T) {
@@ -123,7 +125,7 @@ func TestClaimRace(t *testing.T) {
 	mockClient.volume = v
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 	// adds the volume to the index, making the volume available
 	syncVolume(volumeIndex, mockClient, v)
 	if mockClient.volume.Status.Phase != api.VolumeAvailable {
@@ -209,7 +211,7 @@ func TestNewClaimWithSameNameAsOldClaim(t *testing.T) {
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
 	syncVolume(volumeIndex, mockClient, v)
 	if mockClient.volume.Status.Phase != api.VolumeReleased {
@@ -282,7 +284,7 @@ func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	// adds the volume to the index, making the volume available.
 	// pv also completed provisioning, so syncClaim should cause claim's phase to advance to Bound
@@ -364,7 +366,7 @@ func TestExampleObjects(t *testing.T) {
 		}
 
 		clientset := &fake.Clientset{}
-		clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
+		clientset.AddReactor("*", "*", core.ObjectReaction(o, registered.RESTMapper()))
 
 		if reflect.TypeOf(scenario.expected) == reflect.TypeOf(&api.PersistentVolumeClaim{}) {
 			pvc, err := clientset.Core().PersistentVolumeClaims("ns").Get("doesntmatter")
@@ -431,7 +433,7 @@ func TestBindingWithExamples(t *testing.T) {
 	}
 
 	clientset := &fake.Clientset{}
-	clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
+	clientset.AddReactor("*", "*", core.ObjectReaction(o, registered.RESTMapper()))
 
 	pv, err := clientset.Core().PersistentVolumes().Get("any")
 	if err != nil {
@@ -461,7 +463,7 @@ func TestBindingWithExamples(t *testing.T) {
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	recycler := &PersistentVolumeRecycler{
 		kubeClient: clientset,

@@ -19,6 +19,7 @@ package route
 import (
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -74,6 +75,7 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 	for _, route := range routes {
 		routeMap[route.TargetInstance] = route
 	}
+	wg := sync.WaitGroup{}
 	for _, node := range nodes {
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if node.Spec.PodCIDR == "" {
@@ -88,11 +90,16 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 				DestinationCIDR: node.Spec.PodCIDR,
 			}
 			nameHint := string(node.UID)
-			go func(nameHint string, route *cloudprovider.Route) {
+			wg.Add(1)
+			glog.Infof("Creating route for node %s %s with hint %s", node.Name, route.DestinationCIDR, nameHint)
+			go func(nodeName string, nameHint string, route *cloudprovider.Route, startTime time.Time) {
 				if err := rc.routes.CreateRoute(rc.clusterName, nameHint, route); err != nil {
-					glog.Errorf("Could not create route %s %s: %v", nameHint, route.DestinationCIDR, err)
+					glog.Errorf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Now().Sub(startTime), err)
+				} else {
+					glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 				}
-			}(nameHint, route)
+				wg.Done()
+			}(node.Name, nameHint, route, time.Now())
 		}
 		nodeCIDRs[node.Name] = node.Spec.PodCIDR
 	}
@@ -100,15 +107,22 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 		if rc.isResponsibleForRoute(route) {
 			// Check if this route applies to a node we know about & has correct CIDR.
 			if nodeCIDRs[route.TargetInstance] != route.DestinationCIDR {
+				wg.Add(1)
 				// Delete the route.
-				go func(route *cloudprovider.Route) {
+				glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+				go func(route *cloudprovider.Route, startTime time.Time) {
 					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
-						glog.Errorf("Could not delete route %s %s: %v", route.Name, route.DestinationCIDR, err)
+						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
+					} else {
+						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
 					}
-				}(route)
+					wg.Done()
+
+				}(route, time.Now())
 			}
 		}
 	}
+	wg.Wait()
 	return nil
 }
 

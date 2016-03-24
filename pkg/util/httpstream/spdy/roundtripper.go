@@ -19,6 +19,7 @@ package spdy
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -53,6 +54,10 @@ type SpdyRoundTripper struct {
 
 	// Dialer is the dialer used to connect.  Used if non-nil.
 	Dialer *net.Dialer
+
+	// proxier knows which proxy to use given a request, defaults to http.ProxyFromEnvironment
+	// Used primarily for mocking the proxy discovery in tests.
+	proxier func(req *http.Request) (*url.URL, error)
 }
 
 // NewRoundTripper creates a new SpdyRoundTripper that will use
@@ -70,7 +75,11 @@ func NewSpdyRoundTripper(tlsConfig *tls.Config) *SpdyRoundTripper {
 // dial dials the host specified by req, using TLS if appropriate, optionally
 // using a proxy server if one is configured via environment variables.
 func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
-	proxyURL, err := http.ProxyFromEnvironment(req)
+	proxier := s.proxier
+	if proxier == nil {
+		proxier = http.ProxyFromEnvironment
+	}
+	proxyURL, err := proxier(req)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +96,11 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		Method: "CONNECT",
 		URL:    &url.URL{},
 		Host:   targetHost,
+	}
+
+	if pa := s.proxyAuth(proxyURL); pa != "" {
+		proxyReq.Header = http.Header{}
+		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
 	proxyDialConn, err := s.dialWithoutProxy(proxyURL)
@@ -106,7 +120,7 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		return rwc, nil
 	}
 
-	host, _, err := net.SplitHostPort(req.URL.Host)
+	host, _, err := net.SplitHostPort(targetHost)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +134,11 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	// need to manually call Handshake() so we can call VerifyHostname() below
 	if err := tlsConn.Handshake(); err != nil {
 		return nil, err
+	}
+
+	// Return if we were configured to skip validation
+	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
+		return tlsConn, nil
 	}
 
 	if err := tlsConn.VerifyHostname(host); err != nil {
@@ -168,6 +187,16 @@ func (s *SpdyRoundTripper) dialWithoutProxy(url *url.URL) (net.Conn, error) {
 	}
 
 	return conn, nil
+}
+
+// proxyAuth returns, for a given proxy URL, the value to be used for the Proxy-Authorization header
+func (s *SpdyRoundTripper) proxyAuth(proxyURL *url.URL) string {
+	if proxyURL == nil || proxyURL.User == nil {
+		return ""
+	}
+	credentials := proxyURL.User.String()
+	encodedAuth := base64.StdEncoding.EncodeToString([]byte(credentials))
+	return fmt.Sprintf("Basic %s", encodedAuth)
 }
 
 // RoundTrip executes the Request and upgrades it. After a successful upgrade,

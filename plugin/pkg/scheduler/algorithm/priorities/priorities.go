@@ -44,19 +44,12 @@ func calculateScore(requested int64, capacity int64, node string) int {
 
 // Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) schedulerapi.HostPriority {
-	totalMilliCPU := int64(0)
-	totalMemory := int64(0)
+func calculateResourceOccupancy(pod *api.Pod, node api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
+	totalMilliCPU := nodeInfo.NonZeroRequest().MilliCPU
+	totalMemory := nodeInfo.NonZeroRequest().Memory
 	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
 	capacityMemory := node.Status.Allocatable.Memory().Value()
 
-	for _, existingPod := range pods {
-		for _, container := range existingPod.Spec.Containers {
-			cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
-			totalMilliCPU += cpu
-			totalMemory += memory
-		}
-	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, nodes.
 	for _, container := range pod.Spec.Containers {
@@ -93,7 +86,7 @@ func LeastRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulerca
 
 	list := schedulerapi.HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateResourceOccupancy(pod, node, nodeNameToInfo[node.Name].Pods()))
+		list = append(list, calculateResourceOccupancy(pod, node, nodeNameToInfo[node.Name]))
 	}
 	return list, nil
 }
@@ -183,10 +176,10 @@ func ImageLocalityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercac
 // checkContainerImageOnNode checks if a container image is present on a node and returns its size.
 func checkContainerImageOnNode(node api.Node, container api.Container) int64 {
 	for _, image := range node.Status.Images {
-		for _, repoTag := range image.RepoTags {
-			if container.Image == repoTag {
+		for _, name := range image.Names {
+			if container.Image == name {
 				// Should return immediately.
-				return image.Size
+				return image.SizeBytes
 			}
 		}
 	}
@@ -227,22 +220,15 @@ func BalancedResourceAllocation(pod *api.Pod, nodeNameToInfo map[string]*schedul
 
 	list := schedulerapi.HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateBalancedResourceAllocation(pod, node, nodeNameToInfo[node.Name].Pods()))
+		list = append(list, calculateBalancedResourceAllocation(pod, node, nodeNameToInfo[node.Name]))
 	}
 	return list, nil
 }
 
-func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*api.Pod) schedulerapi.HostPriority {
-	totalMilliCPU := int64(0)
-	totalMemory := int64(0)
+func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
+	totalMilliCPU := nodeInfo.NonZeroRequest().MilliCPU
+	totalMemory := nodeInfo.NonZeroRequest().Memory
 	score := int(0)
-	for _, existingPod := range pods {
-		for _, container := range existingPod.Spec.Containers {
-			cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
-			totalMilliCPU += cpu
-			totalMemory += memory
-		}
-	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, nodes.
 	for _, container := range pod.Spec.Containers {

@@ -63,6 +63,9 @@ elif [[ "${ACTION}" == "down" ]]; then
   reload_state
   disable_service
   stop_service
+elif [[ "${ACTION}" == "enable" ]]; then
+  reload_state
+  enable_service
 else
   echo "Unknown action: ${ACTION}"
   exit 1

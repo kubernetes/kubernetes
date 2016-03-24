@@ -25,8 +25,8 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("Secrets", func() {
-	f := NewFramework("secrets")
+var _ = KubeDescribe("Secrets", func() {
+	f := NewDefaultFramework("secrets")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
 		name := "secret-test-" + string(util.NewUUID())

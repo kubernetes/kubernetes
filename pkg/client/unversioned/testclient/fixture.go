@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/watch"
@@ -311,6 +311,6 @@ func (r *SimpleProxyReactor) Handles(action Action) bool {
 	return true
 }
 
-func (r *SimpleProxyReactor) React(action Action) (bool, client.ResponseWrapper, error) {
+func (r *SimpleProxyReactor) React(action Action) (bool, restclient.ResponseWrapper, error) {
 	return r.Reaction(action)
 }

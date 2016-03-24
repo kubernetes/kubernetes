@@ -60,6 +60,9 @@ type Serializer struct {
 	pretty  bool
 }
 
+// Serializer implements Serializer
+var _ runtime.Serializer = &Serializer{}
+
 // Decode attempts to convert the provided data into YAML or JSON, extract the stored schema kind, apply the provided default gvk, and then
 // load that data into an object matching the desired schema kind or the provided into. If into is *runtime.Unknown, the raw data will be
 // extracted and no decoding will be performed. If into is not registered with the typer, then the object will be straight decoded using
@@ -105,8 +108,8 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 	}
 
 	if unk, ok := into.(*runtime.Unknown); ok && unk != nil {
-		unk.RawJSON = originalData
-		// TODO: set content type here
+		unk.Raw = originalData
+		unk.ContentType = runtime.ContentTypeJSON
 		unk.GetObjectKind().SetGroupVersionKind(actual)
 		return unk, actual, nil
 	}

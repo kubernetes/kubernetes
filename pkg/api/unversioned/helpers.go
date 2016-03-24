@@ -25,6 +25,7 @@ import (
 
 // LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
 // labels.Selector
+// Note: This function should be kept in sync with the selector methods in pkg/labels/selector.go
 func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	if ps == nil {
 		return labels.Nothing(), nil
@@ -34,7 +35,7 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	}
 	selector := labels.NewSelector()
 	for k, v := range ps.MatchLabels {
-		r, err := labels.NewRequirement(k, labels.InOperator, sets.NewString(v))
+		r, err := labels.NewRequirement(k, labels.EqualsOperator, sets.NewString(v))
 		if err != nil {
 			return nil, err
 		}
@@ -61,6 +62,55 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 		selector = selector.Add(*r)
 	}
 	return selector, nil
+}
+
+// ParseToLabelSelector parses a string representing a selector into a LabelSelector object.
+// Note: This function should be kept in sync with the parser in pkg/labels/selector.go
+func ParseToLabelSelector(selector string) (*LabelSelector, error) {
+	reqs, err := labels.ParseToRequirements(selector)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse the selector string \"%s\": %v", selector, err)
+	}
+
+	labelSelector := &LabelSelector{
+		MatchLabels:      map[string]string{},
+		MatchExpressions: []LabelSelectorRequirement{},
+	}
+	for _, req := range reqs {
+		var op LabelSelectorOperator
+		switch req.Operator() {
+		case labels.EqualsOperator, labels.DoubleEqualsOperator:
+			vals := req.Values()
+			if vals.Len() != 1 {
+				return nil, fmt.Errorf("equals operator must have exactly one value")
+			}
+			val, ok := vals.PopAny()
+			if !ok {
+				return nil, fmt.Errorf("equals operator has exactly one value but it cannot be retrieved")
+			}
+			labelSelector.MatchLabels[req.Key()] = val
+			continue
+		case labels.InOperator:
+			op = LabelSelectorOpIn
+		case labels.NotInOperator:
+			op = LabelSelectorOpNotIn
+		case labels.ExistsOperator:
+			op = LabelSelectorOpExists
+		case labels.DoesNotExistOperator:
+			op = LabelSelectorOpDoesNotExist
+		case labels.GreaterThanOperator, labels.LessThanOperator:
+			// Adding a separate case for these operators to indicate that this is deliberate
+			return nil, fmt.Errorf("%q isn't supported in label selectors", req.Operator())
+		default:
+			return nil, fmt.Errorf("%q is not a valid label selector operator", req.Operator())
+		}
+		labelSelector.MatchExpressions = append(labelSelector.MatchExpressions, LabelSelectorRequirement{
+			Key:      req.Key(),
+			Operator: op,
+			Values:   req.Values().List(),
+		})
+	}
+	return labelSelector, nil
 }
 
 // SetAsLabelSelector converts the labels.Set object into a LabelSelector api object.
@@ -91,4 +141,14 @@ func FormatLabelSelector(labelSelector *LabelSelector) string {
 		l = "<none>"
 	}
 	return l
+}
+
+func ExtractGroupVersions(l *APIGroupList) []string {
+	var groupVersions []string
+	for _, g := range l.Groups {
+		for _, gv := range g.Versions {
+			groupVersions = append(groupVersions, gv.GroupVersion)
+		}
+	}
+	return groupVersions
 }

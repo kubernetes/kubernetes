@@ -77,8 +77,8 @@ func checkMetrics(response metrics.Metrics, assumedMetrics map[string][]string) 
 	Expect(invalidLabels).To(BeEmpty())
 }
 
-var _ = Describe("MetricsGrabber", func() {
-	framework := NewFramework("metrics-grabber")
+var _ = KubeDescribe("MetricsGrabber", func() {
+	framework := NewDefaultFramework("metrics-grabber")
 	var c *client.Client
 	var grabber *metrics.MetricsGrabber
 	BeforeEach(func() {

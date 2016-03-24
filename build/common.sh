@@ -48,10 +48,8 @@ readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_GOLANG_VERSION=1.4.2
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="cross-${KUBE_BUILD_GOLANG_VERSION}-2"
-readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
-# KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.4.2-1"
+# KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>"
 
 # Here we map the output directories across both the local and remote _output
 # directories:
@@ -77,7 +75,6 @@ readonly DOCKER_MOUNT_ARGS_BASE=(
   --volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}"
   --volume /etc/localtime:/etc/localtime:ro
 )
-# DOCKER_MOUNT_ARGS=("${DOCKER_MOUNT_ARGS_BASE[@]}" --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
 
 # We create a Docker data container to cache incremental build artifacts.  We
 # need to cache both the go tree in _output and the go tree under Godeps.
@@ -96,7 +93,7 @@ readonly GCS_STAGE="${LOCAL_OUTPUT_ROOT}/gcs-stage"
 # Get the set of master binaries that run in Docker (on Linux)
 # Entry format is "<name-of-binary>,<base-image>".
 # Binaries are placed in /usr/local/bin inside the image.
-# 
+#
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
   case $1 in
@@ -195,9 +192,9 @@ function kube::build::prepare_docker_machine() {
   docker-machine inspect "${DOCKER_MACHINE_NAME}" >/dev/null || {
     kube::log::status "Creating a machine to build Kubernetes"
     docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" \
-      --engine-env HTTP_PROXY="${KUBE_BUILD_HTTP_PROXY:-}" \
-      --engine-env HTTPS_PROXY="${KUBE_BUILD_HTTPS_PROXY:-}" \
-      --engine-env NO_PROXY="${KUBE_BUILD_NO_PROXY:-127.0.0.1}" \
+      --engine-env HTTP_PROXY="${KUBERNETES_HTTP_PROXY:-}" \
+      --engine-env HTTPS_PROXY="${KUBERNETES_HTTPS_PROXY:-}" \
+      --engine-env NO_PROXY="${KUBERNETES_NO_PROXY:-127.0.0.1}" \
       "${DOCKER_MACHINE_NAME}" > /dev/null || {
       kube::log::error "Something went wrong creating a machine."
       kube::log::error "Try the following: "
@@ -244,14 +241,11 @@ function kube::build::is_osx() {
 
 function kube::build::update_dockerfile() {
   if kube::build::is_osx; then
-    sed_opts=("-i ''")
+    sed_opts=(-i '')
   else
     sed_opts=(-i)
   fi
-  sed ${sed_opts[@]} "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTP_PROXY#${KUBE_BUILD_HTTP_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  sed ${sed_opts[@]} "s#KUBE_BUILD_HTTPS_PROXY#${KUBE_BUILD_HTTPS_PROXY:-\"\"}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  sed ${sed_opts[@]} "s#KUBE_BUILD_NO_PROXY#${KUBE_BUILD_NO_PROXY:-127.0.0.1}#" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  sed "${sed_opts[@]}" "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
 }
 
 function kube::build::ensure_docker_in_path() {
@@ -460,23 +454,6 @@ function kube::build::build_image_built() {
   kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
 }
 
-function kube::build::ensure_golang() {
-  kube::build::docker_image_exists golang "${KUBE_BUILD_GOLANG_VERSION}" || {
-    [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
-      echo "You don't have a local copy of the golang:${KUBE_BUILD_GOLANG_VERSION} docker image. This image is 450MB."
-      read -p "Download it now? [y/n] " -r
-      echo
-      [[ $REPLY =~ ^[yY]$ ]] || {
-        echo "Aborting." >&2
-        exit 1
-      }
-    }
-
-    kube::log::status "Pulling docker image: golang:${KUBE_BUILD_GOLANG_VERSION}"
-    "${DOCKER[@]}" pull golang:${KUBE_BUILD_GOLANG_VERSION}
-  }
-}
-
 # The set of source targets to include in the kube-build image
 function kube::build::source_targets() {
   local targets=(
@@ -512,8 +489,6 @@ function kube::build::source_targets() {
 function kube::build::build_image() {
   kube::build::ensure_tar
 
-  kube::build::build_image_cross
-
   mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
   "${TAR}" czf "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-source.tar.gz" $(kube::build::source_targets)
 
@@ -523,19 +498,7 @@ function kube::build::build_image() {
   cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   kube::build::update_dockerfile
 
-  # We don't want to force-pull this image because it's based on a local image
-  # (see kube::build::build_image_cross), not upstream.
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
-}
-
-# Build the kubernetes golang cross base image.
-function kube::build::build_image_cross() {
-  kube::build::ensure_golang
-
-  local -r build_context_dir="${LOCAL_OUTPUT_ROOT}/images/${KUBE_BUILD_IMAGE}/cross"
-  mkdir -p "${build_context_dir}"
-  cp build/build-image/cross/Dockerfile ${build_context_dir}/Dockerfile
-  kube::build::docker_build "${KUBE_BUILD_IMAGE_CROSS}" "${build_context_dir}"
 }
 
 # Build a docker image from a Dockerfile.
@@ -612,6 +575,11 @@ function kube::build::run_build_command() {
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     docker_run_opts+=(-e "KUBERNETES_CONTRIB=${KUBERNETES_CONTRIB}")
   fi
+
+  docker_run_opts+=(
+    --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
+    --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
+  )
 
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
   # to work.  However, if we run this way and don't have stdin, then it ends up
@@ -700,6 +668,13 @@ function kube::release::clean_cruft() {
   find ${RELEASE_STAGE} -name '.DS*' -exec rm {} \;
 }
 
+function kube::release::package_hyperkube() {
+  # If we have these variables set then we want to build all docker images.
+  if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
+    REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" make -C cluster/images/hyperkube/ build
+  fi
+}
+
 function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
@@ -779,7 +754,7 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
 
     kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
-    
+
     # Only release addon images for linux/amd64. These addon images aren't necessary for other architectures
     if [[ ${platform} == "linux/amd64" ]]; then
       kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
@@ -792,6 +767,8 @@ function kube::release::package_server_tarballs() {
     fi
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
+
+    cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
 
     kube::release::clean_cruft
 
@@ -898,7 +875,10 @@ function kube::release::write_addon_docker_images_for_server() {
         kube::log::status "Pulling and writing Docker image for addon: ${addon_path}"
 
         local dest_name="${addon_path//\//\~}"
-        "${DOCKER[@]}" pull "${addon_path}"
+        if [[ -z $("${DOCKER[@]}" images | awk '{print ($1":"$2)}' | grep "${addon_path}") ]]; then
+          kube::log::status "Addon image ${addon_path} does not exist, pulling it..."
+          "${DOCKER[@]}" pull "${addon_path}"
+        fi
         "${DOCKER[@]}" save "${addon_path}" > "${1}/${dest_name}.tar"
       ) &
     done
@@ -906,7 +886,7 @@ function kube::release::write_addon_docker_images_for_server() {
     if [[ ! -z "${BUILD_PYTHON_IMAGE:-}" ]]; then
       (
         kube::log::status "Building Docker python image"
-        
+
         local img_name=python:2.7-slim-pyyaml
         "${DOCKER[@]}" build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
         "${DOCKER[@]}" save "${img_name}" > "${1}/${img_name}.tar"
@@ -944,12 +924,9 @@ function kube::release::package_salt_tarball() {
 }
 
 # This will pack kube-system manifests files for distros without using salt
-# such as Ubuntu Trusty.
-#
-# There are two sources of manifests files: (1) some manifests in the directory
-# cluster/saltbase/salt and cluster/addons can be used directly or after minor
-# revision, so we copy them from there; (2) otherwise, we will maintain separate
-# copies in cluster/gce/<distro>/kube-manifests.
+# such as Ubuntu Trusty. For Trusty, we directly copy manifests from cluster/addons
+# and cluster/saltbase/salt. The script of cluster initialization will remove
+# the salt configuration and evaluate the variables in the manifests.
 function kube::release::package_kube_manifests_tarball() {
   kube::log::status "Building tarball: manifests"
 
@@ -957,7 +934,6 @@ function kube::release::package_kube_manifests_tarball() {
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}/trusty"
 
-  # Source 1: manifests from cluster/saltbase/salt and cluster/addons
   local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
   cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
   cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
@@ -965,18 +941,18 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
   cp "${salt_dir}/etcd/etcd.manifest" "${release_stage}/trusty"
   cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${release_stage}/trusty"
+  cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${release_stage}/trusty"
+  cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${release_stage}/trusty"
   cp "${salt_dir}/kube-addons/namespace.yaml" "${release_stage}/trusty"
   cp "${salt_dir}/kube-addons/kube-addons.sh" "${release_stage}/trusty"
   cp "${salt_dir}/kube-addons/kube-addon-update.sh" "${release_stage}/trusty"
+  cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${release_stage}/trusty"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${release_stage}/trusty"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${release_stage}/trusty"
 
-  # Source 2: manifests from cluster/gce/<distro>/kube-manifests.
-  # TODO(andyzheng0831): Avoid using separate copies for trusty. We should use whatever
-  # from cluster/saltbase/salt to minimize maintenance cost.
-  cp "${KUBE_ROOT}/cluster/gce/trusty/kube-manifests/"* "${release_stage}/trusty"
+  # This is for coreos only. ContainerVM or Trusty does not use it.
   cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
 
   kube::release::clean_cruft
@@ -1056,7 +1032,7 @@ function kube::release::package_full_tarball() {
   cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
-  cp "${KUBE_ROOT}/LICENSE" "${release_stage}/"
+  cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
   mkdir -p "${release_stage}/contrib/completions/bash"
   cp "${KUBE_ROOT}/contrib/completions/bash/kubectl" "${release_stage}/contrib/completions/bash"
@@ -1547,8 +1523,6 @@ function kube::release::docker::release() {
   local archs=(
     "amd64"
     "arm"
-    "arm64"
-    "ppc64le"
   )
 
   local docker_push_cmd=("${DOCKER[@]}")
@@ -1556,21 +1530,45 @@ function kube::release::docker::release() {
     docker_push_cmd=("gcloud" "docker")
   fi
 
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/google_containers" ]]; then
+    # Activate credentials for the k8s.production.user@gmail.com
+    gcloud config set account k8s.production.user@gmail.com
+  fi
   for arch in "${archs[@]}"; do
     for binary in "${binaries[@]}"; do
-      local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-      kube::log::status "Pushing ${binary} to ${docker_target}"
-      "${docker_push_cmd[@]}" push "${docker_target}"
 
-      # If we have a amd64 docker image. Tag it without -amd64 also and push it for compability with earlier versions
-      if [[ ${arch} == "amd64" ]]; then
-        local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
+      # Temporary fix. hyperkube-arm isn't built in the release process, so we can't push it
+      # This if statement skips the push for hyperkube-arm
+      if [[ ${arch} != "arm" || ${binary} != "hyperkube" ]]; then
 
-        "${DOCKER[@]}" tag -f "${docker_target}" "${legacy_docker_target}" 2>/dev/null
 
-        kube::log::status "Pushing ${binary} to ${legacy_docker_target}"
-        "${docker_push_cmd[@]}" push "${legacy_docker_target}"
+        local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+        kube::log::status "Pushing ${binary} to ${docker_target}"
+        "${docker_push_cmd[@]}" push "${docker_target}"
+
+        # If we have a amd64 docker image. Tag it without -amd64 also and push it for compatibility with earlier versions
+        if [[ ${arch} == "amd64" ]]; then
+          local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
+
+          "${DOCKER[@]}" tag -f "${docker_target}" "${legacy_docker_target}" 2>/dev/null
+
+          kube::log::status "Pushing ${binary} to ${legacy_docker_target}"
+          "${docker_push_cmd[@]}" push "${legacy_docker_target}"
+        fi
       fi
     done
   done
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/google_containers" ]]; then
+    # Activate default account
+    gcloud config set account ${USER}@google.com
+  fi
+}
+
+function kube::release::has_gcloud_account() {
+  local -r account="${1-}"
+  if [[ -n $(gcloud auth list --filter-account $account 2>/dev/null) ]]; then
+    return 0
+  else
+    return 1
+  fi
 }

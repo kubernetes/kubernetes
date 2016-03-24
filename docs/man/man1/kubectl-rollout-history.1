@@ -13,7 +13,7 @@ kubectl rollout history \- view rollout history
 
 .SH DESCRIPTION
 .PP
-view previous rollout revisions and configurations.
+View previous rollout revisions and configurations.
 
 
 .SH OPTIONS
@@ -33,7 +33,7 @@ view previous rollout revisions and configurations.
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    DEPRECATED: The API version to use when talking to the server
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -126,7 +126,10 @@ view previous rollout revisions and configurations.
 
 .nf
 # View the rollout history of a deployment
-$ kubectl rollout history deployment/abc
+kubectl rollout history deployment/abc
+
+# View the details of deployment revision 3
+kubectl rollout history deployment/abc \-\-revision=3
 
 .fi
 .RE

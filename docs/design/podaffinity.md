@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/design/podaffinity.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -184,10 +189,10 @@ PodAntiAffinity {
 ```
 
 Then when scheduling pod P, the scheduler
-* Can only schedule P onto nodes that are running pods that satisfy `P1`. (Assumes all nodes have a label with key "node" and value specifying their node name.)
-* Should try to schedule P onto zones that are running pods that satisfy `P3`. (Assumes all nodes have a label with key "zone" and value specifying their zone.)
-* Cannot schedule P onto any racks that are running pods that satisfy `P2`. (Assumes all nodes have a label with key "rack" and value specifying their rack name.)
-* Should try not to schedule P onto any power domains that are running pods that satisfy `P4`. (Assumes all nodes have a label with key "power" and value specifying their power domain.)
+* Can only schedule P onto nodes that are running pods that satisfy `P1`. (Assumes all nodes have a label with key `node` and value specifying their node name.)
+* Should try to schedule P onto zones that are running pods that satisfy `P2`. (Assumes all nodes have a label with key `zone` and value specifying their zone.)
+* Cannot schedule P onto any racks that are running pods that satisfy `P3`. (Assumes all nodes have a label with key `rack` and value specifying their rack name.)
+* Should try not to schedule P onto any power domains that are running pods that satisfy `P4`. (Assumes all nodes have a label with key `power` and value specifying their power domain.)
 
 When `RequiredDuringScheduling` has multiple elements, the requirements are ANDed.
 For `PreferredDuringScheduling` the weights are added for the terms that are satisfied for each node, and

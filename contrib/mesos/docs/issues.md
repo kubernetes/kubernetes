@@ -137,7 +137,8 @@ Host ports that are not defined, or else defined as zero, will automatically be 
 
 To disable the work-around and revert to vanilla Kubernetes service endpoint termination:
 
-- execute the k8sm controller-manager with `-host_port_endpoints=false`;
+- execute the k8sm scheduler with `-host-port-endpoints=false`
+- execute the k8sm controller-manager with `-host-port-endpoints=false`
 
 Then the usual Kubernetes network assumptions must be fulfilled for Kubernetes to work with Mesos, i.e. each container must get a cluster-wide routable IP (compare [Kubernetes Networking documentation](../../../docs/design/networking.md#container-to-container)).
 

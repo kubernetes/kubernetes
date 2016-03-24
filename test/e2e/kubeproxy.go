@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -46,12 +47,16 @@ const (
 	nodeHttpPort            = 32080
 	nodeUdpPort             = 32081
 	loadBalancerHttpPort    = 100
-	netexecImageName        = "gcr.io/google_containers/netexec:1.4"
+	netexecImageName        = "gcr.io/google_containers/netexec:1.5"
 	testPodName             = "test-container-pod"
 	hostTestPodName         = "host-test-container-pod"
 	nodePortServiceName     = "node-port-service"
 	loadBalancerServiceName = "load-balancer-service"
 	enableLoadBalancerTest  = false
+	hitEndpointRetryDelay   = 1 * time.Second
+	// Number of retries to hit a given set of endpoints. Needs to be high
+	// because we verify iptables statistical rr loadbalancing.
+	testTries = 30
 )
 
 type KubeProxyTestConfig struct {
@@ -65,8 +70,8 @@ type KubeProxyTestConfig struct {
 	nodes                []api.Node
 }
 
-var _ = Describe("KubeProxy", func() {
-	f := NewFramework("e2e-kubeproxy")
+var _ = KubeDescribe("KubeProxy", func() {
+	f := NewDefaultFramework("e2e-kubeproxy")
 	config := &KubeProxyTestConfig{
 		f: f,
 	}
@@ -125,7 +130,7 @@ func (config *KubeProxyTestConfig) hitLoadBalancer(epCount int) {
 	hostNames := make(map[string]bool)
 	tries := epCount*epCount + 5
 	for i := 0; i < tries; i++ {
-		transport := &http.Transport{}
+		transport := utilnet.SetTransportDefaults(&http.Transport{})
 		httpClient := createHTTPClient(transport)
 		resp, err := httpClient.Get(fmt.Sprintf("http://%s:%d/hostName", lbIP, loadBalancerHttpPort))
 		if err == nil {
@@ -150,7 +155,7 @@ func createHTTPClient(transport *http.Transport) *http.Client {
 
 func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 	clusterIP := config.nodePortService.Spec.ClusterIP
-	tries := epCount*epCount + 15 // if epCount == 0
+	tries := epCount*epCount + testTries // if epCount == 0
 	By("dialing(udp) node1 --> clusterIP:clusterUdpPort")
 	config.dialFromNode("udp", clusterIP, clusterUdpPort, tries, epCount)
 	By("dialing(http) node1 --> clusterIP:clusterHttpPort")
@@ -169,7 +174,7 @@ func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 
 func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	node1_IP := config.externalAddrs[0]
-	tries := epCount*epCount + 15 //  if epCount == 0
+	tries := epCount*epCount + testTries //  if epCount == 0
 	By("dialing(udp) node1 --> node1:nodeUdpPort")
 	config.dialFromNode("udp", node1_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1  --> node1:nodeHttpPort")
@@ -248,7 +253,10 @@ func (config *KubeProxyTestConfig) dialFromNode(protocol, targetIP string, targe
 	} else {
 		cmd = fmt.Sprintf("curl -s --connect-timeout 1 http://%s:%d/hostName", targetIP, targetPort)
 	}
-	forLoop := fmt.Sprintf("for i in $(seq 1 %d); do %s; echo; done | grep -v '^\\s*$' |sort | uniq -c | wc -l", tries, cmd)
+	// TODO: This simply tells us that we can reach the endpoints. Check that
+	// the probability of hitting a specific endpoint is roughly the same as
+	// hitting any other.
+	forLoop := fmt.Sprintf("for i in $(seq 1 %d); do %s; echo; sleep %v; done | grep -v '^\\s*$' |sort | uniq -c | wc -l", tries, cmd, hitEndpointRetryDelay)
 	By(fmt.Sprintf("Dialing from node. command:%s", forLoop))
 	stdout := RunHostCmdOrDie(config.f.Namespace.Name, config.hostTestContainerPod.Name, forLoop)
 	Expect(strconv.Atoi(strings.TrimSpace(stdout))).To(BeNumerically("==", expectedCount))
@@ -262,6 +270,19 @@ func (config *KubeProxyTestConfig) getSelfURL(path string, expected string) {
 }
 
 func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string, node string) *api.Pod {
+	probe := &api.Probe{
+		InitialDelaySeconds: 10,
+		TimeoutSeconds:      30,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+		Handler: api.Handler{
+			HTTPGet: &api.HTTPGetAction{
+				Path: "/healthz",
+				Port: intstr.IntOrString{IntVal: endpointHttpPort},
+			},
+		},
+	}
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
@@ -293,6 +314,8 @@ func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string, node st
 							Protocol:      api.ProtocolUDP,
 						},
 					},
+					LivenessProbe:  probe,
+					ReadinessProbe: probe,
 				},
 			},
 			NodeName: node,
@@ -492,7 +515,7 @@ func (config *KubeProxyTestConfig) createNetProxyPods(podName string, selector m
 	// wait that all of them are up
 	runningPods := make([]*api.Pod, 0, len(nodes.Items))
 	for _, p := range createdPods {
-		expectNoError(config.f.WaitForPodRunning(p.Name))
+		expectNoError(config.f.WaitForPodReady(p.Name))
 		rp, err := config.getPodClient().Get(p.Name)
 		expectNoError(err)
 		runningPods = append(runningPods, rp)

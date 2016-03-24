@@ -76,15 +76,16 @@ When building final release tars, they are first staged into `_output/release-st
 If you are behind a proxy, you need to export proxy settings for kubernetes build, the following environment variables should be defined.
 
 ```
-export KUBE_BUILD_HTTP_PROXY=http://username:password@proxyaddr:proxyport
-export KUBE_BUILD_HTTPS_PROXY=http://username:password@proxyaddr:proxyport
+export KUBERNETES_HTTP_PROXY=http://username:password@proxyaddr:proxyport
+export KUBERNETES_HTTPS_PROXY=https://username:password@proxyaddr:proxyport
 ```
 
 Optionally, you can specify addresses of no proxy for kubernetes build, for example
 
 ```
-export KUBE_BUILD_NO_PROXY=127.0.0.1
+export KUBERNETES_NO_PROXY=127.0.0.1
 ```
+
 If you are using sudo to make kubernetes build for example make quick-release, you need run `sudo -E make quick-release` to pass the environment variables.
 
 ## TODOs

@@ -124,9 +124,16 @@ type PodStartupLatency struct {
 }
 
 type SchedulingLatency struct {
-	Scheduling LatencyMetric `json:"scheduling:`
+	Scheduling LatencyMetric `json:"scheduling"`
 	Binding    LatencyMetric `json:"binding"`
 	Total      LatencyMetric `json:"total"`
+}
+
+type SaturationTime struct {
+	TimeToSaturate time.Duration `json:"timeToStaturate"`
+	NumberOfNodes  int           `json:"numberOfNodes"`
+	NumberOfPods   int           `json:"numberOfPods"`
+	Throughput     float32       `json:"throughput"`
 }
 
 type APICall struct {
@@ -192,7 +199,7 @@ func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
 
 	ignoredResources := sets.NewString("events")
 	// TODO: figure out why we're getting non-capitalized proxy and fix this.
-	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY", "proxy")
+	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY", "proxy", "CONNECT")
 
 	for _, sample := range samples {
 		// Example line:

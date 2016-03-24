@@ -40,7 +40,7 @@ const (
 	create_context_long = `Sets a context entry in kubeconfig
 Specifying a name that already exists will merge new fields on top of existing values for those fields.`
 	create_context_example = `# Set the user field on the gce context entry without touching other values
-$ kubectl config set-context gce --user=cluster-admin`
+kubectl config set-context gce --user=cluster-admin`
 )
 
 func NewCmdConfigSetContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {

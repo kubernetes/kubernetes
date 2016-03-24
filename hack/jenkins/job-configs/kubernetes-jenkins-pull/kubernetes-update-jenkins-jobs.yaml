@@ -1,0 +1,15 @@
+- job:
+    name: kubernetes-update-jenkins-jobs
+    description: 'Update Jenkins jobs based on configs in https://github.com/kubernetes/kubernetes/tree/master/hack/jenkins/job-configs. Test owner: spxtr.'
+    node: master
+    triggers:
+        - timed: 'H/15 * * * *'
+    builders:
+        - shell: |
+            curl -fsS https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/update-jobs.sh > update-jobs.sh
+            chmod +x update-jobs.sh
+            ./update-jobs.sh "hack/jenkins/job-configs:hack/jenkins/job-configs/kubernetes-jenkins-pull"
+    publishers:
+      - email-ext:
+          recipients: spxtr@google.com
+

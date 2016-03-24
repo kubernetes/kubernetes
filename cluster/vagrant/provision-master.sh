@@ -75,7 +75,8 @@ if [[ ! -f "${known_tokens_file}" ]]; then
   known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
   (umask u=rw,go= ;
    echo "$KUBELET_TOKEN,kubelet,kubelet" > $known_tokens_file;
-   echo "$KUBE_PROXY_TOKEN,kube_proxy,kube_proxy" >> $known_tokens_file)
+   echo "$KUBE_PROXY_TOKEN,kube_proxy,kube_proxy" >> $known_tokens_file;
+   echo "$KUBE_BEARER_TOKEN,admin,admin" >> $known_tokens_file)
 
   mkdir -p /srv/salt-overlay/salt/kubelet
   kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
@@ -100,7 +101,7 @@ readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 if [ ! -e "${BASIC_AUTH_FILE}" ]; then
   mkdir -p /srv/salt-overlay/salt/kube-apiserver
   (umask 077;
-    echo "${MASTER_USER},${MASTER_PASSWD},admin" > "${BASIC_AUTH_FILE}")
+    echo "${MASTER_PASSWD},${MASTER_USER},admin" > "${BASIC_AUTH_FILE}")
 fi
 
 # Enable Fedora Cockpit on host to support Kubernetes administration

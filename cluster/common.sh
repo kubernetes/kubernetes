@@ -417,20 +417,23 @@ function stage-images() {
 # "strip out quotes", and we really should be using a YAML library for
 # this, but PyYAML isn't shipped by default, and *rant rant rant ... SIGH*
 function yaml-quote {
-  echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
+  echo "'$(echo "${@:-}" | sed -e "s/'/''/g")'"
 }
 
-# Builds the RUNTIME_CONFIG var from other feature enable options
+# Builds the RUNTIME_CONFIG var from other feature enable options (such as
+# features in alpha)
 function build-runtime-config() {
-  if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
-      if [[ -z "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG="extensions/v1beta1/daemonsets=true"
-      else
-          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/daemonsets=true"; then
-            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/daemonsets=true"
-          fi
-      fi
-  fi
+  # There is nothing to do here for now. Just using this function as a placeholder.
+  :
+}
+
+# Writes the cluster name into a temporary file.
+# Assumed vars
+#   CLUSTER_NAME
+function write-cluster-name {
+  cat >"${KUBE_TEMP}/cluster-name.txt" << EOF
+${CLUSTER_NAME}
+EOF
 }
 
 function write-master-env {
@@ -497,6 +500,7 @@ OPENCONTRAIL_PUBLIC_SUBNET: $(yaml-quote ${OPENCONTRAIL_PUBLIC_SUBNET:-})
 E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
 KUBE_IMAGE_TAG: $(yaml-quote ${KUBE_IMAGE_TAG:-})
 KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
+KUBE_ADDON_REGISTRY: $(yaml-quote ${KUBE_ADDON_REGISTRY:-})
 MULTIZONE: $(yaml-quote ${MULTIZONE:-})
 NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
 EOF
@@ -534,6 +538,11 @@ EOF
   if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
       cat >>$file <<EOF
 KUBELET_TEST_LOG_LEVEL: $(yaml-quote ${KUBELET_TEST_LOG_LEVEL})
+EOF
+  fi
+  if [ -n "${DOCKER_TEST_LOG_LEVEL:-}" ]; then
+      cat >>$file <<EOF
+DOCKER_TEST_LOG_LEVEL: $(yaml-quote ${DOCKER_TEST_LOG_LEVEL})
 EOF
   fi
   if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
@@ -606,6 +615,11 @@ KUBEPROXY_TEST_LOG_LEVEL: $(yaml-quote ${KUBEPROXY_TEST_LOG_LEVEL})
 EOF
     fi
   fi
+  if [ -n "${NODE_LABELS:-}" ]; then
+      cat >>$file <<EOF
+NODE_LABELS: $(yaml-quote ${NODE_LABELS})
+EOF
+    fi
   if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
     # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
     cat >>$file <<EOF
@@ -701,4 +715,30 @@ function create-certs {
   KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
   KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
   KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
+}
+
+#
+# Using provided master env, extracts value from provided key.
+#
+# Args:
+# $1 master env (kube-env of master; result of calling get-master-env)
+# $2 env key to use
+function get-env-val() {
+  local match=`(echo "${1}" | grep ${2}) || echo ""`
+  if [[ -z ${match} ]]; then
+    echo ""
+  fi
+  echo ${match} | cut -d : -f 2 | cut -d \' -f 2
+}
+
+# Load the master env by calling get-master-env, and extract important values
+function parse-master-env() {
+  # Get required master env vars
+  local master_env=$(get-master-env)
+  KUBELET_TOKEN=$(get-env-val "${master_env}" "KUBELET_TOKEN")
+  KUBE_PROXY_TOKEN=$(get-env-val "${master_env}" "KUBE_PROXY_TOKEN")
+  CA_CERT_BASE64=$(get-env-val "${master_env}" "CA_CERT")
+  EXTRA_DOCKER_OPTS=$(get-env-val "${master_env}" "EXTRA_DOCKER_OPTS")
+  KUBELET_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_CERT")
+  KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
 }

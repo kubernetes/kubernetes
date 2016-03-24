@@ -16,10 +16,10 @@ else
 fi
 echo "${reset}"
 
-# Check if changes to Godeps are reproducable...
+# Check if changes to Godeps are reproducible...
 files=($(git diff --cached --name-only --diff-filter ACM | grep "Godeps"))
 if [[ "${#files[@]}" -ne 0 ]]; then
-  echo -ne "Check if changes to Godeps are reproducable (this is pretty slow)..."
+  echo -ne "Check if changes to Godeps are reproducible (this is pretty slow)..."
   if ! OUT=$("hack/verify-godeps.sh" 2>&1); then
     echo
     echo "${red}${OUT}"
@@ -140,18 +140,6 @@ if ! hack/after-build/verify-generated-conversions.sh > /dev/null; then
   echo "Some conversions functions need regeneration."
   echo "To regenerate conversions, run:"
   echo "  hack/update-generated-conversions.sh"
-  exit_code=1
-else
-  echo "${green}OK"
-fi
-echo "${reset}"
-
-echo -ne "Checking for deep-copies that need updating... "
-if ! hack/after-build/verify-generated-deep-copies.sh > /dev/null; then
-  echo "${red}ERROR!"
-  echo "Some deep-copy functions need regeneration."
-  echo "To regenerate deep-copies, run:"
-  echo "  hack/update-generated-deep-copies.sh"
   exit_code=1
 else
   echo "${green}OK"

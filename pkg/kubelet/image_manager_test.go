@@ -25,20 +25,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 var zero time.Time
 
-func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *container.FakeRuntime, *cadvisor.Mock) {
-	fakeRuntime := &container.FakeRuntime{}
-	mockCadvisor := new(cadvisor.Mock)
+func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *containertest.FakeRuntime, *cadvisortest.Mock) {
+	fakeRuntime := &containertest.FakeRuntime{}
+	mockCadvisor := new(cadvisortest.Mock)
 	return &realImageManager{
 		runtime:      fakeRuntime,
 		policy:       policy,
-		minAge:       0,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     mockCadvisor,
 		recorder:     &record.FakeRecorder{},
@@ -406,13 +406,13 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
+		MinAge:               time.Minute * 1,
 	}
-	fakeRuntime := &container.FakeRuntime{}
-	mockCadvisor := new(cadvisor.Mock)
+	fakeRuntime := &containertest.FakeRuntime{}
+	mockCadvisor := new(cadvisortest.Mock)
 	manager := &realImageManager{
 		runtime:      fakeRuntime,
 		policy:       policy,
-		minAge:       defaultGCAge,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     mockCadvisor,
 		recorder:     &record.FakeRecorder{},
@@ -443,7 +443,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	assert.Len(fakeRuntime.ImageList, 2)
 
 	// move clock by minAge duration, then 1 image will be garbage collected
-	fakeClock.Step(manager.minAge)
+	fakeClock.Step(policy.MinAge)
 	spaceFreed, err = manager.freeSpace(1024, fakeClock.Now())
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)

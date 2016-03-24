@@ -26,10 +26,10 @@ spec:
             # keep request = limit to keep this container in guaranteed class
             limits:
               cpu: 100m
-              memory: 200Mi
+              memory: 500Mi
             requests:
               cpu: 100m
-              memory: 200Mi
+              memory: 500Mi
           ports: 
             - containerPort: 8083
               hostPort: 8083
@@ -38,7 +38,7 @@ spec:
           volumeMounts:
           - name: influxdb-persistent-storage
             mountPath: /data
-        - image: gcr.io/google_containers/heapster_grafana:v2.1.1
+        - image: gcr.io/google_containers/heapster_grafana:v2.6.0-2
           name: grafana
           env:
           resources:

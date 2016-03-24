@@ -28,7 +28,7 @@ _SECONDS=1000          # number of seconds to measure throughput.
 FE="1"                # amount of Web server
 LG="1"                # amount of load generators
 SLAVE="1"             # amount of redis slaves
-TEST="1"              # 0 = Dont run tests, 1 = Do run tests.
+TEST="1"              # 0 = Don't run tests, 1 = Do run tests.
 NS="default"          # namespace
 NODE_PORT=30291     #nodePort, see fe-s.json
 
@@ -38,7 +38,7 @@ _SECONDS="${3:-$_SECONDS}"   # number of seconds to measure throughput.
 FE="${4:-$FE}"       # amount of Web server
 LG="${5:-$LG}"        # amount of load generators
 SLAVE="${6:-$SLAVE}"     # amount of redis slaves
-TEST="${7:-$TEST}"      # 0 = Dont run tests, 1 = Do run tests.
+TEST="${7:-$TEST}"      # 0 = Don't run tests, 1 = Do run tests.
 NS="${8:-$NS}"          # namespace
 NODE_PORT="${9:-$NODE_PORT}" #nodePort, see fe-s.json
 echo "Running w/ args: kubectl $kubectl version $VERSION sec $_SECONDS fe $FE lg $LG slave $SLAVE test = $TEST, NAMESPACE = $NS, NODE_PORT = $NODE_PORT"
@@ -271,7 +271,7 @@ function pollfor {
   do
       ### Just testing that the front end comes up.  Not sure how to test total entries etc... (yet)
       echo "Trying curl frontend:3000 via $TEST_IP:$NODE_PORT, attempt ${i}. Expect a few failures while pulling images... "
-      curl --max-time 1 "$TEST_IP:$NODE_PORT" > result
+      curl --max-time 1 --connect-timeout 3 "$TEST_IP:$NODE_PORT" > result
       cat result
       cat result | grep -q "k8-bps"
       if [ $? -eq 0 ]; then
@@ -296,7 +296,7 @@ function tests {
     for i in `seq 1 $_SECONDS`;
      do
         echo "curl : $TEST_IP:$NODE_PORT , $i of $_SECONDS"
-        curr_cnt="`curl --max-time 1 "$TEST_IP:$NODE_PORT/llen"`"
+        curr_cnt="`curl --max-time 1  --connect-timeout 3 "$TEST_IP:$NODE_PORT/llen"`"
         ### Write CSV File of # of trials / total transcations.
         echo "$i $curr_cnt" >> result
         echo "total transactions so far : $curr_cnt"

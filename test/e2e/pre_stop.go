@@ -117,7 +117,7 @@ func testPreStop(c *client.Client, ns string) {
 
 	// Validate that the server received the web poke.
 	err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
-		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+		subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, c)
 		if err != nil {
 			return false, err
 		}
@@ -158,8 +158,8 @@ func testPreStop(c *client.Client, ns string) {
 	expectNoError(err, "validating pre-stop.")
 }
 
-var _ = Describe("PreStop", func() {
-	f := NewFramework("prestop")
+var _ = KubeDescribe("PreStop", func() {
+	f := NewDefaultFramework("prestop")
 
 	It("should call prestop when killing a pod [Conformance]", func() {
 		testPreStop(f.Client, f.Namespace.Name)

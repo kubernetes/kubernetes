@@ -25,7 +25,7 @@ import (
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/mesos/mesos-go/mesosutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/executorinfo"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -164,8 +164,8 @@ func NewPodResourcesProcurement() Procurement {
 			return err
 		}
 
-		wantedCpus := float64(mresource.NewCPUShares(limits[api.ResourceCPU]))
-		wantedMem := float64(mresource.NewMegaBytes(limits[api.ResourceMemory]))
+		wantedCpus := float64(resources.NewCPUShares(limits[api.ResourceCPU]))
+		wantedMem := float64(resources.NewMegaBytes(limits[api.ResourceMemory]))
 
 		log.V(4).Infof(
 			"trying to match offer with pod %v/%v: cpus: %.2f mem: %.2f MB",
@@ -199,18 +199,18 @@ func NewPodResourcesProcurement() Procurement {
 func NewPortsProcurement() Procurement {
 	return ProcurementFunc(func(t *T, _ *api.Node, ps *ProcureState) error {
 		// fill in port mapping
-		if mapping, err := t.mapper.Map(t, ps.offer); err != nil {
+		if mapping, err := t.mapper.Map(&t.Pod, t.Roles(), ps.offer); err != nil {
 			return err
 		} else {
-			ports := []Port{}
+			ports := []resources.Port{}
 			for _, entry := range mapping {
-				ports = append(ports, Port{
+				ports = append(ports, resources.Port{
 					Port: entry.OfferPort,
 					Role: entry.Role,
 				})
 			}
 			ps.spec.PortMap = mapping
-			ps.spec.Resources = append(ps.spec.Resources, portRangeResources(ports)...)
+			ps.spec.Resources = append(ps.spec.Resources, resources.PortRanges(ports)...)
 		}
 		return nil
 	})
@@ -220,20 +220,20 @@ func NewPortsProcurement() Procurement {
 // If a given offer has no executor IDs set, the given prototype executor resources are considered for procurement.
 // If a given offer has one executor ID set, only pod resources are being procured.
 // An offer with more than one executor ID implies an invariant violation and the first executor ID is being considered.
-func NewExecutorResourceProcurer(resources []*mesos.Resource, registry executorinfo.Registry) Procurement {
+func NewExecutorResourceProcurer(rs []*mesos.Resource, registry executorinfo.Registry) Procurement {
 	return ProcurementFunc(func(t *T, _ *api.Node, ps *ProcureState) error {
 		eids := len(ps.offer.GetExecutorIds())
 		switch {
 		case eids == 0:
-			wantedCpus := sumResources(filterResources(resources, isScalar, hasName("cpus")))
-			wantedMem := sumResources(filterResources(resources, isScalar, hasName("mem")))
+			wantedCpus := resources.Sum(resources.Filter(rs, resources.IsScalar, resources.HasName("cpus")))
+			wantedMem := resources.Sum(resources.Filter(rs, resources.IsScalar, resources.HasName("mem")))
 
-			procuredCpu, remaining := procureScalarResources("cpus", wantedCpus, t.frameworkRoles, ps.offer.GetResources())
+			procuredCpu, remaining := procureScalarResources("cpus", wantedCpus, t.FrameworkRoles, ps.offer.GetResources())
 			if procuredCpu == nil {
 				return fmt.Errorf("not enough cpu resources for executor: want=%v", wantedCpus)
 			}
 
-			procuredMem, remaining := procureScalarResources("mem", wantedMem, t.frameworkRoles, remaining)
+			procuredMem, remaining := procureScalarResources("mem", wantedMem, t.FrameworkRoles, remaining)
 			if procuredMem == nil {
 				return fmt.Errorf("not enough mem resources for executor: want=%v", wantedMem)
 			}
@@ -273,12 +273,12 @@ func procureScalarResources(
 	roles []string,
 	offered []*mesos.Resource,
 ) (procured, remaining []*mesos.Resource) {
-	sorted := byRoles(roles...).sort(offered)
+	sorted := resources.ByRoles(roles...).Sort(offered)
 	procured = make([]*mesos.Resource, 0, len(sorted))
 	remaining = make([]*mesos.Resource, 0, len(sorted))
 
 	for _, r := range sorted {
-		if want >= epsilon && resourceMatchesAll(r, hasName(name), isScalar) {
+		if want >= epsilon && resources.MatchesAll(r, resources.HasName(name), resources.IsScalar) {
 			left, role := r.GetScalar().GetValue(), r.Role
 			consumed := math.Min(want, left)
 

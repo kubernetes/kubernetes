@@ -67,7 +67,11 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 			Email:    ident.Email,
 		}
 
-		parsed, err := url.Parse(loc)
+		value := loc
+		if !strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://") {
+			value = "https://" + value
+		}
+		parsed, err := url.Parse(value)
 		if err != nil {
 			glog.Errorf("Entry %q in dockercfg invalid (%v), ignoring", loc, err)
 			continue
@@ -77,17 +81,20 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 		//    foo.bar.com/namespace
 		// Or hostname matches:
 		//    foo.bar.com
+		// It also considers /v2/  and /v1/ equivalent to the hostname
 		// See ResolveAuthConfig in docker/registry/auth.go.
-		if parsed.Host != "" {
-			// NOTE: foo.bar.com comes through as Path.
-			dk.creds[parsed.Host] = append(dk.creds[parsed.Host], creds)
-			dk.index = append(dk.index, parsed.Host)
+		effectivePath := parsed.Path
+		if strings.HasPrefix(effectivePath, "/v2/") || strings.HasPrefix(effectivePath, "/v1/") {
+			effectivePath = effectivePath[3:]
 		}
-		if (len(parsed.Path) > 0) && (parsed.Path != "/") {
-			key := parsed.Host + parsed.Path
-			dk.creds[key] = append(dk.creds[key], creds)
-			dk.index = append(dk.index, key)
+		var key string
+		if (len(effectivePath) > 0) && (effectivePath != "/") {
+			key = parsed.Host + effectivePath
+		} else {
+			key = parsed.Host
 		}
+		dk.creds[key] = append(dk.creds[key], creds)
+		dk.index = append(dk.index, key)
 	}
 
 	eliminateDupes := sets.NewString(dk.index...)
@@ -100,7 +107,10 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 	sort.Sort(sort.Reverse(sort.StringSlice(dk.index)))
 }
 
-const defaultRegistryHost = "index.docker.io/v1/"
+const (
+	defaultRegistryHost = "index.docker.io"
+	defaultRegistryKey  = defaultRegistryHost + "/v1/"
+)
 
 // isDefaultRegistryMatch determines whether the given image will
 // pull from the default registry (DockerHub) based on the
@@ -223,8 +233,10 @@ func (dk *BasicDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, 
 	}
 
 	// Use credentials for the default registry if provided, and appropriate
-	if auth, ok := dk.creds[defaultRegistryHost]; ok && isDefaultRegistryMatch(image) {
-		return auth, true
+	if isDefaultRegistryMatch(image) {
+		if auth, ok := dk.creds[defaultRegistryHost]; ok {
+			return auth, true
+		}
 	}
 
 	return []docker.AuthConfiguration{}, false

@@ -2,6 +2,7 @@ package stacks
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
@@ -32,9 +33,16 @@ type CreateOptsBuilder interface {
 type CreateOpts struct {
 	// (REQUIRED) The name of the stack. It must start with an alphabetic character.
 	Name string
+	// (REQUIRED) A structure that contains either the template file or url. Call the
+	// associated methods to extract the information relevant to send in a create request.
+	TemplateOpts *Template
+	// (DEPRECATED): Please use TemplateOpts for providing the template. If
+	// TemplateOpts is provided, TemplateURL will be ignored
 	// (OPTIONAL; REQUIRED IF Template IS EMPTY) The URL of the template to instantiate.
 	// This value is ignored if Template is supplied inline.
 	TemplateURL string
+	// (DEPRECATED): Please use TemplateOpts for providing the template. If
+	// TemplateOpts is provided, Template will be ignored
 	// (OPTIONAL; REQUIRED IF TemplateURL IS EMPTY) A template to instantiate. The value
 	// is a stringified version of the JSON/YAML template. Since the template will likely
 	// be located in a file, one way to set this variable is by using ioutil.ReadFile:
@@ -50,8 +58,14 @@ type CreateOpts struct {
 	// creation fails. Default is true, meaning all resources are not deleted when
 	// stack creation fails.
 	DisableRollback Rollback
+	// (OPTIONAL) A structure that contains details for the environment of the stack.
+	EnvironmentOpts *Environment
+	// (DEPRECATED): Please use EnvironmentOpts to provide Environment data
 	// (OPTIONAL) A stringified JSON environment for the stack.
 	Environment string
+	// (DEPRECATED): Files is automatically determined
+	// by parsing the template and environment passed as TemplateOpts and
+	// EnvironmentOpts respectively.
 	// (OPTIONAL) A map that maps file names to file contents. It can also be used
 	// to pass provider template contents. Example:
 	// Files: `{"myfile": "#!/bin/bash\necho 'Hello world' > /root/testfile.txt"}`
@@ -60,6 +74,8 @@ type CreateOpts struct {
 	Parameters map[string]string
 	// (OPTIONAL) The timeout for stack creation in minutes.
 	Timeout int
+	// (OPTIONAL) A list of tags to assosciate with the Stack
+	Tags []string
 }
 
 // ToStackCreateMap casts a CreateOpts struct to a map.
@@ -70,25 +86,60 @@ func (opts CreateOpts) ToStackCreateMap() (map[string]interface{}, error) {
 		return s, errors.New("Required field 'Name' not provided.")
 	}
 	s["stack_name"] = opts.Name
-
-	if opts.Template != "" {
-		s["template"] = opts.Template
-	} else if opts.TemplateURL != "" {
-		s["template_url"] = opts.TemplateURL
+	Files := make(map[string]string)
+	if opts.TemplateOpts == nil {
+		if opts.Template != "" {
+			s["template"] = opts.Template
+		} else if opts.TemplateURL != "" {
+			s["template_url"] = opts.TemplateURL
+		} else {
+			return s, errors.New("Either Template or TemplateURL must be provided.")
+		}
 	} else {
-		return s, errors.New("Either Template or TemplateURL must be provided.")
+		if err := opts.TemplateOpts.Parse(); err != nil {
+			return nil, err
+		}
+
+		if err := opts.TemplateOpts.getFileContents(opts.TemplateOpts.Parsed, ignoreIfTemplate, true); err != nil {
+			return nil, err
+		}
+		opts.TemplateOpts.fixFileRefs()
+		s["template"] = string(opts.TemplateOpts.Bin)
+
+		for k, v := range opts.TemplateOpts.Files {
+			Files[k] = v
+		}
+	}
+	if opts.DisableRollback != nil {
+		s["disable_rollback"] = &opts.DisableRollback
+	}
+
+	if opts.EnvironmentOpts != nil {
+		if err := opts.EnvironmentOpts.Parse(); err != nil {
+			return nil, err
+		}
+		if err := opts.EnvironmentOpts.getRRFileContents(ignoreIfEnvironment); err != nil {
+			return nil, err
+		}
+		opts.EnvironmentOpts.fixFileRefs()
+		for k, v := range opts.EnvironmentOpts.Files {
+			Files[k] = v
+		}
+		s["environment"] = string(opts.EnvironmentOpts.Bin)
+	} else if opts.Environment != "" {
+		s["environment"] = opts.Environment
+	}
+
+	if opts.Files != nil {
+		s["files"] = opts.Files
+	} else {
+		s["files"] = Files
 	}
 
 	if opts.DisableRollback != nil {
 		s["disable_rollback"] = &opts.DisableRollback
 	}
 
-	if opts.Environment != "" {
-		s["environment"] = opts.Environment
-	}
-	if opts.Files != nil {
-		s["files"] = opts.Files
-	}
 	if opts.Parameters != nil {
 		s["parameters"] = opts.Parameters
 	}
@@ -97,6 +148,9 @@ func (opts CreateOpts) ToStackCreateMap() (map[string]interface{}, error) {
 		s["timeout_mins"] = opts.Timeout
 	}
 
+	if opts.Tags != nil {
+		s["tags"] = strings.Join(opts.Tags, ",")
+	}
 	return s, nil
 }
 
@@ -133,9 +187,16 @@ type AdoptOpts struct {
 	Name string
 	// (REQUIRED) The timeout for stack creation in minutes.
 	Timeout int
+	// (REQUIRED) A structure that contains either the template file or url. Call the
+	// associated methods to extract the information relevant to send in a create request.
+	TemplateOpts *Template
+	// (DEPRECATED): Please use TemplateOpts for providing the template. If
+	// TemplateOpts is provided, TemplateURL will be ignored
 	// (OPTIONAL; REQUIRED IF Template IS EMPTY) The URL of the template to instantiate.
 	// This value is ignored if Template is supplied inline.
 	TemplateURL string
+	// (DEPRECATED): Please use TemplateOpts for providing the template. If
+	// TemplateOpts is provided, Template will be ignored
 	// (OPTIONAL; REQUIRED IF TemplateURL IS EMPTY) A template to instantiate. The value
 	// is a stringified version of the JSON/YAML template. Since the template will likely
 	// be located in a file, one way to set this variable is by using ioutil.ReadFile:
@@ -151,8 +212,14 @@ type AdoptOpts struct {
 	// creation fails. Default is true, meaning all resources are not deleted when
 	// stack creation fails.
 	DisableRollback Rollback
+	// (OPTIONAL) A structure that contains details for the environment of the stack.
+	EnvironmentOpts *Environment
+	// (DEPRECATED): Please use EnvironmentOpts to provide Environment data
 	// (OPTIONAL) A stringified JSON environment for the stack.
 	Environment string
+	// (DEPRECATED): Files is automatically determined
+	// by parsing the template and environment passed as TemplateOpts and
+	// EnvironmentOpts respectively.
 	// (OPTIONAL) A map that maps file names to file contents. It can also be used
 	// to pass provider template contents. Example:
 	// Files: `{"myfile": "#!/bin/bash\necho 'Hello world' > /root/testfile.txt"}`
@@ -169,40 +236,69 @@ func (opts AdoptOpts) ToStackAdoptMap() (map[string]interface{}, error) {
 		return s, errors.New("Required field 'Name' not provided.")
 	}
 	s["stack_name"] = opts.Name
-
-	if opts.Template != "" {
-		s["template"] = opts.Template
-	} else if opts.TemplateURL != "" {
-		s["template_url"] = opts.TemplateURL
+	Files := make(map[string]string)
+	if opts.AdoptStackData != "" {
+		s["adopt_stack_data"] = opts.AdoptStackData
+	} else if opts.TemplateOpts == nil {
+		if opts.Template != "" {
+			s["template"] = opts.Template
+		} else if opts.TemplateURL != "" {
+			s["template_url"] = opts.TemplateURL
+		} else {
+			return s, errors.New("One of AdoptStackData, Template, TemplateURL or TemplateOpts must be provided.")
+		}
 	} else {
-		return s, errors.New("Either Template or TemplateURL must be provided.")
-	}
+		if err := opts.TemplateOpts.Parse(); err != nil {
+			return nil, err
+		}
 
-	if opts.AdoptStackData == "" {
-		return s, errors.New("Required field 'AdoptStackData' not provided.")
+		if err := opts.TemplateOpts.getFileContents(opts.TemplateOpts.Parsed, ignoreIfTemplate, true); err != nil {
+			return nil, err
+		}
+		opts.TemplateOpts.fixFileRefs()
+		s["template"] = string(opts.TemplateOpts.Bin)
+
+		for k, v := range opts.TemplateOpts.Files {
+			Files[k] = v
+		}
 	}
-	s["adopt_stack_data"] = opts.AdoptStackData
 
 	if opts.DisableRollback != nil {
 		s["disable_rollback"] = &opts.DisableRollback
 	}
 
-	if opts.Environment != "" {
+	if opts.EnvironmentOpts != nil {
+		if err := opts.EnvironmentOpts.Parse(); err != nil {
+			return nil, err
+		}
+		if err := opts.EnvironmentOpts.getRRFileContents(ignoreIfEnvironment); err != nil {
+			return nil, err
+		}
+		opts.EnvironmentOpts.fixFileRefs()
+		for k, v := range opts.EnvironmentOpts.Files {
+			Files[k] = v
+		}
+		s["environment"] = string(opts.EnvironmentOpts.Bin)
+	} else if opts.Environment != "" {
 		s["environment"] = opts.Environment
 	}
+
 	if opts.Files != nil {
 		s["files"] = opts.Files
+	} else {
+		s["files"] = Files
 	}
+
 	if opts.Parameters != nil {
 		s["parameters"] = opts.Parameters
 	}
 
-	if opts.Timeout == 0 {
-		return nil, errors.New("Required field 'Timeout' not provided.")
+	if opts.Timeout != 0 {
+		s["timeout"] = opts.Timeout
 	}
 	s["timeout_mins"] = opts.Timeout
 
-	return map[string]interface{}{"stack": s}, nil
+	return s, nil
 }
 
 // Adopt accepts an AdoptOpts struct and creates a new stack using the resources
@@ -305,9 +401,16 @@ type UpdateOptsBuilder interface {
 // UpdateOpts contains the common options struct used in this package's Update
 // operation.
 type UpdateOpts struct {
+	// (REQUIRED) A structure that contains either the template file or url. Call the
+	// associated methods to extract the information relevant to send in a create request.
+	TemplateOpts *Template
+	// (DEPRECATED): Please use TemplateOpts for providing the template. If
+	// TemplateOpts is provided, TemplateURL will be ignored
 	// (OPTIONAL; REQUIRED IF Template IS EMPTY) The URL of the template to instantiate.
 	// This value is ignored if Template is supplied inline.
 	TemplateURL string
+	// (DEPRECATED): Please use TemplateOpts for providing the template. If
+	// TemplateOpts is provided, Template will be ignored
 	// (OPTIONAL; REQUIRED IF TemplateURL IS EMPTY) A template to instantiate. The value
 	// is a stringified version of the JSON/YAML template. Since the template will likely
 	// be located in a file, one way to set this variable is by using ioutil.ReadFile:
@@ -319,8 +422,14 @@ type UpdateOpts struct {
 	// }
 	// opts.Template = string(b)
 	Template string
+	// (OPTIONAL) A structure that contains details for the environment of the stack.
+	EnvironmentOpts *Environment
+	// (DEPRECATED): Please use EnvironmentOpts to provide Environment data
 	// (OPTIONAL) A stringified JSON environment for the stack.
 	Environment string
+	// (DEPRECATED): Files is automatically determined
+	// by parsing the template and environment passed as TemplateOpts and
+	// EnvironmentOpts respectively.
 	// (OPTIONAL) A map that maps file names to file contents. It can also be used
 	// to pass provider template contents. Example:
 	// Files: `{"myfile": "#!/bin/bash\necho 'Hello world' > /root/testfile.txt"}`
@@ -329,26 +438,58 @@ type UpdateOpts struct {
 	Parameters map[string]string
 	// (OPTIONAL) The timeout for stack creation in minutes.
 	Timeout int
+	// (OPTIONAL) A list of tags to assosciate with the Stack
+	Tags []string
 }
 
 // ToStackUpdateMap casts a CreateOpts struct to a map.
 func (opts UpdateOpts) ToStackUpdateMap() (map[string]interface{}, error) {
 	s := make(map[string]interface{})
-
-	if opts.Template != "" {
-		s["template"] = opts.Template
-	} else if opts.TemplateURL != "" {
-		s["template_url"] = opts.TemplateURL
+	Files := make(map[string]string)
+	if opts.TemplateOpts == nil {
+		if opts.Template != "" {
+			s["template"] = opts.Template
+		} else if opts.TemplateURL != "" {
+			s["template_url"] = opts.TemplateURL
+		} else {
+			return s, errors.New("Either Template or TemplateURL must be provided.")
+		}
 	} else {
-		return s, errors.New("Either Template or TemplateURL must be provided.")
+		if err := opts.TemplateOpts.Parse(); err != nil {
+			return nil, err
+		}
+
+		if err := opts.TemplateOpts.getFileContents(opts.TemplateOpts.Parsed, ignoreIfTemplate, true); err != nil {
+			return nil, err
+		}
+		opts.TemplateOpts.fixFileRefs()
+		s["template"] = string(opts.TemplateOpts.Bin)
+
+		for k, v := range opts.TemplateOpts.Files {
+			Files[k] = v
+		}
 	}
 
-	if opts.Environment != "" {
+	if opts.EnvironmentOpts != nil {
+		if err := opts.EnvironmentOpts.Parse(); err != nil {
+			return nil, err
+		}
+		if err := opts.EnvironmentOpts.getRRFileContents(ignoreIfEnvironment); err != nil {
+			return nil, err
+		}
+		opts.EnvironmentOpts.fixFileRefs()
+		for k, v := range opts.EnvironmentOpts.Files {
+			Files[k] = v
+		}
+		s["environment"] = string(opts.EnvironmentOpts.Bin)
+	} else if opts.Environment != "" {
 		s["environment"] = opts.Environment
 	}
 
 	if opts.Files != nil {
 		s["files"] = opts.Files
+	} else {
+		s["files"] = Files
 	}
 
 	if opts.Parameters != nil {
@@ -357,6 +498,10 @@ func (opts UpdateOpts) ToStackUpdateMap() (map[string]interface{}, error) {
 
 	if opts.Timeout != 0 {
 		s["timeout_mins"] = opts.Timeout
+	}
+
+	if opts.Tags != nil {
+		s["tags"] = strings.Join(opts.Tags, ",")
 	}
 
 	return s, nil
@@ -397,9 +542,16 @@ type PreviewOpts struct {
 	Name string
 	// (REQUIRED) The timeout for stack creation in minutes.
 	Timeout int
+	// (REQUIRED) A structure that contains either the template file or url. Call the
+	// associated methods to extract the information relevant to send in a create request.
+	TemplateOpts *Template
+	// (DEPRECATED): Please use TemplateOpts for providing the template. If
+	// TemplateOpts is provided, TemplateURL will be ignored
 	// (OPTIONAL; REQUIRED IF Template IS EMPTY) The URL of the template to instantiate.
 	// This value is ignored if Template is supplied inline.
 	TemplateURL string
+	// (DEPRECATED): Please use TemplateOpts for providing the template. If
+	// TemplateOpts is provided, Template will be ignored
 	// (OPTIONAL; REQUIRED IF TemplateURL IS EMPTY) A template to instantiate. The value
 	// is a stringified version of the JSON/YAML template. Since the template will likely
 	// be located in a file, one way to set this variable is by using ioutil.ReadFile:
@@ -415,8 +567,14 @@ type PreviewOpts struct {
 	// creation fails. Default is true, meaning all resources are not deleted when
 	// stack creation fails.
 	DisableRollback Rollback
+	// (OPTIONAL) A structure that contains details for the environment of the stack.
+	EnvironmentOpts *Environment
+	// (DEPRECATED): Please use EnvironmentOpts to provide Environment data
 	// (OPTIONAL) A stringified JSON environment for the stack.
 	Environment string
+	// (DEPRECATED): Files is automatically determined
+	// by parsing the template and environment passed as TemplateOpts and
+	// EnvironmentOpts respectively.
 	// (OPTIONAL) A map that maps file names to file contents. It can also be used
 	// to pass provider template contents. Example:
 	// Files: `{"myfile": "#!/bin/bash\necho 'Hello world' > /root/testfile.txt"}`
@@ -433,25 +591,56 @@ func (opts PreviewOpts) ToStackPreviewMap() (map[string]interface{}, error) {
 		return s, errors.New("Required field 'Name' not provided.")
 	}
 	s["stack_name"] = opts.Name
-
-	if opts.Template != "" {
-		s["template"] = opts.Template
-	} else if opts.TemplateURL != "" {
-		s["template_url"] = opts.TemplateURL
+	Files := make(map[string]string)
+	if opts.TemplateOpts == nil {
+		if opts.Template != "" {
+			s["template"] = opts.Template
+		} else if opts.TemplateURL != "" {
+			s["template_url"] = opts.TemplateURL
+		} else {
+			return s, errors.New("Either Template or TemplateURL must be provided.")
+		}
 	} else {
-		return s, errors.New("Either Template or TemplateURL must be provided.")
-	}
+		if err := opts.TemplateOpts.Parse(); err != nil {
+			return nil, err
+		}
 
+		if err := opts.TemplateOpts.getFileContents(opts.TemplateOpts.Parsed, ignoreIfTemplate, true); err != nil {
+			return nil, err
+		}
+		opts.TemplateOpts.fixFileRefs()
+		s["template"] = string(opts.TemplateOpts.Bin)
+
+		for k, v := range opts.TemplateOpts.Files {
+			Files[k] = v
+		}
+	}
 	if opts.DisableRollback != nil {
 		s["disable_rollback"] = &opts.DisableRollback
 	}
 
-	if opts.Environment != "" {
+	if opts.EnvironmentOpts != nil {
+		if err := opts.EnvironmentOpts.Parse(); err != nil {
+			return nil, err
+		}
+		if err := opts.EnvironmentOpts.getRRFileContents(ignoreIfEnvironment); err != nil {
+			return nil, err
+		}
+		opts.EnvironmentOpts.fixFileRefs()
+		for k, v := range opts.EnvironmentOpts.Files {
+			Files[k] = v
+		}
+		s["environment"] = string(opts.EnvironmentOpts.Bin)
+	} else if opts.Environment != "" {
 		s["environment"] = opts.Environment
 	}
+
 	if opts.Files != nil {
 		s["files"] = opts.Files
+	} else {
+		s["files"] = Files
 	}
+
 	if opts.Parameters != nil {
 		s["parameters"] = opts.Parameters
 	}

@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/devel/api_changes.md).
+[here](http://releases.k8s.io/release-1.2/docs/devel/api_changes.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -306,7 +306,7 @@ removed value as deprecated but allowed). This is actually a special case of
 a new representation, discussed above.
 
 For [Unions](api-conventions.md), sets of fields where at most one should be set,
-it is acceptible to add a new option to the union if the [appropriate conventions]
+it is acceptable to add a new option to the union if the [appropriate conventions]
 were followed in the original object.  Removing an option requires following
 the deprecation process.
 

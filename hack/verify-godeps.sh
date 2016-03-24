@@ -39,9 +39,9 @@ preload-dep() {
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-branch="${1:-master}"
-# notice this uses ... to find the first shared ancestor
-if ! git diff origin/"${branch}"...HEAD | grep 'Godeps/' > /dev/null; then
+readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
+if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
+  ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/'; then
   exit 0
 fi
 
@@ -56,8 +56,11 @@ trap cleanup EXIT
 # build the godep tool
 export GOPATH="${_tmpdir}"
 go get -u github.com/tools/godep 2>/dev/null
-go install github.com/tools/godep 2>/dev/null
 GODEP="${_tmpdir}/bin/godep"
+pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
+  git checkout v53
+  "${GODEP}" go install
+popd > /dev/null
 
 # fill out that nice clean place with the kube godeps
 echo "Starting to download all kubernetes godeps. This takes a while"
@@ -93,7 +96,7 @@ fi
 # is an intentionally broken symlink. Linux can use --no-dereference. OS X cannot.
 # So we --exclude='symlink' so diff -r doesn't die following a bad symlink.
 if ! _out="$(diff -Naupr --exclude='symlink' ${KUBE_ROOT}/Godeps/_workspace/src ${_kubetmp}/Godeps/_workspace/src)"; then
-  echo "Your godeps changes are not reproducable"
+  echo "Your godeps changes are not reproducible"
   echo "${_out}"
   exit 1
 fi

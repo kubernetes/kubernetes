@@ -235,6 +235,12 @@ const SingleServerBody = `
 }
 `
 
+const ServerPasswordBody = `
+{
+    "password": "xlozO3wLCBRWAa2yDjCCVx8vwNPypxnypmRYDa/zErlQ+EzPe1S/Gz6nfmC52mOlOSCRuUOmG7kqqgejPof6M7bOezS387zjq4LSvvwp28zUknzy4YzfFGhnHAdai3TxUJ26pfQCYrq8UTzmKF2Bq8ioSEtVVzM0A96pDh8W2i7BOz6MdoiVyiev/I1K2LsuipfxSJR7Wdke4zNXJjHHP2RfYsVbZ/k9ANu+Nz4iIH8/7Cacud/pphH7EjrY6a4RZNrjQskrhKYed0YERpotyjYk1eDtRe72GrSiXteqCM4biaQ5w3ruS+AcX//PXk3uJ5kC7d67fPXaVz4WaQRYMg=="
+}
+`
+
 var (
 	// ServerHerp is a Server struct that should correspond to the first result in ServerListBody.
 	ServerHerp = Server{
@@ -396,6 +402,18 @@ func HandleServerDeletionSuccessfully(t *testing.T) {
 		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
 
 		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+// HandleServerForceDeletionSuccessfully sets up the test server to respond to a server force deletion
+// request.
+func HandleServerForceDeletionSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/asdfasdfasdf/action", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "POST")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestJSONRequest(t, r, `{ "forceDelete": "" }`)
+
+		w.WriteHeader(http.StatusAccepted)
 	})
 }
 
@@ -662,3 +680,13 @@ func HandleCreateServerImageSuccessfully(t *testing.T) {
 	})
 }
 
+// HandlePasswordGetSuccessfully sets up the test server to respond to a password Get request.
+func HandlePasswordGetSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/1234asdf/os-server-password", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "GET")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestHeader(t, r, "Accept", "application/json")
+
+		fmt.Fprintf(w, ServerPasswordBody)
+	})
+}

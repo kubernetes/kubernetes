@@ -49,7 +49,7 @@ kube::version::get_version_vars() {
     fi
 
     # Use git describe to find the version based on annotated tags.
-    if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
+    if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --long --tags --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
       # This translates the "git describe" to an actual semver.org
       # compatible semantic version that looks something like this:
       #   v1.1.0-alpha.0.6+84c76d1142ea4d
@@ -107,14 +107,14 @@ kube::version::load_version_vars() {
   source "${version_file}"
 }
 
-# golang 1.5 wants `-X key=val`, but golang 1.4- REQUIRES `-X key val`
+# golang 1.5+ wants `-X key=val`, but golang 1.4- REQUIRES `-X key val`
 kube::version::ldflag() {
   local key=${1}
   local val=${2}
 
   GO_VERSION=($(go version))
 
-  if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.5') ]]; then
+  if [[ -n $(echo "${GO_VERSION[2]}" | grep -E 'go1.1|go1.2|go1.3|go1.4') ]]; then
     echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key} ${val}"
   else
     echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}"
@@ -126,7 +126,7 @@ kube::version::ldflag() {
 kube::version::ldflags() {
   kube::version::get_version_vars
 
-  local -a ldflags=()
+  local -a ldflags=($(kube::version::ldflag "buildDate" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"))
   if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
     ldflags+=($(kube::version::ldflag "gitCommit" "${KUBE_GIT_COMMIT}"))
     ldflags+=($(kube::version::ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"))

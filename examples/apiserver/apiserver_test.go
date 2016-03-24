@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-var serverIP = "http://localhost:8080"
+var serverIP = fmt.Sprintf("http://localhost:%d", InsecurePort)
 
 var groupVersion = v1.SchemeGroupVersion
 

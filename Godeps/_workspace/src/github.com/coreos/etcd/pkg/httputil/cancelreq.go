@@ -6,6 +6,7 @@
 
 // +build go1.5
 
+// Package httputil provides HTTP utility functions.
 package httputil
 
 import "net/http"

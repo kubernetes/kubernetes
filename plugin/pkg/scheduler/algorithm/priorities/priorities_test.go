@@ -17,6 +17,7 @@ limitations under the License.
 package priorities
 
 import (
+	"os/exec"
 	"reflect"
 	"sort"
 	"strconv"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/util/codeinspector"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -138,7 +140,6 @@ func TestZeroRequest(t *testing.T) {
 		list, err := scheduler.PrioritizeNodes(
 			test.pod,
 			nodeNameToInfo,
-			algorithm.FakePodLister(test.pods),
 			// This should match the configuration in defaultPriorities() in
 			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
 			// to test what's actually in production.
@@ -767,25 +768,25 @@ func TestImageLocalityPriority(t *testing.T) {
 	node_40_140_2000 := api.NodeStatus{
 		Images: []api.ContainerImage{
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/40",
 					"gcr.io/40:v1",
 					"gcr.io/40:v1",
 				},
-				Size: int64(40 * mb),
+				SizeBytes: int64(40 * mb),
 			},
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/140",
 					"gcr.io/140:v1",
 				},
-				Size: int64(140 * mb),
+				SizeBytes: int64(140 * mb),
 			},
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/2000",
 				},
-				Size: int64(2000 * mb),
+				SizeBytes: int64(2000 * mb),
 			},
 		},
 	}
@@ -793,17 +794,17 @@ func TestImageLocalityPriority(t *testing.T) {
 	node_250_10 := api.NodeStatus{
 		Images: []api.ContainerImage{
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/250",
 				},
-				Size: int64(250 * mb),
+				SizeBytes: int64(250 * mb),
 			},
 			{
-				RepoTags: []string{
+				Names: []string{
 					"gcr.io/10",
 					"gcr.io/10:v1",
 				},
-				Size: int64(10 * mb),
+				SizeBytes: int64(10 * mb),
 			},
 		},
 	}
@@ -882,5 +883,49 @@ func makeImageNode(node string, status api.NodeStatus) api.Node {
 	return api.Node{
 		ObjectMeta: api.ObjectMeta{Name: node},
 		Status:     status,
+	}
+}
+
+func TestPrioritiesRegistered(t *testing.T) {
+	var functionNames []string
+
+	// Files and directories which priorities may be referenced
+	targetFiles := []string{
+		"./../../algorithmprovider/defaults/defaults.go", // Default algorithm
+		"./../../factory/plugins.go",                     // Registered in init()
+	}
+
+	// List all golang source files under ./priorities/, excluding test files and sub-directories.
+	files, err := codeinspector.GetSourceCodeFiles(".")
+
+	if err != nil {
+		t.Errorf("unexpected error: %v when listing files in current directory", err)
+	}
+
+	// Get all public priorities in files.
+	for _, filePath := range files {
+		functions, err := codeinspector.GetPublicFunctions(filePath)
+		if err == nil {
+			functionNames = append(functionNames, functions...)
+		} else {
+			t.Errorf("unexpected error when parsing %s", filePath)
+		}
+	}
+
+	// Check if all public priorities are referenced in target files.
+	for _, functionName := range functionNames {
+		args := []string{"-rl", functionName}
+		args = append(args, targetFiles...)
+
+		err := exec.Command("grep", args...).Run()
+		if err != nil {
+			switch err.Error() {
+			case "exit status 2":
+				t.Errorf("unexpected error when checking %s", functionName)
+			case "exit status 1":
+				t.Errorf("priority %s is implemented as public but seems not registered or used in any other place",
+					functionName)
+			}
+		}
 	}
 }

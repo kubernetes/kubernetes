@@ -32,11 +32,16 @@ import (
 
 type containerGC struct {
 	client           DockerInterface
+	podGetter        podGetter
 	containerLogsDir string
 }
 
-func NewContainerGC(client DockerInterface, containerLogsDir string) *containerGC {
-	return &containerGC{client: client, containerLogsDir: containerLogsDir}
+func NewContainerGC(client DockerInterface, podGetter podGetter, containerLogsDir string) *containerGC {
+	return &containerGC{
+		client:           client,
+		podGetter:        podGetter,
+		containerLogsDir: containerLogsDir,
+	}
 }
 
 // Internal information kept for containers being considered for GC.
@@ -190,6 +195,14 @@ func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy)
 		}
 	}
 
+	// Remove deleted pod containers.
+	for key, unit := range evictUnits {
+		if cgc.isPodDeleted(key.uid) {
+			cgc.removeOldestN(unit, len(unit)) // Remove all.
+			delete(evictUnits, key)
+		}
+	}
+
 	// Enforce max containers per evict unit.
 	if gcPolicy.MaxPerPodContainer >= 0 {
 		cgc.enforceMaxContainersPerEvictUnit(evictUnits, gcPolicy.MaxPerPodContainer)
@@ -230,4 +243,9 @@ func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy)
 	}
 
 	return nil
+}
+
+func (cgc *containerGC) isPodDeleted(podUID types.UID) bool {
+	_, found := cgc.podGetter.GetPodByUID(podUID)
+	return !found
 }

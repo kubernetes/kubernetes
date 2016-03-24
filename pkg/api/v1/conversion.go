@@ -87,7 +87,8 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 				"metadata.annotations",
 				"status.phase",
 				"status.podIP",
-				"spec.nodeName":
+				"spec.nodeName",
+				"spec.restartPolicy":
 				return label, value, nil
 				// This is for backwards compatibility with old v1 clients which send spec.host
 			case "spec.host":
@@ -321,7 +322,7 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 			return err
 		}
 
-		// the host namespace fields have to be handled here for backward compatibilty
+		// the host namespace fields have to be handled here for backward compatibility
 		// with v1.0.0
 		out.HostPID = in.SecurityContext.HostPID
 		out.HostNetwork = in.SecurityContext.HostNetwork

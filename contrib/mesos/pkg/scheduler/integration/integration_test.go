@@ -43,13 +43,14 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -489,9 +490,9 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	ei.Data = []byte{0, 1, 2}
 
 	// create framework
-	client := clientset.NewForConfigOrDie(&client.Config{
+	client := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          apiServer.server.URL,
-		ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
+		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 	})
 	c := *schedcfg.CreateDefaultConfig()
 	fw := framework.New(framework.Config{
@@ -524,11 +525,14 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		schedulerProc.Terminal(),
 		http.DefaultServeMux,
 		&podsListWatch.ListWatch,
-		ei,
-		[]string{"*"},
-		[]string{"*"},
-		mresource.DefaultDefaultContainerCPULimit,
-		mresource.DefaultDefaultContainerMemLimit,
+		podtask.Config{
+			Prototype:        ei,
+			FrameworkRoles:   []string{"*"},
+			DefaultPodRoles:  []string{"*"},
+			HostPortStrategy: hostport.StrategyWildcard,
+		},
+		resources.DefaultDefaultContainerCPULimit,
+		resources.DefaultDefaultContainerMemLimit,
 	)
 	assert.NotNil(scheduler)
 

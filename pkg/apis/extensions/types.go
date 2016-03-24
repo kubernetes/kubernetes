@@ -46,8 +46,9 @@ type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
 	Replicas int `json:"replicas"`
 
-	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
-	Selector map[string]string `json:"selector,omitempty"`
+	// label query over pods that should match the replicas count.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 }
 
 // +genclient=true,noMethods=true
@@ -332,6 +333,9 @@ type RollingUpdateDeployment struct {
 }
 
 type DeploymentStatus struct {
+	// The generation observed by the deployment controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Total number of non-terminated pods targeted by this deployment (their labels match the selector).
 	Replicas int `json:"replicas,omitempty"`
 
@@ -532,7 +536,10 @@ type JobSpec struct {
 	Parallelism *int `json:"parallelism,omitempty"`
 
 	// Completions specifies the desired number of successfully finished pods the
-	// job should be run with.  When unset, any pod exiting signals the job to complete.
+	// job should be run with.  Setting to nil means that the success of any
+	// pod signals the success of all pods, and allows parallelism to have any positive
+	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
+	// pod signals the success of the job.
 	Completions *int `json:"completions,omitempty"`
 
 	// Optional duration in seconds relative to the startTime that the job may be active
@@ -540,7 +547,19 @@ type JobSpec struct {
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 
 	// Selector is a label query over pods that should match the pod count.
+	// Normally, the system sets this field for you.
 	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
+
+	// ManualSelector controls generation of pod labels and pod selectors.
+	// Leave `manualSelector` unset unless you are certain what you are doing.
+	// When false or unset, the system pick labels unique to this job
+	// and appends those labels to the pod template.  When true,
+	// the user is responsible for picking unique labels and specifying
+	// the selector.  Failure to pick a unique label may cause this
+	// and other jobs to not function correctly.  However, You may see
+	// `manualSelector=true` in jobs that were created with the old `extensions/v1beta1`
+	// API.
+	ManualSelector *bool `json:"manualSelector,omitempty"`
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
@@ -750,67 +769,6 @@ type IngressBackend struct {
 	ServicePort intstr.IntOrString `json:"servicePort"`
 }
 
-type NodeResource string
-
-const (
-	// Percentage of node's CPUs that is currently used.
-	CpuConsumption NodeResource = "CpuConsumption"
-
-	// Percentage of node's CPUs that is currently requested for pods.
-	CpuRequest NodeResource = "CpuRequest"
-
-	// Percentage od node's memory that is currently used.
-	MemConsumption NodeResource = "MemConsumption"
-
-	// Percentage of node's CPUs that is currently requested for pods.
-	MemRequest NodeResource = "MemRequest"
-)
-
-// NodeUtilization describes what percentage of a particular resource is used on a node.
-type NodeUtilization struct {
-	Resource NodeResource `json:"resource"`
-
-	// The accepted values are from 0 to 1.
-	Value float64 `json:"value"`
-}
-
-// Configuration of the Cluster Autoscaler
-type ClusterAutoscalerSpec struct {
-	// Minimum number of nodes that the cluster should have.
-	MinNodes int `json:"minNodes"`
-
-	// Maximum number of nodes that the cluster should have.
-	MaxNodes int `json:"maxNodes"`
-
-	// Target average utilization of the cluster nodes. New nodes will be added if one of the
-	// targets is exceeded. Cluster size will be decreased if the current utilization is too low
-	// for all targets.
-	TargetUtilization []NodeUtilization `json:"target"`
-}
-
-type ClusterAutoscaler struct {
-	unversioned.TypeMeta `json:",inline"`
-
-	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	// For now (experimental api) it is required that the name is set to "ClusterAutoscaler" and namespace is "default".
-	api.ObjectMeta `json:"metadata,omitempty"`
-
-	// Spec defines the desired behavior of this daemon set.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	Spec ClusterAutoscalerSpec `json:"spec,omitempty"`
-}
-
-// There will be just one (or none) ClusterAutoscaler.
-type ClusterAutoscalerList struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	unversioned.ListMeta `json:"metadata,omitempty"`
-
-	Items []ClusterAutoscaler `json:"items"`
-}
-
 // +genclient=true
 
 // ReplicaSet represents the configuration of a replica set.
@@ -849,13 +807,16 @@ type ReplicaSetSpec struct {
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
-	Template *api.PodTemplateSpec `json:"template,omitempty"`
+	Template api.PodTemplateSpec `json:"template,omitempty"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
 	// Replicas is the number of actual replicas.
 	Replicas int `json:"replicas"`
+
+	// The number of pods that have labels matching the labels of the pod template of the replicaset.
+	FullyLabeledReplicas int `json:"fullyLabeledReplicas,omitempty"`
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -888,8 +849,8 @@ type PodSecurityPolicySpec struct {
 	HostPID bool `json:"hostPID,omitempty"`
 	// HostIPC determines if the policy allows the use of HostIPC in the pod spec.
 	HostIPC bool `json:"hostIPC,omitempty"`
-	// SELinuxContext is the strategy that will dictate the allowable labels that may be set.
-	SELinuxContext SELinuxContextStrategyOptions `json:"seLinuxContext,omitempty"`
+	// SELinux is the strategy that will dictate the allowable labels that may be set.
+	SELinux SELinuxStrategyOptions `json:"seLinux,omitempty"`
 	// RunAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
 	RunAsUser RunAsUserStrategyOptions `json:"runAsUser,omitempty"`
 }
@@ -924,30 +885,30 @@ var (
 	FC                    FSType = "fc"
 )
 
-// SELinuxContextStrategyOptions defines the strategy type and any options used to create the strategy.
-type SELinuxContextStrategyOptions struct {
-	// Type is the strategy that will dictate the allowable labels that may be set.
-	Type SELinuxContextStrategy `json:"type"`
+// SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
+type SELinuxStrategyOptions struct {
+	// Rule is the strategy that will dictate the allowable labels that may be set.
+	Rule SELinuxStrategy `json:"rule"`
 	// seLinuxOptions required to run as; required for MustRunAs
 	// More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context
 	SELinuxOptions *api.SELinuxOptions `json:"seLinuxOptions,omitempty"`
 }
 
-// SELinuxContextStrategyType denotes strategy types for generating SELinux options for a
-// SecurityContext.
-type SELinuxContextStrategy string
+// SELinuxStrategy denotes strategy types for generating SELinux options for a
+// Security.
+type SELinuxStrategy string
 
 const (
 	// container must have SELinux labels of X applied.
-	SELinuxStrategyMustRunAs SELinuxContextStrategy = "MustRunAs"
+	SELinuxStrategyMustRunAs SELinuxStrategy = "MustRunAs"
 	// container may make requests for any SELinux context labels.
-	SELinuxStrategyRunAsAny SELinuxContextStrategy = "RunAsAny"
+	SELinuxStrategyRunAsAny SELinuxStrategy = "RunAsAny"
 )
 
 // RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.
 type RunAsUserStrategyOptions struct {
-	// Type is the strategy that will dictate the allowable RunAsUser values that may be set.
-	Type RunAsUserStrategy `json:"type"`
+	// Rule is the strategy that will dictate the allowable RunAsUser values that may be set.
+	Rule RunAsUserStrategy `json:"rule"`
 	// Ranges are the allowed ranges of uids that may be used.
 	Ranges []IDRange `json:"ranges,omitempty"`
 }
@@ -960,7 +921,7 @@ type IDRange struct {
 	Max int64 `json:"max"`
 }
 
-// RunAsUserStrategyType denotes strategy types for generating RunAsUser values for a
+// RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
 // SecurityContext.
 type RunAsUserStrategy string
 

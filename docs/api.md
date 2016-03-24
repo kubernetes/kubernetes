@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/api.md).
+[here](http://releases.k8s.io/release-1.2/docs/api.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -38,7 +38,7 @@ Primary system and API concepts are documented in the [User guide](user-guide/RE
 
 Overall API conventions are described in the [API conventions doc](devel/api-conventions.md).
 
-Complete API details are documented via [Swagger](http://swagger.io/). The Kubernetes apiserver (aka "master") exports an API that can be used to retrieve the [Swagger spec](https://github.com/swagger-api/swagger-spec/tree/master/schemas/v1.2) for the Kubernetes API, by default at `/swaggerapi`, and a UI you can use to browse the API documentation at `/swagger-ui`. We also periodically update a [statically generated UI](http://kubernetes.io/third_party/swagger-ui/).
+Complete API details are documented via [Swagger](http://swagger.io/). The Kubernetes apiserver (aka "master") exports an API that can be used to retrieve the [Swagger spec](https://github.com/swagger-api/swagger-spec/tree/master/schemas/v1.2) for the Kubernetes API, by default at `/swaggerapi`. It also exports a UI you can use to browse the API documentation at `/swagger-ui` if the apiserver is passed --enable-swagger-ui=true flag. We also host generated [API reference docs](api-reference/README.md).
 
 Remote access to the API is discussed in the [access doc](admin/accessing-the-api.md).
 
@@ -113,7 +113,7 @@ create their own API groups](design/extending-api.md), and to avoid naming colli
 
 ## Enabling resources in the extensions group
 
-HorizontalPodAutoscalers, Jobs, Ingress, Deployments and ReplicaSets are enabled by default.
+DaemonSets, Deployments, HorizontalPodAutoscalers, Ingress, Jobs and ReplicaSets are enabled by default.
 Other extensions resources can be enabled by setting runtime-config on
 apiserver. runtime-config accepts comma separated values. For ex: to disable deployments and jobs, set
 `--runtime-config=extensions/v1beta1/deployments=false,extensions/v1beta1/jobs=false`

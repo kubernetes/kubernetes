@@ -31,8 +31,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Events", func() {
-	framework := NewFramework("events")
+var _ = KubeDescribe("Events", func() {
+	framework := NewDefaultFramework("events")
 
 	It("should be sent by kubelets and the scheduler about pods scheduling and running [Conformance]", func() {
 
@@ -53,7 +53,7 @@ var _ = Describe("Events", func() {
 				Containers: []api.Container{
 					{
 						Name:  "p",
-						Image: "gcr.io/google_containers/serve_hostname:1.1",
+						Image: "gcr.io/google_containers/serve_hostname:v1.4",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 					},
 				},

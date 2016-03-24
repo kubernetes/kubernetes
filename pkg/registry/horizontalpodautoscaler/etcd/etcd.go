@@ -26,7 +26,6 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
@@ -34,12 +33,12 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
+func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	prefix := "/horizontalpodautoscalers"
 
 	newListFunc := func() runtime.Object { return &extensions.HorizontalPodAutoscalerList{} }
-	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.HorizontalPodAutoscalers), &extensions.HorizontalPodAutoscaler{}, prefix, horizontalpodautoscaler.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.HorizontalPodAutoscalers), &extensions.HorizontalPodAutoscaler{}, prefix, horizontalpodautoscaler.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.HorizontalPodAutoscaler{} },
@@ -63,7 +62,8 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return horizontalpodautoscaler.MatchAutoscaler(label, field)
 		},
-		QualifiedResource: extensions.Resource("horizontalpodautoscalers"),
+		QualifiedResource:       extensions.Resource("horizontalpodautoscalers"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate autoscaler creation
 		CreateStrategy: horizontalpodautoscaler.Strategy,

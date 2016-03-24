@@ -14,7 +14,7 @@
 *.iml
 
 # Vscode files
-.vscode/**
+.vscode
 
 # This is where the result of the go build goes
 /output/**
@@ -87,6 +87,9 @@ doc_tmp/
 
 # CoreOS stuff
 cluster/libvirt-coreos/coreos_*.img
+
+# Juju Stuff
+cluster/juju/charms/*
 
 # Downloaded Kubernetes binary release
 kubernetes/

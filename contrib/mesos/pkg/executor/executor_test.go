@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
 	kmruntime "k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -197,11 +198,11 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	podTask, err := podtask.New(
 		api.NewDefaultContext(),
-		"",
+		podtask.Config{
+			Prototype:        executorinfo,
+			HostPortStrategy: hostport.StrategyWildcard,
+		},
 		pod,
-		executorinfo,
-		nil,
-		nil,
 	)
 	assert.Equal(t, nil, err, "must be able to create a task from a pod")
 
@@ -407,11 +408,12 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	executorinfo := &mesosproto.ExecutorInfo{}
 	podTask, _ := podtask.New(
 		api.NewDefaultContext(),
-		"foo",
+		podtask.Config{
+			ID:               "foo",
+			Prototype:        executorinfo,
+			HostPortStrategy: hostport.StrategyWildcard,
+		},
 		pod,
-		executorinfo,
-		nil,
-		nil,
 	)
 	pod.Annotations = map[string]string{
 		"k8s.mesosphere.io/taskId": podTask.ID,

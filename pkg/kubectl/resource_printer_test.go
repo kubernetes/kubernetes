@@ -34,7 +34,7 @@ import (
 	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 	yamlserializer "k8s.io/kubernetes/pkg/runtime/serializer/yaml"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -182,7 +182,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(testData, poutput) {
-		t.Errorf("Test data and unmarshaled data are not equal: %v", util.ObjectDiff(poutput, testData))
+		t.Errorf("Test data and unmarshaled data are not equal: %v", diff.ObjectDiff(poutput, testData))
 	}
 
 	obj := &api.Pod{
@@ -202,7 +202,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(obj, &objOut) {
-		t.Errorf("Unexpected inequality:\n%v", util.ObjectDiff(obj, &objOut))
+		t.Errorf("Unexpected inequality:\n%v", diff.ObjectDiff(obj, &objOut))
 	}
 }
 
@@ -299,10 +299,10 @@ func TestNamePrinter(t *testing.T) {
 				},
 				Items: []runtime.RawExtension{
 					{
-						RawJSON: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "foo"}}`),
+						Raw: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "foo"}}`),
 					},
 					{
-						RawJSON: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "bar"}}`),
+						Raw: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "bar"}}`),
 					},
 				},
 			},
@@ -1255,9 +1255,9 @@ func TestTranslateTimestamp(t *testing.T) {
 		{"30 seconds ago", translateTimestamp(unversioned.Time{Time: time.Now().Add(-3e10)}), "30s"},
 		{"5 minutes ago", translateTimestamp(unversioned.Time{Time: time.Now().Add(-3e11)}), "5m"},
 		{"an hour ago", translateTimestamp(unversioned.Time{Time: time.Now().Add(-6e12)}), "1h"},
-		{"2 days ago", translateTimestamp(unversioned.Time{Time: time.Now().AddDate(0, 0, -2)}), "2d"},
-		{"months ago", translateTimestamp(unversioned.Time{Time: time.Now().AddDate(0, 0, -90)}), "90d"},
-		{"10 years ago", translateTimestamp(unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)}), "10y"},
+		{"2 days ago", translateTimestamp(unversioned.Time{Time: time.Now().UTC().AddDate(0, 0, -2)}), "2d"},
+		{"months ago", translateTimestamp(unversioned.Time{Time: time.Now().UTC().AddDate(0, 0, -90)}), "90d"},
+		{"10 years ago", translateTimestamp(unversioned.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}), "10y"},
 	}
 	for _, test := range tl {
 		if test.got != test.exp {
@@ -1298,6 +1298,89 @@ func TestPrintDeployment(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
 		printDeployment(&test.deployment, buf, PrintOptions{false, false, false, true, false, false, []string{}})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintDaemonSet(t *testing.T) {
+	tests := []struct {
+		ds         extensions.DaemonSet
+		startsWith string
+	}{
+		{
+			extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.DaemonSetSpec{
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+					},
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 2,
+					DesiredNumberScheduled: 3,
+				},
+			},
+			"test1\t3\t2\t<none>\t0s\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printDaemonSet(&test.ds, buf, PrintOptions{false, false, false, false, false, false, []string{}})
+		if !strings.HasPrefix(buf.String(), test.startsWith) {
+			t.Fatalf("Expected to start with %s but got %s", test.startsWith, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintJob(t *testing.T) {
+	completions := 2
+	tests := []struct {
+		job    extensions.Job
+		expect string
+	}{
+		{
+			extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "job1",
+					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.JobSpec{
+					Completions: &completions,
+				},
+				Status: extensions.JobStatus{
+					Succeeded: 1,
+				},
+			},
+			"job1\t2\t1\t0s\n",
+		},
+		{
+			extensions.Job{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "job2",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: extensions.JobSpec{
+					Completions: nil,
+				},
+				Status: extensions.JobStatus{
+					Succeeded: 0,
+				},
+			},
+			"job2\t<none>\t0\t10y\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printJob(&test.job, buf, PrintOptions{false, false, false, true, false, false, []string{}})
 		if buf.String() != test.expect {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}

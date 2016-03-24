@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -132,8 +132,8 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 }
 
 func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
-	clientset := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewDaemonSetsController(clientset, controller.NoResyncPeriodFunc)
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewDaemonSetsController(clientset, controller.NoResyncPeriodFunc, 0)
 	manager.podStoreSynced = alwaysReady
 	podControl := &controller.FakePodControl{}
 	manager.podControl = podControl
@@ -282,6 +282,36 @@ func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	node := newNode("port-conflict", nil)
 	manager.nodeStore.Add(node)
 	manager.podStore.Add(&api.Pod{
+		Spec: podSpec,
+	})
+
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
+// Test that if the node is already scheduled with a pod using a host port
+// but belonging to the same daemonset, we don't delete that pod
+//
+// Issue: https://github.com/kubernetes/kubernetes/issues/22309
+func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
+	podSpec := api.PodSpec{
+		NodeName: "port-conflict",
+		Containers: []api.Container{{
+			Ports: []api.ContainerPort{{
+				HostPort: 666,
+			}},
+		}},
+	}
+	manager, podControl := newTestController()
+	node := newNode("port-conflict", nil)
+	manager.nodeStore.Add(node)
+	manager.podStore.Add(&api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Labels:    simpleDaemonSetLabel,
+			Namespace: api.NamespaceDefault,
+		},
 		Spec: podSpec,
 	})
 	ds := newDaemonSet("foo")

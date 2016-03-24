@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/examples/javaweb-tomcat-sidecar/README.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -41,7 +46,7 @@ This sidecar mode brings a new workflow for Java users:
 
 ![](workflow.png?raw=true "Workflow")
 
-As you can see, user can create a `sample:v2` container as sidecar to "provide" war file to Tomcat by copying it to the shared `emptyDir` volume. And Pod will make sure the two containers compose an "atomic" scheduling unit, which is perfect for this case. Thus, your application version management will be totally seperated from web server management.
+As you can see, user can create a `sample:v2` container as sidecar to "provide" war file to Tomcat by copying it to the shared `emptyDir` volume. And Pod will make sure the two containers compose an "atomic" scheduling unit, which is perfect for this case. Thus, your application version management will be totally separated from web server management.
 
 For example, if you are going to change the configurations of your Tomcat:
 

@@ -48,7 +48,11 @@ import (
 const kubeProxyLagTimeout = 5 * time.Minute
 
 // Maximum time a load balancer is allowed to not respond after creation.
-const loadBalancerLagTimeout = 2 * time.Minute
+const loadBalancerLagTimeoutDefault = 2 * time.Minute
+
+// On AWS there is a delay between ELB creation and serving traffic;
+// a few minutes is typical, so use 10m.
+const loadBalancerLagTimeoutAWS = 10 * time.Minute
 
 // How long to wait for a load balancer to be created/modified.
 //TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
@@ -57,8 +61,8 @@ const loadBalancerCreateTimeout = 20 * time.Minute
 // This should match whatever the default/configured range is
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
-var _ = Describe("Services", func() {
-	f := NewFramework("services")
+var _ = KubeDescribe("Services", func() {
+	f := NewDefaultFramework("services")
 
 	var c *client.Client
 
@@ -403,6 +407,13 @@ var _ = Describe("Services", func() {
 		// requires cloud load-balancer support
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
+		loadBalancerSupportsUDP := !providerIs("aws")
+
+		loadBalancerLagTimeout := loadBalancerLagTimeoutDefault
+		if providerIs("aws") {
+			loadBalancerLagTimeout = loadBalancerLagTimeoutAWS
+		}
+
 		// This test is more monolithic than we'd like because LB turnup can be
 		// very slow, so we lumped all the tests into one LB lifecycle.
 
@@ -493,10 +504,12 @@ var _ = Describe("Services", func() {
 			s.Spec.Type = api.ServiceTypeLoadBalancer
 		})
 
-		By("changing the UDP service to type=LoadBalancer")
-		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
-			s.Spec.Type = api.ServiceTypeLoadBalancer
-		})
+		if loadBalancerSupportsUDP {
+			By("changing the UDP service to type=LoadBalancer")
+			udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+			})
+		}
 
 		By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
@@ -511,7 +524,6 @@ var _ = Describe("Services", func() {
 		tcpIngressIP := getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
 		Logf("TCP load balancer: %s", tcpIngressIP)
 
-		By("waiting for the UDP service " + serviceName + " to have a load balancer")
 		if providerIs("gce", "gke") {
 			// Do this as early as possible, which overrides the `defer` above.
 			// This is mostly out of fear of leaking the IP in a timeout case
@@ -528,19 +540,22 @@ var _ = Describe("Services", func() {
 			}
 		}
 
-		By("waiting for the UDP service to have a load balancer")
-		// 2nd one should be faster since they ran in parallel.
-		udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name)
-		jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
-		if udpService.Spec.Ports[0].NodePort != udpNodePort {
-			Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
-		}
-		udpIngressIP := getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
-		Logf("UDP load balancer: %s", udpIngressIP)
+		var udpIngressIP string
+		if loadBalancerSupportsUDP {
+			By("waiting for the UDP service to have a load balancer")
+			// 2nd one should be faster since they ran in parallel.
+			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name)
+			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+			if udpService.Spec.Ports[0].NodePort != udpNodePort {
+				Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
+			}
+			udpIngressIP = getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
+			Logf("UDP load balancer: %s", udpIngressIP)
 
-		By("verifying that TCP and UDP use different load balancers")
-		if tcpIngressIP == udpIngressIP {
-			Failf("Load balancers are not different: %s", getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
+			By("verifying that TCP and UDP use different load balancers")
+			if tcpIngressIP == udpIngressIP {
+				Failf("Load balancers are not different: %s", getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
+			}
 		}
 
 		By("hitting the TCP service's NodePort")
@@ -552,8 +567,10 @@ var _ = Describe("Services", func() {
 		By("hitting the TCP service's LoadBalancer")
 		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
-		By("hitting the UDP service's LoadBalancer")
-		jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		if loadBalancerSupportsUDP {
+			By("hitting the UDP service's LoadBalancer")
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		}
 
 		// Change the services' node ports.
 
@@ -572,13 +589,17 @@ var _ = Describe("Services", func() {
 
 		By("changing the UDP service's NodePort")
 		udpService = jig.ChangeServiceNodePortOrFail(ns2, udpService.Name, udpNodePort)
-		jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+		if loadBalancerSupportsUDP {
+			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+		} else {
+			jig.SanityCheckService(udpService, api.ServiceTypeNodePort)
+		}
 		udpNodePortOld := udpNodePort
 		udpNodePort = udpService.Spec.Ports[0].NodePort
 		if udpNodePort == udpNodePortOld {
 			Failf("UDP Spec.Ports[0].NodePort (%d) did not change", udpNodePort)
 		}
-		if getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
+		if loadBalancerSupportsUDP && getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
 			Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
 		}
 		Logf("UDP node port: %d", udpNodePort)
@@ -598,8 +619,10 @@ var _ = Describe("Services", func() {
 		By("hitting the TCP service's LoadBalancer")
 		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
-		By("hitting the UDP service's LoadBalancer")
-		jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		if loadBalancerSupportsUDP {
+			By("hitting the UDP service's LoadBalancer")
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		}
 
 		// Change the services' main ports.
 
@@ -624,14 +647,18 @@ var _ = Describe("Services", func() {
 		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
 			s.Spec.Ports[0].Port++
 		})
-		jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+		if loadBalancerSupportsUDP {
+			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
+		} else {
+			jig.SanityCheckService(udpService, api.ServiceTypeNodePort)
+		}
 		if udpService.Spec.Ports[0].Port != svcPort {
 			Failf("UDP Spec.Ports[0].Port (%d) did not change", udpService.Spec.Ports[0].Port)
 		}
 		if udpService.Spec.Ports[0].NodePort != udpNodePort {
 			Failf("UDP Spec.Ports[0].NodePort (%d) changed", udpService.Spec.Ports[0].NodePort)
 		}
-		if getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
+		if loadBalancerSupportsUDP && getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
 			Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
 		}
 
@@ -646,8 +673,10 @@ var _ = Describe("Services", func() {
 		By("hitting the TCP service's LoadBalancer")
 		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB
 
-		By("hitting the UDP service's LoadBalancer")
-		jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB)
+		if loadBalancerSupportsUDP {
+			By("hitting the UDP service's LoadBalancer")
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB)
+		}
 
 		// Change the services back to ClusterIP.
 
@@ -665,9 +694,11 @@ var _ = Describe("Services", func() {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.Ports[0].NodePort = 0
 		})
-		// Wait for the load balancer to be destroyed asynchronously
-		udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort)
-		jig.SanityCheckService(udpService, api.ServiceTypeClusterIP)
+		if loadBalancerSupportsUDP {
+			// Wait for the load balancer to be destroyed asynchronously
+			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort)
+			jig.SanityCheckService(udpService, api.ServiceTypeClusterIP)
+		}
 
 		By("checking the TCP NodePort is closed")
 		jig.TestNotReachableHTTP(nodeIP, tcpNodePort, kubeProxyLagTimeout)
@@ -678,8 +709,10 @@ var _ = Describe("Services", func() {
 		By("checking the TCP LoadBalancer is closed")
 		jig.TestNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
-		By("checking the UDP LoadBalancer is closed")
-		jig.TestNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		if loadBalancerSupportsUDP {
+			By("checking the UDP LoadBalancer is closed")
+			jig.TestNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		}
 	})
 
 	It("should prevent NodePort collisions", func() {
@@ -1262,7 +1295,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	maxContainerFailures := 0
 	config := RCConfig{
 		Client:               c,
-		Image:                "gcr.io/google_containers/serve_hostname:1.1",
+		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,
@@ -1347,25 +1380,41 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 			return output
 		},
 	}
-	sort.StringSlice(expectedPods).Sort()
+
+	expectedEndpoints := sets.NewString(expectedPods...)
 	By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
 	for _, cmdFunc := range commands {
 		passed := false
-		gotPods := []string{}
+		gotEndpoints := sets.NewString()
+
 		// Retry cmdFunc for a while
-		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-			pods := strings.Split(strings.TrimSpace(cmdFunc()), "\n")
-			// Uniq pods before the sort because inserting them into a set
-			// (which is implemented using dicts) can re-order them.
-			gotPods = sets.NewString(pods...).List()
-			if api.Semantic.DeepEqual(gotPods, expectedPods) {
+		for start := time.Now(); time.Since(start) < kubeProxyLagTimeout; time.Sleep(5 * time.Second) {
+			for _, endpoint := range strings.Split(cmdFunc(), "\n") {
+				trimmedEp := strings.TrimSpace(endpoint)
+				if trimmedEp != "" {
+					gotEndpoints.Insert(trimmedEp)
+				}
+			}
+			// TODO: simply checking that the retrieved endpoints is a superset
+			// of the expected allows us to ignore intermitten network flakes that
+			// result in output like "wget timed out", but these should be rare
+			// and we need a better way to track how often it occurs.
+			if gotEndpoints.IsSuperset(expectedEndpoints) {
+				if !gotEndpoints.Equal(expectedEndpoints) {
+					Logf("Ignoring unexpected output wgetting endpoints of service %s: %v", serviceIP, gotEndpoints.Difference(expectedEndpoints))
+				}
 				passed = true
 				break
 			}
-			Logf("Waiting for expected pods for %s: %v, got: %v", serviceIP, expectedPods, gotPods)
+			Logf("Unable to reach the following endpoints of service %s: %v", serviceIP, expectedEndpoints.Difference(gotEndpoints))
 		}
 		if !passed {
-			return fmt.Errorf("service verification failed for: %s, expected %v, got %v", serviceIP, expectedPods, gotPods)
+			// Sort the lists so they're easier to visually diff.
+			exp := expectedEndpoints.List()
+			got := gotEndpoints.List()
+			sort.StringSlice(exp).Sort()
+			sort.StringSlice(got).Sort()
+			return fmt.Errorf("service verification failed for: %s\nexpected %v\nreceived %v", serviceIP, exp, got)
 		}
 	}
 	return nil
@@ -1393,9 +1442,9 @@ func verifyServeHostnameServiceDown(c *client.Client, host string, serviceIP str
 // This masks problems where the iptables rule has changed, but we don't see it
 // This is intended for relatively quick requests (status checks), so we set a short (5 seconds) timeout
 func httpGetNoConnectionPool(url string) (*http.Response, error) {
-	tr := &http.Transport{
+	tr := utilnet.SetTransportDefaults(&http.Transport{
 		DisableKeepAlives: true,
-	}
+	})
 	client := &http.Client{
 		Transport: tr,
 		Timeout:   5 * time.Second,
@@ -1776,7 +1825,7 @@ func NewServerTest(client *client.Client, namespace string, serviceName string) 
 	t.services = make(map[string]bool)
 
 	t.name = "webserver"
-	t.image = "gcr.io/google_containers/test-webserver"
+	t.image = "gcr.io/google_containers/test-webserver:e2e"
 
 	return t
 }

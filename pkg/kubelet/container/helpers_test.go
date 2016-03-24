@@ -134,3 +134,80 @@ func TestExpandCommandAndArgs(t *testing.T) {
 
 	}
 }
+
+func TestShouldContainerBeRestarted(t *testing.T) {
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "no-history"},
+				{Name: "alive"},
+				{Name: "succeed"},
+				{Name: "failed"},
+				{Name: "unknown"},
+			},
+		},
+	}
+	podStatus := &PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*ContainerStatus{
+			{
+				Name:  "alive",
+				State: ContainerStateRunning,
+			},
+			{
+				Name:     "succeed",
+				State:    ContainerStateExited,
+				ExitCode: 0,
+			},
+			{
+				Name:     "failed",
+				State:    ContainerStateExited,
+				ExitCode: 1,
+			},
+			{
+				Name:     "alive",
+				State:    ContainerStateExited,
+				ExitCode: 2,
+			},
+			{
+				Name:  "unknown",
+				State: ContainerStateUnknown,
+			},
+			{
+				Name:     "failed",
+				State:    ContainerStateExited,
+				ExitCode: 3,
+			},
+		},
+	}
+	policies := []api.RestartPolicy{
+		api.RestartPolicyNever,
+		api.RestartPolicyOnFailure,
+		api.RestartPolicyAlways,
+	}
+	expected := map[string][]bool{
+		"no-history": {true, true, true},
+		"alive":      {false, false, false},
+		"succeed":    {false, false, true},
+		"failed":     {false, true, true},
+		"unknown":    {true, true, true},
+	}
+	for _, c := range pod.Spec.Containers {
+		for i, policy := range policies {
+			pod.Spec.RestartPolicy = policy
+			e := expected[c.Name][i]
+			r := ShouldContainerBeRestarted(&c, pod, podStatus)
+			if r != e {
+				t.Errorf("Restart for container %q with restart policy %q expected %t, got %t",
+					c.Name, policy, e, r)
+			}
+		}
+	}
+}

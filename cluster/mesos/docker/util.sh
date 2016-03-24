@@ -317,7 +317,8 @@ function kube-down {
 }
 
 function test-setup {
-  echo "TODO: test-setup" 1>&2
+  echo "test-setup" 1>&2
+  "${KUBE_ROOT}/cluster/kube-up.sh"
 }
 
 # Execute after running tests to perform any required clean-up
@@ -331,16 +332,6 @@ function test-teardown {
 # SSH to a node by name or IP ($1) and run a command ($2).
 function ssh-to-node {
   echo "TODO: ssh-to-node" 1>&2
-}
-
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  echo "TODO: restart-kube-proxy" 1>&2
-}
-
-# Restart the apiserver
-function restart-apiserver {
-  echo "TODO: restart-apiserver" 1>&2
 }
 
 # Waits for a kube-system pod (of the provided name) to have the phase/status "Running".

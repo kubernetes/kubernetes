@@ -2,6 +2,8 @@ package gophercloud
 
 import (
 	"errors"
+	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -41,4 +43,40 @@ func NormalizeURL(url string) string {
 		return url + "/"
 	}
 	return url
+}
+
+// NormalizePathURL is used to convert rawPath to a fqdn, using basePath as
+// a reference in the filesystem, if necessary. basePath is assumed to contain
+// either '.' when first used, or the file:// type fqdn of the parent resource.
+// e.g. myFavScript.yaml => file://opt/lib/myFavScript.yaml
+func NormalizePathURL(basePath, rawPath string) (string, error) {
+	u, err := url.Parse(rawPath)
+	if err != nil {
+		return "", err
+	}
+	// if a scheme is defined, it must be a fqdn already
+	if u.Scheme != "" {
+		return u.String(), nil
+	}
+	// if basePath is a url, then child resources are assumed to be relative to it
+	bu, err := url.Parse(basePath)
+	if err != nil {
+		return "", err
+	}
+	var basePathSys, absPathSys string
+	if bu.Scheme != "" {
+		basePathSys = filepath.FromSlash(bu.Path)
+		absPathSys = filepath.Join(basePathSys, rawPath)
+		bu.Path = filepath.ToSlash(absPathSys)
+		return bu.String(), nil
+	}
+
+	absPathSys = filepath.Join(basePath, rawPath)
+	u.Path = filepath.ToSlash(absPathSys)
+	if err != nil {
+		return "", err
+	}
+	u.Scheme = "file"
+	return u.String(), nil
+
 }

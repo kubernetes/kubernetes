@@ -40,6 +40,9 @@ type rawFactory struct {
 
 	// Watcher for inotify events.
 	watcher *InotifyWatcher
+
+	// List of metrics to be ignored.
+	ignoreMetrics map[container.MetricKind]struct{}
 }
 
 func (self *rawFactory) String() string {
@@ -51,7 +54,7 @@ func (self *rawFactory) NewContainerHandler(name string, inHostNamespace bool) (
 	if !inHostNamespace {
 		rootFs = "/rootfs"
 	}
-	return newRawContainerHandler(name, self.cgroupSubsystems, self.machineInfoFactory, self.fsInfo, self.watcher, rootFs)
+	return newRawContainerHandler(name, self.cgroupSubsystems, self.machineInfoFactory, self.fsInfo, self.watcher, rootFs, self.ignoreMetrics)
 }
 
 // The raw factory can handle any container. If --docker_only is set to false, non-docker containers are ignored.
@@ -77,7 +80,7 @@ func (self *rawFactory) DebugInfo() map[string][]string {
 	return out
 }
 
-func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo) error {
+func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics map[container.MetricKind]struct{}) error {
 	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
@@ -97,6 +100,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo) erro
 		fsInfo:             fsInfo,
 		cgroupSubsystems:   &cgroupSubsystems,
 		watcher:            watcher,
+		ignoreMetrics:      ignoreMetrics,
 	}
 	container.RegisterContainerHandlerFactory(factory)
 	return nil

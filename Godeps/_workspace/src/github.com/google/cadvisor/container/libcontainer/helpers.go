@@ -17,12 +17,14 @@ package libcontainer
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
 
 	"github.com/golang/glog"
@@ -79,7 +81,7 @@ var supportedSubsystems map[string]struct{} = map[string]struct{}{
 }
 
 // Get cgroup and networking stats of the specified container
-func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int) (*info.ContainerStats, error) {
+func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int, ignoreMetrics container.MetricSet) (*info.ContainerStats, error) {
 	cgroupStats, err := cgroupManager.GetStats()
 	if err != nil {
 		return nil, err
@@ -90,16 +92,19 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int) (*info.Cont
 	stats := toContainerStats(libcontainerStats)
 
 	// If we know the pid then get network stats from /proc/<pid>/net/dev
-	if pid > 0 {
+	if pid == 0 {
+		return stats, nil
+	}
+	if !ignoreMetrics.Has(container.NetworkUsageMetrics) {
 		netStats, err := networkStatsFromProc(rootFs, pid)
 		if err != nil {
 			glog.V(2).Infof("Unable to get network stats from pid %d: %v", pid, err)
 		} else {
 			stats.Network.Interfaces = append(stats.Network.Interfaces, netStats...)
 		}
-
-		// Commenting out to disable: too CPU intensive
-		/*t, err := tcpStatsFromProc(rootFs, pid, "net/tcp")
+	}
+	if !ignoreMetrics.Has(container.NetworkTcpUsageMetrics) {
+		t, err := tcpStatsFromProc(rootFs, pid, "net/tcp")
 		if err != nil {
 			glog.V(2).Infof("Unable to get tcp stats from pid %d: %v", pid, err)
 		} else {
@@ -111,7 +116,7 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int) (*info.Cont
 			glog.V(2).Infof("Unable to get tcp6 stats from pid %d: %v", pid, err)
 		} else {
 			stats.Network.Tcp6 = t6
-		}*/
+		}
 	}
 
 	// For backwards compatibility.
@@ -211,7 +216,6 @@ func setInterfaceStatValues(fields []string, pointers []*uint64) error {
 	return nil
 }
 
-/*
 func tcpStatsFromProc(rootFs string, pid int, file string) (info.TcpStat, error) {
 	tcpStatsFile := path.Join(rootFs, "proc", strconv.Itoa(pid), file)
 
@@ -286,7 +290,6 @@ func scanTcpStats(tcpStatsFile string) (info.TcpStat, error) {
 
 	return stats, nil
 }
-*/
 
 func GetProcesses(cgroupManager cgroups.Manager) ([]int, error) {
 	pids, err := cgroupManager.GetPids()

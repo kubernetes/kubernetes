@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors All rights reserved.
 #
@@ -19,10 +19,11 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd -P)"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-branch="${1:-master}"
-# notice this uses ... to find the first shared ancestor
-if ! git diff origin/"${branch}"...HEAD | grep 'Godeps/' > /dev/null; then
+readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
+if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
+  ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/'; then
   exit 0
 fi
 
@@ -36,13 +37,14 @@ function cleanup {
 }
 trap cleanup EXIT
 
+cp -r "${KUBE_ROOT}/LICENSE" "${_tmpdir}/"
 cp -r "${KUBE_ROOT}/Godeps" "${_tmpdir}/Godeps"
 
 # Update Godep Licenses
 KUBE_ROOT="${_tmpdir}" "${KUBE_ROOT}/hack/update-godep-licenses.sh"
 
 # Compare Godep Licenses
-if ! _out="$(diff -Naupr ${KUBE_ROOT}/Godeps/LICENSES.md ${_tmpdir}/Godeps/LICENSES.md)"; then
+if ! _out="$(diff -Naupr ${KUBE_ROOT}/Godeps/LICENSES ${_tmpdir}/Godeps/LICENSES)"; then
   echo "Your godep licenses file is out of date. Run hack/update-godep-licenses.sh and commit the results."
   echo "${_out}"
   exit 1

@@ -42,10 +42,10 @@ const (
 
 JSON and YAML formats are accepted.`
 	create_example = `# Create a pod using the data in pod.json.
-$ kubectl create -f ./pod.json
+kubectl create -f ./pod.json
 
 # Create a pod based on the JSON passed into stdin.
-$ cat pod.json | kubectl create -f -`
+cat pod.json | kubectl create -f -`
 )
 
 func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -78,6 +78,8 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, out))
 	cmd.AddCommand(NewCmdCreateSecret(f, out))
+	cmd.AddCommand(NewCmdCreateConfigMap(f, out))
+	cmd.AddCommand(NewCmdCreateServiceAccount(f, out))
 	return cmd
 }
 
@@ -234,7 +236,7 @@ func RunCreateSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, 
 		RESTMapper:   mapper,
 		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
 	}
-	info, err := resourceMapper.InfoForObject(obj)
+	info, err := resourceMapper.InfoForObject(obj, nil)
 	if err != nil {
 		return err
 	}

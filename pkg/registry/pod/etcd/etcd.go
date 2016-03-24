@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
+	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -58,17 +58,12 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(
-	s storage.Interface,
-	storageDecorator generic.StorageDecorator,
-	k client.ConnectionInfoGetter,
-	proxyTransport http.RoundTripper,
-) PodStorage {
+func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper) PodStorage {
 	prefix := "/pods"
 
 	newListFunc := func() runtime.Object { return &api.PodList{} }
-	storageInterface := storageDecorator(
-		s, cachesize.GetWatchCacheSizeByResource(cachesize.Pods), &api.Pod{}, prefix, pod.Strategy, newListFunc)
+	storageInterface := opts.Decorator(
+		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.Pods), &api.Pod{}, prefix, pod.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
@@ -85,7 +80,8 @@ func NewStorage(
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return pod.MatchPod(label, field)
 		},
-		QualifiedResource: api.Resource("pods"),
+		QualifiedResource:       api.Resource("pods"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      pod.Strategy,
 		UpdateStrategy:      pod.Strategy,
@@ -179,8 +175,8 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 // assignPod assigns the given pod to the given machine.
 func (r *BindingREST) assignPod(ctx api.Context, podID string, machine string, annotations map[string]string) (err error) {
 	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations); err != nil {
-		err = etcderr.InterpretGetError(err, api.Resource("pods"), podID)
-		err = etcderr.InterpretUpdateError(err, api.Resource("pods"), podID)
+		err = storeerr.InterpretGetError(err, api.Resource("pods"), podID)
+		err = storeerr.InterpretUpdateError(err, api.Resource("pods"), podID)
 		if _, ok := err.(*errors.StatusError); !ok {
 			err = errors.NewConflict(api.Resource("pods/binding"), podID, err)
 		}

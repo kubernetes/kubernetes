@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/testing/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -275,7 +275,7 @@ func TestHandleCrash(t *testing.T) {
 }
 
 func expectResult(t *testing.T, w *worker, expectedResult results.Result, msg string) {
-	result, ok := resultsManager(w.probeManager, w.probeType).Get(testContainerID)
+	result, ok := resultsManager(w.probeManager, w.probeType).Get(w.containerID)
 	if !ok {
 		t.Errorf("[%s - %s] Expected result to be set, but was not set", w.probeType, msg)
 	} else if result != expectedResult {
@@ -304,4 +304,39 @@ type crashingExecProber struct{}
 
 func (p crashingExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
 	panic("Intentional Probe crash.")
+}
+
+func TestOnHoldOnLivenessCheckFailure(t *testing.T) {
+	m := newTestManager()
+	w := newTestWorker(m, liveness, api.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	status := getTestRunningStatus()
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+
+	// First probe should fail.
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg := "first probe"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+	if !w.onHold {
+		t.Errorf("Prober should be on hold due to liveness check failure")
+	}
+	// Set fakeExecProber to return success. However, the result will remain
+	// failure because the worker is on hold and won't probe.
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	msg = "while on hold"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+	if !w.onHold {
+		t.Errorf("Prober should be on hold due to liveness check failure")
+	}
+
+	// Set a new container ID to lift the hold. The next probe will succeed.
+	status.ContainerStatuses[0].ContainerID = "test://newCont_ID"
+	m.statusManager.SetPodStatus(w.pod, status)
+	msg = "hold lifted"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+	if w.onHold {
+		t.Errorf("Prober should not be on hold anymore")
+	}
 }

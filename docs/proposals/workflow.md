@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/proposals/workflow.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -192,7 +197,7 @@ type WorkflowStepStatus struct {
 ```
 
 `JobTemplateSpec` is already introduced by
-ScheduledJob controller proposal](https://github.com/kubernetes/kubernete2s/pull/11980).
+ScheduledJob controller proposal](https://github.com/kubernetes/kubernetes/pull/11980).
 Reported for readability:
 
 ```go
@@ -258,7 +263,7 @@ The events associated to `Workflow`s will be:
 
 ## Kubectl
 
-Kubectl will be modified to display workflows. More particulary the `describe` command
+Kubectl will be modified to display workflows. More particularly the `describe` command
 will display all the steps with their status. Steps will be topologically sorted and
 each dependency will be decorated with its status (wether or not step is waitin for
 dependency).

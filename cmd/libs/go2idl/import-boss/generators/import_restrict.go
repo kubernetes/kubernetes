@@ -32,8 +32,6 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
-
-	//"github.com/golang/glog"
 )
 
 const (
@@ -233,7 +231,7 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 // importRules produces a file with a set for a single type.
 type importRules struct {
 	myPackage *types.Package
-	imports   *generator.ImportTracker
+	imports   namer.ImportTracker
 }
 
 var (

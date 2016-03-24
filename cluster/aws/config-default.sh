@@ -31,14 +31,22 @@ if [[ -z ${NODE_SIZE} ]]; then
 fi
 
 # Dynamically set the master size by the number of nodes, these are guesses
-# TODO: gather some data
 if [[ -z ${MASTER_SIZE} ]]; then
-  if (( ${NUM_NODES} < 50 )); then
-    MASTER_SIZE="t2.micro"
-  elif (( ${NUM_NODES} < 150 )); then
-    MASTER_SIZE="t2.small"
-  else
-    MASTER_SIZE="t2.medium"
+  MASTER_SIZE="m3.medium"
+  if [[ "${NUM_NODES}" -gt "5" ]]; then
+    suggested_master_size="m3.large"
+  fi
+  if [[ "${NUM_NODES}" -gt "10" ]]; then
+    suggested_master_size="m3.xlarge"
+  fi
+  if [[ "${NUM_NODES}" -gt "100" ]]; then
+    suggested_master_size="m3.2xlarge"
+  fi
+  if [[ "${NUM_NODES}" -gt "250" ]]; then
+    suggested_master_size="c4.4xlarge"
+  fi
+  if [[ "${NUM_NODES}" -gt "500" ]]; then
+    suggested_master_size="c4.8xlarge"
   fi
 fi
 
@@ -51,6 +59,9 @@ AWS_S3_REGION=${AWS_S3_REGION:-us-east-1}
 
 # Which docker storage mechanism to use.
 DOCKER_STORAGE=${DOCKER_STORAGE:-aufs}
+
+# Extra docker options for nodes.
+EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
 
 INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-kubernetes}"
 CLUSTER_ID=${INSTANCE_PREFIX}
@@ -86,10 +97,6 @@ MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 # Runtime config
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
-# Enable various v1beta1 features
-ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-}"
-ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-}"
-
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
 #   influxdb - Heapster, InfluxDB, and Grafana
@@ -105,7 +112,7 @@ ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Don't require https for registries in our local RFC1918 network
 if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
-  EXTRA_DOCKER_OPTS="--insecure-registry ${NON_MASQUERADE_CIDR}"
+  EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS} --insecure-registry ${NON_MASQUERADE_CIDR}"
 fi
 
 # Optional: Install cluster DNS.
@@ -134,7 +141,7 @@ ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAcco
 ENABLE_NODE_PUBLIC_IP=${KUBE_ENABLE_NODE_PUBLIC_IP:-true}
 
 # OS options for minions
-KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-vivid}"
+KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-jessie}"
 KUBE_NODE_IMAGE="${KUBE_NODE_IMAGE:-}"
 COREOS_CHANNEL="${COREOS_CHANNEL:-alpha}"
 CONTAINER_RUNTIME="${KUBE_CONTAINER_RUNTIME:-docker}"

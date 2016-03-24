@@ -38,6 +38,10 @@ func (cm *containerManagerStub) GetNodeConfig() NodeConfig {
 	return NodeConfig{}
 }
 
+func (cm *containerManagerStub) Status() Status {
+	return Status{}
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{}
 }

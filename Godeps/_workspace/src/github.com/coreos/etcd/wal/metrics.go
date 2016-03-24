@@ -17,11 +17,12 @@ package wal
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
-	syncDurations = prometheus.NewSummary(prometheus.SummaryOpts{
+	syncDurations = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "etcd",
 		Subsystem: "wal",
-		Name:      "fsync_durations_microseconds",
+		Name:      "fsync_durations_seconds",
 		Help:      "The latency distributions of fsync called by wal.",
+		Buckets:   prometheus.ExponentialBuckets(0.001, 2, 14),
 	})
 	lastIndexSaved = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "etcd",

@@ -81,24 +81,3 @@ func inRoles(roles ...string) rolePredicate {
 		return ok
 	}
 }
-
-// starredRole returns a "*" if the given role is empty else the role itself
-func starredRole(name string) string {
-	if name == "" {
-		return "*"
-	}
-
-	return name
-}
-
-// stringPtrTo returns a pointer to the given string
-// or nil if it is empty string.
-func stringPtrTo(s string) *string {
-	var protos *string
-
-	if s != "" {
-		protos = &s
-	}
-
-	return protos
-}

@@ -173,8 +173,9 @@ func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
 func PodToSelectableFields(pod *api.Pod) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(pod.ObjectMeta, true)
 	podSpecificFieldsSet := fields.Set{
-		"spec.nodeName": pod.Spec.NodeName,
-		"status.phase":  string(pod.Status.Phase),
+		"spec.nodeName":      pod.Spec.NodeName,
+		"spec.restartPolicy": string(pod.Spec.RestartPolicy),
+		"status.phase":       string(pod.Status.Phase),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, podSpecificFieldsSet)
 }

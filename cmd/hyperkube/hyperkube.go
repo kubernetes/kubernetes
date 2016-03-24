@@ -29,6 +29,7 @@ import (
 	"runtime"
 
 	"k8s.io/kubernetes/pkg/util"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -72,7 +73,7 @@ func (hk *HyperKube) Flags() *pflag.FlagSet {
 	if hk.baseFlags == nil {
 		hk.baseFlags = pflag.NewFlagSet(hk.Name, pflag.ContinueOnError)
 		hk.baseFlags.SetOutput(ioutil.Discard)
-		hk.baseFlags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+		hk.baseFlags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 		hk.baseFlags.BoolVarP(&hk.helpFlagVal, "help", "h", false, "help for "+hk.Name)
 
 		// These will add all of the "global" flags (defined with both the

@@ -40,7 +40,7 @@ Creates a deployment or job to manage the created container(s).
 
 .PP
 \fB\-\-generator\fP=""
-    The name of the API generator to use.  Default is 'deployment/v1beta1' if \-\-restart=Always, otherwise the default is 'job/v1beta1'.
+    The name of the API generator to use.  Default is 'deployment/v1beta1' if \-\-restart=Always, otherwise the default is 'job/v1'.  This will happen only for cluster version at least 1.2, for olders we will fallback to 'run/v1' for \-\-restart=Always, 'run\-pod/v1' for others.
 
 .PP
 \fB\-\-hostport\fP=\-1
@@ -74,7 +74,7 @@ Creates a deployment or job to manage the created container(s).
 
 .PP
 \fB\-\-output\-version\fP=""
-    Output the formatted object with the given version (default api\-version).
+    Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
 
 .PP
 \fB\-\-overrides\fP=""
@@ -149,7 +149,7 @@ Creates a deployment or job to manage the created container(s).
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    DEPRECATED: The API version to use when talking to the server
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -242,34 +242,34 @@ Creates a deployment or job to manage the created container(s).
 
 .nf
 # Start a single instance of nginx.
-$ kubectl run nginx \-\-image=nginx
+kubectl run nginx \-\-image=nginx
 
 # Start a single instance of hazelcast and let the container expose port 5701 .
-$ kubectl run hazelcast \-\-image=hazelcast \-\-port=5701
+kubectl run hazelcast \-\-image=hazelcast \-\-port=5701
 
 # Start a single instance of hazelcast and set environment variables "DNS\_DOMAIN=cluster" and "POD\_NAMESPACE=default" in the container.
-$ kubectl run hazelcast \-\-image=hazelcast \-\-env="DNS\_DOMAIN=cluster" \-\-env="POD\_NAMESPACE=default"
+kubectl run hazelcast \-\-image=hazelcast \-\-env="DNS\_DOMAIN=cluster" \-\-env="POD\_NAMESPACE=default"
 
 # Start a replicated instance of nginx.
-$ kubectl run nginx \-\-image=nginx \-\-replicas=5
+kubectl run nginx \-\-image=nginx \-\-replicas=5
 
 # Dry run. Print the corresponding API objects without creating them.
-$ kubectl run nginx \-\-image=nginx \-\-dry\-run
+kubectl run nginx \-\-image=nginx \-\-dry\-run
 
 # Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.
-$ kubectl run nginx \-\-image=nginx \-\-overrides='{ "apiVersion": "v1", "spec": { ... } }'
+kubectl run nginx \-\-image=nginx \-\-overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
 # Start a single instance of busybox and keep it in the foreground, don't restart it if it exits.
-$ kubectl run \-i \-\-tty busybox \-\-image=busybox \-\-restart=Never
+kubectl run \-i \-\-tty busybox \-\-image=busybox \-\-restart=Never
 
 # Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
-$ kubectl run nginx \-\-image=nginx \-\- <arg1> <arg2> ... <argN>
+kubectl run nginx \-\-image=nginx \-\- <arg1> <arg2> ... <argN>
 
 # Start the nginx container using a different command and custom arguments.
-$ kubectl run nginx \-\-image=nginx \-\-command \-\- <cmd> <arg1> ... <argN>
+kubectl run nginx \-\-image=nginx \-\-command \-\- <cmd> <arg1> ... <argN>
 
 # Start the perl container to compute π to 2000 places and print it out.
-$ kubectl run pi \-\-image=perl \-\-restart=OnFailure \-\- perl \-Mbignum=bpi \-wle 'print bpi(2000)'
+kubectl run pi \-\-image=perl \-\-restart=OnFailure \-\- perl \-Mbignum=bpi \-wle 'print bpi(2000)'
 
 .fi
 .RE

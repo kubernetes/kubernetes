@@ -19,8 +19,6 @@ package volume
 import (
 	"errors"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -64,17 +62,10 @@ func (md *metricsDu) GetMetrics() (*Metrics, error) {
 
 // runDu executes the "du" command and writes the results to metrics.Used
 func (md *metricsDu) runDu(metrics *Metrics) error {
-	// Uses the same niceness level as cadvisor.fs does when running du
-	// Uses -B 1 to always scale to a blocksize of 1 byte
-	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", md.path).CombinedOutput()
+	used, err := util.Du(md.path)
 	if err != nil {
-		return fmt.Errorf("failed command 'du' on %s with error %v", md.path, err)
+		return err
 	}
-	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
-	if err != nil {
-		return fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
-	}
-	used.Format = resource.BinarySI
 	metrics.Used = used
 	return nil
 }

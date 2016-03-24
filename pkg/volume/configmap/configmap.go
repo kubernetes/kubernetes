@@ -18,7 +18,6 @@ package configmap
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -104,10 +103,6 @@ func (sv *configMapVolume) GetAttributes() volume.Attributes {
 		Managed:         true,
 		SupportsSELinux: true,
 	}
-}
-
-func (b *configMapVolumeBuilder) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, strings.EscapeQualifiedNameForDisk(configMapPluginName)), b.volName)
 }
 
 // This is the spec for the volume that this plugin wraps.

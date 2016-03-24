@@ -23,15 +23,14 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Networking", func() {
-	f := NewFramework("nettest")
+var _ = KubeDescribe("Networking", func() {
+	f := NewDefaultFramework("nettest")
 
 	var svcname = "nettest"
 
@@ -51,32 +50,7 @@ var _ = Describe("Networking", func() {
 
 	It("should provide Internet connection for containers [Conformance]", func() {
 		By("Running container which tries to wget google.com")
-		podName := "wget-test"
-		contName := "wget-test-container"
-		pod := &api.Pod{
-			TypeMeta: unversioned.TypeMeta{
-				Kind: "Pod",
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name: podName,
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:    contName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
-						Command: []string{"wget", "-s", "google.com"},
-					},
-				},
-				RestartPolicy: api.RestartPolicyNever,
-			},
-		}
-		_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-		expectNoError(err)
-		defer f.Client.Pods(f.Namespace.Name).Delete(podName, nil)
-
-		By("Verify that the pod succeed")
-		expectNoError(waitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name))
+		expectNoError(CheckConnectivityToHost(f, "", "wget-test", "google.com"))
 	})
 
 	// First test because it has no dependencies on variables created later on.
@@ -136,16 +110,9 @@ var _ = Describe("Networking", func() {
 
 		By("Creating a webserver (pending) pod on each node")
 
-		nodes := ListSchedulableNodesOrDie(f.Client)
-		// previous tests may have cause failures of some nodes. Let's skip
-		// 'Not Ready' nodes, just in case (there is no need to fail the test).
-		filterNodes(nodes, func(node api.Node) bool {
-			return !node.Spec.Unschedulable && isNodeConditionSetAsExpected(&node, api.NodeReady, true)
-		})
+		nodes, err := GetReadyNodes(f)
+		expectNoError(err)
 
-		if len(nodes.Items) == 0 {
-			Failf("No Ready nodes found.")
-		}
 		if len(nodes.Items) == 1 {
 			// in general, the test requires two nodes. But for local development, often a one node cluster
 			// is created, for simplicity and speed. (see issue #10012). We permit one-node test
@@ -157,7 +124,7 @@ var _ = Describe("Networking", func() {
 				"Rerun it with at least two nodes to get complete coverage.")
 		}
 
-		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.7")
+		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.8")
 
 		// Clean up the pods
 		defer func() {
@@ -181,26 +148,30 @@ var _ = Describe("Networking", func() {
 		//once response OK, evaluate response body for pass/fail.
 		var body []byte
 		getDetails := func() ([]byte, error) {
-			return f.Client.Get().
-				Namespace(f.Namespace.Name).
-				Prefix("proxy").
-				Resource("services").
+			proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+			if errProxy != nil {
+				return nil, errProxy
+			}
+			return proxyRequest.Namespace(f.Namespace.Name).
 				Name(svc.Name).
 				Suffix("read").
 				DoRaw()
 		}
 
 		getStatus := func() ([]byte, error) {
-			return f.Client.Get().
-				Namespace(f.Namespace.Name).
-				Prefix("proxy").
-				Resource("services").
+			proxyRequest, errProxy := getServicesProxyRequest(f.Client, f.Client.Get())
+			if errProxy != nil {
+				return nil, errProxy
+			}
+			return proxyRequest.Namespace(f.Namespace.Name).
 				Name(svc.Name).
 				Suffix("status").
 				DoRaw()
 		}
 
-		timeout := time.Now().Add(2 * time.Minute)
+		// nettest containers will wait for all service endpoints to come up for 2 minutes
+		// apply a 3 minutes observation period here to avoid this test to time out before the nettest starts to contact peers
+		timeout := time.Now().Add(3 * time.Minute)
 		for i := 0; !passed && timeout.After(time.Now()); i++ {
 			time.Sleep(2 * time.Second)
 			Logf("About to make a proxy status call")
@@ -241,6 +212,49 @@ var _ = Describe("Networking", func() {
 		Expect(string(body)).To(Equal("pass"))
 	})
 
+	// Marked with [Flaky] until the tests prove themselves stable.
+	KubeDescribe("[Flaky] Granular Checks", func() {
+
+		It("should function for pod communication on a single node", func() {
+
+			By("Picking a node")
+			nodes, err := GetReadyNodes(f)
+			expectNoError(err)
+			node := nodes.Items[0]
+
+			By("Creating a webserver pod")
+			podName := "same-node-webserver"
+			defer f.Client.Pods(f.Namespace.Name).Delete(podName, nil)
+			ip := LaunchWebserverPod(f, podName, node.Name)
+
+			By("Checking that the webserver is accessible from a pod on the same node")
+			expectNoError(CheckConnectivityToHost(f, node.Name, "same-node-wget", ip))
+		})
+
+		It("should function for pod communication between nodes", func() {
+
+			podClient := f.Client.Pods(f.Namespace.Name)
+
+			By("Picking multiple nodes")
+			nodes, err := GetReadyNodes(f)
+			expectNoError(err)
+
+			if len(nodes.Items) == 1 {
+				Skipf("The test requires two Ready nodes on %s, but found just one.", testContext.Provider)
+			}
+
+			node1 := nodes.Items[0]
+			node2 := nodes.Items[1]
+
+			By("Creating a webserver pod")
+			podName := "different-node-webserver"
+			defer podClient.Delete(podName, nil)
+			ip := LaunchWebserverPod(f, podName, node1.Name)
+
+			By("Checking that the webserver is accessible from a pod on a different node")
+			expectNoError(CheckConnectivityToHost(f, node2.Name, "different-node-wget", ip))
+		})
+	})
 })
 
 func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name, version string) []string {

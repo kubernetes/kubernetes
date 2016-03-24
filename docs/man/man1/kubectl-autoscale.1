@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl autoscale \- Auto\-scale a deployment or replication controller
+kubectl autoscale \- Auto\-scale a Deployment, ReplicaSet, or ReplicationController
 
 
 .SH SYNOPSIS
@@ -16,7 +16,7 @@ kubectl autoscale \- Auto\-scale a deployment or replication controller
 Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
 
 .PP
-Looks up a deployment or replication controller by name and creates an autoscaler that uses this deployment or replication controller as a reference.
+Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
 An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.
 
 
@@ -61,7 +61,7 @@ An autoscaler can automatically increase or decrease number of pods deployed wit
 
 .PP
 \fB\-\-output\-version\fP=""
-    Output the formatted object with the given version (default api\-version).
+    Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
 
 .PP
 \fB\-\-record\fP=false
@@ -96,7 +96,7 @@ An autoscaler can automatically increase or decrease number of pods deployed wit
 
 .PP
 \fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
+    DEPRECATED: The API version to use when talking to the server
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -189,10 +189,10 @@ An autoscaler can automatically increase or decrease number of pods deployed wit
 
 .nf
 # Auto scale a deployment "foo", with the number of pods between 2 to 10, target CPU utilization at a default value that server applies:
-$ kubectl autoscale deployment foo \-\-min=2 \-\-max=10
+kubectl autoscale deployment foo \-\-min=2 \-\-max=10
 
 # Auto scale a replication controller "foo", with the number of pods between 1 to 5, target CPU utilization at 80%:
-$ kubectl autoscale rc foo \-\-max=5 \-\-cpu\-percent=80
+kubectl autoscale rc foo \-\-max=5 \-\-cpu\-percent=80
 
 .fi
 .RE

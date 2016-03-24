@@ -24,8 +24,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 )
@@ -59,14 +59,14 @@ type streamExecutor struct {
 // multiplexed bidirectional streams. The current implementation uses SPDY,
 // but this could be replaced with HTTP/2 once it's available, or something else.
 // TODO: the common code between this and portforward could be abstracted.
-func NewExecutor(config *client.Config, method string, url *url.URL) (StreamExecutor, error) {
-	tlsConfig, err := client.TLSConfigFor(config)
+func NewExecutor(config *restclient.Config, method string, url *url.URL) (StreamExecutor, error) {
+	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
 		return nil, err
 	}
 
 	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig)
-	wrapper, err := client.HTTPWrappersForConfig(config, upgradeRoundTripper)
+	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
 		return nil, err
 	}

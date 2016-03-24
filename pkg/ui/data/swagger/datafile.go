@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ func third_party_swagger_ui_license() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/LICENSE", size: 596, mode: os.FileMode(416), modTime: time.Unix(1430166950, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/LICENSE", size: 596, mode: os.FileMode(416), modTime: time.Unix(1423116215, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -121,7 +121,7 @@ func third_party_swagger_ui_readme_md() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/README.md", size: 940, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/README.md", size: 931, mode: os.FileMode(416), modTime: time.Unix(1449869777, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -263,7 +263,7 @@ func third_party_swagger_ui_css_reset_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/css/reset.css", size: 1066, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/css/reset.css", size: 1066, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1536,7 +1536,7 @@ func third_party_swagger_ui_css_screen_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/css/screen.css", size: 43042, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/css/screen.css", size: 43042, mode: os.FileMode(416), modTime: time.Unix(1449047502, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1579,7 +1579,7 @@ func third_party_swagger_ui_css_typography_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/css/typography.css", size: 1474, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/css/typography.css", size: 1474, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1596,7 +1596,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_eot() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.eot", size: 22924, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.eot", size: 22924, mode: os.FileMode(416), modTime: time.Unix(1449047502, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2024,7 +2024,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.svg", size: 73575, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.svg", size: 73575, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2041,7 +2041,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_ttf() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.ttf", size: 40516, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.ttf", size: 40516, mode: os.FileMode(416), modTime: time.Unix(1449047502, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2058,7 +2058,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_woff() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.woff", size: 25992, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.woff", size: 25992, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2075,7 +2075,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_woff2() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.woff2", size: 11480, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.woff2", size: 11480, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2092,7 +2092,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_eot() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.eot", size: 22008, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.eot", size: 22008, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2512,7 +2512,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_svg() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.svg", size: 72148, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.svg", size: 72148, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2529,7 +2529,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_ttf() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.ttf", size: 39072, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.ttf", size: 39072, mode: os.FileMode(416), modTime: time.Unix(1449047502, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2546,7 +2546,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_woff() (*asset, er
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.woff", size: 24868, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.woff", size: 24868, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2563,7 +2563,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_woff2() (*asset, e
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.woff2", size: 11304, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.woff2", size: 11304, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2580,7 +2580,7 @@ func third_party_swagger_ui_images_explorer_icons_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/explorer_icons.png", size: 5763, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/explorer_icons.png", size: 5763, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2597,7 +2597,7 @@ func third_party_swagger_ui_images_logo_small_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/logo_small.png", size: 770, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/logo_small.png", size: 770, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2614,7 +2614,7 @@ func third_party_swagger_ui_images_pet_store_api_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/pet_store_api.png", size: 824, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/pet_store_api.png", size: 824, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2631,7 +2631,7 @@ func third_party_swagger_ui_images_throbber_gif() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/throbber.gif", size: 9257, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/throbber.gif", size: 9257, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2648,115 +2648,12 @@ func third_party_swagger_ui_images_wordnik_api_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/wordnik_api.png", size: 980, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/wordnik_api.png", size: 980, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
 var _third_party_swagger_ui_index_html = []byte(`<!DOCTYPE html>
-<html>
-<head>
-  <title>Swagger UI</title>
-  <link rel="icon" type="image/png" href="images/favicon-32x32.png" sizes="32x32" />
-  <link rel="icon" type="image/png" href="images/favicon-16x16.png" sizes="16x16" />
-  <link href='css/typography.css' media='screen' rel='stylesheet' type='text/css'/>
-  <link href='css/reset.css' media='screen' rel='stylesheet' type='text/css'/>
-  <link href='css/screen.css' media='screen' rel='stylesheet' type='text/css'/>
-  <link href='css/reset.css' media='print' rel='stylesheet' type='text/css'/>
-  <link href='css/print.css' media='print' rel='stylesheet' type='text/css'/>
-  <script src='lib/jquery-1.8.0.min.js' type='text/javascript'></script>
-  <script src='lib/jquery.slideto.min.js' type='text/javascript'></script>
-  <script src='lib/jquery.wiggle.min.js' type='text/javascript'></script>
-  <script src='lib/jquery.ba-bbq.min.js' type='text/javascript'></script>
-  <script src='lib/handlebars-2.0.0.js' type='text/javascript'></script>
-  <script src='lib/underscore-min.js' type='text/javascript'></script>
-  <script src='lib/backbone-min.js' type='text/javascript'></script>
-  <script src='swagger-ui.js' type='text/javascript'></script>
-  <script src='lib/highlight.7.3.pack.js' type='text/javascript'></script>
-  <script src='lib/marked.js' type='text/javascript'></script>
-  <script src='lib/swagger-oauth.js' type='text/javascript'></script>
-
-  <script type="text/javascript">
-    $(function () {
-      var url = window.location.search.match(/url=([^&]+)/);
-      if (url && url.length > 1) {
-        url = decodeURIComponent(url[1]);
-      } else {
-        url = "../../swaggerapi";
-      }
-      window.swaggerUi = new SwaggerUi({
-        url: url,
-        dom_id: "swagger-ui-container",
-        supportedSubmitMethods: [],
-        onComplete: function(swaggerApi, swaggerUi){
-          if(typeof initOAuth == "function") {
-            initOAuth({
-              clientId: "your-client-id",
-              realm: "your-realms",
-              appName: "your-app-name"
-            });
-          }
-
-          $('pre code').each(function(i, e) {
-            hljs.highlightBlock(e)
-          });
-
-          addApiKeyAuthorization();
-        },
-        onFailure: function(data) {
-          log("Unable to Load SwaggerUI");
-        },
-        docExpansion: "none",
-        apisSorter: "alpha",
-        showRequestHeaders: false
-      });
-
-      function addApiKeyAuthorization(){
-        var key = encodeURIComponent($('#input_apiKey')[0].value);
-        if(key && key.trim() != "") {
-            var apiKeyAuth = new SwaggerClient.ApiKeyAuthorization("api_key", key, "query");
-            window.swaggerUi.api.clientAuthorizations.add("api_key", apiKeyAuth);
-            log("added key " + key);
-        }
-      }
-
-      $('#input_apiKey').change(addApiKeyAuthorization);
-
-      // if you have an apiKey you would like to pre-populate on the page for demonstration purposes...
-      /*
-        var apiKey = "myApiKeyXXXX123456789";
-        $('#input_apiKey').val(apiKey);
-      */
-
-      window.swaggerUi.load();
-
-      function log() {
-        if ('console' in window) {
-          console.log.apply(console, arguments);
-        }
-      }
-  });
-  </script>
-</head>
-
-<body class="swagger-section">
-<div id='header'>
-  <div class="swagger-ui-wrap">
-    <a id="logo" href="http://swagger.io">swagger</a>
-    <form id='api_selector'>
-      <div class='input'><input placeholder="http://example.com/api" id="input_baseUrl" name="baseUrl" type="text"/></div>
-      <div class='input'><input placeholder="api_key" id="input_apiKey" name="apiKey" type="text"/></div>
-      <div class='input'><a id="explore" href="#">Explore</a></div>
-    </form>
-  </div>
-</div>
-
-<div id="message-bar" class="swagger-ui-wrap">&nbsp;</div>
-<div id="swagger-ui-container" class="swagger-ui-wrap"></div>
-</body>
-</html>
-=======
-<!DOCTYPE html>
 <html>
 <head>
   <title>Swagger UI</title>
@@ -2782,12 +2679,7 @@ var _third_party_swagger_ui_index_html = []byte(`<!DOCTYPE html>
   <script src='lib/swagger-oauth.js' type='text/javascript'></script>
   <script type="text/javascript">
     $(function () {
-      var url = window.location.search.match(/url=([^&]+)/);
-      if (url && url.length > 1) {
-        url = decodeURIComponent(url[1]);
-      } else {
-        url = "../../swagger-spec/";
-      }
+      var url = "../../swaggerapi";
       window.swaggerUi = new SwaggerUi({
         url: url,
         dom_id: "swagger-ui-container",
@@ -2866,7 +2758,7 @@ func third_party_swagger_ui_index_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/index.html", size: 7683, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/index.html", size: 3561, mode: os.FileMode(416), modTime: time.Unix(1458347707, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2897,7 +2789,7 @@ func third_party_swagger_ui_lib_backbone_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/backbone-min.js", size: 20390, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/backbone-min.js", size: 20390, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5192,7 +5084,7 @@ func third_party_swagger_ui_lib_handlebars_1_0_0_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-1.0.0.js", size: 72766, mode: os.FileMode(416), modTime: time.Unix(1430166950, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-1.0.0.js", size: 72766, mode: os.FileMode(416), modTime: time.Unix(1423116215, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5236,7 +5128,7 @@ func third_party_swagger_ui_lib_handlebars_2_0_0_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-2.0.0.js", size: 48517, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-2.0.0.js", size: 48517, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5253,7 +5145,7 @@ func third_party_swagger_ui_lib_highlight_7_3_pack_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/highlight.7.3.pack.js", size: 7499, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/highlight.7.3.pack.js", size: 7499, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5271,7 +5163,7 @@ func third_party_swagger_ui_lib_jquery_1_8_0_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery-1.8.0.min.js", size: 92556, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery-1.8.0.min.js", size: 92556, mode: os.FileMode(416), modTime: time.Unix(1449047502, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5305,7 +5197,7 @@ func third_party_swagger_ui_lib_jquery_ba_bbq_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.ba-bbq.min.js", size: 4119, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.ba-bbq.min.js", size: 4119, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5323,7 +5215,7 @@ func third_party_swagger_ui_lib_jquery_slideto_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.slideto.min.js", size: 369, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.slideto.min.js", size: 369, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5347,7 +5239,7 @@ func third_party_swagger_ui_lib_jquery_wiggle_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.wiggle.min.js", size: 762, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.wiggle.min.js", size: 762, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6635,7 +6527,7 @@ func third_party_swagger_ui_lib_marked_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/marked.js", size: 28156, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/marked.js", size: 28156, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6844,7 +6736,7 @@ func third_party_swagger_ui_lib_shred_content_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred/content.js", size: 6862, mode: os.FileMode(416), modTime: time.Unix(1430166950, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred/content.js", size: 6862, mode: os.FileMode(416), modTime: time.Unix(1423116215, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -9625,7 +9517,7 @@ func third_party_swagger_ui_lib_shred_bundle_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred.bundle.js", size: 88050, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred.bundle.js", size: 88050, mode: os.FileMode(416), modTime: time.Unix(1423116215, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -12573,7 +12465,7 @@ func third_party_swagger_ui_lib_swagger_client_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-client.js", size: 86354, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-client.js", size: 86354, mode: os.FileMode(416), modTime: time.Unix(1423116215, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -12864,7 +12756,7 @@ func third_party_swagger_ui_lib_swagger_oauth_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-oauth.js", size: 8580, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-oauth.js", size: 8580, mode: os.FileMode(416), modTime: time.Unix(1449047502, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -14576,7 +14468,7 @@ func third_party_swagger_ui_lib_swagger_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger.js", size: 53321, mode: os.FileMode(416), modTime: time.Unix(1430166950, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger.js", size: 53321, mode: os.FileMode(416), modTime: time.Unix(1423116215, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -14598,7 +14490,7 @@ func third_party_swagger_ui_lib_underscore_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/underscore-min.js", size: 15626, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/underscore-min.js", size: 15626, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -14634,7 +14526,7 @@ func third_party_swagger_ui_o2c_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/o2c.html", size: 449, mode: os.FileMode(416), modTime: time.Unix(1436315902, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/o2c.html", size: 449, mode: os.FileMode(416), modTime: time.Unix(1436317036, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -16891,7 +16783,7 @@ func third_party_swagger_ui_swagger_ui_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.js", size: 110246, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.js", size: 110246, mode: os.FileMode(416), modTime: time.Unix(1449047502, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -16909,7 +16801,7 @@ func third_party_swagger_ui_swagger_ui_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.min.js", size: 63466, mode: os.FileMode(416), modTime: time.Unix(1439166011, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.min.js", size: 63466, mode: os.FileMode(416), modTime: time.Unix(1449047502, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

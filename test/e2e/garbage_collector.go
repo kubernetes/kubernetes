@@ -17,20 +17,21 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
 //
 // Slow by design (7 min)
-var _ = Describe("Garbage collector [Slow]", func() {
-	f := NewFramework("garbage-collector")
+var _ = KubeDescribe("Garbage collector [Slow]", func() {
+	f := NewDefaultFramework("garbage-collector")
 	It("should handle the creation of 1000 pods", func() {
 		SkipUnlessProviderIs("gce")
 
@@ -51,14 +52,30 @@ var _ = Describe("Garbage collector [Slow]", func() {
 		}
 
 		Logf("created: %v", count)
-		// This sleep has to be longer than the gcCheckPeriod defined
-		// in pkg/controller/gc/gc_controller.go which is currently
-		// 20 seconds.
-		time.Sleep(30 * time.Second)
 
-		pods, err := f.Client.Pods(f.Namespace.Name).List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		Expect(len(pods.Items)).To(BeNumerically("==", 100))
+		// The gc controller polls every 30s and fires off a goroutine per
+		// pod to terminate.
+		var err error
+		var pods *api.PodList
+		timeout := 2 * time.Minute
+		gcThreshold := 100
+
+		By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
+		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
+			pods, err = f.Client.Pods(f.Namespace.Name).List(api.ListOptions{})
+			if err != nil {
+				Logf("Failed to list pod %v", err)
+				return false, nil
+			}
+			if len(pods.Items) != gcThreshold {
+				Logf("Number of observed pods %v, waiting for %v", len(pods.Items), gcThreshold)
+				return false, nil
+			}
+			return true, nil
+		})
+		if pollErr != nil {
+			Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
+		}
 	})
 })
 
@@ -67,9 +84,11 @@ func createTerminatingPod(f *Framework) (*api.Pod, error) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: string(uuid),
+			Annotations: map[string]string{
+				"scheduler.alpha.kubernetes.io/name": "please don't schedule my pods",
+			},
 		},
 		Spec: api.PodSpec{
-			NodeName: "nonexistant-node",
 			Containers: []api.Container{
 				{
 					Name:  string(uuid),

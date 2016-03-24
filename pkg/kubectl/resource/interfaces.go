@@ -19,7 +19,7 @@ package resource
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	client "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // RESTClient is a client helper for dealing with RESTful resources

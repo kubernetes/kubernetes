@@ -17,16 +17,12 @@ limitations under the License.
 package unversioned_test
 
 import (
-	. "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
-)
-
-import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
 func getReplicaSetResourceName() string {
@@ -53,7 +49,7 @@ func TestListReplicaSets(t *testing.T) {
 						},
 						Spec: extensions.ReplicaSetSpec{
 							Replicas: 2,
-							Template: &api.PodTemplateSpec{},
+							Template: api.PodTemplateSpec{},
 						},
 					},
 				},
@@ -80,7 +76,7 @@ func TestGetReplicaSet(t *testing.T) {
 				},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -119,7 +115,7 @@ func TestUpdateReplicaSet(t *testing.T) {
 				},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -147,7 +143,7 @@ func TestUpdateStatusReplicaSet(t *testing.T) {
 				},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 				Status: extensions.ReplicaSetStatus{
 					Replicas: 2,
@@ -187,7 +183,7 @@ func TestCreateReplicaSet(t *testing.T) {
 				},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
-					Template: &api.PodTemplateSpec{},
+					Template: api.PodTemplateSpec{},
 				},
 			},
 		},

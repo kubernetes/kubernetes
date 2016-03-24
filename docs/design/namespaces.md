@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/design/namespaces.md).
+[here](http://releases.k8s.io/release-1.2/docs/design/namespaces.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -294,7 +294,7 @@ User deletes the Namespace in Kubernetes, and Namespace now has following state:
   "kind": "Namespace",
   "metadata": {
     "name": "development",
-    "deletionTimestamp": "..."
+    "deletionTimestamp": "...",
     "labels": {
       "name": "development"
     }
@@ -319,7 +319,7 @@ removing *kubernetes* from the list of finalizers:
   "kind": "Namespace",
   "metadata": {
     "name": "development",
-    "deletionTimestamp": "..."
+    "deletionTimestamp": "...",
     "labels": {
       "name": "development"
     }
@@ -347,7 +347,7 @@ This results in the following state:
   "kind": "Namespace",
   "metadata": {
     "name": "development",
-    "deletionTimestamp": "..."
+    "deletionTimestamp": "...",
     "labels": {
       "name": "development"
     }

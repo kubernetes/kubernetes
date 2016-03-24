@@ -302,11 +302,15 @@ func (g *conversionGenerator) generateConversionsForSlice(inType, outType reflec
 }
 
 func (g *conversionGenerator) generateConversionsForStruct(inType, outType reflect.Type) error {
+	errs := []string{}
 	for i := 0; i < inType.NumField(); i++ {
 		inField := inType.Field(i)
 		outField, found := outType.FieldByName(inField.Name)
 		if !found {
-			return fmt.Errorf("couldn't find a corresponding field %v in %v", inField.Name, outType)
+			// aggregate the errors so we can return them at the end but still provide
+			// best effort for generation for other fields in this type
+			errs = append(errs, fmt.Sprintf("couldn't find a corresponding field %v in %v", inField.Name, outType))
+			continue
 		}
 		if isComplexType(inField.Type) {
 			if err := g.generateConversionsBetween(inField.Type, outField.Type); err != nil {
@@ -314,7 +318,11 @@ func (g *conversionGenerator) generateConversionsForStruct(inType, outType refle
 			}
 		}
 	}
-	return nil
+
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf(strings.Join(errs, ","))
 }
 
 // A buffer of lines that will be written.

@@ -13,9 +13,20 @@ option (gogoproto.goproto_getters_all) = false;
 // An InternalRaftRequest is the union of all requests which can be
 // sent via raft.
 message InternalRaftRequest {
-    Request v2 = 1;
-    RangeRequest range = 2;
-    PutRequest put = 3;
-    DeleteRangeRequest delete_range = 4;
-    TxnRequest txn = 5;
+  uint64 ID = 1;
+  Request v2 = 2;
+
+  RangeRequest range = 3;
+  PutRequest put = 4;
+  DeleteRangeRequest delete_range = 5;
+  TxnRequest txn = 6;
+  CompactionRequest compaction = 7;
+
+  LeaseCreateRequest lease_create = 8;
+  LeaseRevokeRequest lease_revoke = 9;
+
+  AuthEnableRequest auth_enable = 10;
+}
+
+message EmptyResponse {
 }

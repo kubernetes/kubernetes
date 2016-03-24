@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -1123,17 +1124,19 @@ func TestValidateVolumeMounts(t *testing.T) {
 
 	successCase := []api.VolumeMount{
 		{Name: "abc", MountPath: "/foo"},
-		{Name: "123", MountPath: "/foo"},
-		{Name: "abc-123", MountPath: "/bar"},
+		{Name: "123", MountPath: "/bar"},
+		{Name: "abc-123", MountPath: "/baz"},
 	}
 	if errs := validateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	errorCases := map[string][]api.VolumeMount{
-		"empty name":      {{Name: "", MountPath: "/foo"}},
-		"name not found":  {{Name: "", MountPath: "/foo"}},
-		"empty mountpath": {{Name: "abc", MountPath: ""}},
+		"empty name":          {{Name: "", MountPath: "/foo"}},
+		"name not found":      {{Name: "", MountPath: "/foo"}},
+		"empty mountpath":     {{Name: "abc", MountPath: ""}},
+		"colon mountpath":     {{Name: "abc", MountPath: "foo:bar"}},
+		"mountpath collision": {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
 	}
 	for k, v := range errorCases {
 		if errs := validateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
@@ -2620,22 +2623,28 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "invalid port headless",
+			name: "invalid port headless 1",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Ports[0].Port = 11722
 				s.Spec.Ports[0].TargetPort = intstr.FromInt(11721)
 				s.Spec.ClusterIP = api.ClusterIPNone
 			},
-			numErrs: 1,
+			// in the v1 API, targetPorts on headless services were tolerated.
+			// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
+			// numErrs: 1,
+			numErrs: 0,
 		},
 		{
-			name: "invalid port headless",
+			name: "invalid port headless 2",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Ports[0].Port = 11722
 				s.Spec.Ports[0].TargetPort = intstr.FromString("target")
 				s.Spec.ClusterIP = api.ClusterIPNone
 			},
-			numErrs: 1,
+			// in the v1 API, targetPorts on headless services were tolerated.
+			// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
+			// numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "invalid publicIPs localhost",
@@ -2868,6 +2877,34 @@ func TestValidateService(t *testing.T) {
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid LoadBalancer source range annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/8,  5.6.7.8/16"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "empty LoadBalancer source range annotation",
+			tweakSvc: func(s *api.Service) {
+				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = ""
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid LoadBalancer source range annotation (hostname)",
+			tweakSvc: func(s *api.Service) {
+				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid LoadBalancer source range annotation (invalid CIDR)",
+			tweakSvc: func(s *api.Service) {
+				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/33"
 			},
 			numErrs: 1,
 		},
@@ -3828,6 +3865,14 @@ func getResourceList(cpu, memory string) api.ResourceList {
 	return res
 }
 
+func getStorageResourceList(storage string) api.ResourceList {
+	res := api.ResourceList{}
+	if storage != "" {
+		res[api.ResourceStorage] = resource.MustParse(storage)
+	}
+	return res
+}
+
 func TestValidateLimitRange(t *testing.T) {
 	successCases := []struct {
 		name string
@@ -3865,6 +3910,36 @@ func TestValidateLimitRange(t *testing.T) {
 						Default:              getResourceList("50m", "500Mi"),
 						DefaultRequest:       getResourceList("10m", "200Mi"),
 						MaxLimitRequestRatio: getResourceList("10", ""),
+					},
+				},
+			},
+		},
+		{
+			name: "thirdparty-fields-all-valid-standard-container-resources",
+			spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 "thirdparty.com/foo",
+						Max:                  getResourceList("100m", "10000T"),
+						Min:                  getResourceList("5m", "100Mi"),
+						Default:              getResourceList("50m", "500Mi"),
+						DefaultRequest:       getResourceList("10m", "200Mi"),
+						MaxLimitRequestRatio: getResourceList("10", ""),
+					},
+				},
+			},
+		},
+		{
+			name: "thirdparty-fields-all-valid-storage-resources",
+			spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 "thirdparty.com/foo",
+						Max:                  getStorageResourceList("10000T"),
+						Min:                  getStorageResourceList("100Mi"),
+						Default:              getStorageResourceList("500Mi"),
+						DefaultRequest:       getStorageResourceList("200Mi"),
+						MaxLimitRequestRatio: getStorageResourceList(""),
 					},
 				},
 			},
@@ -4016,6 +4091,21 @@ func TestValidateLimitRange(t *testing.T) {
 			}},
 			"ratio 10 is greater than max/min = 4.000000",
 		},
+		"invalid non standard limit type": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 "foo",
+						Max:                  getStorageResourceList("10000T"),
+						Min:                  getStorageResourceList("100Mi"),
+						Default:              getStorageResourceList("500Mi"),
+						DefaultRequest:       getStorageResourceList("200Mi"),
+						MaxLimitRequestRatio: getStorageResourceList(""),
+					},
+				},
+			}},
+			"must be a standard limit type or fully qualified",
+		},
 	}
 
 	for k, v := range errorCases {
@@ -4038,10 +4128,52 @@ func TestValidateResourceQuota(t *testing.T) {
 		Hard: api.ResourceList{
 			api.ResourceCPU:                    resource.MustParse("100"),
 			api.ResourceMemory:                 resource.MustParse("10000"),
+			api.ResourceRequestsCPU:            resource.MustParse("100"),
+			api.ResourceRequestsMemory:         resource.MustParse("10000"),
+			api.ResourceLimitsCPU:              resource.MustParse("100"),
+			api.ResourceLimitsMemory:           resource.MustParse("10000"),
 			api.ResourcePods:                   resource.MustParse("10"),
 			api.ResourceServices:               resource.MustParse("0"),
 			api.ResourceReplicationControllers: resource.MustParse("10"),
 			api.ResourceQuotas:                 resource.MustParse("10"),
+			api.ResourceConfigMaps:             resource.MustParse("10"),
+			api.ResourceSecrets:                resource.MustParse("10"),
+		},
+	}
+
+	terminatingSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU:       resource.MustParse("100"),
+			api.ResourceLimitsCPU: resource.MustParse("200"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeTerminating},
+	}
+
+	nonTerminatingSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotTerminating},
+	}
+
+	bestEffortSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourcePods: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+	}
+
+	nonBestEffortSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotBestEffort},
+	}
+
+	// storage is not yet supported as a quota tracked resource
+	invalidQuotaResourceSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceStorage: resource.MustParse("10"),
 		},
 	}
 
@@ -4053,6 +4185,8 @@ func TestValidateResourceQuota(t *testing.T) {
 			api.ResourceServices:               resource.MustParse("-10"),
 			api.ResourceReplicationControllers: resource.MustParse("-10"),
 			api.ResourceQuotas:                 resource.MustParse("-10"),
+			api.ResourceConfigMaps:             resource.MustParse("-10"),
+			api.ResourceSecrets:                resource.MustParse("-10"),
 		},
 	}
 
@@ -4071,6 +4205,27 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 	}
 
+	invalidTerminatingScopePairsSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeTerminating, api.ResourceQuotaScopeNotTerminating},
+	}
+
+	invalidBestEffortScopePairsSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourcePods: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort, api.ResourceQuotaScopeNotBestEffort},
+	}
+
+	invalidScopeNameSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScope("foo")},
+	}
+
 	successCases := []api.ResourceQuota{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -4085,6 +4240,34 @@ func TestValidateResourceQuota(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: fractionalComputeSpec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: terminatingSpec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: nonTerminatingSpec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: bestEffortSpec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: nonBestEffortSpec,
 		},
 	}
 
@@ -4121,6 +4304,22 @@ func TestValidateResourceQuota(t *testing.T) {
 		"fractional-api-resource": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: fractionalPodSpec},
 			isNotIntegerErrorMsg,
+		},
+		"invalid-quota-resource": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidQuotaResourceSpec},
+			isInvalidQuotaResource,
+		},
+		"invalid-quota-terminating-pair": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidTerminatingScopePairsSpec},
+			"conflicting scopes",
+		},
+		"invalid-quota-besteffort-pair": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidBestEffortScopePairsSpec},
+			"conflicting scopes",
+		},
+		"invalid-quota-scope-name": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
+			"unsupported scope",
 		},
 	}
 	for k, v := range errorCases {
@@ -5105,5 +5304,42 @@ func TestValidateConfigMapUpdate(t *testing.T) {
 		if !tc.isValid && len(errs) == 0 {
 			t.Errorf("%v: unexpected non-error", tc.name)
 		}
+	}
+}
+
+func TestValidateHasLabel(t *testing.T) {
+	successCase := api.ObjectMeta{
+		Name:      "123",
+		Namespace: "ns",
+		Labels: map[string]string{
+			"other": "blah",
+			"foo":   "bar",
+		},
+	}
+	if errs := ValidateHasLabel(successCase, field.NewPath("field"), "foo", "bar"); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	missingCase := api.ObjectMeta{
+		Name:      "123",
+		Namespace: "ns",
+		Labels: map[string]string{
+			"other": "blah",
+		},
+	}
+	if errs := ValidateHasLabel(missingCase, field.NewPath("field"), "foo", "bar"); len(errs) == 0 {
+		t.Errorf("expected failure")
+	}
+
+	wrongValueCase := api.ObjectMeta{
+		Name:      "123",
+		Namespace: "ns",
+		Labels: map[string]string{
+			"other": "blah",
+			"foo":   "notbar",
+		},
+	}
+	if errs := ValidateHasLabel(wrongValueCase, field.NewPath("field"), "foo", "bar"); len(errs) == 0 {
+		t.Errorf("expected failure")
 	}
 }

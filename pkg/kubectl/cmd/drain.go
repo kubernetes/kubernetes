@@ -53,7 +53,7 @@ const (
 	cordon_long = `Mark node as unschedulable.
 `
 	cordon_example = `# Mark node "foo" as unschedulable.
-$ kubectl cordon foo
+kubectl cordon foo
 `
 )
 
@@ -103,7 +103,7 @@ Then drain deletes all pods except mirror pods (which cannot be deleted through
 the API server).  If there are DaemonSet-managed pods, drain will not proceed
 without --ignore-daemonsets, and regardless it will not delete any
 DaemonSet-managed pods, because those pods would be immediately replaced by the
-DaemonSet controller, which ignores unschedulable marknigs.  If there are any
+DaemonSet controller, which ignores unschedulable markings.  If there are any
 pods that are neither mirror pods nor managed--by ReplicationController,
 DaemonSet or Job--, then drain will not delete any pods unless you use --force.
 
@@ -242,7 +242,7 @@ func (o *DrainOptions) getPodsForDeletion() ([]api.Pod, error) {
 					daemonset_pod = true
 				}
 			} else if sr.Reference.Kind == "Job" {
-				job, err := o.client.Jobs(sr.Reference.Namespace).Get(sr.Reference.Name)
+				job, err := o.client.ExtensionsClient.Jobs(sr.Reference.Namespace).Get(sr.Reference.Name)
 
 				// Assume the only reason for an error is because the Job is
 				// gone/missing, not for any other cause.  TODO(mml): something more

@@ -18,6 +18,11 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.2/docs/proposals/federation-lite.md).
+
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -37,7 +42,7 @@ Full Ubernetes will offer sophisticated federation between multiple kuberentes
 clusters, offering true high-availability, multiple provider support &
 cloud-bursting, multiple region support etc.  However, many users have
 expressed a desire for a "reasonably" high-available cluster, that runs in
-multiple zones on GCE or availablity zones in AWS, and can tolerate the failure
+multiple zones on GCE or availability zones in AWS, and can tolerate the failure
 of a single zone without the complexity of running multiple clusters.
 
 Ubernetes-Lite aims to deliver exactly that functionality: to run a single
@@ -88,7 +93,7 @@ The implementation of this will be described in the implementation section.
 
 Note that zone spreading is 'best effort'; zones are just be one of the factors
 in making scheduling decisions, and thus it is not guaranteed that pods will
-spread evenly across zones.  However, this is likely desireable: if a zone is
+spread evenly across zones.  However, this is likely desirable: if a zone is
 overloaded or failing, we still want to schedule the requested number of pods.
 
 ### Volume affinity

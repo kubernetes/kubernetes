@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 type testDecodable struct {
@@ -113,7 +113,8 @@ func TestDecode(t *testing.T) {
 
 			expectedGVK: &unversioned.GroupVersionKind{},
 			expectedObject: &runtime.Unknown{
-				RawJSON: []byte(`{}`),
+				Raw:         []byte(`{}`),
+				ContentType: runtime.ContentTypeJSON,
 			},
 		},
 		{
@@ -122,7 +123,8 @@ func TestDecode(t *testing.T) {
 
 			expectedGVK: &unversioned.GroupVersionKind{},
 			expectedObject: &runtime.Unknown{
-				RawJSON: []byte(`{"test":"object"}`),
+				Raw:         []byte(`{"test":"object"}`),
+				ContentType: runtime.ContentTypeJSON,
 			},
 		},
 		{
@@ -131,8 +133,9 @@ func TestDecode(t *testing.T) {
 			defaultGVK:  &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedObject: &runtime.Unknown{
-				TypeMeta: runtime.TypeMeta{APIVersion: "other/blah", Kind: "Test"},
-				RawJSON:  []byte(`{"test":"object"}`),
+				TypeMeta:    runtime.TypeMeta{APIVersion: "other/blah", Kind: "Test"},
+				Raw:         []byte(`{"test":"object"}`),
+				ContentType: runtime.ContentTypeJSON,
 			},
 		},
 
@@ -241,7 +244,7 @@ func TestDecode(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(test.expectedObject, obj) {
-			t.Errorf("%d: unexpected object:\n%s", i, util.ObjectGoPrintSideBySide(test.expectedObject, obj))
+			t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintSideBySide(test.expectedObject, obj))
 		}
 	}
 }

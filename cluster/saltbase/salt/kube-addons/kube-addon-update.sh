@@ -481,6 +481,7 @@ function update-addons() {
     # That's why we pass an empty string as the version separator.
     # If the description differs on disk, the object should be recreated.
     # This is not implemented in this version.
+    reconcile-objects ${addon_path} Deployment "" &
     reconcile-objects ${addon_path} Service "" &
     reconcile-objects ${addon_path} PersistentVolume "" &
     reconcile-objects ${addon_path} PersistentVolumeClaim "" &

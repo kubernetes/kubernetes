@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Implements RESTScope interface
@@ -81,6 +80,9 @@ type DefaultRESTMapper struct {
 	pluralToSingular     map[unversioned.GroupVersionResource]unversioned.GroupVersionResource
 
 	interfacesFunc VersionInterfacesFunc
+
+	// aliasToResource is used for mapping aliases to resources
+	aliasToResource map[string][]string
 }
 
 func (m *DefaultRESTMapper) String() string {
@@ -104,6 +106,7 @@ func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, f Ver
 	kindToScope := make(map[unversioned.GroupVersionKind]RESTScope)
 	singularToPlural := make(map[unversioned.GroupVersionResource]unversioned.GroupVersionResource)
 	pluralToSingular := make(map[unversioned.GroupVersionResource]unversioned.GroupVersionResource)
+	aliasToResource := make(map[string][]string)
 	// TODO: verify name mappings work correctly when versions differ
 
 	return &DefaultRESTMapper{
@@ -113,6 +116,7 @@ func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, f Ver
 		defaultGroupVersions: defaultGroupVersions,
 		singularToPlural:     singularToPlural,
 		pluralToSingular:     pluralToSingular,
+		aliasToResource:      aliasToResource,
 		interfacesFunc:       f,
 	}
 }
@@ -330,23 +334,8 @@ func (m *DefaultRESTMapper) KindFor(resource unversioned.GroupVersionResource) (
 	if err != nil {
 		return unversioned.GroupVersionKind{}, err
 	}
-
-	// TODO for each group, choose the most preferred (first) version.  This keeps us consistent with code today.
-	// eventually, we'll need a RESTMapper that is aware of what's available server-side and deconflicts that with
-	// user preferences
-	oneKindPerGroup := []unversioned.GroupVersionKind{}
-	groupsAdded := sets.String{}
-	for _, kind := range kinds {
-		if groupsAdded.Has(kind.Group) {
-			continue
-		}
-
-		oneKindPerGroup = append(oneKindPerGroup, kind)
-		groupsAdded.Insert(kind.Group)
-	}
-
-	if len(oneKindPerGroup) == 1 {
-		return oneKindPerGroup[0], nil
+	if len(kinds) == 1 {
+		return kinds[0], nil
 	}
 
 	return unversioned.GroupVersionKind{}, &AmbiguousResourceError{PartialResource: resource, MatchingKinds: kinds}
@@ -504,20 +493,17 @@ func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 	return retVal, nil
 }
 
-// aliasToResource is used for mapping aliases to resources
-var aliasToResource = map[string][]string{}
-
 // AddResourceAlias maps aliases to resources
 func (m *DefaultRESTMapper) AddResourceAlias(alias string, resources ...string) {
 	if len(resources) == 0 {
 		return
 	}
-	aliasToResource[alias] = resources
+	m.aliasToResource[alias] = resources
 }
 
 // AliasesForResource returns whether a resource has an alias or not
 func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
-	if res, ok := aliasToResource[alias]; ok {
+	if res, ok := m.aliasToResource[alias]; ok {
 		return res, true
 	}
 	return nil, false

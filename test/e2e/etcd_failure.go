@@ -27,9 +27,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Etcd failure [Disruptive]", func() {
+var _ = KubeDescribe("Etcd failure [Disruptive]", func() {
 
-	framework := NewFramework("etcd-failure")
+	framework := NewDefaultFramework("etcd-failure")
 
 	BeforeEach(func() {
 		// This test requires:
@@ -70,7 +70,7 @@ func etcdFailTest(framework *Framework, failCommand, fixCommand string) {
 
 	checkExistingRCRecovers(framework)
 
-	ServeImageOrFail(framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
+	ServeImageOrFail(framework, "basic", "gcr.io/google_containers/serve_hostname:v1.4")
 }
 
 // For this duration, etcd will be failed by executing a failCommand on the master.

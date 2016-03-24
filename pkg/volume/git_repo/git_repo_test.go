@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func newTestHost(t *testing.T) (string, volume.VolumeHost) {
@@ -37,7 +38,7 @@ func newTestHost(t *testing.T) (string, volume.VolumeHost) {
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volume.NewFakeVolumeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {

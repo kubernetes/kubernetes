@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package version implements etcd version parsing and contains latest version
+// information.
 package version
 
 import (
@@ -26,14 +28,14 @@ import (
 
 var (
 	// MinClusterVersion is the min cluster version this etcd binary is compatible with.
-	MinClusterVersion = "2.1.0"
-	Version           = "2.2.5"
+	MinClusterVersion = "2.2.0"
+	Version           = "2.3.0"
 
 	// Git SHA Value will be set during build
 	GitSHA = "Not provided (use ./build instead of go build)"
 )
 
-// WalVersion is an enum for versions of etcd logs.
+// DataDirVersion is an enum for versions of etcd logs.
 type DataDirVersion string
 
 const (

@@ -27,6 +27,7 @@ import (
 // communication with other members of the cluster
 type ServerStats struct {
 	Name string `json:"name"`
+	// ID is the raft ID of the node.
 	// TODO(jonboulle): use ID instead of name?
 	ID        string         `json:"id"`
 	State     raft.StateType `json:"state"`

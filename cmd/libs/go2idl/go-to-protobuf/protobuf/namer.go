@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
+	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 )
 
@@ -30,7 +31,7 @@ type localNamer struct {
 }
 
 func (n localNamer) Name(t *types.Type) string {
-	if t.Kind == types.Map {
+	if t.Key != nil && t.Elem != nil {
 		return fmt.Sprintf("map<%s, %s>", n.Name(t.Key), n.Name(t.Elem))
 	}
 	if len(n.localPackage.Package) != 0 && n.localPackage.Package == t.Name.Package {
@@ -66,8 +67,10 @@ func (n *protobufNamer) List() []generator.Package {
 }
 
 func (n *protobufNamer) Add(p *protobufPackage) {
-	n.packagesByPath[p.PackagePath] = p
-	n.packages = append(n.packages, p)
+	if _, ok := n.packagesByPath[p.PackagePath]; !ok {
+		n.packagesByPath[p.PackagePath] = p
+		n.packages = append(n.packages, p)
+	}
 }
 
 func (n *protobufNamer) GoNameToProtoName(name types.Name) types.Name {
@@ -90,24 +93,6 @@ func (n *protobufNamer) GoNameToProtoName(name types.Name) types.Name {
 	return types.Name{Name: name.Name}
 }
 
-func (n *protobufNamer) protoNameForTypeName(name types.Name) string {
-	packageName := name.Package
-	if len(name.Package) != 0 {
-		if p, ok := n.packagesByPath[packageName]; ok {
-			packageName = p.Name()
-		} else {
-			packageName = protoSafePackage(packageName)
-		}
-	}
-	if len(name.Name) == 0 {
-		return packageName
-	}
-	if len(packageName) > 0 {
-		return packageName + "." + name.Name
-	}
-	return name.Name
-}
-
 func protoSafePackage(name string) string {
 	return strings.Replace(name, "/", ".", -1)
 }
@@ -124,7 +109,7 @@ func assignGoTypeToProtoPackage(p *protobufPackage, t *types.Type, local, global
 	if otherP, ok := global[t.Name]; ok {
 		if _, ok := local[t.Name]; !ok {
 			p.Imports.AddType(&types.Type{
-				Kind: typesKindProtobuf,
+				Kind: types.Protobuf,
 				Name: otherP.ProtoTypeName(),
 			})
 		}
@@ -142,7 +127,7 @@ func assignGoTypeToProtoPackage(p *protobufPackage, t *types.Type, local, global
 
 	local[t.Name] = p
 	for _, m := range t.Members {
-		if isPrivateGoName(m.Name) {
+		if namer.IsPrivateGoName(m.Name) {
 			continue
 		}
 		field := &protoField{}

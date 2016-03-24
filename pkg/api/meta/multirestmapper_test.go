@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func TestMultiRESTMapperResourceForErrorHandling(t *testing.T) {
+func TestMultiRESTMapperResourceFor(t *testing.T) {
 	tcs := []struct {
 		name string
 
@@ -49,7 +49,7 @@ func TestMultiRESTMapperResourceForErrorHandling(t *testing.T) {
 		},
 		{
 			name:   "accept first failure",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{resourceFor: unversioned.GroupVersionResource{Resource: "unused"}}},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{resourcesFor: []unversioned.GroupVersionResource{{Resource: "unused"}}}},
 			input:  unversioned.GroupVersionResource{Resource: "foo"},
 			result: unversioned.GroupVersionResource{},
 			err:    errors.New("fail on this"),
@@ -61,13 +61,19 @@ func TestMultiRESTMapperResourceForErrorHandling(t *testing.T) {
 		if e, a := tc.result, actualResult; e != a {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
-		if e, a := tc.err.Error(), actualErr.Error(); e != a {
-			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+		switch {
+		case tc.err == nil && actualErr == nil:
+		case tc.err == nil:
+			t.Errorf("%s: unexpected error: %v", tc.name, actualErr)
+		case actualErr == nil:
+			t.Errorf("%s: expected error: %v got nil", tc.name, tc.err)
+		case tc.err.Error() != actualErr.Error():
+			t.Errorf("%s: expected %v, got %v", tc.name, tc.err, actualErr)
 		}
 	}
 }
 
-func TestMultiRESTMapperResourcesForErrorHandling(t *testing.T) {
+func TestMultiRESTMapperResourcesFor(t *testing.T) {
 	tcs := []struct {
 		name string
 
@@ -97,6 +103,24 @@ func TestMultiRESTMapperResourcesForErrorHandling(t *testing.T) {
 			result: nil,
 			err:    errors.New("fail on this"),
 		},
+		{
+			name: "union and dedup",
+			mapper: MultiRESTMapper{
+				fixedRESTMapper{resourcesFor: []unversioned.GroupVersionResource{{Resource: "dupe"}, {Resource: "first"}}},
+				fixedRESTMapper{resourcesFor: []unversioned.GroupVersionResource{{Resource: "dupe"}, {Resource: "second"}}},
+			},
+			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			result: []unversioned.GroupVersionResource{{Resource: "dupe"}, {Resource: "first"}, {Resource: "second"}},
+		},
+		{
+			name: "skip not and continue",
+			mapper: MultiRESTMapper{
+				fixedRESTMapper{err: &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "IGNORE_THIS"}}},
+				fixedRESTMapper{resourcesFor: []unversioned.GroupVersionResource{{Resource: "first"}, {Resource: "second"}}},
+			},
+			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			result: []unversioned.GroupVersionResource{{Resource: "first"}, {Resource: "second"}},
+		},
 	}
 
 	for _, tc := range tcs {
@@ -104,13 +128,19 @@ func TestMultiRESTMapperResourcesForErrorHandling(t *testing.T) {
 		if e, a := tc.result, actualResult; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
-		if e, a := tc.err.Error(), actualErr.Error(); e != a {
-			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+		switch {
+		case tc.err == nil && actualErr == nil:
+		case tc.err == nil:
+			t.Errorf("%s: unexpected error: %v", tc.name, actualErr)
+		case actualErr == nil:
+			t.Errorf("%s: expected error: %v got nil", tc.name, tc.err)
+		case tc.err.Error() != actualErr.Error():
+			t.Errorf("%s: expected %v, got %v", tc.name, tc.err, actualErr)
 		}
 	}
 }
 
-func TestMultiRESTMapperKindsForErrorHandling(t *testing.T) {
+func TestMultiRESTMapperKindsFor(t *testing.T) {
 	tcs := []struct {
 		name string
 
@@ -140,6 +170,24 @@ func TestMultiRESTMapperKindsForErrorHandling(t *testing.T) {
 			result: nil,
 			err:    errors.New("fail on this"),
 		},
+		{
+			name: "union and dedup",
+			mapper: MultiRESTMapper{
+				fixedRESTMapper{kindsFor: []unversioned.GroupVersionKind{{Kind: "dupe"}, {Kind: "first"}}},
+				fixedRESTMapper{kindsFor: []unversioned.GroupVersionKind{{Kind: "dupe"}, {Kind: "second"}}},
+			},
+			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			result: []unversioned.GroupVersionKind{{Kind: "dupe"}, {Kind: "first"}, {Kind: "second"}},
+		},
+		{
+			name: "skip not and continue",
+			mapper: MultiRESTMapper{
+				fixedRESTMapper{err: &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "IGNORE_THIS"}}},
+				fixedRESTMapper{kindsFor: []unversioned.GroupVersionKind{{Kind: "first"}, {Kind: "second"}}},
+			},
+			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			result: []unversioned.GroupVersionKind{{Kind: "first"}, {Kind: "second"}},
+		},
 	}
 
 	for _, tc := range tcs {
@@ -147,13 +195,19 @@ func TestMultiRESTMapperKindsForErrorHandling(t *testing.T) {
 		if e, a := tc.result, actualResult; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
-		if e, a := tc.err.Error(), actualErr.Error(); e != a {
-			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+		switch {
+		case tc.err == nil && actualErr == nil:
+		case tc.err == nil:
+			t.Errorf("%s: unexpected error: %v", tc.name, actualErr)
+		case actualErr == nil:
+			t.Errorf("%s: expected error: %v got nil", tc.name, tc.err)
+		case tc.err.Error() != actualErr.Error():
+			t.Errorf("%s: expected %v, got %v", tc.name, tc.err, actualErr)
 		}
 	}
 }
 
-func TestMultiRESTMapperKindForErrorHandling(t *testing.T) {
+func TestMultiRESTMapperKindFor(t *testing.T) {
 	tcs := []struct {
 		name string
 
@@ -178,7 +232,7 @@ func TestMultiRESTMapperKindForErrorHandling(t *testing.T) {
 		},
 		{
 			name:   "accept first failure",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{kindFor: unversioned.GroupVersionKind{Kind: "unused"}}},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{kindsFor: []unversioned.GroupVersionKind{{Kind: "unused"}}}},
 			input:  unversioned.GroupVersionResource{Resource: "foo"},
 			result: unversioned.GroupVersionKind{},
 			err:    errors.New("fail on this"),
@@ -190,8 +244,14 @@ func TestMultiRESTMapperKindForErrorHandling(t *testing.T) {
 		if e, a := tc.result, actualResult; e != a {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
-		if e, a := tc.err.Error(), actualErr.Error(); e != a {
-			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+		switch {
+		case tc.err == nil && actualErr == nil:
+		case tc.err == nil:
+			t.Errorf("%s: unexpected error: %v", tc.name, actualErr)
+		case actualErr == nil:
+			t.Errorf("%s: expected error: %v got nil", tc.name, tc.err)
+		case tc.err.Error() != actualErr.Error():
+			t.Errorf("%s: expected %v, got %v", tc.name, tc.err, actualErr)
 		}
 	}
 }
