@@ -34,6 +34,7 @@ type Interface interface {
 	// consistent.
 	List() ([]MountPoint, error)
 	// IsLikelyNotMountPoint determines if a directory is a mountpoint.
+	// It should return ErrNotExist when the directory does not exist.
 	IsLikelyNotMountPoint(file string) (bool, error)
 }
 
