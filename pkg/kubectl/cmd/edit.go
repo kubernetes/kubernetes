@@ -125,7 +125,13 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 		ObjectTyper:  typer,
 		RESTMapper:   mapper,
 		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-		Decoder:      f.Decoder(true),
+
+		// NB: we use `f.Decoder(false)` to get a plain deserializer for
+		// the resourceMapper, since it's used to read in edits and
+		// we don't want to convert into the internal version when
+		// reading in edits (this would cause us to potentially try to
+		// compare two different GroupVersions).
+		Decoder: f.Decoder(false),
 	}
 
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
