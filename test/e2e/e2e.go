@@ -72,6 +72,7 @@ func RegisterFlags() {
 	flag.StringVar(&testContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
 	flag.StringVar(&testContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.StringVar(&testContext.prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
+	flag.StringVar(&testContext.OSDistro, "os-distro", "debian", "The OS distribution of cluster VM instances (debian, trusty, or coreos).")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
