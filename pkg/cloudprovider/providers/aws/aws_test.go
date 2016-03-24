@@ -1264,9 +1264,9 @@ func TestUpdateLoadBalancerCname(t *testing.T) {
 
 	elbHostname := aws.String(FakeElbHostname)
 	service := api.Service{ObjectMeta: api.ObjectMeta{
-		Name:      FakeServiceName,
-		Namespace: FakeNamespace,
-		Labels:    map[string]string{LabelLoadBalancerCnameZone: FakeHostedZoneName},
+		Name:        FakeServiceName,
+		Namespace:   FakeNamespace,
+		Annotations: map[string]string{ServiceAnnotationLoadBalancerCnameZone: FakeHostedZoneName},
 	}}
 
 	err = c.addLoadBalancerCnameEntry(&service, elbHostname)
@@ -1306,9 +1306,9 @@ func TestGetTCPLoadBalancer(t *testing.T) {
 	)
 
 	service := api.Service{ObjectMeta: api.ObjectMeta{
-		Name:      FakeServiceName,
-		Namespace: FakeNamespace,
-		Labels:    map[string]string{LabelLoadBalancerCnameZone: FakeHostedZoneName},
+		Name:        FakeServiceName,
+		Namespace:   FakeNamespace,
+		Annotations: map[string]string{ServiceAnnotationLoadBalancerCnameZone: FakeHostedZoneName},
 	}}
 
 	lbStatus, exists, err := c.GetLoadBalancer(&service)

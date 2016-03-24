@@ -30,9 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// Labels for load balancer configuration
-const LabelLoadBalancerCnameZone = "kubernetes.io/aws-lb-cname-zone"
-
 func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB bool) (*elb.LoadBalancerDescription, error) {
 	loadBalancer, err := s.describeLoadBalancer(loadBalancerName)
 	if err != nil {
@@ -315,7 +312,7 @@ func (s *AWSCloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstan
 }
 
 func getLoadBalancerHostedZone(service *api.Service) string {
-	if zone, ok := service.Labels[LabelLoadBalancerCnameZone]; ok {
+	if zone, ok := service.Annotations[ServiceAnnotationLoadBalancerCnameZone]; ok {
 		return zone + "."
 	} else {
 		return ""
