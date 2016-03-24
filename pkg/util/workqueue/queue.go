@@ -20,6 +20,14 @@ import (
 	"sync"
 )
 
+type Interface interface {
+	Add(item interface{})
+	Len() int
+	Get() (item interface{}, shutdown bool)
+	Done(item interface{})
+	ShutDown()
+}
+
 // New constructs a new workqueue (see the package comment).
 func New() *Type {
 	return &Type{
