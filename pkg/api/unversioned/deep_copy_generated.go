@@ -30,15 +30,6 @@ func DeepCopy_unversioned_Duration(in Duration, out *Duration, c *conversion.Clo
 	return nil
 }
 
-func DeepCopy_unversioned_ExportOptions(in ExportOptions, out *ExportOptions, c *conversion.Cloner) error {
-	if err := DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	out.Export = in.Export
-	out.Exact = in.Exact
-	return nil
-}
-
 func DeepCopy_unversioned_GroupKind(in GroupKind, out *GroupKind, c *conversion.Cloner) error {
 	out.Group = in.Group
 	out.Kind = in.Kind
