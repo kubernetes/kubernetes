@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/proposals/multiple-schedulers.md).
+[here](http://releases.k8s.io/release-1.2/docs/proposals/templates.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -43,7 +43,7 @@ Documentation for other releases can be found at
 ## Motivation
 
 Many examples of clustered software systems require stronger guarantees per instance than are provided
-by the Replication Controller (aka ReplicaSet). Instances of these systems typically require:
+by the Replication Controller (aka Replication Controllers). Instances of these systems typically require:
 
 1. Data per instance which should not be lost even if the pod is deleted, typically on a persistent volume
    * Some cluster instances may have tens of TB of stored data - forcing new instances to replicate data
@@ -52,7 +52,7 @@ by the Replication Controller (aka ReplicaSet). Instances of these systems typic
 3. A consistent network identity that allows other members to locate the instance even if the pod is deleted
 4. A predictable number of instances to ensure that systems can form a quorum
    * This may be necessary during initialization
-5. Instances can migrate from machine to machine as necessary and are not tied to an instance
+5. Ability to migrate from node to node with stable network identity (DNS name)
 6. The ability to scale up in a controlled fashion, but are very rarely scaled down without human
    intervention
 
@@ -80,25 +80,26 @@ while adapting these for Kubernetes should be addressed in a final design.
     flexible to scaling, more likely to support members that come and go. Scale down may trigger massive
     rebalances.
 * Active-active
-  * **Need active-active master example - galera? **
-* ??? 
+  * Galera - has multiple active masters which must remain in sync
+* ???
 
 
 ## Background
 
-ReplicaSets are designed with a weak guarantee - that there should be N replicas of a particular pod template.
-Each pod instance varies only by name, and the replication controller errs on the side of ensuring that N
-replicas exist as quickly as possible (by creating new pods as soon as old ones begin graceful deletion, for
-instance). In addition, pods by design have no stable network identity other than their assigned pod IP,
-which can change over the lifetime of a pod resource. ReplicaSets are best leveraged for shared-nothing,
-zero-coordination software.
+Replication controllers are designed with a weak guarantee - that there should be N replicas of a particular
+pod template. Each pod instance varies only by name, and the replication controller errs on the side of
+ensuring that N replicas exist as quickly as possible (by creating new pods as soon as old ones begin graceful
+deletion, for instance, or by being able to pick arbitrary pods to scale down). In addition, pods by design
+have no stable network identity other than their assigned pod IP, which can change over the lifetime of a pod
+resource. Replication Controllers are best leveraged for stateless, shared-nothing, zero-coordination,
+embarassingly-parallel, or fungible software.
 
 While it is possible to emulate the guarantees described above by leveraging multiple replication controllers
 (for distinct pod templates and pod identities) and multiple services (for stable network identity), the
 resulting objects are hard to maintain and must be copied manually in order to scale a cluster.
 
-By constrast, a DaemonSet *can* offer some of the guarantees above, by leveraging Nodes as stable, long
-lived entities. An administrator might choose a set of nodes, label them a particular way, and create a
+By constrast, a DaemonSet *can* offer some of the guarantees above, by leveraging Nodes as stable, long-lived
+entities. An administrator might choose a set of nodes, label them a particular way, and create a
 DaemonSet that maps pods to each node. The storage of the node itself (which could be network attached
 storage, or a local SAN) is the persistent storage. The network identity of the node is the stable
 identity. However, while there are examples of clustered software that benefit from close association to
@@ -137,7 +138,7 @@ constraints, when a goal of Kubernetes is to decouple system administration from
 
 Add a new resource to Kubernetes to represent a set of pods that are individually distinct but each
 individual can safely be replaced-- the name **PetSet** (working name) is chosen to convey that the
-individual members of the set are themselves "pets" and thus each one is important. A relevant analogy
+individual members of the set are themselves "pets" and thus each one is preserved. A relevant analogy
 is that a PetSet is composed of pets, but the pets are like goldfish. If you have a blue, red, and
 yellow goldfish, and the red goldfish dies, you replace it with another red goldfish and no one would
 notice. If you suddenly have three red goldfish, someone will notice.
@@ -146,6 +147,9 @@ The PetSet is responsible for creating and maintaining a set of **identities** a
 one pod and zero or more **supporting resources** for each identity. There should never be more than one pod
 or unique supporting resource per identity at any one time. A new pod can be created for an identity only
 if a previous pod has been fully terminated (reached its graceful termination limit or cleanly exited).
+
+A PetSet has 0..N **members**, each with a unique **identity** which is a name that is unique within the
+set.
 
 ```
 type PetSet struct {
@@ -156,15 +160,44 @@ type PetSet struct {
 }
 
 type PetSetSpec struct {
-    // Number of instances in the set
-    Replicas *int
+		// A label selector that "owns" objects created under this set
+		Selector map[string]string
+
+    // If set, identities will be auto generated based on the name of the
+    // Set "NAME-$(identity)", i.e. "mysql-1", "mysql-2", ...
+    Members *int
+    // A structured set of identities that if set will be used to generate more
+    /// complex shard patterns
+    MemberIdentities []MemberIdentity
+}
+
+type MemberIdentity struct {
+    // a set of fixed identities, like ["mysql-master", "mysql-slave-1"]
+    Fixed []string
+    // a pattern for a range of identities
+    Range *IdentityRange
+    // a set of nested identities that are constructed from the parent pattern,
+    // allows nesting like "mysql-zone1-1", "mysql-zone1-2", "mysql-zone2-1"
+    Identities []MemberIdentity
+
+    // PROPOSED: Add a set of additional parameters per identity that can be
+		// injected into the templates
+}
+
+type IdentityRange struct {
+    // a pattern like "mysql-slave-$(count)"
+    Pattern string
+    // a minimum and maximum range for the count used in the pattern
+    Min, Max int
 }
 ```
 
 Like a replication controller, a PetSet may be targeted by an autoscaler. The PetSet makes no assumptions
-about upgrading or altering the pods in the set (similar to a DaemonSet) - instead, the user can trigger
-graceful deletion and the PetSet will replace the terminated member with the newer template once it exits.
-Future proposals may offer update capabilities. A PetSet requires RunAlways pods.
+about upgrading or altering the pods in the set for now - instead, the user can trigger graceful deletion
+and the PetSet will replace the terminated member with the newer template once it exits. Future proposals
+may offer update capabilities. A PetSet requires RestartAlways pods. The addition of forgiveness may be
+necessary in the future to increase the safety of the controller recreating pods.
+
 
 ### How identities are managed
 
@@ -178,13 +211,18 @@ identities).
 The simplest way to manage identities, and easiest to understand for users, is a numeric identity system
 starting at I=1 that ranges up to the current replica count and is contiguous.
 
+A future iteration of this proposal should cover identity reclamation - cleaning up resources for identities
+that are no longer in use.
+
 ### Controller behavior.
 
 When a PetSet is scaled up, the controller must create both pods and supporting resources for
 each new identity. The controller must create supporting resources for the pod before creating the
 pod. If a supporting resource with the appropriate name already exists, the controller should treat that as
 creation succeeding. If a supporting resource cannot be created, the controller should flag an error to
-status, back-off (like a scheduler or replication controller), and try again later.
+status, back-off (like a scheduler or replication controller), and try again later. Each resource created
+by a PetSet controller must have a set of labels that match the selector, support orphaning, and have a
+controller back reference annotation identifying the owning PetSet by name and UID.
 
 When a PetSet is scaled down, the pod for the removed indentity should be deleted. It is less clear what the
 controller should do to supporting resources. If every pod requires a PV, and a user accidentally scales
@@ -194,8 +232,8 @@ the cluster if the PV for identities 4 and 5 are deleted (may not be recoverable
 leaving the supporting resources is the safest path (safety first) with a potential future policy applied
 to the PetSet for how to manage supporting resources (DeleteImmediately, GarbageCollect, Preserve).
 
-OPEN: Should information about the state of the pods in the PetSet be reflected in PetSet status? Summarizing
-  which pods match the current PetSet state would be extremely valuable.
+The controller should reflect summary counts of resources on the PetSet status to enable clients to easily
+understand the current state of the set.
 
 
 ### Parameterizing pod templates and supporting resources
@@ -203,114 +241,6 @@ OPEN: Should information about the state of the pods in the PetSet be reflected 
 Since each pod needs a unique and distinct identity, and the pod needs to know its own identity, the
 PetSet must allow a pod template to be parameterized by the identity assigned to the pod. The pods that
 are created should be easily identified by their cluster membership.
-
-
-```
-type PetSetSpec struct {
-    // Number of instances in the set
-    Replicas *int
-
-    // The template to use for the pod in the set
-    Template *PodTemplateSpec
-}
-
-// Proposal 1a: Use the name of the pod as the identity, use downward API for getting identity
-// Downside: all fields that want to leverage the identity need equivalent valueFrom semantics
-{
-    "spec": {
-        "template": {
-            "metadata": {"generateName": "pod-name"}, // assume identity is automatically added to pod name
-            "spec": {
-                "containers": [{
-                    "env": [{
-                        "name": "IDENTITY",
-                        "valueFrom": {"fieldRef": {"fieldPath": "metadata.name"}
-                        }
-                    }]
-                }]
-            }
-        }
-    }
-}
-
-// Proposal 1b: Add an annotation to each pod when the controller creates it
-// Downside: all fields that want to leverage the identity need equivalent valueFrom semantics
-{
-    "spec": {
-        "template": {
-            "spec": {
-                "containers": [{
-                    "env": [{
-                        "name": "IDENTITY",
-                        "valueFrom": {"fieldRef": {"fieldPath": "metadata.annotations[alpha.kubernetes.io/identity]"}}
-                    }]
-                }]
-            }
-        }
-    }
-}
-
-// Proposal 1c: Add a new field to pod spec that is write-once/read-many - identity
-// Downside: all fields that want to leverage the identity need equivalent valueFrom semantics
-{
-    "spec": {
-        "template": {
-            "spec": {
-                "identity": "", // set on creation
-                "containers": [{
-                    "env": [{
-                        "name": "IDENTITY",
-                        "valueFrom": {"fieldRef": {"fieldPath": "spec.identity"}}
-                    }]
-                }]
-            }
-        }
-    }
-}
-
-// Proposal 1d: support template transformation of a field path
-// Downside: possibly too flexible, can conflict with existing env resolution semantics, bypasses downward API
-{
-    "spec": {
-        "template": {
-            "metadata": {"name": "pod-name-$(IDENTITY)"},
-            "spec": {
-                "containers": [{
-                    "env": [{
-                        "name": "IDENTITY",
-                        "value": "$(IDENTITY)"
-                    }]
-                }]
-            }
-        }
-    }
-}
-
-// Proposal 1e: specify merge-patch semantics with some variable replacement
-// Downside: merge patch is inflexible to structural template edits
-{
-    "spec": {
-        "template": {
-            "metadata": {},
-            "spec": {
-                "containers": [{
-                    "env": [{
-                        "name": "IDENTITY",
-                    }]
-                }]
-            }
-        },
-        "templateTransform": [
-            {"op": "add", "path": "/metadata/name", "value": "pod-name-$(IDENTITY)"},
-            {"op": "add", "path": "/spec/containers[0]/env[0]/value", "value": "$(IDENTITY)"}
-        ]
-    }
-}
-```
-
-Proposal 1e has the most overlap with other concepts already existing in the API, and makes it easy
-for clients to identify what will be transformed per template. Outside-in transformations also are
-most amenable to automatic generation.
 
 Because that pod needs access to stable storage, the PetSet may specify a template for one or more
 **supporting resources** that can be used for each distinct pod. In the future other resources may be
@@ -323,13 +253,23 @@ that accomplish the goals above. It should be possible to:
 * Identify the supporting resources by name in the pod template (pvc name)
 * Give the supporting resource a predictable name based on identity
 * Set environment variables that correspond to the identity of the pod for use by the software
-* Provide the current desired set size (`spec.replicas`) to each pod as an integer
+* Provide the current desired set size (`spec.members`) to each pod as an integer
+
+Parameterization will be handled through the [template proposal](templates.md), applied on the pod template immediately
+prior to creation. A set of **implicit parameters** are provided to the pod template:
+
+* **IDENTITY** - The value of the resolved identity
+* **IDENTITY_COUNT** - The total number of identities
+
 
 ```
 type PetSetSpec struct {
     ...
+
     // The template to use for the pod in the set
     Template *PodTemplateSpec
+
+		// A set of supporting resources
     SupportTemplates []SupportTemplateSpec
 }
 
@@ -342,121 +282,37 @@ type SupportTemplateSpec struct {
     Object runtime.Object
 }
 
-// Proposal 2a: use the name of the support resource as identity implicitly
-// Downside: Requires the controller to understand the places to be parameterized in the template - prevents
-//   custom resources from being supported.
-{
-    "spec": {
-        "template": {
-            "spec": {
-                "volumes": [{
-                    "persistentVolumeClaim": {
-                        "claimName": "pod-name-pvc" // controller appends IDENTITY to this claim automatically
-                    }
-                }]
-            }
-        },
-        "supportTemplates": [{
-            "persistentVolumeClaim": {
-                "metadata": {"name": "pod-name-pvc"} // controller appends IDENTTY to this claim automatically
-            }
-        }]
-    }
-}
+// Example of a spec
+spec:
+  template:
+	  metadata:
+			name: "pod-name-$(IDENTITY)"
+      annotations:
+				pod.beta.kubernetes.io/hostname: "mypod-$(IDENTITY)"
+		spec:
+			containers:
+				env:
+				- name: IDENTITY
+					value: "$(IDENTITY)"
+				- name: QUORUM_SIZE
+					value: "$(IDENTITY_COUNT)"
 
-// Proposal 2b: append identity to specified field paths
-// Downside: Flexibility is limited, may need "operations" on the field in order to transform value
-{
-    "spec": {
-        // ...
 
-        "supportTemplates": [{
-            "persistentVolumeClaim": {
-                "metadata": {"name": "pod-name-pvc-"}
-            },
-            "fieldPaths": ["metadata.name"] // controller appends IDENTTY to field metadata.name
-        }]
-    }
-}
-
-// Proposal 2c: append identity to specified field paths, name is special
-// Downside: Flexibility is limited, transformations may be required
-{
-    "spec": {
-        // ...
-
-        "supportTemplates": [{
-            "configData": {
-                "metadata": {"generateName": "pod-name-pvc-"}
-                // controller appends IDENTITY to field metadata.generateName and sets metadata.name from that
-            },
-            "fieldPaths": ["data[identity]"] // controller appends IDENTITY to the "identity" key of config data
-        }]
-    }
-}
-
-// Proposal 2d: support template transformation of a field path
-// Downside: Unrestricted use possibly too powerful
-// Downside: Harder for clients to recognize what fields are parameterized
-{
-    "spec": {
-        "template": {
-            "spec": {
-                "volumes": [{
-                    "persistentVolumeClaim": {
-                        "claimName": "pod-name-pvc" // controller appends IDENTITY to this claim automatically
-                    }
-                }]
-            }
-        },
-        "supportTemplates": [{
-            "persistentVolumeClaim": {
-                "metadata": {"name": "pod-name-pvc-$(IDENTITY)"} // controller adds IDENTTY to this claim as defined
-            }
-        }]
-    }
-}
-
-// Proposal 2e: specify merge-patch semantics with some variable replacement
-{
-    "spec": {
-        // ...
-
-        "supportTemplates": [{
-            "persistentVolumeClaim": {
-                "spec": {...}
-            },
-            "transform": [{"op": "add", "path": "/metadata/name", "value": "pod-name-pvc-$(IDENTITY)"}]
-        }]
-    }
-}
-
+// Example of a supporting resource and its use in the template
+spec:
+  template:
+	  spec:
+		  volumes:
+			- persistentVolumeClaim:
+					claimName: "pod-name-pvc-$(IDENTITY)-1"
+	supportTemplates:
+	  persistentVolumeClaim:
+		  metadata:
+				name: "pod-name-pvc-$(IDENTITY)-1"
 ```
 
-Of all proposals, 2e is the closest to actual semantics we support today (variable replacement in EnvVar and
-patch operations). The path syntax from RFC6902 is not optimal (we prefer JQ field path semantics), but we
-could consider supporting both. Since we desire to support an integer value for quorum size, we may need to
-transform the set size value to an integer for replacement into a supporting resource that needs that value
-as a number:
-
-```
-// Proposal 2f: variant: specify merge-patch semantics with some variable replacement as an integer
-{
-    "spec": {
-        // ...
-
-        "supportTemplates": [{
-            "replicationController": {
-                "spec": {"replicas": 1}
-            },
-            // "$(REPLICAS)" is transformed into 5, not "5"
-            "transform": [{"op": "add", "path": "/metadata/name", "value": "$(REPLICAS)", type: "number"}]
-        }]
-    }
-}
-
-```
-
+It is expected that most volume type resources would be parameterized (secrets, persistent volume claims,
+config maps), as well as node selectors (for zones for sharding), or future event hooks.
 
 
 ### Accessing pods by stable network identity
@@ -499,6 +355,30 @@ mdb-2.mongodb.namespace.svc.cluster.local
 mdb-3.mongodb.namespace.svc.cluster.local
 ```
 
+This is currently implemented via an annotation on pods, which is surfaced to endpoints, and finally
+surfaced as DNS on the service that exposes those pods.
+
+```
+// The pods created by this PetSet will have the DNS names "mypod-mysql-1.NAMESPACE.svc.cluster.local"
+// and "mypod-mysql-2.NAMESPACE.svc.cluster.local"
+metadata:
+  name: mysql
+spec:
+  members: 2
+  template:
+	  metadata:
+			name: "pod-name-$(IDENTITY)"
+      annotations:
+				pod.beta.kubernetes.io/hostname: "mypod-$(IDENTITY)"
+		spec:
+			containers:
+				env:
+				- name: IDENTITY
+					value: "$(IDENTITY)"
+				- name: QUORUM_SIZE
+					value: "$(IDENTITY_COUNT)"
+```
+
 
 ### Preventing duplicate identities
 
@@ -517,14 +397,15 @@ MigratablePetSet).
 
 ## Examples
 
-OPEN: concrete example walkthrough with a DB
+OPEN: concrete example walkthrough with several DBs
 
 ## Overlap with other proposals
 
 * Jobs can be used to perform a run-once initialization of the cluster
 * Init containers can be used to prime PVs and config with the identity of the pod.
 * Templates and how fields are overriden in the resulting object should have broad alignment
-* DaemonSet defines the core model for how new controllers sit alongside replication controller
+* DaemonSet defines the core model for how new controllers sit alongside replication controller and
+  how upgrades can be implemented outside of Deployment objects.
 
 
 
