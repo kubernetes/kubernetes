@@ -227,7 +227,7 @@ spec:
           # change this - must match mysql.yaml password
           value: yourpassword
         - name: WORDPRESS_DB_HOST
-          value: yourmysql_svc_password
+          value: yourmysql_svc_ip:port
       ports: 
         - containerPort: 80
           name: wordpress
