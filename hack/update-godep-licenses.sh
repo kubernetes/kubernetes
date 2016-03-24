@@ -73,7 +73,6 @@ process_content () {
   local ensure_pattern
   local package_root_url
   local dir_root
-  local godeps_root
   local find_maxdepth
   local find_names
   local -a local_files=()
@@ -112,14 +111,9 @@ process_content () {
 
   # Find LOCAL files first - only root and package level
   for dir_root in ${package} ${package_root}; do
-    for godeps_root in ${GODEPS_SRC} ${GODEPS_AUX}; do
-      [[ -d ${godeps_root}/${dir_root} ]] || continue
-
-      # One (set) of these is fine
-      local_files+=($(find ${godeps_root}/${dir_root} \
-                           -xdev -follow -maxdepth ${find_maxdepth} \
-                           -type f "${find_names[@]}"))
-    done
+    # One (set) of these is fine
+    local_files+=($(find ${GODEPS_SRC}/${dir_root} -xdev -follow \
+                        -maxdepth ${find_maxdepth} -type f "${find_names[@]}"))
   done
   # Uniquely sort the array
   IFS=$'\n' local_files=($(LC_ALL=C sort -u <<<"${local_files[*]-}"))
@@ -149,9 +143,9 @@ process_content () {
 
       if [[ -n "${FILE_CONTENT[${package}-${type}]-}" ]]; then
         if ((CREATE_MISSING)); then
-          mkdir -p ${GODEPS_AUX}/${package_root}
+          mkdir -p ${GODEPS_SRC}/${package_root}
           echo "${FILE_CONTENT[${package}-${type}]}" \
-           > ${GODEPS_AUX}/${package_root}/${f}
+           > ${GODEPS_SRC}/${package_root}/${f}
         fi
         break
       fi
@@ -178,7 +172,6 @@ GODEPS_STATE="Godeps/.license_file_state"
 
 GODEPS_LICENSE_FILE=${1:-"Godeps/LICENSES"}
 GODEPS_SRC="Godeps/_workspace/src"
-GODEPS_AUX="Godeps/_workspace_aux/src"
 declare -Ag FILE_CONTENT
 
 
