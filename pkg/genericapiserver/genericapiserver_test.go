@@ -80,6 +80,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(s.enableLogsSupport, config.EnableLogsSupport)
 	assert.Equal(s.enableUISupport, config.EnableUISupport)
 	assert.Equal(s.enableSwaggerSupport, config.EnableSwaggerSupport)
+	assert.Equal(s.enableSwaggerUI, config.EnableSwaggerUI)
 	assert.Equal(s.enableProfiling, config.EnableProfiling)
 	assert.Equal(s.APIPrefix, config.APIPrefix)
 	assert.Equal(s.APIGroupPrefix, config.APIGroupPrefix)
