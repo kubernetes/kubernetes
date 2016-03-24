@@ -83,7 +83,7 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	out.Address = in.Address
 	out.AlgorithmProvider = in.AlgorithmProvider
 	out.PolicyConfigFile = in.PolicyConfigFile
-	if err := api.Convert_bool_To_bool_ref(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
+	if err := api.Convert_bool_To_Pointer_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
 		return err
 	}
 	out.KubeAPIQPS = in.KubeAPIQPS
@@ -103,7 +103,7 @@ func autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderE
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*componentconfig.LeaderElectionConfiguration))(in)
 	}
-	if err := api.Convert_bool_To_bool_ref(&in.LeaderElect, &out.LeaderElect, s); err != nil {
+	if err := api.Convert_bool_To_Pointer_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.LeaseDuration, &out.LeaseDuration, 0); err != nil {
@@ -179,7 +179,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	out.Address = in.Address
 	out.AlgorithmProvider = in.AlgorithmProvider
 	out.PolicyConfigFile = in.PolicyConfigFile
-	if err := api.Convert_bool_ref_To_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
+	if err := api.Convert_Pointer_bool_To_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
 		return err
 	}
 	out.KubeAPIQPS = in.KubeAPIQPS
@@ -199,7 +199,7 @@ func autoConvert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderE
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LeaderElectionConfiguration))(in)
 	}
-	if err := api.Convert_bool_ref_To_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
+	if err := api.Convert_Pointer_bool_To_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.LeaseDuration, &out.LeaseDuration, 0); err != nil {
