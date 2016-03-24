@@ -47,6 +47,10 @@ const (
 	// often. Higher numbers = lower CPU/network load; lower numbers =
 	// shorter amount of time before a mistaken endpoint is corrected.
 	FullServiceResyncPeriod = 30 * time.Second
+
+	// We must avoid syncing service until the pod store has synced. If it hasn't synced, to
+	// avoid a hot loop, we'll wait this long between checks.
+	PodStoreSyncedPollPeriod = 100 * time.Millisecond
 )
 
 var (
@@ -98,6 +102,7 @@ func NewEndpointController(client *clientset.Clientset, resyncPeriod controller.
 			DeleteFunc: e.deletePod,
 		},
 	)
+	e.podStoreSynced = e.podController.HasSynced
 
 	return e
 }
@@ -120,6 +125,9 @@ type EndpointController struct {
 	// controllers.
 	serviceController *framework.Controller
 	podController     *framework.Controller
+	// podStoreSynced returns true if the pod store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	podStoreSynced func() bool
 }
 
 // Runs e; will not return until stopCh is closed. workers determines how many
@@ -268,6 +276,15 @@ func (e *EndpointController) syncService(key string) {
 	defer func() {
 		glog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Now().Sub(startTime))
 	}()
+
+	if !e.podStoreSynced() {
+		// Sleep so we give the pod reflector goroutine a chance to run.
+		time.Sleep(PodStoreSyncedPollPeriod)
+		glog.Infof("Waiting for pods controller to sync, requeuing rc %v", key)
+		e.queue.Add(key)
+		return
+	}
+
 	obj, exists, err := e.serviceStore.Store.GetByKey(key)
 	if err != nil || !exists {
 		// Delete the corresponding endpoint, as the service has been deleted.

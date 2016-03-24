@@ -202,7 +202,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			continue
 
 		case api.StrategicMergePatchType:
-			patch, err = strategicpatch.CreateStrategicMergePatch(originalObjJS, changedJS, &api.Pod{})
+			patch, err = strategicpatch.CreateStrategicMergePatch(originalObjJS, changedJS, versionedObj)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
 				return

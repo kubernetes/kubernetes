@@ -689,6 +689,11 @@ function create-nodes-template() {
 
   local template_name="${NODE_INSTANCE_PREFIX}-template"
 
+  # For master on trusty, we support running nodes on ContainerVM or trusty.
+  if [[ "${OS_DISTRIBUTION}" == "trusty" ]] && \
+     [[ "${NODE_IMAGE}" == container* ]]; then
+    source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
+  fi
   create-node-instance-template $template_name
 }
 
@@ -1340,20 +1345,6 @@ function ssh-to-node {
   done
   # Then actually try the command.
   gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
-}
-
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
-    ssh-to-node "$1" "sudo initctl restart kube-proxy"
-  else
-    ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
-  fi
-}
-
-# Restart the kube-apiserver on a node ($1)
-function restart-apiserver {
-  ssh-to-node "$1" "sudo docker ps | grep /kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
 }
 
 # Perform preparations required to run e2e tests

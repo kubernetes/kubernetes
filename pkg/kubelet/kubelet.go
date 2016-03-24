@@ -405,7 +405,7 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
-			hairpinMode == componentconfig.HairpinVeth,
+			klet.hairpinMode == componentconfig.HairpinVeth,
 			containerRuntimeOptions...,
 		)
 	case "rkt":
@@ -2386,6 +2386,10 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 		switch u.Op {
 		case kubetypes.ADD:
 			glog.V(2).Infof("SyncLoop (ADD, %q): %q", u.Source, format.Pods(u.Pods))
+			// After restarting, kubelet will get all existing pods through
+			// ADD as if they are new pods. These pods will then go through the
+			// admission process and *may* be rejcted. This can be resolved
+			// once we have checkpointing.
 			handler.HandlePodAdditions(u.Pods)
 		case kubetypes.UPDATE:
 			glog.V(2).Infof("SyncLoop (UPDATE, %q): %q", u.Source, format.Pods(u.Pods))

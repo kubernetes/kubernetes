@@ -23,12 +23,7 @@
 
   <script type="text/javascript">
     $(function () {
-      var url = window.location.search.match(/url=([^&]+)/);
-      if (url && url.length > 1) {
-        url = decodeURIComponent(url[1]);
-      } else {
-        url = "../../swaggerapi";
-      }
+      var url = "../../swaggerapi";
       window.swaggerUi = new SwaggerUi({
         url: url,
         dom_id: "swagger-ui-container",

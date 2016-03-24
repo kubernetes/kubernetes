@@ -377,16 +377,6 @@ function ssh-to-node {
   vagrant ssh "${machine}" -c "${cmd}"
 }
 
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  ssh-to-node "$1" "sudo systemctl restart kube-proxy"
-}
-
-# Restart the apiserver
-function restart-apiserver {
-  ssh-to-node "$1" "sudo systemctl restart kube-apiserver"
-}
-
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   echo "Vagrant doesn't need special preparations for e2e tests" 1>&2

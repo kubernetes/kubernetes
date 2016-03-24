@@ -50,6 +50,7 @@ import (
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/election"
 	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/flagutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	minioncfg "k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
@@ -494,6 +495,10 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	appendOptional("pod-infra-container-image", s.kubeletPodInfraContainerImage)
 	appendOptional("host-network-sources", s.kubeletHostNetworkSources)
 	appendOptional("network-plugin", s.kubeletNetworkPluginName)
+
+	// TODO(jdef) this code depends on poorly scoped cadvisor flags, will need refactoring soon
+	appendOptional(flagutil.Cadvisor.HousekeepingInterval.NameValue())
+	appendOptional(flagutil.Cadvisor.GlobalHousekeepingInterval.NameValue())
 
 	log.V(1).Infof("prepared executor command %q with args '%+v'", ci.GetValue(), ci.Arguments)
 

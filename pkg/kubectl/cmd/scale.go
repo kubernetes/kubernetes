@@ -37,14 +37,14 @@ type ScaleOptions struct {
 }
 
 const (
-	scale_long = `Set a new size for a Replication Controller, Job, or Deployment.
+	scale_long = `Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.
 
 Scale also allows users to specify one or more preconditions for the scale action.
 If --current-replicas or --resource-version is specified, it is validated before the
 scale is attempted, and it is guaranteed that the precondition holds true when the
 scale is sent to the server.`
-	scale_example = `# Scale replication controller named 'foo' to 3.
-kubectl scale --replicas=3 rc/foo
+	scale_example = `# Scale a replicaset named 'foo' to 3.
+kubectl scale --replicas=3 rs/foo
 
 # Scale a resource identified by type and name specified in "foo.yaml" to 3.
 kubectl scale --replicas=3 -f foo.yaml
@@ -67,7 +67,7 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		// resize is deprecated
 		Aliases: []string{"resize"},
-		Short:   "Set a new size for a Replication Controller, Job, or Deployment.",
+		Short:   "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.",
 		Long:    scale_long,
 		Example: scale_example,
 		Run: func(cmd *cobra.Command, args []string) {
