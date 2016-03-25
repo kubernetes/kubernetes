@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/union"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/eabac"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
 
@@ -62,15 +63,16 @@ const (
 	ModeAlwaysDeny  string = "AlwaysDeny"
 	ModeABAC        string = "ABAC"
 	ModeWebhook     string = "Webhook"
+	ModeEABAC       string = "EABAC"
 )
 
 // Keep this list in sync with constant list above.
-var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook}
+var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeEABAC}
 
 type AuthorizationConfig struct {
-	// Options for ModeABAC
+	// Options for ModeABAC and ModeEABAC
 
-	// Path to a ABAC policy file.
+	// Path to a ABAC or EABAC policy file.
 	PolicyFile string
 
 	// Options for ModeWebhook
@@ -119,14 +121,23 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 				return nil, err
 			}
 			authorizers = append(authorizers, webhookAuthorizer)
+		case ModeEABAC:
+			if config.PolicyFile == "" {
+				return nil, errors.New("EABAC's authorization policy file not passed")
+			}
+			eabacAuthorizer, err := eabac.New(config.PolicyFile)
+			if err != nil {
+				return nil, err
+			}
+			authorizers = append(authorizers, eabacAuthorizer)
 		default:
 			return nil, fmt.Errorf("Unknown authorization mode %s specified", authorizationMode)
 		}
 		authorizerMap[authorizationMode] = true
 	}
 
-	if !authorizerMap[ModeABAC] && config.PolicyFile != "" {
-		return nil, errors.New("Cannot specify --authorization-policy-file without mode ABAC")
+	if !authorizerMap[ModeABAC] && !authorizerMap[ModeEABAC] && config.PolicyFile != "" {
+		return nil, errors.New("Cannot specify --authorization-policy-file without mode ABAC or EABAC")
 	}
 	if !authorizerMap[ModeWebhook] && config.WebhookConfigFile != "" {
 		return nil, errors.New("Cannot specify --authorization-webhook-config-file without mode Webhook")
