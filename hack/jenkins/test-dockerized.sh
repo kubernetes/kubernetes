@@ -26,17 +26,8 @@ set -o xtrace
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-go get github.com/tools/godep
+go get github.com/tools/godep && godep version
 go get github.com/jstemmer/go-junit-report
-
-# godep v59+ has issues with our GOPATH munging, so pin to v58 for now.
-# https://github.com/kubernetes/kubernetes/issues/23200
-(
-  cd ${GOPATH}/src/github.com/tools/godep
-  git checkout v58
-  godep go install
-)
-godep version
 
 # Enable the Go race detector.
 export KUBE_RACE=-race
@@ -49,6 +40,8 @@ export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 export KUBE_TIMEOUT='-timeout 300s'
 export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 export LOG_LEVEL=4
+
+cd /go/src/k8s.io/kubernetes
 
 ./hack/build-go.sh
 godep go install ./...
