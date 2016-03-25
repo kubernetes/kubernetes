@@ -1206,6 +1206,9 @@ func printNode(node *api.Node, w io.Writer, options PrintOptions) error {
 	if node.Spec.Unschedulable {
 		status = append(status, "SchedulingDisabled")
 	}
+	if node.Spec.Untrusted {
+		status = append(status, "Untrusted")
+	}
 
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", node.Name, strings.Join(status, ","), translateTimestamp(node.CreationTimestamp)); err != nil {
 		return err

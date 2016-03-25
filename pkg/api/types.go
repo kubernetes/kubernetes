@@ -1667,6 +1667,9 @@ type NodeSpec struct {
 
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	Unschedulable bool `json:"unschedulable,omitempty"`
+
+	// Untrusted indicates that the node is not trusted. By default node is trusted.
+	Untrusted bool `json:"untrusted,omitempty"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
