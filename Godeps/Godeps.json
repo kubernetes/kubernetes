@@ -19,6 +19,11 @@
 			"Rev": "1c0a791b33bdc01d062b376612aa04e27eed7eb3"
 		},
 		{
+			"ImportPath": "github.com/Microsoft/go-winio",
+			"Comment": "v0.1.0",
+			"Rev": "8f9387ea7efabb228a981b9c381142be7667967f"
+		},
+		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.6.2-10-g51fe59a",
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
@@ -408,6 +413,11 @@
 			"Rev": "0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d"
 		},
 		{
+			"ImportPath": "github.com/docker/docker/pkg/stdcopy",
+			"Comment": "v1.4.1-4831-g0f5c9d3",
+			"Rev": "0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/symlink",
 			"Comment": "v1.4.1-4831-g0f5c9d3",
 			"Rev": "0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d"
@@ -426,6 +436,31 @@
 			"ImportPath": "github.com/docker/docker/pkg/units",
 			"Comment": "v1.4.1-4831-g0f5c9d3",
 			"Rev": "0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d"
+		},
+		{
+			"ImportPath": "github.com/docker/engine-api/client",
+			"Comment": "v0.2.2-173-g26cdffe",
+			"Rev": "26cdffeca716ae4df98070051a852b3198d7d153"
+		},
+		{
+			"ImportPath": "github.com/docker/engine-api/types",
+			"Comment": "v0.2.2-173-g26cdffe",
+			"Rev": "26cdffeca716ae4df98070051a852b3198d7d153"
+		},
+		{
+			"ImportPath": "github.com/docker/go-connections/nat",
+			"Comment": "v0.2.0-2-gf549a93",
+			"Rev": "f549a9393d05688dff0992ef3efd8bbe6c628aeb"
+		},
+		{
+			"ImportPath": "github.com/docker/go-connections/sockets",
+			"Comment": "v0.2.0-2-gf549a93",
+			"Rev": "f549a9393d05688dff0992ef3efd8bbe6c628aeb"
+		},
+		{
+			"ImportPath": "github.com/docker/go-connections/tlsconfig",
+			"Comment": "v0.2.0-2-gf549a93",
+			"Rev": "f549a9393d05688dff0992ef3efd8bbe6c628aeb"
 		},
 		{
 			"ImportPath": "github.com/docker/go-units",
@@ -1011,6 +1046,10 @@
 		},
 		{
 			"ImportPath": "golang.org/x/net/internal/timeseries",
+			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
+		},
+		{
+			"ImportPath": "golang.org/x/net/proxy",
 			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
 		},
 		{
