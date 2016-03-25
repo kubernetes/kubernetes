@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -94,33 +95,36 @@ func readServiceFromFile(t *testing.T, filename string) *api.Service {
 }
 
 func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object, kind string) (string, []byte) {
-	originalMeta, err := api.ObjectMetaFor(originalObj)
+	originalAccessor, err := meta.Accessor(originalObj)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	originalMeta.Labels["DELETE_ME"] = "DELETE_ME"
+	originalLabels := originalAccessor.GetLabels()
+	originalLabels["DELETE_ME"] = "DELETE_ME"
+	originalAccessor.SetLabels(originalLabels)
 	original, err := json.Marshal(originalObj)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	currentMeta, err := api.ObjectMetaFor(currentObj)
+	currentAccessor, err := meta.Accessor(currentObj)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if currentMeta.Annotations == nil {
-		currentMeta.Annotations = map[string]string{}
+	currentAnnotations := currentAccessor.GetAnnotations()
+	if currentAnnotations == nil {
+		currentAnnotations = make(map[string]string)
 	}
-
-	currentMeta.Annotations[kubectl.LastAppliedConfigAnnotation] = string(original)
+	currentAnnotations[kubectl.LastAppliedConfigAnnotation] = string(original)
+	currentAccessor.SetAnnotations(currentAnnotations)
 	current, err := json.Marshal(currentObj)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return currentMeta.Name, current
+	return currentAccessor.GetName(), current
 }
 
 func readAndAnnotateReplicationController(t *testing.T, filename string) (string, []byte) {

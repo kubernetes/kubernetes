@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -418,11 +419,11 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 	if err != nil {
 		return err
 	}
-	meta, err := api.ObjectMetaFor(object)
+	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
-	prefix := getPodsPrefix(meta.Name)
+	prefix := getPodsPrefix(accessor.GetName())
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -444,14 +445,14 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create pods: %v", err)
 	} else {
-		glog.V(4).Infof("Controller %v created pod %v", meta.Name, newPod.Name)
+		glog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
 		r.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulCreate", "Created pod: %v", newPod.Name)
 	}
 	return nil
 }
 
 func (r RealPodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
-	meta, err := api.ObjectMetaFor(object)
+	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
@@ -459,7 +460,7 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedDelete", "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
 	} else {
-		glog.V(4).Infof("Controller %v deleted pod %v", meta.Name, podID)
+		glog.V(4).Infof("Controller %v deleted pod %v", accessor.GetName(), podID)
 		r.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulDelete", "Deleted pod: %v", podID)
 	}
 	return nil
