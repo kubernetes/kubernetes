@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/install"
@@ -186,9 +187,9 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 	// the resource represents a number of unique references to external
 	// resource. In such a case an evaluator needs to process other objects in
 	// the same namespace which needs to be known.
-	if om, err := api.ObjectMetaFor(inputObject); namespace != "" && err == nil {
-		if om.Namespace == "" {
-			om.Namespace = namespace
+	if accessor, err := meta.Accessor(inputObject); namespace != "" && err == nil {
+		if accessor.GetNamespace() == "" {
+			accessor.SetNamespace(namespace)
 		}
 	}
 

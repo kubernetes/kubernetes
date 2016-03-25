@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -473,14 +472,16 @@ func GetRecordFlag(cmd *cobra.Command) bool {
 
 // RecordChangeCause annotate change-cause to input runtime object.
 func RecordChangeCause(obj runtime.Object, changeCause string) error {
-	meta, err := api.ObjectMetaFor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
-	if meta.Annotations == nil {
-		meta.Annotations = make(map[string]string)
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
 	}
-	meta.Annotations[kubectl.ChangeCauseAnnotation] = changeCause
+	annotations[kubectl.ChangeCauseAnnotation] = changeCause
+	accessor.SetAnnotations(annotations)
 	return nil
 }
 
