@@ -201,9 +201,6 @@ type ThirdPartyResourceList struct {
 type APIVersion struct {
 	// Name of this version (e.g. 'v1').
 	Name string `json:"name,omitempty"`
-
-	// The API group to add this object into, default 'experimental'.
-	APIGroup string `json:"apiGroup,omitempty"`
 }
 
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.

@@ -24,9 +24,6 @@ import (
 func addDefaultingFuncs(scheme *runtime.Scheme) {
 	scheme.AddDefaultingFuncs(
 		func(obj *APIVersion) {
-			if len(obj.APIGroup) == 0 {
-				obj.APIGroup = GroupName
-			}
 		},
 		func(obj *DaemonSet) {
 			labels := obj.Spec.Template.Labels

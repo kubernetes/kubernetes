@@ -97,6 +97,8 @@ type Config struct {
 	KubeletClient           kubeletclient.KubeletClient
 	// Used to start and monitor tunneling
 	Tunneler Tunneler
+
+	disableThirdPartyControllerForTesting bool
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -124,6 +126,8 @@ type Master struct {
 	thirdPartyResources map[string]thirdPartyEntry
 	// protects the map
 	thirdPartyResourcesLock sync.RWMutex
+	// Useful for reliable testing.  Shouldn't be used otherwise.
+	disableThirdPartyControllerForTesting bool
 
 	// Used to start and monitor tunneling
 	tunneler Tunneler
@@ -155,6 +159,8 @@ func New(c *Config) (*Master, error) {
 		enableCoreControllers:   c.EnableCoreControllers,
 		deleteCollectionWorkers: c.DeleteCollectionWorkers,
 		tunneler:                c.Tunneler,
+
+		disableThirdPartyControllerForTesting: c.disableThirdPartyControllerForTesting,
 	}
 	m.InstallAPIs(c)
 
@@ -663,7 +669,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 // getExperimentalResources returns the resources for extensions api
 func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	// All resources except these are disabled by default.
-	enabledResources := sets.NewString("daemonsets", "deployments", "horizontalpodautoscalers", "ingresses", "jobs", "replicasets")
+	enabledResources := sets.NewString("daemonsets", "deployments", "horizontalpodautoscalers", "ingresses", "jobs", "replicasets", "thirdpartyresources")
 	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
 	isEnabled := func(resource string) bool {
 		// Check if the resource has been overriden.
@@ -696,14 +702,13 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 			master: m,
 			thirdPartyResourceRegistry: thirdPartyResourceStorage,
 		}
-		go func() {
-			wait.Forever(func() {
+		if !m.disableThirdPartyControllerForTesting {
+			go wait.Forever(func() {
 				if err := thirdPartyControl.SyncResources(); err != nil {
 					glog.Warningf("third party resource sync failed: %v", err)
 				}
 			}, 10*time.Second)
-		}()
-
+		}
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
 	}
 
