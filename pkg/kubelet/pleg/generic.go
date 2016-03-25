@@ -158,7 +158,6 @@ func generateEvent(podID types.UID, cid string, oldState, newState plegContainer
 	default:
 		panic(fmt.Sprintf("unrecognized container state: %v", newState))
 	}
-	return nil
 }
 
 func (g *GenericPLEG) getRelistTime() time.Time {

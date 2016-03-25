@@ -363,7 +363,7 @@ func TestUnversionedTypes(t *testing.T) {
 	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
 
 	if unv, ok := scheme.IsUnversioned(&InternalSimple{}); !unv || !ok {
-		t.Fatal("type not unversioned and in scheme: %t %t", unv, ok)
+		t.Fatalf("type not unversioned and in scheme: %t %t", unv, ok)
 	}
 
 	kind, err := scheme.ObjectKind(&InternalSimple{})

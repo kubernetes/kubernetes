@@ -722,7 +722,7 @@ func TestFindVPCID(t *testing.T) {
 	}
 	vpcID, err := c.findVPCID()
 	if err != nil {
-		t.Errorf("Unexpected error:", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
 	if vpcID != "vpc-mac0" {
 		t.Errorf("Unexpected vpcID: %s", vpcID)

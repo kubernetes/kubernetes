@@ -374,11 +374,11 @@ func startUDPServer(udpPort int) {
 			if len(parts) == 2 {
 				resp = parts[1]
 			}
-			log.Println("Echoing %q")
+			log.Printf("Echoing %v\n", resp)
 			_, err = serverConn.WriteToUDP([]byte(resp), clientAddress)
 			assertNoError(err)
 		} else if len(receivedText) > 0 {
-			log.Println("Unknown udp command received. ", receivedText)
+			log.Printf("Unknown udp command received: %v\n", receivedText)
 		}
 	}
 }

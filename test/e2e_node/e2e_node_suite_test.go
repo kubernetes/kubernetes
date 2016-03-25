@@ -57,7 +57,7 @@ var _ = BeforeSuite(func() {
 	if *nodeName == "" {
 		output, err := exec.Command("hostname").CombinedOutput()
 		if err != nil {
-			glog.Fatal("Could not get node name from hostname %v.  Output:\n%s", err, output)
+			glog.Fatalf("Could not get node name from hostname %v.  Output:\n%s", err, output)
 		}
 		*nodeName = strings.TrimSpace(fmt.Sprintf("%s", output))
 	}

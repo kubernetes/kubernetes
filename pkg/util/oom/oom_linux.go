@@ -82,7 +82,7 @@ func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 			if syscallNotExists(err) {
 				return os.ErrNotExist
 			}
-			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", err)
+			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", pid, err)
 		}
 	}
 	return err

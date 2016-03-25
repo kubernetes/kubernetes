@@ -217,7 +217,7 @@ func TestIsZero(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		if result := IsZero(testCase.a); result != testCase.expected {
-			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected)
+			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, result)
 		}
 	}
 }

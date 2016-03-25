@@ -172,7 +172,7 @@ func TestSyncAPIs(t *testing.T) {
 		cntrl := ThirdPartyController{master: &fake}
 
 		if err := cntrl.syncResourceList(test.list); err != nil {
-			t.Errorf("[%s] unexpected error: %v", test.name)
+			t.Errorf("[%s] unexpected error: %v", test.name, err)
 		}
 		if len(test.expectedInstalled) != len(fake.installed) {
 			t.Errorf("[%s] unexpected installed APIs: %d, expected %d (%#v)", test.name, len(fake.installed), len(test.expectedInstalled), fake.installed[0])

@@ -109,7 +109,7 @@ func TestHandshake(t *testing.T) {
 			continue
 		}
 		if w.statusCode != nil {
-			t.Errorf("%s: unexpected non-nil w.statusCode: %d", w.statusCode)
+			t.Errorf("%s: unexpected non-nil w.statusCode: %d", name, w.statusCode)
 		}
 
 		// verify response headers
