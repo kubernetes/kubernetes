@@ -392,11 +392,6 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			c.FuzzNoCustom(s)
 			s.Allocatable = s.Capacity
 		},
-		func(s *extensions.APIVersion, c fuzz.Continue) {
-			// We can't use c.RandString() here because it may generate empty
-			// string, which will cause tests failure.
-			s.APIGroup = "something"
-		},
 		func(s *extensions.HorizontalPodAutoscalerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			minReplicas := int(c.Rand.Int31())

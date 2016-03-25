@@ -99,6 +99,14 @@ func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *ass
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
 
+	// TODO: this is kind of hacky.  The trouble is that the sync loop
+	// runs in a go-routine and there is no way to validate in the test
+	// that the sync routine has actually run.  The right answer here
+	// is probably to add some sort of callback that we can register
+	// to validate that it's actually been run, but for now we don't
+	// run the sync routine and register types manually.
+	config.disableThirdPartyControllerForTesting = true
+
 	master, err := New(&config)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
@@ -498,12 +506,10 @@ func initThirdParty(t *testing.T, version string) (*Master, *etcdtesting.EtcdTes
 		},
 		Versions: []extensions.APIVersion{
 			{
-				APIGroup: "group",
-				Name:     version,
+				Name: version,
 			},
 		},
 	}
-	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(etcdserver.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false)
 	_, master.ServiceClusterIPRange, _ = net.ParseCIDR("10.0.0.0/24")
 
 	if !assert.NoError(master.InstallThirdPartyResource(api)) {
@@ -563,7 +569,10 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 			defer etcdserver.Terminate(t)
 
 			if test.items != nil {
-				storeThirdPartyList(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default", test.items)
+				err := storeThirdPartyList(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default", test.items)
+				if !assert.NoError(err) {
+					return
+				}
 			}
 
 			resp, err := http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos")
