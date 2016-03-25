@@ -71,7 +71,7 @@ func (es mockScheduler) Schedule(pod *api.Pod, ml algorithm.NodeLister) (string,
 
 func TestScheduler(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
-	defer eventBroadcaster.StartLogging(t.Logf).Stop()
+	eventBroadcaster.StartLogging(t.Logf).Stop()
 	errS := errors.New("scheduler")
 	errB := errors.New("binder")
 
