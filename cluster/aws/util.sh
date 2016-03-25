@@ -110,7 +110,7 @@ if [[ -n "${KUBE_SUBNET_CIDR:-}" ]]; then
   echo "Using subnet CIDR override: ${KUBE_SUBNET_CIDR}"
   SUBNET_CIDR=${KUBE_SUBNET_CIDR}
 fi
-if [[ -z "${MASTER_INTERNAL_IP-}" ]]; then
+if [[ -z "${MASTER_INTERNAL_IP:-}" ]]; then
   MASTER_INTERNAL_IP="${SUBNET_CIDR%.*}${MASTER_IP_SUFFIX}"
 fi
 
@@ -286,7 +286,7 @@ function detect-nodes () {
 }
 
 function detect-security-groups {
-  if [[ -z "${MASTER_SG_ID-}" ]]; then
+  if [[ -z "${MASTER_SG_ID:-}" ]]; then
     MASTER_SG_ID=$(get_security_group_id "${MASTER_SG_NAME}")
     if [[ -z "${MASTER_SG_ID}" ]]; then
       echo "Could not detect Kubernetes master security group.  Make sure you've launched a cluster with 'kube-up.sh'"
@@ -295,7 +295,7 @@ function detect-security-groups {
       echo "Using master security group: ${MASTER_SG_NAME} ${MASTER_SG_ID}"
     fi
   fi
-  if [[ -z "${NODE_SG_ID-}" ]]; then
+  if [[ -z "${NODE_SG_ID:-}" ]]; then
     NODE_SG_ID=$(get_security_group_id "${NODE_SG_NAME}")
     if [[ -z "${NODE_SG_ID}" ]]; then
       echo "Could not detect Kubernetes minion security group.  Make sure you've launched a cluster with 'kube-up.sh'"
@@ -347,7 +347,7 @@ function detect-trusty-image () {
   # This is the ubuntu 14.04 image for <region>, amd64, hvm:ebs-ssd
   # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
   # This will need to be updated from time to time as amis are deprecated
-  if [[ -z "${AWS_IMAGE-}" ]]; then
+  if [[ -z "${AWS_IMAGE:-}" ]]; then
     case "${AWS_REGION}" in
       ap-northeast-1)
         AWS_IMAGE=ami-93876e93
@@ -632,7 +632,7 @@ function verify-prereqs {
 # Vars set:
 #   KUBE_TEMP
 function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
+  if [[ -z ${KUBE_TEMP:-} ]]; then
     KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
     trap 'rm -rf "${KUBE_TEMP}"' EXIT
   fi
@@ -661,7 +661,7 @@ function upload-server-tars() {
   SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
   BOOTSTRAP_SCRIPT_HASH=$(sha1sum-file "${BOOTSTRAP_SCRIPT}")
 
-  if [[ -z ${AWS_S3_BUCKET-} ]]; then
+  if [[ -z ${AWS_S3_BUCKET:-} ]]; then
       local project_hash=
       local key=$(aws configure get aws_access_key_id)
       if which md5 > /dev/null 2>&1; then
@@ -1365,10 +1365,10 @@ function kube-down {
       done
     fi
 
-    if [[ -z "${KUBE_MASTER_ID-}" ]]; then
+    if [[ -z "${KUBE_MASTER_ID:-}" ]]; then
       KUBE_MASTER_ID=$(get_instanceid_from_name ${MASTER_NAME})
     fi
-    if [[ -n "${KUBE_MASTER_ID-}" ]]; then
+    if [[ -n "${KUBE_MASTER_ID:-}" ]]; then
       delete-instance-alarms ${KUBE_MASTER_ID}
     fi
 
@@ -1571,7 +1571,7 @@ function get_ssh_hostname {
 
   if [[ "${node}" == "${MASTER_NAME}" ]]; then
     node=$(get_instanceid_from_name ${MASTER_NAME})
-    if [[ -z "${node-}" ]]; then
+    if [[ -z "${node:-}" ]]; then
       echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" 1>&2
       exit 1
     fi

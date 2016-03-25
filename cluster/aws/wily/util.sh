@@ -27,7 +27,7 @@ function detect-wily-image () {
   # This is the ubuntu 15.10 image for <region>, amd64, hvm:ebs-ssd
   # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
   # This will need to be updated from time to time as amis are deprecated
-  if [[ -z "${AWS_IMAGE-}" ]]; then
+  if [[ -z "${AWS_IMAGE:-}" ]]; then
     case "${AWS_REGION}" in
       ap-northeast-1)
         AWS_IMAGE=ami-3355505d

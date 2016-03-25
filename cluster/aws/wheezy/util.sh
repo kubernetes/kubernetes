@@ -27,7 +27,7 @@ SSH_USER=admin
 # Vars set:
 #   AWS_IMAGE
 function detect-wheezy-image () {
-  if [[ -z "${AWS_IMAGE-}" ]]; then
+  if [[ -z "${AWS_IMAGE:-}" ]]; then
     case "${AWS_REGION}" in
       ap-northeast-1)
         AWS_IMAGE=ami-b25d44b3
