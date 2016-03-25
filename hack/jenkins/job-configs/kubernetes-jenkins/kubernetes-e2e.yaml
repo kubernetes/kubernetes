@@ -383,7 +383,7 @@
                 export PROJECT="k8s-jkns-e2e-gke-prod"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
-                export KUBE_GCE_ZONE="asia-east1-b"
+                export ZONE="asia-east1-b"
         - 'gke-prod-parallel':
             description: 'Run E2E tests on GKE prod endpoint in parallel.'
             timeout: 80
@@ -393,7 +393,7 @@
                 export JENKINS_USE_SERVER_VERSION="y"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
-                export KUBE_GCE_ZONE="asia-east1-b"
+                export ZONE="asia-east1-b"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
