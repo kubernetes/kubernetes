@@ -3,46 +3,46 @@
 // DO NOT EDIT!
 
 /*
-Package pb is a generated protocol buffer package.
+Package datastore is a generated protocol buffer package.
 
 It is generated from these files:
-    datastore_v1.proto
+	datastore_v1.proto
 
 It has these top-level messages:
-    PartitionId
-    Key
-    Value
-    Property
-    Entity
-    EntityResult
-    Query
-    KindExpression
-    PropertyReference
-    PropertyExpression
-    PropertyOrder
-    Filter
-    CompositeFilter
-    PropertyFilter
-    GqlQuery
-    GqlQueryArg
-    QueryResultBatch
-    Mutation
-    MutationResult
-    ReadOptions
-    LookupRequest
-    LookupResponse
-    RunQueryRequest
-    RunQueryResponse
-    BeginTransactionRequest
-    BeginTransactionResponse
-    RollbackRequest
-    RollbackResponse
-    CommitRequest
-    CommitResponse
-    AllocateIdsRequest
-    AllocateIdsResponse
+	PartitionId
+	Key
+	Value
+	Property
+	Entity
+	EntityResult
+	Query
+	KindExpression
+	PropertyReference
+	PropertyExpression
+	PropertyOrder
+	Filter
+	CompositeFilter
+	PropertyFilter
+	GqlQuery
+	GqlQueryArg
+	QueryResultBatch
+	Mutation
+	MutationResult
+	ReadOptions
+	LookupRequest
+	LookupResponse
+	RunQueryRequest
+	RunQueryResponse
+	BeginTransactionRequest
+	BeginTransactionResponse
+	RollbackRequest
+	RollbackResponse
+	CommitRequest
+	CommitResponse
+	AllocateIdsRequest
+	AllocateIdsResponse
 */
-package pb
+package datastore
 
 import proto "github.com/golang/protobuf/proto"
 import math "math"
@@ -897,7 +897,7 @@ type PropertyExpression struct {
 	// Can only be used when grouping by at least one property. Must
 	// then be set on all properties in the projection that are not
 	// being grouped by.
-	AggregationFunction *PropertyExpression_AggregationFunction `protobuf:"varint,2,opt,name=aggregation_function,enum=pb.PropertyExpression_AggregationFunction" json:"aggregation_function,omitempty"`
+	AggregationFunction *PropertyExpression_AggregationFunction `protobuf:"varint,2,opt,name=aggregation_function,enum=datastore.PropertyExpression_AggregationFunction" json:"aggregation_function,omitempty"`
 	XXX_unrecognized    []byte                                  `json:"-"`
 }
 
@@ -924,7 +924,7 @@ type PropertyOrder struct {
 	// The property to order by.
 	Property *PropertyReference `protobuf:"bytes,1,req,name=property" json:"property,omitempty"`
 	// The direction to order by.
-	Direction        *PropertyOrder_Direction `protobuf:"varint,2,opt,name=direction,enum=pb.PropertyOrder_Direction,def=1" json:"direction,omitempty"`
+	Direction        *PropertyOrder_Direction `protobuf:"varint,2,opt,name=direction,enum=datastore.PropertyOrder_Direction,def=1" json:"direction,omitempty"`
 	XXX_unrecognized []byte                   `json:"-"`
 }
 
@@ -978,7 +978,7 @@ func (m *Filter) GetPropertyFilter() *PropertyFilter {
 // A filter that merges the multiple other filters using the given operation.
 type CompositeFilter struct {
 	// The operator for combining multiple filters.
-	Operator *CompositeFilter_Operator `protobuf:"varint,1,req,name=operator,enum=pb.CompositeFilter_Operator" json:"operator,omitempty"`
+	Operator *CompositeFilter_Operator `protobuf:"varint,1,req,name=operator,enum=datastore.CompositeFilter_Operator" json:"operator,omitempty"`
 	// The list of filters to combine.
 	// Must contain at least one filter.
 	Filter           []*Filter `protobuf:"bytes,2,rep,name=filter" json:"filter,omitempty"`
@@ -1008,7 +1008,7 @@ type PropertyFilter struct {
 	// The property to filter by.
 	Property *PropertyReference `protobuf:"bytes,1,req,name=property" json:"property,omitempty"`
 	// The operator to filter by.
-	Operator *PropertyFilter_Operator `protobuf:"varint,2,req,name=operator,enum=pb.PropertyFilter_Operator" json:"operator,omitempty"`
+	Operator *PropertyFilter_Operator `protobuf:"varint,2,req,name=operator,enum=datastore.PropertyFilter_Operator" json:"operator,omitempty"`
 	// The value to compare the property to.
 	Value            *Value `protobuf:"bytes,3,req,name=value" json:"value,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
@@ -1134,14 +1134,14 @@ func (m *GqlQueryArg) GetCursor() []byte {
 // A batch of results produced by a query.
 type QueryResultBatch struct {
 	// The result type for every entity in entityResults.
-	EntityResultType *EntityResult_ResultType `protobuf:"varint,1,req,name=entity_result_type,enum=pb.EntityResult_ResultType" json:"entity_result_type,omitempty"`
+	EntityResultType *EntityResult_ResultType `protobuf:"varint,1,req,name=entity_result_type,enum=datastore.EntityResult_ResultType" json:"entity_result_type,omitempty"`
 	// The results for this batch.
 	EntityResult []*EntityResult `protobuf:"bytes,2,rep,name=entity_result" json:"entity_result,omitempty"`
 	// A cursor that points to the position after the last result in the batch.
 	// May be absent.
 	EndCursor []byte `protobuf:"bytes,4,opt,name=end_cursor" json:"end_cursor,omitempty"`
 	// The state of the query after the current batch.
-	MoreResults *QueryResultBatch_MoreResultsType `protobuf:"varint,5,req,name=more_results,enum=pb.QueryResultBatch_MoreResultsType" json:"more_results,omitempty"`
+	MoreResults *QueryResultBatch_MoreResultsType `protobuf:"varint,5,req,name=more_results,enum=datastore.QueryResultBatch_MoreResultsType" json:"more_results,omitempty"`
 	// The number of results skipped because of <code>Query.offset</code>.
 	SkippedResults   *int32 `protobuf:"varint,6,opt,name=skipped_results" json:"skipped_results,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
@@ -1300,7 +1300,7 @@ type ReadOptions struct {
 	// Cannot be set when transaction is set.
 	// Lookup and ancestor queries default to STRONG, global queries default to
 	// EVENTUAL and cannot be set to STRONG.
-	ReadConsistency *ReadOptions_ReadConsistency `protobuf:"varint,1,opt,name=read_consistency,enum=pb.ReadOptions_ReadConsistency,def=0" json:"read_consistency,omitempty"`
+	ReadConsistency *ReadOptions_ReadConsistency `protobuf:"varint,1,opt,name=read_consistency,enum=datastore.ReadOptions_ReadConsistency,def=0" json:"read_consistency,omitempty"`
 	// The transaction to use. Optional.
 	Transaction      []byte `protobuf:"bytes,2,opt,name=transaction" json:"transaction,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
@@ -1462,7 +1462,7 @@ func (m *RunQueryResponse) GetBatch() *QueryResultBatch {
 // The request for BeginTransaction.
 type BeginTransactionRequest struct {
 	// The transaction isolation level.
-	IsolationLevel   *BeginTransactionRequest_IsolationLevel `protobuf:"varint,1,opt,name=isolation_level,enum=pb.BeginTransactionRequest_IsolationLevel,def=0" json:"isolation_level,omitempty"`
+	IsolationLevel   *BeginTransactionRequest_IsolationLevel `protobuf:"varint,1,opt,name=isolation_level,enum=datastore.BeginTransactionRequest_IsolationLevel,def=0" json:"isolation_level,omitempty"`
 	XXX_unrecognized []byte                                  `json:"-"`
 }
 
@@ -1533,7 +1533,7 @@ type CommitRequest struct {
 	// The mutation to perform. Optional.
 	Mutation *Mutation `protobuf:"bytes,2,opt,name=mutation" json:"mutation,omitempty"`
 	// The type of commit to perform. Either TRANSACTIONAL or NON_TRANSACTIONAL.
-	Mode             *CommitRequest_Mode `protobuf:"varint,5,opt,name=mode,enum=pb.CommitRequest_Mode,def=1" json:"mode,omitempty"`
+	Mode             *CommitRequest_Mode `protobuf:"varint,5,opt,name=mode,enum=datastore.CommitRequest_Mode,def=1" json:"mode,omitempty"`
 	XXX_unrecognized []byte              `json:"-"`
 }
 
@@ -1621,13 +1621,13 @@ func (m *AllocateIdsResponse) GetKey() []*Key {
 }
 
 func init() {
-	proto.RegisterEnum("pb.EntityResult_ResultType", EntityResult_ResultType_name, EntityResult_ResultType_value)
-	proto.RegisterEnum("pb.PropertyExpression_AggregationFunction", PropertyExpression_AggregationFunction_name, PropertyExpression_AggregationFunction_value)
-	proto.RegisterEnum("pb.PropertyOrder_Direction", PropertyOrder_Direction_name, PropertyOrder_Direction_value)
-	proto.RegisterEnum("pb.CompositeFilter_Operator", CompositeFilter_Operator_name, CompositeFilter_Operator_value)
-	proto.RegisterEnum("pb.PropertyFilter_Operator", PropertyFilter_Operator_name, PropertyFilter_Operator_value)
-	proto.RegisterEnum("pb.QueryResultBatch_MoreResultsType", QueryResultBatch_MoreResultsType_name, QueryResultBatch_MoreResultsType_value)
-	proto.RegisterEnum("pb.ReadOptions_ReadConsistency", ReadOptions_ReadConsistency_name, ReadOptions_ReadConsistency_value)
-	proto.RegisterEnum("pb.BeginTransactionRequest_IsolationLevel", BeginTransactionRequest_IsolationLevel_name, BeginTransactionRequest_IsolationLevel_value)
-	proto.RegisterEnum("pb.CommitRequest_Mode", CommitRequest_Mode_name, CommitRequest_Mode_value)
+	proto.RegisterEnum("datastore.EntityResult_ResultType", EntityResult_ResultType_name, EntityResult_ResultType_value)
+	proto.RegisterEnum("datastore.PropertyExpression_AggregationFunction", PropertyExpression_AggregationFunction_name, PropertyExpression_AggregationFunction_value)
+	proto.RegisterEnum("datastore.PropertyOrder_Direction", PropertyOrder_Direction_name, PropertyOrder_Direction_value)
+	proto.RegisterEnum("datastore.CompositeFilter_Operator", CompositeFilter_Operator_name, CompositeFilter_Operator_value)
+	proto.RegisterEnum("datastore.PropertyFilter_Operator", PropertyFilter_Operator_name, PropertyFilter_Operator_value)
+	proto.RegisterEnum("datastore.QueryResultBatch_MoreResultsType", QueryResultBatch_MoreResultsType_name, QueryResultBatch_MoreResultsType_value)
+	proto.RegisterEnum("datastore.ReadOptions_ReadConsistency", ReadOptions_ReadConsistency_name, ReadOptions_ReadConsistency_value)
+	proto.RegisterEnum("datastore.BeginTransactionRequest_IsolationLevel", BeginTransactionRequest_IsolationLevel_name, BeginTransactionRequest_IsolationLevel_value)
+	proto.RegisterEnum("datastore.CommitRequest_Mode", CommitRequest_Mode_name, CommitRequest_Mode_value)
 }
