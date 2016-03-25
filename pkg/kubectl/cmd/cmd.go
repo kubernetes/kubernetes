@@ -134,7 +134,7 @@ __custom_func() {
    * replicasets (aka 'rs')
    * replicationcontrollers (aka 'rc')
    * secrets
-   * serviceaccounts
+   * serviceaccounts (aka 'sa')
    * services (aka 'svc')
 `
 )
