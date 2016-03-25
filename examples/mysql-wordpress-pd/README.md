@@ -34,301 +34,254 @@ Documentation for other releases can be found at
 
 # Persistent Installation of MySQL and WordPress on Kubernetes
 
-This example describes how to run a persistent installation of [Wordpress](https://wordpress.org/) using the [volumes](../../docs/user-guide/volumes.md) feature of Kubernetes, and [Google Compute Engine](https://cloud.google.com/compute/docs/disks) [persistent disks](../../docs/user-guide/volumes.md#gcepersistentdisk).
+This example describes how to run a persistent installation of
+[WordPress](https://wordpress.org/) and
+[MySQL](https://www.mysql.com/) on Kubernetes. We'll use the
+[mysql](https://registry.hub.docker.com/_/mysql/) and
+[wordpress](https://registry.hub.docker.com/_/wordpress/) official
+[Docker](https://www.docker.com/) images for this installation. (The
+WordPress image includes an Apache server).
 
-We'll use the [mysql](https://registry.hub.docker.com/_/mysql/) and [wordpress](https://registry.hub.docker.com/_/wordpress/) official [Docker](https://www.docker.com/) images for this installation. (The wordpress image includes an Apache server).
+Demonstrated Kubernetes Concepts:
 
-We'll create two Kubernetes [pods](../../docs/user-guide/pods.md) to run mysql and wordpress, both with associated persistent disks, then set up a Kubernetes [service](../../docs/user-guide/services.md) to front each pod.
+* [Persistent Volumes](http://kubernetes.io/docs/user-guide/persistent-volumes/) to
+  define persistent disks (disk lifecycle not tied to the Pods).
+* [Services](http://kubernetes.io/docs/user-guide/services/) to enable Pods to
+  locate one another.
+* [External Load Balancers](http://kubernetes.io/docs/user-guide/services/#type-loadbalancer)
+  to expose Services externally.
+* [Deployments](http://kubernetes.io/docs/user-guide/deployments/) to ensure Pods
+  stay up and running.
+* [Secrets](http://kubernetes.io/docs/user-guide/secrets/) to store sensitive
+  passwords.
 
-This example demonstrates several useful things, including: how to set up and use persistent disks with Kubernetes pods; how to define Kubernetes services to leverage docker-links-compatible service environment variables; and use of an external load balancer to expose the wordpress service externally and make it transparent to the user if the wordpress pod moves to a different cluster node.
+## tl;dr Quickstart
 
-## Get started on Google Compute Engine (GCE)
+Put your desired mysql password in a file called `password.txt` with
+no trailing newline. The first `tr` command will remove the newline if
+your editor added one.
 
-Because we're using the `GCEPersistentDisk` type of volume for persistent storage, this example is only applicable to [Google Compute Engine](https://cloud.google.com/compute/). Take a look at the [volumes documentation](../../docs/user-guide/volumes.md) for other options.
-
-First, if you have not already done so:
-
-1. [Create](https://cloud.google.com/compute/docs/quickstart) a [Google Cloud Platform](https://cloud.google.com/) project.
-2. [Enable billing](https://developers.google.com/console/help/new/#billing).
-3. Install the [gcloud SDK](https://cloud.google.com/sdk/).
-
-Authenticate with gcloud and set the gcloud default project name to point to the project you want to use for your Kubernetes cluster:
-
-```sh
-gcloud auth login
-gcloud config set project <project-name>
+```shell
+tr --delete '\n' <password.txt >.strippedpassword.txt && mv .strippedpassword.txt password.txt
+kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/examples/mysql-wordpress-pd/local-volumes.yaml
+kubectl create secret generic mysql-pass --from-file=password.txt
+kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/examples/mysql-wordpress-pd/mysql-deployment.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/examples/mysql-wordpress-pd/wordpress-deployment.yaml
 ```
 
-Next, start up a Kubernetes cluster:
+## Table of Contents
 
-```sh
-wget -q -O - https://get.k8s.io | bash
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Persistent Installation of MySQL and WordPress on Kubernetes](#persistent-installation-of-mysql-and-wordpress-on-kubernetes)
+  - [tl;dr Quickstart](#tldr-quickstart)
+  - [Table of Contents](#table-of-contents)
+  - [Cluster Requirements](#cluster-requirements)
+  - [Decide where you will store your data](#decide-where-you-will-store-your-data)
+    - [Host Path](#host-path)
+    - [GCE Persistent Disk](#gce-persistent-disk)
+  - [Create the MySQL Password Secret](#create-the-mysql-password-secret)
+  - [Deploy MySQL](#deploy-mysql)
+  - [Deploy WordPress](#deploy-wordpress)
+  - [Visit your new WordPress blog](#visit-your-new-wordpress-blog)
+  - [Take down and restart your blog](#take-down-and-restart-your-blog)
+  - [Next Steps](#next-steps)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
+## Cluster Requirements
+
+Kubernetes runs in a variety of environments and is inherently
+modular. Not all clusters are the same. These are the requirements for
+this example.
+
+* Kubernetes version 1.2 is required due to using newer features, such
+  at PV Claims and Deployments. Run `kubectl version` to see your
+  cluster version.
+* [Cluster DNS](../../cluster/addons/dns/) will be used for service discovery.
+* An [external load balancer](http://kubernetes.io/docs/user-guide/services/#type-loadbalancer)
+  will be used to access WordPress.
+* [Persistent Volume Claims](http://kubernetes.io/docs/user-guide/persistent-volumes/)
+  are used. You must create Persistent Volumes in your cluster to be
+  claimed. This example demonstrates how to create two types of
+  volumes, but any volume is sufficient.
+
+Consult a
+[Getting Started Guide](http://kubernetes.io/docs/getting-started-guides/)
+to set up a cluster and the
+[kubectl](http://kubernetes.io/docs/user-guide/prereqs/) command-line client.
+
+## Decide where you will store your data
+
+MySQL and WordPress will each use a
+[Persistent Volume](http://kubernetes.io/docs/user-guide/persistent-volumes/)
+to store their data. We will use a Persistent Volume Claim to claim an
+available persistent volume. This example covers HostPath and
+GCEPersistentDisk volumes. Choose one of the two, or see
+[Types of Persistent Volumes](http://kubernetes.io/docs/user-guide/persistent-volumes/#types-of-persistent-volumes)
+for more options.
+
+### Host Path
+
+Host paths are volumes mapped to directories on the host. **These
+should be used for testing or single-node clusters only**. The data
+will not be moved between nodes if the pod is recreated on a new
+node. If the pod is deleted and recreated on a new node, data will be
+lost.
+
+Create the persistent volume objects in Kubernetes using
+[local-volumes.yaml](local-volumes.yaml):
+
+```shell
+export KUBE_REPO=https://raw.githubusercontent.com/kubernetes/kubernetes/master
+kubectl create -f $KUBE_REPO/examples/mysql-wordpress-pd/local-volumes.yaml
 ```
 
-Please see the [GCE getting started guide](../../docs/getting-started-guides/gce.md) for full details and other options for starting a cluster.
+### GCE Persistent Disk
 
-## Create two persistent disks
+This storage option is applicable if you are running on
+[Google Compute Engine](http://kubernetes.io/docs/getting-started-guides/gce/).
 
-For this WordPress installation, we're going to configure our Kubernetes [pods](../../docs/user-guide/pods.md) to use [persistent disks](https://cloud.google.com/compute/docs/disks). This means that we can preserve installation state across pod shutdown and re-startup.
+Create two persistent disks. You will need to create the disks in the
+same [GCE zone](https://cloud.google.com/compute/docs/zones) as the
+Kubernetes cluster. The default setup script will create the cluster
+in the `us-central1-b` zone, as seen in the
+[config-default.sh](../../cluster/gce/config-default.sh) file. Replace
+`<zone>` below with the appropriate zone. The names `wordpress-1` and
+`wordpress-2` must match the `pdName` fields we have specified in
+[gce-volumes.yaml](gce-volumes.yaml).
 
-You will need to create the disks in the same [GCE zone](https://cloud.google.com/compute/docs/zones) as the Kubernetes cluster. The default setup script will create the cluster in the `us-central1-b` zone, as seen in the [config-default.sh](../../cluster/gce/config-default.sh) file. Replace `$ZONE` below with the appropriate zone.
-
-We will create two disks: one for the mysql pod, and one for the wordpress pod. In this example, we create 20GB disks, which will be sufficient for this demo. Feel free to change the size to align with your needs, as wordpress requirements can vary. Also, keep in mind that [disk performance scales with size](https://cloud.google.com/compute/docs/disks/#comparison_of_disk_types).
-
-First create the mysql disk.
-
-```sh
-gcloud compute disks create --size=20GB --zone=$ZONE mysql-disk
+```shell
+gcloud compute disks create --size=20GB --zone=<zone> wordpress-1
+gcloud compute disks create --size=20GB --zone=<zone> wordpress-2
 ```
 
-Then create the wordpress disk.
+Create the persistent volume objects in Kubernetes for those disks:
 
-```sh
-gcloud compute disks create --size=20GB --zone=$ZONE wordpress-disk
+```shell
+export KUBE_REPO=https://raw.githubusercontent.com/kubernetes/kubernetes/master
+kubectl create -f $KUBE_REPO/examples/mysql-wordpress-pd/gce-volumes.yaml
 ```
 
-## Start the Mysql Pod and Service
+## Create the MySQL Password Secret
 
-Now that the persistent disks are defined, the Kubernetes pods can be launched.  We'll start with the mysql pod.
+Use a [Secret](http://kubernetes.io/docs/user-guide/secrets/) object
+to store the MySQL password. First create a temporary file called
+`password.txt` and save your password in it. Make sure to not have a
+trailing newline at the end of the password. The first `tr` command
+will remove the newline if your editor added one. Then, create the
+Secret object.
 
-### Start the Mysql pod
-
-First, **edit [`mysql.yaml`](mysql.yaml)**, the mysql pod definition, to use a database password that you specify.
-`mysql.yaml` looks like this:
-
-<!-- BEGIN MUNGE: EXAMPLE mysql.yaml -->
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: mysql
-  labels: 
-    name: mysql
-spec: 
-  containers: 
-    - resources:
-        limits :
-          cpu: 0.5
-      image: mysql:5.6
-      name: mysql
-      env:
-        - name: MYSQL_ROOT_PASSWORD
-          # change this
-          value: yourpassword
-      ports: 
-        - containerPort: 3306
-          name: mysql
-      volumeMounts:
-          # name must match the volume name below
-        - name: mysql-persistent-storage
-          # mount path within the container
-          mountPath: /var/lib/mysql
-  volumes:
-    - name: mysql-persistent-storage
-      gcePersistentDisk:
-        # This GCE PD must already exist.
-        pdName: mysql-disk
-        fsType: ext4
+```shell
+tr --delete '\n' <password.txt >.strippedpassword.txt && mv .strippedpassword.txt password.txt
+kubectl create secret generic mysql-pass --from-file=password.txt
 ```
 
-[Download example](mysql.yaml?raw=true)
-<!-- END MUNGE: EXAMPLE mysql.yaml -->
+This secret is referenced by the MySQL and WordPress pod configuration
+so that those pods will have access to it. The MySQL pod will set the
+database password, and the WordPress pod will use the password to
+access the database.
 
-Note that we've defined a volume mount for `/var/lib/mysql`, and specified a volume that uses the persistent disk (`mysql-disk`) that you created.
-Once you've edited the file to set your database password, create the pod as follows, where `<kubernetes>` is the path to your Kubernetes installation:
+## Deploy MySQL
 
-```sh
-$ kubectl create -f examples/mysql-wordpress-pd/mysql.yaml
+Now that the persistent disks and secrets are defined, the Kubernetes
+pods can be launched. Start MySQL using
+[mysql-deployment.yaml](mysql-deployment.yaml).
+
+```shell
+kubectl create -f $KUBE_REPO/examples/mysql-wordpress-pd/mysql-deployment.yaml
 ```
 
-It may take a short period before the new pod reaches the `Running` state.
-List all pods to see the status of this new pod and the cluster node that it is running on:
+Take a look at [mysql-deployment.yaml](mysql-deployment.yaml), and
+note that we've defined a volume mount for `/var/lib/mysql`, and then
+created a Persistent Volume Claim that looks for a 20G volume. This
+claim is satisfied by any volume that meets the requirements, in our
+case one of the volumes we created above.
 
-```sh
-$ kubectl get pods
+Also look at the `env` section and see that we specified the password
+by referencing the secret `mysql-pass` that we created above. Secrets
+can have multiple key:value pairs. Ours has only one key
+`password.txt` which was the name of the file we used to create the
+secret. The [MySQL image](https://hub.docker.com/_/mysql/) sets the
+database password using the `MYSQL_ROOT_PASSWORD` environment
+variable.
+
+It may take a short period before the new pod reaches the `Running`
+state.  List all pods to see the status of this new pod.
+
+```shell
+kubectl get pods
 ```
 
-
-#### Check the running pod on the Compute instance
-
-You can take a look at the logs for a pod by using `kubectl.sh log`.  For example:
-
-```sh
-$ kubectl logs mysql
+```
+NAME                          READY     STATUS    RESTARTS   AGE
+wordpress-mysql-cqcf4-9q8lo   1/1       Running   0          1m
 ```
 
-If you want to do deeper troubleshooting, e.g. if it seems a container is not staying up, you can also ssh in to the node that a pod is running on.  There, you can run `sudo -s`, then `docker ps -a` to see all the containers.  You can then inspect the logs of containers that have exited, via `docker logs <container_id>`.  (You can also find some relevant logs under `/var/log`, e.g. `docker.log` and `kubelet.log`).
+Kubernetes logs the stderr and stdout for each pod. Take a look at the
+logs for a pod by using `kubectl log`. Copy the pod name from the
+`get pods` command, and then:
 
-### Start the Mysql service
-
-We'll define and start a [service](../../docs/user-guide/services.md) that lets other pods access the mysql database on a known port and host.
-We will specifically name the service `mysql`.  This will let us leverage the support for [Docker-links-compatible](../../docs/user-guide/services.md#how-do-they-work) service environment variables when we set up the wordpress pod. The wordpress Docker image expects to be linked to a mysql container named `mysql`, as you can see in the "How to use this image" section on the wordpress docker hub [page](https://registry.hub.docker.com/_/wordpress/).
-
-So if we label our Kubernetes mysql service `mysql`, the wordpress pod will be able to use the Docker-links-compatible environment variables, defined by Kubernetes, to connect to the database.
-
-The [`mysql-service.yaml`](mysql-service.yaml) file looks like this:
-
-<!-- BEGIN MUNGE: EXAMPLE mysql-service.yaml -->
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata: 
-  labels: 
-    name: mysql
-  name: mysql
-spec: 
-  ports:
-    # the port that this service should serve on
-    - port: 3306
-  # label keys and values that must match in order to receive traffic for this service
-  selector: 
-    name: mysql
+```shell
+kubectl logs <pod-name>
 ```
 
-[Download example](mysql-service.yaml?raw=true)
-<!-- END MUNGE: EXAMPLE mysql-service.yaml -->
-
-Start the service like this:
-
-```sh
-$ kubectl create -f examples/mysql-wordpress-pd/mysql-service.yaml
+```
+...
+2016-02-19 16:58:05 1 [Note] InnoDB: 128 rollback segment(s) are active.
+2016-02-19 16:58:05 1 [Note] InnoDB: Waiting for purge to start
+2016-02-19 16:58:05 1 [Note] InnoDB: 5.6.29 started; log sequence number 1626007
+2016-02-19 16:58:05 1 [Note] Server hostname (bind-address): '*'; port: 3306
+2016-02-19 16:58:05 1 [Note] IPv6 is available.
+2016-02-19 16:58:05 1 [Note]   - '::' resolves to '::';
+2016-02-19 16:58:05 1 [Note] Server socket created on IP: '::'.
+2016-02-19 16:58:05 1 [Warning] 'proxies_priv' entry '@ root@wordpress-mysql-cqcf4-9q8lo' ignored in --skip-name-resolve mode.
+2016-02-19 16:58:05 1 [Note] Event Scheduler: Loaded 0 events
+2016-02-19 16:58:05 1 [Note] mysqld: ready for connections.
+Version: '5.6.29'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  MySQL Community Server (GPL)
 ```
 
-You can see what services are running via:
+Also in [mysql-deployment.yaml](mysql-deployment.yaml) we created a
+service to allow other pods to reach this mysql instance. The name is
+`wordpress-mysql` which resolves to the pod IP.
 
-```sh
-$ kubectl get services
+## Deploy WordPress
+
+Next deploy WordPress using
+[wordpress-deployment.yaml](wordpress-deployment.yaml):
+
+```shell
+kubectl create -f $KUBE_REPO/examples/mysql-wordpress-pd/wordpress-deployment.yaml
 ```
 
+Here we are using many of the same features, such as a volume claim
+for persistent storage and a secret for the password.
 
-## Start the WordPress Pod and Service
+The [WordPress image](https://hub.docker.com/_/wordpress/) accepts the
+database hostname through the environment variable
+`WORDPRESS_DB_HOST`. We set the env value to the name of the MySQL
+service we created: `wordpress-mysql`.
 
-Once the mysql service is up, start the wordpress pod, specified in
-[`wordpress.yaml`](wordpress.yaml).  Before you start it, **edit `wordpress.yaml`** and **set the database password to be the same as you used in `mysql.yaml`**.
-Note that this config file also defines a volume, this one using the `wordpress-disk` persistent disk that you created.
+The WordPress service has the setting `type: LoadBalancer`.  This will
+set up the wordpress service behind an external IP.
 
-<!-- BEGIN MUNGE: EXAMPLE wordpress.yaml -->
+Find the external IP for your WordPress service. **It may take a minute
+to have an external IP assigned to the service, depending on your
+cluster environment.**
 
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: wordpress
-  labels: 
-    name: wordpress
-spec: 
-  containers: 
-    - image: wordpress
-      name: wordpress
-      env:
-        - name: WORDPRESS_DB_PASSWORD
-          # change this - must match mysql.yaml password
-          value: yourpassword
-      ports: 
-        - containerPort: 80
-          name: wordpress
-      volumeMounts:
-          # name must match the volume name below
-        - name: wordpress-persistent-storage
-          # mount path within the container
-          mountPath: /var/www/html
-  volumes:
-    - name: wordpress-persistent-storage
-      gcePersistentDisk:
-        # This GCE PD must already exist.
-        pdName: wordpress-disk
-        fsType: ext4
+```shell
+kubectl get services wordpress
 ```
 
-[Download example](wordpress.yaml?raw=true)
-<!-- END MUNGE: EXAMPLE wordpress.yaml -->
-
-Create the pod:
-
-```sh
-$ kubectl create -f examples/mysql-wordpress-pd/wordpress.yaml
 ```
-
-And list the pods to check that the status of the new pod changes
-to `Running`.  As above, this might take a minute.
-
-```sh
-$ kubectl get pods
+NAME        CLUSTER-IP     EXTERNAL-IP     PORT(S)   AGE
+wordpress   10.0.0.5       1.2.3.4         80/TCP    19h
 ```
-
-### Start the WordPress service
-
-Once the wordpress pod is running, start its service, specified by [`wordpress-service.yaml`](wordpress-service.yaml).
-
-The service config file looks like this:
-
-<!-- BEGIN MUNGE: EXAMPLE wordpress-service.yaml -->
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata: 
-  labels: 
-    name: wpfrontend
-  name: wpfrontend
-spec: 
-  ports:
-    # the port that this service should serve on
-    - port: 80
-  # label keys and values that must match in order to receive traffic for this service
-  selector: 
-    name: wordpress
-  type: LoadBalancer
-```
-
-[Download example](wordpress-service.yaml?raw=true)
-<!-- END MUNGE: EXAMPLE wordpress-service.yaml -->
-
-Note the `type: LoadBalancer` setting.  This will set up the wordpress service behind an external IP.
-Note also that we've set the service port to 80.  We'll return to that shortly.
-
-Start the service:
-
-```sh
-$ kubectl create -f examples/mysql-wordpress-pd/wordpress-service.yaml
-```
-
-and see it in the list of services:
-
-```sh
-$ kubectl get services
-```
-
-Then, find the external IP for your WordPress service by running:
-
-```console
-$ kubectl get services/wpfrontend
-NAME                  CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
-wpfrontend            10.0.0.2         1.2.3.4           80/TCP        ...                    ...
-```
-
-or by listing the forwarding rules for your project:
-
-```sh
-$ gcloud compute forwarding-rules list
-```
-
-Look for the rule called `wpfrontend`, which is what we named the wordpress service, and note its IP address.
 
 ## Visit your new WordPress blog
 
-To access your new installation, you first may need to open up port 80 (the port specified in the wordpress service config) in the firewall for your cluster. You can do this, e.g. via:
-
-```sh
-$ gcloud compute firewall-rules create sample-http --allow tcp:80
-```
-
-This will define a firewall rule called `sample-http` that opens port 80 in the default network for your project.
-
-Now, we can visit the running WordPress app.
-Use the external IP that you obtained above, and visit it on port 80:
+Now, we can visit the running WordPress app. Use the external IP of
+the service that you obtained above.
 
 ```
 http://<external-ip>
@@ -336,27 +289,59 @@ http://<external-ip>
 
 You should see the familiar WordPress init page.
 
+![WordPress init page](WordPress.png "WordPress init page")
+
+> Warning: Do not leave your WordPress installation on this page. If
+> it is found by another user, they can set up a website on your
+> instance and use it to serve potentially malicious content. You
+> should either continue with the installation past the point at which
+> you create your username and password, delete your instance, or set
+> up a firewall to restrict access.
+
 ## Take down and restart your blog
 
-Set up your WordPress blog and play around with it a bit.  Then, take down its pods and bring them back up again. Because you used persistent disks, your blog state will be preserved.
+Set up your WordPress blog and play around with it a bit. Then, take
+down its pods and bring them back up again. Because you used
+persistent disks, your blog state will be preserved.
 
-If you are just experimenting, you can take down and bring up only the pods:
+All of the resources are labeled with `app=wordpress`, so you can
+easily bring them down using a label selector:
 
-```sh
-$ kubectl delete -f examples/mysql-wordpress-pd/wordpress.yaml
-$ kubectl delete -f examples/mysql-wordpress-pd/mysql.yaml
+```shell
+kubectl delete deployment,service -l app=wordpress
+kubectl delete secret mysql-pass
 ```
 
-When you restart the pods again (using the `create` operation as described above), their services will pick up the new pods based on their labels.
+Later, re-creating the resources with the original commands will pick
+up the original disks with all your data intact. Because we did not
+delete the PV Claims, no other pods in the cluster could claim them
+after we deleted our pods. Keeping the PV Claims also ensured
+recreating the Pods did not cause the PD to switch Pods.
 
-If you want to shut down the entire app installation, you can delete the services as well.
+If you are ready to release your persistent volumes and the data on them, run:
 
-If you are ready to turn down your Kubernetes cluster altogether, run:
-
-```sh
-$ cluster/kube-down.sh
+```shell
+kubectl delete pvc -l app=wordpress
 ```
 
+And then delete the volume objects themselves:
+
+```shell
+kubectl delete pv local-pv-1 local-pv-2
+```
+
+or
+
+```shell
+kubectl delete pv wordpress-pv-1 wordpress-pv-2
+```
+
+## Next Steps
+
+* [Introspection and Debugging](http://kubernetes.io/docs/user-guide/introspection-and-debugging/)
+* [Jobs](http://kubernetes.io/docs/user-guide/jobs/) may be useful to run SQL queries.
+* [Exec](http://kubernetes.io/docs/user-guide/getting-into-containers/)
+* [Port Forwarding](http://kubernetes.io/docs/user-guide/connecting-to-applications-port-forward/)
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/mysql-wordpress-pd/README.md?pixel)]()
