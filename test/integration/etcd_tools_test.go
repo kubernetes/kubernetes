@@ -35,14 +35,14 @@ import (
 	"golang.org/x/net/context"
 )
 
-func TestSet(t *testing.T) {
+func TestCreate(t *testing.T) {
 	client := framework.NewEtcdClient()
 	keysAPI := etcd.NewKeysAPI(client)
 	etcdStorage := etcdstorage.NewEtcdStorage(client, testapi.Default.Codec(), "", false)
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		if err := etcdStorage.Set(ctx, key, &testObject, nil, 0); err != nil {
+		if err := etcdStorage.Create(ctx, key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		resp, err := keysAPI.Get(ctx, key, nil)
@@ -94,7 +94,7 @@ func TestWriteTTL(t *testing.T) {
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		if err := etcdStorage.Set(ctx, key, &testObject, nil, 0); err != nil {
+		if err := etcdStorage.Create(ctx, key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		result := &api.ServiceAccount{}

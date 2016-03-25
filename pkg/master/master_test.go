@@ -569,7 +569,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 			defer etcdserver.Terminate(t)
 
 			if test.items != nil {
-				err := storeThirdPartyList(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default", test.items)
+				err := createThirdPartyList(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default", test.items)
 				if !assert.NoError(err) {
 					return
 				}
@@ -637,17 +637,17 @@ func encodeToThirdParty(name string, obj interface{}) (runtime.Object, error) {
 	return &thirdPartyData, nil
 }
 
-func storeThirdPartyObject(s storage.Interface, path, name string, obj interface{}) error {
+func createThirdPartyObject(s storage.Interface, path, name string, obj interface{}) error {
 	data, err := encodeToThirdParty(name, obj)
 	if err != nil {
 		return err
 	}
-	return s.Set(context.TODO(), etcdtest.AddPrefix(path), data, nil, 0)
+	return s.Create(context.TODO(), etcdtest.AddPrefix(path), data, nil, 0)
 }
 
-func storeThirdPartyList(s storage.Interface, path string, list []Foo) error {
+func createThirdPartyList(s storage.Interface, path string, list []Foo) error {
 	for _, obj := range list {
-		if err := storeThirdPartyObject(s, path+"/"+obj.Name, obj.Name, obj); err != nil {
+		if err := createThirdPartyObject(s, path+"/"+obj.Name, obj.Name, obj); err != nil {
 			return err
 		}
 	}
@@ -690,7 +690,7 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
+	if !assert.NoError(createThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
 	}
@@ -803,7 +803,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
+	if !assert.NoError(createThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
 	}
@@ -913,13 +913,13 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
+	if !assert.NoError(createThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
 	}
 	secondObj := expectedObj
 	secondObj.Name = "bar"
-	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/bar", "bar", secondObj)) {
+	if !assert.NoError(createThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/bar", "bar", secondObj)) {
 		t.FailNow()
 		return
 	}
