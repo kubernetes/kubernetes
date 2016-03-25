@@ -226,6 +226,9 @@ spec:
         - name: WORDPRESS_DB_PASSWORD
           # change this - must match mysql.yaml password
           value: yourpassword
+        - name: WORDPRESS_DB_HOST
+          # change this - must match the ip address and port of your mysql service
+          value: yourmysql_svc_ip:port
       ports: 
         - containerPort: 80
           name: wordpress
