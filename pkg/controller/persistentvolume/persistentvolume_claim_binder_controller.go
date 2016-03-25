@@ -238,7 +238,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 
 		if volume.Spec.ClaimRef != nil {
 			claim, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
-			if errors.IsNotFound(err) {
+			if errors.IsNotFound(err) || (claim != nil && claim.UID != volume.Spec.ClaimRef.UID) {
 				if volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRecycle {
 					// Pending volumes that have a ClaimRef where the claim is missing were recently recycled.
 					// The Recycler set the phase to VolumePending to start the volume at the beginning of this lifecycle.
