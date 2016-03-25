@@ -69,6 +69,21 @@ const TagNameSubnetPublicELB = "kubernetes.io/role/elb"
 // This lets us define more advanced semantics in future.
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-load-balancer-internal"
 
+// Service annotation requesting a secure listener. Value is [InstanceProtocol=]CertARN
+// If InstanceProtocol is `http` (default) or `https`, an HTTPS listener that terminates the connection and parses headers is created.
+// If it is set to `ssl` or `tcp`, a "raw" SSL listener is used.
+// For more, see http://docs.aws.amazon.com/ElasticLoadBalancing/latest/DeveloperGuide/elb-listener-config.html
+// CertARN is an IAM or CM certificate ARN, e.g. arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012
+const ServiceAnnotationLoadBalancerCertificate = "service.beta.kubernetes.io/aws-load-balancer-certarn"
+
+// Maps from instance protocol to ELB protocol
+var protocolMapping = map[string]string{
+	"https": "https",
+	"http":  "https",
+	"ssl":   "ssl",
+	"tcp":   "ssl",
+}
+
 // We sometimes read to see if something exists; then try to create it if we didn't find it
 // This can fail once in a consistent system if done in parallel
 // In an eventually consistent system, it could fail unboundedly
@@ -2099,6 +2114,39 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
 	return false, nil
 }
 
+func getListener(port api.ServicePort, annotations map[string]string) (*elb.Listener, error) {
+	loadBalancerPort := int64(port.Port)
+	instancePort := int64(port.NodePort)
+	protocol := strings.ToLower(string(port.Protocol))
+	instanceProtocol := protocol
+
+	listener := &elb.Listener{}
+	listener.InstancePort = &instancePort
+	listener.LoadBalancerPort = &loadBalancerPort
+	certID := annotations[ServiceAnnotationLoadBalancerCertificate]
+	if certID != "" {
+		parts := strings.Split(certID, "=")
+		if len(parts) == 1 {
+			protocol = "https"
+			instanceProtocol = "http"
+		} else if len(parts) == 2 {
+			instanceProtocol = strings.ToLower(parts[0])
+			protocol = protocolMapping[instanceProtocol]
+			if protocol == "" {
+				return nil, fmt.Errorf("Invalid protocol %s in %s", instanceProtocol, certID)
+			}
+			certID = parts[1]
+		} else {
+			return nil, fmt.Errorf("Invalid certificate annotation %s", certID)
+		}
+		listener.SSLCertificateId = &certID
+	}
+	listener.Protocol = &protocol
+	listener.InstanceProtocol = &instanceProtocol
+
+	return listener, nil
+}
+
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
@@ -2113,10 +2161,21 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string, a
 		return nil, fmt.Errorf("requested load balancer with no ports")
 	}
 
+	// Figure out what mappings we want on the load balancer
+	listeners := []*elb.Listener{}
 	for _, port := range apiService.Spec.Ports {
 		if port.Protocol != api.ProtocolTCP {
 			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
 		}
+		if port.NodePort == 0 {
+			glog.Errorf("Ignoring port without NodePort defined: %v", port)
+			continue
+		}
+		listener, err := getListener(port, annotations)
+		if err != nil {
+			return nil, err
+		}
+		listeners = append(listeners, listener)
 	}
 
 	if apiService.Spec.LoadBalancerIP != "" {
@@ -2197,26 +2256,6 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string, a
 		}
 	}
 	securityGroupIDs := []string{securityGroupID}
-
-	// Figure out what mappings we want on the load balancer
-	listeners := []*elb.Listener{}
-	for _, port := range apiService.Spec.Ports {
-		if port.NodePort == 0 {
-			glog.Errorf("Ignoring port without NodePort defined: %v", port)
-			continue
-		}
-		instancePort := int64(port.NodePort)
-		loadBalancerPort := int64(port.Port)
-		protocol := strings.ToLower(string(port.Protocol))
-
-		listener := &elb.Listener{}
-		listener.InstancePort = &instancePort
-		listener.LoadBalancerPort = &loadBalancerPort
-		listener.Protocol = &protocol
-		listener.InstanceProtocol = &protocol
-
-		listeners = append(listeners, listener)
-	}
 
 	// Build the load balancer itself
 	loadBalancer, err := s.ensureLoadBalancer(serviceName, loadBalancerName, listeners, subnetIDs, securityGroupIDs, internalELB)
