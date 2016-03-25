@@ -383,6 +383,7 @@
                 export PROJECT="k8s-jkns-e2e-gke-prod"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
+                export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://container.googleapis.com/"
                 export ZONE="asia-east1-b"
         - 'gke-prod-parallel':
             description: 'Run E2E tests on GKE prod endpoint in parallel.'
@@ -391,6 +392,7 @@
                 export PROJECT="k8s-e2e-gke-prod-parallel"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
+                export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://container.googleapis.com/"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export ZONE="asia-east1-b"
