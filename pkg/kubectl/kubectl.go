@@ -34,7 +34,7 @@ const (
 	PossibleResourceTypes = `Possible resource types include (case insensitive): pods (po), services (svc), deployments,
 replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
 persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
-serviceaccounts, ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
+serviceaccounts (sa), ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
 componentstatuses (cs), endpoints (ep), and secrets.`
 )
 
@@ -138,6 +138,7 @@ var shortForms = map[string]string{
 	"quota":  "resourcequotas",
 	"rc":     "replicationcontrollers",
 	"rs":     "replicasets",
+	"sa":     "serviceaccounts",
 	"svc":    "services",
 }
 
