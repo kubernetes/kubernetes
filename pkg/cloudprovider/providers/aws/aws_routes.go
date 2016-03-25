@@ -149,7 +149,7 @@ func (s *AWSCloud) CreateRoute(clusterName string, nameHint string, route *cloud
 
 		_, err = s.ec2.DeleteRoute(request)
 		if err != nil {
-			return fmt.Errorf("error deleting blackholed AWS route (%s): %v", deleteRoute.DestinationCidrBlock, err)
+			return fmt.Errorf("error deleting blackholed AWS route (%s): %v", aws.StringValue(deleteRoute.DestinationCidrBlock), err)
 		}
 	}
 

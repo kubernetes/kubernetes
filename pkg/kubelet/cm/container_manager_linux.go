@@ -310,7 +310,7 @@ func (cm *containerManagerImpl) setupNode() error {
 		cm.periodicTasks = append(cm.periodicTasks, func() {
 			cont, err := getContainer(os.Getpid())
 			if err != nil {
-				glog.Error("failed to find cgroups of kubelet - %v", err)
+				glog.Errorf("failed to find cgroups of kubelet - %v", err)
 				return
 			}
 			cm.Lock()

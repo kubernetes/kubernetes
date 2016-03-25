@@ -239,7 +239,7 @@ func TestSortMergeLists(t *testing.T) {
 		original := testObjectToJSONOrFail(t, c.Original, c.Description)
 		sorted := testObjectToJSONOrFail(t, c.Sorted, c.Description)
 		if !reflect.DeepEqual(original, sorted) {
-			t.Errorf("error in test case: %s\ncannot sort object:\n%s\n%sexpected:\n%s\ngot:\n%s\n",
+			t.Errorf("error in test case: %s\ncannot sort object:\n%s\nexpected:\n%s\ngot:\n%s\n",
 				c.Description, toYAMLOrError(c.Original), toYAMLOrError(c.Sorted), jsonToYAMLOrError(original))
 		}
 	}
@@ -1814,7 +1814,7 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	actual, err := CreateTwoWayMergePatch(original, modified, mergeItem)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch: %s:\n%s\n",
-			err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+			err, c.Description, original, toYAMLOrError(c.StrategicMergePatchTestCaseData))
 		return
 	}
 

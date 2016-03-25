@@ -337,11 +337,11 @@ func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver i
 	}
 	node, err := client.Get(hostname)
 	if err != nil {
-		glog.Errorf("Can't get Node %q, assuming iptables proxy: %v", hostname, err)
+		glog.Errorf("Can't get Node %q, assuming iptables proxy, err: %v", hostname, err)
 		return tryIptablesProxy(iptver, kcompat)
 	}
 	if node == nil {
-		glog.Errorf("Got nil Node %q, assuming iptables proxy: %v", hostname)
+		glog.Errorf("Got nil Node %q, assuming iptables proxy", hostname)
 		return tryIptablesProxy(iptver, kcompat)
 	}
 	proxyMode, found := node.Annotations[betaProxyModeAnnotation]

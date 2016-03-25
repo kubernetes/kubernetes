@@ -317,7 +317,7 @@ func TestWatchEtcdState(t *testing.T) {
 	}
 
 	if e, a := endpoint, event.Object; !api.Semantic.DeepDerivative(e, a) {
-		t.Errorf("%s: expected %v, got %v", e, a)
+		t.Errorf("Unexpected error: expected %v, got %v", e, a)
 	}
 }
 
@@ -367,7 +367,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	}
 
 	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
-		t.Errorf("%s: expected %v, got %v", e, a)
+		t.Errorf("Unexpected error: expected %v, got %v", e, a)
 	}
 }
 
@@ -397,7 +397,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	}
 
 	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
-		t.Errorf("%s: expected %v, got %v", e, a)
+		t.Errorf("Unexpected error: expected %v, got %v", e, a)
 	}
 }
 

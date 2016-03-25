@@ -140,7 +140,7 @@ func (p *ecrProvider) Provide() credentialprovider.DockerConfig {
 			data.AuthorizationToken != nil {
 			decodedToken, err := base64.StdEncoding.DecodeString(aws.StringValue(data.AuthorizationToken))
 			if err != nil {
-				glog.Errorf("while decoding token for endpoint %s %v", data.ProxyEndpoint, err)
+				glog.Errorf("while decoding token for endpoint %v %v", data.ProxyEndpoint, err)
 				return cfg
 			}
 			parts := strings.SplitN(string(decodedToken), ":", 2)

@@ -172,7 +172,7 @@ func (g *GenericEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.Us
 	}
 	list, err := g.ListFuncByNamespace(options.Namespace, api.ListOptions{})
 	if err != nil {
-		return result, fmt.Errorf("%s: Failed to list %v: %v", g.Name, g.GroupKind, err)
+		return result, fmt.Errorf("%s: Failed to list %v: %v", g.Name, g.GroupKind(), err)
 	}
 	_, err = meta.Accessor(list)
 	if err != nil {

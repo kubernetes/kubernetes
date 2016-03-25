@@ -325,7 +325,7 @@ func TestGenerateService(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if test.expectPOST != sawPOST {
-			t.Error("expectPost: %v, sawPost: %v", test.expectPOST, sawPOST)
+			t.Errorf("expectPost: %v, sawPost: %v", test.expectPOST, sawPOST)
 		}
 	}
 }

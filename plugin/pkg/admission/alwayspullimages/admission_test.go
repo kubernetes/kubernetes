@@ -46,7 +46,7 @@ func TestAdmission(t *testing.T) {
 	}
 	for _, c := range pod.Spec.Containers {
 		if c.ImagePullPolicy != api.PullAlways {
-			t.Errorf("Container %s: expected pull always, got %v", c.ImagePullPolicy)
+			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
 		}
 	}
 }
