@@ -627,7 +627,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 	everything := unversioned.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {
-		dsc.eventRecorder.Eventf(ds, api.EventTypeWarning, "SelectingAll", "This controller is selecting all pods. Skipping sync.")
+		dsc.eventRecorder.Eventf(ds, api.EventTypeWarning, "SelectingAll", "This daemon set is selecting all pods. A non-empty selector is required.")
 		return nil
 	}
 
