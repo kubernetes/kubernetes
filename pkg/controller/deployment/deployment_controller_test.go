@@ -782,3 +782,28 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 
 	f.run(getKey(d, t))
 }
+
+// issue: https://github.com/kubernetes/kubernetes/issues/23218
+func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
+	fake := &fake.Clientset{}
+	controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
+
+	controller.eventRecorder = &record.FakeRecorder{}
+	controller.rsStoreSynced = alwaysReady
+	controller.podStoreSynced = alwaysReady
+
+	d := newDeployment(1, nil)
+	empty := unversioned.LabelSelector{}
+	d.Spec.Selector = &empty
+	controller.dStore.Store.Add(d)
+	// We expect the deployment controller to not take action here since it's configuration
+	// is invalid, even though no replicasets exist that match it's selector.
+	controller.syncDeployment(fmt.Sprintf("%s/%s", d.ObjectMeta.Namespace, d.ObjectMeta.Name))
+	if len(fake.Actions()) == 0 {
+		return
+	}
+	for _, action := range fake.Actions() {
+		t.Logf("unexpected action: %#v", action)
+	}
+	t.Errorf("expected deployment controller to not take action")
+}
