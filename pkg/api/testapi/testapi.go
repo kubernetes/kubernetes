@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/controlplane"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -36,6 +37,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
+	_ "k8s.io/kubernetes/pkg/apis/controlplane/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
 )
@@ -46,6 +48,7 @@ var (
 	Autoscaling TestGroup
 	Batch       TestGroup
 	Extensions  TestGroup
+	Clusters    TestGroup
 )
 
 type TestGroup struct {
@@ -122,11 +125,19 @@ func init() {
 			internalTypes:        api.Scheme.KnownTypes(extensions.SchemeGroupVersion),
 		}
 	}
+	if _, ok := Groups[controlplane.GroupName]; !ok {
+		Groups[controlplane.GroupName] = TestGroup{
+			externalGroupVersion: unversioned.GroupVersion{Group: controlplane.GroupName, Version: registered.GroupOrDie(controlplane.GroupName).GroupVersion.Version},
+			internalGroupVersion: extensions.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(controlplane.SchemeGroupVersion),
+		}
+	}
 
 	Default = Groups[api.GroupName]
 	Autoscaling = Groups[autoscaling.GroupName]
 	Batch = Groups[batch.GroupName]
 	Extensions = Groups[extensions.GroupName]
+	Clusters = Groups[controlplane.GroupName]
 }
 
 func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.Codec) {

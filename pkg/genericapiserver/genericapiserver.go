@@ -618,7 +618,7 @@ func (s *GenericAPIServer) init(c *Config) {
 // Exposes the given group versions in API.
 func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
 	for _, apiGroupInfo := range groupsInfo {
-		if err := s.installAPIGroup(&apiGroupInfo); err != nil {
+		if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
 			return err
 		}
 	}
@@ -743,7 +743,7 @@ func (s *GenericAPIServer) Run(options *ServerRunOptions) {
 	glog.Fatal(http.ListenAndServe())
 }
 
-func (s *GenericAPIServer) installAPIGroup(apiGroupInfo *APIGroupInfo) error {
+func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	apiPrefix := s.APIGroupPrefix
 	if apiGroupInfo.IsLegacyGroup {
 		apiPrefix = s.APIPrefix

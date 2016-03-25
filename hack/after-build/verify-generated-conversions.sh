@@ -23,7 +23,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-APIROOTS=${APIROOTS:-pkg/api pkg/apis/authorization pkg/apis/autoscaling pkg/apis/batch pkg/apis/extensions pkg/apis/metrics}
+gendeepcopy=$(kube::util::find-binary "gendeepcopy")
+APIROOTS=${APIROOTS:-pkg/api pkg/apis/authorization pkg/apis/autoscaling pkg/apis/batch pkg/apis/extensions pkg/apis/metrics pkg/apis/controlplane}
 _tmp="${KUBE_ROOT}/_tmp"
 
 cleanup() {
