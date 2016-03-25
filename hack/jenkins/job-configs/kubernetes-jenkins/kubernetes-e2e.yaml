@@ -768,6 +768,8 @@
     suffix:
         - 'gke-trusty-prod':
             timeout: 180
+            # Failing constantly due to a known issue.
+            disable_job: true
             description: |
                 Run e2e tests with Trusty as node image using the following config:<br>
                 - provider: GKE<br>
