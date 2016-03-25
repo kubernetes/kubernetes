@@ -1199,3 +1199,98 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 
 	c.EnsureLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{}, map[string]string{})
 }
+
+func TestGetListener(t *testing.T) {
+	tests := []struct {
+		name string
+
+		lbPort       int64
+		instancePort int64
+		annotation   string
+
+		expectError      bool
+		lbProtocol       string
+		instanceProtocol string
+		certID           string
+		//listener    *elb.Listener
+	}{
+		{
+			"No annotation, passthrough",
+			80, 8000, "",
+			false, "tcp", "tcp", "",
+		},
+		{
+			"Invalid cert annotation, no protocol before equal sign",
+			443, 8000, "=foo",
+			true, "tcp", "tcp", "cert",
+		},
+		{
+			"Invalid cert annotation, bogus protocol before equal sign",
+			443, 8000, "bacon=foo",
+			true, "tcp", "tcp", "cert",
+		},
+		{
+			"Invalid cert annotation, too many equal signs",
+			443, 8000, "==",
+			true, "tcp", "tcp", "cert",
+		},
+		{
+			"HTTPS->HTTPS",
+			443, 8000, "https=cert",
+			false, "https", "https", "cert",
+		},
+		{
+			"HTTPS->HTTP",
+			443, 8000, "http=cert",
+			false, "https", "http", "cert",
+		},
+		{
+			"SSL->SSL",
+			443, 8000, "ssl=cert",
+			false, "ssl", "ssl", "cert",
+		},
+		{
+			"SSL->TCP",
+			443, 8000, "tcp=cert",
+			false, "ssl", "tcp", "cert",
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		annotations := make(map[string]string)
+		if test.annotation != "" {
+			annotations[ServiceAnnotationLoadBalancerCertificate] = test.annotation
+		}
+		l, err := getListener(api.ServicePort{
+			NodePort: int(test.instancePort),
+			Port:     int(test.lbPort),
+			Protocol: api.Protocol("tcp"),
+		}, annotations)
+		if test.expectError {
+			if err == nil {
+				t.Errorf("Should error for case %s", test.name)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Should succeed for case: %s, got %v", test.name, err)
+			} else {
+				var cert *string
+				if test.certID != "" {
+					cert = &test.certID
+				}
+				expected := &elb.Listener{
+					InstancePort:     &test.instancePort,
+					InstanceProtocol: &test.instanceProtocol,
+					LoadBalancerPort: &test.lbPort,
+					Protocol:         &test.lbProtocol,
+					SSLCertificateId: cert,
+				}
+				if !reflect.DeepEqual(l, expected) {
+					t.Errorf("Incorrect listener (%v vs %v) for case: %s",
+						l, expected, test.name)
+				}
+			}
+		}
+	}
+}
