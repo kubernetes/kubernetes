@@ -48,6 +48,8 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate, runOnceTimeout ti
 		// Sync node status to master (needed to register node with master
 		// to get pods).
 		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, done)
+		go wait.Until(kl.updateRuntimeUp, 5*time.Second, done)
+		go wait.Until(kl.syncNetworkStatus, 30*time.Second, done)
 	}
 
 	// Setup filesystem directories.
