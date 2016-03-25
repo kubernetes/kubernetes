@@ -1059,11 +1059,11 @@
 		},
 		{
 			"ImportPath": "google.golang.org/cloud/compute/metadata",
-			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
+			"Rev": "eb47ba841d53d93506cfbfbc03927daf9cc48f88"
 		},
 		{
 			"ImportPath": "google.golang.org/cloud/internal",
-			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
+			"Rev": "eb47ba841d53d93506cfbfbc03927daf9cc48f88"
 		},
 		{
 			"ImportPath": "google.golang.org/grpc",

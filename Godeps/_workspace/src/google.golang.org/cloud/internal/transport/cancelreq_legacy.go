@@ -12,26 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build go1.3
+// +build !go1.5
 
-package metadata
+package transport
 
-import (
-	"net"
-	"time"
-)
+import "net/http"
 
-// This is a workaround for https://github.com/golang/oauth2/issues/70, where
-// net.Dialer.KeepAlive is unavailable on Go 1.2 (which App Engine as of
-// Jan 2015 still runs).
-//
-// TODO(bradfitz,jbd,adg): remove this once App Engine supports Go
-// 1.3+.
-func init() {
-	go13Dialer = func() *net.Dialer {
-		return &net.Dialer{
-			Timeout:   750 * time.Millisecond,
-			KeepAlive: 30 * time.Second,
+// makeReqCancel returns a closure that cancels the given http.Request
+// when called.
+func makeReqCancel(req *http.Request) func(http.RoundTripper) {
+	// Go 1.4 and prior do not have a reliable way of cancelling a request.
+	// Transport.CancelRequest will only work if the request is already in-flight.
+	return func(r http.RoundTripper) {
+		if t, ok := r.(*http.Transport); ok {
+			t.CancelRequest(req)
 		}
 	}
 }
