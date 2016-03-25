@@ -30,11 +30,9 @@ import (
 // This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
 //
 // Slow by design (7 min)
-var _ = KubeDescribe("Garbage collector [Slow]", func() {
+var _ = KubeDescribe("Garbage collector [Feature:GarbageCollector] [Slow]", func() {
 	f := NewDefaultFramework("garbage-collector")
 	It("should handle the creation of 1000 pods", func() {
-		SkipUnlessProviderIs("gce")
-
 		var count int
 		for count < 1000 {
 			pod, err := createTerminatingPod(f)
