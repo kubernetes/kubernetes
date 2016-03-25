@@ -67,10 +67,10 @@ switch to a different namespace with the --namespaces flag, or specify --all-nam
   kubectl cluster-info dump --namespaces default,kube-system --output-directory=/tmp`
 )
 
-func getWriter(cmd *cobra.Command, out io.Writer, filename string) io.Writer {
+func getWriter(cmd *cobra.Command, defaultWriter io.Writer, filename string) io.Writer {
 	dir := cmdutil.GetFlagString(cmd, "output-directory")
 	if len(dir) == 0 || dir == "-" {
-		return out
+		return defaultWriter
 	}
 	fullFile := path.Join(dir, filename)
 	parent := path.Dir(fullFile)
