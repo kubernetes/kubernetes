@@ -223,7 +223,6 @@ func NewMainKubelet(
 	if resyncInterval <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
 	}
-	dockerClient = dockertools.NewInstrumentedDockerInterface(dockerClient)
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
