@@ -105,7 +105,7 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 			plugin:  plugin},
 		fsType:   fc.FSType,
 		readOnly: readOnly,
-		mounter:  &mount.SafeFormatAndMount{mounter, exec.New()},
+		mounter:  &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
 	}, nil
 }
 

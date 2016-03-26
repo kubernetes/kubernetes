@@ -227,7 +227,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		ReplicaSetLister: f.ReplicaSetLister,
 		// All fit predicates only need to consider schedulable nodes.
 		NodeLister: f.NodeLister.NodeCondition(getNodeConditionPredicate()),
-		NodeInfo:   &predicates.CachedNodeInfo{f.NodeLister},
+		NodeInfo:   &predicates.CachedNodeInfo{StoreToNodeLister: f.NodeLister},
 		PVInfo:     f.PVLister,
 		PVCInfo:    f.PVCLister,
 	}

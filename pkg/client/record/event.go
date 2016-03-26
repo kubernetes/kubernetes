@@ -294,7 +294,7 @@ func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp unvers
 }
 
 func (recorder *recorderImpl) makeEvent(ref *api.ObjectReference, eventtype, reason, message string) *api.Event {
-	t := unversioned.Time{recorder.clock.Now()}
+	t := unversioned.Time{Time: recorder.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {
 		namespace = api.NamespaceDefault

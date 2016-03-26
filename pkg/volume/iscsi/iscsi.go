@@ -105,7 +105,7 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 			plugin:  plugin},
 		fsType:   iscsi.FSType,
 		readOnly: readOnly,
-		mounter:  &mount.SafeFormatAndMount{mounter, exec.New()},
+		mounter:  &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
 	}, nil
 }
 

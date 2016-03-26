@@ -101,7 +101,7 @@ func (plugin *cinderPlugin) newBuilderInternal(spec *volume.Spec, podUID types.U
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
-		blockDeviceMounter: &mount.SafeFormatAndMount{mounter, exec.New()}}, nil
+		blockDeviceMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}}, nil
 }
 
 func (plugin *cinderPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {

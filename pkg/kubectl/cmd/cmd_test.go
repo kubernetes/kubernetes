@@ -566,7 +566,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test1",
-					CreationTimestamp: unversioned.Time{time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
@@ -583,7 +583,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test2",
-					CreationTimestamp: unversioned.Time{time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
@@ -600,7 +600,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test3",
-					CreationTimestamp: unversioned.Time{time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
@@ -617,7 +617,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test4",
-					CreationTimestamp: unversioned.Time{time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
@@ -634,7 +634,7 @@ func newAllPhasePodList() *api.PodList {
 			{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "test5",
-					CreationTimestamp: unversioned.Time{time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),

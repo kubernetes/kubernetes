@@ -103,7 +103,7 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 
 	dsc := &DaemonSetsController{
 		kubeClient:    kubeClient,

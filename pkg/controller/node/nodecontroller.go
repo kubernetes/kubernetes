@@ -141,7 +141,7 @@ func NewNodeController(
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
 		glog.Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
+		eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 	} else {
 		glog.Infof("No api server defined - no events will be sent to API server.")
 	}

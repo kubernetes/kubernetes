@@ -104,7 +104,7 @@ func (HorizontalPodAutoscalerV1Beta1) Generate(genericParams map[string]interfac
 		scaler.Spec.MinReplicas = &min
 	}
 	if cpu >= 0 {
-		scaler.Spec.CPUUtilization = &extensions.CPUTargetUtilization{cpu}
+		scaler.Spec.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: cpu}
 	}
 	return &scaler, nil
 }

@@ -68,7 +68,7 @@ func NewKubeletServer() *KubeletServer {
 		KubeletConfiguration: componentconfig.KubeletConfiguration{
 			Address:                     "0.0.0.0",
 			CAdvisorPort:                4194,
-			VolumeStatsAggPeriod:        unversioned.Duration{time.Minute},
+			VolumeStatsAggPeriod:        unversioned.Duration{Duration: time.Minute},
 			CertDirectory:               "/var/run/kubernetes",
 			CgroupRoot:                  "",
 			ConfigureCBR0:               false,
@@ -80,14 +80,14 @@ func NewKubeletServer() *KubeletServer {
 			EnableCustomMetrics:         false,
 			EnableDebuggingHandlers:     true,
 			EnableServer:                true,
-			FileCheckFrequency:          unversioned.Duration{20 * time.Second},
+			FileCheckFrequency:          unversioned.Duration{Duration: 20 * time.Second},
 			HealthzBindAddress:          "127.0.0.1",
 			HealthzPort:                 10248,
 			HostNetworkSources:          kubetypes.AllSource,
 			HostPIDSources:              kubetypes.AllSource,
 			HostIPCSources:              kubetypes.AllSource,
-			HTTPCheckFrequency:          unversioned.Duration{20 * time.Second},
-			ImageMinimumGCAge:           unversioned.Duration{2 * time.Minute},
+			HTTPCheckFrequency:          unversioned.Duration{Duration: 20 * time.Second},
+			ImageMinimumGCAge:           unversioned.Duration{Duration: 2 * time.Minute},
 			ImageGCHighThresholdPercent: 90,
 			ImageGCLowThresholdPercent:  80,
 			LowDiskSpaceThresholdMB:     256,
@@ -96,12 +96,12 @@ func NewKubeletServer() *KubeletServer {
 			MaxPerPodContainerCount:     2,
 			MaxOpenFiles:                1000000,
 			MaxPods:                     110,
-			MinimumGCAge:                unversioned.Duration{1 * time.Minute},
+			MinimumGCAge:                unversioned.Duration{Duration: 1 * time.Minute},
 			NetworkPluginDir:            "/usr/libexec/kubernetes/kubelet-plugins/net/exec/",
 			NetworkPluginName:           "",
 			NonMasqueradeCIDR:           "10.0.0.0/8",
 			VolumePluginDir:             "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
-			NodeStatusUpdateFrequency:   unversioned.Duration{10 * time.Second},
+			NodeStatusUpdateFrequency:   unversioned.Duration{Duration: 10 * time.Second},
 			NodeLabels:                  make(map[string]string),
 			OOMScoreAdj:                 qos.KubeletOOMScoreAdj,
 			LockFilePath:                "",
@@ -118,14 +118,14 @@ func NewKubeletServer() *KubeletServer {
 			RootDirectory:                  defaultRootDir,
 			RuntimeCgroups:                 "",
 			SerializeImagePulls:            true,
-			StreamingConnectionIdleTimeout: unversioned.Duration{4 * time.Hour},
-			SyncFrequency:                  unversioned.Duration{1 * time.Minute},
+			StreamingConnectionIdleTimeout: unversioned.Duration{Duration: 4 * time.Hour},
+			SyncFrequency:                  unversioned.Duration{Duration: 1 * time.Minute},
 			SystemCgroups:                  "",
 			ReconcileCIDR:                  true,
 			KubeAPIQPS:                     5.0,
 			KubeAPIBurst:                   10,
 			ExperimentalFlannelOverlay:     experimentalFlannelOverlay,
-			OutOfDiskTransitionFrequency:   unversioned.Duration{5 * time.Minute},
+			OutOfDiskTransitionFrequency:   unversioned.Duration{Duration: 5 * time.Minute},
 			HairpinMode:                    componentconfig.PromiscuousBridge,
 			BabysitDaemons:                 false,
 		},
@@ -141,7 +141,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ManifestURL, "manifest-url", s.ManifestURL, "URL for accessing the container manifest")
 	fs.StringVar(&s.ManifestURLHeader, "manifest-url-header", s.ManifestURLHeader, "HTTP header to use when accessing the manifest URL, with the key separated from the value with a ':', as in 'key:value'")
 	fs.BoolVar(&s.EnableServer, "enable-server", s.EnableServer, "Enable the Kubelet's server")
-	fs.Var(componentconfig.IPVar{&s.Address}, "address", "The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.UintVar(&s.Port, "port", s.Port, "The port for the Kubelet to serve on.")
 	fs.UintVar(&s.ReadOnlyPort, "read-only-port", s.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
@@ -173,7 +173,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
 	fs.UintVar(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
-	fs.Var(componentconfig.IPVar{&s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
+	fs.Var(componentconfig.IPVar{Val: &s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")
 	fs.StringSliceVar(&s.APIServerList, "api-servers", []string{}, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.BoolVar(&s.RegisterNode, "register-node", s.RegisterNode, "Register the node with the apiserver (defaults to true if --api-servers is set)")
