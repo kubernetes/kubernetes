@@ -74,7 +74,7 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode
 	}
 }
 
-func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	source, _ := plugin.getGlusterVolumeSource(spec)
 	ep_name := source.EndpointsName
 	ns := pod.Namespace
@@ -84,7 +84,7 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ vol
 		return nil, err
 	}
 	glog.V(1).Infof("glusterfs: endpoints %v", ep)
-	return plugin.newBuilderInternal(spec, ep, pod, plugin.host.GetMounter(), exec.New())
+	return plugin.newMounterInternal(spec, ep, pod, plugin.host.GetMounter(), exec.New())
 }
 
 func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.GlusterfsVolumeSource, bool) {
@@ -97,9 +97,9 @@ func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.G
 	}
 }
 
-func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface) (volume.Mounter, error) {
 	source, readOnly := plugin.getGlusterVolumeSource(spec)
-	return &glusterfsBuilder{
+	return &glusterfsMounter{
 		glusterfs: &glusterfs{
 			volName: spec.Name(),
 			mounter: mounter,
@@ -112,12 +112,12 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 		exe:      exe}, nil
 }
 
-func (plugin *glusterfsPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, plugin.host.GetMounter())
+func (plugin *glusterfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 
-func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
-	return &glusterfsCleaner{&glusterfs{
+func (plugin *glusterfsPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
+	return &glusterfsUnmounter{&glusterfs{
 		volName: volName,
 		mounter: mounter,
 		pod:     &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
@@ -139,7 +139,7 @@ type glusterfs struct {
 	volume.MetricsNil
 }
 
-type glusterfsBuilder struct {
+type glusterfsMounter struct {
 	*glusterfs
 	hosts    *api.Endpoints
 	path     string
@@ -147,9 +147,9 @@ type glusterfsBuilder struct {
 	exe      exec.Interface
 }
 
-var _ volume.Builder = &glusterfsBuilder{}
+var _ volume.Mounter = &glusterfsMounter{}
 
-func (b *glusterfsBuilder) GetAttributes() volume.Attributes {
+func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:        b.readOnly,
 		Managed:         false,
@@ -158,11 +158,11 @@ func (b *glusterfsBuilder) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *glusterfsBuilder) SetUp(fsGroup *int64) error {
+func (b *glusterfsMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *glusterfsBuilder) SetUpAt(dir string, fsGroup *int64) error {
+func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("glusterfs: mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -179,7 +179,7 @@ func (b *glusterfsBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// Cleanup upon failure.
-	c := &glusterfsCleaner{b.glusterfs}
+	c := &glusterfsUnmounter{b.glusterfs}
 	c.cleanup(dir)
 	return err
 }
@@ -189,21 +189,21 @@ func (glusterfsVolume *glusterfs) GetPath() string {
 	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), glusterfsVolume.volName)
 }
 
-type glusterfsCleaner struct {
+type glusterfsUnmounter struct {
 	*glusterfs
 }
 
-var _ volume.Cleaner = &glusterfsCleaner{}
+var _ volume.Unmounter = &glusterfsUnmounter{}
 
-func (c *glusterfsCleaner) TearDown() error {
+func (c *glusterfsUnmounter) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
 
-func (c *glusterfsCleaner) TearDownAt(dir string) error {
+func (c *glusterfsUnmounter) TearDownAt(dir string) error {
 	return c.cleanup(dir)
 }
 
-func (c *glusterfsCleaner) cleanup(dir string) error {
+func (c *glusterfsUnmounter) cleanup(dir string) error {
 	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
 		return fmt.Errorf("glusterfs: Error checking IsLikelyNotMountPoint: %v", err)
@@ -228,7 +228,7 @@ func (c *glusterfsCleaner) cleanup(dir string) error {
 	return nil
 }
 
-func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
+func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	var errs error
 
 	options := []string{}
