@@ -66,11 +66,7 @@ function get_trusty_image_project() {
 function get_latest_trusty_image() {
     local image_type="$1"
     local image_index=""
-    if [[ "${image_type}" == head ]]; then
-      image_index="trusty-head"
-    elif [[ "${image_type}" == dev ]]; then
-      image_index="trusty-dev"
-    elif [[ "${image_type}" == beta ]]; then
+    if [[ "${image_type}" == beta ]]; then
       image_index="trusty-beta"
     elif [[ "${image_type}" == stable ]]; then
       image_index="trusty-stable"
@@ -438,14 +434,6 @@ TRUSTY_DEFAULT_SKIP_TESTS=(
     "Services.*should\swork\safter\srestarting\skube-proxy"
 )
 
-TRUSTY_HEAD_SKIP_TESTS=(
-    "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
-)
-
-TRUSTY_DEV_SKIP_TESTS=(
-    "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
-)
-
 TRUSTY_BETA_SKIP_TESTS=(
     "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
 )
@@ -536,89 +524,6 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-1-1"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
-
-  # Runs non-flaky tests on GCE with Trusty as base image for minions,
-  # sequentially.
-  kubernetes-e2e-gce-trusty-head-release)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-release"}
-    : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="e2e-gce-trusty-release"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          ${TRUSTY_HEAD_SKIP_TESTS[@]:+${TRUSTY_HEAD_SKIP_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
-    : ${PROJECT:="kubekins-e2e-gce-trusty-rls"}
-    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image "head")"}
-    : ${KUBE_OS_DISTRIBUTION:="trusty"}
-    : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
-    ;;
-
-  # Runs slow tests on GCE with Trusty as base image for minions, sequentially.
-  kubernetes-e2e-gce-trusty-head-slow)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-slow"}
-    : ${E2E_NETWORK:="e2e-gce-trusty-slow"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          ) --ginkgo.skip=$(join_regex_allow_empty \
-          ${TRUSTY_HEAD_SKIP_TESTS[@]:+${TRUSTY_HEAD_SKIP_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-slow"}
-    : ${PROJECT:="k8s-e2e-gce-trusty-slow"}
-    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image "head")"}
-    : ${KUBE_OS_DISTRIBUTION:="trusty"}
-    : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    ;;
-
-  # Runs non-flaky tests on GCE with Trusty-dev as base image for minions,
-  # sequentially.
-  kubernetes-e2e-gce-trusty-dev-release)
-   : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-dev-release"}
-   : ${E2E_DOWN:="false"}
-   : ${E2E_NETWORK:="e2e-gce-trusty-dev-release"}
-   : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-         ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-         ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
-         ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-         ${TRUSTY_DEV_SKIP_TESTS[@]:+${TRUSTY_DEV_SKIP_TESTS[@]}} \
-         )"}
-   : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
-   : ${PROJECT:="k8s-e2e-gce-trusty-dev"}
-   : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-   : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image "dev")"}
-   : ${KUBE_OS_DISTRIBUTION:="trusty"}
-   : ${ENABLE_CLUSTER_REGISTRY:=false}
-   : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
-   ;;
-
-  # Runs slow tests on GCE with Trusty-dev as base image for minions,
-  # sequentially.
-  kubernetes-e2e-gce-trusty-dev-slow)
-   : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-dev-slow"}
-   : ${E2E_NETWORK:="e2e-gce-trusty-dev-slow"}
-   : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
-         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-         ) --ginkgo.skip=$(join_regex_allow_empty \
-         ${TRUSTY_DEV_SKIP_TESTS[@]:+${TRUSTY_DEV_SKIP_TESTS[@]}} \
-         )"}
-   : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-dev-slow"}
-   : ${PROJECT:="k8s-e2e-gce-trusty-dev-slow"}
-   : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-   : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image "dev")"}
-   : ${KUBE_OS_DISTRIBUTION:="trusty"}
-   : ${ENABLE_CLUSTER_REGISTRY:=false}
-   : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
-   : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-   ;;
 
   # Runs non-flaky tests on GCE with Trusty-beta as base image for minions,
   # sequentially.
