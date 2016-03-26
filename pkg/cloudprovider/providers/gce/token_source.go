@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2"
@@ -61,7 +61,7 @@ type altTokenSource struct {
 	oauthClient *http.Client
 	tokenURL    string
 	tokenBody   string
-	throttle    util.RateLimiter
+	throttle    flowcontrol.RateLimiter
 }
 
 func (a *altTokenSource) Token() (*oauth2.Token, error) {
@@ -106,7 +106,7 @@ func newAltTokenSource(tokenURL, tokenBody string) oauth2.TokenSource {
 		oauthClient: client,
 		tokenURL:    tokenURL,
 		tokenBody:   tokenBody,
-		throttle:    util.NewTokenBucketRateLimiter(tokenURLQPS, tokenURLBurst),
+		throttle:    flowcontrol.NewTokenBucketRateLimiter(tokenURLQPS, tokenURLBurst),
 	}
 	return oauth2.ReuseTokenSource(nil, a)
 }
