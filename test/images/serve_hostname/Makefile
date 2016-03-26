@@ -16,7 +16,7 @@ all: serve_hostname
 
 TAG = v1.4
 PREFIX = gcr.io/google_containers
-TEST_PREFIX = gcr.io/_b_k8s_authenticated_test
+TEST_PREFIX = b.gcr.io/k8s_authenticated_test
 
 serve_hostname: serve_hostname.go
 	CGO_ENABLED=0 go build -a -installsuffix cgo --ldflags '-w' ./serve_hostname.go
