@@ -93,11 +93,11 @@ type Executor struct {
 	dockerClient         dockertools.DockerInterface
 	suicideWatch         suicideWatcher
 	suicideTimeout       time.Duration
-	shutdownAlert        func()          // invoked just prior to executor shutdown
-	kubeletFinished      <-chan struct{} // signals that kubelet Run() died
+	shutdownAlert        func() // invoked just prior to executor shutdown
 	exitFunc             func(int)
 	staticPodsConfigPath string
 	staticPodsFilters    podutil.Filters
+	podTaskFilters       podutil.Filters // applied at binding time
 	launchGracePeriod    time.Duration
 	nodeInfos            chan<- NodeInfo
 	initCompleted        chan struct{} // closes upon completion of Init()
@@ -142,7 +142,6 @@ func New(config Config) *Executor {
 		outgoing:          make(chan func() (mesos.Status, error), 1024),
 		dockerClient:      config.Docker,
 		suicideTimeout:    config.SuicideTimeout,
-		kubeletFinished:   config.KubeletFinished,
 		suicideWatch:      &suicideTimer{},
 		shutdownAlert:     config.ShutdownAlert,
 		exitFunc:          config.ExitFunc,
@@ -175,6 +174,13 @@ func StaticPods(configPath string, f podutil.Filters) Option {
 	}
 }
 
+// PodTaskFilters creates a pod-task filters Option for an Executor
+func PodTaskFilters(f podutil.Filters) Option {
+	return func(k *Executor) {
+		k.podTaskFilters = f
+	}
+}
+
 // Done returns a chan that closes when the executor is shutting down
 func (k *Executor) Done() <-chan struct{} {
 	return k.terminate
@@ -203,8 +209,6 @@ func (k *Executor) Init(driver bindings.ExecutorDriver) {
 		}
 		return true
 	})
-
-	//TODO(jdef) monitor kubeletFinished and shutdown if it happens
 }
 
 func (k *Executor) isDone() bool {
@@ -273,8 +277,12 @@ func (k *Executor) Reregistered(driver bindings.ExecutorDriver, slaveInfo *mesos
 		return
 	}
 	log.Infof("Reregistered with slave %v\n", slaveInfo)
+
 	if !(&k.state).transition(disconnectedState, connectedState) {
-		log.Errorf("failed to reregister/transition to a connected state")
+		// in reality, we may have been temporarily disconnected from the slave during a slave
+		// failover event. but because we never tried to send a message to the slave, we never
+		// found out that we were disconnected.
+		log.V(2).Info("not disconnected, but we received a re-registration callback from slave?")
 	}
 
 	if slaveInfo != nil {
@@ -469,6 +477,15 @@ func (k *Executor) bindAndWatchTask(driver bindings.ExecutorDriver, task *mesos.
 		return
 	}
 
+	// apply pod task filters
+	ok, err := k.podTaskFilters.Accept(pod)
+	if !ok || err != nil {
+		log.Errorf("failed to apply pod filters for task %v pod %v/%v: %v",
+			task.TaskId.GetValue(), pod.Namespace, pod.Name, err)
+		k.sendStatus(driver, newStatus(task.TaskId, mesos.TaskState_TASK_FAILED, fmt.Sprintf("filter failed: %v", err)))
+		return
+	}
+
 	err = k.registry.bind(task.TaskId.GetValue(), pod)
 	if err != nil {
 		log.Errorf("failed to bind task %v pod %v/%v: %v",
@@ -633,19 +650,16 @@ func (k *Executor) doShutdown(driver bindings.ExecutorDriver) {
 	// if needed, so don't take extra time to do that here.
 	k.registry.shutdown()
 
-	select {
 	// the main Run() func may still be running... wait for it to finish: it will
 	// clear the pod configuration cleanly, telling k8s "there are no pods" and
 	// clean up resources (pods, volumes, etc).
-	case <-k.kubeletFinished:
 
 	//TODO(jdef) attempt to wait for events to propagate to API server?
 
 	// TODO(jdef) extract constant, should be smaller than whatever the
 	// slave graceful shutdown timeout period is.
-	case <-time.After(15 * time.Second):
-		log.Errorf("timed out waiting for kubelet Run() to die")
-	}
+	time.Sleep(15 * time.Second)
+
 	log.Infoln("exiting")
 	if k.exitFunc != nil {
 		k.exitFunc(0)

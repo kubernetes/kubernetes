@@ -24,6 +24,6 @@ import (
 const (
 	DefaultInfoID            = "k8sm-executor"
 	DefaultInfoSource        = "kubernetes"
-	DefaultSuicideTimeout    = 20 * time.Minute
+	DefaultSuicideTimeout    = 5 * time.Minute
 	DefaultLaunchGracePeriod = 5 * time.Minute
 )

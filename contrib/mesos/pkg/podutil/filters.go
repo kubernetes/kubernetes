@@ -23,10 +23,28 @@ import (
 
 type defaultFunc func(pod *api.Pod) error
 
+type Filter interface {
+	Accept(*api.Pod) (bool, error)
+}
+
 // return true if the pod passes the filter
 type FilterFunc func(pod *api.Pod) (bool, error)
 
-type Filters []FilterFunc
+type Filters []Filter
+
+func (f FilterFunc) Accept(pod *api.Pod) (bool, error) {
+	return f(pod)
+}
+
+func (filters Filters) Accept(pod *api.Pod) (bool, error) {
+	for i := range filters {
+		ok, err := filters[i].Accept(pod)
+		if !ok || err != nil {
+			return ok, err
+		}
+	}
+	return true, nil
+}
 
 // Annotate safely copies annotation metadata from kv to meta.Annotations.
 func Annotate(meta *api.ObjectMeta, kv map[string]string) {
@@ -100,19 +118,19 @@ func Stream(list *api.PodList, err error) <-chan *api.Pod {
 }
 
 func (filters Filters) Do(in <-chan *api.Pod) (out <-chan *api.Pod) {
-	out = in
-	for _, f := range filters {
-		out = f.Do(out)
-	}
-	return
+	return ApplyFilter(filters, in)
 }
 
 func (filter FilterFunc) Do(in <-chan *api.Pod) <-chan *api.Pod {
+	return ApplyFilter(filter, in)
+}
+
+func ApplyFilter(filter Filter, in <-chan *api.Pod) <-chan *api.Pod {
 	out := make(chan *api.Pod)
 	go func() {
 		defer close(out)
 		for pod := range in {
-			if ok, err := filter(pod); err != nil {
+			if ok, err := filter.Accept(pod); err != nil {
 				log.Errorf("pod failed selection: %v", err)
 			} else if ok {
 				out <- pod

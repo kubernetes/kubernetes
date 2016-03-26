@@ -27,7 +27,7 @@ import (
 
 	kubecontrollermanager "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	"k8s.io/kubernetes/contrib/mesos/pkg/node"
+	"k8s.io/kubernetes/contrib/mesos/pkg/controller/node"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -159,10 +159,12 @@ func (s *CMServer) Run(_ []string) error {
 		s.NodeMonitorGracePeriod.Duration, s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod.Duration)
 
-	nodeStatusUpdaterController := node.NewStatusUpdater(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "node-status-controller")), s.NodeMonitorPeriod.Duration, time.Now)
-	if err := nodeStatusUpdaterController.Run(wait.NeverStop); err != nil {
-		glog.Fatalf("Failed to start node status update controller: %v", err)
-	}
+	// k8sm node controller
+	go node.NewController(
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "k8sm-node-controller")),
+		s.NodeMonitorPeriod.Duration,
+		node.SlaveStatusController(),
+	).Run(wait.NeverStop)
 
 	serviceController := servicecontroller.New(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
 	if err := serviceController.Run(s.ServiceSyncPeriod.Duration, s.NodeSyncPeriod.Duration); err != nil {

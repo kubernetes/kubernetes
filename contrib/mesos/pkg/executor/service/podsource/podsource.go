@@ -17,6 +17,8 @@ limitations under the License.
 package podsource
 
 import (
+	"sync"
+
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor"
 	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
 	"k8s.io/kubernetes/pkg/api"
@@ -52,11 +54,16 @@ type (
 
 	Source struct {
 		stop    <-chan struct{}
-		out     chan<- interface{} // never close this because pkg/util/config.mux doesn't handle that very well
-		filters []Filter           // additional filters to apply to pod objects
+		filters []Filter // additional filters to apply to pod objects
+		name    string
+
+		guard sync.Locker        // guard out because it's mutable, shared across multiple go-routines
+		out   chan<- interface{} // never close this because pkg/util/config.mux doesn't handle that very well
 	}
 
 	Option func(*Source)
+
+	noopLock bool // dummy lock type, implements sync.Locker with noop funcs
 )
 
 const (
@@ -70,6 +77,23 @@ func (f FilterFunc) Before(_ int)                         {}
 func (f FilterFunc) After()                               {}
 func (f FilterFunc) Accept(pod *api.Pod) (*api.Pod, bool) { return f(pod) }
 
+func (nl *noopLock) Lock()   {}
+func (nl *noopLock) Unlock() {}
+
+// Generic creates a generic podsource that supports the following options: ClearPodsOnShutdown, Name.
+func Generic(stop <-chan struct{}, out chan<- interface{}, in <-chan interface{}, options ...Option) {
+	source := &Source{
+		stop:  stop,
+		out:   out,
+		guard: new(noopLock),
+	}
+	// note: any filters added by options should be applied after the defaults
+	for _, opt := range options {
+		opt(source)
+	}
+	go source.sendLoopGeneric(in)
+}
+
 // Mesos spawns a new pod source that watches API server for changes and collaborates with
 // executor.Registry to generate api.Pod objects in a fashion that's very Mesos-aware.
 func Mesos(
@@ -80,8 +104,10 @@ func Mesos(
 	options ...Option,
 ) {
 	source := &Source{
-		stop: stop,
-		out:  out,
+		stop:  stop,
+		out:   out,
+		guard: new(noopLock),
+		name:  MesosSource,
 		filters: []Filter{
 			FilterFunc(filterMirrorPod),
 			&registeredPodFilter{registry: registry},
@@ -102,7 +128,7 @@ func Mesos(
 }
 
 func filterMirrorPod(p *api.Pod) (*api.Pod, bool) {
-	_, ok := (*p).Annotations[kubetypes.ConfigMirrorAnnotationKey]
+	_, ok := p.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return p, ok
 }
 
@@ -176,6 +202,11 @@ foreachPod:
 		Pods:   pods,
 		Source: MesosSource,
 	}
+
+	// source.out is mutable
+	source.guard.Lock()
+	defer source.guard.Unlock()
+
 	select {
 	case <-source.stop:
 	case source.out <- u:
@@ -196,5 +227,57 @@ func filterContainerEnvOverlay(env []api.EnvVar) FilterFunc {
 		f(pod)
 		// we should't vote, let someone else decide whether the pod gets accepted
 		return pod, false
+	}
+}
+
+// ClearPodsOnShutdown sends an empty pod snapshot upon termination (close of Source.stop).
+// This option will not be applied if the source is unnamed (see Name).
+func ClearPodsOnShutdown() Option {
+	return func(s *Source) {
+		if s.name == "" {
+			return
+		}
+		s.guard = &sync.Mutex{}
+		go func() {
+			<-s.stop
+
+			log.Infof("sending final, blank pod snapshot for source %q", s.name)
+
+			var out chan<- interface{}
+			s.guard.Lock()
+			out = s.out
+			s.out = nil
+			s.guard.Unlock()
+
+			out <- kubetypes.PodUpdate{Op: kubetypes.SET, Pods: []*api.Pod{}, Source: s.name}
+		}()
+	}
+}
+
+// Name overrides the default name of the source. Intended be used with Generic sources since
+// they will have no name set by default.
+func Name(name string) Option {
+	return func(s *Source) {
+		s.name = name
+	}
+}
+
+func (source *Source) sendLoopGeneric(in <-chan interface{}) {
+	for {
+		select {
+		case x := <-in:
+			func() {
+				// source.out is mutable
+				source.guard.Lock()
+				defer source.guard.Unlock()
+
+				select {
+				case <-source.stop:
+				case source.out <- x:
+				}
+			}()
+		case <-source.stop:
+			return
+		}
 	}
 }

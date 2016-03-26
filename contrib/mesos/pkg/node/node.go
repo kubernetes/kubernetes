@@ -64,8 +64,8 @@ func Create(
 				{
 					Type:              api.NodeReady,
 					Status:            api.ConditionTrue,
-					Reason:            slaveReadyReason,
-					Message:           slaveReadyMessage,
+					Reason:            SlaveReadyReason,
+					Message:           SlaveReadyMessage,
 					LastHeartbeatTime: unversioned.Now(),
 				},
 			},

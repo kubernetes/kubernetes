@@ -93,6 +93,7 @@ type framework struct {
 	reconcileCooldown  time.Duration
 	asRegisteredMaster proc.Doer
 	terminate          <-chan struct{} // signal chan, closes when we should kill background tasks
+	podGC              *podGC
 }
 
 type Config struct {
@@ -192,6 +193,8 @@ func (k *framework) Init(sched scheduler.Scheduler, electedMaster proc.Process, 
 	k.terminate = electedMaster.Done()
 	k.offers.Init(k.terminate)
 	k.nodeRegistrator.Run(k.terminate)
+	k.podGC = newPodGC(k.client.Core(), k.terminate)
+	go k.podGC.run()
 	return k.recoverTasks()
 }
 
@@ -514,15 +517,42 @@ func (k *framework) StatusUpdate(driver bindings.SchedulerDriver, taskStatus *me
 }
 
 func (k *framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
-	task, state := k.sched.Tasks().UpdateStatus(taskStatus)
+	var (
+		task, state = k.sched.Tasks().UpdateStatus(taskStatus)
+		source      = taskStatus.GetSource()
+		reason      = taskStatus.GetReason()
+		message     = taskStatus.GetMessage()
+		executorID  = taskStatus.ExecutorId
+		slaveID     = taskStatus.SlaveId
+	)
 
-	if (state == podtask.StateRunning || state == podtask.StatePending) &&
-		((taskStatus.GetSource() == mesos.TaskStatus_SOURCE_MASTER && taskStatus.GetReason() == mesos.TaskStatus_REASON_RECONCILIATION) ||
-			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED) ||
-			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED) ||
-			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.ContainersDisappeared) ||
-			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.KubeletPodLaunchFailed) ||
-			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.TaskKilled && !task.Has(podtask.Deleted))) {
+	switch {
+	case source == mesos.TaskStatus_SOURCE_MASTER && reason == mesos.TaskStatus_REASON_SLAVE_REMOVED:
+		// we're lucky to have received this message because it's not guaranteed. as such we should
+		// probably wait for explicit reconciliation (if any) to finish and then trigger a delete of
+		// any lingering pods (including mirrors) that may be left over on the node.
+
+		// TODO(jdef) process response here: if false, we probably need to reschedule this GC attempt
+		// (see SlaveLost for similer handling)
+		// if true, we may want to kamikaze the executor if it's still running (because if the slave proc
+		// dies and fails to respawn then the kubelet-executor could stay running for a very long time)
+		sid := slaveID.GetValue()
+		host := k.slaveHostNames.HostName(sid)
+		_, err := k.podGC.schedule(host, sid)
+		if err != nil {
+			log.Errorln(err.Error())
+		}
+
+		// we fallthrough here to forcefully delete this pod
+		fallthrough
+
+	case (state == podtask.StateRunning || state == podtask.StatePending) &&
+		((source == mesos.TaskStatus_SOURCE_MASTER && reason == mesos.TaskStatus_REASON_RECONCILIATION) ||
+			(source == mesos.TaskStatus_SOURCE_SLAVE && reason == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED) ||
+			(source == mesos.TaskStatus_SOURCE_SLAVE && reason == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED) ||
+			(source == mesos.TaskStatus_SOURCE_EXECUTOR && message == messages.ContainersDisappeared) ||
+			(source == mesos.TaskStatus_SOURCE_EXECUTOR && message == messages.KubeletPodLaunchFailed) ||
+			(source == mesos.TaskStatus_SOURCE_EXECUTOR && message == messages.TaskKilled && !task.Has(podtask.Deleted))):
 		//--
 		// pod-task has metadata that refers to:
 		// (1) a task that Mesos no longer knows about, or else
@@ -537,20 +567,23 @@ func (k *framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskS
 		if err := k.client.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
 			log.Errorf("failed to delete pod %v/%v for terminal task %v: %v", pod.Namespace, pod.Name, task.ID, err)
 		}
-	} else if taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED || taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED {
+	case reason == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED || reason == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED:
 		// attempt to prevent dangling pods in the pod and task registries
-		log.V(1).Infof("request explicit reconciliation to clean up for task %v after executor reported (terminated/unregistered)", taskStatus.TaskId.GetValue())
+		log.V(1).Infof(
+			"request explicit reconciliation to clean up for task %v after executor reported (terminated/unregistered)",
+			taskStatus.TaskId.GetValue())
 		k.tasksReconciler.RequestExplicit()
-	} else if taskStatus.GetState() == mesos.TaskState_TASK_LOST && state == podtask.StateRunning && taskStatus.ExecutorId != nil && taskStatus.SlaveId != nil {
+
+	case taskStatus.GetState() == mesos.TaskState_TASK_LOST && state == podtask.StateRunning && executorID != nil && slaveID != nil:
 		//TODO(jdef) this may not be meaningful once we have proper checkpointing and master detection
 		//If we're reconciling and receive this then the executor may be
 		//running a task that we need it to kill. It's possible that the framework
 		//is unrecognized by the master at this point, so KillTask is not guaranteed
 		//to do anything. The underlying driver transport may be able to send a
 		//FrameworkMessage directly to the slave to terminate the task.
-		log.V(2).Info("forwarding TASK_LOST message to executor %v on slave %v", taskStatus.ExecutorId, taskStatus.SlaveId)
+		log.V(2).Info("forwarding TASK_LOST message to executor %v on slave %v", executorID, slaveID)
 		data := fmt.Sprintf("%s:%s", messages.TaskLost, task.ID) //TODO(jdef) use a real message type
-		if _, err := driver.SendFrameworkMessage(taskStatus.ExecutorId, taskStatus.SlaveId, data); err != nil {
+		if _, err := driver.SendFrameworkMessage(executorID, slaveID, data); err != nil {
 			log.Error(err.Error())
 		}
 	}
@@ -636,9 +669,19 @@ func (k *framework) FrameworkMessage(driver bindings.SchedulerDriver,
 
 // SlaveLost is called when some slave is lost.
 func (k *framework) SlaveLost(driver bindings.SchedulerDriver, slaveId *mesos.SlaveID) {
-	log.Infof("Slave %v is lost\n", slaveId)
-
 	sid := slaveId.GetValue()
+	log.Infof("Slave %q is lost, master has removed it from the cluster", sid)
+
+	// TODO(jdef) process response here: if false, we probably need to reschedule this GC attempt
+	// (see reconcileTerminalTask for similer handling)
+	// if true, we may want to kamikaze the executor if it's still running (because if the slave proc
+	// dies and fails to respawn then the kubelet-executor could stay running for a very long time)
+	host := k.slaveHostNames.HostName(sid)
+	_, err := k.podGC.schedule(host, sid)
+	if err != nil {
+		log.Errorln(err.Error())
+	}
+
 	k.offers.InvalidateForSlave(sid)
 
 	// TODO(jdef): delete slave from our internal list? probably not since we may need to reconcile

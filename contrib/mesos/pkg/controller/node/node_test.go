@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	kubeletoptions "k8s.io/kubernetes/cmd/kubelet/app/options"
+	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
@@ -51,7 +52,9 @@ func Test_nodeWithUpdatedStatus(t *testing.T) {
 	assert.True(t, kubecfg.NodeStatusUpdateFrequency.Duration*3 < cm.NodeMonitorGracePeriod.Duration) // sanity check for defaults
 
 	n := testNode(0, api.ConditionTrue, "KubeletReady")
-	su := NewStatusUpdater(nil, cm.NodeMonitorPeriod.Duration, func() time.Time { return now })
+	controller := NewController(nil, cm.NodeMonitorPeriod.Duration, NowFunc(func() time.Time { return now }))
+	su := controller.newSlaveStatusController()
+
 	_, updated, err := su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.False(t, updated, "no update expected b/c kubelet updated heartbeat just now")
@@ -60,8 +63,8 @@ func Test_nodeWithUpdatedStatus(t *testing.T) {
 	n2, updated, err := su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.True(t, updated, "update expected b/c kubelet's update is older than DefaultNodeMonitorGracePeriod")
-	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Reason, slaveReadyReason)
-	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Message, slaveReadyMessage)
+	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Reason, node.SlaveReadyReason)
+	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Message, node.SlaveReadyMessage)
 
 	n = testNode(-kubecfg.NodeStatusUpdateFrequency.Duration, api.ConditionTrue, "KubeletReady")
 	n2, updated, err = su.nodeWithUpdatedStatus(n)
@@ -72,6 +75,6 @@ func Test_nodeWithUpdatedStatus(t *testing.T) {
 	n2, updated, err = su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.True(t, updated, "update expected b/c kubelet's update is older than 3*DefaultNodeStatusUpdateFrequency")
-	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Reason, slaveReadyReason)
-	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Message, slaveReadyMessage)
+	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Reason, node.SlaveReadyReason)
+	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Message, node.SlaveReadyMessage)
 }

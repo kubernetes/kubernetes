@@ -191,6 +191,13 @@ func TestResourceOffer_Add_Rescind(t *testing.T) {
 	testFramework.OfferRescinded(nil, util.NewOfferID("notExist"))
 }
 
+func fakePodGC() *podGC {
+	// return an already-terminated podGC
+	ch := make(chan struct{})
+	close(ch)
+	return newPodGC(nil, ch)
+}
+
 //test that when a slave is lost we remove all offers
 func TestSlave_Lost(t *testing.T) {
 	assert := assert.New(t)
@@ -208,6 +215,7 @@ func TestSlave_Lost(t *testing.T) {
 		}),
 		slaveHostNames: newSlaveRegistry(),
 		sched:          mockScheduler(),
+		podGC:          fakePodGC(),
 	}
 
 	hostname := "h1"
