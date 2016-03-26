@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -154,12 +155,14 @@ func (t *Tester) TestUpdate(valid runtime.Object, setFn SetFunc, getFn GetFunc, 
 		t.testUpdateRejectsMismatchedNamespace(copyOrDie(valid), setFn)
 	}
 	t.testUpdateInvokesValidation(copyOrDie(valid), setFn, invalidUpdateFn...)
+	t.testUpdateWithWrongUID(copyOrDie(valid), setFn, getFn)
 }
 
 // Test deleting an object.
 func (t *Tester) TestDelete(valid runtime.Object, setFn SetFunc, getFn GetFunc, isNotFoundFn IsErrorFunc) {
 	t.testDeleteNonExist(copyOrDie(valid))
 	t.testDeleteNoGraceful(copyOrDie(valid), setFn, getFn, isNotFoundFn)
+	t.testDeleteWithUID(copyOrDie(valid), setFn, getFn, isNotFoundFn)
 }
 
 // Test gracefully deleting an object.
@@ -474,6 +477,26 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, setFn SetFunc, 
 	}
 }
 
+func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, setFn SetFunc, getFn GetFunc) {
+	ctx := t.TestContext()
+	foo := copyOrDie(obj)
+	t.setObjectMeta(foo, "foo5")
+	objectMeta := t.getObjectMetaOrFail(foo)
+	objectMeta.UID = types.UID("UID0000")
+	if err := setFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	objectMeta.UID = types.UID("UID1111")
+
+	obj, created, err := t.storage.(rest.Updater).Update(ctx, foo)
+	if created || obj != nil {
+		t.Errorf("expected nil object and no creation for object: %v", foo)
+	}
+	if err == nil || !errors.IsConflict(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
 	t.setObjectMeta(obj, "foo")
 	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), obj)
@@ -555,6 +578,42 @@ func (t *Tester) testDeleteNonExist(obj runtime.Object) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+}
+
+//  This test the fast-fail path. We test that the precondition gets verified
+//  again before deleting the object in tests of pkg/storage/etcd.
+func (t *Tester) testDeleteWithUID(obj runtime.Object, setFn SetFunc, getFn GetFunc, isNotFoundFn IsErrorFunc) {
+	ctx := t.TestContext()
+
+	foo := copyOrDie(obj)
+	t.setObjectMeta(foo, "foo1")
+	objectMeta := t.getObjectMetaOrFail(foo)
+	objectMeta.UID = types.UID("UID0000")
+	if err := setFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	obj, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewPreconditionDeleteOptions("UID1111"))
+	if err == nil || !errors.IsConflict(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	obj, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewPreconditionDeleteOptions("UID0000"))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if !t.returnDeletedObject {
+		if status, ok := obj.(*unversioned.Status); !ok {
+			t.Errorf("expected status of delete, got %v", status)
+		} else if status.Status != unversioned.StatusSuccess {
+			t.Errorf("expected success, got: %v", status.Status)
+		}
+	}
+
+	_, err = getFn(ctx, foo)
+	if err == nil || !isNotFoundFn(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
 }
 
 // =============================================================================

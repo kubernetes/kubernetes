@@ -61,6 +61,7 @@ func NewREST(opts generic.RESTOptions, ttl uint64) *REST {
 
 		CreateStrategy: event.Strategy,
 		UpdateStrategy: event.Strategy,
+		DeleteStrategy: event.Strategy,
 
 		Storage: storageInterface,
 	}

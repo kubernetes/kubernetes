@@ -120,11 +120,6 @@ func TestUpdate(t *testing.T) {
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.ReplicationController)
-			object.UID = "newUID"
-			return object
-		},
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*api.ReplicationController)
 			object.Name = ""
 			return object
 		},

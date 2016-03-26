@@ -163,7 +163,7 @@ func NewConflict(qualifiedResource unversioned.GroupResource, name string, err e
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
 		},
-		Message: fmt.Sprintf("%s %q cannot be updated: %v", qualifiedResource.String(), name, err),
+		Message: fmt.Sprintf("Operation cannot be fulfilled on %s %q: %v", qualifiedResource.String(), name, err),
 	}}
 }
 

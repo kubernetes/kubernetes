@@ -85,6 +85,7 @@ func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter
 
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,
+		DeleteStrategy: node.Strategy,
 		ExportStrategy: node.Strategy,
 
 		Storage: storageInterface,

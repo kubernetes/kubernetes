@@ -60,6 +60,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 		CreateStrategy:      podsecuritypolicy.Strategy,
 		UpdateStrategy:      podsecuritypolicy.Strategy,
+		DeleteStrategy:      podsecuritypolicy.Strategy,
 		ReturnDeletedObject: true,
 		Storage:             storageInterface,
 	}

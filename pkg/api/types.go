@@ -1887,6 +1887,12 @@ type Binding struct {
 	Target ObjectReference `json:"target"`
 }
 
+// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+type Preconditions struct {
+	// Specifies the target UID.
+	UID *types.UID `json:"uid,omitempty"`
+}
+
 // DeleteOptions may be provided when deleting an API object
 type DeleteOptions struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -1894,7 +1900,11 @@ type DeleteOptions struct {
 	// Optional duration in seconds before the object should be deleted. Value must be non-negative integer.
 	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
 	// specified type will be used.
-	GracePeriodSeconds *int64 `json:"gracePeriodSeconds"`
+	GracePeriodSeconds *int64 `json:"gracePeriodSeconds,omitempty"`
+
+	// Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
+	// returned.
+	Preconditions *Preconditions `json:"preconditions,omitempty"`
 }
 
 // ExportOptions is the query options to the standard REST get call.

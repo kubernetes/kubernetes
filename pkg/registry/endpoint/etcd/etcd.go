@@ -59,6 +59,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,
+		DeleteStrategy: endpoint.Strategy,
 
 		Storage: storageInterface,
 	}

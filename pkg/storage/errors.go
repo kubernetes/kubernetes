@@ -16,7 +16,11 @@ limitations under the License.
 
 package storage
 
-import "fmt"
+import (
+	"fmt"
+
+	"k8s.io/kubernetes/pkg/util/validation/field"
+)
 
 const (
 	ErrCodeKeyNotFound int = iota + 1
@@ -103,4 +107,48 @@ func isErrCode(err error, code int) bool {
 		return e.Code == code
 	}
 	return false
+}
+
+// InvalidError is generated when an error caused by invalid API object occurs
+// in the storage package.
+type InvalidError struct {
+	Errs field.ErrorList
+}
+
+func (e InvalidError) Error() string {
+	return e.Errs.ToAggregate().Error()
+}
+
+// IsInvalidError returns true if and only if err is an InvalidError.
+func IsInvalidError(err error) bool {
+	_, ok := err.(InvalidError)
+	return ok
+}
+
+func NewInvalidError(errors field.ErrorList) InvalidError {
+	return InvalidError{errors}
+}
+
+// InternalError is generated when an error occurs in the storage package, i.e.,
+// not from the underlying storage backend (e.g., etcd).
+type InternalError struct {
+	Reason string
+}
+
+func (e InternalError) Error() string {
+	return e.Reason
+}
+
+// IsInternalError returns true if and only if err is an InternalError.
+func IsInternalError(err error) bool {
+	_, ok := err.(InternalError)
+	return ok
+}
+
+func NewInternalError(reason string) InternalError {
+	return InternalError{reason}
+}
+
+func NewInternalErrorf(format string, a ...interface{}) InternalError {
+	return InternalError{fmt.Sprintf(format, a)}
 }

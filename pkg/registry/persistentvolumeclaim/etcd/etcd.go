@@ -59,6 +59,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 		CreateStrategy:      persistentvolumeclaim.Strategy,
 		UpdateStrategy:      persistentvolumeclaim.Strategy,
+		DeleteStrategy:      persistentvolumeclaim.Strategy,
 		ReturnDeletedObject: true,
 
 		Storage: storageInterface,
