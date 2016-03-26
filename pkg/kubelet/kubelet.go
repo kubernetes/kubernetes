@@ -259,7 +259,7 @@ func NewMainKubelet(
 		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()
 	}
 	nodeLister := &cache.StoreToNodeLister{Store: nodeStore}
-	nodeInfo := &predicates.CachedNodeInfo{nodeLister}
+	nodeInfo := &predicates.CachedNodeInfo{StoreToNodeLister: nodeLister}
 
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
@@ -2111,7 +2111,7 @@ func (kl *Kubelet) deletePod(pod *api.Pod) error {
 	if runningPod.IsEmpty() {
 		return fmt.Errorf("pod not found")
 	}
-	podPair := kubecontainer.PodPair{pod, &runningPod}
+	podPair := kubecontainer.PodPair{APIPod: pod, RunningPod: &runningPod}
 
 	kl.podKillingCh <- &podPair
 	// TODO: delete the mirror pod here?
@@ -2156,7 +2156,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	}
 	for _, pod := range runningPods {
 		if _, found := desiredPods[pod.ID]; !found {
-			kl.podKillingCh <- &kubecontainer.PodPair{nil, pod}
+			kl.podKillingCh <- &kubecontainer.PodPair{APIPod: nil, RunningPod: pod}
 		}
 	}
 

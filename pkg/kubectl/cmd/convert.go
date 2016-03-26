@@ -110,7 +110,7 @@ func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.
 	clientMapper := resource.ClientMapperFunc(f.ClientForMapping)
 	if o.local {
 		fmt.Fprintln(out, "running in local mode...")
-		o.builder = resource.NewBuilder(mapper, typer, resource.DisabledClientForMapping{clientMapper}, f.Decoder(true))
+		o.builder = resource.NewBuilder(mapper, typer, resource.DisabledClientForMapping{ClientMapper: clientMapper}, f.Decoder(true))
 	} else {
 		o.builder = resource.NewBuilder(mapper, typer, clientMapper, f.Decoder(true))
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))

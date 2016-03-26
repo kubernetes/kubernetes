@@ -143,7 +143,7 @@ func (plugin *flexVolumePlugin) newBuilderInternal(spec *volume.Spec, pod *api.P
 		options:            source.Options,
 		runner:             runner,
 		manager:            manager,
-		blockDeviceMounter: &mount.SafeFormatAndMount{mounter, runner},
+		blockDeviceMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: runner},
 	}, nil
 }
 

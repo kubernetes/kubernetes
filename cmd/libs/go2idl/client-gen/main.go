@@ -97,9 +97,9 @@ func main() {
 		// We may change the output path later.
 		arguments.OutputPackagePath = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput"
 		arguments.CustomArgs = clientgenargs.Args{
-			[]unversioned.GroupVersion{{"testgroup", ""}},
+			[]unversioned.GroupVersion{{Group: "testgroup", Version: ""}},
 			map[unversioned.GroupVersion]string{
-				unversioned.GroupVersion{"testgroup", ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
+				unversioned.GroupVersion{Group: "testgroup", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
 			},
 			"test_internalclientset",
 			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",

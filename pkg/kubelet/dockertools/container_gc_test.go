@@ -101,7 +101,7 @@ func TestGarbageCollectZeroMaxContainers(t *testing.T) {
 	})
 	addPods(gc.podGetter, "foo")
 
-	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Minute, 1, 0}))
+	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: 1, MaxContainers: 0}))
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
@@ -116,7 +116,7 @@ func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
 	})
 	addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4")
 
-	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Minute, -1, 4}))
+	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: 4}))
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
@@ -131,7 +131,6 @@ func TestGarbageCollectNoMaxLimit(t *testing.T) {
 	})
 	addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4")
 
-	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Minute, 1, -1}))
 	assert.Len(t, fakeDocker.Removed, 0)
 }
 
@@ -246,7 +245,7 @@ func TestGarbageCollect(t *testing.T) {
 		gc, fakeDocker := newTestContainerGC(t)
 		fakeDocker.SetFakeContainers(test.containers)
 		addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4", "foo5", "foo6", "foo7")
-		assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{time.Hour, 2, 6}))
+		assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}))
 		verifyStringArrayEqualsAnyOrder(t, fakeDocker.Removed, test.expectedRemoved)
 	}
 }

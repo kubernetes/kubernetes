@@ -68,7 +68,7 @@ func TestCodec(t *testing.T) {
 			obj: &Foo{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "bar",
-					CreationTimestamp: unversioned.Time{time.Unix(100, 0)},
+					CreationTimestamp: unversioned.Time{Time: time.Unix(100, 0)},
 				},
 				TypeMeta: unversioned.TypeMeta{Kind: "Foo"},
 			},

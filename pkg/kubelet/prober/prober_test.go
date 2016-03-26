@@ -198,7 +198,7 @@ func TestProbe(t *testing.T) {
 		refManager: kubecontainer.NewRefManager(),
 		recorder:   &record.FakeRecorder{},
 	}
-	containerID := kubecontainer.ContainerID{"test", "foobar"}
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
 
 	execProbe := &api.Probe{
 		Handler: api.Handler{

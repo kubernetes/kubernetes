@@ -50,7 +50,7 @@ func TestMain(m *testing.M) {
 	node = &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "node",
-			CreationTimestamp: unversioned.Time{time.Now()},
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
 		},
 		Spec: api.NodeSpec{
 			ExternalID: "node",
@@ -209,7 +209,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "rc",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{time.Now()},
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("replicationcontrollers", "rc"),
 		},
@@ -225,7 +225,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{time.Now()},
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			Labels:            labels,
 			Annotations:       rc_anno,
 		},
@@ -238,7 +238,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "ds",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{time.Now()},
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/daemonsets/ds",
 		},
 		Spec: extensions.DaemonSetSpec{
@@ -253,7 +253,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{time.Now()},
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			Labels:            labels,
 			Annotations:       ds_anno,
 		},
@@ -266,7 +266,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "job",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{time.Now()},
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/jobs/job",
 		},
 		Spec: extensions.JobSpec{
@@ -278,7 +278,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{time.Now()},
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			Labels:            labels,
 			Annotations:       map[string]string{controller.CreatedByAnnotation: refJson(t, &job)},
 		},
@@ -288,7 +288,7 @@ func TestDrain(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
-			CreationTimestamp: unversioned.Time{time.Now()},
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			Labels:            labels,
 		},
 		Spec: api.PodSpec{

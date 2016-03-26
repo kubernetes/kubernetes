@@ -33,5 +33,5 @@ func Version(version string) string {
 }
 
 func GroupVersion(gv unversioned.GroupVersion) unversioned.GroupVersion {
-	return unversioned.GroupVersion{Group(gv.Group), Version(gv.Version)}
+	return unversioned.GroupVersion{Group: Group(gv.Group), Version: Version(gv.Version)}
 }

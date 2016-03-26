@@ -127,7 +127,7 @@ func (f CodecFactory) UniversalDeserializer() runtime.Decoder {
 //
 // TODO: the decoder will eventually be removed in favor of dealing with objects in their versioned form
 func (f CodecFactory) UniversalDecoder(versions ...unversioned.GroupVersion) runtime.Decoder {
-	return f.CodecForVersions(runtime.NoopEncoder{f.universal}, nil, versions)
+	return f.CodecForVersions(runtime.NoopEncoder{Decoder: f.universal}, nil, versions)
 }
 
 // CodecFor creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
