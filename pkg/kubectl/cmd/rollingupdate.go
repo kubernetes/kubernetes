@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -246,7 +247,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			}
 			fmt.Fprintf(out, "Found existing update in progress (%s), resuming.\n", newRc.Name)
 		} else {
-			if oldRc.Spec.Template.Spec.Containers[0].Image == image {
+			if oldRc.Spec.Template.Spec.Containers[0].Image == image && !strings.HasSuffix(image, ":latest") {
 				return cmdutil.UsageError(cmd, "Specified --image must be distinct from existing container image")
 			}
 			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, codec, cmdNamespace, oldName, newName, image, container, deploymentKey)
