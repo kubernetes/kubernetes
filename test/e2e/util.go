@@ -190,6 +190,7 @@ type TestContextType struct {
 	MinStartupPods        int
 	UpgradeTarget         string
 	PrometheusPushGateway string
+	OSDistro              string
 	VerifyServiceAccount  bool
 	DeleteNamespace       bool
 	CleanStart            bool
