@@ -153,12 +153,6 @@ func TestUpdate(t *testing.T) {
 		// invalid updateFunc: ObjeceMeta is not to be tampered with.
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.Ingress)
-			object.UID = "newUID"
-			return object
-		},
-
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Ingress)
 			object.Name = ""
 			return object
 		},

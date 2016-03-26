@@ -72,6 +72,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 		CreateStrategy: configmap.Strategy,
 		UpdateStrategy: configmap.Strategy,
+		DeleteStrategy: configmap.Strategy,
 
 		Storage: storageInterface,
 	}

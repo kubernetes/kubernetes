@@ -16,11 +16,7 @@ limitations under the License.
 
 package storage
 
-import (
-	"testing"
-
-	"k8s.io/kubernetes/pkg/api/errors"
-)
+import "testing"
 
 func TestEtcdParseWatchResourceVersion(t *testing.T) {
 	testCases := []struct {
@@ -42,7 +38,7 @@ func TestEtcdParseWatchResourceVersion(t *testing.T) {
 				t.Errorf("%s: unexpected non-error", testCase.Version)
 				continue
 			}
-			if !errors.IsInvalid(err) {
+			if !IsInvalidError(err) {
 				t.Errorf("%s: unexpected error: %v", testCase.Version, err)
 				continue
 			}

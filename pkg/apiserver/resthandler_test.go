@@ -317,7 +317,7 @@ func TestPatchResourceWithConflict(t *testing.T) {
 		changedPod:  &api.Pod{},
 		updatePod:   &api.Pod{},
 
-		expectedError: `pods "foo" cannot be updated: existing 2, new 1`,
+		expectedError: `Operation cannot be fulfilled on pods "foo": existing 2, new 1`,
 	}
 
 	tc.startingPod.Name = name

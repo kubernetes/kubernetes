@@ -72,6 +72,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 		// Used to validate daemon set updates
 		UpdateStrategy: daemonset.Strategy,
+		DeleteStrategy: daemonset.Strategy,
 
 		Storage: storageInterface,
 	}

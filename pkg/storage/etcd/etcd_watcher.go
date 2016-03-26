@@ -42,6 +42,7 @@ const (
 	EtcdSet    = "set"
 	EtcdCAS    = "compareAndSwap"
 	EtcdDelete = "delete"
+	EtcdCAD    = "compareAndDelete"
 	EtcdExpire = "expire"
 )
 
@@ -450,7 +451,7 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 		w.sendAdd(res)
 	case EtcdSet, EtcdCAS:
 		w.sendModify(res)
-	case EtcdDelete, EtcdExpire:
+	case EtcdDelete, EtcdExpire, EtcdCAD:
 		w.sendDelete(res)
 	default:
 		utilruntime.HandleError(fmt.Errorf("unknown action: %v", res.Action))

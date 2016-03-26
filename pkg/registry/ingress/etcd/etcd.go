@@ -72,6 +72,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 		// Used to validate controller updates
 		UpdateStrategy: ingress.Strategy,
+		DeleteStrategy: ingress.Strategy,
 
 		Storage: storageInterface,
 	}
