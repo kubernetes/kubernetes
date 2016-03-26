@@ -24,6 +24,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
 	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	fakeunversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned/fake"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
@@ -57,7 +58,7 @@ type Clientset struct {
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
-	return &FakeDiscovery{&c.Fake}
+	return &fakediscovery.FakeDiscovery{&c.Fake}
 }
 
 var _ clientset.Interface = &Clientset{}

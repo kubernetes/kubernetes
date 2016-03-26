@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO: the fake discovery client should live in pkg/client/discovery/, rather
-// than being copied in every fake clientset.
 package fake
 
 import (
