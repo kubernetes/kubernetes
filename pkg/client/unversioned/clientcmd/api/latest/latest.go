@@ -40,9 +40,15 @@ const OldestVersion = "v1"
 // with a set of versions to choose.
 var Versions = []string{"v1"}
 
-var Codec = versioning.NewCodecForScheme(
-	api.Scheme,
-	json.NewYAMLSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme)),
-	[]unversioned.GroupVersion{{Version: Version}},
-	[]unversioned.GroupVersion{{Version: runtime.APIVersionInternal}},
-)
+var Codec runtime.Codec
+
+func init() {
+	yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme))
+	Codec = versioning.NewCodecForScheme(
+		api.Scheme,
+		yamlSerializer,
+		yamlSerializer,
+		[]unversioned.GroupVersion{{Version: Version}},
+		[]unversioned.GroupVersion{{Version: runtime.APIVersionInternal}},
+	)
+}
