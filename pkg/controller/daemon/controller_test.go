@@ -167,7 +167,7 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
 }
 
-// DaemonSets without node selectors should launch pods on every node.
+// DaemonSets should do nothing if there aren't any nodes
 func TestNoNodesDoesNothing(t *testing.T) {
 	manager, podControl := newTestController()
 	ds := newDaemonSet("foo")
@@ -175,7 +175,8 @@ func TestNoNodesDoesNothing(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
-// DaemonSets without node selectors should launch pods on every node.
+// DaemonSets without node selectors should launch on a single node in a
+// single node cluster.
 func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 	manager, podControl := newTestController()
 	manager.nodeStore.Add(newNode("only-node", nil))
@@ -348,6 +349,41 @@ func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
 	ds.Spec.Template.Spec = podSpec2
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSetController should not sync DaemonSets with empty pod selectors.
+//
+// issue https://github.com/kubernetes/kubernetes/pull/23223
+func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
+	manager, podControl := newTestController()
+	manager.nodeStore.Store.Add(newNode("node1", nil))
+	// Create pod not controlled by a daemonset.
+	manager.podStore.Add(&api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Labels:    map[string]string{"bang": "boom"},
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: api.PodSpec{
+			NodeName: "node1",
+		},
+	})
+
+	// Create a misconfigured DaemonSet. An empty pod selector is invalid but could happen
+	// if we upgrade and make a backwards incompatible change.
+	//
+	// The node selector matches no nodes which mimics the behavior of kubectl delete.
+	//
+	// The DaemonSet should not schedule pods and should not delete scheduled pods in
+	// this case even though it's empty pod selector matches all pods. The DaemonSetController
+	// should detect this misconfiguration and choose not to sync the DaemonSet. We should
+	// not observe a deletion of the pod on node1.
+	ds := newDaemonSet("foo")
+	ls := unversioned.LabelSelector{}
+	ds.Spec.Selector = &ls
+	ds.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
 // Controller should not create pods on nodes which have daemon pods, and should remove excess pods from nodes that have extra pods.
