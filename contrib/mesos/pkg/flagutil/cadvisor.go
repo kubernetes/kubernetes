@@ -19,10 +19,6 @@ package flagutil
 import (
 	"flag"
 
-	// TODO(jdef) kill this once cadvisor flags are no longer configured by
-	// global variables. Importing it this way guarantees that the global flag
-	// variables are initialized.
-	_ "github.com/google/cadvisor/manager"
 	// kubelet attempts to customize default values for some cadvisor flags, so
 	// make sure that we pick these up.
 	_ "k8s.io/kubernetes/pkg/kubelet/cadvisor"
