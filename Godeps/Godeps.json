@@ -381,7 +381,7 @@
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
-			"Rev": "3e6e67c4dcea3ac2f25fd4731abc0e1deaf36216"
+			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
 		{
 			"ImportPath": "github.com/daviddengcn/go-colortext",

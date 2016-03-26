@@ -42,5 +42,5 @@ docker run --rm=true \
   -e "KUBE_FORCE_VERIFY_CHECKS=${KUBE_FORCE_VERIFY_CHECKS:-}" \
   -e "KUBE_VERIFY_GIT_BRANCH=${KUBE_VERIFY_GIT_BRANCH:-}" \
   -e "REPO_DIR=${REPO_DIR}" \
-  -i gcr.io/google_containers/kubekins-test:0.8 \
+  -i gcr.io/google_containers/kubekins-test:0.9 \
   bash -c "cd kubernetes && ./hack/jenkins/test-dockerized.sh"
