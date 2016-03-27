@@ -693,9 +693,16 @@ func TestValidateDaemonSet(t *testing.T) {
 				Template: validPodTemplate.Template,
 			},
 		},
+		"nil selector": {
+			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			Spec: extensions.DaemonSetSpec{
+				Template: validPodTemplate.Template,
+			},
+		},
 		"empty selector": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
+				Selector: &unversioned.LabelSelector{},
 				Template: validPodTemplate.Template,
 			},
 		},
