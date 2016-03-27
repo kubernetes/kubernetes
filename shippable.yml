@@ -4,7 +4,7 @@ language: go
 
 matrix:
   include:
-    - go: 1.5.3
+    - go: 1.6.0
       env:
         - KUBE_TEST_API_VERSIONS=v1,extensions/v1beta1 KUBE_TEST_ETCD_PREFIXES=registry
         - KUBE_JUNIT_REPORT_DIR="${SHIPPABLE_REPO_DIR}/shippable/testresults"
