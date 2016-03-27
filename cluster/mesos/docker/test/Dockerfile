@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.4.3
+FROM golang:1.6.0
 MAINTAINER Mesosphere <support@mesosphere.io>
 
 # docker.io is suppossed to be in backports, but it's not there yet.
