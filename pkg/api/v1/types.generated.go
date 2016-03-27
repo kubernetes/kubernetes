@@ -22412,7 +22412,7 @@ func (x *PreferredSchedulingTerm) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 			if r.TryDecodeAsNil() {
 				x.Weight = 0
 			} else {
-				x.Weight = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Weight = int32(r.DecodeInt(32))
 			}
 		case "preference":
 			if r.TryDecodeAsNil() {
@@ -22449,7 +22449,7 @@ func (x *PreferredSchedulingTerm) codecDecodeSelfFromArray(l int, d *codec1978.D
 	if r.TryDecodeAsNil() {
 		x.Weight = 0
 	} else {
-		x.Weight = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Weight = int32(r.DecodeInt(32))
 	}
 	yyj6++
 	if yyhl6 {
