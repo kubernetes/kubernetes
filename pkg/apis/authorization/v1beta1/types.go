@@ -20,6 +20,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+// +genclient=true,nonNamespaced=true,noMethods=true
+
 // SubjectAccessReview checks whether or not a user or group can perform an action.
 type SubjectAccessReview struct {
 	unversioned.TypeMeta `json:",inline"`

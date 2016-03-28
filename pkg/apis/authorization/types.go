@@ -20,6 +20,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+// +genclient=true,nonNamespaced=true,noMethods=true
+
 // SubjectAccessReview checks whether or not a user or group can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".
 type SubjectAccessReview struct {
