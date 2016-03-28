@@ -616,15 +616,12 @@ func (s *GenericAPIServer) init(c *Config) {
 	s.installGroupsDiscoveryHandler()
 }
 
-// Exposes the given group versions in API.
+// Exposes the given group versions in API. Helper method to install multiple group versions at once.
 func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
 	for _, apiGroupInfo := range groupsInfo {
-		if err := s.installAPIGroup(&apiGroupInfo); err != nil {
+		if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
 			return err
 		}
-	}
-	if s.enableSwaggerSupport {
-		s.InstallSwaggerAPI()
 	}
 	return nil
 }
@@ -652,7 +649,10 @@ func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
 }
 
 func (s *GenericAPIServer) Run(options *ServerRunOptions) {
-	// We serve on 2 ports.  See docs/accessing_the_api.md
+	if s.enableSwaggerSupport {
+		s.InstallSwaggerAPI()
+	}
+	// We serve on 2 ports. See docs/accessing_the_api.md
 	secureLocation := ""
 	if options.SecurePort != 0 {
 		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
@@ -768,7 +768,8 @@ func shouldGenSelfSignedCerts(certPath, keyPath string) bool {
 	return true
 }
 
-func (s *GenericAPIServer) installAPIGroup(apiGroupInfo *APIGroupInfo) error {
+// Exposes the given group version in API.
+func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	apiPrefix := s.APIGroupPrefix
 	if apiGroupInfo.IsLegacyGroup {
 		apiPrefix = s.APIPrefix
