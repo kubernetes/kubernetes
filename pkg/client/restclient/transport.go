@@ -62,5 +62,6 @@ func (c *Config) transportConfig() *transport.Config {
 		Username:    c.Username,
 		Password:    c.Password,
 		BearerToken: c.BearerToken,
+		Impersonate: c.Impersonate,
 	}
 }

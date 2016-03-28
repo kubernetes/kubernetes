@@ -34,6 +34,9 @@ type Config struct {
 	// Bearer token for authentication
 	BearerToken string
 
+	// Impersonate is the username that this Config will impersonate
+	Impersonate string
+
 	// Transport may be used for custom HTTP behavior. This attribute may
 	// not be specified with the TLS client certificate options. Use
 	// WrapTransport for most client level operations.
