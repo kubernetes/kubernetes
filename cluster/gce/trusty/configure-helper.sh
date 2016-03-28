@@ -605,10 +605,12 @@ prepare_kube_addons() {
     # Replace the salt configurations with variable values.
     metrics_memory="200Mi"
     eventer_memory="200Mi"
+    readonly metrics_memory_per_node="4"
+    readonly eventer_memory_per_node="500"
     if [ -n "${NUM_NODES:-}" ] && [ "${NUM_NODES}" -ge 1 ]; then
       num_kube_nodes="$((${NUM_NODES}-1))"
-      metrics_memory="$((${num_kube_nodes} * 4 + 200))Mi"
-      eventer_memory="$((${num_kube_nodes} * 500 + 200 * 1024))Ki"
+      metrics_memory="$((${num_kube_nodes} * ${metrics_memory_per_node} + 200))Mi"
+      eventer_memory="$((${num_kube_nodes} * ${eventer_memory_per_node} + 200 * 1024))Ki"
     fi
     controller_yaml="${addon_dst_dir}/${file_dir}"
     if [ "${ENABLE_CLUSTER_MONITORING:-}" = "googleinfluxdb" ]; then
@@ -619,6 +621,8 @@ prepare_kube_addons() {
     remove_salt_config_comments "${controller_yaml}"
     sed -i -e "s@{{ *metrics_memory *}}@${metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory *}}@${eventer_memory}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
   fi
   cp "${addon_src_dir}/namespace.yaml" "${addon_dst_dir}"
   if [ "${ENABLE_L7_LOADBALANCING:-}" = "glbc" ]; then
