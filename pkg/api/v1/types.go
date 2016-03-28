@@ -1419,7 +1419,7 @@ type NodeAffinity struct {
 // (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
 type PreferredSchedulingTerm struct {
 	// Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
-	Weight int `json:"weight"`
+	Weight int32 `json:"weight"`
 	// A node selector term, associated with the corresponding weight.
 	Preference NodeSelectorTerm `json:"preference"`
 }
