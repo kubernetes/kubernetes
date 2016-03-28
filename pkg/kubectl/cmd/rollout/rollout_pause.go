@@ -39,6 +39,7 @@ type PauseConfig struct {
 
 	Out       io.Writer
 	Filenames []string
+	Recursive bool
 }
 
 const (
@@ -70,6 +71,7 @@ func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
 	kubectl.AddJsonFilenameFlag(cmd, &opts.Filenames, usage)
+	cmdutil.AddRecursiveFlag(cmd, &opts.Recursive)
 	return cmd
 }
 
@@ -89,7 +91,7 @@ func (o *PauseConfig) CompletePause(f *cmdutil.Factory, cmd *cobra.Command, out 
 
 	infos, err := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Filenames...).
+		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
 		Latest().

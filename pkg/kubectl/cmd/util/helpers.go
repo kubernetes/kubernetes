@@ -331,6 +331,10 @@ func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
 }
 
+func AddRecursiveFlag(cmd *cobra.Command, value *bool) {
+	cmd.Flags().BoolVarP(value, "recursive", "R", *value, "If true, process directory recursively.")
+}
+
 func AddApplyAnnotationFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.")
 }
