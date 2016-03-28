@@ -99,6 +99,9 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		u.Fragment = ""
 		clientConfig.Host = u.String()
 	}
+	if len(configAuthInfo.Impersonate) > 0 {
+		clientConfig.Impersonate = configAuthInfo.Impersonate
+	}
 
 	// only try to read the auth information if we are secure
 	if restclient.IsConfigTransportTLS(*clientConfig) {
@@ -155,6 +158,9 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 	// blindly overwrite existing values based on precedence
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
+	}
+	if len(configAuthInfo.Impersonate) > 0 {
+		mergedConfig.Impersonate = configAuthInfo.Impersonate
 	}
 	if len(configAuthInfo.ClientCertificate) > 0 || len(configAuthInfo.ClientCertificateData) > 0 {
 		mergedConfig.CertFile = configAuthInfo.ClientCertificate

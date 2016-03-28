@@ -725,6 +725,87 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	}
 }
 
+type impersonateAuthorizer struct{}
+
+// alice can't act as anyone and bob can't do anything but act-as someone
+func (impersonateAuthorizer) Authorize(a authorizer.Attributes) error {
+	if a.GetUserName() == "alice" && a.GetVerb() != "impersonate" {
+		return nil
+	}
+	if a.GetUserName() == "bob" && a.GetVerb() == "impersonate" {
+		return nil
+	}
+	return errors.New("I can't allow that.  Go ask alice.")
+}
+
+func TestImpersonateIsForbidden(t *testing.T) {
+	framework.DeleteAllEtcdKeys()
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig.Authenticator = getTestTokenAuth()
+	masterConfig.Authorizer = impersonateAuthorizer{}
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
+
+	transport := http.DefaultTransport
+
+	for _, r := range getTestRequests() {
+		token := BobToken
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+		func() {
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Logf("case %v", r)
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// Expect all of bob's actions to return Forbidden
+			if resp.StatusCode != http.StatusForbidden {
+				t.Logf("case %v", r)
+				t.Errorf("Expected not status Forbidden, but got %s", resp.Status)
+			}
+		}()
+	}
+
+	for _, r := range getTestRequests() {
+		token := BobToken
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		req.Header.Set("Impersonate-User", "alice")
+		func() {
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Logf("case %v", r)
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// Expect all the requests to be allowed, don't care what they actually do
+			if resp.StatusCode == http.StatusForbidden {
+				t.Logf("case %v", r)
+				t.Errorf("Expected status not %v, but got %v", http.StatusForbidden, resp.StatusCode)
+			}
+		}()
+	}
+}
+
 func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authorizer {
 	f, err := ioutil.TempFile("", "auth_test")
 	if err != nil {
