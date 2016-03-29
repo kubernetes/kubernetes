@@ -46,6 +46,16 @@ type NodeStats struct {
 	// Stats pertaining to total usage of filesystem resources on the rootfs used by node k8s components.
 	// NodeFs.Used is the total bytes used on the filesystem.
 	Fs *FsStats `json:"fs,omitempty"`
+	// Stats about the underlying container runtime.
+	Runtime *RuntimeStats `json:"runtime,omitempty"`
+}
+
+// Stats pertaining to the underlying container runtime.
+type RuntimeStats struct {
+	// Stats about the underlying filesystem where container images are stored.
+	// This filesystem could be the same as the primary (root) filesystem.
+	// Usage here refers to the total number of bytes occupied by images on the filesystem.
+	ImageFs *FsStats `json:"imageFs,omitempty"`
 }
 
 const (
