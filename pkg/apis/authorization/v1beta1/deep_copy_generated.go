@@ -147,6 +147,19 @@ func DeepCopy_v1beta1_SubjectAccessReviewSpec(in SubjectAccessReviewSpec, out *S
 	} else {
 		out.Groups = nil
 	}
+	if in.Extra != nil {
+		in, out := in.Extra, &out.Extra
+		*out = make(map[string][]string)
+		for key, val := range in {
+			if newVal, err := c.DeepCopy(val); err != nil {
+				return err
+			} else {
+				(*out)[key] = newVal.([]string)
+			}
+		}
+	} else {
+		out.Extra = nil
+	}
 	return nil
 }
 
