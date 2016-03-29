@@ -6,6 +6,7 @@
     - [Other notable changes](#other-notable-changes)
 - [v1.3.0-alpha.3](#v130-alpha3)
   - [Downloads](#downloads)
+- [v1.3.0-alpha.3](#v130-alpha3)
   - [Changes since v1.3.0-alpha.2](#changes-since-v130-alpha2)
     - [Action Required](#action-required)
     - [Other notable changes](#other-notable-changes)

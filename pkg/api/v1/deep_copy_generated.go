@@ -2176,6 +2176,17 @@ func DeepCopy_v1_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error {
 	} else {
 		out.Volumes = nil
 	}
+	if in.InitContainers != nil {
+		in, out := in.InitContainers, &out.InitContainers
+		*out = make([]Container, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_Container(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.InitContainers = nil
+	}
 	if in.Containers != nil {
 		in, out := in.Containers, &out.Containers
 		*out = make([]Container, len(in))
@@ -2268,6 +2279,17 @@ func DeepCopy_v1_PodStatus(in PodStatus, out *PodStatus, c *conversion.Cloner) e
 		}
 	} else {
 		out.StartTime = nil
+	}
+	if in.InitContainerStatuses != nil {
+		in, out := in.InitContainerStatuses, &out.InitContainerStatuses
+		*out = make([]ContainerStatus, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_ContainerStatus(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.InitContainerStatuses = nil
 	}
 	if in.ContainerStatuses != nil {
 		in, out := in.ContainerStatuses, &out.ContainerStatuses

@@ -186,7 +186,7 @@ var map_Container = map[string]string{
 	"ports":                  "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
 	"env":                    "List of environment variables to set in the container. Cannot be updated.",
 	"resources":              "Compute Resources required by this container. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources",
-	"volumeMounts":           "Pod volumes to mount into the container's filesyste. Cannot be updated.",
+	"volumeMounts":           "Pod volumes to mount into the container's filesystem. Cannot be updated.",
 	"livenessProbe":          "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
 	"readinessProbe":         "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
 	"lifecycle":              "Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
