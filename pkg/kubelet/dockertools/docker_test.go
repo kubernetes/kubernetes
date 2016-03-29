@@ -334,25 +334,25 @@ func TestPullWithSecrets(t *testing.T) {
 		"default keyring secrets": {
 			"ubuntu",
 			[]api.Secret{},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email", nil}}),
 			[]string{`ubuntu:latest using {"username":"built-in","password":"password","email":"email"}`},
 		},
 		"default keyring secrets unused": {
 			"ubuntu",
 			[]api.Secret{},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"extraneous": {"built-in", "password", "email"}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"extraneous": {"built-in", "password", "email", nil}}),
 			[]string{`ubuntu:latest using {}`},
 		},
 		"builtin keyring secrets, but use passed": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email", nil}}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
 		"builtin keyring secrets, but use passed with new docker config": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockerConfigJson, Data: map[string][]byte{api.DockerConfigJsonKey: dockerConfigJsonContent}}},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email", nil}}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
 	}
@@ -407,16 +407,20 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 
 func TestDockerKeyringLookup(t *testing.T) {
 
-	ada := docker.AuthConfiguration{
-		Username: "ada",
-		Password: "smash",
-		Email:    "ada@example.com",
+	ada := credentialprovider.LazyAuthConfiguration{
+		AuthConfiguration: docker.AuthConfiguration{
+			Username: "ada",
+			Password: "smash",
+			Email:    "ada@example.com",
+		},
 	}
 
-	grace := docker.AuthConfiguration{
-		Username: "grace",
-		Password: "squash",
-		Email:    "grace@example.com",
+	grace := credentialprovider.LazyAuthConfiguration{
+		AuthConfiguration: docker.AuthConfiguration{
+			Username: "grace",
+			Password: "squash",
+			Email:    "grace@example.com",
+		},
 	}
 
 	dk := &credentialprovider.BasicDockerKeyring{}
@@ -435,27 +439,27 @@ func TestDockerKeyringLookup(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match []docker.AuthConfiguration
+		match []credentialprovider.LazyAuthConfiguration
 		ok    bool
 	}{
 		// direct match
-		{"bar.example.com", []docker.AuthConfiguration{ada}, true},
+		{"bar.example.com", []credentialprovider.LazyAuthConfiguration{ada}, true},
 
 		// direct match deeper than other possible matches
-		{"bar.example.com/pong", []docker.AuthConfiguration{grace, ada}, true},
+		{"bar.example.com/pong", []credentialprovider.LazyAuthConfiguration{grace, ada}, true},
 
 		// no direct match, deeper path ignored
-		{"bar.example.com/ping", []docker.AuthConfiguration{ada}, true},
+		{"bar.example.com/ping", []credentialprovider.LazyAuthConfiguration{ada}, true},
 
 		// match first part of path token
-		{"bar.example.com/pongz", []docker.AuthConfiguration{grace, ada}, true},
+		{"bar.example.com/pongz", []credentialprovider.LazyAuthConfiguration{grace, ada}, true},
 
 		// match regardless of sub-path
-		{"bar.example.com/pong/pang", []docker.AuthConfiguration{grace, ada}, true},
+		{"bar.example.com/pong/pang", []credentialprovider.LazyAuthConfiguration{grace, ada}, true},
 
 		// no host match
-		{"example.com", []docker.AuthConfiguration{}, false},
-		{"foo.example.com", []docker.AuthConfiguration{}, false},
+		{"example.com", []credentialprovider.LazyAuthConfiguration{}, false},
+		{"foo.example.com", []credentialprovider.LazyAuthConfiguration{}, false},
 	}
 
 	for i, tt := range tests {
@@ -474,10 +478,12 @@ func TestDockerKeyringLookup(t *testing.T) {
 // by images that only match the hostname.
 // NOTE: the above covers the case of a more specific match trumping just hostname.
 func TestIssue3797(t *testing.T) {
-	rex := docker.AuthConfiguration{
-		Username: "rex",
-		Password: "tiny arms",
-		Email:    "rex@example.com",
+	rex := credentialprovider.LazyAuthConfiguration{
+		AuthConfiguration: docker.AuthConfiguration{
+			Username: "rex",
+			Password: "tiny arms",
+			Email:    "rex@example.com",
+		},
 	}
 
 	dk := &credentialprovider.BasicDockerKeyring{}
@@ -491,15 +497,15 @@ func TestIssue3797(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match []docker.AuthConfiguration
+		match []credentialprovider.LazyAuthConfiguration
 		ok    bool
 	}{
 		// direct match
-		{"quay.io", []docker.AuthConfiguration{rex}, true},
+		{"quay.io", []credentialprovider.LazyAuthConfiguration{rex}, true},
 
 		// partial matches
-		{"quay.io/foo", []docker.AuthConfiguration{rex}, true},
-		{"quay.io/foo/bar", []docker.AuthConfiguration{rex}, true},
+		{"quay.io/foo", []credentialprovider.LazyAuthConfiguration{rex}, true},
+		{"quay.io/foo/bar", []credentialprovider.LazyAuthConfiguration{rex}, true},
 	}
 
 	for i, tt := range tests {

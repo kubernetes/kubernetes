@@ -119,6 +119,11 @@ func (p *ecrProvider) Enabled() bool {
 	return true
 }
 
+// LazyProvide implements DockerConfigProvider.LazyProvide. Should never be called.
+func (p *ecrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
+	return nil
+}
+
 // Provide implements DockerConfigProvider.Provide, refreshing ECR tokens on demand
 func (p *ecrProvider) Provide() credentialprovider.DockerConfig {
 	cfg := credentialprovider.DockerConfig{}
