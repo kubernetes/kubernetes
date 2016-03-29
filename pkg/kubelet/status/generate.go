@@ -77,3 +77,58 @@ func GeneratePodReadyCondition(spec *api.PodSpec, containerStatuses []api.Contai
 		Status: api.ConditionTrue,
 	}
 }
+
+// GeneratePodInitializedCondition returns initialized condition if all init containers in a pod are ready, else it
+// returns an uninitialized condition.
+func GeneratePodInitializedCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus, podPhase api.PodPhase) api.PodCondition {
+	// Find if all containers are ready or not.
+	if containerStatuses == nil && len(spec.InitContainers) > 0 {
+		return api.PodCondition{
+			Type:   api.PodInitialized,
+			Status: api.ConditionFalse,
+			Reason: "UnknownContainerStatuses",
+		}
+	}
+	unknownContainers := []string{}
+	unreadyContainers := []string{}
+	for _, container := range spec.InitContainers {
+		if containerStatus, ok := api.GetContainerStatus(containerStatuses, container.Name); ok {
+			if !containerStatus.Ready {
+				unreadyContainers = append(unreadyContainers, container.Name)
+			}
+		} else {
+			unknownContainers = append(unknownContainers, container.Name)
+		}
+	}
+
+	// If all init containers are known and succeeded, just return PodCompleted.
+	if podPhase == api.PodSucceeded && len(unknownContainers) == 0 {
+		return api.PodCondition{
+			Type:   api.PodInitialized,
+			Status: api.ConditionTrue,
+			Reason: "PodCompleted",
+		}
+	}
+
+	unreadyMessages := []string{}
+	if len(unknownContainers) > 0 {
+		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unknown status: %s", unknownContainers))
+	}
+	if len(unreadyContainers) > 0 {
+		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with incomplete status: %s", unreadyContainers))
+	}
+	unreadyMessage := strings.Join(unreadyMessages, ", ")
+	if unreadyMessage != "" {
+		return api.PodCondition{
+			Type:    api.PodInitialized,
+			Status:  api.ConditionFalse,
+			Reason:  "ContainersNotInitialized",
+			Message: unreadyMessage,
+		}
+	}
+
+	return api.PodCondition{
+		Type:   api.PodInitialized,
+		Status: api.ConditionTrue,
+	}
+}
