@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
@@ -208,9 +209,10 @@ func newServerTest() *serverTestFramework {
 	}
 	server := NewServer(
 		fw.fakeKubelet,
-		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
+		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &kubecontainertesting.FakeRuntime{}),
 		fw.fakeAuth,
-		true)
+		true,
+		&kubecontainertesting.Mock{})
 	fw.serverUnderTest = &server
 	// TODO: Close() this when fix #19254
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
