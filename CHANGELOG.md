@@ -1,3 +1,46 @@
+# Release Notes for Kubernetes v1.3.0-alpha.1
+
+## [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/HEAD/examples)
+
+## Downloads
+
+binary | sha1 hash | md5 hash
+------ | --------- | --------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.0-alpha.1/kubernetes.tar.gz) | `e0041b08e220a4704ea2ad90a6ec7c8f2120c2d3` | `7bb2df32aea94678f72a8d1f43a12098`
+
+## Changes since v1.2.0 (last PR #23530)
+
+### Action Required
+* Disabling swagger ui by default on apiserver. Adding a flag that can enable it (#23025, @nikhiljindal)
+* restore ability to run against secured etcd (#21535, @AdoHe)
+
+### Other notable changes
+* Trusty: Avoid reaching GCE custom metadata size limit (#22818, @andyzheng0831)
+* Update kubectl help for 1.2 resources (#23305, @janetkuo)
+* Removing URL query param from swagger UI to fix the XSS issue (#23234, @nikhiljindal)
+* Fix hairpin mode (#23325, @MurgaNikolay)
+* Bump to container-vm-v20160321 (#23313, @zmerlynn)
+* Remove the restart-kube-proxy and restart-apiserver functions (#23180, @roberthbailey)
+* Copy annotations back from RS to Deployment on rollback (#23160, @janetkuo)
+* Trusty: Support hybrid cluster with nodes on ContainerVM (#23079, @andyzheng0831)
+* update expose command description to add deployment (#23246, @AdoHe)
+* Add a rate limiter to the GCE cloudprovider (#23019, @alex-mohr)
+* Add a Deployment example for kubectl expose. (#23222, @madhusudancs)
+* Use versioned object when computing patch (#23145, @liggitt)
+* kubelet: send all recevied pods in one update (#23141, @yujuhong)
+* Add a SSHKey sync check to the master's healthz (when using SSHTunnels). (#23167, @cjcullen)
+* Validate minimum CPU limits to be >= 10m (#23143, @vishh)
+* kubernetes/kubernetes#23034 Fix controller-manager race condition issue which cause endpoints flush during restart (#23035, @xinxiaogang)
+* MESOS: forward globally declared cadvisor housekeeping flags (#22974, @jdef)
+* Trusty: support developer workflow on base image (#22960, @andyzheng0831)
+* Bumped Heapster to stable version 1.0.0 (#22993, @piosz)
+* Deprecating --api-version flag (#22410, @nikhiljindal)
+* allow resource.version.group in kubectl (#22853, @deads2k)
+* Use SCP to dump logs and parallelize a bit. (#22835, @spxtr)
+* update wide option output (#22772, @AdoHe)
+* Change scheduler logic from random to round-robin (#22430, @gmarek)
+
+
 # Release Notes for Kubernetes 1.2.0
 
 ## [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
