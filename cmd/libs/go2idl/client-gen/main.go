@@ -94,8 +94,6 @@ func main() {
 		arguments.InputDirs = append(dependencies, []string{
 			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
 		}...)
-		// We may change the output path later.
-		arguments.OutputPackagePath = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput"
 		arguments.CustomArgs = clientgenargs.Args{
 			[]unversioned.GroupVersion{{Group: "testgroup", Version: ""}},
 			map[unversioned.GroupVersion]string{
@@ -114,12 +112,6 @@ func main() {
 		}
 		glog.Infof("going to generate clientset from these input paths: %v", inputPath)
 		arguments.InputDirs = append(inputPath, dependencies...)
-		// TODO: we need to make OutPackagePath a map[string]string. For example,
-		// we need clientset and the individual typed clients be output to different
-		// output path.
-
-		// We may change the output path later.
-		arguments.OutputPackagePath = "k8s.io/kubernetes/pkg/client/typed/generated"
 
 		arguments.CustomArgs = clientgenargs.Args{
 			groupVersions,
