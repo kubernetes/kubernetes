@@ -106,11 +106,13 @@ etcd-certfile
 etcd-config
 etcd-keyfile
 etcd-mutation-timeout
+etcd-password
 etcd-prefix
 etcd-quorum-read
 etcd-server
 etcd-servers
 etcd-servers-overrides
+etcd-username
 event-burst
 event-qps
 event-ttl

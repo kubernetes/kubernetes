@@ -630,3 +630,30 @@ func TestDeleteWithRetry(t *testing.T) {
 		t.Errorf("Expect an NotFound error, got %v", err)
 	}
 }
+
+func TestNewEtcdClientConfig(t *testing.T) {
+	expectedServerList := []string{"server1", "server2"}
+	expectedUsername := "testuser"
+	expectedPassword := "testpass"
+
+	etcdConfig := EtcdConfig{
+		ServerList: expectedServerList,
+		Username:   expectedUsername,
+		Password:   expectedPassword,
+	}
+
+	clientConfig := etcdConfig.newClientConfig(nil)
+
+	if clientConfig.Transport == nil {
+		t.Errorf("Unexpected nil transport")
+	}
+	if !reflect.DeepEqual(expectedServerList, clientConfig.Endpoints) {
+		t.Errorf("Expect endpoints %v, got %v", expectedServerList, clientConfig.Endpoints)
+	}
+	if clientConfig.Username != "testuser" {
+		t.Errorf("Expect username %s, got %s", expectedUsername, clientConfig.Username)
+	}
+	if clientConfig.Password != "testpass" {
+		t.Errorf("Expect password %s, got %s", expectedPassword, clientConfig.Username)
+	}
+}
