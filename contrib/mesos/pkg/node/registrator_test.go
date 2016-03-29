@@ -22,9 +22,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	"k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
