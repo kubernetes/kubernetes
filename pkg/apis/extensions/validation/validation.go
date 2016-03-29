@@ -526,13 +526,6 @@ func ValidateIngressName(name string, prefix bool) (bool, string) {
 
 func validateIngressTLS(spec *extensions.IngressSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// Currently the Ingress only supports HTTP(S), so a secretName is required.
-	// This will not be the case if we support SSL routing at L4 via SNI.
-	for i, t := range spec.TLS {
-		if t.SecretName == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("secretName"), spec.TLS[i].SecretName))
-		}
-	}
 	// TODO: Perform a more thorough validation of spec.TLS.Hosts that takes
 	// the wildcard spec from RFC 6125 into account.
 	return allErrs
