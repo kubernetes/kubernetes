@@ -90,7 +90,7 @@
     triggers:
         - pollscm:
             cron: 'H/5 * * * *'
-        - timed: '@daily'
+        - timed: 'H/30 * * * *'
     wrappers:
         - ansicolor:
             colormap: xterm
