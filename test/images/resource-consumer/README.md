@@ -48,15 +48,14 @@ Custom metrics in Prometheus format are exposed on "/metrics" endpoint.
 
 ###CURL example
 ```console
-$ kubectl run resource-consumer --image=gcr.io/google_containers/resource_consumer:beta
-$ kubectl expose rc resource-consumer --create-external-load-balancer=true --port=8080 --target-port=8080
+$ kubectl run resource-consumer --image=gcr.io/google_containers/resource_consumer:beta --expose --service-overrides='{ "spec": { "type": "LoadBalancer" } }' --port 8080
 $ kubectl get services resource-consumer
 ```
 
-There are two IPs first one is internal, second one is the external load-balanced IP. Both serving port 8080. (Use second one)
+There are two IPs.  The first one is internal, while the second one is the external load-balanced IP.  Both serve port 8080. (Use second one)
 
 ```console
-$ curl --data "millicores=300&durationSec=600" http://104.197.103.250:8080/ConsumeCPU.
+$ curl --data "millicores=300&durationSec=600" http://<EXTERNAL-IP>:8080/ConsumeCPU
 ```
 
 300 millicores will be consumed for 600 seconds.

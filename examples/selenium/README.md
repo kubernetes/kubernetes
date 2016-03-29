@@ -222,7 +222,7 @@ To remove all created resources, run the following:
 kubectl delete rc selenium-hub
 kubectl delete rc selenium-node-chrome
 kubectl delete rc selenium-node-firefox
-kubectl delete rc selenium-python
+kubectl delete deployment selenium-python
 kubectl delete svc selenium-hub
 kubectl delete svc selenium-hub-external
 ```
