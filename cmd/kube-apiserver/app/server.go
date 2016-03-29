@@ -36,10 +36,14 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -249,7 +253,7 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
 
-	apiGroupVersionOverrides, err := parseRuntimeConfig(s)
+	apiResourceConfigSource, err := parseRuntimeConfig(s)
 	if err != nil {
 		glog.Fatalf("error in parsing runtime-config: %s", err)
 	}
@@ -292,7 +296,7 @@ func Run(s *options.APIServer) error {
 	}
 	storageDestinations.AddAPIGroup("", etcdStorage)
 
-	if !apiGroupVersionOverrides["extensions/v1beta1"].Disable {
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
 		glog.Infof("Configuring extensions/v1beta1 storage destination")
 		expGroup, err := registered.Group(extensions.GroupName)
 		if err != nil {
@@ -321,7 +325,7 @@ func Run(s *options.APIServer) error {
 	// autoscaling/v1/horizontalpodautoscalers is a move from extensions/v1beta1/horizontalpodautoscalers.
 	// The storage version needs to be either extensions/v1beta1 or autoscaling/v1.
 	// Users must roll forward while using 1.2, because we will require the latter for 1.3.
-	if !apiGroupVersionOverrides["autoscaling/v1"].Disable {
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(autoscalingapiv1.SchemeGroupVersion) {
 		glog.Infof("Configuring autoscaling/v1 storage destination")
 		autoscalingGroup, err := registered.Group(autoscaling.GroupName)
 		if err != nil {
@@ -348,7 +352,7 @@ func Run(s *options.APIServer) error {
 	// version needs to be either extensions/v1beta1 or batch/v1. Users
 	// must roll forward while using 1.2, because we will require the
 	// latter for 1.3.
-	if !apiGroupVersionOverrides["batch/v1"].Disable {
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv1.SchemeGroupVersion) {
 		glog.Infof("Configuring batch/v1 storage destination")
 		batchGroup, err := registered.Group(batch.GroupName)
 		if err != nil {
@@ -464,7 +468,7 @@ func Run(s *options.APIServer) error {
 			SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
 			Authorizer:                authorizer,
 			AdmissionControl:          admissionController,
-			APIGroupVersionOverrides:  apiGroupVersionOverrides,
+			APIResourceConfigSource:   apiResourceConfigSource,
 			MasterServiceNamespace:    s.MasterServiceNamespace,
 			MasterCount:               s.MasterCount,
 			ExternalHost:              s.ExternalHost,
@@ -511,13 +515,24 @@ func getRuntimeConfigValue(s *options.APIServer, apiKey string, defaultValue boo
 	return defaultValue
 }
 
-// Parses the given runtime-config and formats it into map[string]ApiGroupVersionOverride
-func parseRuntimeConfig(s *options.APIServer) (map[string]genericapiserver.APIGroupVersionOverride, error) {
+// Parses the given runtime-config and formats it into genericapiserver.APIResourceConfigSource
+func parseRuntimeConfig(s *options.APIServer) (genericapiserver.APIResourceConfigSource, error) {
+	v1GroupVersionString := "api/v1"
+	extensionsGroupVersionString := extensionsapiv1beta1.SchemeGroupVersion.String()
+	versionToResourceSpecifier := map[unversioned.GroupVersion]string{
+		apiv1.SchemeGroupVersion:                v1GroupVersionString,
+		extensionsapiv1beta1.SchemeGroupVersion: extensionsGroupVersionString,
+		batchapiv1.SchemeGroupVersion:           batchapiv1.SchemeGroupVersion.String(),
+		autoscalingapiv1.SchemeGroupVersion:     autoscalingapiv1.SchemeGroupVersion.String(),
+	}
+
+	resourceConfig := master.DefaultAPIResourceConfigSource()
+
 	// "api/all=false" allows users to selectively enable specific api versions.
-	disableAllAPIs := false
+	enableAPIByDefault := true
 	allAPIFlagValue, ok := s.RuntimeConfig["api/all"]
 	if ok && allAPIFlagValue == "false" {
-		disableAllAPIs = true
+		enableAPIByDefault = false
 	}
 
 	// "api/legacy=false" allows users to disable legacy api versions.
@@ -528,60 +543,40 @@ func parseRuntimeConfig(s *options.APIServer) (map[string]genericapiserver.APIGr
 	}
 	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
 
-	// "api/v1={true|false} allows users to enable/disable v1 API.
+	// "<resourceSpecifier>={true|false} allows users to enable/disable API.
 	// This takes preference over api/all and api/legacy, if specified.
-	disableV1 := disableAllAPIs
-	v1GroupVersion := "api/v1"
-	disableV1 = !getRuntimeConfigValue(s, v1GroupVersion, !disableV1)
-	apiGroupVersionOverrides := map[string]genericapiserver.APIGroupVersionOverride{}
-	if disableV1 {
-		apiGroupVersionOverrides[v1GroupVersion] = genericapiserver.APIGroupVersionOverride{
-			Disable: true,
-		}
-	}
-
-	// "extensions/v1beta1={true|false} allows users to enable/disable the extensions API.
-	// This takes preference over api/all, if specified.
-	disableExtensions := disableAllAPIs
-	extensionsGroupVersion := "extensions/v1beta1"
-	// TODO: Make this a loop over all group/versions when there are more of them.
-	disableExtensions = !getRuntimeConfigValue(s, extensionsGroupVersion, !disableExtensions)
-	if disableExtensions {
-		apiGroupVersionOverrides[extensionsGroupVersion] = genericapiserver.APIGroupVersionOverride{
-			Disable: true,
-		}
-	}
-
-	disableAutoscaling := disableAllAPIs
-	autoscalingGroupVersion := "autoscaling/v1"
-	disableAutoscaling = !getRuntimeConfigValue(s, autoscalingGroupVersion, !disableAutoscaling)
-	if disableAutoscaling {
-		apiGroupVersionOverrides[autoscalingGroupVersion] = genericapiserver.APIGroupVersionOverride{
-			Disable: true,
-		}
-	}
-	disableBatch := disableAllAPIs
-	batchGroupVersion := "batch/v1"
-	disableBatch = !getRuntimeConfigValue(s, batchGroupVersion, !disableBatch)
-	if disableBatch {
-		apiGroupVersionOverrides[batchGroupVersion] = genericapiserver.APIGroupVersionOverride{
-			Disable: true,
+	for version, resourceSpecifier := range versionToResourceSpecifier {
+		enableVersion := getRuntimeConfigValue(s, resourceSpecifier, enableAPIByDefault)
+		if enableVersion {
+			resourceConfig.EnableVersions(version)
+		} else {
+			resourceConfig.DisableVersions(version)
 		}
 	}
 
 	for key := range s.RuntimeConfig {
-		if strings.HasPrefix(key, v1GroupVersion+"/") {
-			return nil, fmt.Errorf("api/v1 resources cannot be enabled/disabled individually")
-		} else if strings.HasPrefix(key, extensionsGroupVersion+"/") {
-			resource := strings.TrimPrefix(key, extensionsGroupVersion+"/")
+		tokens := strings.Split(key, "/")
+		if len(tokens) != 3 {
+			continue
+		}
 
-			apiGroupVersionOverride := apiGroupVersionOverrides[extensionsGroupVersion]
-			if apiGroupVersionOverride.ResourceOverrides == nil {
-				apiGroupVersionOverride.ResourceOverrides = map[string]bool{}
+		switch {
+		case strings.HasPrefix(key, extensionsGroupVersionString+"/"):
+			if !resourceConfig.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
+				return nil, fmt.Errorf("%v is disabled, you cannot configure its resources individually", extensionsapiv1beta1.SchemeGroupVersion)
 			}
-			apiGroupVersionOverride.ResourceOverrides[resource] = getRuntimeConfigValue(s, key, false)
-			apiGroupVersionOverrides[extensionsGroupVersion] = apiGroupVersionOverride
+
+			resource := strings.TrimPrefix(key, extensionsGroupVersionString+"/")
+			if getRuntimeConfigValue(s, key, false) {
+				resourceConfig.EnableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource(resource))
+			} else {
+				resourceConfig.DisableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource(resource))
+			}
+
+		default:
+			// TODO enable individual resource capability for all GroupVersionResources
+			return nil, fmt.Errorf("%v resources cannot be enabled/disabled individually", key)
 		}
 	}
-	return apiGroupVersionOverrides, nil
+	return resourceConfig, nil
 }

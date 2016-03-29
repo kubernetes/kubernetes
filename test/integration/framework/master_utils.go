@@ -168,13 +168,14 @@ func NewMasterConfig() *master.Config {
 
 	return &master.Config{
 		Config: &genericapiserver.Config{
-			StorageDestinations: storageDestinations,
-			StorageVersions:     storageVersions,
-			APIPrefix:           "/api",
-			APIGroupPrefix:      "/apis",
-			Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
-			AdmissionControl:    admit.NewAlwaysAdmit(),
-			Serializer:          api.Codecs,
+			StorageDestinations:     storageDestinations,
+			StorageVersions:         storageVersions,
+			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
+			APIPrefix:               "/api",
+			APIGroupPrefix:          "/apis",
+			Authorizer:              apiserver.NewAlwaysAllowAuthorizer(),
+			AdmissionControl:        admit.NewAlwaysAdmit(),
+			Serializer:              api.Codecs,
 		},
 		KubeletClient: kubeletclient.FakeKubeletClient{},
 	}
@@ -186,6 +187,7 @@ func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig.EnableCoreControllers = true
 	masterConfig.EnableIndex = true
 	masterConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	masterConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	return masterConfig
 }
 

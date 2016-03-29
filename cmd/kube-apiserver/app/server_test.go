@@ -24,8 +24,10 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -132,13 +134,15 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 
 func TestParseRuntimeConfig(t *testing.T) {
 	testCases := []struct {
-		runtimeConfig            map[string]string
-		apiGroupVersionOverrides map[string]genericapiserver.APIGroupVersionOverride
-		err                      bool
+		runtimeConfig     map[string]string
+		expectedAPIConfig func() *genericapiserver.ResourceConfig
+		err               bool
 	}{
 		{
-			runtimeConfig:            map[string]string{},
-			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{},
+			runtimeConfig: map[string]string{},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				return master.DefaultAPIResourceConfigSource()
+			},
 			err: false,
 		},
 		{
@@ -146,7 +150,9 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"api/v1/pods": "false",
 			},
-			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				return master.DefaultAPIResourceConfigSource()
+			},
 			err: true,
 		},
 		{
@@ -154,10 +160,10 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"api/v1": "false",
 			},
-			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{
-				"api/v1": {
-					Disable: true,
-				},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := master.DefaultAPIResourceConfigSource()
+				config.DisableVersions(unversioned.GroupVersion{Group: "", Version: "v1"})
+				return config
 			},
 			err: false,
 		},
@@ -166,10 +172,10 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"extensions/v1beta1": "false",
 			},
-			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{
-				"extensions/v1beta1": {
-					Disable: true,
-				},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := master.DefaultAPIResourceConfigSource()
+				config.DisableVersions(unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"})
+				return config
 			},
 			err: false,
 		},
@@ -178,28 +184,24 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"extensions/v1beta1/deployments": "false",
 			},
-			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{
-				"extensions/v1beta1": {
-					ResourceOverrides: map[string]bool{
-						"deployments": false,
-					},
-				},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := master.DefaultAPIResourceConfigSource()
+				config.DisableResources(unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"})
+				return config
 			},
 			err: false,
 		},
 		{
 			// Enable deployments and disable jobs.
 			runtimeConfig: map[string]string{
-				"extensions/v1beta1/deployments": "true",
-				"extensions/v1beta1/jobs":        "false",
+				"extensions/v1beta1/anything": "true",
+				"extensions/v1beta1/jobs":     "false",
 			},
-			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{
-				"extensions/v1beta1": {
-					ResourceOverrides: map[string]bool{
-						"deployments": true,
-						"jobs":        false,
-					},
-				},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := master.DefaultAPIResourceConfigSource()
+				config.DisableResources(unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "jobs"})
+				config.EnableResources(unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "anything"})
+				return config
 			},
 			err: false,
 		},
@@ -208,7 +210,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 		s := &options.APIServer{
 			RuntimeConfig: test.runtimeConfig,
 		}
-		apiGroupVersionOverrides, err := parseRuntimeConfig(s)
+		actualDisablers, err := parseRuntimeConfig(s)
 
 		if err == nil && test.err {
 			t.Fatalf("expected error for test: %v", test)
@@ -216,8 +218,9 @@ func TestParseRuntimeConfig(t *testing.T) {
 			t.Fatalf("unexpected error: %s, for test: %v", err, test)
 		}
 
-		if err == nil && !reflect.DeepEqual(apiGroupVersionOverrides, test.apiGroupVersionOverrides) {
-			t.Fatalf("unexpected apiGroupVersionOverrides. Actual: %v, expected: %v", apiGroupVersionOverrides, test.apiGroupVersionOverrides)
+		expectedConfig := test.expectedAPIConfig()
+		if err == nil && !reflect.DeepEqual(actualDisablers, expectedConfig) {
+			t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %q\n expected: %q", test.runtimeConfig, actualDisablers, expectedConfig)
 		}
 	}
 
