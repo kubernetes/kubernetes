@@ -46,6 +46,7 @@ type DockerConfigEntry struct {
 	Username string
 	Password string
 	Email    string
+	Provider DockerConfigProvider
 }
 
 var (

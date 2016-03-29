@@ -187,7 +187,7 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		err := p.client.PullImage(opts, currentCreds)
+		err := p.client.PullImage(opts, credentialprovider.LazyProvide(currentCreds))
 		// If there was no error, return success
 		if err == nil {
 			return nil

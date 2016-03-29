@@ -462,6 +462,11 @@ func (d *testProvider) Enabled() bool {
 	return true
 }
 
+// LazyProvide implements dockerConfigProvider. Should never be called.
+func (d *testProvider) LazyProvide() *DockerConfigEntry {
+	return nil
+}
+
 // Provide implements dockerConfigProvider
 func (d *testProvider) Provide() DockerConfig {
 	d.Count += 1
