@@ -130,12 +130,6 @@ kube::build::get_docker_wrapped_binaries() {
   echo "${targets[@]}"
 }
 
-# The set of addons images that should be prepopulated on linux/amd64
-readonly KUBE_ADDON_PATHS=(
-  gcr.io/google_containers/pause:2.0
-  gcr.io/google_containers/kube-registry-proxy:0.3
-)
-
 # ---------------------------------------------------------------------------
 # Basic setup functions
 
@@ -755,11 +749,6 @@ function kube::release::package_server_tarballs() {
 
     kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
 
-    # Only release addon images for linux/amd64. These addon images aren't necessary for other architectures
-    if [[ ${platform} == "linux/amd64" ]]; then
-      kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
-    fi
-
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
     if [[ "${platform%/*}" == "windows" ]]; then
@@ -862,40 +851,6 @@ function kube::release::create_docker_images_for_server() {
     kube::log::status "Docker builds done"
   )
 
-}
-
-# This will pull and save docker images for addons which need to placed
-# on the nodes directly.
-function kube::release::write_addon_docker_images_for_server() {
-  # Create a sub-shell so that we don't pollute the outer environment
-  (
-    local addon_path
-    for addon_path in "${KUBE_ADDON_PATHS[@]}"; do
-      (
-        kube::log::status "Pulling and writing Docker image for addon: ${addon_path}"
-
-        local dest_name="${addon_path//\//\~}"
-        if [[ -z $("${DOCKER[@]}" images | awk '{print ($1":"$2)}' | grep "${addon_path}") ]]; then
-          kube::log::status "Addon image ${addon_path} does not exist, pulling it..."
-          "${DOCKER[@]}" pull "${addon_path}"
-        fi
-        "${DOCKER[@]}" save "${addon_path}" > "${1}/${dest_name}.tar"
-      ) &
-    done
-
-    if [[ ! -z "${BUILD_PYTHON_IMAGE:-}" ]]; then
-      (
-        kube::log::status "Building Docker python image"
-
-        local img_name=python:2.7-slim-pyyaml
-        "${DOCKER[@]}" build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
-        "${DOCKER[@]}" save "${img_name}" > "${1}/${img_name}.tar"
-      ) &
-    fi
-
-    kube::util::wait-for-jobs || { kube::log::error "unable to pull or write addon image"; return 1; }
-    kube::log::status "Addon images done"
-  )
 }
 
 # Package up the salt configuration tree.  This is an optional helper to getting
