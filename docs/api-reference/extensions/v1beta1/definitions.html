@@ -766,7 +766,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">tls</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">TLS configuration. Currently the Ingress only supports a single TLS port, 443, and assumes TLS termination. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TLS configuration. Currently the Ingress only supports a single TLS port, 443. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension, if the ingress controller fulfilling the ingress supports SNI.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_ingresstls">v1beta1.IngressTLS</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5605,7 +5605,7 @@ Both these may change in the future. Incoming requests are matched against the h
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-03-15 23:36:04 UTC
+Last updated 2016-03-31 23:31:32 UTC
 </div>
 </div>
 </body>

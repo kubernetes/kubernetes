@@ -169,15 +169,6 @@ func TestUpdate(t *testing.T) {
 				"foo.bar.com": {"/invalid[": "svc"}})
 			return object
 		},
-
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Ingress)
-			object.Spec.TLS = append(object.Spec.TLS, extensions.IngressTLS{
-				Hosts:      []string{"foo.bar.com"},
-				SecretName: "",
-			})
-			return object
-		},
 	)
 }
 

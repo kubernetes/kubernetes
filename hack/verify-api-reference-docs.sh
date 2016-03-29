@@ -36,7 +36,7 @@ TMP_ROOT="${KUBE_ROOT}/_tmp"
 echo "diffing ${API_REFERENCE_DOCS_ROOT} against freshly generated docs"
 ret=0
 diff -NauprB -I 'Last update' --exclude=*.md "${API_REFERENCE_DOCS_ROOT}" "${OUTPUT_DIR}" || ret=$?
-rm -rf "${TMP_ROOT}"
+# rm -rf "${TMP_ROOT}"
 if [[ $ret -eq 0 ]]
 then
   echo "${API_REFERENCE_DOCS_ROOT} up to date."

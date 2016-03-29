@@ -1263,7 +1263,11 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress) (string, err
 func describeIngressTLS(out io.Writer, ingTLS []extensions.IngressTLS) {
 	fmt.Fprintf(out, "TLS:\n")
 	for _, t := range ingTLS {
-		fmt.Fprintf(out, "  %v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
+		if t.SecretName == "" {
+			fmt.Fprintf(out, "  SNI routes %v\n", strings.Join(t.Hosts, ","))
+		} else {
+			fmt.Fprintf(out, "  %v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
+		}
 	}
 	return
 }
