@@ -466,6 +466,13 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		}
 	}
 	if !containerExists {
+		for _, container := range pod.Spec.InitContainers {
+			if container.Name == containerName {
+				containerExists = true
+			}
+		}
+	}
+	if !containerExists {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("container %q not found in pod %q\n", containerName, podID))
 		return
 	}
