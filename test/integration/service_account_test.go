@@ -355,7 +355,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
 	rootTokenAuth := authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
 		if token == rootToken {
-			return &user.DefaultInfo{rootUserName, "", []string{}}, true, nil
+			return &user.DefaultInfo{Name: rootUserName}, true, nil
 		}
 		return nil, false, nil
 	})
