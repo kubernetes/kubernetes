@@ -295,7 +295,7 @@ message Container {
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources
   optional ResourceRequirements resources = 8;
 
-  // Pod volumes to mount into the container's filesyste.
+  // Pod volumes to mount into the container's filesystem.
   // Cannot be updated.
   repeated VolumeMount volumeMounts = 9;
 

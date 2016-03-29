@@ -418,8 +418,7 @@ func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSet
 	} else {
 		out.Selector = nil
 	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -439,8 +438,7 @@ func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extension
 	} else {
 		out.Selector = nil
 	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
