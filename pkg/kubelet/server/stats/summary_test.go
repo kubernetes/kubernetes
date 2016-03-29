@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kubestats "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
 
@@ -127,7 +128,7 @@ func TestBuildSummary(t *testing.T) {
 	}
 
 	sb := &summaryBuilder{
-		newFsResourceAnalyzer(&MockStatsProvider{}, time.Minute*5), &node, nodeConfig, rootfs, imagefs, infos}
+		newFsResourceAnalyzer(&MockStatsProvider{}, time.Minute*5), &node, nodeConfig, rootfs, imagefs, container.ImageStats{}, infos}
 	summary, err := sb.build()
 
 	assert.NoError(t, err)

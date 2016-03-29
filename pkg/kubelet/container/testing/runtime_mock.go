@@ -137,3 +137,8 @@ func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy) error {
 	args := r.Called(gcPolicy)
 	return args.Error(0)
 }
+
+func (r *Mock) ImageStats() (*ImageStats, error) {
+	args := r.Called()
+	return args.Get(0).(*ImageStats), args.Error(1)
+}

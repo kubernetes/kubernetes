@@ -203,6 +203,16 @@ var _ = Describe("Kubelet", func() {
 				Expect(summary.Node.Fs.UsedBytes).NotTo(BeNil())
 				Expect(*summary.Node.Fs.UsedBytes).NotTo(BeZero())
 
+				By("Having container runtime's image storage information")
+				Expect(summary.Node.Runtime).NotTo(BeNil())
+				Expect(summary.Node.Runtime.ImageFs).NotTo(BeNil())
+				Expect(summary.Node.Runtime.ImageFs.AvailableBytes).NotTo(BeNil())
+				Expect(*summary.Node.Runtime.ImageFs.AvailableBytes).NotTo(BeZero())
+				Expect(summary.Node.Runtime.ImageFs.CapacityBytes).NotTo(BeNil())
+				Expect(*summary.Node.Runtime.ImageFs.CapacityBytes).NotTo(BeZero())
+				Expect(summary.Node.Runtime.ImageFs.UsedBytes).NotTo(BeNil())
+				Expect(*summary.Node.Runtime.ImageFs.UsedBytes).NotTo(BeZero())
+
 				By("Having resources for kubelet and runtime system containers")
 				sysContainers := map[string]stats.ContainerStats{}
 				sysContainersList := []string{}

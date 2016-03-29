@@ -353,3 +353,11 @@ func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy) error {
 	f.CalledFunctions = append(f.CalledFunctions, "GarbageCollect")
 	return f.Err
 }
+
+func (f *FakeRuntime) ImageStats() (*ImageStats, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "ImageStats")
+	return nil, f.Err
+}
