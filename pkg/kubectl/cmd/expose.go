@@ -73,7 +73,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
-		Short:   "Take a replication controller, service, or pod and expose it as a new Kubernetes Service",
+		Short:   "Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
 		Run: func(cmd *cobra.Command, args []string) {
