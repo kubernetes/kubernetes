@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -45,15 +46,16 @@ type SummaryProvider interface {
 type summaryProviderImpl struct {
 	provider           StatsProvider
 	fsResourceAnalyzer fsResourceAnalyzerInterface
+	runtime            container.Runtime
 }
 
 var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a new SummaryProvider
-func NewSummaryProvider(statsProvider StatsProvider, fsResourceAnalyzer fsResourceAnalyzerInterface) SummaryProvider {
+func NewSummaryProvider(statsProvider StatsProvider, fsResourceAnalyzer fsResourceAnalyzerInterface, cruntime container.Runtime) SummaryProvider {
 	stackBuff := []byte{}
 	runtime.Stack(stackBuff, false)
-	return &summaryProviderImpl{statsProvider, fsResourceAnalyzer}
+	return &summaryProviderImpl{statsProvider, fsResourceAnalyzer, cruntime}
 }
 
 // Get implements the SummaryProvider interface
@@ -83,8 +85,11 @@ func (sp *summaryProviderImpl) Get() (*stats.Summary, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	sb := &summaryBuilder{sp.fsResourceAnalyzer, node, nodeConfig, rootFsInfo, imageFsInfo, infos}
+	imageStats, err := sp.runtime.ImageStats()
+	if err != nil || imageStats == nil {
+		return nil, err
+	}
+	sb := &summaryBuilder{sp.fsResourceAnalyzer, node, nodeConfig, rootFsInfo, imageFsInfo, *imageStats, infos}
 	return sb.build()
 }
 
@@ -95,6 +100,7 @@ type summaryBuilder struct {
 	nodeConfig         cm.NodeConfig
 	rootFsInfo         cadvisorapiv2.FsInfo
 	imageFsInfo        cadvisorapiv2.FsInfo
+	imageStats         container.ImageStats
 	infos              map[string]cadvisorapiv2.ContainerInfo
 }
 
@@ -116,6 +122,13 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 			CapacityBytes:  &sb.rootFsInfo.Capacity,
 			UsedBytes:      &sb.rootFsInfo.Usage},
 		StartTime: rootStats.StartTime,
+		Runtime: &stats.RuntimeStats{
+			ImageFs: &stats.FsStats{
+				AvailableBytes: &sb.imageFsInfo.Available,
+				CapacityBytes:  &sb.imageFsInfo.Capacity,
+				UsedBytes:      &sb.imageStats.TotalStorageBytes,
+			},
+		},
 	}
 
 	systemContainers := map[string]string{
@@ -152,7 +165,6 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 		AvailableBytes: &sb.imageFsInfo.Available,
 		CapacityBytes:  &sb.imageFsInfo.Capacity,
 	}
-
 	lcs, found := sb.latestContainerStats(info)
 	if !found {
 		return

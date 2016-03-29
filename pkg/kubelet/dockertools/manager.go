@@ -163,6 +163,9 @@ type DockerManager struct {
 
 	// The api version cache of docker daemon.
 	versionCache *cache.VersionCache
+
+	// Provides image stats
+	*imageStatsProvider
 }
 
 // A subset of the pod.Manager interface extracted for testing purposes.
@@ -240,6 +243,7 @@ func NewDockerManager(
 		cpuCFSQuota:            cpuCFSQuota,
 		enableCustomMetrics:    enableCustomMetrics,
 		configureHairpinMode:   hairpinMode,
+		imageStatsProvider:     &imageStatsProvider{client},
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	if serializeImagePulls {
