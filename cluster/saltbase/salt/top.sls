@@ -17,6 +17,8 @@ base:
     - flannel
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
     - cni
+{% elif pillar.get('network_provider', '').lower() == 'cni' %}
+    - cni
 {% endif %}
     - helpers
     - kube-client-tools
@@ -48,6 +50,8 @@ base:
     - flannel-server
     - flannel
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
+    - cni
+{% elif pillar.get('network_provider', '').lower() == 'cni' %}
     - cni
 {% endif %}
     - kube-apiserver
