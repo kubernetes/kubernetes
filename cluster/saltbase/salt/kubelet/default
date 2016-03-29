@@ -144,6 +144,8 @@
 {% set network_plugin = "" -%}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
   {% set network_plugin = "--network-plugin=opencontrail" %}
+{% elif pillar.get('network_provider', '').lower() == 'cni' %}
+  {% set network_plugin = "--network-plugin=cni --network-plugin-dir=/etc/cni/net.d/" %}
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
   {% set network_plugin = "--network-plugin=kubenet" -%}
   {% if reconcile_cidr_args == '' -%}

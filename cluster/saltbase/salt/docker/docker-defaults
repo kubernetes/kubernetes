@@ -7,6 +7,9 @@
 {% if pillar.get('network_provider', '').lower() == 'kubenet' %}
   {% set bridge_opts = "" %}
 {% endif -%}
+{% if pillar.get('network_provider', '').lower() == 'cni' %}
+  {% set bridge_opts = "" %}
+{% endif -%}
 {% set log_level = "--log-level=warn" -%}
 {% if pillar['docker_test_log_level'] is defined -%}
   {% set log_level = pillar['docker_test_log_level'] -%}
