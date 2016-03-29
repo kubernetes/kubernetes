@@ -27,6 +27,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
@@ -57,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -443,7 +446,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, errors.New("provided options object is not a PodLogOptions")
 				}
 				selector := labels.SelectorFromSet(t.Spec.Selector)
-				pod, numPods, err := GetFirstPod(c, t.Namespace, selector)
+				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) }
+				pod, numPods, err := GetFirstPod(c, t.Namespace, selector, 20*time.Second, sortBy)
 				if err != nil {
 					return nil, err
 				}
@@ -462,7 +466,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if err != nil {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
-				pod, numPods, err := GetFirstPod(c, t.Namespace, selector)
+				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) }
+				pod, numPods, err := GetFirstPod(c, t.Namespace, selector, 20*time.Second, sortBy)
 				if err != nil {
 					return nil, err
 				}
@@ -619,21 +624,24 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			switch t := object.(type) {
 			case *api.ReplicationController:
 				selector := labels.SelectorFromSet(t.Spec.Selector)
-				pod, _, err := GetFirstPod(client, t.Namespace, selector)
+				sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+				pod, _, err := GetFirstPod(client, t.Namespace, selector, 1*time.Minute, sortBy)
 				return pod, err
 			case *extensions.Deployment:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
 				if err != nil {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
-				pod, _, err := GetFirstPod(client, t.Namespace, selector)
+				sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+				pod, _, err := GetFirstPod(client, t.Namespace, selector, 1*time.Minute, sortBy)
 				return pod, err
 			case *batch.Job:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
 				if err != nil {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
-				pod, _, err := GetFirstPod(client, t.Namespace, selector)
+				sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+				pod, _, err := GetFirstPod(client, t.Namespace, selector, 1*time.Minute, sortBy)
 				return pod, err
 			case *api.Pod:
 				return t, nil
@@ -651,21 +659,45 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 }
 
-// GetFirstPod returns the first pod of an object from its namespace and selector and the number of matching pods
-func GetFirstPod(client *client.Client, namespace string, selector labels.Selector) (*api.Pod, int, error) {
-	var pods *api.PodList
-	for pods == nil || len(pods.Items) == 0 {
-		var err error
-		options := api.ListOptions{LabelSelector: selector}
-		if pods, err = client.Pods(namespace).List(options); err != nil {
-			return nil, 0, err
-		}
-		if len(pods.Items) == 0 {
-			time.Sleep(2 * time.Second)
-		}
+// GetFirstPod returns a pod matching the namespace and label selector
+// and the number of all pods that match the label selector.
+func GetFirstPod(client client.Interface, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*api.Pod) sort.Interface) (*api.Pod, int, error) {
+	options := api.ListOptions{LabelSelector: selector}
+
+	podList, err := client.Pods(namespace).List(options)
+	if err != nil {
+		return nil, 0, err
 	}
-	pod := &pods.Items[0]
-	return pod, len(pods.Items), nil
+	pods := []*api.Pod{}
+	for i := range podList.Items {
+		pod := podList.Items[i]
+		pods = append(pods, &pod)
+	}
+	if len(pods) > 0 {
+		sort.Sort(sortBy(pods))
+		return pods[0], len(podList.Items), nil
+	}
+
+	// Watch until we observe a pod
+	options.ResourceVersion = podList.ResourceVersion
+	w, err := client.Pods(namespace).Watch(options)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer w.Stop()
+
+	condition := func(event watch.Event) (bool, error) {
+		return event.Type == watch.Added || event.Type == watch.Modified, nil
+	}
+	event, err := watch.Until(timeout, w, condition)
+	if err != nil {
+		return nil, 0, err
+	}
+	pod, ok := event.Object.(*api.Pod)
+	if !ok {
+		return nil, 0, fmt.Errorf("%#v is not a pod event", event)
+	}
+	return pod, 1, nil
 }
 
 // Command will stringify and return all environment arguments ie. a command run by a client
