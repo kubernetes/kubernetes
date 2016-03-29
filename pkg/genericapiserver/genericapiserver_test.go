@@ -88,7 +88,6 @@ func TestNew(t *testing.T) {
 	assert.Equal(s.authenticator, config.Authenticator)
 	assert.Equal(s.authorizer, config.Authorizer)
 	assert.Equal(s.AdmissionControl, config.AdmissionControl)
-	assert.Equal(s.ApiGroupVersionOverrides, config.APIGroupVersionOverrides)
 	assert.Equal(s.RequestContextMapper, config.RequestContextMapper)
 	assert.Equal(s.cacheTimeout, config.CacheTimeout)
 	assert.Equal(s.ExternalAddress, config.ExternalHost)
