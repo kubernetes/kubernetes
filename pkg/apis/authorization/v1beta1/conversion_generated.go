@@ -321,6 +321,20 @@ func autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessR
 	} else {
 		out.Groups = nil
 	}
+	if in.Extra != nil {
+		in, out := &in.Extra, &out.Extra
+		*out = make(map[string][]string, len(*in))
+		for key, val := range *in {
+			newVal := new([]string)
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&val, newVal, 0); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Extra = nil
+	}
 	return nil
 }
 
@@ -357,6 +371,20 @@ func autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessR
 		copy(*out, *in)
 	} else {
 		out.Groups = nil
+	}
+	if in.Extra != nil {
+		in, out := &in.Extra, &out.Extra
+		*out = make(map[string][]string, len(*in))
+		for key, val := range *in {
+			newVal := new([]string)
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&val, newVal, 0); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Extra = nil
 	}
 	return nil
 }

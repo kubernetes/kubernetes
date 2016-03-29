@@ -101,6 +101,9 @@ type SubjectAccessReviewSpec struct {
 	User string
 	// Groups is the groups you're testing for.
 	Groups []string
+	// Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
+	// it needs a reflection here.
+	Extra map[string][]string
 }
 
 // SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAttributes
