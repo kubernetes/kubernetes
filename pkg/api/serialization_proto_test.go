@@ -67,6 +67,9 @@ func TestUniversalDeserializer(t *testing.T) {
 func TestProtobufRoundTrip(t *testing.T) {
 	obj := &v1.Pod{}
 	apitesting.FuzzerFor(t, v1.SchemeGroupVersion, rand.NewSource(benchmarkSeed)).Fuzz(obj)
+	// InitContainers are turned into annotations by conversion.
+	obj.Spec.InitContainers = nil
+	obj.Status.InitContainerStatuses = nil
 	data, err := obj.Marshal()
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +80,7 @@ func TestProtobufRoundTrip(t *testing.T) {
 	}
 	if !api.Semantic.Equalities.DeepEqual(out, obj) {
 		t.Logf("marshal\n%s", hex.Dump(data))
-		t.Fatalf("Unmarshal is unequal\n%s", diff.ObjectGoPrintSideBySide(out, obj))
+		t.Fatalf("Unmarshal is unequal\n%s", diff.ObjectGoPrintDiff(out, obj))
 	}
 }
 
