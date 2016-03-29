@@ -63,6 +63,11 @@ func canRunPod(pod *api.Pod) error {
 				return fmt.Errorf("pod with UID %q specified privileged container, but is disallowed", pod.UID)
 			}
 		}
+		for _, container := range pod.Spec.InitContainers {
+			if securitycontext.HasPrivilegedRequest(&container) {
+				return fmt.Errorf("pod with UID %q specified privileged container, but is disallowed", pod.UID)
+			}
+		}
 	}
 	return nil
 }
