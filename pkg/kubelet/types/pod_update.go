@@ -42,6 +42,9 @@ const (
 	// Pods with the given ids have unexpected status in this source,
 	// kubelet should reconcile status with this source
 	RECONCILE
+	// Source is ready. Sent as initial update when no pods are available
+	// from the source, to notify to kubelet that the source is otherwise ready.
+	SOURCE_READY
 
 	// These constants identify the sources of pods
 	// Updates from a file

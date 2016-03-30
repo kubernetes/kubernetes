@@ -171,7 +171,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			// Send an empty update when first seeing the source and there are
 			// no ADD or UPDATE pods from the source. This signals kubelet that
 			// the source is ready.
-			s.updates <- *adds
+			s.updates <- kubetypes.PodUpdate{Pods: adds.Pods, Op: kubetypes.SOURCE_READY, Source: source}
 		}
 		// Only add reconcile support here, because kubelet doesn't support Snapshot update now.
 		if len(reconciles.Pods) > 0 {
@@ -187,8 +187,10 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		}
 
 	case PodConfigNotificationSnapshot:
-		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 || firstSet {
+		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
 			s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*api.Pod), Op: kubetypes.SET, Source: source}
+		} else if firstSet {
+			s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{}, Op: kubetypes.SOURCE_READY, Source: source}
 		}
 
 	case PodConfigNotificationUnknown:
