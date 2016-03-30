@@ -27,13 +27,6 @@ base:
 {% else %}
     - kube-proxy
 {% endif %}
-{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
-  {% if pillar['logging_destination'] == 'elasticsearch' %}
-    - fluentd-es
-  {% elif pillar['logging_destination'] == 'gcp' %}
-    - fluentd-gcp
-  {% endif %}
-{% endif %}
 {% if pillar.get('enable_cluster_registry', '').lower() == 'true' %}
     - kube-registry-proxy
 {% endif %}
@@ -57,13 +50,6 @@ base:
     - kube-client-tools
     - kube-master-addons
     - kube-admission-controls
-{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
-  {% if pillar['logging_destination'] == 'elasticsearch' %}
-    - fluentd-es
-  {% elif pillar['logging_destination'] == 'gcp' %}
-    - fluentd-gcp
-  {% endif %}
-{% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
 {% endif %}
