@@ -43,6 +43,7 @@ Documentation for other releases can be found at
 *Note: Libraries provided by outside parties are supported by their authors, not the core Kubernetes team*
 
    * [Clojure](https://github.com/yanatan16/clj-kubernetes-api)
+   * [Go](https://bitbucket.org/amdatulabs/amdatu-kubernetes-go)
    * [Java (OSGi)](https://bitbucket.org/amdatulabs/amdatu-kubernetes)
    * [Java (Fabric8, OSGi)](https://github.com/fabric8io/kubernetes-client)
    * [Node.js](https://github.com/tenxcloud/node-kubernetes-client)
