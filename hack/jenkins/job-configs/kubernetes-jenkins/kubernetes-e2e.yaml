@@ -341,6 +341,13 @@
     provider-env: |
         {gke-provider-env}
     suffix:
+        - 'gke-pre-release':
+            description: 'Run E2E tests on GKE test endpoint against the latest prerelease (alpha/beta).'
+            timeout: 480
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-prerel"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
+                export JENKINS_PUBLISHED_VERSION="release/latest"
         - 'gke-test':
             description: 'Run E2E tests on GKE test endpoint.'
             timeout: 480
