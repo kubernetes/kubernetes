@@ -77,11 +77,14 @@ go run hack/e2e.go -v --pushup
 # Run all tests
 go run hack/e2e.go -v --test
 
-# Run tests matching the regex "\[Conformance\]" (the conformance tests)
-go run hack/e2e.go -v -test --test_args="--ginkgo.focus=\[Conformance\]"
+# Run tests matching the regex "\[Feature:Performance\]"
+go run hack/e2e.go -v -test --test_args="--ginkgo.focus=\[Feature:Performance\]"
 
 # Conversely, exclude tests that match the regex "Pods.*env"
 go run hack/e2e.go -v -test --test_args="--ginkgo.focus=Pods.*env"
+
+# Run tests in parallel, skip any that must be run serially
+GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.skip=\[Serial\]"
 
 # Flags can be combined, and their actions will take place in this order:
 # --build, --push|--up|--pushup, --test|--tests=..., --down
@@ -96,9 +99,6 @@ KUBERNETES_PROVIDER=aws go run hack/e2e.go -v --build --pushup --test --down
 # kubectl output.
 go run hack/e2e.go -v -ctl='get events'
 go run hack/e2e.go -v -ctl='delete pod foobar'
-
-# Alternately, if you have the e2e cluster up and no desire to see the event stream, you can run ginkgo-e2e.sh directly:
-hack/ginkgo-e2e.sh --ginkgo.focus=\[Conformance\]
 ```
 
 The tests are built into a single binary which can be run used to deploy a Kubernetes system or run tests against an already-deployed Kubernetes system.  See `go run hack/e2e.go --help` (or the flag definitions in `hack/e2e.go`) for more options, such as reusing an existing cluster.
@@ -208,13 +208,31 @@ We are working on implementing clearer partitioning of our e2e tests to make run
 
 ### Conformance tests
 
-Finally, `[Conformance]` tests are tests we expect to pass on **any** Kubernetes cluster.  The `[Conformance]` label does not supersede any other labels.  `[Conformance]` test policies are a work-in-progress (see #18162).
+Finally, `[Conformance]` tests represent a subset of the e2e-tests we expect to pass on **any** Kubernetes cluster.  The `[Conformance]` label does not supersede any other labels.
 
-End-to-end testing, as described above, is for [development distributions](writing-a-getting-started-guide.md).  A conformance test is used on a [versioned distro](writing-a-getting-started-guide.md).  (Links WIP)
+As each new release of Kubernetes providers new functionality, the subset of tests necessary to demonstrate conformance grows with each release.  Conformance is thus considered versioned, with the same backwards compatibility guarantees as laid out in [our versioning policy](../design/versioning.md#supported-releases).  Conformance tests for a given version should be run off of the release branch that corresponds to that version.  Thus `v1.2` conformance tests would be run from the head of the `release-1.2` branch. eg:
 
-The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not require support for up/push/down and other operations.  To run a conformance test, you need to know the IP of the master for your cluster and the authorization arguments to use.  The conformance test is intended to run against a cluster at a specific binary release of Kubernetes.  See [conformance-test.sh](http://releases.k8s.io/HEAD/hack/conformance-test.sh).
+ - A v1.3 development cluster should pass v1.1, v1.2 conformance tests
+ - A v1.2 cluster should pass v1.1, v1.2 conformance tests
+ - A v1.1 cluster should pass v1.0, v1.1 conformance tests, and fail v1.2 conformance tests
 
-### Defining what Conformance means
+Conformance tests are designed to be run with no cloud provider configured.  Conformance tests can be run against clusters that have not been created with `hack/e2e.go`, just provide a kubeconfig with the appropriate endpoint and credentials.
+
+```sh
+# setup for conformance tests
+export KUBECONFIG=/path/to/kubeconfig
+export KUBERNETES_CONFORMANCE_TEST=y
+
+# run all conformance tests
+go run hack/e2e.go -v --test_args="--ginkgo.focus=\[Conformance\]"
+
+# run all parallel-safe conformance tests in parallel
+GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.focus=\[Conformance\] --ginkgo.skip=\[Serial\]"
+# ... and finish up with remaining tests in serial
+go run hack/e2e.go --v --test --test_args="--ginkgo.focus=\[Serial\].*\[Conformance\]"
+```
+
+### Defining Conformance Subset
 
 It is impossible to define the entire space of Conformance tests without knowing the future, so instead, we define the compliment of conformance tests, below.
 
