@@ -106,6 +106,8 @@ type DockerManager struct {
 
 	// The image name of the pod infra container.
 	podInfraContainerImage string
+	// (Optional) The Secret to use when pulling the pod infra container image.
+	podInfraContainerImagePullSecret *api.Secret
 	// (Optional) Additional environment variables to be set for the pod infra container.
 	podInfraContainerEnv []api.EnvVar
 
@@ -183,6 +185,7 @@ func NewDockerManager(
 	podGetter podGetter,
 	machineInfo *cadvisorapi.MachineInfo,
 	podInfraContainerImage string,
+	podInfraContainerImagePullSecret *api.Secret,
 	qps float32,
 	burst int,
 	containerLogsDir string,
@@ -213,24 +216,25 @@ func NewDockerManager(
 	}
 
 	dm := &DockerManager{
-		client:                 client,
-		recorder:               recorder,
-		containerRefManager:    containerRefManager,
-		os:                     osInterface,
-		machineInfo:            machineInfo,
-		podInfraContainerImage: podInfraContainerImage,
-		dockerPuller:           newDockerPuller(client, qps, burst),
-		dockerRoot:             dockerRoot,
-		containerLogsDir:       containerLogsDir,
-		networkPlugin:          networkPlugin,
-		livenessManager:        livenessManager,
-		runtimeHelper:          runtimeHelper,
-		execHandler:            execHandler,
-		oomAdjuster:            oomAdjuster,
-		procFs:                 procFs,
-		cpuCFSQuota:            cpuCFSQuota,
-		enableCustomMetrics:    enableCustomMetrics,
-		configureHairpinMode:   hairpinMode,
+		client:                           client,
+		recorder:                         recorder,
+		containerRefManager:              containerRefManager,
+		os:                               osInterface,
+		machineInfo:                      machineInfo,
+		podInfraContainerImage:           podInfraContainerImage,
+		podInfraContainerImagePullSecret: podInfraContainerImagePullSecret,
+		dockerPuller:                     newDockerPuller(client, qps, burst),
+		dockerRoot:                       dockerRoot,
+		containerLogsDir:                 containerLogsDir,
+		networkPlugin:                    networkPlugin,
+		livenessManager:                  livenessManager,
+		runtimeHelper:                    runtimeHelper,
+		execHandler:                      execHandler,
+		oomAdjuster:                      oomAdjuster,
+		procFs:                           procFs,
+		cpuCFSQuota:                      cpuCFSQuota,
+		enableCustomMetrics:              enableCustomMetrics,
+		configureHairpinMode:             hairpinMode,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	if serializeImagePulls {
