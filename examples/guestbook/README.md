@@ -44,11 +44,13 @@ This example shows how to build a simple, multi-tier web application using Kuber
     - [Prerequisites](#prerequisites)
     - [Quick Start](#quick-start)
     - [Step One: Start up the redis master](#step-one-start-up-the-redis-master)
-      - [Define a replication controller](#define-a-replication-controller)
-      - [Define a service](#define-a-service)
-      - [Create a service](#create-a-service)
-      - [Finding a service](#finding-a-service)
-      - [Create a replication controller](#create-a-replication-controller)
+      - [Define a Deployment](#define-a-deployment)
+      - [Define a Service](#define-a-service)
+      - [Create a Service](#create-a-service)
+      - [Finding a Service](#finding-a-service)
+        - [Environment variables](#environment-variables)
+        - [DNS service](#dns-service)
+      - [Create a Deployment](#create-a-deployment)
       - [Optional Interlude](#optional-interlude)
     - [Step Two: Start up the redis slave](#step-two-start-up-the-redis-slave)
     - [Step Three: Start up the guestbook frontend](#step-three-start-up-the-guestbook-frontend)
@@ -67,11 +69,19 @@ The example consists of:
 
 The web frontend interacts with the redis master via javascript redis API calls.
 
-**Note**:  If you are running this example on a [Google Container Engine](https://cloud.google.com/container-engine/) installation, see [this Container Engine guestbook walkthrough](https://cloud.google.com/container-engine/docs/tutorials/guestbook) instead. The basic concepts are the same, but the walkthrough is tailored to a Container Engine setup.
+**Note**:  If you are running this example on a [Google Container Engine](https://cloud.google.com/container-engine/) installation, see [this Google Container Engine guestbook walkthrough](https://cloud.google.com/container-engine/docs/tutorials/guestbook) instead. The basic concepts are the same, but the walkthrough is tailored to a Container Engine setup.
 
 ### Prerequisites
 
-This example requires a running Kubernetes cluster. See the [Getting Started guides](../../docs/getting-started-guides/) for how to get started. And follow the [Prerequisites](../../docs/user-guide/prereqs.md) to make sure your `kubectl` is ok. As noted above, if you have a Google Container Engine cluster set up, go [here](https://cloud.google.com/container-engine/docs/tutorials/guestbook) instead.
+This example requires a running Kubernetes cluster. First, check that kubectl is properly configured by getting the cluster state:
+
+```console
+$ kubectl cluster-info
+```
+
+If you see a url response, you are ready to go. If not, read the [Getting Started guides](http://kubernetes.io/docs/getting-started-guides/) for how to get started, and follow the [prerequisites](http://kubernetes.io/docs/user-guide/prereqs/) to install and configure `kubectl`. As noted above, if you have a Google Container Engine cluster set up, read [this example](https://cloud.google.com/container-engine/docs/tutorials/guestbook) instead.
+
+All the files referenced in this example can be downloaded in [current folder](./).
 
 ### Quick Start
 
@@ -82,30 +92,30 @@ Start the guestbook with one command:
 ```console
 $ kubectl create -f examples/guestbook/all-in-one/guestbook-all-in-one.yaml
 service "redis-master" created
-replicationcontroller "redis-master" created
+deployment "redis-master" created
 service "redis-slave" created
-replicationcontroller "redis-slave" created
+deployment "redis-slave" created
 service "frontend" created
-replicationcontroller "frontend" created
+deployment "frontend" created
 ```
 
-You also can start the guestbook by running:
+Alternatively, you can start the guestbook by running:
 
 ```console
 $ kubectl create -f examples/guestbook/
 ```
 
-Then, list all your services:
+Then, list all your Services:
 
 ```console
 $ kubectl get services
-NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR                            AGE
-frontend          10.0.93.211      <none>            80/TCP        app=guestbook,tier=frontend         1h
-redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master,tier=backend  1h
-redis-slave       10.0.21.92       <none>            6379/TCP      app=redis,role=slave,tier=backend   1h
+NAME           CLUSTER-IP   EXTERNAL-IP   PORT(S)    AGE
+frontend       10.0.0.117   <none>        80/TCP     20s
+redis-master   10.0.0.170   <none>        6379/TCP   20s
+redis-slave    10.0.0.201   <none>        6379/TCP   20s
 ```
 
-Now you can access the guestbook on each node with frontend service's `<ClusterIP>:Port`, e.g. `10.0.93.211:80` in this guide. `<ClusterIP>` is a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to the frontend service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, setting the type field to `type: LoadBalancer` will provision a load balancer for your service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](../../docs/user-guide/accessing-the-cluster.md#accessing-services-running-on-the-cluster).
+Now you can access the guestbook on each node with frontend Service's `<Cluster-IP>:<PORT>`, e.g. `10.0.0.117:80` in this guide. `<Cluster-IP>` is a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to the frontend Service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, adding `type: LoadBalancer` to the frontend Service `spec` field will provision a load balancer for your Service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](../../docs/user-guide/accessing-the-cluster.md#accessing-services-running-on-the-cluster).
 
 Clean up the guestbook:
 
@@ -123,29 +133,29 @@ $ kubectl delete -f examples/guestbook/
 ### Step One: Start up the redis master
 
 Before continuing to the gory details, we also recommend you to read [Quick walkthrough](../../docs/user-guide/#quick-walkthrough), [Thorough walkthough](../../docs/user-guide/#thorough-walkthrough) and [Concept guide](../../docs/user-guide/#concept-guide).
-**Note**: The redis master in this example is *not* highly available.  Making it highly available would be an interesting, but intricate exercise— redis doesn't actually support multi-master deployments at this point in time, so high availability would be a somewhat tricky thing to implement, and might involve periodic serialization to disk, and so on.
+**Note**: The redis master in this example is *not* highly available.  Making it highly available would be an interesting, but intricate exercise — redis doesn't actually support multi-master Deployments at this point in time, so high availability would be a somewhat tricky thing to implement, and might involve periodic serialization to disk, and so on.
 
-#### Define a replication controller
+#### Define a Deployment
 
-To start the redis master, use the file `examples/guestbook/redis-master-controller.yaml`, which describes a single [pod](../../docs/user-guide/pods.md) running a redis key-value server in a container.
+To start the redis master, use the file `examples/guestbook/redis-master-deployment.yaml`, which describes a single [pod](../../docs/user-guide/pods.md) running a redis key-value server in a container.
 
-Although we have a single instance of our redis master, we are using a [replication controller](../../docs/user-guide/replication-controller.md) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the replication controller will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
+Although we have a single instance of our redis master, we are using a [Deployment](../../docs/user-guide/deployments.md) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the Deployment will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
 
-The file `examples/guestbook/redis-master-controller.yaml` defines the redis master replication controller:
+The file `examples/guestbook/redis-master-deployment.yaml` defines the redis master Deployment:
 
-<!-- BEGIN MUNGE: EXAMPLE redis-master-controller.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE redis-master-deployment.yaml -->
 
 ```yaml
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: redis-master
   # these labels can be applied automatically 
   # from the labels in the pod template if not set
-  labels:
-    app: redis
-    role: master
-    tier: backend
+  # labels:
+  #   app: redis
+  #   role: master
+  #   tier: backend
 spec:
   # this replicas value is default
   # modify it according to your case
@@ -153,9 +163,10 @@ spec:
   # selector can be applied automatically 
   # from the labels in the pod template if not set
   # selector:
-  #   app: guestbook
-  #   role: master
-  #   tier: backend
+  #   matchLabels:
+  #     app: guestbook
+  #     role: master
+  #     tier: backend
   template:
     metadata:
       labels:
@@ -174,17 +185,17 @@ spec:
         - containerPort: 6379
 ```
 
-[Download example](redis-master-controller.yaml?raw=true)
-<!-- END MUNGE: EXAMPLE redis-master-controller.yaml -->
+[Download example](redis-master-deployment.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE redis-master-deployment.yaml -->
 
-#### Define a service
+#### Define a Service
 
-A Kubernetes [service](../../docs/user-guide/services.md) is a named load balancer that proxies traffic to one or more containers. This is done using the [labels](../../docs/user-guide/labels.md) metadata that we defined in the `redis-master` pod above.  As mentioned, we have only one redis master, but we nevertheless want to create a service for it. Why? Because it gives us a deterministic way to route to the single master using an elastic IP.
+A Kubernetes [Service](../../docs/user-guide/services.md) is a named load balancer that proxies traffic to one or more containers. This is done using the [labels](../../docs/user-guide/labels.md) metadata that we defined in the `redis-master` pod above.  As mentioned, we have only one redis master, but we nevertheless want to create a Service for it. Why? Because it gives us a deterministic way to route to the single master using an elastic IP.
 
 Services find the pods to load balance based on the pods' labels.
-The selector field of the service description determines which pods will receive the traffic sent to the service, and the `port` and `targetPort` information defines what port the service proxy will run at.
+The selector field of the Service description determines which pods will receive the traffic sent to the Service, and the `port` and `targetPort` information defines what port the Service proxy will run at.
 
-The file `examples/guestbook/redis-master-service.yaml` defines the redis master service:
+The file `examples/guestbook/redis-master-service.yaml` defines the redis master Service:
 
 <!-- BEGIN MUNGE: EXAMPLE redis-master-service.yaml -->
 
@@ -211,9 +222,9 @@ spec:
 [Download example](redis-master-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE redis-master-service.yaml -->
 
-#### Create a service
+#### Create a Service
 
-According to the [config best practices](../../docs/user-guide/config-best-practices.md), create a service before corresponding replication controllers so that the scheduler can spread the pods comprising the service. So we first create the service by running:
+According to the [config best practices](../../docs/user-guide/config-best-practices.md), create a Service before corresponding Deployments so that the scheduler can spread the pods comprising the Service. So we first create the Service by running:
 
 ```console
 $ kubectl create -f examples/guestbook/redis-master-service.yaml
@@ -224,54 +235,59 @@ Then check the list of services, which should include the redis-master:
 
 ```console
 $ kubectl get services
-NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR                            AGE
-redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master,tier=backend  1h
+NAME              CLUSTER-IP       EXTERNAL-IP       PORT(S)       AGE
+redis-master      10.0.76.248      <none>            6379/TCP      1s
 ```
 
-This will cause all pods to see the redis master apparently running on `<ip>:6379`.  A service can map an incoming port to any `targetPort` in the backend pod.  Once created, the service proxy on each node is configured to set up a proxy on the specified port (in this case port `6379`).
+This will cause all pods to see the redis master apparently running on `<CLUSTER-IP>:<PORT>`.  A Service can map an incoming port to any `targetPort` in the backend pod.  Once created, the Service proxy on each node is configured to set up a proxy on the specified port (in this case port `6379`).
 
-`targetPort` will default to `port` if it is omitted in the configuration. For simplicity's sake, we omit it in the following configurations.
+`targetPort` will default to `port` if it is omitted in the configuration. `targetPort` is the port the container accepts traffic on, and `port` is the abstracted Service port, which can be any port other pods use to access the Service. For simplicity's sake, we omit it in the following configurations.
 
-The traffic flow from slaves to masters can be described in two steps, like so:
+The traffic flow from slaves to masters can be described in two steps:
 
-  - A *redis slave* will connect to "port" on the *redis master service*
-  - Traffic will be forwarded from the service "port" (on the service node) to the  *targetPort* on the pod that the service listens to.
+  - A *redis slave* will connect to `port` on the *redis master Service*
+  - Traffic will be forwarded from the Service `port` (on the Service node) to the `targetPort` on the pod that the Service listens to.
 
 For more details, please see [Connecting applications](../../docs/user-guide/connecting-applications.md).
 
-#### Finding a service
+#### Finding a Service
 
-Kubernetes supports two primary modes of finding a service— environment variables and DNS.
+Kubernetes supports two primary modes of finding a Service — environment variables and DNS.
+
+
+##### Environment variables
 
 The services in a Kubernetes cluster are discoverable inside other containers [via environment variables](../../docs/user-guide/services.md#environment-variables).
 
-An alternative is to use the [cluster's DNS service](../../docs/user-guide/services.md#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the service name.
+##### DNS service
+
+An alternative is to use the [cluster's DNS service](../../docs/user-guide/services.md#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the Service name.
 
 This example has been configured to use the DNS service by default.
 
 If your cluster does not have the DNS service enabled, then you can use environment variables by setting the
 `GET_HOSTS_FROM` env value in both
-`examples/guestbook/redis-slave-controller.yaml` and `examples/guestbook/frontend-controller.yaml`
+`examples/guestbook/redis-slave-deployment.yaml` and `examples/guestbook/frontend-deployment.yaml`
 from `dns` to `env` before you start up the app.
 (However, this is unlikely to be necessary. You can check for the DNS service in the list of the cluster's services by
-running `kubectl --namespace=kube-system get rc`, and looking for a controller prefixed `kube-dns`.)
-Note that switching to env causes creation-order dependencies, since services need to be created before their clients that require env vars.
+running `kubectl --namespace=kube-system get rc -l k8s-app=kube-dns`.)
+Note that switching to env causes creation-order dependencies, since Services need to be created before their clients that require env vars.
 
-#### Create a replication controller
+#### Create a Deployment
 
 Second, create the redis master pod in your Kubernetes cluster by running:
 
 ```console
-$ kubectl create -f examples/guestbook/redis-master-controller.yaml
-replicationcontroller "redis-master" created
+$ kubectl create -f examples/guestbook/redis-master-deployment.yaml
+deployment "redis-master" created
 ```
 
-You can see the replication controllers for your cluster by running:
+You can see the Deployment for your cluster by running:
 
 ```console
-$ kubectl get rc
-CONTROLLER                  CONTAINER(S)            IMAGE(S)                   SELECTOR                                      REPLICAS
-redis-master                master                  redis                      app=redis,role=master,tier=backend            1
+$ kubectl get deployments
+NAME           DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+redis-master   1         1         1            1           27s
 ```
 
 Then, you can list the pods in the cluster, to verify that the master is running:
@@ -284,9 +300,9 @@ You'll see all pods in the cluster, including the redis master pod, and the stat
 The name of the redis master will look similar to that in the following list:
 
 ```console
-NAME                                READY     STATUS    RESTARTS   AGE
+NAME                            READY     STATUS    RESTARTS   AGE
+redis-master-2353460263-1ecey   1/1       Running   0          1m
 ...
-redis-master-dz33o                  1/1       Running   0          2h
 ```
 
 (Note that an initial `docker pull` to grab a container image may take a few minutes, depending on network conditions. A pod will be reported as `Pending` while its image is being downloaded.)
@@ -301,36 +317,32 @@ For more details, please see [Configuring containers](../../docs/user-guide/conf
 
 #### Optional Interlude
 
-You can get information about a pod, including the machine that it is running on, via `kubectl describe pods/<pod_name>`.  E.g., for the redis master, you should see something like the following (your pod name will be different):
+You can get information about a pod, including the machine that it is running on, via `kubectl describe pods/<POD-NAME>`.  E.g., for the redis master, you should see something like the following (your pod name will be different):
 
 ```console
-$ kubectl describe pods/redis-master-dz33o
+$ kubectl describe pods redis-master-2353460263-1ecey
+Name:		redis-master-2353460263-1ecey
+Node:		kubernetes-minion-m0k7/10.240.0.5
 ...
-Name:       redis-master-dz33o
-Image(s):     redis
-Node:       kubernetes-minion-krxw/10.240.67.201
-Labels:       app=redis,role=master,tier=backend
-Status:       Running
-Replication Controllers:  redis-master (1/1 replicas created)
+Labels:		app=redis,pod-template-hash=2353460263,role=master,tier=backend
+Status:		Running
+IP:		10.244.2.3
+Controllers:	ReplicaSet/redis-master-2353460263
 Containers:
   master:
-    Image:    redis
-    State:    Running
-      Started:    Fri, 12 Jun 2015 12:53:46 -0700
-    Ready:    True
-    Restart Count:  0
-Conditions:
-  Type    Status
-  Ready   True
-No events.
+    Container ID:	docker://76cf8115485966131587958ea3cbe363e2e1dcce129e2e624883f393ce256f6c
+    Image:		gcr.io/google_containers/redis:e2e
+    Image ID:		docker://e5f6c5a2b5646828f51e8e0d30a2987df7e8183ab2c3ed0ca19eaa03cc5db08c
+    Port:		6379/TCP
+...
 ```
 
-The `Node` is the name of the machine, e.g. `kubernetes-minion-krxw` in the example above.
+The `Node` is the name and IP of the machine, e.g. `kubernetes-minion-m0k7` in the example above. You can find more details about this node with `kubectl describe nodes kubernetes-minion-m0k7`.
 
 If you want to view the container logs for a given pod, you can run:
 
 ```console
-$ kubectl logs <pod_name>
+$ kubectl logs <POD-NAME>
 ```
 
 These logs will usually give you enough information to troubleshoot.
@@ -338,7 +350,7 @@ These logs will usually give you enough information to troubleshoot.
 However, if you should want to SSH to the listed host machine, you can inspect various logs there directly as well.  For example, with Google Compute Engine, using `gcloud`, you can SSH like this:
 
 ```console
-me@workstation$ gcloud compute ssh kubernetes-minion-krxw
+me@workstation$ gcloud compute ssh <NODE-NAME>
 ```
 
 Then, you can look at the Docker containers on the remote machine.  You should see something like this (the specifics of the IDs will be different):
@@ -360,13 +372,13 @@ $ docker logs <container_id>
 
 Now that the redis master is running, we can start up its 'read slaves'.
 
-We'll define these as replicated pods as well, though this time— unlike for the redis master— we'll define the number of replicas to be 2.
-In Kubernetes, a replication controller (RC) is responsible for managing multiple instances of a replicated pod. The replication controller will automatically launch new pods if the number of replicas falls below the specified number.
+We'll define these as replicated pods as well, though this time — unlike for the redis master — we'll define the number of replicas to be 2.
+In Kubernetes, a Deployment is responsible for managing multiple instances of a replicated pod. The Deployment will automatically launch new pods if the number of replicas falls below the specified number.
 (This particular replicated pod is a great one to test this with -- you can try killing the Docker processes for your pods directly, then watch them come back online on a new node shortly thereafter.)
 
-Just like the master, we want to have a service to proxy connections to the redis slaves. In this case, in addition to discovery, the slave service will provide transparent load balancing to web app clients.
+Just like the master, we want to have a Service to proxy connections to the redis slaves. In this case, in addition to discovery, the slave Service will provide transparent load balancing to web app clients.
 
-This time we put the service and RC into one [file](../../docs/user-guide/managing-deployments.md#organizing-resource-configurations). Group related objects together in a single file. This is often better than separate files.
+This time we put the Service and Deployment into one [file](../../docs/user-guide/managing-deployments.md#organizing-resource-configurations). Grouping related objects together in a single file is often better than having separate files.
 The specification for the slaves is in `examples/guestbook/all-in-one/redis-slave.yaml`:
 
 <!-- BEGIN MUNGE: EXAMPLE all-in-one/redis-slave.yaml -->
@@ -389,16 +401,16 @@ spec:
     role: slave
     tier: backend
 ---
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: redis-slave
   # these labels can be applied automatically
   # from the labels in the pod template if not set
-  labels:
-    app: redis
-    role: slave
-    tier: backend
+  # labels:
+  #   app: redis
+  #   role: slave
+  #   tier: backend
 spec:
   # this replicas value is default
   # modify it according to your case
@@ -406,9 +418,10 @@ spec:
   # selector can be applied automatically
   # from the labels in the pod template if not set
   # selector:
-  #   app: guestbook
-  #   role: slave
-  #   tier: backend
+  #   matchLabels:
+  #     app: guestbook
+  #     role: slave
+  #     tier: backend
   template:
     metadata:
       labels:
@@ -438,46 +451,45 @@ spec:
 [Download example](all-in-one/redis-slave.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE all-in-one/redis-slave.yaml -->
 
-This time the selector for the service is `app=redis,role=slave,tier=backend`, because that identifies the pods running redis slaves. It is generally helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "app=redis,role=slave,tier=backend"` command. For more information on the usage of labels, see [using-labels-effectively](../../docs/user-guide/managing-deployments.md#using-labels-effectively).
+This time the selector for the Service is `app=redis,role=slave,tier=backend`, because that identifies the pods running redis slaves. It is generally helpful to set labels on your Service itself as we've done here to make it easy to locate them with the `kubectl get services -l "app=redis,role=slave,tier=backend"` command. For more information on the usage of labels, see [using-labels-effectively](../../docs/user-guide/managing-deployments.md#using-labels-effectively).
 
-Now that you have created the specification, create the service in your cluster by running:
+Now that you have created the specification, create the Service in your cluster by running:
 
 ```console
 $ kubectl create -f examples/guestbook/all-in-one/redis-slave.yaml
 service "redis-slave" created
-replicationcontroller "redis-slave" created
+deployment "redis-slave" created
 
 $ kubectl get services
-NAME             CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR                            AGE
-redis-master     10.0.136.3       <none>            6379/TCP      app=redis,role=master,tier=backend  1h
-redis-slave      10.0.21.92       <none>            6379/TCP      app=redis,role=slave,tier=backend   1h
+NAME           CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+redis-master   10.0.76.248    <none>        6379/TCP   20m
+redis-slave    10.0.112.188   <none>        6379/TCP   16s
 
-$ kubectl get rc
-CONTROLLER                  CONTAINER(S)            IMAGE(S)                                 SELECTOR                                      REPLICAS
-redis-master                master                  redis                                    app=redis,role=master,tier=backend            1
-redis-slave                 slave                   gcr.io/google_samples/gb-redisslave:v1   app=redis,role=slave,tier=backend             2
+$ kubectl get deployments
+NAME           DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+redis-master   1         1         1            1           22m
+redis-slave    2         2         2            2           2m
 ```
 
-Once the replication controller is up, you can list the pods in the cluster, to verify that the master and slaves are running.  You should see a list that includes something like the following:
+Once the Deployment is up, you can list the pods in the cluster, to verify that the master and slaves are running.  You should see a list that includes something like the following:
 
 ```console
 $ kubectl get pods
-NAME                                READY     STATUS    RESTARTS   AGE
-...
-redis-master-dz33o                  1/1       Running   0          2h
-redis-slave-35mer                   1/1       Running   0          2h
-redis-slave-iqkhy                   1/1       Running   0          2h
+NAME                            READY     STATUS    RESTARTS   AGE
+redis-master-2353460263-1ecey   1/1       Running   0          35m
+redis-slave-1691881626-dlf5f    1/1       Running   0          15m
+redis-slave-1691881626-sfn8t    1/1       Running   0          15m
 ```
 
-You should see a single redis master pod and two redis slave pods.  As mentioned above, you can get more information about any pod with: `kubectl describe pods/<pod_name>`. And also can view the resources on [kube-ui](../../docs/user-guide/ui.md).
+You should see a single redis master pod and two redis slave pods.  As mentioned above, you can get more information about any pod with: `kubectl describe pods/<POD_NAME>`. And also can view the resources on [kube-ui](../../docs/user-guide/ui.md).
 
 ### Step Three: Start up the guestbook frontend
 
 A frontend pod is a simple PHP server that is configured to talk to either the slave or master services, depending on whether the client request is a read or a write. It exposes a simple AJAX interface, and serves an Angular-based UX.
-Again we'll create a set of replicated frontend pods instantiated by a replication controller— this time, with three replicas.
+Again we'll create a set of replicated frontend pods instantiated by a Deployment — this time, with three replicas.
 
-As with the other pods, we now want to create a service to group the frontend pods.
-The RC and service are described in the file `frontend.yaml`:
+As with the other pods, we now want to create a Service to group the frontend pods.
+The Deployment and Service are described in the file `frontend.yaml`:
 
 <!-- BEGIN MUNGE: EXAMPLE all-in-one/frontend.yaml -->
 
@@ -500,15 +512,15 @@ spec:
     app: guestbook
     tier: frontend
 ---
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: frontend
   # these labels can be applied automatically
   # from the labels in the pod template if not set
-  labels:
-    app: guestbook
-    tier: frontend
+  # labels:
+  #   app: guestbook
+  #   tier: frontend
 spec:
   # this replicas value is default
   # modify it according to your case
@@ -516,8 +528,9 @@ spec:
   # selector can be applied automatically
   # from the labels in the pod template if not set
   # selector:
-  #   app: guestbook
-  #   tier: frontend
+  #   matchLabels:
+  #     app: guestbook
+  #     tier: frontend
   template:
     metadata:
       labels:
@@ -554,45 +567,45 @@ To do this, uncomment the `type: LoadBalancer` line in the `frontend.yaml` file 
 
 [See the appendix below](#appendix-accessing-the-guestbook-site-externally) on accessing the guestbook site externally for more details.
 
-Create the service and replication controller like this:
+Create the service and Deployment like this:
 
 ```console
 $ kubectl create -f examples/guestbook/all-in-one/frontend.yaml
 service "frontend" created
-replicationcontroller "frontend" created
+deployment "frontend" created
 ```
 
 Then, list all your services again:
 
 ```console
 $ kubectl get services
-NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR                            AGE
-frontend          10.0.93.211      <none>            80/TCP        app=guestbook,tier=frontend         1h
-redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master,tier=backend  1h
-redis-slave       10.0.21.92       <none>            6379/TCP      app=redis,role=slave,tier=backend   1h
+NAME           CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+frontend       10.0.63.63     <none>        80/TCP     1m
+redis-master   10.0.76.248    <none>        6379/TCP   39m
+redis-slave    10.0.112.188   <none>        6379/TCP   19m
 ```
 
-Also list all your replication controllers:
+Also list all your Deployments:
 
 ```console
-$ kubectl get rc
-CONTROLLER                  CONTAINER(S)            IMAGE(S)                                   SELECTOR                               REPLICAS
-frontend                    php-redis               kubernetes/example-guestbook-php-redis:v3  app=guestbook,tier=frontend            3
-redis-master                master                  redis                                      app=redis,role=master,tier=backend     1
-redis-slave                 slave                   gcr.io/google_samples/gb-redisslave:v1     app=redis,role=slave,tier=backend      2
+$ kubectl get deployments 
+NAME           DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+frontend       3         3         3            3           2m
+redis-master   1         1         1            1           39m
+redis-slave    2         2         2            2           20m
 ```
 
-Once it's up (again, it may take up to thirty seconds to create the pods), you can list the pods with specified labels in the cluster, to verify that the master, slaves and frontends are all running. You should see a list containing pods with label 'tier' like the following:
+Once it's up, i.e. when desired replicas match current replicas (again, it may take up to thirty seconds to create the pods), you can list the pods with specified labels in the cluster, to verify that the master, slaves and frontends are all running. You should see a list containing pods with label 'tier' like the following:
 
 ```console
 $ kubectl get pods -L tier
-NAME                                READY     STATUS    RESTARTS   AGE     TIER
-frontend-4o11g                      1/1       Running   0          2h      frontend
-frontend-u9aq6                      1/1       Running   0          2h      frontend
-frontend-yga1l                      1/1       Running   0          2h      frontend
-redis-master-dz33o                  1/1       Running   0          2h      backend
-redis-slave-35mer                   1/1       Running   0          2h      backend
-redis-slave-iqkhy                   1/1       Running   0          2h      backend
+NAME                            READY     STATUS    RESTARTS   AGE       TIER
+frontend-1211764471-4e1j2       1/1       Running   0          4m        frontend
+frontend-1211764471-gkbkv       1/1       Running   0          4m        frontend
+frontend-1211764471-rk1cf       1/1       Running   0          4m        frontend
+redis-master-2353460263-1ecey   1/1       Running   0          42m       backend
+redis-slave-1691881626-dlf5f    1/1       Running   0          22m       backend
+redis-slave-1691881626-sfn8t    1/1       Running   0          22m       backend
 ```
 
 You should see a single redis master pod, two redis slaves, and three frontend pods.
@@ -645,15 +658,14 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-Note the use of the `redis-master` and `redis-slave` host names-- we're finding those services via the Kubernetes cluster's DNS service, as discussed above.  All the frontend replicas will write to the load-balancing redis-slaves service, which can be highly replicated as well.
+Note the use of the `redis-master` and `redis-slave` host names -- we're finding those Services via the Kubernetes cluster's DNS service, as discussed above.  All the frontend replicas will write to the load-balancing redis-slaves service, which can be highly replicated as well.
 
 ### Step Four: Cleanup
 
-If you are in a live Kubernetes cluster, you can just kill the pods by deleting the replication controllers and services. Using labels to select the resources to delete is an easy way to do this in one command.
+If you are in a live Kubernetes cluster, you can just kill the pods by deleting the Deployments and Services. Using labels to select the resources to delete is an easy way to do this in one command.
 
 ```console
-$ kubectl delete rc -l "app in (redis, guestbook)"
-$ kubectl delete service -l "app in (redis, guestbook)"
+$ kubectl delete deployments,services -l "app in (redis, guestbook)"
 ```
 
 To completely tear down a Kubernetes cluster, if you ran this from source, you can use:
@@ -664,7 +676,7 @@ $ <kubernetes>/cluster/kube-down.sh
 
 ### Troubleshooting
 
-If you are having trouble bringing up your guestbook app, double check that your external IP is properly defined for your frontend service, and that the firewall for your cluster nodes is open to port 80.
+If you are having trouble bringing up your guestbook app, double check that your external IP is properly defined for your frontend Service, and that the firewall for your cluster nodes is open to port 80.
 
 Then, see the [troubleshooting documentation](../../docs/troubleshooting.md) for a further list of common issues and how you can diagnose them.
 
@@ -672,21 +684,21 @@ Then, see the [troubleshooting documentation](../../docs/troubleshooting.md) for
 
 ### Appendix: Accessing the guestbook site externally
 
-You'll want to set up your guestbook service so that it can be accessed from outside of the internal Kubernetes network. Above, we introduced one way to do that, using the `type: LoadBalancer` spec.
+You'll want to set up your guestbook Service so that it can be accessed from outside of the internal Kubernetes network. Above, we introduced one way to do that, by setting `type: LoadBalancer` to Service `spec`.
 
-More generally, Kubernetes supports two ways of exposing a service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](../../docs/user-guide/services.md#publishing-services---service-types).
+More generally, Kubernetes supports two ways of exposing a Service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](../../docs/user-guide/services.md#publishing-services---service-types).
 
 If the `LoadBalancer` specification is used, it can take a short period for an external IP to show up in `kubectl get services` output, but you should then see it listed as well, e.g. like this:
 
 ```console
 $ kubectl get services
-NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR                             AGE
-frontend          10.0.93.211      130.211.188.51    80/TCP        app=guestbook,tier=frontend          1h
-redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master,tier=backend   1h
-redis-slave       10.0.21.92       <none>            6379/TCP      app=redis,role=master,tier=backend   1h
+NAME           CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+frontend       10.0.63.63     23.236.59.54  80/TCP     1m
+redis-master   10.0.76.248    <none>        6379/TCP   39m
+redis-slave    10.0.112.188   <none>        6379/TCP   19m
 ```
 
-Once you've exposed the service to an external IP, visit the IP to see your guestbook in action. E.g., `http://130.211.188.51:80` in the example above.
+Once you've exposed the service to an external IP, visit the IP to see your guestbook in action, i.e. `http://<EXTERNAL-IP>:<PORT>`.
 
 You should see a web page that looks something like this (without the messages).  Try adding some entries to it!
 
