@@ -146,7 +146,10 @@ func filterHTTPError(err error, image string) error {
 
 func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 	// If no tag was specified, use the default "latest".
-	imageID, tag := parsers.ParseImageName(image)
+	imageID, tag, err := parsers.ParseImageName(image)
+	if err != nil {
+		return err
+	}
 
 	keyring, err := credentialprovider.MakeDockerKeyring(secrets, p.keyring)
 	if err != nil {
