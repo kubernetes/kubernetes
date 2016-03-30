@@ -1654,19 +1654,26 @@ type EndpointsList struct {
 
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpec struct {
-	// PodCIDR represents the pod IP range assigned to the node
+	// PodCIDR represents the pod IP range assigned to the node.
 	// Note: assigning IP ranges to nodes might need to be revisited when we support migratable IPs.
 	PodCIDR string `json:"podCIDR,omitempty"`
 
-	// External ID of the node assigned by some machine database (e.g. a cloud provider)
+	// External ID of the node assigned by some machine database (e.g. a cloud provider).
 	ExternalID string `json:"externalID,omitempty"`
 
-	// ID of the node assigned by the cloud provider
+	// ID of the node assigned by the cloud provider.
 	// Note: format is "<ProviderName>://<ProviderSpecificNodeID>"
 	ProviderID string `json:"providerID,omitempty"`
 
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	Unschedulable bool `json:"unschedulable,omitempty"`
+}
+
+type Heartbeat struct {
+	// Time when this heartbeat was generated.
+	Timestamp unversioned.Time `json:"timestamp,omitempty"`
+	// Reference to the object which generated this heartbeat.
+	Object ObjectReference `json:"object,omitempty"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
