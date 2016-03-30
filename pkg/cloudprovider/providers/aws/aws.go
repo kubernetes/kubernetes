@@ -2298,7 +2298,7 @@ func (s *AWSCloud) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatu
 	return status, true, nil
 }
 
-func (s *AWSCloud) toStatus(lb *elb.LoadBalancerDescription, service *api.Service) *api.LoadBalancerStatus {
+func (s *AWSCloud) toStatus(lb *elb.LoadBalancerDescription, apiService *api.Service) *api.LoadBalancerStatus {
 	var ingress []api.LoadBalancerIngress
 
 	if !isNilOrEmpty(lb.DNSName) {
@@ -2307,8 +2307,8 @@ func (s *AWSCloud) toStatus(lb *elb.LoadBalancerDescription, service *api.Servic
 		ingress = append(ingress, dnsIngress)
 	}
 
-	cname := s.getLoadBalancerCname(service)
-	fmt.Println("Cname is", cname)
+	cname := s.getLoadBalancerCname(apiService)
+	glog.Info("CName for service %v is %v", apiService.Name, cname)
 	if cname != "" {
 		cname = removeDnsTrailingDot(cname)
 		cnameIngress := api.LoadBalancerIngress{Hostname: cname}
