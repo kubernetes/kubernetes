@@ -210,13 +210,27 @@ var _ = Describe("Addon update", func() {
 		// Reduce the addon update intervals so that we have faster response
 		// to changes in the addon directory.
 		// do not use "service" command because it clears the environment variables
-		sshExecAndVerify(sshClient, "sudo TEST_ADDON_CHECK_INTERVAL_SEC=1 /etc/init.d/kube-addons restart")
+		switch testContext.OSDistro {
+		case "debian":
+			sshExecAndVerify(sshClient, "sudo TEST_ADDON_CHECK_INTERVAL_SEC=1 /etc/init.d/kube-addons restart")
+		case "trusty":
+			sshExecAndVerify(sshClient, "sudo initctl restart kube-addons TEST_ADDON_CHECK_INTERVAL_SEC=1")
+		default:
+			Failf("Unsupported OS distro type %s", testContext.OSDistro)
+		}
 	})
 
 	AfterEach(func() {
 		if sshClient != nil {
 			// restart addon_update with the default options
-			sshExec(sshClient, "sudo /etc/init.d/kube-addons restart")
+			switch testContext.OSDistro {
+			case "debian":
+				sshExec(sshClient, "sudo /etc/init.d/kube-addons restart")
+			case "trusty":
+				sshExec(sshClient, "sudo initctl restart kube-addons")
+			default:
+				Failf("Unsupported OS distro type %s", testContext.OSDistro)
+			}
 			sshClient.Close()
 		}
 	})

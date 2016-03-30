@@ -273,6 +273,7 @@ oidc-groups-claim
 oidc-username-claim
 only-idl
 oom-score-adj
+os-distro
 out-version
 outofdisk-transition-frequency
 output-base
