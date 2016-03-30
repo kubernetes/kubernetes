@@ -8,6 +8,7 @@ spec:
       labels:
         app: sematext-agent
     spec:
+      selector: {}
       dnsPolicy: "ClusterFirst"
       restartPolicy: "Always"
       containers:
@@ -20,7 +21,7 @@ spec:
         - name: LOGSENE_TOKEN
           value: "YOUR_LOGSENE_TOKEN"
         - name: KUBERNETES
-          value: 1
+          value: "1"
         volumeMounts:
           - mountPath: /var/run/docker.sock
             name: docker-sock
@@ -33,4 +34,3 @@ spec:
         - name: localtime
           hostPath:
             path: /etc/localtime
-
