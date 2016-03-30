@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -144,11 +145,14 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 		}
 		glog.Infof("pod %q containers not running: syncing", format.Pod(pod))
 
-		glog.Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
-		if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-			glog.Errorf("Failed creating a mirror pod %q: %v", format.Pod(pod), err)
+		var mirrorPod *api.Pod
+		if kubepod.IsStaticPod(pod) {
+			glog.Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
+			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
+				glog.Errorf("Failed creating a mirror pod %q: %v", format.Pod(pod), err)
+			}
+			mirrorPod, _ = kl.podManager.GetMirrorPodByPod(pod)
 		}
-		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 
 		if err = kl.syncPod(pod, mirrorPod, status, kubetypes.SyncPodUpdate); err != nil {
 			return fmt.Errorf("error syncing pod %q: %v", format.Pod(pod), err)
