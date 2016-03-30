@@ -30,6 +30,7 @@ import (
 // referencing the cmd.Flags()
 type StopOptions struct {
 	Filenames []string
+	Recursive bool
 }
 
 const (
@@ -69,6 +70,7 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	usage := "Filename, directory, or URL to file of resource(s) to be stopped."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
 	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful stop.")
@@ -89,7 +91,7 @@ func RunStop(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Write
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(false, args...).
-		FilenameParam(enforceNamespace, options.Filenames...).
+		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
 		SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
 		Flatten().

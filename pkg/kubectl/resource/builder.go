@@ -98,7 +98,7 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 // will cause an error.
 // If ContinueOnError() is set prior to this method, objects on the path that are not
 // recognized will be ignored (but logged at V(2)).
-func (b *Builder) FilenameParam(enforceNamespace bool, paths ...string) *Builder {
+func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...string) *Builder {
 	for _, s := range paths {
 		switch {
 		case s == "-":
@@ -111,7 +111,7 @@ func (b *Builder) FilenameParam(enforceNamespace bool, paths ...string) *Builder
 			}
 			b.URL(url)
 		default:
-			b.Path(s)
+			b.Path(recursive, s)
 		}
 	}
 
@@ -157,7 +157,7 @@ func (b *Builder) Stream(r io.Reader, name string) *Builder {
 // FileVisitor is streaming the content to a StreamVisitor. If ContinueOnError() is set
 // prior to this method being called, objects on the path that are unrecognized will be
 // ignored (but logged at V(2)).
-func (b *Builder) Path(paths ...string) *Builder {
+func (b *Builder) Path(recursive bool, paths ...string) *Builder {
 	for _, p := range paths {
 		_, err := os.Stat(p)
 		if os.IsNotExist(err) {
@@ -169,7 +169,7 @@ func (b *Builder) Path(paths ...string) *Builder {
 			continue
 		}
 
-		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, FileExtensions, b.schema)
+		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, recursive, FileExtensions, b.schema)
 		if err != nil {
 			b.errs = append(b.errs, fmt.Errorf("error reading %q: %v", p, err))
 		}

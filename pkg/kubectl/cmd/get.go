@@ -33,6 +33,7 @@ import (
 // referencing the cmd.Flags()
 type GetOptions struct {
 	Filenames []string
+	Recursive bool
 }
 
 const (
@@ -100,6 +101,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("export", false, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	return cmd
 }
 
@@ -139,7 +141,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	if isWatch || isWatchOnly {
 		r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
-			FilenameParam(enforceNamespace, options.Filenames...).
+			FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 			SelectorParam(selector).
 			ExportParam(export).
 			ResourceTypeOrNameArgs(true, args...).
@@ -194,7 +196,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
-		FilenameParam(enforceNamespace, options.Filenames...).
+		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		SelectorParam(selector).
 		ExportParam(export).
 		ResourceTypeOrNameArgs(true, args...).
