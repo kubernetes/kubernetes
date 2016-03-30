@@ -426,6 +426,11 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	d := obj.(*extensions.Deployment)
+	everything := unversioned.LabelSelector{}
+	if reflect.DeepEqual(d.Spec.Selector, &everything) {
+		dc.eventRecorder.Eventf(d, api.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
+		return nil
+	}
 
 	if d.Spec.Paused {
 		// TODO: Implement scaling for paused deployments.
