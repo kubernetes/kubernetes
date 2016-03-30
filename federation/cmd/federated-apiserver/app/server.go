@@ -32,7 +32,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -68,8 +68,8 @@ func NewAPIServerCommand() *cobra.Command {
 	s := options.NewAPIServer()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
-		Use: "kube-apiserver",
-		Long: `The Kubernetes API server validates and configures data
+		Use: "federated-apiserver",
+		Long: `The Kubernetes federation API server validates and configures data
 for the api objects which include pods, services, replicationcontrollers, and
 others. The API Server services REST operations and provides the frontend to the
 cluster's shared state through which all other components interact.`,
