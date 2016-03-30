@@ -103,7 +103,6 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 			continue
 		}
 
-		formattedOutput := ""
 		if revisionDetail > 0 {
 			// Print details of a specific revision
 			template, ok := historyInfo.RevisionToTemplate[revisionDetail]
@@ -111,16 +110,16 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 				return fmt.Errorf("unable to find revision %d of %s %q", revisionDetail, mapping.Resource, info.Name)
 			}
 			fmt.Fprintf(out, "%s %q revision %d\n", mapping.Resource, info.Name, revisionDetail)
-			formattedOutput, err = kubectl.DescribePodTemplate(template)
+			kubectl.DescribePodTemplate(template, out)
 		} else {
 			// Print all revisions
-			formattedOutput, err = kubectl.PrintRolloutHistory(historyInfo, mapping.Resource, info.Name)
+			formattedOutput, printErr := kubectl.PrintRolloutHistory(historyInfo, mapping.Resource, info.Name)
+			if printErr != nil {
+				errs = append(errs, printErr)
+				continue
+			}
+			fmt.Fprintf(out, "%s\n", formattedOutput)
 		}
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		fmt.Fprintf(out, "%s\n", formattedOutput)
 	}
 
 	return errors.NewAggregate(errs)
