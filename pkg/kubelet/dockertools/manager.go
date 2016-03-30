@@ -382,11 +382,14 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 
 		terminationMessagePath := containerInfo.TerminationMessagePath
 		if terminationMessagePath != "" {
-			if path, found := iResult.Volumes[terminationMessagePath]; found {
-				if data, err := ioutil.ReadFile(path); err != nil {
-					message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
-				} else {
-					message = string(data)
+			for _, mount := range iResult.Mounts {
+				if mount.Destination == terminationMessagePath {
+					path := mount.Source
+					if data, err := ioutil.ReadFile(path); err != nil {
+						message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
+					} else {
+						message = string(data)
+					}
 				}
 			}
 		}
