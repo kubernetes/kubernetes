@@ -11,35 +11,35 @@ binary | sha1 hash | md5 hash
 ## Changes since v1.2.0 (last PR #23530)
 
 ### Action Required
-* Disabling swagger ui by default on apiserver. Adding a flag that can enable it (#23025, @nikhiljindal)
-* restore ability to run against secured etcd (#21535, @AdoHe)
+
+* Disabling swagger ui by default on apiserver. Adding a flag that can enable it ([#23025](https://github.com/kubernetes/kubernetes/pull/23025), [@nikhiljindal](https://github.com/nikhiljindal))
+* restore ability to run against secured etcd ([#21535](https://github.com/kubernetes/kubernetes/pull/21535), [@AdoHe](https://github.com/AdoHe))
 
 ### Other notable changes
-* Trusty: Avoid reaching GCE custom metadata size limit (#22818, @andyzheng0831)
-* Update kubectl help for 1.2 resources (#23305, @janetkuo)
-* Removing URL query param from swagger UI to fix the XSS issue (#23234, @nikhiljindal)
-* Fix hairpin mode (#23325, @MurgaNikolay)
-* Bump to container-vm-v20160321 (#23313, @zmerlynn)
-* Remove the restart-kube-proxy and restart-apiserver functions (#23180, @roberthbailey)
-* Copy annotations back from RS to Deployment on rollback (#23160, @janetkuo)
-* Trusty: Support hybrid cluster with nodes on ContainerVM (#23079, @andyzheng0831)
-* update expose command description to add deployment (#23246, @AdoHe)
-* Add a rate limiter to the GCE cloudprovider (#23019, @alex-mohr)
-* Add a Deployment example for kubectl expose. (#23222, @madhusudancs)
-* Use versioned object when computing patch (#23145, @liggitt)
-* kubelet: send all recevied pods in one update (#23141, @yujuhong)
-* Add a SSHKey sync check to the master's healthz (when using SSHTunnels). (#23167, @cjcullen)
-* Validate minimum CPU limits to be >= 10m (#23143, @vishh)
-* kubernetes/kubernetes#23034 Fix controller-manager race condition issue which cause endpoints flush during restart (#23035, @xinxiaogang)
-* MESOS: forward globally declared cadvisor housekeeping flags (#22974, @jdef)
-* Trusty: support developer workflow on base image (#22960, @andyzheng0831)
-* Bumped Heapster to stable version 1.0.0 (#22993, @piosz)
-* Deprecating --api-version flag (#22410, @nikhiljindal)
-* allow resource.version.group in kubectl (#22853, @deads2k)
-* Use SCP to dump logs and parallelize a bit. (#22835, @spxtr)
-* update wide option output (#22772, @AdoHe)
-* Change scheduler logic from random to round-robin (#22430, @gmarek)
-
+* Trusty: Avoid reaching GCE custom metadata size limit ([#22818](https://github.com/kubernetes/kubernetes/pull/22818), [@andyzheng0831](https://github.com/andyzheng0831))
+* Update kubectl help for 1.2 resources ([#23305](https://github.com/kubernetes/kubernetes/pull/23305), [@janetkuo](https://github.com/janetkuo))
+* Removing URL query param from swagger UI to fix the XSS issue ([#23234](https://github.com/kubernetes/kubernetes/pull/23234), [@nikhiljindal](https://github.com/nikhiljindal))
+* Fix hairpin mode ([#23325](https://github.com/kubernetes/kubernetes/pull/23325), [@MurgaNikolay](https://github.com/MurgaNikolay))
+* Bump to container-vm-v20160321 ([#23313](https://github.com/kubernetes/kubernetes/pull/23313), [@zmerlynn](https://github.com/zmerlynn))
+* Remove the restart-kube-proxy and restart-apiserver functions ([#23180](https://github.com/kubernetes/kubernetes/pull/23180), [@roberthbailey](https://github.com/roberthbailey))
+* Copy annotations back from RS to Deployment on rollback ([#23160](https://github.com/kubernetes/kubernetes/pull/23160), [@janetkuo](https://github.com/janetkuo))
+* Trusty: Support hybrid cluster with nodes on ContainerVM ([#23079](https://github.com/kubernetes/kubernetes/pull/23079), [@andyzheng0831](https://github.com/andyzheng0831))
+* update expose command description to add deployment ([#23246](https://github.com/kubernetes/kubernetes/pull/23246), [@AdoHe](https://github.com/AdoHe))
+* Add a rate limiter to the GCE cloudprovider ([#23019](https://github.com/kubernetes/kubernetes/pull/23019), [@alex-mohr](https://github.com/alex-mohr))
+* Add a Deployment example for kubectl expose. ([#23222](https://github.com/kubernetes/kubernetes/pull/23222), [@madhusudancs](https://github.com/madhusudancs))
+* Use versioned object when computing patch ([#23145](https://github.com/kubernetes/kubernetes/pull/23145), [@liggitt](https://github.com/liggitt))
+* kubelet: send all recevied pods in one update ([#23141](https://github.com/kubernetes/kubernetes/pull/23141), [@yujuhong](https://github.com/yujuhong))
+* Add a SSHKey sync check to the master's healthz (when using SSHTunnels). ([#23167](https://github.com/kubernetes/kubernetes/pull/23167), [@cjcullen](https://github.com/cjcullen))
+* Validate minimum CPU limits to be >= 10m ([#23143](https://github.com/kubernetes/kubernetes/pull/23143), [@vishh](https://github.com/vishh))
+* kubernetes/kubernetes#23034 Fix controller-manager race condition issue which cause endpoints flush during restart ([#23035](https://github.com/kubernetes/kubernetes/pull/23035), [@xinxiaogang](https://github.com/xinxiaogang))
+* MESOS: forward globally declared cadvisor housekeeping flags ([#22974](https://github.com/kubernetes/kubernetes/pull/22974), [@jdef](https://github.com/jdef))
+* Trusty: support developer workflow on base image ([#22960](https://github.com/kubernetes/kubernetes/pull/22960), [@andyzheng0831](https://github.com/andyzheng0831))
+* Bumped Heapster to stable version 1.0.0 ([#22993](https://github.com/kubernetes/kubernetes/pull/22993), [@piosz](https://github.com/piosz))
+* Deprecating --api-version flag ([#22410](https://github.com/kubernetes/kubernetes/pull/22410), [@nikhiljindal](https://github.com/nikhiljindal))
+* allow resource.version.group in kubectl ([#22853](https://github.com/kubernetes/kubernetes/pull/22853), [@deads2k](https://github.com/deads2k))
+* Use SCP to dump logs and parallelize a bit. ([#22835](https://github.com/kubernetes/kubernetes/pull/22835), [@spxtr](https://github.com/spxtr))
+* update wide option output ([#22772](https://github.com/kubernetes/kubernetes/pull/22772), [@AdoHe](https://github.com/AdoHe))
+* Change scheduler logic from random to round-robin ([#22430](https://github.com/kubernetes/kubernetes/pull/22430), [@gmarek](https://github.com/gmarek))
 
 # Release Notes for Kubernetes 1.2.0
 
@@ -47,10 +47,9 @@ binary | sha1 hash | md5 hash
 
 ## Downloads
 
-binary | hash alg | hash
------- | -------- | ----
-[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.0/kubernetes.tar.gz) | md5  | `c0ce9e6150e9d7a19455db82f3318b4c`
-[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.0/kubernetes.tar.gz) | sha1 | `52dd998e1191f464f581a9b87017d70ce0b058d9`
+binary | sha1 hash | md5 hash
+------ | --------- | --------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.0/kubernetes.tar.gz) | `52dd998e1191f464f581a9b87017d70ce0b058d9` | `c0ce9e6150e9d7a19455db82f3318b4c`
 
 ## Changes since v1.1.1
 
@@ -345,20 +344,20 @@ With kube-up:
 
 ## Changelog
 
-(Linked [github releases](https://github.com/kubernetes/kubernetes/releases) 1.1.2 to 1.2.0-beta-1 that are part of 1.2.0)
+(Linked [github releases](https://github.com/kubernetes/kubernetes/releases) 1.2.0-beta-1 to 1.1.2 that are part of 1.2.0)
 
-* [v1.1.2](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.2)
-* [v1.1.3](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.3)
-* [v1.1.4](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.4)
-* [v1.1.7](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.7)
-* [v1.1.8](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.8)
-* [v1.2.0-alpha.4](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.4)
-* [v1.2.0-alpha.5](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.5)
-* [v1.2.0-alpha.6](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.6)
-* [v1.2.0-alpha.7](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.7)
-* [v1.2.0-alpha.8](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.8)
-* [v1.2.0-beta.0](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-beta.0)
 * [v1.2.0-beta.1](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-beta.1)
+* [v1.2.0-beta.0](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-beta.0)
+* [v1.2.0-alpha.8](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.8)
+* [v1.2.0-alpha.7](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.7)
+* [v1.2.0-alpha.6](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.6)
+* [v1.2.0-alpha.5](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.5)
+* [v1.2.0-alpha.4](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.4)
+* [v1.1.8](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.8)
+* [v1.1.7](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.7)
+* [v1.1.4](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.4)
+* [v1.1.3](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.3)
+* [v1.1.2](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.2)
 
 Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
 
