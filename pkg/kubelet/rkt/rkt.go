@@ -52,11 +52,12 @@ import (
 )
 
 const (
-	RktType = "rkt"
+	RktType                      = "rkt"
+	DefaultRktAPIServiceEndpoint = "localhost:15441"
 
 	minimumAppcVersion       = "0.7.4"
-	minimumRktBinVersion     = "0.13.0"
-	recommendedRktBinVersion = "0.13.0"
+	minimumRktBinVersion     = "1.2.1"
+	recommendedRktBinVersion = "1.2.1"
 	minimumRktApiVersion     = "1.0.0-alpha"
 	minimumSystemdVersion    = "219"
 
@@ -108,9 +109,7 @@ type Runtime struct {
 	// The grpc client for rkt api-service.
 	apisvcConn *grpc.ClientConn
 	apisvc     rktapi.PublicAPIClient
-	// The absolute path to rkt binary.
-	rktBinAbsPath string
-	config        *Config
+	config     *Config
 	// TODO(yifan): Refactor this to be generic keyring.
 	dockerKeyring credentialprovider.DockerKeyring
 
@@ -134,7 +133,9 @@ type volumeGetter interface {
 // New creates the rkt container runtime which implements the container runtime interface.
 // It will test if the rkt binary is in the $PATH, and whether we can get the
 // version of it. If so, creates the rkt container runtime, otherwise returns an error.
-func New(config *Config,
+func New(
+	apiEndpoint string,
+	config *Config,
 	runtimeHelper kubecontainer.RuntimeHelper,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
@@ -150,16 +151,16 @@ func New(config *Config,
 	}
 
 	// TODO(yifan): Use secure connection.
-	apisvcConn, err := grpc.Dial(defaultRktAPIServiceAddr, grpc.WithInsecure())
+	apisvcConn, err := grpc.Dial(apiEndpoint, grpc.WithInsecure())
 	if err != nil {
 		return nil, fmt.Errorf("rkt: cannot connect to rkt api service: %v", err)
 	}
 
-	rktBinAbsPath := config.Path
-	if rktBinAbsPath == "" {
+	// TODO(yifan): Get the rkt path from API service.
+	if config.Path == "" {
 		// No default rkt path was set, so try to find one in $PATH.
 		var err error
-		rktBinAbsPath, err = exec.LookPath("rkt")
+		config.Path, err = exec.LookPath("rkt")
 		if err != nil {
 			return nil, fmt.Errorf("cannot find rkt binary: %v", err)
 		}
@@ -167,7 +168,6 @@ func New(config *Config,
 
 	rkt := &Runtime{
 		systemd:             systemd,
-		rktBinAbsPath:       rktBinAbsPath,
 		apisvcConn:          apisvcConn,
 		apisvc:              rktapi.NewPublicAPIClient(apisvcConn),
 		config:              config,
@@ -178,6 +178,12 @@ func New(config *Config,
 		livenessManager:     livenessManager,
 		volumeGetter:        volumeGetter,
 	}
+
+	rkt.config, err = rkt.getConfig(rkt.config)
+	if err != nil {
+		return nil, fmt.Errorf("rkt: cannot get config from rkt api service: %v", err)
+	}
+
 	if serializeImagePulls {
 		rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt, imageBackOff)
 	} else {
@@ -192,7 +198,7 @@ func New(config *Config,
 }
 
 func (r *Runtime) buildCommand(args ...string) *exec.Cmd {
-	cmd := exec.Command(r.rktBinAbsPath)
+	cmd := exec.Command(r.config.Path)
 	cmd.Args = append(cmd.Args, r.config.buildGlobalOptions()...)
 	cmd.Args = append(cmd.Args, args...)
 	return cmd
@@ -754,6 +760,10 @@ func (r *Runtime) generateRunCommand(pod *api.Pod, uuid string) (string, error) 
 	if len(dnsServers) > 0 || len(dnsSearches) > 0 {
 		runPrepared = append(runPrepared, fmt.Sprintf("--dns-opt=%s", defaultDNSOption))
 	}
+
+	// TODO(yifan): host domain is not being used.
+	hostname, _ := r.runtimeHelper.GeneratePodHostNameAndDomain(pod)
+	runPrepared = append(runPrepared, fmt.Sprintf("--hostname=%s", hostname))
 	runPrepared = append(runPrepared, uuid)
 	return strings.Join(runPrepared, " "), nil
 }

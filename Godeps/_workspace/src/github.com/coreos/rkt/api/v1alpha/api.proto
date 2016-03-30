@@ -237,6 +237,27 @@ message ImageFilter {
         repeated string full_names = 9;
 }
 
+// GlobalFlags describes the flags that passed to rkt api service when it is launched.
+message GlobalFlags {
+        // Data directory.
+        string dir = 1;
+
+        // System configuration directory.
+        string system_config_dir = 2;
+
+        // Local configuration directory.
+        string local_config_dir = 3;
+
+        // User configuration directory.
+        string user_config_dir = 4;
+
+        // Insecure flags configurates what security features to disable.
+        string insecure_flags = 5;
+
+        // Whether to automatically trust gpg keys fetched from https
+        bool trust_keys_from_https = 6;
+}
+
 // Info describes the information of rkt on the machine.
 message Info {
         // Version of rkt, required, in the form of Semantic Versioning 2.0.0 (http://semver.org/).
@@ -247,6 +268,9 @@ message Info {
 
         // Latest version of the api that's supported by the service, required, in the form of Semantic Versioning 2.0.0 (http://semver.org/).
         string api_version = 3;
+
+        // The global flags that passed to the rkt api service when it's launched.
+        GlobalFlags global_flags = 4;
 }
 
 // EventType defines the type of the events that will be received via ListenEvents().
