@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/appc/cni/libcni"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -38,7 +40,6 @@ import (
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	"strings"
 )
 
 const (
@@ -61,6 +62,7 @@ type kubenetNetworkPlugin struct {
 	mu          sync.Mutex //Mutex for protecting podCIDRs map and netConfig
 	execer      utilexec.Interface
 	nsenterPath string
+	hairpinMode componentconfig.HairpinMode
 }
 
 func NewPlugin() network.NetworkPlugin {
@@ -71,8 +73,9 @@ func NewPlugin() network.NetworkPlugin {
 	}
 }
 
-func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
+func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode) error {
 	plugin.host = host
+	plugin.hairpinMode = hairpinMode
 	plugin.cniConfig = &libcni.CNIConfig{
 		Path: []string{DefaultCNIDir},
 	}
@@ -279,6 +282,19 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 
 	if err = plugin.addContainerToNetwork(id, rt); err != nil {
 		return err
+	}
+
+	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
+	// TODO: Remove this once the kernel bug (#20096) is fixed.
+	// TODO: check and set promiscuous mode with netlink once vishvananda/netlink supports it
+	if plugin.hairpinMode == componentconfig.PromiscuousBridge {
+		output, err := plugin.execer.Command("ip", "link", "show", "dev", BridgeName).CombinedOutput()
+		if err != nil || strings.Index(string(output), "PROMISC") < 0 {
+			_, err := plugin.execer.Command("ip", "link", "set", BridgeName, "promisc", "on").CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)
+			}
+		}
 	}
 
 	// The first SetUpPod call creates the bridge; ensure shaping is enabled

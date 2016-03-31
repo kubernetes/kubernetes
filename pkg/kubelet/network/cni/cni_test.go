@@ -34,6 +34,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -144,7 +145,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 	fakeDocker := dockertools.NewFakeDockerClient()
 	fakeRecorder := &record.FakeRecorder{}
 	containerRefManager := kubecontainer.NewRefManager()
-	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
+	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone)
 	dockerManager := dockertools.NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
@@ -174,7 +175,7 @@ func TestCNIPlugin(t *testing.T) {
 	installPluginUnderTest(t, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName, pluginName)
 
 	np := probeNetworkPluginsWithVendorCNIDirPrefix(path.Join(testNetworkConfigPath, pluginName), testVendorCNIDirPrefix)
-	plug, err := network.InitNetworkPlugin(np, "cni", NewFakeHost(nil))
+	plug, err := network.InitNetworkPlugin(np, "cni", NewFakeHost(nil), componentconfig.HairpinNone)
 	if err != nil {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}

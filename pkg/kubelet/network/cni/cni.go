@@ -25,6 +25,7 @@ import (
 	"github.com/appc/cni/libcni"
 	cnitypes "github.com/appc/cni/pkg/types"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -93,7 +94,7 @@ func getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix string) (*cniNetwork, er
 	return nil, fmt.Errorf("No valid networks found in %s", pluginDir)
 }
 
-func (plugin *cniNetworkPlugin) Init(host network.Host) error {
+func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode) error {
 	plugin.host = host
 	return nil
 }
