@@ -25,20 +25,17 @@ import (
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_v1alpha1_Cluster,
-		DeepCopy_v1alpha1_ClusterCondition,
+		DeepCopy_v1alpha1_ClusterAddress,
 		DeepCopy_v1alpha1_ClusterList,
 		DeepCopy_v1alpha1_ClusterMeta,
 		DeepCopy_v1alpha1_ClusterSpec,
 		DeepCopy_v1alpha1_ClusterStatus,
-		DeepCopy_v1alpha1_SubReplicaSet,
-		DeepCopy_v1alpha1_SubReplicaSetList,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
@@ -61,17 +58,8 @@ func DeepCopy_v1alpha1_Cluster(in Cluster, out *Cluster, c *conversion.Cloner) e
 	return nil
 }
 
-func DeepCopy_v1alpha1_ClusterCondition(in ClusterCondition, out *ClusterCondition, c *conversion.Cloner) error {
-	out.Type = in.Type
-	out.Status = in.Status
-	if err := unversioned.DeepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
-		return err
-	}
-	out.Reason = in.Reason
-	out.Message = in.Message
+func DeepCopy_v1alpha1_ClusterAddress(in ClusterAddress, out *ClusterAddress, c *conversion.Cloner) error {
+	out.Url = in.Url
 	return nil
 }
 
@@ -118,17 +106,7 @@ func DeepCopy_v1alpha1_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conversi
 }
 
 func DeepCopy_v1alpha1_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *conversion.Cloner) error {
-	if in.Conditions != nil {
-		in, out := in.Conditions, &out.Conditions
-		*out = make([]ClusterCondition, len(in))
-		for i := range in {
-			if err := DeepCopy_v1alpha1_ClusterCondition(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
-	}
+	out.Phase = in.Phase
 	if in.Capacity != nil {
 		in, out := in.Capacity, &out.Capacity
 		*out = make(v1.ResourceList)
@@ -157,43 +135,6 @@ func DeepCopy_v1alpha1_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *co
 	}
 	if err := DeepCopy_v1alpha1_ClusterMeta(in.ClusterMeta, &out.ClusterMeta, c); err != nil {
 		return err
-	}
-	return nil
-}
-
-func DeepCopy_v1alpha1_SubReplicaSet(in SubReplicaSet, out *SubReplicaSet, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-		return err
-	}
-	if err := v1beta1.DeepCopy_v1beta1_ReplicaSetSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
-	}
-	if err := v1beta1.DeepCopy_v1beta1_ReplicaSetStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func DeepCopy_v1alpha1_SubReplicaSetList(in SubReplicaSetList, out *SubReplicaSetList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := in.Items, &out.Items
-		*out = make([]SubReplicaSet, len(in))
-		for i := range in {
-			if err := DeepCopy_v1alpha1_SubReplicaSet(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
 	}
 	return nil
 }

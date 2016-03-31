@@ -19,113 +19,73 @@ package v1alpha1
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
-// ClusterSpec describes the attributes of a kubernetes cluster.
+// Address of a cluster
+type ClusterAddress struct {
+	// URL to access the cluster
+	Url string `json:"url"`
+}
+
+// ClusterSpec describes the attributes on a Cluster.
 type ClusterSpec struct {
-	// A map of client CIDR to server address.
-	// This is to help clients reach servers in the most network-efficient way possible.
-	// Clients can use the appropriate server address as per the CIDR that they match.
-	// In case of multiple matches, clients should use the longest matching CIDR.
-	ServerAddressByClientCIDRs []unversioned.ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" patchStrategy:"merge" patchMergeKey:"clientCIDR" protobuf:"bytes,1,rep,name=serverAddressByClientCIDRs"`
-	// the type (e.g. bearer token, client certificate etc) and data of the credential used to access cluster.
-	// It’s used for system routines (not behalf of users)
-	// TODO: string may not enough, https://github.com/kubernetes/kubernetes/pull/23847#discussion_r59301275
-	Credential string `json:"credential,omitempty" protobuf:"bytes,2,opt,name=credential"`
+	// a map of client CIDR to server address
+	ServerAddressByClientCIDRs []unversioned.ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs"`
+	// The credential used to access cluster. It’s used for system routines (not behalf of users)
+	Credential string `json:"credential",omitempty`
 }
 
-type ClusterConditionType string
+type ClusterPhase string
 
-// These are valid conditions of a cluster.
+// These are the valid phases of a cluster.
 const (
-	// ClusterReady means the cluster is ready to accept workloads.
-	ClusterReady ClusterConditionType = "Ready"
-	// ClusterOffline means the cluster is temporarily down or not reachable
-	ClusterOffline ClusterConditionType = "Offline"
+	// Newly registered clusters or clusters suspended by admin for various reasons. They are not eligible for accepting workloads
+	ClusterPending ClusterPhase = "pending"
+	// Clusters in normal status that can accept workloads
+	ClusterRunning ClusterPhase = "running"
+	// Clusters temporarily down or not reachable
+	ClusterOffline ClusterPhase = "offline"
+	// Clusters removed from federation
+	ClusterTerminated ClusterPhase = "terminated"
 )
-
-// ClusterCondition describes current state of a cluster.
-type ClusterCondition struct {
-	// Type of cluster condition, Complete or Failed.
-	Type ClusterConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ClusterConditionType"`
-	// Status of the condition, one of True, False, Unknown.
-	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/kubernetes/pkg/api/v1.ConditionStatus"`
-	// Last time the condition was checked.
-	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
-	// Last time the condition transit from one status to another.
-	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
-	// (brief) reason for the condition's last transition.
-	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
-	// Human readable message indicating details about last transition.
-	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
-}
 
 // Cluster metadata
 type ClusterMeta struct {
-	// Release version of the cluster.
-	Version string `json:"version,omitempty" protobuf:"bytes,1,opt,name=version"`
+	// Version of the cluster
+	Version string `json:"version,omitempty"`
 }
 
-// ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
+// ClusterStatus is information about the current status of a cluster.
 type ClusterStatus struct {
-	// Conditions is an array of current cluster conditions.
-	Conditions []ClusterCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
+	// Phase is the recently observed lifecycle phase of the cluster.
+	Phase ClusterPhase `json:"phase,omitempty"`
 	// Capacity represents the total resources of the cluster
-	Capacity v1.ResourceList `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity,casttype=k8s.io/kubernetes/pkg/api/v1.ResourceList,castkey=k8s.io/kubernetes/pkg/api/v1.ResourceName"`
+	Capacity v1.ResourceList `json:"capacity,omitempty"`
 	// Allocatable represents the total resources of a cluster that are available for scheduling.
-	Allocatable v1.ResourceList `json:"allocatable,omitempty" protobuf:"bytes,3,rep,name=allocatable,casttype=k8s.io/kubernetes/pkg/api/v1.ResourceList,castkey=k8s.io/kubernetes/pkg/api/v1.ResourceName"`
-	ClusterMeta `json:",inline" protobuf:"bytes,4,opt,name=clusterMeta"`
+	Allocatable v1.ResourceList `json:"allocatable,omitempty"`
+	ClusterMeta `json:",inline"`
 }
 
-// +genclient=true,nonNamespaced=true
-
-// Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
+// Cluster information in Ubernetes
 type Cluster struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of the Cluster.
-	Spec ClusterSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Spec ClusterSpec `json:"spec,omitempty"`
 	// Status describes the current status of a Cluster
-	Status ClusterStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	Status ClusterStatus `json:"status,omitempty"`
 }
 
-// A list of all the kubernetes clusters registered to the federation
+// A list of Clusters
 type ClusterList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of Cluster objects.
-	Items []Cluster `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
-
-// +genclient=true
-
-// SubReplicaSet represents the configuration of a replica set scheduled to a Cluster.
-type SubReplicaSet struct {
-	unversioned.TypeMeta `json:",inline"`
-	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Spec defines the desired behavior of this SubReplicaSet.
-	Spec extensionsv1.ReplicaSetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-
-	// Status is the current status of this SubReplicaSet. This data may be
-	// out of date by some window of time.
-	Status extensionsv1.ReplicaSetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
-}
-
-// A list of SubReplicaSets
-type SubReplicaSetList struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// List of SubReplicaSet objects.
-	Items []SubReplicaSet `json:"items" protobuf:"bytes,2,rep,name=items"`
+	Items []Cluster `json:"items"`
 }

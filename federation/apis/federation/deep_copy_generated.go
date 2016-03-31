@@ -24,20 +24,17 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_federation_Cluster,
-		DeepCopy_federation_ClusterCondition,
+		DeepCopy_federation_ClusterAddress,
 		DeepCopy_federation_ClusterList,
 		DeepCopy_federation_ClusterMeta,
 		DeepCopy_federation_ClusterSpec,
 		DeepCopy_federation_ClusterStatus,
-		DeepCopy_federation_SubReplicaSet,
-		DeepCopy_federation_SubReplicaSetList,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
@@ -60,17 +57,8 @@ func DeepCopy_federation_Cluster(in Cluster, out *Cluster, c *conversion.Cloner)
 	return nil
 }
 
-func DeepCopy_federation_ClusterCondition(in ClusterCondition, out *ClusterCondition, c *conversion.Cloner) error {
-	out.Type = in.Type
-	out.Status = in.Status
-	if err := unversioned.DeepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
-		return err
-	}
-	out.Reason = in.Reason
-	out.Message = in.Message
+func DeepCopy_federation_ClusterAddress(in ClusterAddress, out *ClusterAddress, c *conversion.Cloner) error {
+	out.Url = in.Url
 	return nil
 }
 
@@ -117,17 +105,7 @@ func DeepCopy_federation_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conver
 }
 
 func DeepCopy_federation_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *conversion.Cloner) error {
-	if in.Conditions != nil {
-		in, out := in.Conditions, &out.Conditions
-		*out = make([]ClusterCondition, len(in))
-		for i := range in {
-			if err := DeepCopy_federation_ClusterCondition(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
-	}
+	out.Phase = in.Phase
 	if in.Capacity != nil {
 		in, out := in.Capacity, &out.Capacity
 		*out = make(api.ResourceList)
@@ -156,43 +134,6 @@ func DeepCopy_federation_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *
 	}
 	if err := DeepCopy_federation_ClusterMeta(in.ClusterMeta, &out.ClusterMeta, c); err != nil {
 		return err
-	}
-	return nil
-}
-
-func DeepCopy_federation_SubReplicaSet(in SubReplicaSet, out *SubReplicaSet, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-		return err
-	}
-	if err := extensions.DeepCopy_extensions_ReplicaSetSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
-	}
-	if err := extensions.DeepCopy_extensions_ReplicaSetStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func DeepCopy_federation_SubReplicaSetList(in SubReplicaSetList, out *SubReplicaSetList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := in.Items, &out.Items
-		*out = make([]SubReplicaSet, len(in))
-		for i := range in {
-			if err := DeepCopy_federation_SubReplicaSet(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
 	}
 	return nil
 }
