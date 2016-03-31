@@ -20,10 +20,21 @@
 
 /etc/init.d/docker stop
 # Make sure docker gracefully terminated before start again
+starttime=`date +%s`
 while pidof docker > /dev/null; do
-    echo "waiting clean shutdown"
-    sleep 10
+    currenttime=`date +%s`
+    ((elapsedtime = currenttime - starttime))
+    # after 60 seconds, forcefully terminate docker process
+    if test $elapsedtime -gt 60; then
+      echo "attempting to kill docker process with sigkill signal"
+      kill -9 `pidof docker` || sleep 10
+    else
+      echo "waiting clean shutdown"
+      sleep 10
+    fi
 done
+
+echo "docker is not running. starting docker"
 
 # cleanup docker network checkpoint to avoid running into known issue
 # of docker (https://github.com/docker/docker/issues/18283)
@@ -35,7 +46,7 @@ echo "waiting 30s for startup"
 sleep 30
 
 while true; do
-  if ! sudo timeout 10 docker version > /dev/null; then
+  if ! timeout 60 docker ps > /dev/null; then
     echo "Docker failed!"
     exit 2
   fi
