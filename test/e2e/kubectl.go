@@ -115,6 +115,25 @@ var (
 var _ = framework.KubeDescribe("Kubectl client", func() {
 	defer GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
+
+	// Reustable cluster state function.  This won't be adversly affected by lazy initialization of framework.
+	clusterState := func() *framework.ClusterVerification {
+		return f.NewClusterVerification(
+			framework.PodStateVerification{
+				Selectors:   map[string]string{"app": "redis"},
+				ValidPhases: []api.PodPhase{api.PodRunning /*api.PodPending*/},
+			})
+	}
+	// Customized Wait  / ForEach wrapper for this test.  These demonstrate the
+	// idiomatic way to wrap the ClusterVerification structs for syntactic sugar in large
+	// test files.
+	waitFor := func(atLeast int) {
+		// 60 seconds can be flakey for some of the containers.
+		clusterState().WaitFor(atLeast, 90*time.Second)
+	}
+	forEachPod := func(podFunc func(p api.Pod)) {
+		clusterState().ForEach(podFunc)
+	}
 	var c *client.Client
 	var ns string
 	BeforeEach(func() {
@@ -588,8 +607,10 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDie("create", "-f", controllerJson, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", serviceJson, nsFlag)
 
+			// Wait for the redis pods to come online...
+			waitFor(1)
 			// Pod
-			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+			forEachPod(func(pod api.Pod) {
 				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
 				requiredStrings := [][]string{
 					{"Name:", "redis-master-"},
@@ -684,8 +705,11 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			redisPort := 6379
 
 			By("creating Redis RC")
+
+			framework.Logf("namespace %v", ns)
 			framework.RunKubectlOrDie("create", "-f", controllerJson, nsFlag)
-			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+			forEachPod(func(pod api.Pod) {
+				framework.Logf("wait on %v ", ns)
 				framework.LookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", framework.PodStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
@@ -799,7 +823,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		It("should be able to retrieve and filter logs [Conformance]", func() {
 			framework.SkipUnlessServerVersionGTE(extendedPodLogFilterVersion, c)
 
-			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+			forEachPod(func(pod api.Pod) {
 				By("checking for a matching strings")
 				_, err := framework.LookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", framework.PodStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -850,12 +874,12 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("creating Redis RC")
 			framework.RunKubectlOrDie("create", "-f", controllerJson, nsFlag)
 			By("patching all pods")
-			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+			forEachPod(func(pod api.Pod) {
 				framework.RunKubectlOrDie("patch", "pod", pod.Name, nsFlag, "-p", "{\"metadata\":{\"annotations\":{\"x\":\"y\"}}}")
 			})
 
 			By("checking annotations")
-			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+			forEachPod(func(pod api.Pod) {
 				found := false
 				for key, val := range pod.Annotations {
 					if key == "x" && val == "y" {
