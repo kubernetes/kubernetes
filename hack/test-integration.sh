@@ -59,10 +59,6 @@ runTests() {
   KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
     --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}" --watch-cache=true
 
-  kube::log::status "Running integration test scenario with watch cache off"
-  KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
-    --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}" --watch-cache=false
-
   cleanup
 }
 
