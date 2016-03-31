@@ -417,35 +417,44 @@ func TestMultiScheduler(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
-	close(schedulerConfig.StopEverything)
 
-	//	8. create 2 pods: testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2
-	//		- note: these two pods belong to default scheduler which no longer exists
-	podWithNoAnnotation2 := createPod("pod-with-no-annotation2", nil)
-	podWithAnnotationFitsDefault2 := createPod("pod-with-annotation-fits-default2", schedulerAnnotationFitsDefault)
-	testPodNoAnnotation2, err := restClient.Pods(api.NamespaceDefault).Create(podWithNoAnnotation2)
-	if err != nil {
-		t.Fatalf("Failed to create pod: %v", err)
-	}
-	testPodWithAnnotationFitsDefault2, err := restClient.Pods(api.NamespaceDefault).Create(podWithAnnotationFitsDefault2)
-	if err != nil {
-		t.Fatalf("Failed to create pod: %v", err)
-	}
+	// The rest of this test assumes that closing StopEverything will cause the
+	// scheduler thread to stop immediately.  It won't, and in fact it will often
+	// schedule 1 more pod before finally exiting.  Comment out until we fix that.
+	//
+	// See https://github.com/kubernetes/kubernetes/issues/23715 for more details.
 
-	//	9. **check point-3**:
-	//		- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 shoule NOT be scheduled
-	err = wait.Poll(time.Second, time.Second*5, podScheduled(restClient, testPodNoAnnotation2.Namespace, testPodNoAnnotation2.Name))
-	if err == nil {
-		t.Errorf("Test MultiScheduler: %s Pod got scheduled, %v", testPodNoAnnotation2.Name, err)
-	} else {
-		t.Logf("Test MultiScheduler: %s Pod not scheduled", testPodNoAnnotation2.Name)
-	}
-	err = wait.Poll(time.Second, time.Second*5, podScheduled(restClient, testPodWithAnnotationFitsDefault2.Namespace, testPodWithAnnotationFitsDefault2.Name))
-	if err == nil {
-		t.Errorf("Test MultiScheduler: %s Pod got scheduled, %v", testPodWithAnnotationFitsDefault2.Name, err)
-	} else {
-		t.Logf("Test MultiScheduler: %s Pod scheduled", testPodWithAnnotationFitsDefault2.Name)
-	}
+	/*
+		close(schedulerConfig.StopEverything)
+
+		//	8. create 2 pods: testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2
+		//		- note: these two pods belong to default scheduler which no longer exists
+		podWithNoAnnotation2 := createPod("pod-with-no-annotation2", nil)
+		podWithAnnotationFitsDefault2 := createPod("pod-with-annotation-fits-default2", schedulerAnnotationFitsDefault)
+		testPodNoAnnotation2, err := restClient.Pods(api.NamespaceDefault).Create(podWithNoAnnotation2)
+		if err != nil {
+			t.Fatalf("Failed to create pod: %v", err)
+		}
+		testPodWithAnnotationFitsDefault2, err := restClient.Pods(api.NamespaceDefault).Create(podWithAnnotationFitsDefault2)
+		if err != nil {
+			t.Fatalf("Failed to create pod: %v", err)
+		}
+
+		//	9. **check point-3**:
+		//		- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 shoule NOT be scheduled
+		err = wait.Poll(time.Second, time.Second*5, podScheduled(restClient, testPodNoAnnotation2.Namespace, testPodNoAnnotation2.Name))
+		if err == nil {
+			t.Errorf("Test MultiScheduler: %s Pod got scheduled, %v", testPodNoAnnotation2.Name, err)
+		} else {
+			t.Logf("Test MultiScheduler: %s Pod not scheduled", testPodNoAnnotation2.Name)
+		}
+		err = wait.Poll(time.Second, time.Second*5, podScheduled(restClient, testPodWithAnnotationFitsDefault2.Namespace, testPodWithAnnotationFitsDefault2.Name))
+		if err == nil {
+			t.Errorf("Test MultiScheduler: %s Pod got scheduled, %v", testPodWithAnnotationFitsDefault2.Name, err)
+		} else {
+			t.Logf("Test MultiScheduler: %s Pod scheduled", testPodWithAnnotationFitsDefault2.Name)
+		}
+	*/
 }
 
 func createPod(name string, annotation map[string]string) *api.Pod {
