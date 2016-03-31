@@ -24,6 +24,7 @@ import (
 	"path"
 	"runtime"
 
+	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -45,10 +46,11 @@ const pkgBase = "k8s.io/kubernetes/pkg"
 var (
 	functionDest = flag.StringP("funcDest", "f", "-", "Output for conversion functions; '-' means stdout")
 	groupVersion = flag.StringP("version", "v", "api/v1", "groupPath/version for conversion.")
+	gvPath       = flag.StringP("path", "p", "", "path to the api group version directory, relative path to pkg/apis")
 )
 
 // We're moving to pkg/apis/group/version. This handles new and legacy packages.
-func pkgPath(group, version string) string {
+func pkgPath(gvPath, group, version string) string {
 	if group == "" {
 		group = "api"
 	}
@@ -61,7 +63,7 @@ func pkgPath(group, version string) string {
 		// TODO(lavalamp): remove this special case when we move api to apis/api
 		return path.Join(pkgBase, gv)
 	default:
-		return path.Join(pkgBase, "apis", gv)
+		return path.Join(pkgBase, "apis", gvPath, gv)
 	}
 }
 
@@ -93,7 +95,7 @@ func main() {
 		glog.Fatalf("Error while writing package line: %v", err)
 	}
 
-	versionPath := pkgPath(gv.Group, gv.Version)
+	versionPath := pkgPath(*gvPath, gv.Group, gv.Version)
 	generator := kruntime.NewConversionGenerator(api.Scheme, versionPath)
 	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
 	generator.AddImport(path.Join(pkgBase, "api/resource"))

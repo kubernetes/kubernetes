@@ -26,7 +26,8 @@ kube::golang::setup_env
 genconversion=$(kube::util::find-binary "genconversion")
 
 function generate_version() {
-  local group_version=$1
+  local path=$1
+  local group_version=$2
   local TMPFILE="/tmp/conversion_generated.$(date +%s).go"
 
   echo "Generating for ${group_version}"
@@ -37,16 +38,26 @@ function generate_version() {
 
 EOF
 
-  "${genconversion}" -v "${group_version}" -f - >>  "$TMPFILE"
+  "${genconversion}" -p "${path}" -v "${group_version}" -f - >>  "$TMPFILE"
 
-  mv "$TMPFILE" "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/conversion_generated.go"
+  mv "$TMPFILE" "pkg/$(kube::util::group-version-to-pkg-path "$3")/conversion_generated.go"
+}
+
+function parse_path_group_version() {
+  local _gv=$(expr "$1" : '.*/\(.*/.*\)')
+  local _gv=${_gv:-$1} # 'v1' or 'batch/v1', etc. will not match, so take from '$1'
+  local _path=${1%$_gv}
+
+  eval "$2=${_path}"
+  eval "$3=${_gv}"
 }
 
 # TODO(lavalamp): get this list by listing the pkg/apis/ directory?
-DEFAULT_GROUP_VERSIONS="v1 authorization/v1beta1 autoscaling/v1 batch/v1 extensions/v1beta1 componentconfig/v1alpha1 metrics/v1alpha1"
+DEFAULT_GROUP_VERSIONS="v1 authorization/v1beta1 autoscaling/v1 batch/v1 extensions/v1beta1 componentconfig/v1alpha1 metrics/v1alpha1 ../../federation/apis/federation/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 for ver in $VERSIONS; do
   # Ensure that the version being processed is registered by setting
   # KUBE_API_VERSIONS.
-  KUBE_API_VERSIONS="${ver}" generate_version "${ver}"
+  parse_path_group_version $ver path gv
+  KUBE_API_VERSIONS="${gv}" generate_version "${path}" "${gv}" "${ver}"
 done
