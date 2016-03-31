@@ -10,7 +10,8 @@ description: |
   DaemonSet-managed pods, because those pods would be immediately replaced by the
   DaemonSet controller, which ignores unschedulable markings.  If there are any
   pods that are neither mirror pods nor managed--by ReplicationController,
-  DaemonSet or Job--, then drain will not delete any pods unless you use --force.
+  ReplicaSet, DaemonSet or Job--, then drain will not delete any pods unless you
+  use --force.
 
   When you are ready to put the node back into service, use kubectl uncordon, which
   will make the node schedulable again.
@@ -18,7 +19,7 @@ options:
 - name: force
   default_value: "false"
   usage: |
-    Continue even if there are pods not managed by a ReplicationController, Job, or DaemonSet.
+    Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet.
 - name: grace-period
   default_value: "-1"
   usage: |
@@ -88,10 +89,10 @@ inherited_options:
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
 example: |
-  # Drain node "foo", even if there are pods not managed by a ReplicationController, Job, or DaemonSet on it.
+  # Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet on it.
   $ kubectl drain foo --force
 
-  # As above, but abort if there are pods not managed by a ReplicationController, Job, or DaemonSet, and use a grace period of 15 minutes.
+  # As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet, and use a grace period of 15 minutes.
   $ kubectl drain foo --grace-period=900
 see_also:
 - kubectl
