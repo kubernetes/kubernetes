@@ -38,8 +38,6 @@ type TypeMeta struct {
 
 const (
 	ContentTypeJSON string = "application/json"
-	// TODO: Fix the value.
-	ContentTypeProtobuf string = "application/protobuf"
 )
 
 // RawExtension is used to hold extensions in external versions.
