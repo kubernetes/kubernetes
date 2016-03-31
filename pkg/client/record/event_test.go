@@ -348,7 +348,10 @@ func TestEventf(t *testing.T) {
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for index, item := range table {
 		clock.Step(1 * time.Second)
-		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
+		// TODO: uncomment this after we upgrade to Go 1.6.1.
+		// testing.(*common).log() is racing with testing.(*T).report() in Go 1.6.
+		// See #23533 for more details.
+		// logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
 		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
@@ -367,7 +370,8 @@ func TestEventf(t *testing.T) {
 			actualEvent := <-createEvent
 			validateEvent(string(index), actualEvent, item.expect, t)
 		}
-		logWatcher1.Stop()
+		// TODO: uncomment this after we upgrade to Go 1.6.1.
+		// logWatcher1.Stop()
 		logWatcher2.Stop()
 	}
 	sinkWatcher.Stop()
@@ -560,7 +564,10 @@ func TestEventfNoNamespace(t *testing.T) {
 
 	for index, item := range table {
 		clock.Step(1 * time.Second)
-		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
+		// TODO: uncomment this after we upgrade to Go 1.6.1.
+		// testing.(*common).log() is racing with testing.(*T).report() in Go 1.6.
+		// See #23533 for more details.
+		// logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
 		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
@@ -580,7 +587,8 @@ func TestEventfNoNamespace(t *testing.T) {
 			validateEvent(string(index), actualEvent, item.expect, t)
 		}
 
-		logWatcher1.Stop()
+		// TODO: uncomment this after we upgrade to Go 1.6.1.
+		// logWatcher1.Stop()
 		logWatcher2.Stop()
 	}
 	sinkWatcher.Stop()
