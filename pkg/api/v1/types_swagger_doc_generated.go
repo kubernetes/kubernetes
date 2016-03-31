@@ -1616,6 +1616,29 @@ func (TCPSocketAction) SwaggerDoc() map[string]string {
 	return map_TCPSocketAction
 }
 
+var map_Taint = map[string]string{
+	"":       "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
+	"key":    "Required. The taint key to be applied to a node.",
+	"value":  "Required. The taint value corresponding to the taint key.",
+	"effect": "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule and PreferNoSchedule.",
+}
+
+func (Taint) SwaggerDoc() map[string]string {
+	return map_Taint
+}
+
+var map_Toleration = map[string]string{
+	"":         "The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+	"key":      "Required. Key is the taint key that the toleration applies to.",
+	"operator": "operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+	"value":    "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
+	"effect":   "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and PreferNoSchedule.",
+}
+
+func (Toleration) SwaggerDoc() map[string]string {
+	return map_Toleration
+}
+
 var map_Volume = map[string]string{
 	"":     "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
 	"name": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names",

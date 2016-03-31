@@ -2686,6 +2686,42 @@ message TCPSocketAction {
   optional k8s.io.kubernetes.pkg.util.intstr.IntOrString port = 1;
 }
 
+// The node this Taint is attached to has the effect "effect" on
+// any pod that that does not tolerate the Taint.
+message Taint {
+  // Required. The taint key to be applied to a node.
+  optional string key = 1;
+
+  // Required. The taint value corresponding to the taint key.
+  optional string value = 2;
+
+  // Required. The effect of the taint on pods
+  // that do not tolerate the taint.
+  // Valid effects are NoSchedule and PreferNoSchedule.
+  optional string effect = 3;
+}
+
+// The pod this Toleration is attached to tolerates any taint that matches
+// the triple <key,value,effect> using the matching operator <operator>.
+message Toleration {
+  // Required. Key is the taint key that the toleration applies to.
+  optional string key = 1;
+
+  // operator represents a key's relationship to the value.
+  // Valid operators are Exists and Equal. Defaults to Equal.
+  // Exists is equivalent to wildcard for value, so that a pod can
+  // tolerate all taints of a particular category.
+  optional string operator = 2;
+
+  // Value is the taint value the toleration matches to.
+  // If the operator is Exists, the value should be empty, otherwise just a regular string.
+  optional string value = 3;
+
+  // Effect indicates the taint effect to match. Empty means match all taint effects.
+  // When specified, allowed values are NoSchedule and PreferNoSchedule.
+  optional string effect = 4;
+}
+
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
 message Volume {
   // Volume's name.
