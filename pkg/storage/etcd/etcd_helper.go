@@ -57,7 +57,7 @@ func (c *EtcdStorageConfig) GetType() string {
 
 // implements storage.Config
 func (c *EtcdStorageConfig) NewStorage() (storage.Interface, error) {
-	etcdClient, err := c.Config.newEtcdClient()
+	etcdClient, err := c.Config.NewEtcdClient()
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ type EtcdConfig struct {
 	Quorum     bool
 }
 
-func (c *EtcdConfig) newEtcdClient() (etcd.Client, error) {
+func (c *EtcdConfig) NewEtcdClient() (etcd.Client, error) {
 	t, err := c.newHttpTransport()
 	if err != nil {
 		return nil, err
