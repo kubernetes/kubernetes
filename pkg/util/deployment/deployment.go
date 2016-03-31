@@ -47,6 +47,39 @@ const (
 	RollbackDone              = "DeploymentRollback"
 )
 
+// GetAllReplicaSets list all RSes of a given deployment atomically
+func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface) (allOldRSes []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, err error) {
+	namespace := deployment.Namespace
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, nil, err
+	}
+	options := api.ListOptions{LabelSelector: selector}
+	rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	oldRSes := map[string]extensions.ReplicaSet{}
+	newRSTemplate := GetNewReplicaSetTemplate(deployment)
+	for _, rs := range rsList.Items {
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+		// Filter out replica set that has the same pod template spec as the deployment - that is the new replica set.
+		if api.Semantic.DeepEqual(rs.Spec.Template, newRSTemplate) {
+			newRS = &rs
+			continue
+		}
+		oldRSes[rs.ObjectMeta.Name] = rs
+	}
+	for key := range oldRSes {
+		value := oldRSes[key]
+		allOldRSes = append(allOldRSes, &value)
+	}
+	return
+}
+
 // GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {

@@ -2520,11 +2520,7 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		if err != nil {
 			return false, err
 		}
-		oldRSs, allOldRSs, err = deploymentutil.GetOldReplicaSets(deployment, c)
-		if err != nil {
-			return false, err
-		}
-		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
+		allOldRSs, newRS, err = deploymentutil.GetAllReplicaSets(deployment, c)
 		if err != nil {
 			return false, err
 		}
@@ -2532,7 +2528,7 @@ func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 			// New RC hasn't been created yet.
 			return false, nil
 		}
-		allRSs = append(oldRSs, newRS)
+		allRSs = append(allOldRSs, newRS)
 		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 		totalAvailable, err := deploymentutil.GetAvailablePodsForReplicaSets(c, allRSs, minReadySeconds)
 		if err != nil {
