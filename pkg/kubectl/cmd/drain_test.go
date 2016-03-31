@@ -221,7 +221,7 @@ func TestDrain(t *testing.T) {
 	rc_anno := make(map[string]string)
 	rc_anno[controller.CreatedByAnnotation] = refJson(t, &rc)
 
-	replicated_pod := api.Pod{
+	rc_pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -284,6 +284,35 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
+	rs := extensions.ReplicaSet{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "rs",
+			Namespace:         "default",
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			Labels:            labels,
+			SelfLink:          testapi.Default.SelfLink("replicasets", "rs"),
+		},
+		Spec: extensions.ReplicaSetSpec{
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
+		},
+	}
+
+	rs_anno := make(map[string]string)
+	rs_anno[controller.CreatedByAnnotation] = refJson(t, &rs)
+
+	rs_pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			Labels:            labels,
+			Annotations:       rs_anno,
+		},
+		Spec: api.PodSpec{
+			NodeName: "node",
+		},
+	}
+
 	naked_pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
@@ -302,6 +331,7 @@ func TestDrain(t *testing.T) {
 		expected     *api.Node
 		pods         []api.Pod
 		rcs          []api.ReplicationController
+		replicaSets  []extensions.ReplicaSet
 		args         []string
 		expectFatal  bool
 		expectDelete bool
@@ -310,7 +340,7 @@ func TestDrain(t *testing.T) {
 			description:  "RC-managed pod",
 			node:         node,
 			expected:     cordoned_node,
-			pods:         []api.Pod{replicated_pod},
+			pods:         []api.Pod{rc_pod},
 			rcs:          []api.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
@@ -342,6 +372,16 @@ func TestDrain(t *testing.T) {
 			expected:     cordoned_node,
 			pods:         []api.Pod{job_pod},
 			rcs:          []api.ReplicationController{rc},
+			args:         []string{"node"},
+			expectFatal:  false,
+			expectDelete: true,
+		},
+		{
+			description:  "RS-managed pod",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []api.Pod{rs_pod},
+			replicaSets:  []extensions.ReplicaSet{rs},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -396,6 +436,8 @@ func TestDrain(t *testing.T) {
 					return &http.Response{StatusCode: 200, Body: objBody(testapi.Extensions.Codec(), &ds)}, nil
 				case m.isFor("GET", "/namespaces/default/jobs/job"):
 					return &http.Response{StatusCode: 200, Body: objBody(testapi.Extensions.Codec(), &job)}, nil
+				case m.isFor("GET", "/namespaces/default/replicasets/rs"):
+					return &http.Response{StatusCode: 200, Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
 				case m.isFor("GET", "/pods"):
 					values, err := url.ParseQuery(req.URL.RawQuery)
 					if err != nil {
