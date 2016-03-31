@@ -19,8 +19,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 source "${KUBE_ROOT}/test/kubemark/common.sh"
 
-kubectl delete -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json &> /dev/null || true
-kubectl delete -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json &> /dev/null || true
+"${KUBECTL}" delete -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json &> /dev/null || true
+"${KUBECTL}" delete -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json &> /dev/null || true
 
 GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
 

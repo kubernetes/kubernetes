@@ -18,11 +18,6 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-if ! command -v kubectl >/dev/null 2>&1; then
-  echo "Please install kubectl before running this script"
-  exit 1
-fi
-
 source "${KUBE_ROOT}/test/kubemark/common.sh"
 
 RUN_FROM_DISTRO=${RUN_FROM_DISTRO:-false}
@@ -209,15 +204,15 @@ EOF
 
 sed "s/##numreplicas##/${NUM_NODES:-10}/g" "${KUBE_ROOT}"/test/kubemark/hollow-node_template.json > "${KUBE_ROOT}"/test/kubemark/hollow-node.json
 sed -i'' -e "s/##project##/${PROJECT}/g" "${KUBE_ROOT}"/test/kubemark/hollow-node.json
-kubectl create -f "${KUBE_ROOT}"/test/kubemark/kubemark-ns.json
-kubectl create -f "${KUBECONFIG_SECRET}" --namespace="kubemark"
-kubectl create -f "${KUBE_ROOT}"/test/kubemark/hollow-node.json --namespace="kubemark"
+"${KUBECTL}" create -f "${KUBE_ROOT}"/test/kubemark/kubemark-ns.json
+"${KUBECTL}" create -f "${KUBECONFIG_SECRET}" --namespace="kubemark"
+"${KUBECTL}" create -f "${KUBE_ROOT}"/test/kubemark/hollow-node.json --namespace="kubemark"
 
 rm "${KUBECONFIG_SECRET}"
 
 echo "Waiting for all HollowNodes to become Running..."
 start=$(date +%s)
-nodes=$(kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node) || true
+nodes=$("${KUBECTL}" --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node) || true
 ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 
 until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
@@ -229,14 +224,14 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
     echo ""
     echo "Timeout waiting for all HollowNodes to become Running"
     # Try listing nodes again - if it fails it means that API server is not responding
-    if kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node &> /dev/null; then
+    if "${KUBECTL}" --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node &> /dev/null; then
       echo "Found only ${ready} ready Nodes while waiting for ${NUM_NODES}."
       exit 1
     fi
     echo "Got error while trying to list Nodes. Probably API server is down."
     exit 1
   fi
-  nodes=$(kubectl --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node) || true
+  nodes=$("${KUBECTL}" --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node) || true
   ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 done
 
