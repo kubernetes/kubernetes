@@ -21,6 +21,7 @@ package kubenet
 import (
 	"fmt"
 	"net"
+	"os/exec"
 	"strings"
 	"syscall"
 
@@ -28,6 +29,7 @@ import (
 
 	"github.com/appc/cni/libcni"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -54,6 +56,7 @@ type kubenetNetworkPlugin struct {
 
 	podCIDRs map[kubecontainer.ContainerID]string
 	MTU      int
+	promisc  bool
 }
 
 func NewPlugin() network.NetworkPlugin {
@@ -63,7 +66,7 @@ func NewPlugin() network.NetworkPlugin {
 	}
 }
 
-func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
+func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode) error {
 	plugin.host = host
 	plugin.cniConfig = &libcni.CNIConfig{
 		Path: []string{DefaultCNIDir},
@@ -85,6 +88,10 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
 	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
 	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+	}
+
+	if hairpinMode == componentconfig.PromiscuousBridge {
+		plugin.promisc = true
 	}
 
 	return nil
@@ -215,6 +222,13 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		return fmt.Errorf("Error building CNI config: %v", err)
 	}
 
+	// Check if the bridge has been created yet
+	var newBridge bool
+	bridge, err := netlink.LinkByName(BridgeName)
+	if bridge == nil {
+		newBridge = true
+	}
+
 	glog.V(3).Infof("Calling cni plugins to add container to network with cni runtime: %+v", rt)
 	res, err := plugin.cniConfig.AddNetwork(plugin.netConfig, rt)
 	if err != nil {
@@ -225,6 +239,15 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	}
 
 	plugin.podCIDRs[id] = res.IP4.IP.String()
+
+	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
+	// TODO: Remove this once the kernel bug (#20096) is fixed.
+	if plugin.promisc && newBridge {
+		// TODO: set with netlink once vishvananda/netlink gets that capability
+		if err := exec.Command("ip", "link", "set", BridgeName, "promisc", "on").Run(); err != nil {
+			return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)
+		}
+	}
 
 	// The first SetUpPod call creates the bridge; ensure shaping is enabled
 	if plugin.shaper == nil {

@@ -353,7 +353,17 @@ func NewMainKubelet(
 		}
 		glog.Infof("Using node IP: %q", klet.nodeIP.String())
 	}
-	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
+
+	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(hairpinMode), containerRuntime, configureCBR0, networkPluginName); err != nil {
+		// This is a non-recoverable error. Returning it up the callstack will just
+		// lead to retries of the same failure, so just fail hard.
+		glog.Fatalf("Invalid hairpin mode: %v", err)
+	} else {
+		klet.hairpinMode = mode
+	}
+	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
+
+	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}, klet.hairpinMode); err != nil {
 		return nil, err
 	} else {
 		klet.networkPlugin = plug
@@ -371,15 +381,6 @@ func NewMainKubelet(
 
 	klet.podCache = kubecontainer.NewCache()
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
-
-	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(hairpinMode), containerRuntime, configureCBR0); err != nil {
-		// This is a non-recoverable error. Returning it up the callstack will just
-		// lead to retries of the same failure, so just fail hard.
-		glog.Fatalf("Invalid hairpin mode: %v", err)
-	} else {
-		klet.hairpinMode = mode
-	}
-	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
 	// Initialize the runtime.
 	switch containerRuntime {
@@ -490,7 +491,7 @@ func NewMainKubelet(
 	return klet, nil
 }
 
-func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRuntime string, configureCBR0 bool) (componentconfig.HairpinMode, error) {
+func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRuntime string, configureCBR0 bool, networkPlugin string) (componentconfig.HairpinMode, error) {
 	// The hairpin mode setting doesn't matter if:
 	// - We're not using a bridge network. This is hard to check because we might
 	//   be using a plugin. It matters if --configure-cbr0=true, and we currently
@@ -505,7 +506,7 @@ func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRunt
 			glog.Warningf("Hairpin mode set to %q but container runtime is %q, ignoring", hairpinMode, containerRuntime)
 			return componentconfig.HairpinNone, nil
 		}
-		if hairpinMode == componentconfig.PromiscuousBridge && !configureCBR0 {
+		if hairpinMode == componentconfig.PromiscuousBridge && !configureCBR0 && networkPlugin != "kubenet" {
 			// This is not a valid combination.  Users might be using the
 			// default values (from before the hairpin-mode flag existed) and we
 			// should keep the old behavior.
