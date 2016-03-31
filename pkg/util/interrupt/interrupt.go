@@ -65,6 +65,7 @@ func (h *Handler) Signal(s os.Signal) {
 func (h *Handler) Run(fn func() error) error {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, childSignals...)
+	defer close(ch)
 	defer signal.Stop(ch)
 	go func() {
 		sig, ok := <-ch
