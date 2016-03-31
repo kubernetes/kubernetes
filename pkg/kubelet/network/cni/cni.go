@@ -38,6 +38,8 @@ const (
 )
 
 type cniNetworkPlugin struct {
+	network.NoopNetworkPlugin
+
 	defaultNetwork *cniNetwork
 	host           network.Host
 }
@@ -94,9 +96,6 @@ func getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix string) (*cniNetwork, er
 func (plugin *cniNetworkPlugin) Init(host network.Host) error {
 	plugin.host = host
 	return nil
-}
-
-func (plugin *cniNetworkPlugin) Event(name string, details map[string]interface{}) {
 }
 
 func (plugin *cniNetworkPlugin) Name() string {

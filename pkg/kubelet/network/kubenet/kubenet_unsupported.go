@@ -26,6 +26,7 @@ import (
 )
 
 type kubenetNetworkPlugin struct {
+	network.NoopNetworkPlugin
 }
 
 func NewPlugin() network.NetworkPlugin {
@@ -34,8 +35,6 @@ func NewPlugin() network.NetworkPlugin {
 
 func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
 	return fmt.Errorf("Kubenet is not supported in this build")
-}
-func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interface{}) {
 }
 
 func (plugin *kubenetNetworkPlugin) Name() string {
