@@ -82,7 +82,7 @@ doc_tmp/
 /_gopath/
 
 # Config directories created by gcloud and gsutil on Jenkins
-/.config/gcloud/
+/.config/gcloud*/
 /.gsutil/
 
 # CoreOS stuff
