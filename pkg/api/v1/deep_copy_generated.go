@@ -172,6 +172,8 @@ func init() {
 		DeepCopy_v1_ServiceSpec,
 		DeepCopy_v1_ServiceStatus,
 		DeepCopy_v1_TCPSocketAction,
+		DeepCopy_v1_Taint,
+		DeepCopy_v1_Toleration,
 		DeepCopy_v1_Volume,
 		DeepCopy_v1_VolumeMount,
 		DeepCopy_v1_VolumeSource,
@@ -2925,6 +2927,21 @@ func DeepCopy_v1_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *co
 	if err := intstr.DeepCopy_intstr_IntOrString(in.Port, &out.Port, c); err != nil {
 		return err
 	}
+	return nil
+}
+
+func DeepCopy_v1_Taint(in Taint, out *Taint, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Value = in.Value
+	out.Effect = in.Effect
+	return nil
+}
+
+func DeepCopy_v1_Toleration(in Toleration, out *Toleration, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	out.Value = in.Value
+	out.Effect = in.Effect
 	return nil
 }
 

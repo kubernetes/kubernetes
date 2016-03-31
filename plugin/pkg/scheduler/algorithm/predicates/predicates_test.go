@@ -2358,3 +2358,286 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 		}
 	}
 }
+
+func TestPodToleratesTaints(t *testing.T) {
+	podTolerateTaintsTests := []struct {
+		pod  *api.Pod
+		node api.Node
+		fits bool
+		test string
+	}{
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod0",
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+			},
+			fits: false,
+			test: "a pod having no tolerations can't be scheduled onto a node with nonempty taints",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod1",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Image: "pod1:V1"}},
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+			},
+			fits: true,
+			test: "a pod which can be scheduled on a dedicated node assgined to user1 with effect NoSchedule",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod2",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"operator": "Equal",
+							"value": "user2",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+			},
+			fits: false,
+			test: "a pod which can't be scheduled on a dedicated node assgined to user2 with effect NoSchedule",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod2",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "foo",
+							"operator": "Exists",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "foo",
+							"value": "bar",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+			},
+			fits: true,
+			test: "a pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod2",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"operator": "Equal",
+							"value": "user2",
+							"effect": "NoSchedule"
+						}, {
+							"key": "foo",
+							"operator": "Exists",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user2",
+							"effect": "NoSchedule"
+						}, {
+							"key": "foo",
+							"value": "bar",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+			},
+			fits: true,
+			test: "a pod has multiple tolerations, node has multiple taints, all the taints are tolerated, pod can be scheduled onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod2",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "foo",
+							"operator": "Equal",
+							"value": "bar",
+							"effect": "PreferNoSchedule"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "foo",
+							"value": "bar",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+			},
+			fits: false,
+			test: "a pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +
+				"can't be scheduled onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod2",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "foo",
+							"operator": "Equal",
+							"value": "bar"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "foo",
+							"value": "bar",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+			},
+			fits: true,
+			test: "The pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +
+				"and the effect of taint is NoSchedule. Pod can be scheduled onto the node",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod2",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"operator": "Equal",
+							"value": "user2",
+							"effect": "NoSchedule"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Annotations: map[string]string{
+						api.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "PreferNoSchedule"
+						}]`,
+					},
+				},
+			},
+			fits: true,
+			test: "The pod has a toleration that key and value don't match the taint on the node, " +
+				"but the effect of taint on node is PreferNochedule. Pod can be shceduled onto the node",
+		},
+	}
+
+	for _, test := range podTolerateTaintsTests {
+		tolerationMatch := TolerationMatch{FakeNodeInfo(test.node)}
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(&test.node)
+		fits, err := tolerationMatch.PodToleratesNodeTaints(test.pod, nodeInfo)
+		if fits == false && !reflect.DeepEqual(err, ErrTaintsTolerationsNotMatch) {
+			t.Errorf("%s, unexpected error: %v", test.test, err)
+		}
+		if fits != test.fits {
+			t.Errorf("%s, expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}

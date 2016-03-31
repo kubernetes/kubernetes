@@ -1617,6 +1617,7 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
 		printLabelsMultiline(out, "Labels", node.Labels)
+		printTaintsInAnnotationMultiline(out, "Taints", node.Annotations)
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		fmt.Fprintf(out, "Phase:\t%v\n", node.Status.Phase)
 		if len(node.Status.Conditions) > 0 {
@@ -2254,5 +2255,44 @@ func printLabelsMultilineWithIndent(out io.Writer, initialIndent, title, innerIn
 		}
 		fmt.Fprintf(out, "%s=%s\n", key, labels[key])
 		i++
+	}
+}
+
+// printTaintsMultiline prints multiple taints with a proper alignment.
+func printTaintsInAnnotationMultiline(out io.Writer, title string, annotations map[string]string) {
+	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	if err != nil {
+		taints = []api.Taint{}
+	}
+	printTaintsMultilineWithIndent(out, "", title, "\t", taints)
+}
+
+// printTaintsMultilineWithIndent prints multiple taints with a user-defined alignment.
+func printTaintsMultilineWithIndent(out io.Writer, initialIndent, title, innerIndent string, taints []api.Taint) {
+	fmt.Fprintf(out, "%s%s:%s", initialIndent, title, innerIndent)
+
+	if taints == nil || len(taints) == 0 {
+		fmt.Fprintln(out, "<none>")
+		return
+	}
+
+	// to print taints in the sorted order
+	keys := make([]string, 0, len(taints))
+	for _, taint := range taints {
+		keys = append(keys, taint.Key)
+	}
+	sort.Strings(keys)
+
+	for i, key := range keys {
+		for _, taint := range taints {
+			if taint.Key == key {
+				if i != 0 {
+					fmt.Fprint(out, initialIndent)
+					fmt.Fprint(out, innerIndent)
+				}
+				fmt.Fprintf(out, "%s=%s:%s\n", taint.Key, taint.Value, taint.Effect)
+				i++
+			}
+		}
 	}
 }

@@ -227,6 +227,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 
 	cmds.AddCommand(NewCmdLabel(f, out))
 	cmds.AddCommand(NewCmdAnnotate(f, out))
+	cmds.AddCommand(NewCmdTaint(f, out))
 
 	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out))
 	cmds.AddCommand(NewCmdClusterInfo(f, out))
