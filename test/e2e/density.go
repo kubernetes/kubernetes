@@ -303,7 +303,7 @@ var _ = KubeDescribe("Density", func() {
 			expectNoError(RunRC(config))
 			e2eStartupTime = time.Now().Sub(startTime)
 			Logf("E2E startup time for %d pods: %v", totalPods, e2eStartupTime)
-			Logf("Throughput during cluster saturation phase: %v", float32(totalPods)/float32(e2eStartupTime))
+			Logf("Throughput (pods/s) during cluster saturation phase: %v", float32(totalPods)/float32(e2eStartupTime/time.Second))
 
 			By("Waiting for all events to be recorded")
 			last := -1
