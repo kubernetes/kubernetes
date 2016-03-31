@@ -1798,6 +1798,9 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 		return err
 	}
 
+	if !kl.shapingEnabled() {
+		return nil
+	}
 	ingress, egress, err := extractBandwidthResources(pod)
 	if err != nil {
 		return err
@@ -2734,11 +2737,14 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	if err := ensureCbr0(cidr, kl.hairpinMode == componentconfig.PromiscuousBridge, kl.babysitDaemons); err != nil {
 		return err
 	}
-	if kl.shaper == nil {
-		glog.V(5).Info("Shaper is nil, creating")
-		kl.shaper = bandwidth.NewTCShaper("cbr0")
+	if kl.shapingEnabled() {
+		if kl.shaper == nil {
+			glog.V(5).Info("Shaper is nil, creating")
+			kl.shaper = bandwidth.NewTCShaper("cbr0")
+		}
+		return kl.shaper.ReconcileInterface()
 	}
-	return kl.shaper.ReconcileInterface()
+	return nil
 }
 
 // updateNodeStatus updates node status to master with retries.
@@ -3594,6 +3600,15 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 	}
 }
+
+func (kl *Kubelet) shapingEnabled() bool {
+	// Disable shaping if a network plugin is defined and supports shaping
+	if kl.networkPlugin != nil && kl.networkPlugin.Capabilities().Has(network.NET_PLUGIN_CAPABILITY_SHAPING) {
+		return false
+	}
+	return true
+}
+
 func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
 	return kl.containerManager.GetNodeConfig()
 }
