@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -4608,6 +4609,7 @@ func TestValidateSecret(t *testing.T) {
 		leadingDotKey = validSecret()
 		dotKey        = validSecret()
 		doubleDotKey  = validSecret()
+		tooManyKeys   = validSecret()
 	)
 
 	emptyName.Name = ""
@@ -4615,12 +4617,15 @@ func TestValidateSecret(t *testing.T) {
 	emptyNs.Namespace = ""
 	invalidNs.Namespace = "NoUppercaseOrSpecialCharsLike=Equals"
 	overMaxSize.Data = map[string][]byte{
-		"over": make([]byte, api.MaxSecretSize+1),
+		"over": make([]byte, api.MaxUnserializedSecretSize+1),
 	}
 	invalidKey.Data["a..b"] = []byte("whoops")
 	leadingDotKey.Data[".key"] = []byte("bar")
 	dotKey.Data["."] = []byte("bar")
 	doubleDotKey.Data[".."] = []byte("bar")
+	for i := 0; i < api.MaxSecretKeys+1; i++ {
+		tooManyKeys.Data[fmt.Sprintf("suchkeys-%d", i)] = []byte("bar")
+	}
 
 	// kubernetes.io/service-account-token secret validation
 	validServiceAccountTokenSecret := func() api.Secret {
@@ -4666,6 +4671,7 @@ func TestValidateSecret(t *testing.T) {
 		"leading dot key":                           {leadingDotKey, true},
 		"dot key":                                   {dotKey, false},
 		"double dot key":                            {doubleDotKey, false},
+		"too many keys":                             {tooManyKeys, false},
 	}
 
 	for name, tc := range tests {
@@ -5227,8 +5233,13 @@ func TestValidateConfigMap(t *testing.T) {
 		dotKey           = newConfigMap("validname", "validns", map[string]string{".": "value"})
 		doubleDotKey     = newConfigMap("validname", "validns", map[string]string{"..": "value"})
 		overMaxKeyLength = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 254): "value"})
-		overMaxSize      = newConfigMap("validname", "validns", map[string]string{"key": strings.Repeat("a", api.MaxSecretSize+1)})
+		overMaxSize      = newConfigMap("validname", "validns", map[string]string{"key": strings.Repeat("a", api.MaxUnserializedSecretSize+1)})
+		tooManyKeys      = newConfigMap("validname", "validns", map[string]string{})
 	)
+
+	for i := 0; i < api.MaxSecretKeys+1; i++ {
+		tooManyKeys.Data[fmt.Sprintf("suchkeys-%d", i)] = "value"
+	}
 
 	tests := map[string]struct {
 		cfg     api.ConfigMap
@@ -5246,6 +5257,7 @@ func TestValidateConfigMap(t *testing.T) {
 		"double dot key":      {doubleDotKey, false},
 		"over max key length": {overMaxKeyLength, false},
 		"over max size":       {overMaxSize, false},
+		"too many keys":       {tooManyKeys, false},
 	}
 
 	for name, tc := range tests {
