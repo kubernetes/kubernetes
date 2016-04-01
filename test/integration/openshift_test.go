@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapiservercfg "k8s.io/kubernetes/pkg/genericapiserver/config"
 	"k8s.io/kubernetes/pkg/master"
 )
 
@@ -28,9 +29,13 @@ import (
 func TestMasterExportsSymbols(t *testing.T) {
 	_ = &master.Config{
 		Config: &genericapiserver.Config{
-			EnableUISupport:      false,
-			EnableSwaggerSupport: false,
-			RestfulContainer:     nil,
+			APIServerConfig: genericapiservercfg.APIServerConfig{
+				EnableUISupport:      false,
+				EnableSwaggerSupport: false,
+			},
+			InternalConfig: genericapiserver.InternalConfig{
+				RestfulContainer: nil,
+			},
 		},
 		EnableCoreControllers: false,
 	}

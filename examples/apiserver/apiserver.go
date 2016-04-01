@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapiservercfg "k8s.io/kubernetes/pkg/genericapiserver/config"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 
 	// Install the testgroup API
@@ -57,11 +58,15 @@ func newStorageDestinations(groupName string, groupMeta *apimachinery.GroupMeta)
 
 func Run() error {
 	config := genericapiserver.Config{
-		EnableIndex:          true,
-		EnableSwaggerSupport: true,
-		APIPrefix:            "/api",
-		APIGroupPrefix:       "/apis",
-		Serializer:           api.Codecs,
+		genericapiservercfg.APIServerConfig{
+			EnableIndex:          true,
+			EnableSwaggerSupport: true,
+			APIPrefix:            "/api",
+			APIGroupPrefix:       "/apis",
+		},
+		genericapiserver.InternalConfig{
+			Serializer: api.Codecs,
+		},
 	}
 	s, err := genericapiserver.New(&config)
 	if err != nil {

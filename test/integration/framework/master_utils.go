@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -41,6 +40,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapiservercfg "k8s.io/kubernetes/pkg/genericapiserver/config"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
@@ -48,6 +48,8 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -168,14 +170,18 @@ func NewMasterConfig() *master.Config {
 
 	return &master.Config{
 		Config: &genericapiserver.Config{
-			StorageDestinations:     storageDestinations,
-			StorageVersions:         storageVersions,
-			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
-			APIPrefix:               "/api",
-			APIGroupPrefix:          "/apis",
-			Authorizer:              apiserver.NewAlwaysAllowAuthorizer(),
-			AdmissionControl:        admit.NewAlwaysAdmit(),
-			Serializer:              api.Codecs,
+			APIServerConfig: genericapiservercfg.APIServerConfig{
+				StorageVersions: storageVersions,
+				APIPrefix:       "/api",
+				APIGroupPrefix:  "/apis",
+			},
+			InternalConfig: genericapiserver.InternalConfig{
+				StorageDestinations:     storageDestinations,
+				APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
+				Authorizer:              apiserver.NewAlwaysAllowAuthorizer(),
+				AdmissionControl:        admit.NewAlwaysAdmit(),
+				Serializer:              api.Codecs,
+			},
 		},
 		KubeletClient: kubeletclient.FakeKubeletClient{},
 	}
