@@ -65,9 +65,7 @@ func MatchCluster(label labels.Selector, field fields.Selector) generic.Matcher 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (clusterStrategy) PrepareForCreate(obj runtime.Object) {
 	cluster := obj.(*federation.Cluster)
-	cluster.Status = federation.ClusterStatus{
-		Phase: federation.ClusterPending,
-	}
+	cluster.Status = federation.ClusterStatus{}
 }
 
 // Validate validates a new cluster.
