@@ -83,7 +83,7 @@ func (d *MyDuration) UnmarshalText(text []byte) error {
 type LoadBalancerOpts struct {
 	SubnetId          string     `gcfg:"subnet-id"` // required
 	FloatingNetworkId string     `gcfg:"floating-network-id"`
-	LBMethod          string     `gfcg:"lb-method"`
+	LBMethod          string     `gcfg:"lb-method"`
 	CreateMonitor     bool       `gcfg:"create-monitor"`
 	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
 	MonitorTimeout    MyDuration `gcfg:"monitor-timeout"`
