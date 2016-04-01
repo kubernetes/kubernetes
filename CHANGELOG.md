@@ -16,6 +16,7 @@ binary | sha1 hash | md5 hash
 * restore ability to run against secured etcd ([#21535](https://github.com/kubernetes/kubernetes/pull/21535), [@AdoHe](https://github.com/AdoHe))
 
 ### Other notable changes
+
 * Trusty: Avoid reaching GCE custom metadata size limit ([#22818](https://github.com/kubernetes/kubernetes/pull/22818), [@andyzheng0831](https://github.com/andyzheng0831))
 * Update kubectl help for 1.2 resources ([#23305](https://github.com/kubernetes/kubernetes/pull/23305), [@janetkuo](https://github.com/janetkuo))
 * Removing URL query param from swagger UI to fix the XSS issue ([#23234](https://github.com/kubernetes/kubernetes/pull/23234), [@nikhiljindal](https://github.com/nikhiljindal))
@@ -61,7 +62,7 @@ Kubelet supports 100 pods per node with 4x reduced system overhead.
      * Dynamic Configuration (ConfigMap API in the core API group) enables application
 configuration to be stored as a Kubernetes API object and pulled dynamically on
 container startup, as an alternative to baking in command-line flags when a
-container is built. 
+container is built.
      * Turnkey Deployments (Deployment API (Beta) in the Extensions API group)
 automate deployment and rolling updates of applications, specified
 declaratively. It handles versioning, multiple simultaneous rollouts,
@@ -90,10 +91,10 @@ interacting with the system. Note: the GUI is enabled by default in 1.2 clusters
 
 <img src="docs/images/newgui.png" width="" alt="Dashboard UI screenshot showing cards that represent applications that run inside a cluster" title="Dashboard UI apps screen">
 
-## Other notable improvements 
+## Other notable improvements
 
-  * Job was Beta in 1.1 and is GA in 1.2 .  
-     * <code>apiVersion: batch/v1 </code>is now available.  You now do not need to specify the <code>.spec.selector</code> field — a [unique selector is automatically generated ](http://kubernetes.io/docs/user-guide/jobs/#pod-selector)for you.  
+  * Job was Beta in 1.1 and is GA in 1.2 .
+     * <code>apiVersion: batch/v1 </code>is now available.  You now do not need to specify the <code>.spec.selector</code> field — a [unique selector is automatically generated ](http://kubernetes.io/docs/user-guide/jobs/#pod-selector)for you.
      * The previous version, <code>apiVersion: extensions/v1beta1</code>, is still supported.  Even if you roll back to 1.1, the objects created using
 the new apiVersion will still be accessible, using the old version.   You can
 continue to use your existing JSON and YAML files until you are ready to switch
@@ -123,7 +124,7 @@ annotation is not specified, then ‘iptables’ mode is the default. If kube-pr
 is unable to start in iptables mode because system requirements are not met
 (kernel or iptables versions are insufficient), the kube-proxy will fall-back
 to userspace mode. Kube-proxy is much more performant and less
-resource-intensive in ‘iptables’ mode. 
+resource-intensive in ‘iptables’ mode.
   * Node stability can be improved by reserving [resources](https://github.com/kubernetes/kubernetes/blob/release-1.2/docs/proposals/node-allocatable.md) for the base operating system using --system-reserved and --kube-reserved Kubelet flags
   * Liveness and readiness probes now support more configuration parameters:
 periodSeconds, successThreshold, failureThreshold
@@ -151,7 +152,7 @@ etc) volumes and block-device volumes will be owned by the FSGroup, and each
 container in the pod will run with the FSGroup as a supplemental group
   * Volumes that support SELinux labelling are now automatically relabeled with the
 Pod’s SELinux context, if specified
-  * A stable client library release\_1\_2 is added. The library is [here](https://github.com/kubernetes/kubernetes/tree/master/pkg/client/clientset_generated/release_1_2), and detailed doc is [here](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/generating-clientset.md#released-clientsets). We will keep the interface of this go client stable.
+  * A stable client library release\_1\_2 is added. The library is [here](pkg/client/clientset_generated/release_1_2/), and detailed doc is [here](docs/devel/generating-clientset.md#released-clientsets). We will keep the interface of this go client stable.
   * New Azure File Service Volume Plugin enables mounting Microsoft Azure File
 Volumes (SMB 2.1 and 3.0) into a Pod. See [example](https://github.com/kubernetes/kubernetes/blob/release-1.2/examples/azure_file/README.md) for details.
   * Logs usage and root filesystem usage of a container, volumes usage of a pod and node disk usage are exposed through Kubelet new metrics API.
@@ -165,7 +166,7 @@ automatically provision a PersistentVolume to bind to an unfulfilled
 PersistentVolumeClaim.
   * Run multiple schedulers in parallel, e.g. one or more custom schedulers
 alongside the default Kubernetes scheduler, using pod annotations to select
-among the schedulers for each pod. Documentation is [here](http://kubernetes.io/docs/admin/multiple-schedulers.md), design doc is [here](https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/multiple-schedulers.md).
+among the schedulers for each pod. Documentation is [here](http://kubernetes.io/docs/admin/multiple-schedulers.md), design doc is [here](docs/proposals/multiple-schedulers.md).
   * More expressive node affinity syntax, and support for “soft” node affinity.
 Node selectors (to constrain pods to schedule on a subset of nodes) now support
 the operators {<code>In, NotIn, Exists, DoesNotExist, Gt, Lt</code>}  instead of just conjunction of exact match on node label values. In
@@ -178,11 +179,11 @@ details can be found in the [DNS README](https://github.com/kubernetes/kubernete
   * New SchedulerExtender enables users to implement custom
 out-of-(the-scheduler)-process scheduling predicates and priority functions,
 for example to schedule pods based on resources that are not directly managed
-by Kubernetes. Changes were introduced in PR [#13580](https://github.com/kubernetes/kubernetes/pull/13580). Example configuration and documentation is available [here](https://github.com/kubernetes/kubernetes/blob/master/docs/design/scheduler_extender.md). This is an alpha feature and may not be supported in its current form at beta
+by Kubernetes. Changes were introduced in PR [#13580](https://github.com/kubernetes/kubernetes/pull/13580). Example configuration and documentation is available [here](docs/design/scheduler_extender.md). This is an alpha feature and may not be supported in its current form at beta
 or GA.
   * New Flex Volume Plugin enables users to use out-of-process volume plugins that
 are installed to “/usr/libexec/kubernetes/kubelet-plugins/volume/exec/” on
-every node, instead of being compiled into the Kubernetes binary. See [example](https://github.com/kubernetes/kubernetes/blob/master/examples/flexvolume/README.md) for details.
+every node, instead of being compiled into the Kubernetes binary. See [example](examples/flexvolume/README.md) for details.
   * vendor volumes into a pod. It expects vendor drivers are installed in the
 volume plugin path on each kubelet node. This is an alpha feature and may
 change in future.
@@ -199,17 +200,17 @@ request only, if you want to avoid hardcapping. If the kernel does not support
 CPU Quota, NodeStatus will contain a warning indicating that CPU Limits cannot
 be enforced.
   * The following applies only if you use the Go language client (<code>/pkg/client/unversioned</code>) to create Job by defining Go variables of type "<code>k8s.io/kubernetes/pkg/apis/extensions".Job</code>).  We think <strong>this is not common</strong>, so if you are not sure what this means, you probably aren't doing this.  If
-you do this, then, at the time you re-vendor the "<code>k8s.io/kubernetes/"</code> code, you will need to set <code>job.Spec.ManualSelector = true</code>, or else set <code>job.Spec.Selector = nil.  </code>Otherwise, the jobs you create may be rejected.  See [Specifying your own pod selector](http://kubernetes.io/docs/user-guide/jobs/#specifying-your-own-pod-selector). 
+you do this, then, at the time you re-vendor the "<code>k8s.io/kubernetes/"</code> code, you will need to set <code>job.Spec.ManualSelector = true</code>, or else set <code>job.Spec.Selector = nil.  </code>Otherwise, the jobs you create may be rejected.  See [Specifying your own pod selector](http://kubernetes.io/docs/user-guide/jobs/#specifying-your-own-pod-selector).
   * Deployment was Alpha in 1.1 (though it had apiVersion extensions/v1beta1) and
 was disabled by default. Due to some non-backward-compatible API changes, any
-Deployment objects you created in 1.1 won’t work with in the 1.2 release. 
+Deployment objects you created in 1.1 won’t work with in the 1.2 release.
      * Before upgrading to 1.2, <strong>delete all Deployment alpha-version resources</strong>, including the Replication Controllers and Pods the Deployment manages. Then
 create Deployment Beta resources after upgrading to 1.2. Not deleting the
 Deployment objects may cause the deployment controller to mistakenly match
 other pods and delete them, due to the selector API change.
      * Client (kubectl) and server versions must match (both 1.1 or both 1.2) for any
 Deployment-related operations.
-     * Behavior change: 
+     * Behavior change:
         * Deployment creates ReplicaSets instead of ReplicationControllers.
         * Scale subresource now has a new <code>targetSelector</code> field in its status. This field supports the new set-based selectors supported
 by Deployments, but in a serialized format.
@@ -222,12 +223,12 @@ and its default value is changed from
         * .spec.strategy.rollingUpdate.minReadySeconds is moved to .spec.minReadySeconds
   * DaemonSet was Alpha in 1.1 (though it had apiVersion extensions/v1beta1) and
 was disabled by default. Due to some non-backward-compatible API changes, any
-DaemonSet objects you created in 1.1 won’t work with in the 1.2 release. 
+DaemonSet objects you created in 1.1 won’t work with in the 1.2 release.
      * Before upgrading to 1.2, <strong>delete all DaemonSet alpha-version resources</strong>. If you do not want to disrupt the pods, use kubectl delete daemonset <name>
---cascade=false. Then create DaemonSet Beta resources after upgrading to 1.2. 
+--cascade=false. Then create DaemonSet Beta resources after upgrading to 1.2.
      * Client (kubectl) and server versions must match (both 1.1 or both 1.2) for any
 DaemonSet-related operations.
-     * Behavior change: 
+     * Behavior change:
         * DaemonSet pods will be created on nodes with .spec.unschedulable=true and will
 not be evicted from nodes whose Ready condition is false.
         * Updates to the pod template are now permitted. To perform a rolling update of a
@@ -251,7 +252,7 @@ content type, helpfully sends "application/x-www-urlencoded", which is not
 correct.
 Other client authors should double check that you are sending proper
 accept and content type headers, or set no value (in which case JSON is the
-default). 
+default).
 An example using curl:
 <code>curl -H "Content-Type: application/json" -XPOST -d
 '{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"kube-system"}}' "[http://127.0.0.1:8080/api/v1/namespaces](http://127.0.0.1:8080/api/v1/namespaces)"</code>
@@ -262,7 +263,7 @@ MINION\_SIZE to kube-up, you should now specify NUM\_NODES or NODE\_SIZE.
 
 ## Known Issues
 
-  * Paused deployments can't be resized and don't clean up old ReplicaSets. 
+  * Paused deployments can't be resized and don't clean up old ReplicaSets.
   * Minimum memory limit is 4MB. This is a docker limitation
   * Minimum CPU limits is 10m. This is a Linux Kernel limitation
   * “kubectl rollout undo” (i.e. rollback) will hang on paused deployments, because
@@ -291,7 +292,7 @@ defines the number of nodes that if not Ready in time won’t cause kube-up
 failure.
   * “kubectl rolling-update” only supports Replication Controllers (it doesn’t
 support Replica Sets). It’s recommended to use Deployment 1.2 with “kubectl
-rollout” commands instead, if you want to rolling update Replica Sets. 
+rollout” commands instead, if you want to rolling update Replica Sets.
   * When live upgrading Kubelet to 1.2 without draining the pods running on the node,
 the containers will be restarted by Kubelet (see details in [#23104](https://github.com/kubernetes/kubernetes/issues/23104)).
 
@@ -360,5 +361,6 @@ With kube-up:
 * [v1.1.2](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.2)
 
 Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
+
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/CHANGELOG.md?pixel)]()
