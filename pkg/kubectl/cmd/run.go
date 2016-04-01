@@ -87,6 +87,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 	addRunFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 
@@ -256,7 +257,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			if err != nil {
 				return err
 			}
-			_, typer := f.Object()
+			_, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 			r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 				ContinueOnError().
 				NamespaceParam(namespace).DefaultNamespace().
@@ -270,7 +271,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	if outputFormat != "" {
-		return f.PrintObject(cmd, obj, cmdOut)
+		return f.PrintObject(cmd, mapper, obj, cmdOut)
 	}
 	cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], "created")
 	return nil
@@ -421,7 +422,7 @@ func generateService(f *cmdutil.Factory, cmd *cobra.Command, args []string, serv
 	}
 
 	if cmdutil.GetFlagString(cmd, "output") != "" {
-		return f.PrintObject(cmd, obj, out)
+		return f.PrintObject(cmd, mapper, obj, out)
 	}
 	cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, args[0], "created")
 
@@ -440,7 +441,7 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 		return nil, "", nil, nil, err
 	}
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	groupVersionKind, err := typer.ObjectKind(obj)
 	if err != nil {
 		return nil, "", nil, nil, err

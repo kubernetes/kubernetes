@@ -79,7 +79,7 @@ func (o *UndoOptions) CompleteUndo(f *cmdutil.Factory, cmd *cobra.Command, out i
 	}
 
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper, o.Typer = f.Object(false)
 	o.Out = out
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()

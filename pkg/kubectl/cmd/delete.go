@@ -100,6 +100,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	cmdutil.AddOutputFlagsForMutation(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 
@@ -109,7 +110,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 	deleteAll := cmdutil.GetFlagBool(cmd, "all")
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
