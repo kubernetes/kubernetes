@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -33,6 +35,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
+)
+
+const (
+	filePollPeriod     = 5 * time.Second
+	failureRetryPeriod = 10 * time.Second
+	eofMarker          = "### EOF ###"
 )
 
 type policyLoadError struct {
@@ -51,13 +60,73 @@ func (p policyLoadError) Error() string {
 
 type policyList []*api.Policy
 
+type ABACPolicy struct {
+	Auth atomic.Value
+}
+
+func New(path string) (*ABACPolicy, error) {
+
+	var plist policyList
+	abacPolicy := &ABACPolicy{}
+
+	plist, err, eof := newFromFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if eof {
+		go wait.Forever(func() {
+			var lastModifiedTime *time.Time
+			for {
+				time.Sleep(filePollPeriod)
+
+				done := make(chan error)
+				go func() {
+					info, err := os.Stat(path)
+					if err != nil {
+						done <- err
+					} else {
+						modTime := info.ModTime()
+						if lastModifiedTime == nil || *lastModifiedTime == modTime {
+							lastModifiedTime = &modTime
+							close(done)
+						} else {
+							tmpPlist, err, eof := newFromFile(path)
+							if err != nil {
+								done <- err
+							} else {
+								if !eof {
+									done <- errors.New("ABAC EOF marker is not detected, policy is not reloaded")
+								} else {
+									abacPolicy.Auth.Store(tmpPlist)
+									glog.Infof("ABAC policy is successfully reloaded")
+									close(done)
+								}
+							}
+						}
+					}
+				}()
+
+				err, ok := <-done
+				if ok {
+					glog.Warningf("%v, retry in %v", err, failureRetryPeriod)
+					time.Sleep(failureRetryPeriod)
+				}
+			}
+		}, time.Second)
+	}
+
+	abacPolicy.Auth.Store(plist)
+	return abacPolicy, nil
+}
+
 // TODO: Have policies be created via an API call and stored in REST storage.
-func NewFromFile(path string) (policyList, error) {
+func newFromFile(path string) (policyList, error, bool) {
 	// File format is one map per line.  This allows easy concatentation of files,
 	// comments in files, and identification of errors by line number.
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
 	defer file.Close()
 
@@ -68,7 +137,9 @@ func NewFromFile(path string) (policyList, error) {
 
 	i := 0
 	unversionedLines := 0
+	var eofMarkerDetected bool
 	for scanner.Scan() {
+		eofMarkerDetected = false
 		i++
 		p := &api.Policy{}
 		b := scanner.Bytes()
@@ -76,22 +147,25 @@ func NewFromFile(path string) (policyList, error) {
 		// skip comment lines and blank lines
 		trimmed := strings.TrimSpace(string(b))
 		if len(trimmed) == 0 || strings.HasPrefix(trimmed, "#") {
+			if trimmed == eofMarker {
+				eofMarkerDetected = true
+			}
 			continue
 		}
 
 		decodedObj, _, err := decoder.Decode(b, nil, nil)
 		if err != nil {
 			if !(runtime.IsMissingVersion(err) || runtime.IsMissingKind(err) || runtime.IsNotRegisteredError(err)) {
-				return nil, policyLoadError{path, i, b, err}
+				return nil, policyLoadError{path, i, b, err}, false
 			}
 			unversionedLines++
 			// Migrate unversioned policy object
 			oldPolicy := &v0.Policy{}
 			if err := runtime.DecodeInto(decoder, b, oldPolicy); err != nil {
-				return nil, policyLoadError{path, i, b, err}
+				return nil, policyLoadError{path, i, b, err}, false
 			}
 			if err := api.Scheme.Convert(oldPolicy, p); err != nil {
-				return nil, policyLoadError{path, i, b, err}
+				return nil, policyLoadError{path, i, b, err}, false
 			}
 			pl = append(pl, p)
 			continue
@@ -99,7 +173,7 @@ func NewFromFile(path string) (policyList, error) {
 
 		decodedPolicy, ok := decodedObj.(*api.Policy)
 		if !ok {
-			return nil, policyLoadError{path, i, b, fmt.Errorf("unrecognized object: %#v", decodedObj)}
+			return nil, policyLoadError{path, i, b, fmt.Errorf("unrecognized object: %#v", decodedObj)}, false
 		}
 		pl = append(pl, decodedPolicy)
 	}
@@ -109,9 +183,9 @@ func NewFromFile(path string) (policyList, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, policyLoadError{path, -1, nil, err}
+		return nil, policyLoadError{path, -1, nil, err}, false
 	}
-	return pl, nil
+	return pl, nil, eofMarkerDetected
 }
 
 func matches(p api.Policy, a authorizer.Attributes) bool {
@@ -215,7 +289,12 @@ func resourceMatches(p api.Policy, a authorizer.Attributes) bool {
 }
 
 // Authorizer implements authorizer.Authorize
-func (pl policyList) Authorize(a authorizer.Attributes) error {
+func (apolicy *ABACPolicy) Authorize(a authorizer.Attributes) error {
+	pl, ok := apolicy.Auth.Load().(policyList)
+	if !ok {
+		return errors.New("unexpected error: cannot convert atomic data to authorizer.Authorizer type")
+	}
+
 	for _, p := range pl {
 		if matches(*p, a) {
 			return nil
