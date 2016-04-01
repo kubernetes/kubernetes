@@ -367,8 +367,11 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 	}
 	containerName := dockerName.ContainerName
 
-	var containerInfo *labelledContainerInfo
-	containerInfo = getContainerInfoFromLabel(iResult.Config.Labels)
+	containerInfo := getContainerInfoFromLabel(iResult.Config.Labels)
+	var restartCount int
+	if containerInfo.LastStatus != nil {
+		restartCount = containerInfo.LastStatus.RestartCount + 1
+	}
 
 	parseTimestampError := func(label, s string) {
 		glog.Errorf("Failed to parse %q timestamp %q for container %q of pod %q", label, s, id, kubecontainer.BuildPodFullName(podName, podNamespace))
@@ -386,7 +389,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 
 	status := kubecontainer.ContainerStatus{
 		Name:         containerName,
-		RestartCount: containerInfo.RestartCount,
+		RestartCount: restartCount,
 		Image:        iResult.Config.Image,
 		ImageID:      DockerPrefix + iResult.Image,
 		ID:           kubecontainer.DockerID(id).ContainerID(),
@@ -549,7 +552,7 @@ func (dm *DockerManager) runContainer(
 	ipcMode string,
 	utsMode string,
 	pidMode string,
-	restartCount int,
+	labels map[string]string,
 	oomScoreAdj int) (kubecontainer.ContainerID, error) {
 
 	dockerName := KubeletContainerName{
@@ -563,18 +566,13 @@ func (dm *DockerManager) runContainer(
 		return kubecontainer.ContainerID{}, err
 	}
 
-	// Pod information is recorded on the container as labels to preserve it in the event the pod is deleted
-	// while the Kubelet is down and there is no information available to recover the pod.
-	// TODO: keep these labels up to date if the pod changes
-	labels := newLabels(container, pod, restartCount, dm.enableCustomMetrics)
-
 	// TODO(random-liu): Remove this when we start to use new labels for KillContainerInPod
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		// TODO: This is kind of hacky, we should really just encode the bits we need.
 		// TODO: This is hacky because the Kubelet should be parameterized to encode a specific version
 		//   and needs to be able to migrate this whenever we deprecate v1. Should be a member of DockerManager.
 		if data, err := runtime.Encode(api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"}), pod); err == nil {
-			labels[kubernetesPodLabel] = string(data)
+			labels[podLabel] = string(data)
 		} else {
 			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
 		}
@@ -1194,7 +1192,7 @@ func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (stri
 
 // TODO(random-liu): Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.
 // We can only deprecate this after refactoring kubelet.
-// TODO(random-liu): After using pod status for KillPod(), we can also remove the kubernetesPodLabel, because all the needed information should have
+// TODO(random-liu): After using pod status for KillPod(), we can also remove the podLabel, because all the needed information should have
 // been extract from new labels and stored in pod status.
 // only hard eviction scenarios should provide a grace period override, all other code paths must pass nil.
 func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
@@ -1425,7 +1423,7 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 	labels := inspect.Config.Labels
 
 	// the pod data may not be set
-	if body, found := labels[kubernetesPodLabel]; found {
+	if body, found := labels[podLabel]; found {
 		pod = &api.Pod{}
 		if err = runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
 			name := labels[types.KubernetesContainerNameLabel]
@@ -1454,7 +1452,7 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 	// attempt to find the default grace period if we didn't commit a pod, but set the generic metadata
 	// field (the one used by kill)
 	if pod == nil {
-		if period, ok := labels[kubernetesPodTerminationGracePeriodLabel]; ok {
+		if period, ok := labels[podTerminationGracePeriodLabel]; ok {
 			if seconds, err := strconv.ParseInt(period, 10, 64); err == nil {
 				pod = &api.Pod{}
 				pod.DeletionGracePeriodSeconds = &seconds
@@ -1495,7 +1493,7 @@ func (dm *DockerManager) applyOOMScoreAdj(pod *api.Pod, container *api.Container
 
 // Run a single container from a pod. Returns the docker container ID
 // If do not need to pass labels, just pass nil.
-func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode, pidMode, podIP string, restartCount int) (kubecontainer.ContainerID, error) {
+func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode, pidMode, podIP string, labels map[string]string) (kubecontainer.ContainerID, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("runContainerInPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1519,7 +1517,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 
 	oomScoreAdj := dm.calculateOomScoreAdj(pod, container)
 
-	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, restartCount, oomScoreAdj)
+	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, labels, oomScoreAdj)
 	if err != nil {
 		return kubecontainer.ContainerID{}, fmt.Errorf("runContainer: %v", err)
 	}
@@ -1703,8 +1701,9 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 		return "", err, msg
 	}
 
-	// Currently we don't care about restart count of infra container, just set it to 0.
-	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), "", 0)
+	// We don't need last container status of infra container, set it to nil.
+	labels := newLabels(container, pod, nil, dm.enableCustomMetrics)
+	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), "", labels)
 	if err != nil {
 		return "", kubecontainer.ErrRunContainer, err.Error()
 	}
@@ -2129,15 +2128,9 @@ func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Po
 		}
 	}
 
-	// For a new container, the RestartCount should be 0
-	restartCount := 0
-	containerStatus := podStatus.FindContainerStatusByName(container.Name)
-	if containerStatus != nil {
-		restartCount = containerStatus.RestartCount + 1
-	}
-
 	// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
-	_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, pidMode, podIP, restartCount)
+	labels := newLabels(container, pod, podStatus.FindContainerStatusByName(container.Name), dm.enableCustomMetrics)
+	_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, pidMode, podIP, labels)
 	if err != nil {
 		// TODO(bburns) : Perhaps blacklist a container after N failures?
 		return kubecontainer.ErrRunContainer, err.Error()

@@ -459,7 +459,7 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 			Name: "/k8s_foo_qux_new_1234_42",
 			Config: &dockercontainer.Config{
 				Labels: map[string]string{
-					kubernetesPodLabel:                 string(podString),
+					podLabel: string(podString),
 					types.KubernetesContainerNameLabel: "foo",
 				},
 			},
