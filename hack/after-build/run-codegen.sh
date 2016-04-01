@@ -35,8 +35,7 @@ setgen=$(kube::util::find-binary "set-gen")
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} -t "$@"
-# TODO: Enable when conversion generator is ready.
-# ${conversiongen} "$@"
+${conversiongen} "$@"
 ${deepcopygen} "$@"
 ${setgen} "$@"
 
