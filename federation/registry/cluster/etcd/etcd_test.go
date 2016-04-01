@@ -54,9 +54,7 @@ func validNewCluster() *federation.Cluster {
 			},
 		},
 		Status: federation.ClusterStatus{
-			Conditions: []federation.ClusterCondition{
-				{Type: federation.ClusterReady, Status: api.ConditionFalse},
-			},
+			Phase: federation.ClusterPending,
 		},
 	}
 }
@@ -131,7 +129,7 @@ func TestWatch(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "foo"},
 		},
-		// not matching fields
+		// not matchin fields
 		[]fields.Set{
 			{"metadata.name": "bar"},
 		},

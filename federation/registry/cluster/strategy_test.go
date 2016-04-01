@@ -47,9 +47,7 @@ func validNewCluster() *federation.Cluster {
 			},
 		},
 		Status: federation.ClusterStatus{
-			Conditions: []federation.ClusterCondition{
-				{Type: federation.ClusterReady, Status: api.ConditionTrue},
-			},
+			Phase: federation.ClusterTerminated,
 		},
 	}
 }
@@ -64,9 +62,7 @@ func invalidNewCluster() *federation.Cluster {
 			Credential: "bar",
 		},
 		Status: federation.ClusterStatus{
-			Conditions: []federation.ClusterCondition{
-				{Type: federation.ClusterReady, Status: api.ConditionFalse},
-			},
+			Phase: federation.ClusterPending,
 		},
 	}
 }
@@ -82,7 +78,7 @@ func TestClusterStrategy(t *testing.T) {
 
 	cluster := validNewCluster()
 	Strategy.PrepareForCreate(cluster)
-	if len(cluster.Status.Conditions) != 0 {
+	if len(cluster.Status.Phase) != 0 {
 		t.Errorf("Cluster should not allow setting phase on create")
 	}
 	errs := Strategy.Validate(ctx, cluster)
@@ -119,10 +115,6 @@ func TestClusterStatusStrategy(t *testing.T) {
 	StatusStrategy.PrepareForUpdate(cluster, invalidCluster)
 	if !reflect.DeepEqual(invalidCluster.Spec, cluster.Spec) ||
 		reflect.DeepEqual(invalidCluster.Status, cluster.Status) {
-		t.Logf("== cluster.Spec: %v\n", cluster.Spec)
-		t.Logf("== cluster.Status: %v\n", cluster.Status)
-		t.Logf("== invalidCluster.Spec: %v\n", cluster.Spec)
-		t.Logf("== invalidCluster.Spec: %v\n", cluster.Status)
 		t.Error("Only spec is expected being changed")
 	}
 	errs := Strategy.ValidateUpdate(ctx, invalidCluster, cluster)
