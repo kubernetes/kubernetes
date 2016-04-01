@@ -496,7 +496,7 @@ case ${JOB_NAME} in
     ;;
 
   # Sets up the GCE soak cluster weekly using the latest 1.1 ci release.
-  kubernetes-soak-weekly-deploy-gce-1.1)
+  kubernetes-soak-weekly-deploy-gce-release-1.1)
     : ${E2E_CLUSTER_NAME:="gce-soak-weekly-1.1"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="gce-soak-weekly-1-1"}
@@ -509,7 +509,7 @@ case ${JOB_NAME} in
     ;;
 
   # Runs tests on GCE soak cluster for latest 1.1 ci release.
-  kubernetes-soak-continuous-e2e-gce-1.1)
+  kubernetes-soak-continuous-e2e-gce-release-1.1)
     : ${E2E_CLUSTER_NAME:="gce-soak-weekly-1.1"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="gce-soak-weekly-1-1"}
@@ -633,7 +633,7 @@ case ${JOB_NAME} in
   # sequentially, against the latest 1.1 ci release.
   # The autoscaling test is not disruptive, however there is no better suite
   # to run it.
-  kubernetes-e2e-gce-disruptive-1.1)
+  kubernetes-e2e-gce-disruptive-release-1.1)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-disruptive-1.1"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="gce-e2e-disruptive-1-1"}
@@ -719,7 +719,7 @@ case ${JOB_NAME} in
           )"}
     ;;
 
-  kubernetes-e2e-gke-1.1)
+  kubernetes-e2e-gke-release-1.1)
     : ${E2E_CLUSTER_NAME:="gke-release-1-1"}
     : ${E2E_NETWORK:="gke-release-1-1"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
