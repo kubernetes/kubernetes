@@ -1,3 +1,32 @@
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Release Notes for Kubernetes v1.3.0-alpha.1](#release-notes-for-kubernetes-v130-alpha1)
+  - [[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/HEAD/examples)](#documentationhttpkubernetesgithubio--exampleshttpreleasesk8sioheadexamples)
+  - [Downloads](#downloads)
+  - [Changes since v1.2.0 (last PR #23530)](#changes-since-v120-last-pr-23530)
+    - [Action Required](#action-required)
+    - [Other notable changes](#other-notable-changes)
+- [Release Notes for Kubernetes 1.2.0](#release-notes-for-kubernetes-120)
+  - [[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)](#documentationhttpkubernetesgithubio--exampleshttpreleasesk8siorelease-12examples)
+  - [Downloads](#downloads)
+  - [Changes since v1.1.1](#changes-since-v111)
+  - [Major Themes](#major-themes)
+  - [Other notable improvements](#other-notable-improvements)
+  - [Experimental Features](#experimental-features)
+  - [Action required](#action-required)
+  - [Known Issues](#known-issues)
+    - [Docker Known Issues](#docker-known-issues)
+      - [1.9.1](#191)
+  - [Provider-specific Notes](#provider-specific-notes)
+    - [Various](#various)
+    - [AWS](#aws)
+    - [GCE](#gce)
+  - [Changelog](#changelog)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
+<!-- NEW RELEASE NOTES ENTRY -->
+
 # Release Notes for Kubernetes v1.3.0-alpha.1
 
 ## [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/HEAD/examples)
