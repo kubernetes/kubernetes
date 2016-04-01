@@ -33,9 +33,10 @@ import (
 const latestReleaseBranch = "release-1.2"
 
 var (
-	verbose = flag.Bool("verbose", false, "On verification failure, emit pre-munge and post-munge versions.")
-	verify  = flag.Bool("verify", false, "Exit with status 1 if files would have needed changes but do not change.")
-	rootDir = flag.String("root-dir", "", "Root directory containing documents to be processed.")
+	verbose   = flag.Bool("verbose", false, "On verification failure, emit pre-munge and post-munge versions.")
+	verify    = flag.Bool("verify", false, "Exit with status 1 if files would have needed changes but do not change.")
+	norecurse = flag.Bool("norecurse", false, "Only process the files of --root-dir.")
+	rootDir   = flag.String("root-dir", "", "Root directory containing documents to be processed.")
 	// "repo-root" seems like a dumb name, this is the relative path (from rootDir) to get to the repoRoot
 	relRoot = flag.String("repo-root", "..", `Appended to --root-dir to get the repository root.
 It's done this way so that generally you just have to set --root-dir.
@@ -155,6 +156,10 @@ func (f fileProcessor) visit(path string) error {
 
 func newWalkFunc(fp *fileProcessor, changesNeeded *bool) filepath.WalkFunc {
 	return func(path string, info os.FileInfo, err error) error {
+		stat, err := os.Stat(path)
+		if path != *rootDir && stat.IsDir() && *norecurse {
+			return filepath.SkipDir
+		}
 		if err := fp.visit(path); err != nil {
 			*changesNeeded = true
 			if err != ErrChangesNeeded {
@@ -194,7 +199,7 @@ func main() {
 	flag.Parse()
 
 	if *rootDir == "" {
-		fmt.Fprintf(os.Stderr, "usage: %s [--verify] --root-dir <docs root>\n", flag.Arg(0))
+		fmt.Fprintf(os.Stderr, "usage: %s [--help] [--verify] [--norecurse] --root-dir [--skip-munges=<skip list>] <docs root>\n", flag.Arg(0))
 		os.Exit(1)
 	}
 
