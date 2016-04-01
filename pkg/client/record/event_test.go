@@ -27,10 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	_ "k8s.io/kubernetes/pkg/api/install" // To register api.Pod used in tests below
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	k8sruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	"net/http"
 )
 
 type testEventSink struct {
@@ -430,6 +432,41 @@ func TestWriteEventError(t *testing.T) {
 		if attempts != ent.attemptsWanted {
 			t.Errorf("case %v: wanted %d, got %d attempts", caseName, ent.attemptsWanted, attempts)
 		}
+	}
+}
+
+func TestUpdateExpiredEvent(t *testing.T) {
+	eventCorrelator := NewEventCorrelator(util.RealClock{})
+	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	var createdEvent *api.Event
+
+	sink := &testEventSink{
+		OnPatch: func(*api.Event, []byte) (*api.Event, error) {
+			return nil, &errors.StatusError{
+				ErrStatus: unversioned.Status{
+					Code:   http.StatusNotFound,
+					Reason: unversioned.StatusReasonNotFound,
+				}}
+		},
+		OnCreate: func(event *api.Event) (*api.Event, error) {
+			createdEvent = event
+			return event, nil
+		},
+	}
+
+	ev := &api.Event{}
+	ev.ResourceVersion = "updated-resource-version"
+	ev.Count = 2
+	recordToSink(sink, ev, eventCorrelator, randGen, 0)
+
+	if createdEvent == nil {
+		t.Error("Event did not get created after patch failed")
+		return
+	}
+
+	if createdEvent.ResourceVersion != "" {
+		t.Errorf("Event did not have its resource version cleared, was %s", createdEvent.ResourceVersion)
 	}
 }
 
