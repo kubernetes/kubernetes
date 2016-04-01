@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -108,7 +107,7 @@ func (util *AWSDiskUtil) DetachDisk(c *awsElasticBlockStoreUnmounter) error {
 }
 
 func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
-	cloud, err := getCloudProvider()
+	cloud, err := getCloudProvider(d.awsElasticBlockStore.plugin)
 	if err != nil {
 		return err
 	}
@@ -129,7 +128,7 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 // CreateVolume creates an AWS EBS volume.
 // Returns: volumeID, volumeSizeGB, labels, error
 func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (string, int, map[string]string, error) {
-	cloud, err := getCloudProvider()
+	cloud, err := getCloudProvider(c.awsElasticBlockStore.plugin)
 	if err != nil {
 		return "", 0, nil, err
 	}
@@ -175,7 +174,7 @@ func attachDiskAndVerify(b *awsElasticBlockStoreMounter, xvdBeforeSet sets.Strin
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
 		var err error
 		if awsCloud == nil {
-			awsCloud, err = getCloudProvider()
+			awsCloud, err = getCloudProvider(b.awsElasticBlockStore.plugin)
 			if err != nil || awsCloud == nil {
 				// Retry on error. See issue #11321
 				glog.Errorf("Error getting AWSCloudProvider while detaching PD %q: %v", b.volumeID, err)
@@ -250,7 +249,7 @@ func detachDiskAndVerify(c *awsElasticBlockStoreUnmounter) {
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
 		var err error
 		if awsCloud == nil {
-			awsCloud, err = getCloudProvider()
+			awsCloud, err = getCloudProvider(c.awsElasticBlockStore.plugin)
 			if err != nil || awsCloud == nil {
 				// Retry on error. See issue #11321
 				glog.Errorf("Error getting AWSCloudProvider while detaching PD %q: %v", c.volumeID, err)
@@ -348,12 +347,19 @@ func pathExists(path string) (bool, error) {
 }
 
 // Return cloud provider
-func getCloudProvider() (*aws.AWSCloud, error) {
-	awsCloudProvider, err := cloudprovider.GetCloudProvider("aws", nil)
-	if err != nil || awsCloudProvider == nil {
-		return nil, err
+func getCloudProvider(plugin *awsElasticBlockStorePlugin) (*aws.AWSCloud, error) {
+	if plugin == nil {
+		return nil, fmt.Errorf("Failed to get AWS Cloud Provider. plugin object is nil.")
+	}
+	if plugin.host == nil {
+		return nil, fmt.Errorf("Failed to get AWS Cloud Provider. plugin.host object is nil.")
 	}
 
-	// The conversion must be safe otherwise bug in GetCloudProvider()
-	return awsCloudProvider.(*aws.AWSCloud), nil
+	cloudProvider := plugin.host.GetCloudProvider()
+	awsCloudProvider, ok := cloudProvider.(*aws.AWSCloud)
+	if !ok || awsCloudProvider == nil {
+		return nil, fmt.Errorf("Failed to get AWS Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)
+	}
+
+	return awsCloudProvider, nil
 }
