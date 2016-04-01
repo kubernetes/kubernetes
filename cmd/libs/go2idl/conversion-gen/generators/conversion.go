@@ -149,6 +149,10 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	// (in the directory one above) and can be automatically converted to.
 	for _, p := range context.Universe {
 		path := p.Path
+		// TODO: Only a subset of InputDirs is actually where we would like
+		// to generate conversions, the rest of files are added, because either
+		// conversion methods are generated there or they contain types
+		// necessary for conversions.
 		if !inputs.Has(path) {
 			continue
 		}
@@ -248,6 +252,13 @@ func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
 			// Check if there is an out member with that name.
 			outMember, found := findMember(out, inMember.Name)
 			if !found {
+				// Check if the member doesn't have comment:
+				// "+ genconversion=false"
+				// comment to ignore this field for conversion.
+				// TODO: Switch to SecondClosestCommentLines.
+				if types.ExtractCommentTags("+", inMember.CommentLines)["genconversion"] == "false" {
+					continue
+				}
 				return false
 			}
 			convertible = convertible && isConvertible(inMember.Type, outMember.Type, preexisting)
@@ -306,7 +317,7 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 	if t.Name.Package != g.targetPackage {
 		return false
 	}
-	if types.ExtractCommentTags("+", t.CommentLines)["genConversion"] == "false" {
+	if types.ExtractCommentTags("+", t.CommentLines)["genconversion"] == "false" {
 		return false
 	}
 	// TODO: Consider generating functions for other kinds too.
@@ -478,14 +489,14 @@ func (g *genConversion) doBuiltin(inType, outType *types.Type, sw *generator.Sni
 }
 
 func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("out = make($.|raw$, len(in))\n", outType)
+	sw.Do("*out = make($.|raw$, len(*in))\n", outType)
 	if outType.Key.IsAssignable() {
-		sw.Do("for key, val := range in {\n", nil)
+		sw.Do("for key, val := range *in {\n", nil)
 		if outType.Elem.IsAssignable() {
 			if inType.Key == outType.Key {
-				sw.Do("out[key] = ", nil)
+				sw.Do("(*out)[key] = ", nil)
 			} else {
-				sw.Do("out[$.|raw$(key)] = ", outType.Key)
+				sw.Do("(*out)[$.|raw$(key)] = ", outType.Key)
 			}
 			if inType.Elem == outType.Elem {
 				sw.Do("val\n", nil)
@@ -506,40 +517,40 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 			if inType.Key == outType.Key {
-				sw.Do("out[key] = *newVal\n", nil)
+				sw.Do("(*out)[key] = *newVal\n", nil)
 			} else {
-				sw.Do("out[$.|raw$(key)] = *newVal\n", outType.Key)
+				sw.Do("(*out)[$.|raw$(key)] = *newVal\n", outType.Key)
 			}
 		}
 	} else {
 		// TODO: Implement it when necessary.
-		sw.Do("for range in {\n", nil)
+		sw.Do("for range *in {\n", nil)
 		sw.Do("// FIXME: Converting unassignable keys unsupported $.|raw$\n", inType.Key)
 	}
 	sw.Do("}\n", nil)
 }
 
 func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("out = make($.|raw$, len(in))\n", outType)
+	sw.Do("*out = make($.|raw$, len(*in))\n", outType)
 	if inType.Elem == outType.Elem && inType.Elem.Kind == types.Builtin {
-		sw.Do("copy(out, in)\n", nil)
+		sw.Do("copy(*out, *in)\n", nil)
 	} else {
-		sw.Do("for i := range in {\n", nil)
+		sw.Do("for i := range *in {\n", nil)
 		if outType.Elem.IsAssignable() {
 			if inType.Elem == outType.Elem {
-				sw.Do("out[i] = in[i]\n", nil)
+				sw.Do("(*out)[i] = (*in)[i]\n", nil)
 			} else {
-				sw.Do("out[i] = $.|raw$(in[i])\n", outType.Elem)
+				sw.Do("(*out)[i] = $.|raw$((*in)[i])\n", outType.Elem)
 			}
 		} else {
 			if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
-				sw.Do("if err := $.|raw$(&in[i], &out[i], s); err != nil {\n", function)
+				sw.Do("if err := $.|raw$(&(*in)[i], &(*out)[i], s); err != nil {\n", function)
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				funcName := g.funcNameTmpl(inType.Elem, outType.Elem)
-				sw.Do(fmt.Sprintf("if err := %s(&in[i], &out[i], s); err != nil {\n", funcName), argsFromType(inType.Elem, outType.Elem))
+				sw.Do(fmt.Sprintf("if err := %s(&(*in)[i], &(*out)[i], s); err != nil {\n", funcName), argsFromType(inType.Elem, outType.Elem))
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
-				sw.Do("if err := s.Convert(&in[i], &out[i], 0); err != nil {\n", nil)
+				sw.Do("if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {\n", nil)
 			}
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
@@ -550,7 +561,12 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	for _, m := range inType.Members {
-		outMember, _ := findMember(outType, m.Name)
+		outMember, isOutMember := findMember(outType, m.Name)
+		if !isOutMember {
+			// Since this object wasn't filtered out, this means that
+			// this field has "genconversion=false" comment to ignore it.
+			continue
+		}
 		args := map[string]interface{}{
 			"inType":  m.Type,
 			"outType": outMember.Type,
@@ -572,7 +588,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			}
 		case types.Map, types.Slice, types.Pointer:
 			sw.Do("if in.$.name$ != nil {\n", args)
-			sw.Do("in, out := in.$.name$, out.$.name$\n", args)
+			sw.Do("in, out := &in.$.name$, &out.$.name$\n", args)
 			g.generateFor(m.Type, outMember.Type, sw)
 			sw.Do("} else {\n", nil)
 			sw.Do("out.$.name$ = nil\n", args)
@@ -589,7 +605,11 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("}\n", nil)
 		case types.Alias:
 			if outMember.Type.IsAssignable() {
-				sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
+				if m.Type == outMember.Type {
+					sw.Do("out.$.name$ = in.$.name$\n", args)
+				} else {
+					sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
+				}
 			} else {
 				if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
 					funcName := g.funcNameTmpl(m.Type, outMember.Type)
@@ -616,22 +636,22 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 }
 
 func (g *genConversion) doPointer(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("out = new($.Elem|raw$)\n", outType)
+	sw.Do("*out = new($.Elem|raw$)\n", outType)
 	if outType.Elem.IsAssignable() {
 		if inType.Elem == outType.Elem {
-			sw.Do("*out = *in\n", nil)
+			sw.Do("**out = **in\n", nil)
 		} else {
-			sw.Do("*out = $.|raw$(*in)\n", outType.Elem)
+			sw.Do("**out = $.|raw$(**in)\n", outType.Elem)
 		}
 	} else {
 		if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
-			sw.Do("if err := $.|raw$(in, out, s); err != nil {\n", function)
+			sw.Do("if err := $.|raw$(*in, *out, s); err != nil {\n", function)
 		} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 			funcName := g.funcNameTmpl(inType.Elem, outType.Elem)
-			sw.Do(fmt.Sprintf("if err := %s(in, out, s); err != nil {\n", funcName), argsFromType(inType.Elem, outType.Elem))
+			sw.Do(fmt.Sprintf("if err := %s(*in, *out, s); err != nil {\n", funcName), argsFromType(inType.Elem, outType.Elem))
 		} else {
 			sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
-			sw.Do("if err := s.Convert(in, out, 0); err != nil {\n", nil)
+			sw.Do("if err := s.Convert(*in, *out, 0); err != nil {\n", nil)
 		}
 		sw.Do("return err\n", nil)
 		sw.Do("}\n", nil)
