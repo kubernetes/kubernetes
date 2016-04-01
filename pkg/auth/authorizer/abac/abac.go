@@ -100,6 +100,7 @@ func New(path string) (*ABACPolicy, error) {
 								} else {
 									abacPolicy.Auth.Store(tmpPlist)
 									glog.Infof("ABAC policy is successfully reloaded")
+									lastModifiedTime = &modTime
 									close(done)
 								}
 							}
