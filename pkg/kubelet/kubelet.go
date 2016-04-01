@@ -1803,7 +1803,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 	if !kl.shapingEnabled() {
 		return nil
 	}
-	ingress, egress, err := extractBandwidthResources(pod)
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
 	if err != nil {
 		return err
 	}
@@ -1929,7 +1929,7 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 	possibleCIDRs := sets.String{}
 	for ix := range allPods {
 		pod := allPods[ix]
-		ingress, egress, err := extractBandwidthResources(pod)
+		ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
 		if err != nil {
 			return err
 		}
@@ -3610,39 +3610,4 @@ func (kl *Kubelet) shapingEnabled() bool {
 
 func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
 	return kl.containerManager.GetNodeConfig()
-}
-
-var minRsrc = resource.MustParse("1k")
-var maxRsrc = resource.MustParse("1P")
-
-func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
-	if rsrc.Value() < minRsrc.Value() {
-		return fmt.Errorf("resource is unreasonably small (< 1kbit)")
-	}
-	if rsrc.Value() > maxRsrc.Value() {
-		return fmt.Errorf("resoruce is unreasonably large (> 1Pbit)")
-	}
-	return nil
-}
-
-func extractBandwidthResources(pod *api.Pod) (ingress, egress *resource.Quantity, err error) {
-	str, found := pod.Annotations["kubernetes.io/ingress-bandwidth"]
-	if found {
-		if ingress, err = resource.ParseQuantity(str); err != nil {
-			return nil, nil, err
-		}
-		if err := validateBandwidthIsReasonable(ingress); err != nil {
-			return nil, nil, err
-		}
-	}
-	str, found = pod.Annotations["kubernetes.io/egress-bandwidth"]
-	if found {
-		if egress, err = resource.ParseQuantity(str); err != nil {
-			return nil, nil, err
-		}
-		if err := validateBandwidthIsReasonable(egress); err != nil {
-			return nil, nil, err
-		}
-	}
-	return ingress, egress, nil
 }
