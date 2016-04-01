@@ -24,42 +24,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# TODO: DRY. Refactor into upload-to-gcs.sh ?
-: ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/logs"}
-: ${JENKINS_UPLOAD_TO_GCS:="y"}
+export JENKINS_BUILD_STARTED="true"
 
-if [[ ! ${JENKINS_UPLOAD_TO_GCS:-} =~ ^[yY]$ ]]; then
-  exit 0
-fi
+echo
+echo "Passing through to upload-to-gcs.sh with JENKINS_BUILD_STARTED=${JENKINS_BUILD_STARTED}"
+echo "Please update configs to call upload-to-gcs.sh directly."
+echo
 
-version=""
-readonly timestamp=$(date +%s)
-readonly location="${JENKINS_GCS_LOGS_PATH}/${JOB_NAME}/${BUILD_NUMBER}/started.json"
-
-echo -n 'Run starting at '; date -d "@${timestamp}"
-
-# Try to discover the kubernetes version.
-if [[ -e "version" ]]; then
-    version=$(cat "version")
-elif [[ -e "hack/lib/version.sh" ]]; then
-    version=$(
-        export KUBE_ROOT="."
-        source "hack/lib/version.sh"
-        kube::version::get_version_vars
-        echo "${KUBE_GIT_VERSION-}"
-    )
-fi
-
-if [[ -n "${version}" ]]; then
-    echo "Found Kubernetes version: ${version}"
+if [[ -x ./hack/jenkins/upload-to-gcs.sh ]]; then
+  ./hack/jenkins/upload-to-gcs.sh
 else
-    echo "Could not find Kubernetes version"
+  curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" | bash -
 fi
-
-echo "Uploading version to: ${location}"
-gsutil -q cp -a "public-read" <(
-    echo "{"
-    echo "    \"version\": \"${version}\","
-    echo "    \"timestamp\": ${timestamp}"
-    echo "}"
-) "${location}"
