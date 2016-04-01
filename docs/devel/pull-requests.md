@@ -73,16 +73,12 @@ The following will save time for both you and your reviewer:
 
 ## Release Notes
 
-All pull requests are initiated with a `needs-release-note` label.
-There are many `release-note-*` label options, including `release-note-none`.
-If your PR does not require any visibility at release time, you may use a
-`release-note-none` label.  Otherwise, please choose a `release-note-*` label
-that fits your PR.
-
-Additionally, `release-note-none` is not allowed on PRs on release branches.
-
-Finally, ensure your PR title is the release note you want published at relase
-time.
+1. Your PR title is the **release note** you want published at release time.
+1. Release note labels are only needed on master branch PRs.
+1. All pull requests are initiated with a `release-note-label-needed` label.
+1. For a PR to be ready to merge, the `release-note-label-needed` label must be removed and one of the other `release-note-*` labels must be added.
+1. `release-note-none` is a valid option if the PR does not need to be mentioned
+ at release time.
 
 ## Visual overview
 
