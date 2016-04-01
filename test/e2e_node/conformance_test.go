@@ -28,8 +28,10 @@ import (
 )
 
 const (
-	retryTimeout = 4 * time.Minute
-	pollInterval = time.Second * 5
+	retryTimeout      = time.Minute * 4
+	pollInterval      = time.Second * 5
+	imageRetryTimeout = time.Minute * 2
+	imagePullInterval = time.Second * 15
 )
 
 var _ = Describe("Container Conformance Test", func() {
@@ -55,10 +57,10 @@ var _ = Describe("Container Conformance Test", func() {
 					conformImages = append(conformImages, image)
 				}
 				for _, image := range conformImages {
-					if err := image.Pull(); err != nil {
-						Expect(err).NotTo(HaveOccurred())
-						break
-					}
+					// Pulling images from gcr.io is flaky, so retry failures
+					Eventually(func() error {
+						return image.Pull()
+					}, imageRetryTimeout, imagePullInterval).ShouldNot(HaveOccurred())
 				}
 			})
 			It("it should list pulled images [Conformance]", func() {
