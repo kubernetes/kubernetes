@@ -1,3 +1,5 @@
+// +build fixtures
+
 package users
 
 const singleDB = `{"databases": [{"name": "databaseE"}]}`
