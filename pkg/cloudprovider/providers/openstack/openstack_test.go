@@ -147,6 +147,18 @@ func TestInstances(t *testing.T) {
 	}
 	t.Logf("Found servers (%d): %s\n", len(srvs), srvs)
 
+	srvExternalId, err := i.ExternalID(srvs[0])
+	if err != nil {
+		t.Fatalf("Instances.ExternalId(%s) failed: %s", srvs[0], err)
+	}
+	t.Logf("Found server (%s), with external id: %s\n", srvs[0], srvExternalId)
+
+	srvInstanceId, err := i.InstanceID(srvs[0])
+	if err != nil {
+		t.Fatalf("Instance.InstanceId(%s) failed: %s", srvs[0], err)
+	}
+	t.Logf("Found server (%s), with instance id: %s\n", srvs[0], srvInstanceId)
+
 	addrs, err := i.NodeAddresses(srvs[0])
 	if err != nil {
 		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", srvs[0], err)
