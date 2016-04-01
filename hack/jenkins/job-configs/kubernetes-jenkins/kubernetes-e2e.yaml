@@ -92,6 +92,8 @@
                 export PROJECT="k8s-jkns-e2e-gce-ci-reboot"
         - 'gce-autoscaling':
             description: 'Run autoscaling E2E tests on GCE.'
+            # Issue: #23716
+            disable_job: true
             timeout: 210
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterSizeAutoscaling\]|\[Feature:InitialResources\] \
