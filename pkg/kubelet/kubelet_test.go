@@ -4395,7 +4395,7 @@ func TestExtractBandwidthResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ingress, egress, err := extractBandwidthResources(test.pod)
+		ingress, egress, err := bandwidth.ExtractPodBandwidthResources(test.pod.Annotations)
 		if test.expectError {
 			if err == nil {
 				t.Errorf("unexpected non-error")
