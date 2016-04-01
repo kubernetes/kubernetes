@@ -130,7 +130,7 @@ You can also view recordings of past events and presentations on our [Media page
 For Q&A, our threads are at:
 
  * [Stack Overflow](http://stackoverflow.com/questions/tagged/kubernetes)
- * [Slack](https://github.com/docs/troubleshooting.md#slack)
+ * [Slack](http://slack.k8s.io/)
 
 ### Want to do more than just 'discuss' Kubernetes?
 
