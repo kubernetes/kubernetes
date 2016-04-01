@@ -100,6 +100,7 @@ spec:
         - -addr=0.0.0.0:53
         - -ns-rotate=false
         - -domain={{ pillar['dns_domain'] }}.
+        - -nameservers=8.8.8.8:53,8.8.4.4:53
         ports:
         - containerPort: 53
           name: dns
