@@ -1,35 +1,81 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [Release Notes for Kubernetes v1.3.0-alpha.1](#release-notes-for-kubernetes-v130-alpha1)
-  - [[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/HEAD/examples)](#documentationhttpkubernetesgithubio--exampleshttpreleasesk8sioheadexamples)
+- [v1.2.1](#v121)
   - [Downloads](#downloads)
-  - [Changes since v1.2.0 (last PR #23530)](#changes-since-v120-last-pr-23530)
+  - [Changes since v1.2.0](#changes-since-v120)
+    - [Other notable changes](#other-notable-changes)
+- [v1.3.0-alpha.1](#v130-alpha1)
+  - [Downloads](#downloads)
+  - [Changes since v1.2.0](#changes-since-v120)
     - [Action Required](#action-required)
     - [Other notable changes](#other-notable-changes)
-- [Release Notes for Kubernetes 1.2.0](#release-notes-for-kubernetes-120)
-  - [[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)](#documentationhttpkubernetesgithubio--exampleshttpreleasesk8siorelease-12examples)
+- [v1.2.0](#v120)
   - [Downloads](#downloads)
   - [Changes since v1.1.1](#changes-since-v111)
-  - [Major Themes](#major-themes)
-  - [Other notable improvements](#other-notable-improvements)
-  - [Experimental Features](#experimental-features)
-  - [Action required](#action-required)
-  - [Known Issues](#known-issues)
-    - [Docker Known Issues](#docker-known-issues)
-      - [1.9.1](#191)
-  - [Provider-specific Notes](#provider-specific-notes)
-    - [Various](#various)
-    - [AWS](#aws)
-    - [GCE](#gce)
-  - [Changelog](#changelog)
+    - [Major Themes](#major-themes)
+    - [Other notable improvements](#other-notable-improvements)
+    - [Experimental Features](#experimental-features)
+    - [Action required](#action-required)
+    - [Known Issues](#known-issues)
+      - [Docker Known Issues](#docker-known-issues)
+        - [1.9.1](#191)
+    - [Provider-specific Notes](#provider-specific-notes)
+      - [Various](#various)
+      - [AWS](#aws)
+      - [GCE](#gce)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
 
-# Release Notes for Kubernetes v1.3.0-alpha.1
+# v1.2.1
 
-## [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/HEAD/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
+
+## Downloads
+
+binary | sha1 hash | md5 hash
+------ | --------- | --------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.1/kubernetes.tar.gz) | `1639807c5788e1c6b1ab51fd30b723fb5debd865` | `235a1da47972c96a560d718d3256ca4f`
+
+## Changes since v1.2.0
+
+### Other notable changes
+
+* AWS: Fix problems with >2 security groups ([#23718](https://github.com/kubernetes/kubernetes/pull/23718), [@justinsb](https://github.com/justinsb))
+* AWS: Fix problems with >2 security groups ([#23340](https://github.com/kubernetes/kubernetes/pull/23340), [@justinsb](https://github.com/justinsb))
+* IngressTLS: allow secretName to be blank for SNI routing ([#23707](https://github.com/kubernetes/kubernetes/pull/23707), [@tam7t](https://github.com/tam7t))
+* IngressTLS: allow secretName to be blank for SNI routing ([#23500](https://github.com/kubernetes/kubernetes/pull/23500), [@tam7t](https://github.com/tam7t))
+* Heapster patch release to 1.0.2 ([#23487](https://github.com/kubernetes/kubernetes/pull/23487), [@piosz](https://github.com/piosz))
+* Remove unnecessary override of /etc/init.d/docker on containervm image. ([#23593](https://github.com/kubernetes/kubernetes/pull/23593), [@dchen1107](https://github.com/dchen1107))
+* Change kube-proxy & fluentd CPU request to 20m/80m. ([#23646](https://github.com/kubernetes/kubernetes/pull/23646), [@cjcullen](https://github.com/cjcullen))
+* make docker-checker more robust ([#23662](https://github.com/kubernetes/kubernetes/pull/23662), [@ArtfulCoder](https://github.com/ArtfulCoder))
+* validate that daemonsets don't have empty selectors on creation ([#23530](https://github.com/kubernetes/kubernetes/pull/23530), [@mikedanese](https://github.com/mikedanese))
+* don't sync deployment when pod selector is empty ([#23467](https://github.com/kubernetes/kubernetes/pull/23467), [@mikedanese](https://github.com/mikedanese))
+* Support differentiation of OS distro in e2e tests ([#23466](https://github.com/kubernetes/kubernetes/pull/23466), [@andyzheng0831](https://github.com/andyzheng0831))
+* don't sync daemonsets with selectors that match all pods ([#23223](https://github.com/kubernetes/kubernetes/pull/23223), [@mikedanese](https://github.com/mikedanese))
+* Trusty: Avoid reaching GCE custom metadata size limit ([#22818](https://github.com/kubernetes/kubernetes/pull/22818), [@andyzheng0831](https://github.com/andyzheng0831))
+* Update kubectl help for 1.2 resources ([#23305](https://github.com/kubernetes/kubernetes/pull/23305), [@janetkuo](https://github.com/janetkuo))
+* Removing URL query param from swagger UI to fix the XSS issue ([#23234](https://github.com/kubernetes/kubernetes/pull/23234), [@nikhiljindal](https://github.com/nikhiljindal))
+* Fix hairpin mode ([#23325](https://github.com/kubernetes/kubernetes/pull/23325), [@MurgaNikolay](https://github.com/MurgaNikolay))
+* Bump to container-vm-v20160321 ([#23313](https://github.com/kubernetes/kubernetes/pull/23313), [@zmerlynn](https://github.com/zmerlynn))
+* Remove the restart-kube-proxy and restart-apiserver functions ([#23180](https://github.com/kubernetes/kubernetes/pull/23180), [@roberthbailey](https://github.com/roberthbailey))
+* Copy annotations back from RS to Deployment on rollback ([#23160](https://github.com/kubernetes/kubernetes/pull/23160), [@janetkuo](https://github.com/janetkuo))
+* Trusty: Support hybrid cluster with nodes on ContainerVM ([#23079](https://github.com/kubernetes/kubernetes/pull/23079), [@andyzheng0831](https://github.com/andyzheng0831))
+* update expose command description to add deployment ([#23246](https://github.com/kubernetes/kubernetes/pull/23246), [@AdoHe](https://github.com/AdoHe))
+* Add a rate limiter to the GCE cloudprovider ([#23019](https://github.com/kubernetes/kubernetes/pull/23019), [@alex-mohr](https://github.com/alex-mohr))
+* Add a Deployment example for kubectl expose. ([#23222](https://github.com/kubernetes/kubernetes/pull/23222), [@madhusudancs](https://github.com/madhusudancs))
+* Use versioned object when computing patch ([#23145](https://github.com/kubernetes/kubernetes/pull/23145), [@liggitt](https://github.com/liggitt))
+* kubelet: send all recevied pods in one update ([#23141](https://github.com/kubernetes/kubernetes/pull/23141), [@yujuhong](https://github.com/yujuhong))
+* Add a SSHKey sync check to the master's healthz (when using SSHTunnels). ([#23167](https://github.com/kubernetes/kubernetes/pull/23167), [@cjcullen](https://github.com/cjcullen))
+* Validate minimum CPU limits to be >= 10m ([#23143](https://github.com/kubernetes/kubernetes/pull/23143), [@vishh](https://github.com/vishh))
+* kubernetes/kubernetes#23034 Fix controller-manager race condition issue which cause endpoints flush during restart ([#23035](https://github.com/kubernetes/kubernetes/pull/23035), [@xinxiaogang](https://github.com/xinxiaogang))
+* MESOS: forward globally declared cadvisor housekeeping flags ([#22974](https://github.com/kubernetes/kubernetes/pull/22974), [@jdef](https://github.com/jdef))
+* Trusty: support developer workflow on base image ([#22960](https://github.com/kubernetes/kubernetes/pull/22960), [@andyzheng0831](https://github.com/andyzheng0831))
+
+# v1.3.0-alpha.1
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/HEAD/examples)
 
 ## Downloads
 
@@ -37,7 +83,7 @@ binary | sha1 hash | md5 hash
 ------ | --------- | --------
 [kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.0-alpha.1/kubernetes.tar.gz) | `e0041b08e220a4704ea2ad90a6ec7c8f2120c2d3` | `7bb2df32aea94678f72a8d1f43a12098`
 
-## Changes since v1.2.0 (last PR #23530)
+## Changes since v1.2.0
 
 ### Action Required
 
@@ -71,9 +117,9 @@ binary | sha1 hash | md5 hash
 * update wide option output ([#22772](https://github.com/kubernetes/kubernetes/pull/22772), [@AdoHe](https://github.com/AdoHe))
 * Change scheduler logic from random to round-robin ([#22430](https://github.com/kubernetes/kubernetes/pull/22430), [@gmarek](https://github.com/gmarek))
 
-# Release Notes for Kubernetes 1.2.0
+# v1.2.0
 
-## [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
 
 ## Downloads
 
@@ -83,7 +129,7 @@ binary | sha1 hash | md5 hash
 
 ## Changes since v1.1.1
 
-## Major Themes
+### Major Themes
 
   * <strong>Significant scale improvements</strong>. Increased cluster scale by 400% to 1000 nodes with 30,000 pods per cluster.
 Kubelet supports 100 pods per node with 4x reduced system overhead.
@@ -120,7 +166,7 @@ interacting with the system. Note: the GUI is enabled by default in 1.2 clusters
 
 <img src="docs/images/newgui.png" width="" alt="Dashboard UI screenshot showing cards that represent applications that run inside a cluster" title="Dashboard UI apps screen">
 
-## Other notable improvements
+### Other notable improvements
 
   * Job was Beta in 1.1 and is GA in 1.2 .
      * <code>apiVersion: batch/v1 </code>is now available.  You now do not need to specify the <code>.spec.selector</code> field — a [unique selector is automatically generated ](http://kubernetes.io/docs/user-guide/jobs/#pod-selector)for you.
@@ -186,7 +232,7 @@ Pod’s SELinux context, if specified
 Volumes (SMB 2.1 and 3.0) into a Pod. See [example](https://github.com/kubernetes/kubernetes/blob/release-1.2/examples/azure_file/README.md) for details.
   * Logs usage and root filesystem usage of a container, volumes usage of a pod and node disk usage are exposed through Kubelet new metrics API.
 
-## Experimental Features
+### Experimental Features
 
   * Dynamic Provisioning of PersistentVolumes: Kubernetes previously required all
 volumes to be manually provisioned by a cluster administrator before use. With
@@ -218,7 +264,7 @@ volume plugin path on each kubelet node. This is an alpha feature and may
 change in future.
   * Kubelet exposes a new Alpha metrics API - /stats/summary in a user friendly format with reduced system overhead. The measurement is done in PR [#22542](https://github.com/kubernetes/kubernetes/pull/22542).
 
-## Action required
+### Action required
 
   * Docker v1.9.1 is officially recommended. Docker v1.8.3 and Docker v1.10 are
 supported. If you are using an older release of Docker, please upgrade. Known
@@ -290,7 +336,7 @@ change. More details [here](https://docs.influxdata.com/influxdb/v0.9/administra
   * We have renamed “minions” to “nodes”.  If you were specifying NUM\_MINIONS or
 MINION\_SIZE to kube-up, you should now specify NUM\_NODES or NODE\_SIZE.
 
-## Known Issues
+### Known Issues
 
   * Paused deployments can't be resized and don't clean up old ReplicaSets.
   * Minimum memory limit is 4MB. This is a docker limitation
@@ -325,9 +371,9 @@ rollout” commands instead, if you want to rolling update Replica Sets.
   * When live upgrading Kubelet to 1.2 without draining the pods running on the node,
 the containers will be restarted by Kubelet (see details in [#23104](https://github.com/kubernetes/kubernetes/issues/23104)).
 
-### Docker Known Issues
+#### Docker Known Issues
 
-#### 1.9.1
+##### 1.9.1
 
   * Listing containers can be slow at times which will affect kubelet performance.
 More information [here](https://github.com/docker/docker/issues/17720)
@@ -338,15 +384,15 @@ restarting the daemon alleviates this issue, but hasn’t been verified to
 completely eliminate the IP allocation issue. More information [here](https://github.com/kubernetes/kubernetes/issues/21523#issuecomment-191498969)
   * Daemon becomes unresponsive (rarely) due to kernel deadlocks. More information [here](https://github.com/kubernetes/kubernetes/issues/21866#issuecomment-189492391)
 
-## Provider-specific Notes
+### Provider-specific Notes
 
-### Various
+#### Various
 
    Core changes:
 
   * Support for load balancers with source ranges
 
-### AWS
+#### AWS
 
 Core changes:
 
@@ -368,26 +414,9 @@ With kube-up:
   * Use an elastic IP for the master by default
   * Experimental support for node spot instances (set NODE\_SPOT\_PRICE=0.05)
 
-### GCE
+#### GCE
 
   * Ubuntu Trusty support added
-
-## Changelog
-
-(Linked [github releases](https://github.com/kubernetes/kubernetes/releases) 1.2.0-beta-1 to 1.1.2 that are part of 1.2.0)
-
-* [v1.2.0-beta.1](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-beta.1)
-* [v1.2.0-beta.0](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-beta.0)
-* [v1.2.0-alpha.8](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.8)
-* [v1.2.0-alpha.7](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.7)
-* [v1.2.0-alpha.6](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.6)
-* [v1.2.0-alpha.5](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.5)
-* [v1.2.0-alpha.4](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.4)
-* [v1.1.8](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.8)
-* [v1.1.7](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.7)
-* [v1.1.4](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.4)
-* [v1.1.3](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.3)
-* [v1.1.2](https://github.com/kubernetes/kubernetes/releases/tag/v1.1.2)
 
 Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
 
