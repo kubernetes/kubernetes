@@ -122,7 +122,7 @@ func (puller *serializedImagePuller) PullImage(pod *api.Pod, container *api.Cont
 		puller.logIt(ref, api.EventTypeWarning, FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
 		puller.backOff.Next(backOffKey, puller.backOff.Clock.Now())
 		if err == RegistryUnavailable {
-			msg := fmt.Sprintf("image pull failed for %s because the registry is temporarily unavailable.", container.Image)
+			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
 			return err, msg
 		} else {
 			return ErrImagePull, err.Error()
