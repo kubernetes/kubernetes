@@ -84,7 +84,6 @@ import (
 	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/wait"
-	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
@@ -164,7 +163,7 @@ func NewMainKubelet(
 	kubeClient clientset.Interface,
 	rootDirectory string,
 	podInfraContainerImage string,
-	podInfraContainerImagePullSecret string,
+	podInfraContainerImagePullSecret *api.Secret,
 	resyncInterval time.Duration,
 	pullQPS float32,
 	pullBurst int,
@@ -385,10 +384,6 @@ func NewMainKubelet(
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
-		secret, err := getPodInfraContainerImagePullSecret(podInfraContainerImagePullSecret)
-		if err != nil {
-			return nil, err
-		}
 		// Only supported one for now, continue.
 		klet.containerRuntime = dockertools.NewDockerManager(
 			dockerClient,
@@ -398,7 +393,7 @@ func NewMainKubelet(
 			klet.podManager,
 			machineInfo,
 			podInfraContainerImage,
-			secret,
+			podInfraContainerImagePullSecret,
 			pullQPS,
 			pullBurst,
 			containerLogsDir,
@@ -493,41 +488,6 @@ func NewMainKubelet(
 		opt(klet)
 	}
 	return klet, nil
-}
-
-func getPodInfraContainerImagePullSecret(filename string) (*api.Secret, error) {
-	if len(filename) == 0 {
-		return nil, nil
-	}
-
-	glog.V(3).Infof("Reading pod infra container secret file %q", filename)
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-	// JSON is valid YAML, so this should work for everything.
-	json, err := utilyaml.ToJSON(data)
-	if err != nil {
-		return nil, err
-	}
-	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(), json)
-	if err != nil {
-		return nil, err
-	}
-	// Check whether the object could be converted to single secret
-	secret, ok := obj.(*api.Secret)
-	if !ok {
-		err = fmt.Errorf("invalid secret: %+v", obj)
-		return nil, err
-	}
-
-	return secret, nil
 }
 
 func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRuntime string, configureCBR0 bool) (componentconfig.HairpinMode, error) {

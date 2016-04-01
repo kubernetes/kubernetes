@@ -142,9 +142,9 @@ type KubeletConfiguration struct {
 	// podInfraContainerImage is the image whose network/ipc namespaces
 	// containers in each pod will use.
 	PodInfraContainerImage string `json:"podInfraContainerImage"`
-	// podInfraContainerImagePullSecret is the path to a json or yaml file
+	// podInfraContainerImagePullSecretFile is the path to a json or yaml file
 	// containing a Secret to use when pulling the podInfraContainerImage.
-	PodInfraContainerImagePullSecret string `json:podInfraContainerImagePullSecret"`
+	PodInfraContainerImagePullSecretFile string `json:podInfraContainerImagePullSecretFile"`
 	// dockerEndpoint is the path to the docker endpoint to communicate with.
 	DockerEndpoint string `json:"dockerEndpoint"`
 	// rootDirectory is the directory path to place kubelet files (volume
