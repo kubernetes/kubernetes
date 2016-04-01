@@ -57,9 +57,20 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
+var fallbackPackages = []string{
+	"k8s.io/kubernetes/pkg/api/unversioned",
+	"k8s.io/kubernetes/pkg/apis/extensions",
+}
+
 func getInternalTypeFor(context *generator.Context, t *types.Type) (*types.Type, bool) {
 	internalPackage := filepath.Dir(t.Name.Package)
 	if !context.Universe.Package(internalPackage).Has(t.Name.Name) {
+		for _, fallbackPackage := range fallbackPackages {
+			if fallbackPackage == t.Name.Package || !context.Universe.Package(fallbackPackage).Has(t.Name.Name) {
+				continue
+			}
+			return context.Universe.Package(fallbackPackage).Type(t.Name.Name), true
+		}
 		return nil, false
 	}
 	return context.Universe.Package(internalPackage).Type(t.Name.Name), true
@@ -149,11 +160,19 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	// (in the directory one above) and can be automatically converted to.
 	for _, p := range context.Universe {
 		path := p.Path
-		// TODO: Only a subset of InputDirs is actually where we would like
-		// to generate conversions, the rest of files are added, because either
-		// conversion methods are generated there or they contain types
-		// necessary for conversions.
 		if !inputs.Has(path) {
+			continue
+		}
+		// Only generate conversions for package which explicitly requested it
+		// byt setting "+genversion=true" in their doc.go file.
+		filtered := false
+		for _, comment := range p.DocComments {
+			comment := strings.Trim(comment, "//")
+			if types.ExtractCommentTags("+", comment)["genconversion"] == "true" {
+				filtered = true
+			}
+		}
+		if !filtered {
 			continue
 		}
 
@@ -164,6 +183,10 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			internalType, exists := getInternalTypeFor(context, t)
 			if !exists {
 				// There is no corresponding type in the internal package.
+				continue
+			}
+			// We won't be able to convert to private type.
+			if namer.IsPrivateGoName(internalType.Name.Name) {
 				continue
 			}
 			// If we can generate conversion in any direction, we should
@@ -308,10 +331,11 @@ func (g *genConversion) Namers(c *generator.Context) namer.NameSystems {
 
 func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type) bool {
 	var t *types.Type
+	var other *types.Type
 	if inType.Name.Package == g.targetPackage {
-		t = inType
+		t, other = inType, outType
 	} else {
-		t = outType
+		t, other = outType, inType
 	}
 
 	if t.Name.Package != g.targetPackage {
@@ -325,7 +349,7 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 		return false
 	}
 	// Also, filter out private types.
-	if namer.IsPrivateGoName(t.Name.Name) {
+	if namer.IsPrivateGoName(other.Name.Name) {
 		return false
 	}
 	return true

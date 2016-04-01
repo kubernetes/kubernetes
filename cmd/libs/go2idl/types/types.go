@@ -89,6 +89,9 @@ type Package struct {
 	// 'package x' line.
 	Name string
 
+	// Comments from doc.go file.
+	DocComments []string
+
 	// Types within this package, indexed by their name (*not* including
 	// package name).
 	Types map[string]*Type
