@@ -2286,37 +2286,42 @@ func toStatus(lb *elb.LoadBalancerDescription) *api.LoadBalancerStatus {
 // Otherwise we will return an error.
 func findSecurityGroupForInstance(instance *ec2.Instance, taggedSecurityGroups map[string]*ec2.SecurityGroup) (*ec2.GroupIdentifier, error) {
 	instanceID := aws.StringValue(instance.InstanceId)
-	var best *ec2.GroupIdentifier
+
+	var tagged []*ec2.GroupIdentifier
+	var untagged []*ec2.GroupIdentifier
 	for _, group := range instance.SecurityGroups {
 		groupID := aws.StringValue(group.GroupId)
 		if groupID == "" {
 			glog.Warningf("Ignoring security group without id for instance %q: %v", instanceID, group)
 			continue
 		}
-		if best == nil {
-			best = group
-			continue
-		}
-
-		_, bestIsTagged := taggedSecurityGroups[*best.GroupId]
-		_, groupIsTagged := taggedSecurityGroups[groupID]
-
-		if bestIsTagged && !groupIsTagged {
-			// best is still best
-		} else if groupIsTagged && !bestIsTagged {
-			best = group
+		_, isTagged := taggedSecurityGroups[groupID]
+		if isTagged {
+			tagged = append(tagged, group)
 		} else {
-			// We create instances with one SG
-			// If users create multiple SGs, they must tag one of them as being k8s owned
-			return nil, fmt.Errorf("Multiple security groups found for instance (%s); ensure the k8s security group is tagged", instanceID)
+			untagged = append(untagged, group)
 		}
 	}
 
-	if best == nil {
-		glog.Warning("No security group found for instance ", instanceID)
+	if len(tagged) > 0 {
+		// We create instances with one SG
+		// If users create multiple SGs, they must tag one of them as being k8s owned
+		if len(tagged) != 1 {
+			return nil, fmt.Errorf("Multiple tagged security groups found for instance %s; ensure only the k8s security group is tagged", instanceID)
+		}
+		return tagged[0], nil
 	}
 
-	return best, nil
+	if len(untagged) > 0 {
+		// For back-compat, we will allow a single untagged SG
+		if len(untagged) != 1 {
+			return nil, fmt.Errorf("Multiple untagged security groups found for instance %s; ensure the k8s security group is tagged", instanceID)
+		}
+		return untagged[0], nil
+	}
+
+	glog.Warningf("No security group found for instance %q", instanceID)
+	return nil, nil
 }
 
 // Return all the security groups that are tagged as being part of our cluster
