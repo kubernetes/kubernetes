@@ -7,7 +7,7 @@
         numToKeep: 200
     node: unittest
     builders:
-        - shell: 'bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")'
+        - shell: 'JENKINS_BUILD_STARTED=true bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh")'
         - shell: |
             export KUBE_FORCE_VERIFY_CHECKS='y'
             export KUBE_VERIFY_GIT_BRANCH='{branch}'
