@@ -80,7 +80,7 @@ func (o *PauseConfig) CompletePause(f *cmdutil.Factory, cmd *cobra.Command, out 
 		return cmdutil.UsageError(cmd, cmd.Use)
 	}
 
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper, o.Typer = f.Object(false)
 	o.PauseObject = f.PauseObject
 	o.Out = out
 
