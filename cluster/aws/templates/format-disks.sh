@@ -26,7 +26,7 @@ fi
 
 block_devices=()
 
-ephemeral_devices=$(curl --silent http://169.254.169.254/2014-11-05/meta-data/block-device-mapping/ | grep ephemeral)
+ephemeral_devices=$( (curl --silent http://169.254.169.254/2014-11-05/meta-data/block-device-mapping/ | grep ephemeral) || true )
 for ephemeral_device in $ephemeral_devices; do
   echo "Checking ephemeral device: ${ephemeral_device}"
   aws_device=$(curl --silent http://169.254.169.254/2014-11-05/meta-data/block-device-mapping/${ephemeral_device})
