@@ -643,17 +643,17 @@ func (e *Etcd) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) (
 	return ttl, err
 }
 
-func exportObjectMeta(objMeta *api.ObjectMeta, exact bool) {
-	objMeta.UID = ""
+func exportObjectMeta(accessor meta.Object, exact bool) {
+	accessor.SetUID("")
 	if !exact {
-		objMeta.Namespace = ""
+		accessor.SetNamespace("")
 	}
-	objMeta.CreationTimestamp = unversioned.Time{}
-	objMeta.DeletionTimestamp = nil
-	objMeta.ResourceVersion = ""
-	objMeta.SelfLink = ""
-	if len(objMeta.GenerateName) > 0 && !exact {
-		objMeta.Name = ""
+	accessor.SetCreationTimestamp(unversioned.Time{})
+	accessor.SetDeletionTimestamp(nil)
+	accessor.SetResourceVersion("")
+	accessor.SetSelfLink("")
+	if len(accessor.GetGenerateName()) > 0 && !exact {
+		accessor.SetName("")
 	}
 }
 
@@ -663,8 +663,8 @@ func (e *Etcd) Export(ctx api.Context, name string, opts unversioned.ExportOptio
 	if err != nil {
 		return nil, err
 	}
-	if meta, err := api.ObjectMetaFor(obj); err == nil {
-		exportObjectMeta(meta, opts.Exact)
+	if accessor, err := meta.Accessor(obj); err == nil {
+		exportObjectMeta(accessor, opts.Exact)
 	} else {
 		glog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
 	}

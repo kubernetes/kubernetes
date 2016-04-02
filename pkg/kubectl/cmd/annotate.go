@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -310,14 +311,14 @@ func validateAnnotations(removeAnnotations []string, newAnnotations map[string]s
 }
 
 // validateNoAnnotationOverwrites validates that when overwrite is false, to-be-updated annotations don't exist in the object annotation map (yet)
-func validateNoAnnotationOverwrites(meta *api.ObjectMeta, annotations map[string]string) error {
+func validateNoAnnotationOverwrites(accessor meta.Object, annotations map[string]string) error {
 	var buf bytes.Buffer
 	for key := range annotations {
 		// change-cause annotation can always be overwritten
 		if key == kubectl.ChangeCauseAnnotation {
 			continue
 		}
-		if value, found := meta.Annotations[key]; found {
+		if value, found := accessor.GetAnnotations()[key]; found {
 			if buf.Len() > 0 {
 				buf.WriteString("; ")
 			}
@@ -332,29 +333,31 @@ func validateNoAnnotationOverwrites(meta *api.ObjectMeta, annotations map[string
 
 // updateAnnotations updates annotations of obj
 func (o AnnotateOptions) updateAnnotations(obj runtime.Object) error {
-	meta, err := api.ObjectMetaFor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
 	if !o.overwrite {
-		if err := validateNoAnnotationOverwrites(meta, o.newAnnotations); err != nil {
+		if err := validateNoAnnotationOverwrites(accessor, o.newAnnotations); err != nil {
 			return err
 		}
 	}
 
-	if meta.Annotations == nil {
-		meta.Annotations = make(map[string]string)
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
 	}
 
 	for key, value := range o.newAnnotations {
-		meta.Annotations[key] = value
+		annotations[key] = value
 	}
 	for _, annotation := range o.removeAnnotations {
-		delete(meta.Annotations, annotation)
+		delete(annotations, annotation)
 	}
+	accessor.SetAnnotations(annotations)
 
 	if len(o.resourceVersion) != 0 {
-		meta.ResourceVersion = o.resourceVersion
+		accessor.SetResourceVersion(o.resourceVersion)
 	}
 	return nil
 }

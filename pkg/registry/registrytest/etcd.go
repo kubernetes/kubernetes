@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
@@ -168,12 +169,12 @@ func getCodec(obj runtime.Object) (runtime.Codec, error) {
 // Helper functions
 
 func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	meta, err := api.ObjectMetaFor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := t.storage.Get(ctx, meta.Name)
+	result, err := t.storage.Get(ctx, accessor.GetName())
 	if err != nil {
 		return nil, err
 	}
@@ -181,11 +182,11 @@ func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object,
 }
 
 func (t *Tester) setObject(ctx api.Context, obj runtime.Object) error {
-	meta, err := api.ObjectMetaFor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
-	key, err := t.storage.KeyFunc(ctx, meta.Name)
+	key, err := t.storage.KeyFunc(ctx, accessor.GetName())
 	if err != nil {
 		return err
 	}
@@ -209,11 +210,11 @@ func (t *Tester) emitObject(obj runtime.Object, action string) error {
 	case etcdstorage.EtcdCreate:
 		err = t.setObject(ctx, obj)
 	case etcdstorage.EtcdDelete:
-		meta, err := api.ObjectMetaFor(obj)
+		accessor, err := meta.Accessor(obj)
 		if err != nil {
 			return err
 		}
-		_, err = t.storage.Delete(ctx, meta.Name, nil)
+		_, err = t.storage.Delete(ctx, accessor.GetName(), nil)
 	default:
 		err = fmt.Errorf("unexpected action: %v", action)
 	}
