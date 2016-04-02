@@ -27,9 +27,11 @@ KUBE_ROOT=$(readlink -m ${JUJU_PATH}/../../)
 source "${JUJU_PATH}/${KUBE_CONFIG_FILE-config-default.sh}"
 # This attempts installation of Juju - This really needs to support multiple
 # providers/distros - but I'm super familiar with ubuntu so assume that for now.
-source ${JUJU_PATH}/prereqs/ubuntu-juju.sh
-export JUJU_REPOSITORY=${JUJU_PATH}/charms
-KUBE_BUNDLE_PATH=${JUJU_PATH}/bundles/local.yaml
+source "${JUJU_PATH}/prereqs/ubuntu-juju.sh"
+export JUJU_REPOSITORY="${JUJU_PATH}/charms"
+KUBE_BUNDLE_PATH="${JUJU_PATH}/bundles/local.yaml"
+# The directory for the kubectl binary, this is one of the paths in kubectl.sh.
+KUBECTL_DIR="${KUBE_ROOT}/platforms/linux/amd64"
 
 
 function build-local() {
@@ -78,16 +80,15 @@ function kube-up() {
     detect-master
     detect-nodes
 
-    local prefix=$RANDOM
-    export KUBECONFIG=/tmp/${prefix}/config
-    # Copy the cert and key to this machine.
+    # Copy kubectl, the cert and key to this machine from master.
     (
       umask 077
-      mkdir -p /tmp/${prefix}
-      juju scp ${KUBE_MASTER_NAME}:kubectl_package.tar.gz /tmp/${prefix}/
-      ls -al /tmp/${prefix}/
-      tar xfz /tmp/${prefix}/kubectl_package.tar.gz -C /tmp/${prefix}
+      mkdir -p ${KUBECTL_DIR}
+      juju scp ${KUBE_MASTER_NAME}:kubectl_package.tar.gz ${KUBECTL_DIR}
+      tar xfz ${KUBECTL_DIR}/kubectl_package.tar.gz -C ${KUBECTL_DIR}
     )
+    # Export the location of the kubectl configuration file.
+    export KUBECONFIG="${KUBECTL_DIR}/config"
 }
 
 function kube-down() {
@@ -95,6 +96,10 @@ function kube-down() {
     local jujuenv
     jujuenv=$(juju switch)
     juju destroy-model ${jujuenv} ${force} || true
+    # Clean up the generated charm files.
+    rm -rf ${KUBE_ROOT}/cluster/juju/charms
+    # Clean up the kubectl binary and config file.
+    rm -rf ${KUBECTL_DIR}
 }
 
 function prepare-e2e() {
