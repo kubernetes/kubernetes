@@ -32,6 +32,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/net"
@@ -154,13 +155,15 @@ func New(issuerURL, clientID, clientSecret, caFile, usernameClaim, groupsClaim s
 	// and maximum threshold.
 	stop := client.SyncProviderConfig(issuerURL)
 
-	return &OIDCAuthenticator{
+	authn := &OIDCAuthenticator{
 		clientConfig:     ccfg,
 		client:           client,
 		usernameClaim:    usernameClaim,
 		groupsClaim:      groupsClaim,
 		stopSyncProvider: stop,
-	}, nil
+	}
+	authn.bearerAuthenticator = bearertoken.New(authn)
+	return authn, nil
 }
 
 // SetHandlersAttached tells the authenticator that the OIDC related HTTP handlers are in use and have been attached.

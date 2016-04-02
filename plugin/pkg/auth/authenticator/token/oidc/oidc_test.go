@@ -338,92 +338,166 @@ func TestOIDCAuthentication(t *testing.T) {
 	}
 
 	tests := []struct {
-		userClaim   string
-		groupsClaim string
-		token       string
-		userInfo    user.Info
-		verified    bool
-		err         string
+		userClaim        string
+		groupsClaim      string
+		token            string
+		userInfo         user.Info
+		verified         bool
+		err              string
+		path             string
+		handlersAttached bool
 	}{
 		{
-			"sub",
-			"",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			&user.DefaultInfo{Name: fmt.Sprintf("%s#%s", srv.URL, "user-foo")},
-			true,
-			"",
+			userClaim:   "sub",
+			groupsClaim: "",
+			token:       op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+			userInfo:    &user.DefaultInfo{Name: fmt.Sprintf("%s#%s", srv.URL, "user-foo")},
+			verified:    true,
+			err:         "",
 		},
 		{
 			// Use user defined claim (email here).
-			"email",
-			"",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "", nil),
-			&user.DefaultInfo{Name: "foo@example.com"},
-			true,
-			"",
+			userClaim:   "email",
+			groupsClaim: "",
+			token:       op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "", nil),
+			userInfo:    &user.DefaultInfo{Name: "foo@example.com"},
+			verified:    true,
+			err:         "",
 		},
 		{
 			// Use user defined claim (email here).
-			"email",
-			"",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
-			&user.DefaultInfo{Name: "foo@example.com"},
-			true,
-			"",
+			userClaim:   "email",
+			groupsClaim: "",
+			token:       op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
+			userInfo:    &user.DefaultInfo{Name: "foo@example.com"},
+			verified:    true,
+			err:         "",
 		},
 		{
 			// Use user defined claim (email here).
-			"email",
-			"groups",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
-			&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1", "group2"}},
-			true,
-			"",
+			userClaim:   "email",
+			groupsClaim: "groups",
+			token:       op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
+			userInfo:    &user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1", "group2"}},
+			verified:    true,
+			err:         "",
 		},
 		{
-			"sub",
-			"",
-			op.generateMalformedToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: unable to verify JWT signature: no matching keys",
+			userClaim:   "sub",
+			groupsClaim: "",
+			token:       op.generateMalformedToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+			userInfo:    nil,
+			verified:    false,
+			err:         "oidc: unable to verify JWT signature: no matching keys",
 		},
 		{
 			// Invalid 'aud'.
-			"sub",
-			"",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-bar", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: JWT claims invalid: invalid claims, 'aud' claim and 'client_id' do not match",
+			userClaim:   "sub",
+			groupsClaim: "",
+			token:       op.generateGoodToken(t, srv.URL, "client-foo", "client-bar", "sub", "user-foo", "", nil),
+			userInfo:    nil,
+			verified:    false,
+			err:         "oidc: JWT claims invalid: invalid claims, 'aud' claim and 'client_id' do not match",
 		},
 		{
 			// Invalid issuer.
-			"sub",
-			"",
-			op.generateGoodToken(t, "http://foo-bar.com", "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: JWT claims invalid: invalid claim value: 'iss'.",
+			userClaim:   "sub",
+			groupsClaim: "",
+			token:       op.generateGoodToken(t, "http://foo-bar.com", "client-foo", "client-foo", "sub", "user-foo", "", nil),
+			userInfo:    nil,
+			verified:    false,
+			err:         "oidc: JWT claims invalid: invalid claim value: 'iss'.",
 		},
 		{
-			"sub",
-			"",
-			op.generateExpiredToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: JWT claims invalid: token is expired",
+			userClaim:   "sub",
+			groupsClaim: "",
+			token:       op.generateExpiredToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+			userInfo:    nil,
+			verified:    false,
+			err:         "oidc: JWT claims invalid: token is expired",
+		},
+		{
+			userClaim:        "sub",
+			groupsClaim:      "",
+			token:            "",
+			userInfo:         nil,
+			verified:         false,
+			err:              "",
+			handlersAttached: true,
+		},
+		{
+			userClaim:        "sub",
+			groupsClaim:      "",
+			token:            "",
+			userInfo:         UserUnauthenticated,
+			verified:         true,
+			err:              "",
+			handlersAttached: true,
+			path:             PathExchangeRefreshToken,
+		},
+		{
+			userClaim:        "sub",
+			groupsClaim:      "",
+			token:            "",
+			userInfo:         UserUnauthenticated,
+			verified:         true,
+			err:              "",
+			handlersAttached: true,
+			path:             PathAuthenticate,
+		},
+		{
+			userClaim:        "sub",
+			groupsClaim:      "",
+			token:            "",
+			userInfo:         UserUnauthenticated,
+			verified:         true,
+			err:              "",
+			handlersAttached: true,
+			path:             PathAuthCallback,
+		},
+		{
+			userClaim:        "sub",
+			groupsClaim:      "",
+			token:            "",
+			userInfo:         UserUnauthenticated,
+			verified:         true,
+			err:              "",
+			handlersAttached: true,
+			path:             PathExchangeCode,
+		},
+		{
+			userClaim:        "sub",
+			groupsClaim:      "",
+			token:            op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+			userInfo:         UserUnauthenticated,
+			verified:         true,
+			err:              "",
+			handlersAttached: true,
+			path:             PathExchangeRefreshToken,
 		},
 	}
 
 	for i, tt := range tests {
 		client, err := New(srv.URL, "client-foo", "", cert, tt.userClaim, tt.groupsClaim)
+		client.SetHandlersAttached(tt.handlersAttached)
+
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
 
-		user, result, err := client.AuthenticateToken(tt.token)
+		path := tt.path
+		if path == "" {
+			path = "/some_path"
+		}
+		req := &http.Request{
+			URL: &url.URL{
+				Path: path,
+			},
+			Header: http.Header{"Authorization": []string{"Bearer " + tt.token}},
+		}
+		user, result, err := client.AuthenticateRequest(req)
+		//user, result, err := client.AuthenticateToken(tt.token)
 		if tt.err != "" {
 			if !strings.HasPrefix(err.Error(), tt.err) {
 				t.Errorf("#%d: Expecting: %v..., but got: %v", i, tt.err, err)
