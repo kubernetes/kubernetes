@@ -32,147 +32,27 @@ var _ = KubeDescribe("ConfigMap", func() {
 	f := NewDefaultFramework("configmap")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
-		name := "configmap-test-volume-" + string(util.NewUUID())
-		volumeName := "configmap-volume"
-		volumeMountPath := "/etc/configmap-volume"
+		doConfigMapE2EWithoutMappings(f, 0, 0)
+	})
 
-		configMap := &api.ConfigMap{
-			ObjectMeta: api.ObjectMeta{
-				Namespace: f.Namespace.Name,
-				Name:      name,
-			},
-			Data: map[string]string{
-				"data-1": "value-1",
-				"data-2": "value-2",
-				"data-3": "value-3",
-			},
-		}
+	It("should be consumable from pods in volume as non-root [Conformance]", func() {
+		doConfigMapE2EWithoutMappings(f, 1000, 0)
+	})
 
-		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
-		defer func() {
-			By("Cleaning up the configMap")
-			if err := f.Client.ConfigMaps(f.Namespace.Name).Delete(configMap.Name); err != nil {
-				Failf("unable to delete configMap %v: %v", configMap.Name, err)
-			}
-		}()
-		var err error
-		if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
-			Failf("unable to create test configMap %s: %v", configMap.Name, err)
-		}
-
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name: "pod-configmaps-" + string(util.NewUUID()),
-			},
-			Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{
-						Name: volumeName,
-						VolumeSource: api.VolumeSource{
-							ConfigMap: &api.ConfigMapVolumeSource{
-								LocalObjectReference: api.LocalObjectReference{
-									Name: name,
-								},
-							},
-						},
-					},
-				},
-				Containers: []api.Container{
-					{
-						Name:  "configmap-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.6",
-						Args:  []string{"--file_content=/etc/configmap-volume/data-1"},
-						VolumeMounts: []api.VolumeMount{
-							{
-								Name:      volumeName,
-								MountPath: volumeMountPath,
-								ReadOnly:  true,
-							},
-						},
-					},
-				},
-				RestartPolicy: api.RestartPolicyNever,
-			},
-		}
-
-		testContainerOutput("consume configMaps", f.Client, pod, 0, []string{
-			"content of file \"/etc/configmap-volume/data-1\": value-1",
-		}, f.Namespace.Name)
+	It("should be consumable from pods in volume as non-root with FSGroup [Feature:FSGroup]", func() {
+		doConfigMapE2EWithoutMappings(f, 1000, 1001)
 	})
 
 	It("should be consumable from pods in volume with mappings [Conformance]", func() {
-		name := "configmap-test-volume-map-" + string(util.NewUUID())
-		volumeName := "configmap-volume"
-		volumeMountPath := "/etc/configmap-volume"
+		doConfigMapE2EWithMappings(f, 0, 0)
+	})
 
-		configMap := &api.ConfigMap{
-			ObjectMeta: api.ObjectMeta{
-				Namespace: f.Namespace.Name,
-				Name:      name,
-			},
-			Data: map[string]string{
-				"data-1": "value-1",
-				"data-2": "value-2",
-				"data-3": "value-3",
-			},
-		}
+	It("should be consumable from pods in volume with mappings as non-root [Conformance]", func() {
+		doConfigMapE2EWithMappings(f, 1000, 0)
+	})
 
-		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
-		defer func() {
-			By("Cleaning up the configMap")
-			if err := f.Client.ConfigMaps(f.Namespace.Name).Delete(configMap.Name); err != nil {
-				Failf("unable to delete configMap %v: %v", configMap.Name, err)
-			}
-		}()
-		var err error
-		if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
-			Failf("unable to create test configMap %s: %v", configMap.Name, err)
-		}
-
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name: "pod-configmaps-" + string(util.NewUUID()),
-			},
-			Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{
-						Name: volumeName,
-						VolumeSource: api.VolumeSource{
-							ConfigMap: &api.ConfigMapVolumeSource{
-								LocalObjectReference: api.LocalObjectReference{
-									Name: name,
-								},
-								Items: []api.KeyToPath{
-									{
-										Key:  "data-2",
-										Path: "path/to/data-2",
-									},
-								},
-							},
-						},
-					},
-				},
-				Containers: []api.Container{
-					{
-						Name:  "configmap-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.6",
-						Args:  []string{"--file_content=/etc/configmap-volume/path/to/data-2"},
-						VolumeMounts: []api.VolumeMount{
-							{
-								Name:      volumeName,
-								MountPath: volumeMountPath,
-								ReadOnly:  true,
-							},
-						},
-					},
-				},
-				RestartPolicy: api.RestartPolicyNever,
-			},
-		}
-
-		testContainerOutput("consume configMaps", f.Client, pod, 0, []string{
-			"content of file \"/etc/configmap-volume/path/to/data-2\": value-2",
-		}, f.Namespace.Name)
+	It("should be consumable from pods in volume with mappings as non-root with FSGroup [Feature:FSGroup]", func() {
+		doConfigMapE2EWithMappings(f, 1000, 1001)
 	})
 
 	It("updates should be reflected in volume [Conformance]", func() {
@@ -273,18 +153,7 @@ var _ = KubeDescribe("ConfigMap", func() {
 
 	It("should be consumable via environment variable [Conformance]", func() {
 		name := "configmap-test-" + string(util.NewUUID())
-		configMap := &api.ConfigMap{
-			ObjectMeta: api.ObjectMeta{
-				Namespace: f.Namespace.Name,
-				Name:      name,
-			},
-			Data: map[string]string{
-				"data-1": "value-1",
-				"data-2": "value-2",
-				"data-3": "value-3",
-			},
-		}
-
+		configMap := newConfigMap(f, name)
 		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		defer func() {
 			By("Cleaning up the configMap")
@@ -331,3 +200,162 @@ var _ = KubeDescribe("ConfigMap", func() {
 		}, f.Namespace.Name)
 	})
 })
+
+func newConfigMap(f *Framework, name string) *api.ConfigMap {
+	return &api.ConfigMap{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: f.Namespace.Name,
+			Name:      name,
+		},
+		Data: map[string]string{
+			"data-1": "value-1",
+			"data-2": "value-2",
+			"data-3": "value-3",
+		},
+	}
+}
+
+func doConfigMapE2EWithoutMappings(f *Framework, uid, fsGroup int64) {
+	var (
+		name            = "configmap-test-volume-" + string(util.NewUUID())
+		volumeName      = "configmap-volume"
+		volumeMountPath = "/etc/configmap-volume"
+		configMap       = newConfigMap(f, name)
+	)
+
+	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+	defer func() {
+		By("Cleaning up the configMap")
+		if err := f.Client.ConfigMaps(f.Namespace.Name).Delete(configMap.Name); err != nil {
+			Failf("unable to delete configMap %v: %v", configMap.Name, err)
+		}
+	}()
+	var err error
+	if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		Failf("unable to create test configMap %s: %v", configMap.Name, err)
+	}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pod-configmaps-" + string(util.NewUUID()),
+		},
+		Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{},
+			Volumes: []api.Volume{
+				{
+					Name: volumeName,
+					VolumeSource: api.VolumeSource{
+						ConfigMap: &api.ConfigMapVolumeSource{
+							LocalObjectReference: api.LocalObjectReference{
+								Name: name,
+							},
+						},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:  "configmap-volume-test",
+					Image: "gcr.io/google_containers/mounttest:0.6",
+					Args:  []string{"--file_content=/etc/configmap-volume/data-1"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: volumeMountPath,
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+
+	if uid != 0 {
+		pod.Spec.SecurityContext.RunAsUser = &uid
+	}
+
+	if fsGroup != 0 {
+		pod.Spec.SecurityContext.FSGroup = &fsGroup
+	}
+
+	testContainerOutput("consume configMaps", f.Client, pod, 0, []string{
+		"content of file \"/etc/configmap-volume/data-1\": value-1",
+	}, f.Namespace.Name)
+
+}
+
+func doConfigMapE2EWithMappings(f *Framework, uid, fsGroup int64) {
+	var (
+		name            = "configmap-test-volume-map-" + string(util.NewUUID())
+		volumeName      = "configmap-volume"
+		volumeMountPath = "/etc/configmap-volume"
+		configMap       = newConfigMap(f, name)
+	)
+
+	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+	defer func() {
+		By("Cleaning up the configMap")
+		if err := f.Client.ConfigMaps(f.Namespace.Name).Delete(configMap.Name); err != nil {
+			Failf("unable to delete configMap %v: %v", configMap.Name, err)
+		}
+	}()
+	var err error
+	if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		Failf("unable to create test configMap %s: %v", configMap.Name, err)
+	}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pod-configmaps-" + string(util.NewUUID()),
+		},
+		Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{},
+			Volumes: []api.Volume{
+				{
+					Name: volumeName,
+					VolumeSource: api.VolumeSource{
+						ConfigMap: &api.ConfigMapVolumeSource{
+							LocalObjectReference: api.LocalObjectReference{
+								Name: name,
+							},
+							Items: []api.KeyToPath{
+								{
+									Key:  "data-2",
+									Path: "path/to/data-2",
+								},
+							},
+						},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:  "configmap-volume-test",
+					Image: "gcr.io/google_containers/mounttest:0.6",
+					Args:  []string{"--file_content=/etc/configmap-volume/path/to/data-2"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: volumeMountPath,
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+
+	if uid != 0 {
+		pod.Spec.SecurityContext.RunAsUser = &uid
+	}
+
+	if fsGroup != 0 {
+		pod.Spec.SecurityContext.FSGroup = &fsGroup
+	}
+
+	testContainerOutput("consume configMaps", f.Client, pod, 0, []string{
+		"content of file \"/etc/configmap-volume/path/to/data-2\": value-2",
+	}, f.Namespace.Name)
+}
