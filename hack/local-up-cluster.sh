@@ -308,7 +308,7 @@ function start_kubelet {
             if ! chcon -R system_u:object_r:svirt_sandbox_file_t:s0 /var/lib/kubelet; then
                echo "Failed to apply selinux label to /var/lib/kubelet."
             fi
-	 fi
+         fi
       fi
       # Enable dns
       if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
