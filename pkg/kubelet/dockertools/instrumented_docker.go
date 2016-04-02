@@ -23,23 +23,25 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
+// instrumentedDockerInterface wraps the DockerInterface and records the operations
+// and errors metrics.
 type instrumentedDockerInterface struct {
 	client DockerInterface
 }
 
 // Creates an instrumented DockerInterface from an existing DockerInterface.
-func NewInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterface {
+func newInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterface {
 	return instrumentedDockerInterface{
 		client: dockerClient,
 	}
 }
 
-// Record the duration of the operation.
+// recordOperation records the duration of the operation.
 func recordOperation(operation string, start time.Time) {
 	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
 }
 
-// Record error for metric if an error occurred.
+// recordError records error for metric if an error occurred.
 func recordError(operation string, err error) {
 	if err != nil {
 		metrics.DockerErrors.WithLabelValues(operation).Inc()
