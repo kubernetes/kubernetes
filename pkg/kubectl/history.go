@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -128,9 +129,9 @@ func PrintRolloutHistory(historyInfo HistoryInfo, resource, name string) (string
 
 // getChangeCause returns the change-cause annotation of the input object
 func getChangeCause(obj runtime.Object) string {
-	meta, err := api.ObjectMetaFor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return ""
 	}
-	return meta.Annotations[ChangeCauseAnnotation]
+	return accessor.GetAnnotations()[ChangeCauseAnnotation]
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -105,10 +106,10 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func validateNoOverwrites(meta *api.ObjectMeta, labels map[string]string) error {
+func validateNoOverwrites(accessor meta.Object, labels map[string]string) error {
 	allErrs := []error{}
 	for key := range labels {
-		if value, found := meta.Labels[key]; found {
+		if value, found := accessor.GetLabels()[key]; found {
 			allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, value))
 		}
 	}
@@ -140,29 +141,31 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 }
 
 func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) error {
-	meta, err := api.ObjectMetaFor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
 	if !overwrite {
-		if err := validateNoOverwrites(meta, labels); err != nil {
+		if err := validateNoOverwrites(accessor, labels); err != nil {
 			return err
 		}
 	}
 
-	if meta.Labels == nil {
-		meta.Labels = make(map[string]string)
+	objLabels := accessor.GetLabels()
+	if objLabels == nil {
+		objLabels = make(map[string]string)
 	}
 
 	for key, value := range labels {
-		meta.Labels[key] = value
+		objLabels[key] = value
 	}
 	for _, label := range remove {
-		delete(meta.Labels, label)
+		delete(objLabels, label)
 	}
+	accessor.SetLabels(objLabels)
 
 	if len(resourceVersion) != 0 {
-		meta.ResourceVersion = resourceVersion
+		accessor.SetResourceVersion(resourceVersion)
 	}
 	return nil
 }
@@ -250,9 +253,12 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			if err != nil {
 				return err
 			}
-			meta, err := api.ObjectMetaFor(obj)
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return err
+			}
 			for _, label := range remove {
-				if _, ok := meta.Labels[label]; !ok {
+				if _, ok := accessor.GetLabels()[label]; !ok {
 					fmt.Fprintf(out, "label %q not found.\n", label)
 				}
 			}
