@@ -40,7 +40,7 @@ Client-gen is an automatic tool that generates [clientset](../../docs/proposals/
 
 The workflow includes four steps:
 - Marking API types with tags: in `pkg/apis/${GROUP}/${VERSION}/types.go`, mark the types (e.g., Pods) that you want to generate clients for with the `// +genclient=true` tag.  If the resource associated with the type is not namespace scoped (e.g., PersistentVolume), you need to append the `nonNamespaced=true` tag as well.
-- Running the client-gen tool: you need to use the command line argument `--input` to specify the groups and versions of the APIs you want to generate clients for, client-gen will then look into `pkg/apis/${GROUP}/${VERSION}/types.go` and generate clients for the types you have marked with the `genlcient` tags. For example, run
+- Running the client-gen tool: you need to use the command line argument `--input` to specify the groups and versions of the APIs you want to generate clients for, client-gen will then look into `pkg/apis/${GROUP}/${VERSION}/types.go` and generate clients for the types you have marked with the `genclient` tags. For example, run
 
 ```
 $ client-gen --input="api/v1,extensions/v1beta1" --clientset-name="my_release"
