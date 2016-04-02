@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
@@ -564,6 +565,107 @@ func TestCasting(t *testing.T) {
 	binder.deleteVolume(unk)
 	binder.addClaim(pvc)
 	binder.updateClaim(pvc, pvc)
+}
+
+func TestRecycledPersistentVolumeUID(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("claimbinder-test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	codec := api.Codecs.UniversalDecoder()
+	o := core.NewObjects(api.Scheme, codec)
+	if err := core.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, codec); err != nil {
+		t.Fatal(err)
+	}
+	if err := core.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/volumes/local-01.yaml", o, codec); err != nil {
+		t.Fatal(err)
+	}
+
+	clientset := &fake.Clientset{}
+	clientset.AddReactor("*", "*", core.ObjectReaction(o, registered.RESTMapper()))
+
+	pv, err := clientset.Core().PersistentVolumes().Get("any")
+	if err != nil {
+		t.Errorf("Unexpected error getting PV from client: %v", err)
+	}
+	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimRecycle
+	if err != nil {
+		t.Errorf("Unexpected error getting PV from client: %v", err)
+	}
+	pv.ObjectMeta.SelfLink = testapi.Default.SelfLink("pv", "")
+
+	// the default value of the PV is Pending. if processed at least once, its status in etcd is Available.
+	// There was a bug where only Pending volumes were being indexed and made ready for claims.
+	// Test that !Pending gets correctly added
+	pv.Status.Phase = api.VolumeAvailable
+
+	claim, error := clientset.Core().PersistentVolumeClaims("ns").Get("any")
+	if error != nil {
+		t.Errorf("Unexpected error getting PVC from client: %v", err)
+	}
+	claim.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", "")
+	claim.ObjectMeta.UID = types.UID("uid1")
+
+	volumeIndex := NewPersistentVolumeOrderedIndex()
+	mockClient := &mockBinderClient{
+		volume: pv,
+		claim:  claim,
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	recycler := &PersistentVolumeRecycler{
+		kubeClient: clientset,
+		client:     mockClient,
+		pluginMgr:  plugMgr,
+	}
+
+	// adds the volume to the index, making the volume available
+	syncVolume(volumeIndex, mockClient, pv)
+	if mockClient.volume.Status.Phase != api.VolumeAvailable {
+		t.Errorf("Expected phase %s but got %s", api.VolumeAvailable, mockClient.volume.Status.Phase)
+	}
+
+	// add the claim to fake API server
+	mockClient.UpdatePersistentVolumeClaim(claim)
+	// an initial sync for a claim will bind it to an unbound volume
+	syncClaim(volumeIndex, mockClient, claim)
+
+	// pretend the user deleted their claim. periodic resync picks it up.
+	mockClient.claim = nil
+	syncVolume(volumeIndex, mockClient, mockClient.volume)
+
+	if mockClient.volume.Status.Phase != api.VolumeReleased {
+		t.Errorf("Expected phase %s but got %s", api.VolumeReleased, mockClient.volume.Status.Phase)
+	}
+
+	// released volumes with a PersistentVolumeReclaimPolicy (recycle/delete) can have further processing
+	err = recycler.reclaimVolume(mockClient.volume)
+	if err != nil {
+		t.Errorf("Unexpected error reclaiming volume: %+v", err)
+	}
+	if mockClient.volume.Status.Phase != api.VolumePending {
+		t.Errorf("Expected phase %s but got %s", api.VolumePending, mockClient.volume.Status.Phase)
+	}
+
+	// after the recycling changes the phase to Pending, the binder picks up again
+	// to remove any vestiges of binding and make the volume Available again
+	//
+	// explicitly set the claim's UID to a different value to ensure that a new claim with the same
+	// name as what the PV was previously bound still yields an available volume
+	claim.ObjectMeta.UID = types.UID("uid2")
+	mockClient.claim = claim
+	syncVolume(volumeIndex, mockClient, mockClient.volume)
+
+	if mockClient.volume.Status.Phase != api.VolumeAvailable {
+		t.Errorf("Expected phase %s but got %s", api.VolumeAvailable, mockClient.volume.Status.Phase)
+	}
+	if mockClient.volume.Spec.ClaimRef != nil {
+		t.Errorf("Expected nil ClaimRef: %+v", mockClient.volume.Spec.ClaimRef)
+	}
 }
 
 type mockBinderClient struct {
