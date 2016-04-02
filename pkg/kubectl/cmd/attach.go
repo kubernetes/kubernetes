@@ -29,6 +29,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -87,7 +88,7 @@ func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclie
 	if err != nil {
 		return err
 	}
-	return exec.Stream(stdin, stdout, stderr, tty)
+	return exec.Stream(remotecommandserver.SupportedStreamingProtocols, stdin, stdout, stderr, tty)
 }
 
 // AttachOptions declare the arguments accepted by the Exec command
