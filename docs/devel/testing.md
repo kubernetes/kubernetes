@@ -32,11 +32,11 @@ Documentation for other releases can be found at
 This assumes you already read the [development guide](development.md) to
 install go, godeps, and configure your git client.
 
-In order to send pull requests you need to make sure you changes pass
-unit and integration tests.
+Before sending pull requests you should at least make sure your changes have
+passed both unit and integration tests.
 
-Kubernetes only merges pull requests when e2e tests are passing, so it is often
-a good idea to make sure these work as well.
+Kubernetes only merges pull requests when unit, integration, and e2e tests are
+passing, so it is often a good idea to make sure the e2e tests work as well.
 
 ## Unit tests
 
@@ -155,13 +155,13 @@ Kubernetes includes a script to help install etcd on your machine.
 # Option a) install inside kubernetes root
 cd kubernetes
 hack/install-etcd.sh  # Installs in ./third_party/etcd
-echo export PATH="$PATH:$(pwd)/third_party/etcd" >> .profile  # Add to PATH
+echo export PATH="$PATH:$(pwd)/third_party/etcd" >> ~/.profile  # Add to PATH
 
 # Option b) install manually
 cd kubernetes
 grep -E "image.*etcd" cluster/saltbase/etcd/etcd.manifest  # Find version
 # Install that version using yum/apt-get/etc
-echo export PATH="$PATH:<LOCATION>" >> .profile  # Add to PATH
+echo export PATH="$PATH:<LOCATION>" >> ~/.profile  # Add to PATH
 ```
 
 ### Run integration tests
