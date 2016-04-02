@@ -150,5 +150,9 @@ That said, if you have questions, reach out to us one way or another.  We don't 
 
 You can find more projects, tools and articles related to Kubernetes on the  [awesome-kubernetes](https://github.com/ramitsurana/awesome-kubernetes) list. Add your project there and help us make it better.
 
+* **CoreKube** - [https://corekube.com](https://corekube.com):
+
+Instructive & educational resources for the Kubernetes community. By the community.
+
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()
