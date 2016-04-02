@@ -284,6 +284,8 @@ func TestGetAttribs(t *testing.T) {
 				Path:            "/api/v1/nodes/mynode",
 				ResourceRequest: true,
 				Resource:        "nodes",
+				APIVersion:      "v1",
+				Name:            "mynode",
 			},
 		},
 		"namespaced resource": {
@@ -295,6 +297,8 @@ func TestGetAttribs(t *testing.T) {
 				ResourceRequest: true,
 				Namespace:       "myns",
 				Resource:        "pods",
+				APIVersion:      "v1",
+				Name:            "mypod",
 			},
 		},
 		"API group resource": {
@@ -305,6 +309,7 @@ func TestGetAttribs(t *testing.T) {
 				Path:            "/apis/extensions/v1beta1/namespaces/myns/jobs",
 				ResourceRequest: true,
 				APIGroup:        extensions.GroupName,
+				APIVersion:      "v1beta1",
 				Namespace:       "myns",
 				Resource:        "jobs",
 			},
