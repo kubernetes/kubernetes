@@ -199,6 +199,8 @@ func NewDockerManager(
 	enableCustomMetrics bool,
 	hairpinMode bool,
 	options ...kubecontainer.Option) *DockerManager {
+	// Wrap the docker client with instrumentedDockerInterface
+	client = newInstrumentedDockerInterface(client)
 
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
@@ -1392,10 +1394,6 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		gracePeriod = minimumGracePeriodInSeconds
 	}
 	err := dm.client.StopContainer(ID, uint(gracePeriod))
-	if _, ok := err.(*docker.ContainerNotRunning); ok && err != nil {
-		glog.V(4).Infof("Container %q has already exited", name)
-		return nil
-	}
 	if err == nil {
 		glog.V(2).Infof("Container %q exited after %s", name, unversioned.Now().Sub(start.Time))
 	} else {
