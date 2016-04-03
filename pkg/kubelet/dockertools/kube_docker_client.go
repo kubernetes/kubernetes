@@ -157,20 +157,16 @@ func (d *kubeDockerClient) InspectImage(image string) (*docker.Image, error) {
 	return imageInfo, nil
 }
 
-func (d *kubeDockerClient) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
-	resp, err := d.client.ImageList(getDefaultContext(), dockertypes.ImageListOptions{
-		MatchName: opts.Filter,
-		All:       opts.All,
-		Filters:   convertFilters(opts.Filters),
-	})
+func (d *kubeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
+	images, err := d.client.ImageList(getDefaultContext(), opts)
 	if err != nil {
 		return nil, err
 	}
-	images := []docker.APIImages{}
-	if err = convertType(&resp, &images); err != nil {
-		return nil, err
+	dockerImages := []dockertypes.Image{}
+	for _, img := range images {
+		dockerImages = append(dockerImages, dockertypes.Image(img))
 	}
-	return images, nil
+	return dockerImages, nil
 }
 
 func base64EncodeAuth(auth docker.AuthConfiguration) (string, error) {

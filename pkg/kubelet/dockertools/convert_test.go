@@ -70,7 +70,7 @@ func TestToRuntimeContainer(t *testing.T) {
 }
 
 func TestToRuntimeImage(t *testing.T) {
-	original := &docker.APIImages{
+	original := &dockertypes.Image{
 		ID:          "aeeea",
 		RepoTags:    []string{"abc", "def"},
 		VirtualSize: 1234,
