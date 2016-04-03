@@ -28,7 +28,6 @@ kube::golang::setup_env
     cmd/genkubedocs \
     cmd/genman \
     cmd/genyaml \
-    cmd/genbashcomp \
     cmd/mungedocs
 
 kube::util::ensure-temp-dir
