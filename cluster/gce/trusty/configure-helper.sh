@@ -309,7 +309,6 @@ create_master_auth() {
     add_token_entry "system:controller_manager" "${known_tokens_csv}"
     add_token_entry "system:logging" "${known_tokens_csv}"
     add_token_entry "system:monitoring" "${known_tokens_csv}"
-    add_token_entry "system:dns" "${known_tokens_csv}"
   fi
 
   if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
