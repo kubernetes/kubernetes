@@ -3,7 +3,7 @@ import:
 - package: bitbucket.org/bertimus9/systemstat
   version: 1468fd0db20598383c9393cccaa547de6ad99e5e
 - package: bitbucket.org/ww/goautoneg
-  version: '''75cd24fc2f2c2a2088577d12123ddee5f54e0675'''
+  version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
 - package: github.com/ClusterHQ/flocker-go
   version: 1c0a791b33bdc01d062b376612aa04e27eed7eb3
 - package: github.com/Microsoft/go-winio
