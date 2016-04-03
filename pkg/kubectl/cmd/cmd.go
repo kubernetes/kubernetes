@@ -124,7 +124,7 @@ __kubectl_require_pod_and_container()
 
 __custom_func() {
     case ${last_command} in
-        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop)
+        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop | kubectl_edit)
             __kubectl_get_resource
             return
             ;;
