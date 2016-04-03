@@ -174,10 +174,11 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	var packageList []generator.Package
+	typedClientBasePath := filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName, "typed")
 
-	packageList = append(packageList, packageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
+	packageList = append(packageList, packageForClientset(customArgs, typedClientBasePath, boilerplate))
 	if customArgs.FakeClient {
-		packageList = append(packageList, fake.PackageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
+		packageList = append(packageList, fake.PackageForClientset(customArgs, typedClientBasePath, boilerplate))
 	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
@@ -188,9 +189,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	orderer := namer.Orderer{namer.NewPrivateNamer(0)}
 	for _, gv := range customArgs.GroupVersions {
 		types := gvToTypes[gv]
-		packageList = append(packageList, packageForGroup(normalization.GroupVersion(gv), orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
+		packageList = append(packageList, packageForGroup(normalization.GroupVersion(gv), orderer.OrderTypes(types), typedClientBasePath, arguments.OutputBase, boilerplate))
 		if customArgs.FakeClient {
-			packageList = append(packageList, fake.PackageForGroup(normalization.GroupVersion(gv), orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
+			packageList = append(packageList, fake.PackageForGroup(normalization.GroupVersion(gv), orderer.OrderTypes(types), typedClientBasePath, arguments.OutputBase, boilerplate))
 		}
 	}
 
