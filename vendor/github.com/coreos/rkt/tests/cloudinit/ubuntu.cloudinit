@@ -1,0 +1,27 @@
+#!/bin/bash
+cat > /var/tmp/rkt-test.sh <<TESTEOF
+#!/bin/bash
+
+set -e
+set -x
+
+# Sometimes journald does not work well on old versions
+exec > >(tee -a "/var/tmp/rkt-test.log") 2>&1
+
+export DEBIAN_FRONTEND=noninteractive
+
+groupadd rkt
+gpasswd -a ubuntu rkt
+
+apt-get update -y
+apt-get dist-upgrade -y --force-yes
+apt-get install -y build-essential autoconf
+apt-get install -y wget squashfs-tools patch gnupg golang libacl1-dev systemd-container
+
+su - ubuntu --command="cd /var/tmp ; git clone --branch @GIT_BRANCH@ @GIT_URL@ rkt"
+su - ubuntu --command="PATH=\$PATH ; cd /var/tmp/rkt ; ./tests/run-build.sh @FLAVOR@"
+TESTEOF
+
+chmod +x /var/tmp/rkt-test.sh
+
+systemd-run --unit=rkt-test /var/tmp/rkt-test.sh

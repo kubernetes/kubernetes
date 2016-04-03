@@ -1,0 +1,2403 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/jFfT_5FQxY4swYRA_Wr05M6Vn5o\"",
+ "discoveryVersion": "v1",
+ "id": "drive:v3",
+ "name": "drive",
+ "version": "v3",
+ "revision": "20151209",
+ "title": "Drive API",
+ "description": "The API to interact with Drive.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "https://ssl.gstatic.com/docs/doclist/images/drive_icon_16.png",
+  "x32": "https://ssl.gstatic.com/docs/doclist/images/drive_icon_32.png"
+ },
+ "documentationLink": "https://developers.google.com/drive/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/drive/v3/",
+ "basePath": "/drive/v3/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "drive/v3/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/drive": {
+     "description": "View and manage the files in your Google Drive"
+    },
+    "https://www.googleapis.com/auth/drive.appdata": {
+     "description": "View and manage its own configuration data in your Google Drive"
+    },
+    "https://www.googleapis.com/auth/drive.file": {
+     "description": "View and manage Google Drive files and folders that you have opened or created with this app"
+    },
+    "https://www.googleapis.com/auth/drive.metadata": {
+     "description": "View and manage metadata of files in your Google Drive"
+    },
+    "https://www.googleapis.com/auth/drive.metadata.readonly": {
+     "description": "View metadata for files in your Google Drive"
+    },
+    "https://www.googleapis.com/auth/drive.photos.readonly": {
+     "description": "View the photos, videos and albums in your Google Photos"
+    },
+    "https://www.googleapis.com/auth/drive.readonly": {
+     "description": "View the files in your Google Drive"
+    },
+    "https://www.googleapis.com/auth/drive.scripts": {
+     "description": "Modify your Google Apps Script scripts' behavior"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "About": {
+   "id": "About",
+   "type": "object",
+   "description": "Information about the user, the user's Drive, and system capabilities.",
+   "properties": {
+    "appInstalled": {
+     "type": "boolean",
+     "description": "Whether the user has installed the requesting app."
+    },
+    "exportFormats": {
+     "type": "object",
+     "description": "A map of source MIME type to possible targets for all supported exports.",
+     "additionalProperties": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "folderColorPalette": {
+     "type": "array",
+     "description": "The currently supported folder colors as RGB hex strings.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "importFormats": {
+     "type": "object",
+     "description": "A map of source MIME type to possible targets for all supported imports.",
+     "additionalProperties": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#about.",
+     "default": "drive#about"
+    },
+    "maxImportSizes": {
+     "type": "object",
+     "description": "A map of maximum import sizes by MIME type, in bytes.",
+     "additionalProperties": {
+      "type": "string",
+      "format": "int64"
+     }
+    },
+    "maxUploadSize": {
+     "type": "string",
+     "description": "The maximum upload size in bytes.",
+     "format": "int64"
+    },
+    "storageQuota": {
+     "type": "object",
+     "description": "The user's storage quota limits and usage. All fields are measured in bytes.",
+     "properties": {
+      "limit": {
+       "type": "string",
+       "description": "The usage limit, if applicable. This will not be present if the user has unlimited storage.",
+       "format": "int64"
+      },
+      "usage": {
+       "type": "string",
+       "description": "The total usage across all services.",
+       "format": "int64"
+      },
+      "usageInDrive": {
+       "type": "string",
+       "description": "The usage by all files in Google Drive.",
+       "format": "int64"
+      },
+      "usageInDriveTrash": {
+       "type": "string",
+       "description": "The usage by trashed files in Google Drive.",
+       "format": "int64"
+      }
+     }
+    },
+    "user": {
+     "$ref": "User",
+     "description": "The authenticated user."
+    }
+   }
+  },
+  "Change": {
+   "id": "Change",
+   "type": "object",
+   "description": "A change to a file.",
+   "properties": {
+    "file": {
+     "$ref": "File",
+     "description": "The updated state of the file. Present if the file has not been removed."
+    },
+    "fileId": {
+     "type": "string",
+     "description": "The ID of the file which has changed."
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#change.",
+     "default": "drive#change"
+    },
+    "removed": {
+     "type": "boolean",
+     "description": "Whether the file has been removed from the view of the changes list, for example by deletion or lost access."
+    },
+    "time": {
+     "type": "string",
+     "description": "The time of this change (RFC 3339 date-time).",
+     "format": "date-time"
+    }
+   }
+  },
+  "ChangeList": {
+   "id": "ChangeList",
+   "type": "object",
+   "description": "A list of changes for a user.",
+   "properties": {
+    "changes": {
+     "type": "array",
+     "description": "The page of changes.",
+     "items": {
+      "$ref": "Change"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#changeList.",
+     "default": "drive#changeList"
+    },
+    "newStartPageToken": {
+     "type": "string",
+     "description": "The starting page token for future changes. This will be present only if the end of the current changes list has been reached."
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The page token for the next page of changes. This will be absent if the end of the current changes list has been reached."
+    }
+   }
+  },
+  "Channel": {
+   "id": "Channel",
+   "type": "object",
+   "description": "An notification channel used to watch for resource changes.",
+   "properties": {
+    "address": {
+     "type": "string",
+     "description": "The address where notifications are delivered for this channel."
+    },
+    "expiration": {
+     "type": "string",
+     "description": "Date and time of notification channel expiration, expressed as a Unix timestamp, in milliseconds. Optional.",
+     "format": "int64"
+    },
+    "id": {
+     "type": "string",
+     "description": "A UUID or similar unique string that identifies this channel."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this as a notification channel used to watch for changes to a resource. Value: the fixed string \"api#channel\".",
+     "default": "api#channel"
+    },
+    "params": {
+     "type": "object",
+     "description": "Additional parameters controlling delivery channel behavior. Optional.",
+     "additionalProperties": {
+      "type": "string",
+      "description": "Declares a new parameter by name."
+     }
+    },
+    "payload": {
+     "type": "boolean",
+     "description": "A Boolean value to indicate whether payload is wanted. Optional."
+    },
+    "resourceId": {
+     "type": "string",
+     "description": "An opaque ID that identifies the resource being watched on this channel. Stable across different API versions."
+    },
+    "resourceUri": {
+     "type": "string",
+     "description": "A version-specific identifier for the watched resource."
+    },
+    "token": {
+     "type": "string",
+     "description": "An arbitrary string delivered to the target address with each notification delivered over this channel. Optional."
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of delivery mechanism used for this channel."
+    }
+   }
+  },
+  "Comment": {
+   "id": "Comment",
+   "type": "object",
+   "description": "A comment on a file.",
+   "properties": {
+    "anchor": {
+     "type": "string",
+     "description": "A region of the document represented as a JSON string. See anchor documentation for details on how to define and interpret anchor properties."
+    },
+    "author": {
+     "$ref": "User",
+     "description": "The user who created the comment."
+    },
+    "content": {
+     "type": "string",
+     "description": "The plain text content of the comment. This field is used for setting the content, while htmlContent should be displayed.",
+     "annotations": {
+      "required": [
+       "drive.comments.create",
+       "drive.comments.update"
+      ]
+     }
+    },
+    "createdTime": {
+     "type": "string",
+     "description": "The time at which the comment was created (RFC 3339 date-time).",
+     "format": "date-time"
+    },
+    "deleted": {
+     "type": "boolean",
+     "description": "Whether the comment has been deleted. A deleted comment has no content."
+    },
+    "htmlContent": {
+     "type": "string",
+     "description": "The content of the comment with HTML formatting."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the comment."
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#comment.",
+     "default": "drive#comment"
+    },
+    "modifiedTime": {
+     "type": "string",
+     "description": "The last time the comment or any of its replies was modified (RFC 3339 date-time).",
+     "format": "date-time"
+    },
+    "quotedFileContent": {
+     "type": "object",
+     "description": "The file content to which the comment refers, typically within the anchor region. For a text file, for example, this would be the text at the location of the comment.",
+     "properties": {
+      "mimeType": {
+       "type": "string",
+       "description": "The MIME type of the quoted content."
+      },
+      "value": {
+       "type": "string",
+       "description": "The quoted content itself. This is interpreted as plain text if set through the API."
+      }
+     }
+    },
+    "replies": {
+     "type": "array",
+     "description": "The full list of replies to the comment in chronological order.",
+     "items": {
+      "$ref": "Reply"
+     }
+    },
+    "resolved": {
+     "type": "boolean",
+     "description": "Whether the comment has been resolved by one of its replies."
+    }
+   }
+  },
+  "CommentList": {
+   "id": "CommentList",
+   "type": "object",
+   "description": "A list of comments on a file.",
+   "properties": {
+    "comments": {
+     "type": "array",
+     "description": "The page of comments.",
+     "items": {
+      "$ref": "Comment"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#commentList.",
+     "default": "drive#commentList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The page token for the next page of comments. This will be absent if the end of the comments list has been reached."
+    }
+   }
+  },
+  "File": {
+   "id": "File",
+   "type": "object",
+   "description": "The metadata for a file.",
+   "properties": {
+    "appProperties": {
+     "type": "object",
+     "description": "A collection of arbitrary key-value pairs which are private to the requesting app.\nEntries with null values are cleared in update and copy requests.",
+     "additionalProperties": {
+      "type": "string"
+     }
+    },
+    "capabilities": {
+     "type": "object",
+     "description": "Capabilities the current user has on the file.",
+     "properties": {
+      "canComment": {
+       "type": "boolean",
+       "description": "Whether the user can comment on the file."
+      },
+      "canCopy": {
+       "type": "boolean",
+       "description": "Whether the user can copy the file."
+      },
+      "canEdit": {
+       "type": "boolean",
+       "description": "Whether the user can edit the file's content."
+      },
+      "canShare": {
+       "type": "boolean",
+       "description": "Whether the user can modify the file's permissions and sharing settings."
+      }
+     }
+    },
+    "contentHints": {
+     "type": "object",
+     "description": "Additional information about the content of the file. These fields are never populated in responses.",
+     "properties": {
+      "indexableText": {
+       "type": "string",
+       "description": "Text to be indexed for the file to improve fullText queries. This is limited to 128KB in length and may contain HTML elements."
+      },
+      "thumbnail": {
+       "type": "object",
+       "description": "A thumbnail for the file. This will only be used if Drive cannot generate a standard thumbnail.",
+       "properties": {
+        "image": {
+         "type": "string",
+         "description": "The thumbnail data encoded with URL-safe Base64 (RFC 4648 section 5).",
+         "format": "byte"
+        },
+        "mimeType": {
+         "type": "string",
+         "description": "The MIME type of the thumbnail."
+        }
+       }
+      }
+     }
+    },
+    "createdTime": {
+     "type": "string",
+     "description": "The time at which the file was created (RFC 3339 date-time).",
+     "format": "date-time"
+    },
+    "description": {
+     "type": "string",
+     "description": "A short description of the file."
+    },
+    "explicitlyTrashed": {
+     "type": "boolean",
+     "description": "Whether the file has been explicitly trashed, as opposed to recursively trashed from a parent folder."
+    },
+    "fileExtension": {
+     "type": "string",
+     "description": "The final component of fullFileExtension. This is only available for files with binary content in Drive."
+    },
+    "folderColorRgb": {
+     "type": "string",
+     "description": "The color for a folder as an RGB hex string. The supported colors are published in the folderColorPalette field of the About resource.\nIf an unsupported color is specified, the closest color in the palette will be used instead."
+    },
+    "fullFileExtension": {
+     "type": "string",
+     "description": "The full file extension extracted from the name field. May contain multiple concatenated extensions, such as \"tar.gz\". This is only available for files with binary content in Drive.\nThis is automatically updated when the name field changes, however it is not cleared if the new name does not contain a valid extension."
+    },
+    "headRevisionId": {
+     "type": "string",
+     "description": "The ID of the file's head revision. This is currently only available for files with binary content in Drive."
+    },
+    "iconLink": {
+     "type": "string",
+     "description": "A static, unauthenticated link to the file's icon."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the file."
+    },
+    "imageMediaMetadata": {
+     "type": "object",
+     "description": "Additional metadata about image media, if available.",
+     "properties": {
+      "aperture": {
+       "type": "number",
+       "description": "The aperture used to create the photo (f-number).",
+       "format": "float"
+      },
+      "cameraMake": {
+       "type": "string",
+       "description": "The make of the camera used to create the photo."
+      },
+      "cameraModel": {
+       "type": "string",
+       "description": "The model of the camera used to create the photo."
+      },
+      "colorSpace": {
+       "type": "string",
+       "description": "The color space of the photo."
+      },
+      "exposureBias": {
+       "type": "number",
+       "description": "The exposure bias of the photo (APEX value).",
+       "format": "float"
+      },
+      "exposureMode": {
+       "type": "string",
+       "description": "The exposure mode used to create the photo."
+      },
+      "exposureTime": {
+       "type": "number",
+       "description": "The length of the exposure, in seconds.",
+       "format": "float"
+      },
+      "flashUsed": {
+       "type": "boolean",
+       "description": "Whether a flash was used to create the photo."
+      },
+      "focalLength": {
+       "type": "number",
+       "description": "The focal length used to create the photo, in millimeters.",
+       "format": "float"
+      },
+      "height": {
+       "type": "integer",
+       "description": "The height of the image in pixels.",
+       "format": "int32"
+      },
+      "isoSpeed": {
+       "type": "integer",
+       "description": "The ISO speed used to create the photo.",
+       "format": "int32"
+      },
+      "lens": {
+       "type": "string",
+       "description": "The lens used to create the photo."
+      },
+      "location": {
+       "type": "object",
+       "description": "Geographic location information stored in the image.",
+       "properties": {
+        "altitude": {
+         "type": "number",
+         "description": "The altitude stored in the image.",
+         "format": "double"
+        },
+        "latitude": {
+         "type": "number",
+         "description": "The latitude stored in the image.",
+         "format": "double"
+        },
+        "longitude": {
+         "type": "number",
+         "description": "The longitude stored in the image.",
+         "format": "double"
+        }
+       }
+      },
+      "maxApertureValue": {
+       "type": "number",
+       "description": "The smallest f-number of the lens at the focal length used to create the photo (APEX value).",
+       "format": "float"
+      },
+      "meteringMode": {
+       "type": "string",
+       "description": "The metering mode used to create the photo."
+      },
+      "rotation": {
+       "type": "integer",
+       "description": "The rotation in clockwise degrees from the image's original orientation.",
+       "format": "int32"
+      },
+      "sensor": {
+       "type": "string",
+       "description": "The type of sensor used to create the photo."
+      },
+      "subjectDistance": {
+       "type": "integer",
+       "description": "The distance to the subject of the photo, in meters.",
+       "format": "int32"
+      },
+      "time": {
+       "type": "string",
+       "description": "The date and time the photo was taken (EXIF DateTime)."
+      },
+      "whiteBalance": {
+       "type": "string",
+       "description": "The white balance mode used to create the photo."
+      },
+      "width": {
+       "type": "integer",
+       "description": "The width of the image in pixels.",
+       "format": "int32"
+      }
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#file.",
+     "default": "drive#file"
+    },
+    "lastModifyingUser": {
+     "$ref": "User",
+     "description": "The last user to modify the file."
+    },
+    "md5Checksum": {
+     "type": "string",
+     "description": "The MD5 checksum for the content of the file. This is only applicable to files with binary content in Drive."
+    },
+    "mimeType": {
+     "type": "string",
+     "description": "The MIME type of the file.\nDrive will attempt to automatically detect an appropriate value from uploaded content if no value is provided. The value cannot be changed unless a new revision is uploaded.\nIf a file is created with a Google Doc MIME type, the uploaded content will be imported if possible. The supported import formats are published in the About resource."
+    },
+    "modifiedByMeTime": {
+     "type": "string",
+     "description": "The last time the file was modified by the user (RFC 3339 date-time).",
+     "format": "date-time"
+    },
+    "modifiedTime": {
+     "type": "string",
+     "description": "The last time the file was modified by anyone (RFC 3339 date-time).\nNote that setting modifiedTime will also update modifiedByMeTime for the user.",
+     "format": "date-time"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the file. This is not necessarily unique within a folder."
+    },
+    "originalFilename": {
+     "type": "string",
+     "description": "The original filename of the uploaded content if available, or else the original value of the name field. This is only available for files with binary content in Drive."
+    },
+    "ownedByMe": {
+     "type": "boolean",
+     "description": "Whether the user owns the file."
+    },
+    "owners": {
+     "type": "array",
+     "description": "The owners of the file. Currently, only certain legacy files may have more than one owner.",
+     "items": {
+      "$ref": "User"
+     }
+    },
+    "parents": {
+     "type": "array",
+     "description": "The IDs of the parent folders which contain the file.\nIf not specified as part of a create request, the file will be placed directly in the My Drive folder. Update requests must use the addParents and removeParents parameters to modify the values.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "permissions": {
+     "type": "array",
+     "description": "The full list of permissions for the file. This is only available if the requesting user can share the file.",
+     "items": {
+      "$ref": "Permission"
+     }
+    },
+    "properties": {
+     "type": "object",
+     "description": "A collection of arbitrary key-value pairs which are visible to all apps.\nEntries with null values are cleared in update and copy requests.",
+     "additionalProperties": {
+      "type": "string"
+     }
+    },
+    "quotaBytesUsed": {
+     "type": "string",
+     "description": "The number of storage quota bytes used by the file. This includes the head revision as well as previous revisions with keepForever enabled.",
+     "format": "int64"
+    },
+    "shared": {
+     "type": "boolean",
+     "description": "Whether the file has been shared."
+    },
+    "sharedWithMeTime": {
+     "type": "string",
+     "description": "The time at which the file was shared with the user, if applicable (RFC 3339 date-time).",
+     "format": "date-time"
+    },
+    "sharingUser": {
+     "$ref": "User",
+     "description": "The user who shared the file with the requesting user, if applicable."
+    },
+    "size": {
+     "type": "string",
+     "description": "The size of the file's content in bytes. This is only applicable to files with binary content in Drive.",
+     "format": "int64"
+    },
+    "spaces": {
+     "type": "array",
+     "description": "The list of spaces which contain the file. The currently supported values are 'drive', 'appDataFolder' and 'photos'.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "starred": {
+     "type": "boolean",
+     "description": "Whether the user has starred the file."
+    },
+    "thumbnailLink": {
+     "type": "string",
+     "description": "A short-lived link to the file's thumbnail, if available. Typically lasts on the order of hours."
+    },
+    "trashed": {
+     "type": "boolean",
+     "description": "Whether the file has been trashed, either explicitly or from a trashed parent folder. Only the owner may trash a file, and other users cannot see files in the owner's trash."
+    },
+    "version": {
+     "type": "string",
+     "description": "A monotonically increasing version number for the file. This reflects every change made to the file on the server, even those not visible to the user.",
+     "format": "int64"
+    },
+    "videoMediaMetadata": {
+     "type": "object",
+     "description": "Additional metadata about video media. This may not be available immediately upon upload.",
+     "properties": {
+      "durationMillis": {
+       "type": "string",
+       "description": "The duration of the video in milliseconds.",
+       "format": "int64"
+      },
+      "height": {
+       "type": "integer",
+       "description": "The height of the video in pixels.",
+       "format": "int32"
+      },
+      "width": {
+       "type": "integer",
+       "description": "The width of the video in pixels.",
+       "format": "int32"
+      }
+     }
+    },
+    "viewedByMe": {
+     "type": "boolean",
+     "description": "Whether the file has been viewed by this user."
+    },
+    "viewedByMeTime": {
+     "type": "string",
+     "description": "The last time the file was viewed by the user (RFC 3339 date-time).",
+     "format": "date-time"
+    },
+    "viewersCanCopyContent": {
+     "type": "boolean",
+     "description": "Whether users with only reader or commenter permission can copy the file's content. This affects copy, download, and print operations."
+    },
+    "webContentLink": {
+     "type": "string",
+     "description": "A link for downloading the content of the file in a browser. This is only available for files with binary content in Drive."
+    },
+    "webViewLink": {
+     "type": "string",
+     "description": "A link for opening the file in a relevant Google editor or viewer in a browser."
+    },
+    "writersCanShare": {
+     "type": "boolean",
+     "description": "Whether users with only writer permission can modify the file's permissions."
+    }
+   }
+  },
+  "FileList": {
+   "id": "FileList",
+   "type": "object",
+   "description": "A list of files.",
+   "properties": {
+    "files": {
+     "type": "array",
+     "description": "The page of files.",
+     "items": {
+      "$ref": "File"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#fileList.",
+     "default": "drive#fileList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The page token for the next page of files. This will be absent if the end of the files list has been reached."
+    }
+   }
+  },
+  "GeneratedIds": {
+   "id": "GeneratedIds",
+   "type": "object",
+   "description": "A list of generated file IDs which can be provided in create requests.",
+   "properties": {
+    "ids": {
+     "type": "array",
+     "description": "The IDs generated for the requesting user in the specified space.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#generatedIds",
+     "default": "drive#generatedIds"
+    },
+    "space": {
+     "type": "string",
+     "description": "The type of file that can be created with these IDs."
+    }
+   }
+  },
+  "Permission": {
+   "id": "Permission",
+   "type": "object",
+   "description": "A permission for a file. A permission grants a user, group, domain or the world access to a file or a folder hierarchy.",
+   "properties": {
+    "allowFileDiscovery": {
+     "type": "boolean",
+     "description": "Whether the permission allows the file to be discovered through search. This is only applicable for permissions of type domain or anyone."
+    },
+    "displayName": {
+     "type": "string",
+     "description": "A displayable name for users, groups or domains."
+    },
+    "domain": {
+     "type": "string",
+     "description": "The domain to which this permission refers."
+    },
+    "emailAddress": {
+     "type": "string",
+     "description": "The email address of the user or group to which this permission refers."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of this permission. This is a unique identifier for the grantee, and is published in User resources as permissionId."
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#permission.",
+     "default": "drive#permission"
+    },
+    "photoLink": {
+     "type": "string",
+     "description": "A link to the user's profile photo, if available."
+    },
+    "role": {
+     "type": "string",
+     "description": "The role granted by this permission. Valid values are:  \n- owner \n- writer \n- commenter \n- reader",
+     "annotations": {
+      "required": [
+       "drive.permissions.create"
+      ]
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of the grantee. Valid values are:  \n- user \n- group \n- domain \n- anyone",
+     "annotations": {
+      "required": [
+       "drive.permissions.create"
+      ]
+     }
+    }
+   }
+  },
+  "PermissionList": {
+   "id": "PermissionList",
+   "type": "object",
+   "description": "A list of permissions for a file.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#permissionList.",
+     "default": "drive#permissionList"
+    },
+    "permissions": {
+     "type": "array",
+     "description": "The full list of permissions.",
+     "items": {
+      "$ref": "Permission"
+     }
+    }
+   }
+  },
+  "Reply": {
+   "id": "Reply",
+   "type": "object",
+   "description": "A reply to a comment on a file.",
+   "properties": {
+    "action": {
+     "type": "string",
+     "description": "The action the reply performed to the parent comment. Valid values are:  \n- resolve \n- reopen"
+    },
+    "author": {
+     "$ref": "User",
+     "description": "The user who created the reply."
+    },
+    "content": {
+     "type": "string",
+     "description": "The plain text content of the reply. This field is used for setting the content, while htmlContent should be displayed. This is required on creates if no action is specified.",
+     "annotations": {
+      "required": [
+       "drive.replies.update"
+      ]
+     }
+    },
+    "createdTime": {
+     "type": "string",
+     "description": "The time at which the reply was created (RFC 3339 date-time).",
+     "format": "date-time"
+    },
+    "deleted": {
+     "type": "boolean",
+     "description": "Whether the reply has been deleted. A deleted reply has no content."
+    },
+    "htmlContent": {
+     "type": "string",
+     "description": "The content of the reply with HTML formatting."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the reply."
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#reply.",
+     "default": "drive#reply"
+    },
+    "modifiedTime": {
+     "type": "string",
+     "description": "The last time the reply was modified (RFC 3339 date-time).",
+     "format": "date-time"
+    }
+   }
+  },
+  "ReplyList": {
+   "id": "ReplyList",
+   "type": "object",
+   "description": "A list of replies to a comment on a file.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#replyList.",
+     "default": "drive#replyList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The page token for the next page of replies. This will be absent if the end of the replies list has been reached."
+    },
+    "replies": {
+     "type": "array",
+     "description": "The page of replies.",
+     "items": {
+      "$ref": "Reply"
+     }
+    }
+   }
+  },
+  "Revision": {
+   "id": "Revision",
+   "type": "object",
+   "description": "The metadata for a revision to a file.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The ID of the revision."
+    },
+    "keepForever": {
+     "type": "boolean",
+     "description": "Whether to keep this revision forever, even if it is no longer the head revision. If not set, the revision will be automatically purged 30 days after newer content is uploaded. This can be set on a maximum of 200 revisions for a file.\nThis field is only applicable to files with binary content in Drive."
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#revision.",
+     "default": "drive#revision"
+    },
+    "lastModifyingUser": {
+     "$ref": "User",
+     "description": "The last user to modify this revision."
+    },
+    "md5Checksum": {
+     "type": "string",
+     "description": "The MD5 checksum of the revision's content. This is only applicable to files with binary content in Drive."
+    },
+    "mimeType": {
+     "type": "string",
+     "description": "The MIME type of the revision."
+    },
+    "modifiedTime": {
+     "type": "string",
+     "description": "The last time the revision was modified (RFC 3339 date-time).",
+     "format": "date-time"
+    },
+    "originalFilename": {
+     "type": "string",
+     "description": "The original filename used to create this revision. This is only applicable to files with binary content in Drive."
+    },
+    "publishAuto": {
+     "type": "boolean",
+     "description": "Whether subsequent revisions will be automatically republished. This is only applicable to Google Docs."
+    },
+    "published": {
+     "type": "boolean",
+     "description": "Whether this revision is published. This is only applicable to Google Docs."
+    },
+    "publishedOutsideDomain": {
+     "type": "boolean",
+     "description": "Whether this revision is published outside the domain. This is only applicable to Google Docs."
+    },
+    "size": {
+     "type": "string",
+     "description": "The size of the revision's content in bytes. This is only applicable to files with binary content in Drive.",
+     "format": "int64"
+    }
+   }
+  },
+  "RevisionList": {
+   "id": "RevisionList",
+   "type": "object",
+   "description": "A list of revisions of a file.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#revisionList.",
+     "default": "drive#revisionList"
+    },
+    "revisions": {
+     "type": "array",
+     "description": "The full list of revisions.",
+     "items": {
+      "$ref": "Revision"
+     }
+    }
+   }
+  },
+  "StartPageToken": {
+   "id": "StartPageToken",
+   "type": "object",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#startPageToken.",
+     "default": "drive#startPageToken"
+    },
+    "startPageToken": {
+     "type": "string",
+     "description": "The starting page token for listing changes."
+    }
+   }
+  },
+  "User": {
+   "id": "User",
+   "type": "object",
+   "description": "Information about a Drive user.",
+   "properties": {
+    "displayName": {
+     "type": "string",
+     "description": "A plain text displayable name for this user."
+    },
+    "emailAddress": {
+     "type": "string",
+     "description": "The email address of the user. This may not be present in certain contexts if the user has not made their email address visible to the requester."
+    },
+    "kind": {
+     "type": "string",
+     "description": "This is always drive#user.",
+     "default": "drive#user"
+    },
+    "me": {
+     "type": "boolean",
+     "description": "Whether this user is the requesting user."
+    },
+    "permissionId": {
+     "type": "string",
+     "description": "The user's ID as visible in Permission resources."
+    },
+    "photoLink": {
+     "type": "string",
+     "description": "A link to the user's profile photo, if available."
+    }
+   }
+  }
+ },
+ "resources": {
+  "about": {
+   "methods": {
+    "get": {
+     "id": "drive.about.get",
+     "path": "about",
+     "httpMethod": "GET",
+     "description": "Gets information about the user, the user's Drive, and system capabilities.",
+     "response": {
+      "$ref": "About"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    }
+   }
+  },
+  "changes": {
+   "methods": {
+    "getStartPageToken": {
+     "id": "drive.changes.getStartPageToken",
+     "path": "changes/startPageToken",
+     "httpMethod": "GET",
+     "description": "Gets the starting pageToken for listing future changes.",
+     "response": {
+      "$ref": "StartPageToken"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    },
+    "list": {
+     "id": "drive.changes.list",
+     "path": "changes",
+     "httpMethod": "GET",
+     "description": "Lists changes for a user.",
+     "parameters": {
+      "includeRemoved": {
+       "type": "boolean",
+       "description": "Whether to include changes indicating that items have left the view of the changes list, for example by deletion or lost access.",
+       "default": "true",
+       "location": "query"
+      },
+      "pageSize": {
+       "type": "integer",
+       "description": "The maximum number of changes to return per page.",
+       "default": "100",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response or to the response from the getStartPageToken method.",
+       "required": true,
+       "location": "query"
+      },
+      "restrictToMyDrive": {
+       "type": "boolean",
+       "description": "Whether to restrict the results to changes inside the My Drive hierarchy. This omits changes to files such as those in the Application Data folder or shared files which have not been added to My Drive.",
+       "default": "false",
+       "location": "query"
+      },
+      "spaces": {
+       "type": "string",
+       "description": "A comma-separated list of spaces to query within the user corpus. Supported values are 'drive', 'appDataFolder' and 'photos'.",
+       "default": "drive",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "pageToken"
+     ],
+     "response": {
+      "$ref": "ChangeList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ],
+     "supportsSubscription": true
+    },
+    "watch": {
+     "id": "drive.changes.watch",
+     "path": "changes/watch",
+     "httpMethod": "POST",
+     "description": "Subscribes to changes for a user.",
+     "parameters": {
+      "includeRemoved": {
+       "type": "boolean",
+       "description": "Whether to include changes indicating that items have left the view of the changes list, for example by deletion or lost access.",
+       "default": "true",
+       "location": "query"
+      },
+      "pageSize": {
+       "type": "integer",
+       "description": "The maximum number of changes to return per page.",
+       "default": "100",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response or to the response from the getStartPageToken method.",
+       "required": true,
+       "location": "query"
+      },
+      "restrictToMyDrive": {
+       "type": "boolean",
+       "description": "Whether to restrict the results to changes inside the My Drive hierarchy. This omits changes to files such as those in the Application Data folder or shared files which have not been added to My Drive.",
+       "default": "false",
+       "location": "query"
+      },
+      "spaces": {
+       "type": "string",
+       "description": "A comma-separated list of spaces to query within the user corpus. Supported values are 'drive', 'appDataFolder' and 'photos'.",
+       "default": "drive",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "pageToken"
+     ],
+     "request": {
+      "$ref": "Channel",
+      "parameterName": "resource"
+     },
+     "response": {
+      "$ref": "Channel"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ],
+     "supportsSubscription": true
+    }
+   }
+  },
+  "channels": {
+   "methods": {
+    "stop": {
+     "id": "drive.channels.stop",
+     "path": "channels/stop",
+     "httpMethod": "POST",
+     "description": "Stop watching resources through this channel",
+     "request": {
+      "$ref": "Channel",
+      "parameterName": "resource"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    }
+   }
+  },
+  "comments": {
+   "methods": {
+    "create": {
+     "id": "drive.comments.create",
+     "path": "files/{fileId}/comments",
+     "httpMethod": "POST",
+     "description": "Creates a new comment on a file.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "request": {
+      "$ref": "Comment"
+     },
+     "response": {
+      "$ref": "Comment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    },
+    "delete": {
+     "id": "drive.comments.delete",
+     "path": "files/{fileId}/comments/{commentId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a comment.",
+     "parameters": {
+      "commentId": {
+       "type": "string",
+       "description": "The ID of the comment.",
+       "required": true,
+       "location": "path"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "commentId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    },
+    "get": {
+     "id": "drive.comments.get",
+     "path": "files/{fileId}/comments/{commentId}",
+     "httpMethod": "GET",
+     "description": "Gets a comment by ID.",
+     "parameters": {
+      "commentId": {
+       "type": "string",
+       "description": "The ID of the comment.",
+       "required": true,
+       "location": "path"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "includeDeleted": {
+       "type": "boolean",
+       "description": "Whether to return deleted comments. Deleted comments will not include their original content.",
+       "default": "false",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "commentId"
+     ],
+     "response": {
+      "$ref": "Comment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    },
+    "list": {
+     "id": "drive.comments.list",
+     "path": "files/{fileId}/comments",
+     "httpMethod": "GET",
+     "description": "Lists a file's comments.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "includeDeleted": {
+       "type": "boolean",
+       "description": "Whether to include deleted comments. Deleted comments will not include their original content.",
+       "default": "false",
+       "location": "query"
+      },
+      "pageSize": {
+       "type": "integer",
+       "description": "The maximum number of comments to return per page.",
+       "default": "20",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response.",
+       "location": "query"
+      },
+      "startModifiedTime": {
+       "type": "string",
+       "description": "The minimum value of 'modifiedTime' for the result comments (RFC 3339 date-time).",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "response": {
+      "$ref": "CommentList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    },
+    "update": {
+     "id": "drive.comments.update",
+     "path": "files/{fileId}/comments/{commentId}",
+     "httpMethod": "PATCH",
+     "description": "Updates a comment with patch semantics.",
+     "parameters": {
+      "commentId": {
+       "type": "string",
+       "description": "The ID of the comment.",
+       "required": true,
+       "location": "path"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "commentId"
+     ],
+     "request": {
+      "$ref": "Comment"
+     },
+     "response": {
+      "$ref": "Comment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    }
+   }
+  },
+  "files": {
+   "methods": {
+    "copy": {
+     "id": "drive.files.copy",
+     "path": "files/{fileId}/copy",
+     "httpMethod": "POST",
+     "description": "Creates a copy of a file and applies any requested updates with patch semantics.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "ignoreDefaultVisibility": {
+       "type": "boolean",
+       "description": "Whether to ignore the domain's default visibility settings for the created file. Domain administrators can choose to make all uploaded files visible to the domain by default; this parameter bypasses that behavior for the request. Permissions are still inherited from parent folders.",
+       "default": "false",
+       "location": "query"
+      },
+      "keepRevisionForever": {
+       "type": "boolean",
+       "description": "Whether to set the 'keepForever' field in the new head revision. This is only applicable to files with binary content in Drive.",
+       "default": "false",
+       "location": "query"
+      },
+      "ocrLanguage": {
+       "type": "string",
+       "description": "A language hint for OCR processing during image import (ISO 639-1 code).",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "request": {
+      "$ref": "File"
+     },
+     "response": {
+      "$ref": "File"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.photos.readonly"
+     ]
+    },
+    "create": {
+     "id": "drive.files.create",
+     "path": "files",
+     "httpMethod": "POST",
+     "description": "Creates a new file.",
+     "parameters": {
+      "ignoreDefaultVisibility": {
+       "type": "boolean",
+       "description": "Whether to ignore the domain's default visibility settings for the created file. Domain administrators can choose to make all uploaded files visible to the domain by default; this parameter bypasses that behavior for the request. Permissions are still inherited from parent folders.",
+       "default": "false",
+       "location": "query"
+      },
+      "keepRevisionForever": {
+       "type": "boolean",
+       "description": "Whether to set the 'keepForever' field in the new head revision. This is only applicable to files with binary content in Drive.",
+       "default": "false",
+       "location": "query"
+      },
+      "ocrLanguage": {
+       "type": "string",
+       "description": "A language hint for OCR processing during image import (ISO 639-1 code).",
+       "location": "query"
+      },
+      "useContentAsIndexableText": {
+       "type": "boolean",
+       "description": "Whether to use the uploaded content as indexable text.",
+       "default": "false",
+       "location": "query"
+      }
+     },
+     "request": {
+      "$ref": "File"
+     },
+     "response": {
+      "$ref": "File"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file"
+     ],
+     "supportsMediaUpload": true,
+     "mediaUpload": {
+      "accept": [
+       "*/*"
+      ],
+      "maxSize": "5120GB",
+      "protocols": {
+       "simple": {
+        "multipart": true,
+        "path": "/upload/drive/v3/files"
+       },
+       "resumable": {
+        "multipart": true,
+        "path": "/resumable/upload/drive/v3/files"
+       }
+      }
+     },
+     "supportsSubscription": true
+    },
+    "delete": {
+     "id": "drive.files.delete",
+     "path": "files/{fileId}",
+     "httpMethod": "DELETE",
+     "description": "Permanently deletes a file owned by the user without moving it to the trash. If the target is a folder, all descendants owned by the user are also deleted.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    },
+    "emptyTrash": {
+     "id": "drive.files.emptyTrash",
+     "path": "files/trash",
+     "httpMethod": "DELETE",
+     "description": "Permanently deletes all of the user's trashed files.",
+     "scopes": [
+      "https://www.googleapis.com/auth/drive"
+     ]
+    },
+    "export": {
+     "id": "drive.files.export",
+     "path": "files/{fileId}/export",
+     "httpMethod": "GET",
+     "description": "Exports a Google Doc to the requested MIME type.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "mimeType": {
+       "type": "string",
+       "description": "The MIME type of the format requested for this export.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "mimeType"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ],
+     "supportsMediaDownload": true
+    },
+    "generateIds": {
+     "id": "drive.files.generateIds",
+     "path": "files/generateIds",
+     "httpMethod": "GET",
+     "description": "Generates a set of file IDs which can be provided in create requests.",
+     "parameters": {
+      "count": {
+       "type": "integer",
+       "description": "The number of IDs to return.",
+       "default": "10",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "space": {
+       "type": "string",
+       "description": "The space in which the IDs can be used to create new files. Supported values are 'drive' and 'appDataFolder'.",
+       "default": "drive",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "GeneratedIds"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    },
+    "get": {
+     "id": "drive.files.get",
+     "path": "files/{fileId}",
+     "httpMethod": "GET",
+     "description": "Gets a file's metadata or content by ID.",
+     "parameters": {
+      "acknowledgeAbuse": {
+       "type": "boolean",
+       "description": "Whether the user is acknowledging the risk of downloading known malware or other abusive files. This is only applicable when alt=media.",
+       "default": "false",
+       "location": "query"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "response": {
+      "$ref": "File"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ],
+     "supportsMediaDownload": true,
+     "supportsSubscription": true
+    },
+    "list": {
+     "id": "drive.files.list",
+     "path": "files",
+     "httpMethod": "GET",
+     "description": "Lists or searches files.",
+     "parameters": {
+      "corpus": {
+       "type": "string",
+       "description": "The source of files to list.",
+       "default": "user",
+       "enum": [
+        "domain",
+        "user"
+       ],
+       "enumDescriptions": [
+        "Files shared to the user's domain.",
+        "Files owned by or shared to the user."
+       ],
+       "location": "query"
+      },
+      "orderBy": {
+       "type": "string",
+       "description": "A comma-separated list of sort keys. Valid keys are 'createdTime', 'folder', 'modifiedByMeTime', 'modifiedTime', 'name', 'quotaBytesUsed', 'recency', 'sharedWithMeTime', 'starred', and 'viewedByMeTime'. Each key sorts ascending by default, but may be reversed with the 'desc' modifier. Example usage: ?orderBy=folder,modifiedTime desc,name. Please note that there is a current limitation for users with approximately one million files in which the requested sort order is ignored.",
+       "location": "query"
+      },
+      "pageSize": {
+       "type": "integer",
+       "description": "The maximum number of files to return per page.",
+       "default": "100",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response.",
+       "location": "query"
+      },
+      "q": {
+       "type": "string",
+       "description": "A query for filtering the file results. See the \"Search for Files\" guide for supported syntax.",
+       "location": "query"
+      },
+      "spaces": {
+       "type": "string",
+       "description": "A comma-separated list of spaces to query within the corpus. Supported values are 'drive', 'appDataFolder' and 'photos'.",
+       "default": "drive",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "FileList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    },
+    "update": {
+     "id": "drive.files.update",
+     "path": "files/{fileId}",
+     "httpMethod": "PATCH",
+     "description": "Updates a file's metadata and/or content with patch semantics.",
+     "parameters": {
+      "addParents": {
+       "type": "string",
+       "description": "A comma-separated list of parent IDs to add.",
+       "location": "query"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "keepRevisionForever": {
+       "type": "boolean",
+       "description": "Whether to set the 'keepForever' field in the new head revision. This is only applicable to files with binary content in Drive.",
+       "default": "false",
+       "location": "query"
+      },
+      "ocrLanguage": {
+       "type": "string",
+       "description": "A language hint for OCR processing during image import (ISO 639-1 code).",
+       "location": "query"
+      },
+      "removeParents": {
+       "type": "string",
+       "description": "A comma-separated list of parent IDs to remove.",
+       "location": "query"
+      },
+      "useContentAsIndexableText": {
+       "type": "boolean",
+       "description": "Whether to use the uploaded content as indexable text.",
+       "default": "false",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "request": {
+      "$ref": "File"
+     },
+     "response": {
+      "$ref": "File"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.scripts"
+     ],
+     "supportsMediaUpload": true,
+     "mediaUpload": {
+      "accept": [
+       "*/*"
+      ],
+      "maxSize": "5120GB",
+      "protocols": {
+       "simple": {
+        "multipart": true,
+        "path": "/upload/drive/v3/files/{fileId}"
+       },
+       "resumable": {
+        "multipart": true,
+        "path": "/resumable/upload/drive/v3/files/{fileId}"
+       }
+      }
+     }
+    },
+    "watch": {
+     "id": "drive.files.watch",
+     "path": "files/{fileId}/watch",
+     "httpMethod": "POST",
+     "description": "Subscribes to changes to a file",
+     "parameters": {
+      "acknowledgeAbuse": {
+       "type": "boolean",
+       "description": "Whether the user is acknowledging the risk of downloading known malware or other abusive files. This is only applicable when alt=media.",
+       "default": "false",
+       "location": "query"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "request": {
+      "$ref": "Channel",
+      "parameterName": "resource"
+     },
+     "response": {
+      "$ref": "Channel"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ],
+     "supportsMediaDownload": true,
+     "supportsSubscription": true
+    }
+   }
+  },
+  "permissions": {
+   "methods": {
+    "create": {
+     "id": "drive.permissions.create",
+     "path": "files/{fileId}/permissions",
+     "httpMethod": "POST",
+     "description": "Creates a permission for a file.",
+     "parameters": {
+      "emailMessage": {
+       "type": "string",
+       "description": "A custom message to include in the notification email.",
+       "location": "query"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "sendNotificationEmail": {
+       "type": "boolean",
+       "description": "Whether to send a notification email when sharing to users or groups. This defaults to true for users and groups, and is not allowed for other requests. It must not be disabled for ownership transfers.",
+       "location": "query"
+      },
+      "transferOwnership": {
+       "type": "boolean",
+       "description": "Whether to transfer ownership to the specified user and downgrade the current owner to a writer. This parameter is required as an acknowledgement of the side effect.",
+       "default": "false",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "request": {
+      "$ref": "Permission"
+     },
+     "response": {
+      "$ref": "Permission"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    },
+    "delete": {
+     "id": "drive.permissions.delete",
+     "path": "files/{fileId}/permissions/{permissionId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a permission.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "permissionId": {
+       "type": "string",
+       "description": "The ID of the permission.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "permissionId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    },
+    "get": {
+     "id": "drive.permissions.get",
+     "path": "files/{fileId}/permissions/{permissionId}",
+     "httpMethod": "GET",
+     "description": "Gets a permission by ID.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "permissionId": {
+       "type": "string",
+       "description": "The ID of the permission.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "permissionId"
+     ],
+     "response": {
+      "$ref": "Permission"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    },
+    "list": {
+     "id": "drive.permissions.list",
+     "path": "files/{fileId}/permissions",
+     "httpMethod": "GET",
+     "description": "Lists a file's permissions.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "response": {
+      "$ref": "PermissionList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    },
+    "update": {
+     "id": "drive.permissions.update",
+     "path": "files/{fileId}/permissions/{permissionId}",
+     "httpMethod": "PATCH",
+     "description": "Updates a permission with patch semantics.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "permissionId": {
+       "type": "string",
+       "description": "The ID of the permission.",
+       "required": true,
+       "location": "path"
+      },
+      "transferOwnership": {
+       "type": "boolean",
+       "description": "Whether to transfer ownership to the specified user and downgrade the current owner to a writer. This parameter is required as an acknowledgement of the side effect.",
+       "default": "false",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "permissionId"
+     ],
+     "request": {
+      "$ref": "Permission"
+     },
+     "response": {
+      "$ref": "Permission"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    }
+   }
+  },
+  "replies": {
+   "methods": {
+    "create": {
+     "id": "drive.replies.create",
+     "path": "files/{fileId}/comments/{commentId}/replies",
+     "httpMethod": "POST",
+     "description": "Creates a new reply to a comment.",
+     "parameters": {
+      "commentId": {
+       "type": "string",
+       "description": "The ID of the comment.",
+       "required": true,
+       "location": "path"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "commentId"
+     ],
+     "request": {
+      "$ref": "Reply"
+     },
+     "response": {
+      "$ref": "Reply"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    },
+    "delete": {
+     "id": "drive.replies.delete",
+     "path": "files/{fileId}/comments/{commentId}/replies/{replyId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a reply.",
+     "parameters": {
+      "commentId": {
+       "type": "string",
+       "description": "The ID of the comment.",
+       "required": true,
+       "location": "path"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "replyId": {
+       "type": "string",
+       "description": "The ID of the reply.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "commentId",
+      "replyId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    },
+    "get": {
+     "id": "drive.replies.get",
+     "path": "files/{fileId}/comments/{commentId}/replies/{replyId}",
+     "httpMethod": "GET",
+     "description": "Gets a reply by ID.",
+     "parameters": {
+      "commentId": {
+       "type": "string",
+       "description": "The ID of the comment.",
+       "required": true,
+       "location": "path"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "includeDeleted": {
+       "type": "boolean",
+       "description": "Whether to return deleted replies. Deleted replies will not include their original content.",
+       "default": "false",
+       "location": "query"
+      },
+      "replyId": {
+       "type": "string",
+       "description": "The ID of the reply.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "commentId",
+      "replyId"
+     ],
+     "response": {
+      "$ref": "Reply"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    },
+    "list": {
+     "id": "drive.replies.list",
+     "path": "files/{fileId}/comments/{commentId}/replies",
+     "httpMethod": "GET",
+     "description": "Lists a comment's replies.",
+     "parameters": {
+      "commentId": {
+       "type": "string",
+       "description": "The ID of the comment.",
+       "required": true,
+       "location": "path"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "includeDeleted": {
+       "type": "boolean",
+       "description": "Whether to include deleted replies. Deleted replies will not include their original content.",
+       "default": "false",
+       "location": "query"
+      },
+      "pageSize": {
+       "type": "integer",
+       "description": "The maximum number of replies to return per page.",
+       "default": "20",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "commentId"
+     ],
+     "response": {
+      "$ref": "ReplyList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    },
+    "update": {
+     "id": "drive.replies.update",
+     "path": "files/{fileId}/comments/{commentId}/replies/{replyId}",
+     "httpMethod": "PATCH",
+     "description": "Updates a reply with patch semantics.",
+     "parameters": {
+      "commentId": {
+       "type": "string",
+       "description": "The ID of the comment.",
+       "required": true,
+       "location": "path"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "replyId": {
+       "type": "string",
+       "description": "The ID of the reply.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "commentId",
+      "replyId"
+     ],
+     "request": {
+      "$ref": "Reply"
+     },
+     "response": {
+      "$ref": "Reply"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    }
+   }
+  },
+  "revisions": {
+   "methods": {
+    "delete": {
+     "id": "drive.revisions.delete",
+     "path": "files/{fileId}/revisions/{revisionId}",
+     "httpMethod": "DELETE",
+     "description": "Permanently deletes a revision. This method is only applicable to files with binary content in Drive.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "revisionId": {
+       "type": "string",
+       "description": "The ID of the revision.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "revisionId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    },
+    "get": {
+     "id": "drive.revisions.get",
+     "path": "files/{fileId}/revisions/{revisionId}",
+     "httpMethod": "GET",
+     "description": "Gets a revision's metadata or content by ID.",
+     "parameters": {
+      "acknowledgeAbuse": {
+       "type": "boolean",
+       "description": "Whether the user is acknowledging the risk of downloading known malware or other abusive files. This is only applicable when alt=media.",
+       "default": "false",
+       "location": "query"
+      },
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "revisionId": {
+       "type": "string",
+       "description": "The ID of the revision.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "revisionId"
+     ],
+     "response": {
+      "$ref": "Revision"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ],
+     "supportsMediaDownload": true
+    },
+    "list": {
+     "id": "drive.revisions.list",
+     "path": "files/{fileId}/revisions",
+     "httpMethod": "GET",
+     "description": "Lists a file's revisions.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId"
+     ],
+     "response": {
+      "$ref": "RevisionList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.metadata",
+      "https://www.googleapis.com/auth/drive.metadata.readonly",
+      "https://www.googleapis.com/auth/drive.photos.readonly",
+      "https://www.googleapis.com/auth/drive.readonly"
+     ]
+    },
+    "update": {
+     "id": "drive.revisions.update",
+     "path": "files/{fileId}/revisions/{revisionId}",
+     "httpMethod": "PATCH",
+     "description": "Updates a revision with patch semantics.",
+     "parameters": {
+      "fileId": {
+       "type": "string",
+       "description": "The ID of the file.",
+       "required": true,
+       "location": "path"
+      },
+      "revisionId": {
+       "type": "string",
+       "description": "The ID of the revision.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "fileId",
+      "revisionId"
+     ],
+     "request": {
+      "$ref": "Revision"
+     },
+     "response": {
+      "$ref": "Revision"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file"
+     ]
+    }
+   }
+  }
+ }
+}

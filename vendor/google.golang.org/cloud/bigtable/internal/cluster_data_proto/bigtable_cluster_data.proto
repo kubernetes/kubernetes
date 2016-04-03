@@ -1,0 +1,89 @@
+// Copyright (c) 2015, Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package google.bigtable.admin.cluster.v1;
+
+
+option java_multiple_files = true;
+option java_outer_classname = "BigtableClusterDataProto";
+option java_package = "com.google.bigtable.admin.cluster.v1";
+
+
+// A physical location in which a particular project can allocate Cloud BigTable
+// resources.
+message Zone {
+  // Possible states of a zone.
+  enum Status {
+    // The state of the zone is unknown or unspecified.
+    UNKNOWN = 0;
+
+    // The zone is in a good state.
+    OK = 1;
+
+    // The zone is down for planned maintenance.
+    PLANNED_MAINTENANCE = 2;
+
+    // The zone is down for emergency or unplanned maintenance.
+    EMERGENCY_MAINENANCE = 3;
+  }
+
+  // A permanent unique identifier for the zone.
+  // Values are of the form projects/<project>/zones/[a-z][-a-z0-9]*
+  string name = 1;
+
+  // The name of this zone as it appears in UIs.
+  string display_name = 2;
+
+  // The current state of this zone.
+  Status status = 3;
+}
+
+// An isolated set of Cloud BigTable resources on which tables can be hosted.
+message Cluster {
+  // A permanent unique identifier for the cluster. For technical reasons, the
+  // zone in which the cluster resides is included here.
+  // Values are of the form
+  // projects/<project>/zones/<zone>/clusters/[a-z][-a-z0-9]*
+  string name = 1;
+
+  // If this cluster has been deleted, the time at which its backup will
+  // be irrevocably destroyed. Omitted otherwise.
+  // This cannot be set directly, only through DeleteCluster.
+
+  // The operation currently running on the cluster, if any.
+  // This cannot be set directly, only through CreateCluster, UpdateCluster,
+  // or UndeleteCluster. Calls to these methods will be rejected if
+  // "current_operation" is already set.
+
+  // The descriptive name for this cluster as it appears in UIs.
+  // Must be unique per zone.
+  string display_name = 4;
+
+  // The number of serve nodes allocated to this cluster.
+  int32 serve_nodes = 5;
+
+  // What storage type to use for tables in this cluster. Only configurable at
+  // cluster creation time. If unspecified, STORAGE_SSD will be used.
+  StorageType default_storage_type = 8;
+}
+
+enum StorageType {
+  // The storage type used is unspecified.
+  STORAGE_UNSPECIFIED = 0;
+
+  // Data will be stored in SSD, providing low and consistent latencies.
+  STORAGE_SSD = 1;
+}

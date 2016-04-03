@@ -1,0 +1,460 @@
+syntax = "proto2";
+option go_package = "socket";
+
+package appengine;
+
+message RemoteSocketServiceError {
+  enum ErrorCode {
+    SYSTEM_ERROR = 1;
+    GAI_ERROR = 2;
+    FAILURE = 4;
+    PERMISSION_DENIED = 5;
+    INVALID_REQUEST = 6;
+    SOCKET_CLOSED = 7;
+  }
+
+  enum SystemError {
+    option allow_alias = true;
+
+    SYS_SUCCESS = 0;
+    SYS_EPERM = 1;
+    SYS_ENOENT = 2;
+    SYS_ESRCH = 3;
+    SYS_EINTR = 4;
+    SYS_EIO = 5;
+    SYS_ENXIO = 6;
+    SYS_E2BIG = 7;
+    SYS_ENOEXEC = 8;
+    SYS_EBADF = 9;
+    SYS_ECHILD = 10;
+    SYS_EAGAIN = 11;
+    SYS_EWOULDBLOCK = 11;
+    SYS_ENOMEM = 12;
+    SYS_EACCES = 13;
+    SYS_EFAULT = 14;
+    SYS_ENOTBLK = 15;
+    SYS_EBUSY = 16;
+    SYS_EEXIST = 17;
+    SYS_EXDEV = 18;
+    SYS_ENODEV = 19;
+    SYS_ENOTDIR = 20;
+    SYS_EISDIR = 21;
+    SYS_EINVAL = 22;
+    SYS_ENFILE = 23;
+    SYS_EMFILE = 24;
+    SYS_ENOTTY = 25;
+    SYS_ETXTBSY = 26;
+    SYS_EFBIG = 27;
+    SYS_ENOSPC = 28;
+    SYS_ESPIPE = 29;
+    SYS_EROFS = 30;
+    SYS_EMLINK = 31;
+    SYS_EPIPE = 32;
+    SYS_EDOM = 33;
+    SYS_ERANGE = 34;
+    SYS_EDEADLK = 35;
+    SYS_EDEADLOCK = 35;
+    SYS_ENAMETOOLONG = 36;
+    SYS_ENOLCK = 37;
+    SYS_ENOSYS = 38;
+    SYS_ENOTEMPTY = 39;
+    SYS_ELOOP = 40;
+    SYS_ENOMSG = 42;
+    SYS_EIDRM = 43;
+    SYS_ECHRNG = 44;
+    SYS_EL2NSYNC = 45;
+    SYS_EL3HLT = 46;
+    SYS_EL3RST = 47;
+    SYS_ELNRNG = 48;
+    SYS_EUNATCH = 49;
+    SYS_ENOCSI = 50;
+    SYS_EL2HLT = 51;
+    SYS_EBADE = 52;
+    SYS_EBADR = 53;
+    SYS_EXFULL = 54;
+    SYS_ENOANO = 55;
+    SYS_EBADRQC = 56;
+    SYS_EBADSLT = 57;
+    SYS_EBFONT = 59;
+    SYS_ENOSTR = 60;
+    SYS_ENODATA = 61;
+    SYS_ETIME = 62;
+    SYS_ENOSR = 63;
+    SYS_ENONET = 64;
+    SYS_ENOPKG = 65;
+    SYS_EREMOTE = 66;
+    SYS_ENOLINK = 67;
+    SYS_EADV = 68;
+    SYS_ESRMNT = 69;
+    SYS_ECOMM = 70;
+    SYS_EPROTO = 71;
+    SYS_EMULTIHOP = 72;
+    SYS_EDOTDOT = 73;
+    SYS_EBADMSG = 74;
+    SYS_EOVERFLOW = 75;
+    SYS_ENOTUNIQ = 76;
+    SYS_EBADFD = 77;
+    SYS_EREMCHG = 78;
+    SYS_ELIBACC = 79;
+    SYS_ELIBBAD = 80;
+    SYS_ELIBSCN = 81;
+    SYS_ELIBMAX = 82;
+    SYS_ELIBEXEC = 83;
+    SYS_EILSEQ = 84;
+    SYS_ERESTART = 85;
+    SYS_ESTRPIPE = 86;
+    SYS_EUSERS = 87;
+    SYS_ENOTSOCK = 88;
+    SYS_EDESTADDRREQ = 89;
+    SYS_EMSGSIZE = 90;
+    SYS_EPROTOTYPE = 91;
+    SYS_ENOPROTOOPT = 92;
+    SYS_EPROTONOSUPPORT = 93;
+    SYS_ESOCKTNOSUPPORT = 94;
+    SYS_EOPNOTSUPP = 95;
+    SYS_ENOTSUP = 95;
+    SYS_EPFNOSUPPORT = 96;
+    SYS_EAFNOSUPPORT = 97;
+    SYS_EADDRINUSE = 98;
+    SYS_EADDRNOTAVAIL = 99;
+    SYS_ENETDOWN = 100;
+    SYS_ENETUNREACH = 101;
+    SYS_ENETRESET = 102;
+    SYS_ECONNABORTED = 103;
+    SYS_ECONNRESET = 104;
+    SYS_ENOBUFS = 105;
+    SYS_EISCONN = 106;
+    SYS_ENOTCONN = 107;
+    SYS_ESHUTDOWN = 108;
+    SYS_ETOOMANYREFS = 109;
+    SYS_ETIMEDOUT = 110;
+    SYS_ECONNREFUSED = 111;
+    SYS_EHOSTDOWN = 112;
+    SYS_EHOSTUNREACH = 113;
+    SYS_EALREADY = 114;
+    SYS_EINPROGRESS = 115;
+    SYS_ESTALE = 116;
+    SYS_EUCLEAN = 117;
+    SYS_ENOTNAM = 118;
+    SYS_ENAVAIL = 119;
+    SYS_EISNAM = 120;
+    SYS_EREMOTEIO = 121;
+    SYS_EDQUOT = 122;
+    SYS_ENOMEDIUM = 123;
+    SYS_EMEDIUMTYPE = 124;
+    SYS_ECANCELED = 125;
+    SYS_ENOKEY = 126;
+    SYS_EKEYEXPIRED = 127;
+    SYS_EKEYREVOKED = 128;
+    SYS_EKEYREJECTED = 129;
+    SYS_EOWNERDEAD = 130;
+    SYS_ENOTRECOVERABLE = 131;
+    SYS_ERFKILL = 132;
+  }
+
+  optional int32 system_error = 1 [default=0];
+  optional string error_detail = 2;
+}
+
+message AddressPort {
+  required int32 port = 1;
+  optional bytes packed_address = 2;
+
+  optional string hostname_hint = 3;
+}
+
+
+
+message CreateSocketRequest {
+  enum SocketFamily {
+    IPv4 = 1;
+    IPv6 = 2;
+  }
+
+  enum SocketProtocol {
+    TCP = 1;
+    UDP = 2;
+  }
+
+  required SocketFamily family = 1;
+  required SocketProtocol protocol = 2;
+
+  repeated SocketOption socket_options = 3;
+
+  optional AddressPort proxy_external_ip = 4;
+
+  optional int32 listen_backlog = 5 [default=0];
+
+  optional AddressPort remote_ip = 6;
+
+  optional string app_id = 9;
+
+  optional int64 project_id = 10;
+}
+
+message CreateSocketReply {
+  optional string socket_descriptor = 1;
+
+  optional AddressPort server_address = 3;
+
+  optional AddressPort proxy_external_ip = 4;
+
+  extensions 1000 to max;
+}
+
+
+
+message BindRequest {
+  required string socket_descriptor = 1;
+  required AddressPort proxy_external_ip = 2;
+}
+
+message BindReply {
+  optional AddressPort proxy_external_ip = 1;
+}
+
+
+
+message GetSocketNameRequest {
+  required string socket_descriptor = 1;
+}
+
+message GetSocketNameReply {
+  optional AddressPort proxy_external_ip = 2;
+}
+
+
+
+message GetPeerNameRequest {
+  required string socket_descriptor = 1;
+}
+
+message GetPeerNameReply {
+  optional AddressPort peer_ip = 2;
+}
+
+
+message SocketOption {
+
+  enum SocketOptionLevel {
+    SOCKET_SOL_IP = 0;
+    SOCKET_SOL_SOCKET = 1;
+    SOCKET_SOL_TCP = 6;
+    SOCKET_SOL_UDP = 17;
+  }
+
+  enum SocketOptionName {
+    option allow_alias = true;
+
+    SOCKET_SO_DEBUG = 1;
+    SOCKET_SO_REUSEADDR = 2;
+    SOCKET_SO_TYPE = 3;
+    SOCKET_SO_ERROR = 4;
+    SOCKET_SO_DONTROUTE = 5;
+    SOCKET_SO_BROADCAST = 6;
+    SOCKET_SO_SNDBUF = 7;
+    SOCKET_SO_RCVBUF = 8;
+    SOCKET_SO_KEEPALIVE = 9;
+    SOCKET_SO_OOBINLINE = 10;
+    SOCKET_SO_LINGER = 13;
+    SOCKET_SO_RCVTIMEO = 20;
+    SOCKET_SO_SNDTIMEO = 21;
+
+    SOCKET_IP_TOS = 1;
+    SOCKET_IP_TTL = 2;
+    SOCKET_IP_HDRINCL = 3;
+    SOCKET_IP_OPTIONS = 4;
+
+    SOCKET_TCP_NODELAY = 1;
+    SOCKET_TCP_MAXSEG = 2;
+    SOCKET_TCP_CORK = 3;
+    SOCKET_TCP_KEEPIDLE = 4;
+    SOCKET_TCP_KEEPINTVL = 5;
+    SOCKET_TCP_KEEPCNT = 6;
+    SOCKET_TCP_SYNCNT = 7;
+    SOCKET_TCP_LINGER2 = 8;
+    SOCKET_TCP_DEFER_ACCEPT = 9;
+    SOCKET_TCP_WINDOW_CLAMP = 10;
+    SOCKET_TCP_INFO = 11;
+    SOCKET_TCP_QUICKACK = 12;
+  }
+
+  required SocketOptionLevel level = 1;
+  required SocketOptionName option = 2;
+  required bytes value = 3;
+}
+
+
+message SetSocketOptionsRequest {
+  required string socket_descriptor = 1;
+  repeated SocketOption options = 2;
+}
+
+message SetSocketOptionsReply {
+}
+
+message GetSocketOptionsRequest {
+  required string socket_descriptor = 1;
+  repeated SocketOption options = 2;
+}
+
+message GetSocketOptionsReply {
+  repeated SocketOption options = 2;
+}
+
+
+message ConnectRequest {
+  required string socket_descriptor = 1;
+  required AddressPort remote_ip = 2;
+  optional double timeout_seconds = 3 [default=-1];
+}
+
+message ConnectReply {
+  optional AddressPort proxy_external_ip = 1;
+
+  extensions 1000 to max;
+}
+
+
+message ListenRequest {
+  required string socket_descriptor = 1;
+  required int32 backlog = 2;
+}
+
+message ListenReply {
+}
+
+
+message AcceptRequest {
+  required string socket_descriptor = 1;
+  optional double timeout_seconds = 2 [default=-1];
+}
+
+message AcceptReply {
+  optional bytes new_socket_descriptor = 2;
+  optional AddressPort remote_address = 3;
+}
+
+
+
+message ShutDownRequest {
+  enum How {
+    SOCKET_SHUT_RD = 1;
+    SOCKET_SHUT_WR = 2;
+    SOCKET_SHUT_RDWR = 3;
+  }
+  required string socket_descriptor = 1;
+  required How how = 2;
+  required int64 send_offset = 3;
+}
+
+message ShutDownReply {
+}
+
+
+
+message CloseRequest {
+  required string socket_descriptor = 1;
+  optional int64 send_offset = 2 [default=-1];
+}
+
+message CloseReply {
+}
+
+
+
+message SendRequest {
+  required string socket_descriptor = 1;
+  required bytes data = 2 [ctype=CORD];
+  required int64 stream_offset = 3;
+  optional int32 flags = 4 [default=0];
+  optional AddressPort send_to = 5;
+  optional double timeout_seconds = 6 [default=-1];
+}
+
+message SendReply {
+  optional int32 data_sent = 1;
+}
+
+
+message ReceiveRequest {
+  enum Flags {
+    MSG_OOB = 1;
+    MSG_PEEK = 2;
+  }
+  required string socket_descriptor = 1;
+  required int32 data_size = 2;
+  optional int32 flags = 3 [default=0];
+  optional double timeout_seconds = 5 [default=-1];
+}
+
+message ReceiveReply {
+  optional int64 stream_offset = 2;
+  optional bytes data = 3 [ctype=CORD];
+  optional AddressPort received_from = 4;
+  optional int32 buffer_size = 5;
+}
+
+
+
+message PollEvent {
+
+  enum PollEventFlag {
+    SOCKET_POLLNONE = 0;
+    SOCKET_POLLIN = 1;
+    SOCKET_POLLPRI = 2;
+    SOCKET_POLLOUT = 4;
+    SOCKET_POLLERR = 8;
+    SOCKET_POLLHUP = 16;
+    SOCKET_POLLNVAL = 32;
+    SOCKET_POLLRDNORM = 64;
+    SOCKET_POLLRDBAND = 128;
+    SOCKET_POLLWRNORM = 256;
+    SOCKET_POLLWRBAND = 512;
+    SOCKET_POLLMSG = 1024;
+    SOCKET_POLLREMOVE = 4096;
+    SOCKET_POLLRDHUP = 8192;
+  };
+
+  required string socket_descriptor = 1;
+  required int32 requested_events = 2;
+  required int32 observed_events = 3;
+}
+
+message PollRequest {
+  repeated PollEvent events = 1;
+  optional double timeout_seconds = 2 [default=-1];
+}
+
+message PollReply {
+  repeated PollEvent events = 2;
+}
+
+message ResolveRequest {
+  required string name = 1;
+  repeated CreateSocketRequest.SocketFamily address_families = 2;
+}
+
+message ResolveReply {
+  enum ErrorCode {
+    SOCKET_EAI_ADDRFAMILY = 1;
+    SOCKET_EAI_AGAIN = 2;
+    SOCKET_EAI_BADFLAGS = 3;
+    SOCKET_EAI_FAIL = 4;
+    SOCKET_EAI_FAMILY = 5;
+    SOCKET_EAI_MEMORY = 6;
+    SOCKET_EAI_NODATA = 7;
+    SOCKET_EAI_NONAME = 8;
+    SOCKET_EAI_SERVICE = 9;
+    SOCKET_EAI_SOCKTYPE = 10;
+    SOCKET_EAI_SYSTEM = 11;
+    SOCKET_EAI_BADHINTS = 12;
+    SOCKET_EAI_PROTOCOL = 13;
+    SOCKET_EAI_OVERFLOW = 14;
+    SOCKET_EAI_MAX = 15;
+  };
+
+  repeated bytes packed_address = 2;
+  optional string canonical_name = 3;
+  repeated string aliases = 4;
+}

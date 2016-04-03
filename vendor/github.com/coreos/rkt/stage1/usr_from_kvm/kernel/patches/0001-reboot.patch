@@ -1,0 +1,12 @@
+--- linux-4.0/kernel/reboot.c~	2015-05-06 09:45:56.000000000 -0400
++++ linux-4.0/kernel/reboot.c	2015-05-08 09:43:18.178582429 -0400
+@@ -326,7 +326,8 @@
+ 		break;
+ 
+ 	case LINUX_REBOOT_CMD_HALT:
+-		kernel_halt();
++		// kernel_halt(); // as guest always give back control to host trough restart - don't block
++		kernel_restart("<rkt: obligatory restart>");
+ 		do_exit(0);
+ 		panic("cannot halt");
+ 

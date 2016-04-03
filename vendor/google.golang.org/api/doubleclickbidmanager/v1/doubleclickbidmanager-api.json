@@ -1,0 +1,1806 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/mAPHdimW0pvTGXzTTcUsJfk40xQ\"",
+ "discoveryVersion": "v1",
+ "id": "doubleclickbidmanager:v1",
+ "name": "doubleclickbidmanager",
+ "canonicalName": "DoubleClick Bid Manager",
+ "version": "v1",
+ "revision": "20150925",
+ "title": "DoubleClick Bid Manager API",
+ "description": "API for viewing and managing your reports in DoubleClick Bid Manager.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/bid-manager/",
+ "labels": [
+  "limited_availability"
+ ],
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/doubleclickbidmanager/v1/",
+ "basePath": "/doubleclickbidmanager/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "doubleclickbidmanager/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "schemas": {
+  "DownloadLineItemsRequest": {
+   "id": "DownloadLineItemsRequest",
+   "type": "object",
+   "description": "Request to fetch stored line items.",
+   "properties": {
+    "fileSpec": {
+     "type": "string",
+     "description": "File specification (column names, types, order) in which the line items will be returned. Default to EWF.",
+     "enum": [
+      "EWF",
+      "SDF"
+     ],
+     "enumDescriptions": [
+      "",
+      ""
+     ]
+    },
+    "filterIds": {
+     "type": "array",
+     "description": "Ids of the specified filter type used to filter line items to fetch. If omitted, all the line items will be returned.",
+     "items": {
+      "type": "string",
+      "format": "int64"
+     }
+    },
+    "filterType": {
+     "type": "string",
+     "description": "Filter type used to filter line items to fetch.",
+     "enum": [
+      "ADVERTISER_ID",
+      "INSERTION_ORDER_ID",
+      "LINE_ITEM_ID"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      ""
+     ]
+    },
+    "format": {
+     "type": "string",
+     "description": "Format in which the line items will be returned. Default to CSV.",
+     "enum": [
+      "CSV"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    }
+   }
+  },
+  "DownloadLineItemsResponse": {
+   "id": "DownloadLineItemsResponse",
+   "type": "object",
+   "description": "Download line items response.",
+   "properties": {
+    "lineItems": {
+     "type": "string",
+     "description": "Retrieved line items in CSV format. Refer to  Entity Write File Format or  Structured Data File Format for more information on file formats."
+    }
+   }
+  },
+  "FilterPair": {
+   "id": "FilterPair",
+   "type": "object",
+   "description": "Filter used to match traffic data in your report.",
+   "properties": {
+    "type": {
+     "type": "string",
+     "description": "Filter type.",
+     "enum": [
+      "FILTER_ACTIVE_VIEW_EXPECTED_VIEWABILITY",
+      "FILTER_ACTIVITY_ID",
+      "FILTER_ADVERTISER",
+      "FILTER_ADVERTISER_CURRENCY",
+      "FILTER_ADVERTISER_TIMEZONE",
+      "FILTER_AD_POSITION",
+      "FILTER_AGE",
+      "FILTER_BRANDSAFE_CHANNEL_ID",
+      "FILTER_BROWSER",
+      "FILTER_CAMPAIGN_DAILY_FREQUENCY",
+      "FILTER_CARRIER",
+      "FILTER_CHANNEL_ID",
+      "FILTER_CITY",
+      "FILTER_CONVERSION_DELAY",
+      "FILTER_COUNTRY",
+      "FILTER_CREATIVE_HEIGHT",
+      "FILTER_CREATIVE_ID",
+      "FILTER_CREATIVE_SIZE",
+      "FILTER_CREATIVE_TYPE",
+      "FILTER_CREATIVE_WIDTH",
+      "FILTER_DATA_PROVIDER",
+      "FILTER_DATE",
+      "FILTER_DAY_OF_WEEK",
+      "FILTER_DMA",
+      "FILTER_EXCHANGE_ID",
+      "FILTER_FLOODLIGHT_PIXEL_ID",
+      "FILTER_GENDER",
+      "FILTER_INSERTION_ORDER",
+      "FILTER_INVENTORY_FORMAT",
+      "FILTER_INVENTORY_SOURCE",
+      "FILTER_INVENTORY_SOURCE_TYPE",
+      "FILTER_KEYWORD",
+      "FILTER_LINE_ITEM",
+      "FILTER_LINE_ITEM_DAILY_FREQUENCY",
+      "FILTER_LINE_ITEM_LIFETIME_FREQUENCY",
+      "FILTER_LINE_ITEM_TYPE",
+      "FILTER_MOBILE_DEVICE_MAKE",
+      "FILTER_MOBILE_DEVICE_MAKE_MODEL",
+      "FILTER_MOBILE_DEVICE_TYPE",
+      "FILTER_MOBILE_GEO",
+      "FILTER_MONTH",
+      "FILTER_MRAID_SUPPORT",
+      "FILTER_NIELSEN_AGE",
+      "FILTER_NIELSEN_COUNTRY_CODE",
+      "FILTER_NIELSEN_DEVICE_ID",
+      "FILTER_NIELSEN_GENDER",
+      "FILTER_ORDER_ID",
+      "FILTER_OS",
+      "FILTER_PAGE_CATEGORY",
+      "FILTER_PAGE_LAYOUT",
+      "FILTER_PARTNER",
+      "FILTER_PARTNER_CURRENCY",
+      "FILTER_PUBLIC_INVENTORY",
+      "FILTER_QUARTER",
+      "FILTER_REGION",
+      "FILTER_REGULAR_CHANNEL_ID",
+      "FILTER_SITE_ID",
+      "FILTER_SITE_LANGUAGE",
+      "FILTER_TARGETED_USER_LIST",
+      "FILTER_TIME_OF_DAY",
+      "FILTER_TRUEVIEW_CONVERSION_TYPE",
+      "FILTER_UNKNOWN",
+      "FILTER_USER_LIST",
+      "FILTER_USER_LIST_FIRST_PARTY",
+      "FILTER_USER_LIST_THIRD_PARTY",
+      "FILTER_VIDEO_AD_POSITION_IN_STREAM",
+      "FILTER_VIDEO_COMPANION_SIZE",
+      "FILTER_VIDEO_COMPANION_TYPE",
+      "FILTER_VIDEO_CREATIVE_DURATION",
+      "FILTER_VIDEO_CREATIVE_DURATION_SKIPPABLE",
+      "FILTER_VIDEO_DURATION_SECONDS",
+      "FILTER_VIDEO_FORMAT_SUPPORT",
+      "FILTER_VIDEO_INVENTORY_TYPE",
+      "FILTER_VIDEO_PLAYER_SIZE",
+      "FILTER_VIDEO_RATING_TIER",
+      "FILTER_VIDEO_SKIPPABLE_SUPPORT",
+      "FILTER_VIDEO_VPAID_SUPPORT",
+      "FILTER_WEEK",
+      "FILTER_YEAR",
+      "FILTER_YOUTUBE_VERTICAL",
+      "FILTER_ZIP_CODE"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "value": {
+     "type": "string",
+     "description": "Filter value."
+    }
+   }
+  },
+  "ListQueriesResponse": {
+   "id": "ListQueriesResponse",
+   "type": "object",
+   "description": "List queries response.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"doubleclickbidmanager#listQueriesResponse\".",
+     "default": "doubleclickbidmanager#listQueriesResponse"
+    },
+    "queries": {
+     "type": "array",
+     "description": "Retrieved queries.",
+     "items": {
+      "$ref": "Query"
+     }
+    }
+   }
+  },
+  "ListReportsResponse": {
+   "id": "ListReportsResponse",
+   "type": "object",
+   "description": "List reports response.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"doubleclickbidmanager#listReportsResponse\".",
+     "default": "doubleclickbidmanager#listReportsResponse"
+    },
+    "reports": {
+     "type": "array",
+     "description": "Retrieved reports.",
+     "items": {
+      "$ref": "Report"
+     }
+    }
+   }
+  },
+  "Parameters": {
+   "id": "Parameters",
+   "type": "object",
+   "description": "Parameters of a query or report.",
+   "properties": {
+    "filters": {
+     "type": "array",
+     "description": "Filters used to match traffic data in your report.",
+     "items": {
+      "$ref": "FilterPair"
+     }
+    },
+    "groupBys": {
+     "type": "array",
+     "description": "Data is grouped by the filters listed in this field.",
+     "items": {
+      "type": "string",
+      "enum": [
+       "FILTER_ACTIVE_VIEW_EXPECTED_VIEWABILITY",
+       "FILTER_ACTIVITY_ID",
+       "FILTER_ADVERTISER",
+       "FILTER_ADVERTISER_CURRENCY",
+       "FILTER_ADVERTISER_TIMEZONE",
+       "FILTER_AD_POSITION",
+       "FILTER_AGE",
+       "FILTER_BRANDSAFE_CHANNEL_ID",
+       "FILTER_BROWSER",
+       "FILTER_CAMPAIGN_DAILY_FREQUENCY",
+       "FILTER_CARRIER",
+       "FILTER_CHANNEL_ID",
+       "FILTER_CITY",
+       "FILTER_CONVERSION_DELAY",
+       "FILTER_COUNTRY",
+       "FILTER_CREATIVE_HEIGHT",
+       "FILTER_CREATIVE_ID",
+       "FILTER_CREATIVE_SIZE",
+       "FILTER_CREATIVE_TYPE",
+       "FILTER_CREATIVE_WIDTH",
+       "FILTER_DATA_PROVIDER",
+       "FILTER_DATE",
+       "FILTER_DAY_OF_WEEK",
+       "FILTER_DMA",
+       "FILTER_EXCHANGE_ID",
+       "FILTER_FLOODLIGHT_PIXEL_ID",
+       "FILTER_GENDER",
+       "FILTER_INSERTION_ORDER",
+       "FILTER_INVENTORY_FORMAT",
+       "FILTER_INVENTORY_SOURCE",
+       "FILTER_INVENTORY_SOURCE_TYPE",
+       "FILTER_KEYWORD",
+       "FILTER_LINE_ITEM",
+       "FILTER_LINE_ITEM_DAILY_FREQUENCY",
+       "FILTER_LINE_ITEM_LIFETIME_FREQUENCY",
+       "FILTER_LINE_ITEM_TYPE",
+       "FILTER_MOBILE_DEVICE_MAKE",
+       "FILTER_MOBILE_DEVICE_MAKE_MODEL",
+       "FILTER_MOBILE_DEVICE_TYPE",
+       "FILTER_MOBILE_GEO",
+       "FILTER_MONTH",
+       "FILTER_MRAID_SUPPORT",
+       "FILTER_NIELSEN_AGE",
+       "FILTER_NIELSEN_COUNTRY_CODE",
+       "FILTER_NIELSEN_DEVICE_ID",
+       "FILTER_NIELSEN_GENDER",
+       "FILTER_ORDER_ID",
+       "FILTER_OS",
+       "FILTER_PAGE_CATEGORY",
+       "FILTER_PAGE_LAYOUT",
+       "FILTER_PARTNER",
+       "FILTER_PARTNER_CURRENCY",
+       "FILTER_PUBLIC_INVENTORY",
+       "FILTER_QUARTER",
+       "FILTER_REGION",
+       "FILTER_REGULAR_CHANNEL_ID",
+       "FILTER_SITE_ID",
+       "FILTER_SITE_LANGUAGE",
+       "FILTER_TARGETED_USER_LIST",
+       "FILTER_TIME_OF_DAY",
+       "FILTER_TRUEVIEW_CONVERSION_TYPE",
+       "FILTER_UNKNOWN",
+       "FILTER_USER_LIST",
+       "FILTER_USER_LIST_FIRST_PARTY",
+       "FILTER_USER_LIST_THIRD_PARTY",
+       "FILTER_VIDEO_AD_POSITION_IN_STREAM",
+       "FILTER_VIDEO_COMPANION_SIZE",
+       "FILTER_VIDEO_COMPANION_TYPE",
+       "FILTER_VIDEO_CREATIVE_DURATION",
+       "FILTER_VIDEO_CREATIVE_DURATION_SKIPPABLE",
+       "FILTER_VIDEO_DURATION_SECONDS",
+       "FILTER_VIDEO_FORMAT_SUPPORT",
+       "FILTER_VIDEO_INVENTORY_TYPE",
+       "FILTER_VIDEO_PLAYER_SIZE",
+       "FILTER_VIDEO_RATING_TIER",
+       "FILTER_VIDEO_SKIPPABLE_SUPPORT",
+       "FILTER_VIDEO_VPAID_SUPPORT",
+       "FILTER_WEEK",
+       "FILTER_YEAR",
+       "FILTER_YOUTUBE_VERTICAL",
+       "FILTER_ZIP_CODE"
+      ],
+      "enumDescriptions": [
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       ""
+      ]
+     }
+    },
+    "includeInviteData": {
+     "type": "boolean",
+     "description": "Whether to include data from Invite Media."
+    },
+    "metrics": {
+     "type": "array",
+     "description": "Metrics to include as columns in your report.",
+     "items": {
+      "type": "string",
+      "enum": [
+       "METRIC_BID_REQUESTS",
+       "METRIC_BILLABLE_COST_ADVERTISER",
+       "METRIC_BILLABLE_COST_PARTNER",
+       "METRIC_BILLABLE_COST_USD",
+       "METRIC_CLICKS",
+       "METRIC_CLICK_TO_POST_CLICK_CONVERSION_RATE",
+       "METRIC_COMSCORE_VCE_AUDIENCE_AVG_FREQUENCY",
+       "METRIC_COMSCORE_VCE_AUDIENCE_IMPRESSIONS",
+       "METRIC_COMSCORE_VCE_AUDIENCE_IMPRESSIONS_SHARE",
+       "METRIC_COMSCORE_VCE_AUDIENCE_REACH_PCT",
+       "METRIC_COMSCORE_VCE_AUDIENCE_SHARE_PCT",
+       "METRIC_COMSCORE_VCE_GROSS_RATING_POINTS",
+       "METRIC_COMSCORE_VCE_POPULATION",
+       "METRIC_COMSCORE_VCE_UNIQUE_AUDIENCE",
+       "METRIC_CONVERSIONS_PER_MILLE",
+       "METRIC_CPM_FEE1_ADVERTISER",
+       "METRIC_CPM_FEE1_PARTNER",
+       "METRIC_CPM_FEE1_USD",
+       "METRIC_CPM_FEE2_ADVERTISER",
+       "METRIC_CPM_FEE2_PARTNER",
+       "METRIC_CPM_FEE2_USD",
+       "METRIC_CPM_FEE3_ADVERTISER",
+       "METRIC_CPM_FEE3_PARTNER",
+       "METRIC_CPM_FEE3_USD",
+       "METRIC_CPM_FEE4_ADVERTISER",
+       "METRIC_CPM_FEE4_PARTNER",
+       "METRIC_CPM_FEE4_USD",
+       "METRIC_CPM_FEE5_ADVERTISER",
+       "METRIC_CPM_FEE5_PARTNER",
+       "METRIC_CPM_FEE5_USD",
+       "METRIC_CTR",
+       "METRIC_DATA_COST_ADVERTISER",
+       "METRIC_DATA_COST_PARTNER",
+       "METRIC_DATA_COST_USD",
+       "METRIC_FEE10_ADVERTISER",
+       "METRIC_FEE10_PARTNER",
+       "METRIC_FEE10_USD",
+       "METRIC_FEE11_ADVERTISER",
+       "METRIC_FEE11_PARTNER",
+       "METRIC_FEE11_USD",
+       "METRIC_FEE12_ADVERTISER",
+       "METRIC_FEE12_PARTNER",
+       "METRIC_FEE12_USD",
+       "METRIC_FEE13_ADVERTISER",
+       "METRIC_FEE13_PARTNER",
+       "METRIC_FEE13_USD",
+       "METRIC_FEE14_ADVERTISER",
+       "METRIC_FEE14_PARTNER",
+       "METRIC_FEE14_USD",
+       "METRIC_FEE15_ADVERTISER",
+       "METRIC_FEE15_PARTNER",
+       "METRIC_FEE15_USD",
+       "METRIC_FEE16_ADVERTISER",
+       "METRIC_FEE16_PARTNER",
+       "METRIC_FEE16_USD",
+       "METRIC_FEE17_ADVERTISER",
+       "METRIC_FEE17_PARTNER",
+       "METRIC_FEE17_USD",
+       "METRIC_FEE18_ADVERTISER",
+       "METRIC_FEE18_PARTNER",
+       "METRIC_FEE18_USD",
+       "METRIC_FEE19_ADVERTISER",
+       "METRIC_FEE19_PARTNER",
+       "METRIC_FEE19_USD",
+       "METRIC_FEE20_ADVERTISER",
+       "METRIC_FEE20_PARTNER",
+       "METRIC_FEE20_USD",
+       "METRIC_FEE21_ADVERTISER",
+       "METRIC_FEE21_PARTNER",
+       "METRIC_FEE21_USD",
+       "METRIC_FEE22_ADVERTISER",
+       "METRIC_FEE22_PARTNER",
+       "METRIC_FEE22_USD",
+       "METRIC_FEE2_ADVERTISER",
+       "METRIC_FEE2_PARTNER",
+       "METRIC_FEE2_USD",
+       "METRIC_FEE3_ADVERTISER",
+       "METRIC_FEE3_PARTNER",
+       "METRIC_FEE3_USD",
+       "METRIC_FEE4_ADVERTISER",
+       "METRIC_FEE4_PARTNER",
+       "METRIC_FEE4_USD",
+       "METRIC_FEE5_ADVERTISER",
+       "METRIC_FEE5_PARTNER",
+       "METRIC_FEE5_USD",
+       "METRIC_FEE6_ADVERTISER",
+       "METRIC_FEE6_PARTNER",
+       "METRIC_FEE6_USD",
+       "METRIC_FEE7_ADVERTISER",
+       "METRIC_FEE7_PARTNER",
+       "METRIC_FEE7_USD",
+       "METRIC_FEE8_ADVERTISER",
+       "METRIC_FEE8_PARTNER",
+       "METRIC_FEE8_USD",
+       "METRIC_FEE9_ADVERTISER",
+       "METRIC_FEE9_PARTNER",
+       "METRIC_FEE9_USD",
+       "METRIC_IMPRESSIONS",
+       "METRIC_IMPRESSIONS_TO_CONVERSION_RATE",
+       "METRIC_LAST_CLICKS",
+       "METRIC_LAST_IMPRESSIONS",
+       "METRIC_MEDIA_COST_ADVERTISER",
+       "METRIC_MEDIA_COST_ECPAPC_ADVERTISER",
+       "METRIC_MEDIA_COST_ECPAPC_PARTNER",
+       "METRIC_MEDIA_COST_ECPAPC_USD",
+       "METRIC_MEDIA_COST_ECPAPV_ADVERTISER",
+       "METRIC_MEDIA_COST_ECPAPV_PARTNER",
+       "METRIC_MEDIA_COST_ECPAPV_USD",
+       "METRIC_MEDIA_COST_ECPA_ADVERTISER",
+       "METRIC_MEDIA_COST_ECPA_PARTNER",
+       "METRIC_MEDIA_COST_ECPA_USD",
+       "METRIC_MEDIA_COST_ECPCV_ADVERTISER",
+       "METRIC_MEDIA_COST_ECPCV_PARTNER",
+       "METRIC_MEDIA_COST_ECPCV_USD",
+       "METRIC_MEDIA_COST_ECPC_ADVERTISER",
+       "METRIC_MEDIA_COST_ECPC_PARTNER",
+       "METRIC_MEDIA_COST_ECPC_USD",
+       "METRIC_MEDIA_COST_ECPM_ADVERTISER",
+       "METRIC_MEDIA_COST_ECPM_PARTNER",
+       "METRIC_MEDIA_COST_ECPM_USD",
+       "METRIC_MEDIA_COST_PARTNER",
+       "METRIC_MEDIA_COST_USD",
+       "METRIC_MEDIA_COST_VIEWABLE_ECPM_ADVERTISER",
+       "METRIC_MEDIA_COST_VIEWABLE_ECPM_PARTNER",
+       "METRIC_MEDIA_COST_VIEWABLE_ECPM_USD",
+       "METRIC_MEDIA_FEE1_ADVERTISER",
+       "METRIC_MEDIA_FEE1_PARTNER",
+       "METRIC_MEDIA_FEE1_USD",
+       "METRIC_MEDIA_FEE2_ADVERTISER",
+       "METRIC_MEDIA_FEE2_PARTNER",
+       "METRIC_MEDIA_FEE2_USD",
+       "METRIC_MEDIA_FEE3_ADVERTISER",
+       "METRIC_MEDIA_FEE3_PARTNER",
+       "METRIC_MEDIA_FEE3_USD",
+       "METRIC_MEDIA_FEE4_ADVERTISER",
+       "METRIC_MEDIA_FEE4_PARTNER",
+       "METRIC_MEDIA_FEE4_USD",
+       "METRIC_MEDIA_FEE5_ADVERTISER",
+       "METRIC_MEDIA_FEE5_PARTNER",
+       "METRIC_MEDIA_FEE5_USD",
+       "METRIC_PIXEL_LOADS",
+       "METRIC_PLATFORM_FEE_ADVERTISER",
+       "METRIC_PLATFORM_FEE_PARTNER",
+       "METRIC_PLATFORM_FEE_USD",
+       "METRIC_POST_CLICK_DFA_REVENUE",
+       "METRIC_POST_VIEW_DFA_REVENUE",
+       "METRIC_PROFIT_ADVERTISER",
+       "METRIC_PROFIT_ECPAPC_ADVERTISER",
+       "METRIC_PROFIT_ECPAPC_PARTNER",
+       "METRIC_PROFIT_ECPAPC_USD",
+       "METRIC_PROFIT_ECPAPV_ADVERTISER",
+       "METRIC_PROFIT_ECPAPV_PARTNER",
+       "METRIC_PROFIT_ECPAPV_USD",
+       "METRIC_PROFIT_ECPA_ADVERTISER",
+       "METRIC_PROFIT_ECPA_PARTNER",
+       "METRIC_PROFIT_ECPA_USD",
+       "METRIC_PROFIT_ECPC_ADVERTISER",
+       "METRIC_PROFIT_ECPC_PARTNER",
+       "METRIC_PROFIT_ECPC_USD",
+       "METRIC_PROFIT_ECPM_ADVERTISER",
+       "METRIC_PROFIT_ECPM_PARTNER",
+       "METRIC_PROFIT_ECPM_USD",
+       "METRIC_PROFIT_MARGIN",
+       "METRIC_PROFIT_PARTNER",
+       "METRIC_PROFIT_USD",
+       "METRIC_PROFIT_VIEWABLE_ECPM_ADVERTISER",
+       "METRIC_PROFIT_VIEWABLE_ECPM_PARTNER",
+       "METRIC_PROFIT_VIEWABLE_ECPM_USD",
+       "METRIC_REVENUE_ADVERTISER",
+       "METRIC_REVENUE_ECPAPC_ADVERTISER",
+       "METRIC_REVENUE_ECPAPC_PARTNER",
+       "METRIC_REVENUE_ECPAPC_USD",
+       "METRIC_REVENUE_ECPAPV_ADVERTISER",
+       "METRIC_REVENUE_ECPAPV_PARTNER",
+       "METRIC_REVENUE_ECPAPV_USD",
+       "METRIC_REVENUE_ECPA_ADVERTISER",
+       "METRIC_REVENUE_ECPA_PARTNER",
+       "METRIC_REVENUE_ECPA_USD",
+       "METRIC_REVENUE_ECPCV_ADVERTISER",
+       "METRIC_REVENUE_ECPCV_PARTNER",
+       "METRIC_REVENUE_ECPCV_USD",
+       "METRIC_REVENUE_ECPC_ADVERTISER",
+       "METRIC_REVENUE_ECPC_PARTNER",
+       "METRIC_REVENUE_ECPC_USD",
+       "METRIC_REVENUE_ECPM_ADVERTISER",
+       "METRIC_REVENUE_ECPM_PARTNER",
+       "METRIC_REVENUE_ECPM_USD",
+       "METRIC_REVENUE_PARTNER",
+       "METRIC_REVENUE_USD",
+       "METRIC_REVENUE_VIEWABLE_ECPM_ADVERTISER",
+       "METRIC_REVENUE_VIEWABLE_ECPM_PARTNER",
+       "METRIC_REVENUE_VIEWABLE_ECPM_USD",
+       "METRIC_RICH_MEDIA_VIDEO_COMPLETIONS",
+       "METRIC_RICH_MEDIA_VIDEO_FIRST_QUARTILE_COMPLETES",
+       "METRIC_RICH_MEDIA_VIDEO_FULL_SCREENS",
+       "METRIC_RICH_MEDIA_VIDEO_MIDPOINTS",
+       "METRIC_RICH_MEDIA_VIDEO_MUTES",
+       "METRIC_RICH_MEDIA_VIDEO_PAUSES",
+       "METRIC_RICH_MEDIA_VIDEO_PLAYS",
+       "METRIC_RICH_MEDIA_VIDEO_SKIPS",
+       "METRIC_RICH_MEDIA_VIDEO_THIRD_QUARTILE_COMPLETES",
+       "METRIC_TEA_TRUEVIEW_IMPRESSIONS",
+       "METRIC_TEA_TRUEVIEW_UNIQUE_COOKIES",
+       "METRIC_TEA_TRUEVIEW_UNIQUE_PEOPLE",
+       "METRIC_TOTAL_CONVERSIONS",
+       "METRIC_TOTAL_MEDIA_COST_ADVERTISER",
+       "METRIC_TOTAL_MEDIA_COST_ECPAPC_ADVERTISER",
+       "METRIC_TOTAL_MEDIA_COST_ECPAPC_PARTNER",
+       "METRIC_TOTAL_MEDIA_COST_ECPAPC_USD",
+       "METRIC_TOTAL_MEDIA_COST_ECPAPV_ADVERTISER",
+       "METRIC_TOTAL_MEDIA_COST_ECPAPV_PARTNER",
+       "METRIC_TOTAL_MEDIA_COST_ECPAPV_USD",
+       "METRIC_TOTAL_MEDIA_COST_ECPA_ADVERTISER",
+       "METRIC_TOTAL_MEDIA_COST_ECPA_PARTNER",
+       "METRIC_TOTAL_MEDIA_COST_ECPA_USD",
+       "METRIC_TOTAL_MEDIA_COST_ECPCV_ADVERTISER",
+       "METRIC_TOTAL_MEDIA_COST_ECPCV_PARTNER",
+       "METRIC_TOTAL_MEDIA_COST_ECPCV_USD",
+       "METRIC_TOTAL_MEDIA_COST_ECPC_ADVERTISER",
+       "METRIC_TOTAL_MEDIA_COST_ECPC_PARTNER",
+       "METRIC_TOTAL_MEDIA_COST_ECPC_USD",
+       "METRIC_TOTAL_MEDIA_COST_ECPM_ADVERTISER",
+       "METRIC_TOTAL_MEDIA_COST_ECPM_PARTNER",
+       "METRIC_TOTAL_MEDIA_COST_ECPM_USD",
+       "METRIC_TOTAL_MEDIA_COST_PARTNER",
+       "METRIC_TOTAL_MEDIA_COST_USD",
+       "METRIC_TOTAL_MEDIA_COST_VIEWABLE_ECPM_ADVERTISER",
+       "METRIC_TOTAL_MEDIA_COST_VIEWABLE_ECPM_PARTNER",
+       "METRIC_TOTAL_MEDIA_COST_VIEWABLE_ECPM_USD",
+       "METRIC_TRUEVIEW_CONVERSION_COST_MANY_PER_VIEW_ADVERTISER",
+       "METRIC_TRUEVIEW_CONVERSION_COST_MANY_PER_VIEW_PARTNER",
+       "METRIC_TRUEVIEW_CONVERSION_COST_MANY_PER_VIEW_USD",
+       "METRIC_TRUEVIEW_CONVERSION_COST_ONE_PER_VIEW_ADVERTISER",
+       "METRIC_TRUEVIEW_CONVERSION_COST_ONE_PER_VIEW_PARTNER",
+       "METRIC_TRUEVIEW_CONVERSION_COST_ONE_PER_VIEW_USD",
+       "METRIC_TRUEVIEW_CONVERSION_MANY_PER_VIEW",
+       "METRIC_TRUEVIEW_CONVERSION_ONE_PER_VIEW",
+       "METRIC_TRUEVIEW_CONVERSION_RATE_ONE_PER_VIEW",
+       "METRIC_TRUEVIEW_CONVERSION_VALUE_MANY_PER_VIEW_ADVERTISER",
+       "METRIC_TRUEVIEW_CONVERSION_VALUE_MANY_PER_VIEW_PARTNER",
+       "METRIC_TRUEVIEW_CONVERSION_VALUE_MANY_PER_VIEW_USD",
+       "METRIC_TRUEVIEW_CONVERSION_VALUE_ONE_PER_VIEW_ADVERTISER",
+       "METRIC_TRUEVIEW_CONVERSION_VALUE_ONE_PER_VIEW_PARTNER",
+       "METRIC_TRUEVIEW_CONVERSION_VALUE_ONE_PER_VIEW_USD",
+       "METRIC_TRUEVIEW_COST_CONVERSION_MANY_PER_VIEW_RATIO",
+       "METRIC_TRUEVIEW_COST_CONVERSION_ONE_PER_VIEW_RATIO",
+       "METRIC_TRUEVIEW_CPV_ADVERTISER",
+       "METRIC_TRUEVIEW_CPV_PARTNER",
+       "METRIC_TRUEVIEW_CPV_USD",
+       "METRIC_TRUEVIEW_EARNED_LIKES",
+       "METRIC_TRUEVIEW_EARNED_PLAYLIST_ADDITIONS",
+       "METRIC_TRUEVIEW_EARNED_SHARES",
+       "METRIC_TRUEVIEW_EARNED_SUBSCRIBERS",
+       "METRIC_TRUEVIEW_EARNED_VIEWS",
+       "METRIC_TRUEVIEW_IMPRESSION_SHARE",
+       "METRIC_TRUEVIEW_LOST_IS_BUDGET",
+       "METRIC_TRUEVIEW_LOST_IS_RANK",
+       "METRIC_TRUEVIEW_TOTAL_CONVERSION_VALUE",
+       "METRIC_TRUEVIEW_TOTAL_CONVERSION_VALUES_ADVERTISER",
+       "METRIC_TRUEVIEW_TOTAL_CONVERSION_VALUES_PARTNER",
+       "METRIC_TRUEVIEW_TOTAL_CONVERSION_VALUES_USD",
+       "METRIC_TRUEVIEW_UNIQUE_VIEWERS",
+       "METRIC_TRUEVIEW_VALUE_CONVERSION_MANY_PER_VIEW_RATIO",
+       "METRIC_TRUEVIEW_VALUE_CONVERSION_ONE_PER_VIEW_RATIO",
+       "METRIC_TRUEVIEW_VIEWS",
+       "METRIC_TRUEVIEW_VIEW_RATE",
+       "METRIC_TRUEVIEW_VIEW_THROUGH_CONVERSION",
+       "METRIC_UNIQUE_VISITORS_COOKIES",
+       "METRIC_UNKNOWN",
+       "METRIC_VIDEO_COMPANION_CLICKS",
+       "METRIC_VIDEO_COMPANION_IMPRESSIONS",
+       "METRIC_VIDEO_COMPLETION_RATE"
+      ],
+      "enumDescriptions": [
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       "",
+       ""
+      ]
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "Report type.",
+     "enum": [
+      "TYPE_ACTIVE_GRP",
+      "TYPE_AUDIENCE_COMPOSITION",
+      "TYPE_AUDIENCE_PERFORMANCE",
+      "TYPE_CLIENT_SAFE",
+      "TYPE_COMSCORE_VCE",
+      "TYPE_CROSS_FEE",
+      "TYPE_CROSS_PARTNER",
+      "TYPE_CROSS_PARTNER_THIRD_PARTY_DATA_PROVIDER",
+      "TYPE_ESTIMATED_CONVERSION",
+      "TYPE_FEE",
+      "TYPE_GENERAL",
+      "TYPE_INVENTORY_AVAILABILITY",
+      "TYPE_KEYWORD",
+      "TYPE_NIELSEN_AUDIENCE_PROFILE",
+      "TYPE_NIELSEN_DAILY_REACH_BUILD",
+      "TYPE_NIELSEN_ONLINE_GLOBAL_MARKET",
+      "TYPE_NIELSEN_SITE",
+      "TYPE_ORDER_ID",
+      "TYPE_PAGE_CATEGORY",
+      "TYPE_PIXEL_LOAD",
+      "TYPE_REACH_AND_FREQUENCY",
+      "TYPE_THIRD_PARTY_DATA_PROVIDER",
+      "TYPE_TRUEVIEW",
+      "TYPE_TRUEVIEW_IAR",
+      "TYPE_VERIFICATION",
+      "TYPE_YOUTUBE_VERTICAL"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    }
+   }
+  },
+  "Query": {
+   "id": "Query",
+   "type": "object",
+   "description": "Represents a query.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"doubleclickbidmanager#query\".",
+     "default": "doubleclickbidmanager#query"
+    },
+    "metadata": {
+     "$ref": "QueryMetadata",
+     "description": "Query metadata."
+    },
+    "params": {
+     "$ref": "Parameters",
+     "description": "Query parameters."
+    },
+    "queryId": {
+     "type": "string",
+     "description": "Query ID.",
+     "format": "int64"
+    },
+    "reportDataEndTimeMs": {
+     "type": "string",
+     "description": "The ending time for the data that is shown in the report. Note, reportDataEndTimeMs is required if metadata.dataRange is CUSTOM_DATES and ignored otherwise.",
+     "format": "int64"
+    },
+    "reportDataStartTimeMs": {
+     "type": "string",
+     "description": "The starting time for the data that is shown in the report. Note, reportDataStartTimeMs is required if metadata.dataRange is CUSTOM_DATES and ignored otherwise.",
+     "format": "int64"
+    },
+    "schedule": {
+     "$ref": "QuerySchedule",
+     "description": "Information on how often and when to run a query."
+    },
+    "timezoneCode": {
+     "type": "string",
+     "description": "Canonical timezone code for report data time. Defaults to America/New_York."
+    }
+   }
+  },
+  "QueryMetadata": {
+   "id": "QueryMetadata",
+   "type": "object",
+   "description": "Query metadata.",
+   "properties": {
+    "dataRange": {
+     "type": "string",
+     "description": "Range of report data.",
+     "enum": [
+      "ALL_TIME",
+      "CURRENT_DAY",
+      "CUSTOM_DATES",
+      "LAST_14_DAYS",
+      "LAST_30_DAYS",
+      "LAST_365_DAYS",
+      "LAST_7_DAYS",
+      "LAST_90_DAYS",
+      "MONTH_TO_DATE",
+      "PREVIOUS_DAY",
+      "PREVIOUS_HALF_MONTH",
+      "PREVIOUS_MONTH",
+      "PREVIOUS_QUARTER",
+      "PREVIOUS_WEEK",
+      "PREVIOUS_YEAR",
+      "QUARTER_TO_DATE",
+      "WEEK_TO_DATE",
+      "YEAR_TO_DATE"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "format": {
+     "type": "string",
+     "description": "Format of the generated report.",
+     "enum": [
+      "CSV",
+      "EXCEL_CSV",
+      "XLSX"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      ""
+     ]
+    },
+    "googleCloudStoragePathForLatestReport": {
+     "type": "string",
+     "description": "The path to the location in Google Cloud Storage where the latest report is stored."
+    },
+    "googleDrivePathForLatestReport": {
+     "type": "string",
+     "description": "The path in Google Drive for the latest report."
+    },
+    "latestReportRunTimeMs": {
+     "type": "string",
+     "description": "The time when the latest report started to run.",
+     "format": "int64"
+    },
+    "locale": {
+     "type": "string",
+     "description": "Locale of the generated reports. Valid values are cs CZECH de GERMAN en ENGLISH es SPANISH fr FRENCH it ITALIAN ja JAPANESE ko KOREAN pl POLISH pt-BR BRAZILIAN_PORTUGUESE ru RUSSIAN tr TURKISH uk UKRAINIAN zh-CN CHINA_CHINESE zh-TW TAIWAN_CHINESE\n\nAn locale string not in the list above will generate reports in English."
+    },
+    "reportCount": {
+     "type": "integer",
+     "description": "Number of reports that have been generated for the query.",
+     "format": "int32"
+    },
+    "running": {
+     "type": "boolean",
+     "description": "Whether the latest report is currently running."
+    },
+    "sendNotification": {
+     "type": "boolean",
+     "description": "Whether to send an email notification when a report is ready. Default to false."
+    },
+    "shareEmailAddress": {
+     "type": "array",
+     "description": "List of email addresses which are sent email notifications when the report is finished. Separate from sendNotification.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "title": {
+     "type": "string",
+     "description": "Query title. It is used to name the reports generated from this query."
+    }
+   }
+  },
+  "QuerySchedule": {
+   "id": "QuerySchedule",
+   "type": "object",
+   "description": "Information on how frequently and when to run a query.",
+   "properties": {
+    "endTimeMs": {
+     "type": "string",
+     "description": "Datetime to periodically run the query until.",
+     "format": "int64"
+    },
+    "frequency": {
+     "type": "string",
+     "description": "How often the query is run.",
+     "enum": [
+      "DAILY",
+      "MONTHLY",
+      "ONE_TIME",
+      "QUARTERLY",
+      "SEMI_MONTHLY",
+      "WEEKLY"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "nextRunMinuteOfDay": {
+     "type": "integer",
+     "description": "Time of day at which a new report will be generated, represented as minutes past midnight. Range is 0 to 1439. Only applies to scheduled reports.",
+     "format": "int32"
+    },
+    "nextRunTimezoneCode": {
+     "type": "string",
+     "description": "Canonical timezone code for report generation time. Defaults to America/New_York."
+    }
+   }
+  },
+  "Report": {
+   "id": "Report",
+   "type": "object",
+   "description": "Represents a report.",
+   "properties": {
+    "key": {
+     "$ref": "ReportKey",
+     "description": "Key used to identify a report."
+    },
+    "metadata": {
+     "$ref": "ReportMetadata",
+     "description": "Report metadata."
+    },
+    "params": {
+     "$ref": "Parameters",
+     "description": "Report parameters."
+    }
+   }
+  },
+  "ReportFailure": {
+   "id": "ReportFailure",
+   "type": "object",
+   "description": "An explanation of a report failure.",
+   "properties": {
+    "errorCode": {
+     "type": "string",
+     "description": "Error code that shows why the report was not created.",
+     "enum": [
+      "AUTHENTICATION_ERROR",
+      "DEPRECATED_REPORTING_INVALID_QUERY",
+      "REPORTING_BUCKET_NOT_FOUND",
+      "REPORTING_CREATE_BUCKET_FAILED",
+      "REPORTING_DELETE_BUCKET_FAILED",
+      "REPORTING_FATAL_ERROR",
+      "REPORTING_ILLEGAL_FILENAME",
+      "REPORTING_IMCOMPATIBLE_METRICS",
+      "REPORTING_INVALID_QUERY_MISSING_PARTNER_AND_ADVERTISER_FILTERS",
+      "REPORTING_INVALID_QUERY_TITLE_MISSING",
+      "REPORTING_INVALID_QUERY_TOO_MANY_UNFILTERED_LARGE_GROUP_BYS",
+      "REPORTING_QUERY_NOT_FOUND",
+      "REPORTING_TRANSIENT_ERROR",
+      "REPORTING_UPDATE_BUCKET_PERMISSION_FAILED",
+      "REPORTING_WRITE_BUCKET_OBJECT_FAILED",
+      "SERVER_ERROR",
+      "UNAUTHORIZED_API_ACCESS",
+      "VALIDATION_ERROR"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    }
+   }
+  },
+  "ReportKey": {
+   "id": "ReportKey",
+   "type": "object",
+   "description": "Key used to identify a report.",
+   "properties": {
+    "queryId": {
+     "type": "string",
+     "description": "Query ID.",
+     "format": "int64"
+    },
+    "reportId": {
+     "type": "string",
+     "description": "Report ID.",
+     "format": "int64"
+    }
+   }
+  },
+  "ReportMetadata": {
+   "id": "ReportMetadata",
+   "type": "object",
+   "description": "Report metadata.",
+   "properties": {
+    "googleCloudStoragePath": {
+     "type": "string",
+     "description": "The path to the location in Google Cloud Storage where the report is stored."
+    },
+    "reportDataEndTimeMs": {
+     "type": "string",
+     "description": "The ending time for the data that is shown in the report.",
+     "format": "int64"
+    },
+    "reportDataStartTimeMs": {
+     "type": "string",
+     "description": "The starting time for the data that is shown in the report.",
+     "format": "int64"
+    },
+    "status": {
+     "$ref": "ReportStatus",
+     "description": "Report status."
+    }
+   }
+  },
+  "ReportStatus": {
+   "id": "ReportStatus",
+   "type": "object",
+   "description": "Report status.",
+   "properties": {
+    "failure": {
+     "$ref": "ReportFailure",
+     "description": "If the report failed, this records the cause."
+    },
+    "finishTimeMs": {
+     "type": "string",
+     "description": "The time when this report either completed successfully or failed.",
+     "format": "int64"
+    },
+    "format": {
+     "type": "string",
+     "description": "The file type of the report.",
+     "enum": [
+      "CSV",
+      "EXCEL_CSV",
+      "XLSX"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      ""
+     ]
+    },
+    "state": {
+     "type": "string",
+     "description": "The state of the report.",
+     "enum": [
+      "DONE",
+      "FAILED",
+      "RUNNING"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      ""
+     ]
+    }
+   }
+  },
+  "RowStatus": {
+   "id": "RowStatus",
+   "type": "object",
+   "description": "Represents the upload status of a row in the request.",
+   "properties": {
+    "changed": {
+     "type": "boolean",
+     "description": "Whether the stored entity is changed as a result of upload."
+    },
+    "entityId": {
+     "type": "string",
+     "description": "Entity Id.",
+     "format": "int64"
+    },
+    "entityName": {
+     "type": "string",
+     "description": "Entity name."
+    },
+    "errors": {
+     "type": "array",
+     "description": "Reasons why the entity can't be uploaded.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "persisted": {
+     "type": "boolean",
+     "description": "Whether the entity is persisted."
+    },
+    "rowNumber": {
+     "type": "integer",
+     "description": "Row number.",
+     "format": "int32"
+    }
+   }
+  },
+  "RunQueryRequest": {
+   "id": "RunQueryRequest",
+   "type": "object",
+   "description": "Request to run a stored query to generate a report.",
+   "properties": {
+    "dataRange": {
+     "type": "string",
+     "description": "Report data range used to generate the report.",
+     "enum": [
+      "ALL_TIME",
+      "CURRENT_DAY",
+      "CUSTOM_DATES",
+      "LAST_14_DAYS",
+      "LAST_30_DAYS",
+      "LAST_365_DAYS",
+      "LAST_7_DAYS",
+      "LAST_90_DAYS",
+      "MONTH_TO_DATE",
+      "PREVIOUS_DAY",
+      "PREVIOUS_HALF_MONTH",
+      "PREVIOUS_MONTH",
+      "PREVIOUS_QUARTER",
+      "PREVIOUS_WEEK",
+      "PREVIOUS_YEAR",
+      "QUARTER_TO_DATE",
+      "WEEK_TO_DATE",
+      "YEAR_TO_DATE"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "reportDataEndTimeMs": {
+     "type": "string",
+     "description": "The ending time for the data that is shown in the report. Note, reportDataEndTimeMs is required if dataRange is CUSTOM_DATES and ignored otherwise.",
+     "format": "int64"
+    },
+    "reportDataStartTimeMs": {
+     "type": "string",
+     "description": "The starting time for the data that is shown in the report. Note, reportDataStartTimeMs is required if dataRange is CUSTOM_DATES and ignored otherwise.",
+     "format": "int64"
+    },
+    "timezoneCode": {
+     "type": "string",
+     "description": "Canonical timezone code for report data time. Defaults to America/New_York."
+    }
+   }
+  },
+  "UploadLineItemsRequest": {
+   "id": "UploadLineItemsRequest",
+   "type": "object",
+   "description": "Request to upload line items.",
+   "properties": {
+    "dryRun": {
+     "type": "boolean",
+     "description": "Set to true to get upload status without actually persisting the line items."
+    },
+    "format": {
+     "type": "string",
+     "description": "Format the line items are in. Default to CSV.",
+     "enum": [
+      "CSV"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    },
+    "lineItems": {
+     "type": "string",
+     "description": "Line items in CSV to upload. Refer to  Entity Write File Format for more information on file format."
+    }
+   }
+  },
+  "UploadLineItemsResponse": {
+   "id": "UploadLineItemsResponse",
+   "type": "object",
+   "description": "Upload line items response.",
+   "properties": {
+    "uploadStatus": {
+     "$ref": "UploadStatus",
+     "description": "Status of upload."
+    }
+   }
+  },
+  "UploadStatus": {
+   "id": "UploadStatus",
+   "type": "object",
+   "description": "Represents the status of upload.",
+   "properties": {
+    "errors": {
+     "type": "array",
+     "description": "Reasons why upload can't be completed.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "rowStatus": {
+     "type": "array",
+     "description": "Per-row upload status.",
+     "items": {
+      "$ref": "RowStatus"
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "lineitems": {
+   "methods": {
+    "downloadlineitems": {
+     "id": "doubleclickbidmanager.lineitems.downloadlineitems",
+     "path": "lineitems/downloadlineitems",
+     "httpMethod": "POST",
+     "description": "Retrieves line items in CSV format.",
+     "request": {
+      "$ref": "DownloadLineItemsRequest"
+     },
+     "response": {
+      "$ref": "DownloadLineItemsResponse"
+     }
+    },
+    "uploadlineitems": {
+     "id": "doubleclickbidmanager.lineitems.uploadlineitems",
+     "path": "lineitems/uploadlineitems",
+     "httpMethod": "POST",
+     "description": "Uploads line items in CSV format.",
+     "request": {
+      "$ref": "UploadLineItemsRequest"
+     },
+     "response": {
+      "$ref": "UploadLineItemsResponse"
+     }
+    }
+   }
+  },
+  "queries": {
+   "methods": {
+    "createquery": {
+     "id": "doubleclickbidmanager.queries.createquery",
+     "path": "query",
+     "httpMethod": "POST",
+     "description": "Creates a query.",
+     "request": {
+      "$ref": "Query"
+     },
+     "response": {
+      "$ref": "Query"
+     }
+    },
+    "deletequery": {
+     "id": "doubleclickbidmanager.queries.deletequery",
+     "path": "query/{queryId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a stored query as well as the associated stored reports.",
+     "parameters": {
+      "queryId": {
+       "type": "string",
+       "description": "Query ID to delete.",
+       "required": true,
+       "format": "int64",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "queryId"
+     ]
+    },
+    "getquery": {
+     "id": "doubleclickbidmanager.queries.getquery",
+     "path": "query/{queryId}",
+     "httpMethod": "GET",
+     "description": "Retrieves a stored query.",
+     "parameters": {
+      "queryId": {
+       "type": "string",
+       "description": "Query ID to retrieve.",
+       "required": true,
+       "format": "int64",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "queryId"
+     ],
+     "response": {
+      "$ref": "Query"
+     }
+    },
+    "listqueries": {
+     "id": "doubleclickbidmanager.queries.listqueries",
+     "path": "queries",
+     "httpMethod": "GET",
+     "description": "Retrieves stored queries.",
+     "response": {
+      "$ref": "ListQueriesResponse"
+     }
+    },
+    "runquery": {
+     "id": "doubleclickbidmanager.queries.runquery",
+     "path": "query/{queryId}",
+     "httpMethod": "POST",
+     "description": "Runs a stored query to generate a report.",
+     "parameters": {
+      "queryId": {
+       "type": "string",
+       "description": "Query ID to run.",
+       "required": true,
+       "format": "int64",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "queryId"
+     ],
+     "request": {
+      "$ref": "RunQueryRequest"
+     }
+    }
+   }
+  },
+  "reports": {
+   "methods": {
+    "listreports": {
+     "id": "doubleclickbidmanager.reports.listreports",
+     "path": "queries/{queryId}/reports",
+     "httpMethod": "GET",
+     "description": "Retrieves stored reports.",
+     "parameters": {
+      "queryId": {
+       "type": "string",
+       "description": "Query ID with which the reports are associated.",
+       "required": true,
+       "format": "int64",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "queryId"
+     ],
+     "response": {
+      "$ref": "ListReportsResponse"
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,23 @@
+# Configures rkt tests at Travis CI (https://travis-ci.org).
+
+language: go
+
+go:
+  - 1.4.2
+  - 1.5.3
+  - 1.6
+
+before_install:
+ - sudo apt-get update -qq
+ - sudo apt-get install -y cpio realpath squashfs-tools
+ - sudo apt-get install -y build-essential
+ - sudo apt-get install -y libacl1-dev
+
+install: true
+
+script:
+ - ./autogen.sh
+ # Build host and fly to ensure we build stage1 init. We don't build everything
+ # to avoid downloading large images.
+ - ./configure --with-stage1-flavors=host,fly --enable-tpm=auto
+ - make unit-check

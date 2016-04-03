@@ -1,0 +1,883 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/u5FQM4I03EZTfBK_pxzZ11vNzAs\"",
+ "discoveryVersion": "v1",
+ "id": "deploymentmanager:v2beta1",
+ "name": "deploymentmanager",
+ "version": "v2beta1",
+ "revision": "20150831",
+ "title": "Google Cloud Deployment Manager API",
+ "description": "The Deployment Manager API allows users to declaratively configure, deploy and run complex solutions on the Google Cloud Platform.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/deployment-manager/",
+ "labels": [
+  "limited_availability"
+ ],
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/deploymentmanager/v2beta1/projects/",
+ "basePath": "/deploymentmanager/v2beta1/projects/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "deploymentmanager/v2beta1/projects/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/cloud-platform": {
+     "description": "View and manage your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/cloud-platform.read-only": {
+     "description": "View your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/ndev.cloudman": {
+     "description": "View and manage your Google Cloud Platform management resources and deployment status information"
+    },
+    "https://www.googleapis.com/auth/ndev.cloudman.readonly": {
+     "description": "View your Google Cloud Platform management resources and deployment status information"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Deployment": {
+   "id": "Deployment",
+   "type": "object",
+   "description": "Next available tag: 8",
+   "properties": {
+    "description": {
+     "type": "string",
+     "description": "! An optional user-provided description of the deployment."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output Only] Unique identifier for the resource; defined by the server.",
+     "format": "uint64"
+    },
+    "manifest": {
+     "type": "string",
+     "description": "! [Output Only] URL of the manifest representing the full configuration ! of this deployment."
+    },
+    "name": {
+     "type": "string",
+     "description": "! The name of the deployment, which must be unique within the project."
+    },
+    "targetConfig": {
+     "type": "string",
+     "description": "! [Input Only] The YAML configuration to use in processing this deployment. ! ! When you create a deployment, the server creates a new manifest with the ! given YAML configuration and sets the `manifest` property to the URL of ! the manifest resource."
+    }
+   }
+  },
+  "DeploymentsListResponse": {
+   "id": "DeploymentsListResponse",
+   "type": "object",
+   "description": "! A response containing a partial list of deployments and a page token used ! to build the next request if the request has been truncated. Next available tag: 4",
+   "properties": {
+    "deployments": {
+     "type": "array",
+     "description": "! The deployments contained in this response.",
+     "items": {
+      "$ref": "Deployment"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "! A token used to continue a truncated list request."
+    }
+   }
+  },
+  "Manifest": {
+   "id": "Manifest",
+   "type": "object",
+   "description": "Next available tag: 10",
+   "properties": {
+    "config": {
+     "type": "string",
+     "description": "v2beta1: YAML with config - described above v2beta2: YAML + templates. ! The YAML configuration for this manifest."
+    },
+    "evaluatedConfig": {
+     "type": "string",
+     "description": "! [Output Only] The fully-expanded configuration file, including any ! templates and references."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output Only] Unique identifier for the resource; defined by the server.",
+     "format": "uint64"
+    },
+    "name": {
+     "type": "string",
+     "description": "! [Output Only] The name of the manifest."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output Only] Self link for the manifest."
+    }
+   }
+  },
+  "ManifestsListResponse": {
+   "id": "ManifestsListResponse",
+   "type": "object",
+   "description": "! A response containing a partial list of manifests and a page token used ! to build the next request if the request has been truncated. Next available tag: 4",
+   "properties": {
+    "manifests": {
+     "type": "array",
+     "description": "! Manifests contained in this list response.",
+     "items": {
+      "$ref": "Manifest"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "! A token used to continue a truncated list request."
+    }
+   }
+  },
+  "Operation": {
+   "id": "Operation",
+   "type": "object",
+   "description": "! An operation resource, used to manage asynchronous API requests. Next available tag: 24",
+   "properties": {
+    "creationTimestamp": {
+     "type": "string",
+     "description": "! [Output Only] Creation timestamp in RFC3339 text format."
+    },
+    "endTime": {
+     "type": "string",
+     "description": "! [Output Only] The time that this operation was completed. This is in ! RFC3339 format."
+    },
+    "error": {
+     "type": "object",
+     "description": "! [Output Only] If errors occurred during processing of this operation, ! this field will be populated.",
+     "properties": {
+      "errors": {
+       "type": "array",
+       "description": "! The array of errors encountered while processing this operation.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "code": {
+          "type": "string",
+          "description": "! The error type identifier for this error."
+         },
+         "location": {
+          "type": "string",
+          "description": "! Indicates the field in the request which caused the error. ! This property is optional."
+         },
+         "message": {
+          "type": "string",
+          "description": "! An optional, human-readable error message."
+         }
+        }
+       }
+      }
+     }
+    },
+    "httpErrorMessage": {
+     "type": "string",
+     "description": "! [Output Only] If operation fails, the HTTP error message returned, ! e.g. NOT FOUND."
+    },
+    "httpErrorStatusCode": {
+     "type": "integer",
+     "description": "! [Output Only] If operation fails, the HTTP error status code returned, ! e.g. 404.",
+     "format": "int32"
+    },
+    "id": {
+     "type": "string",
+     "description": "! [Output Only] Unique identifier for the resource; defined by the server.",
+     "format": "uint64"
+    },
+    "insertTime": {
+     "type": "string",
+     "description": "! [Output Only] The time that this operation was requested. ! This is in RFC 3339 format."
+    },
+    "name": {
+     "type": "string",
+     "description": "! [Output Only] Name of the operation."
+    },
+    "operationType": {
+     "type": "string",
+     "description": "! [Output Only] Type of the operation. Examples include \"insert\", or ! \"delete\""
+    },
+    "progress": {
+     "type": "integer",
+     "description": "! [Output Only] An optional progress indicator that ranges from 0 to 100. ! There is no requirement that this be linear or support any granularity ! of operations. This should not be used to guess at when the operation will ! be complete. This number should be monotonically increasing as the ! operation progresses.",
+     "format": "int32"
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output Only] Self link for the manifest."
+    },
+    "startTime": {
+     "type": "string",
+     "description": "! [Output Only] The time that this operation was started by the server. ! This is in RFC 3339 format."
+    },
+    "status": {
+     "type": "string",
+     "description": "! [Output Only] Status of the operation. Can be one of the following: ! \"PENDING\", \"RUNNING\", or \"DONE\"."
+    },
+    "statusMessage": {
+     "type": "string",
+     "description": "! [Output Only] An optional textual description of the current status of ! the operation."
+    },
+    "targetId": {
+     "type": "string",
+     "description": "! [Output Only] Unique target id which identifies a particular ! incarnation of the target.",
+     "format": "uint64"
+    },
+    "targetLink": {
+     "type": "string",
+     "description": "! [Output Only] URL of the resource the operation is mutating."
+    },
+    "user": {
+     "type": "string",
+     "description": "! [Output Only] User who requested the operation, for example ! \"user@example.com\""
+    },
+    "warnings": {
+     "type": "array",
+     "description": "! [Output Only] If warning messages generated during processing of this ! operation, this field will be populated.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "any",
+        "description": "! The warning type identifier for this warning."
+       },
+       "data": {
+        "type": "array",
+        "description": "! Metadata for this warning in 'key: value' format.",
+        "items": {
+         "type": "object",
+         "properties": {
+          "key": {
+           "type": "string",
+           "description": "! A key for the warning data."
+          },
+          "value": {
+           "type": "string",
+           "description": "! A warning data value corresponding to the key."
+          }
+         }
+        }
+       },
+       "message": {
+        "type": "string",
+        "description": "! Optional human-readable details for this warning."
+       }
+      }
+     }
+    }
+   }
+  },
+  "OperationsListResponse": {
+   "id": "OperationsListResponse",
+   "type": "object",
+   "description": "! A response containing a partial list of operations and a page token used ! to build the next request if the request has been truncated. Next available tag: 4",
+   "properties": {
+    "nextPageToken": {
+     "type": "string",
+     "description": "! A token used to continue a truncated list request."
+    },
+    "operations": {
+     "type": "array",
+     "description": "! Operations contained in this list response.",
+     "items": {
+      "$ref": "Operation"
+     }
+    }
+   }
+  },
+  "Resource": {
+   "id": "Resource",
+   "type": "object",
+   "description": "Next available tag: 12",
+   "properties": {
+    "errors": {
+     "type": "array",
+     "description": "! [Output Only] A list of any errors that occurred during deployment.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output Only] Unique identifier for the resource; defined by the server.",
+     "format": "uint64"
+    },
+    "intent": {
+     "type": "string",
+     "description": "! [Output Only] The intended state of the resource."
+    },
+    "manifest": {
+     "type": "string",
+     "description": "! [Output Only] URL of the manifest representing the current configuration ! of this resource."
+    },
+    "name": {
+     "type": "string",
+     "description": "! [Output Only] The name of the resource as it appears in the YAML config."
+    },
+    "state": {
+     "type": "string",
+     "description": "! [Output Only] The state of the resource."
+    },
+    "type": {
+     "type": "string",
+     "description": "! [Output Only] The type of the resource, for example ! ?compute.v1.instance?, or ?replicaPools.v1beta2.instanceGroupManager?"
+    },
+    "url": {
+     "type": "string",
+     "description": "! [Output Only] The URL of the actual resource."
+    }
+   }
+  },
+  "ResourcesListResponse": {
+   "id": "ResourcesListResponse",
+   "type": "object",
+   "description": "! A response containing a partial list of resources and a page token used ! to build the next request if the request has been truncated. Next available tag: 4",
+   "properties": {
+    "nextPageToken": {
+     "type": "string",
+     "description": "! A token used to continue a truncated list request."
+    },
+    "resources": {
+     "type": "array",
+     "description": "! Resources contained in this list response.",
+     "items": {
+      "$ref": "Resource"
+     }
+    }
+   }
+  },
+  "Type": {
+   "id": "Type",
+   "type": "object",
+   "description": "! A type supported by Deployment Manager. Next available tag: 4",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "! Name of the type."
+    }
+   }
+  },
+  "TypesListResponse": {
+   "id": "TypesListResponse",
+   "type": "object",
+   "description": "! A response that returns all Types supported by Deployment Manager Next available tag: 3",
+   "properties": {
+    "types": {
+     "type": "array",
+     "description": "! Types supported by Deployment Manager",
+     "items": {
+      "$ref": "Type"
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "deployments": {
+   "methods": {
+    "delete": {
+     "id": "deploymentmanager.deployments.delete",
+     "path": "{project}/global/deployments/{deployment}",
+     "httpMethod": "DELETE",
+     "description": "! Deletes a deployment and all of the resources in the deployment.",
+     "parameters": {
+      "deployment": {
+       "type": "string",
+       "description": "! The name of the deployment for this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "deployment"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "get": {
+     "id": "deploymentmanager.deployments.get",
+     "path": "{project}/global/deployments/{deployment}",
+     "httpMethod": "GET",
+     "description": "! Gets information about a specific deployment.",
+     "parameters": {
+      "deployment": {
+       "type": "string",
+       "description": "! The name of the deployment for this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "deployment"
+     ],
+     "response": {
+      "$ref": "Deployment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "insert": {
+     "id": "deploymentmanager.deployments.insert",
+     "path": "{project}/global/deployments",
+     "httpMethod": "POST",
+     "description": "! Creates a deployment and all of the resources described by the ! deployment manifest.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "request": {
+      "$ref": "Deployment"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "list": {
+     "id": "deploymentmanager.deployments.list",
+     "path": "{project}/global/deployments",
+     "httpMethod": "GET",
+     "description": "! Lists all deployments for a given project.",
+     "parameters": {
+      "maxResults": {
+       "type": "integer",
+       "description": "! Maximum count of results to be returned. ! Acceptable values are 0 to 100, inclusive. (Default: 50)",
+       "default": "50",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "! Specifies a nextPageToken returned by a previous list request. This ! token can be used to request the next page of results from a previous ! list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "response": {
+      "$ref": "DeploymentsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    }
+   }
+  },
+  "manifests": {
+   "methods": {
+    "get": {
+     "id": "deploymentmanager.manifests.get",
+     "path": "{project}/global/deployments/{deployment}/manifests/{manifest}",
+     "httpMethod": "GET",
+     "description": "! Gets information about a specific manifest.",
+     "parameters": {
+      "deployment": {
+       "type": "string",
+       "description": "! The name of the deployment for this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "manifest": {
+       "type": "string",
+       "description": "! The name of the manifest for this request.",
+       "required": true,
+       "pattern": "[-a-z0-9]{1,61}",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "deployment",
+      "manifest"
+     ],
+     "response": {
+      "$ref": "Manifest"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "list": {
+     "id": "deploymentmanager.manifests.list",
+     "path": "{project}/global/deployments/{deployment}/manifests",
+     "httpMethod": "GET",
+     "description": "! Lists all manifests for a given deployment.",
+     "parameters": {
+      "deployment": {
+       "type": "string",
+       "description": "! The name of the deployment for this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "! Maximum count of results to be returned. ! Acceptable values are 0 to 100, inclusive. (Default: 50)",
+       "default": "50",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "! Specifies a nextPageToken returned by a previous list request. This ! token can be used to request the next page of results from a previous ! list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "deployment"
+     ],
+     "response": {
+      "$ref": "ManifestsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    }
+   }
+  },
+  "operations": {
+   "methods": {
+    "get": {
+     "id": "deploymentmanager.operations.get",
+     "path": "{project}/global/operations/{operation}",
+     "httpMethod": "GET",
+     "description": "! Gets information about a specific Operation.",
+     "parameters": {
+      "operation": {
+       "type": "string",
+       "description": "! The name of the operation for this request.",
+       "required": true,
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "operation"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "list": {
+     "id": "deploymentmanager.operations.list",
+     "path": "{project}/global/operations",
+     "httpMethod": "GET",
+     "description": "! Lists all Operations for a project.",
+     "parameters": {
+      "maxResults": {
+       "type": "integer",
+       "description": "! Maximum count of results to be returned. ! Acceptable values are 0 to 100, inclusive. (Default: 50)",
+       "default": "50",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "! Specifies a nextPageToken returned by a previous list request. This ! token can be used to request the next page of results from a previous ! list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "response": {
+      "$ref": "OperationsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    }
+   }
+  },
+  "resources": {
+   "methods": {
+    "get": {
+     "id": "deploymentmanager.resources.get",
+     "path": "{project}/global/deployments/{deployment}/resources/{resource}",
+     "httpMethod": "GET",
+     "description": "! Gets information about a single resource.",
+     "parameters": {
+      "deployment": {
+       "type": "string",
+       "description": "! The name of the deployment for this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "resource": {
+       "type": "string",
+       "description": "! The name of the resource for this request.",
+       "required": true,
+       "pattern": "[-a-z0-9]{1,61}",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "deployment",
+      "resource"
+     ],
+     "response": {
+      "$ref": "Resource"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "list": {
+     "id": "deploymentmanager.resources.list",
+     "path": "{project}/global/deployments/{deployment}/resources",
+     "httpMethod": "GET",
+     "description": "! Lists all resources in a given deployment.",
+     "parameters": {
+      "deployment": {
+       "type": "string",
+       "description": "! The name of the deployment for this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "! Maximum count of results to be returned. ! Acceptable values are 0 to 100, inclusive. (Default: 50)",
+       "default": "50",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "! Specifies a nextPageToken returned by a previous list request. This ! token can be used to request the next page of results from a previous ! list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "deployment"
+     ],
+     "response": {
+      "$ref": "ResourcesListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    }
+   }
+  },
+  "types": {
+   "methods": {
+    "list": {
+     "id": "deploymentmanager.types.list",
+     "path": "{project}/global/types",
+     "httpMethod": "GET",
+     "description": "! Lists all Types for Deployment Manager.",
+     "parameters": {
+      "maxResults": {
+       "type": "integer",
+       "description": "! Maximum count of results to be returned. ! Acceptable values are 0 to 100, inclusive. (Default: 50)",
+       "default": "50",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "! Specifies a nextPageToken returned by a previous list request. This ! token can be used to request the next page of results from a previous ! list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "! The project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "response": {
+      "$ref": "TypesListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    k8s-app: heapster
+    name: heapster
+    version: v6
+  name: heapster
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    k8s-app: heapster
+    version: v6
+  template:
+    metadata:
+      labels:
+        k8s-app: heapster
+        version: v6
+    spec:
+      containers:
+      - name: heapster
+        image: kubernetes/heapster:canary
+        imagePullPolicy: Always
+        command:
+        - /heapster
+        - --source=kubernetes:https://kubernetes.default
+        - --sink=influxdb:http://monitoring-influxdb:8086

@@ -1,0 +1,7 @@
+--plugin go
+-e doc-src/plugin/plugin.rb
+-m markdown
+-o doc/api
+--title "AWS SDK for Go"
+aws/**/*.go
+service/**/*.go

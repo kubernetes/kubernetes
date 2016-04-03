@@ -1,0 +1,13 @@
+# /etc/conf.d/docker: config file for /etc/init.d/docker
+
+# where the docker daemon output gets piped
+#DOCKER_LOGFILE="/var/log/docker.log"
+
+# where docker's pid get stored
+#DOCKER_PIDFILE="/run/docker.pid"
+
+# where the docker daemon itself is run from
+#DOCKER_BINARY="/usr/bin/docker"
+
+# any other random options you want to pass to docker
+DOCKER_OPTS=""

@@ -1,0 +1,101 @@
+// Copyright (c) 2015, Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package google.bigtable.admin.table.v1;
+
+import "google.golang.org/cloud/bigtable/internal/table_data_proto/bigtable_table_data.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "BigtableTableServiceMessagesProto";
+option java_package = "com.google.bigtable.admin.table.v1";
+
+
+message CreateTableRequest {
+  // The unique name of the cluster in which to create the new table.
+  string name = 1;
+
+  // The name by which the new table should be referred to within the cluster,
+  // e.g. "foobar" rather than "<cluster_name>/tables/foobar".
+  string table_id = 2;
+
+  // The Table to create. The `name` field of the Table and all of its
+  // ColumnFamilies must be left blank, and will be populated in the response.
+  Table table = 3;
+
+  // The optional list of row keys that will be used to initially split the
+  // table into several tablets (Tablets are similar to HBase regions).
+  // Given two split keys, "s1" and "s2", three tablets will be created,
+  // spanning the key ranges: [, s1), [s1, s2), [s2, ).
+  //
+  // Example:
+  //  * Row keys := ["a", "apple", "custom", "customer_1", "customer_2",
+  //                 "other", "zz"]
+  //  * initial_split_keys := ["apple", "customer_1", "customer_2", "other"]
+  //  * Key assignment:
+  //    - Tablet 1 [, apple)                => {"a"}.
+  //    - Tablet 2 [apple, customer_1)      => {"apple", "custom"}.
+  //    - Tablet 3 [customer_1, customer_2) => {"customer_1"}.
+  //    - Tablet 4 [customer_2, other)      => {"customer_2"}.
+  //    - Tablet 5 [other, )                => {"other", "zz"}.
+  repeated string initial_split_keys = 4;
+}
+
+message ListTablesRequest {
+  // The unique name of the cluster for which tables should be listed.
+  string name = 1;
+}
+
+message ListTablesResponse {
+  // The tables present in the requested cluster.
+  // At present, only the names of the tables are populated.
+  repeated Table tables = 1;
+}
+
+message GetTableRequest {
+  // The unique name of the requested table.
+  string name = 1;
+}
+
+message DeleteTableRequest {
+  // The unique name of the table to be deleted.
+  string name = 1;
+}
+
+message RenameTableRequest {
+  // The current unique name of the table.
+  string name = 1;
+
+  // The new name by which the table should be referred to within its containing
+  // cluster, e.g. "foobar" rather than "<cluster_name>/tables/foobar".
+  string new_id = 2;
+}
+
+message CreateColumnFamilyRequest {
+  // The unique name of the table in which to create the new column family.
+  string name = 1;
+
+  // The name by which the new column family should be referred to within the
+  // table, e.g. "foobar" rather than "<table_name>/columnFamilies/foobar".
+  string column_family_id = 2;
+
+  // The column family to create. The `name` field must be left blank.
+  ColumnFamily column_family = 3;
+}
+
+message DeleteColumnFamilyRequest {
+  // The unique name of the column family to be deleted.
+  string name = 1;
+}

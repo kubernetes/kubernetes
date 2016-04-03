@@ -1,0 +1,16 @@
+sudo: false
+
+language: go
+
+go:
+  - 1.4
+  - 1.5
+
+before_install:
+  - openssl aes-256-cbc -K $encrypted_7fd28a0c5534_key -iv $encrypted_7fd28a0c5534_iv -in key.json.enc -out key.json -d
+
+install:
+  - go get -v google.golang.org/api/...
+
+script:
+  - GCLOUD_TESTS_GOLANG_PROJECT_ID="dulcet-port-762" GCLOUD_TESTS_GOLANG_DESTRUCTIVE_TEST_BUCKET_NAME="dulcet-port-762-api-go-client-storage-integration-test" GCLOUD_TESTS_GOLANG_KEY="$(pwd)/key.json" go test -v -tags=integration google.golang.org/api/...

@@ -1,0 +1,4 @@
+[Unit]
+Description=Poweroff
+DefaultDependencies=no
+AllowIsolate=yes

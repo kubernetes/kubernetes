@@ -1,0 +1,176 @@
+// Package arrayofenum provides access to the Example API.
+//
+// Usage example:
+//
+//   import "google.golang.org/api/arrayofenum/v1"
+//   ...
+//   arrayofenumService, err := arrayofenum.New(oauthHttpClient)
+package arrayofenum // import "google.golang.org/api/arrayofenum/v1"
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	context "golang.org/x/net/context"
+	ctxhttp "golang.org/x/net/context/ctxhttp"
+	gensupport "google.golang.org/api/gensupport"
+	googleapi "google.golang.org/api/googleapi"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+)
+
+// Always reference these packages, just in case the auto-generated code
+// below doesn't.
+var _ = bytes.NewBuffer
+var _ = strconv.Itoa
+var _ = fmt.Sprintf
+var _ = json.NewDecoder
+var _ = io.Copy
+var _ = url.Parse
+var _ = gensupport.MarshalJSON
+var _ = googleapi.Version
+var _ = errors.New
+var _ = strings.Replace
+var _ = context.Canceled
+var _ = ctxhttp.Do
+
+const apiId = "arrayofenum:v1"
+const apiName = "arrayofenum"
+const apiVersion = "v1"
+const basePath = "https://www.googleapis.com/discovery/v1/apis"
+
+func New(client *http.Client) (*Service, error) {
+	if client == nil {
+		return nil, errors.New("client is nil")
+	}
+	s := &Service{client: client, BasePath: basePath}
+	return s, nil
+}
+
+type Service struct {
+	client    *http.Client
+	BasePath  string // API endpoint base URL
+	UserAgent string // optional additional User-Agent fragment
+}
+
+func (s *Service) userAgent() string {
+	if s.UserAgent == "" {
+		return googleapi.UserAgent
+	}
+	return googleapi.UserAgent + " " + s.UserAgent
+}
+
+// Container: Represents a Google Tag Manager Container.
+type Container struct {
+	// AccountId: GTM Account ID.
+	AccountId string `json:"accountId,omitempty"`
+
+	// ContainerId: This is a long description that has URLs in it that
+	// shouldn't break.
+	// https://sites.google.com/a/google.com/adx-integration/Home/engineering/binary-releases/rtb-api-release
+	// https://cs.corp.google.com/#piper///depot/google3/contentads/adx/tools/rtb_api/adxrtb.py
+	ContainerId string `json:"containerId,omitempty"`
+
+	// DomainName: Optional list of domain names associated with the
+	// Container.
+	DomainName []string `json:"domainName,omitempty"`
+
+	// EnabledBuiltInVariable: List of enabled built-in variables. Valid
+	// values include: pageUrl, pageHostname, pagePath, referrer, event,
+	// clickElement, clickClasses, clickId, clickTarget, clickUrl,
+	// clickText, formElement, formClasses, formId, formTarget, formUrl,
+	// formText, errorMessage, errorUrl, errorLine, newHistoryFragment,
+	// oldHistoryFragment, newHistoryState, oldHistoryState, historySource,
+	// containerVersion, debugMode, randomNumber, containerId.
+	//
+	// Possible values:
+	//   "advertiserId"
+	//   "advertisingTrackingEnabled"
+	//   "appId"
+	//   "appName"
+	//   "appVersionCode"
+	//   "appVersionName"
+	//   "clickClasses"
+	//   "clickElement"
+	//   "clickId"
+	//   "clickTarget"
+	//   "clickText"
+	//   "clickUrl"
+	//   "containerId"
+	//   "containerVersion"
+	//   "debugMode"
+	//   "deviceName"
+	//   "errorLine"
+	//   "errorMessage"
+	//   "errorUrl"
+	//   "event"
+	//   "formClasses"
+	//   "formElement"
+	//   "formId"
+	//   "formTarget"
+	//   "formText"
+	//   "formUrl"
+	//   "historySource"
+	//   "language"
+	//   "newHistoryFragment"
+	//   "newHistoryState"
+	//   "oldHistoryFragment"
+	//   "oldHistoryState"
+	//   "osVersion"
+	//   "pageHostname"
+	//   "pagePath"
+	//   "pageUrl"
+	//   "platform"
+	//   "randomNumber"
+	//   "referrer"
+	//   "resolution"
+	//   "sdkVersion"
+	EnabledBuiltInVariable []string `json:"enabledBuiltInVariable,omitempty"`
+
+	// Fingerprint: The fingerprint of the GTM Container as computed at
+	// storage time. This value is recomputed whenever the account is
+	// modified.
+	Fingerprint string `json:"fingerprint,omitempty"`
+
+	// Name: Container display name.
+	Name string `json:"name,omitempty"`
+
+	// Notes: Container Notes.
+	Notes string `json:"notes,omitempty"`
+
+	// PublicId: Container Public ID.
+	PublicId string `json:"publicId,omitempty"`
+
+	// TimeZoneCountryId: Container Country ID.
+	TimeZoneCountryId string `json:"timeZoneCountryId,omitempty"`
+
+	// TimeZoneId: Container Time Zone ID.
+	TimeZoneId string `json:"timeZoneId,omitempty"`
+
+	// UsageContext: List of Usage Contexts for the Container. Valid values
+	// include: web, android, ios.
+	//
+	// Possible values:
+	//   "android"
+	//   "ios"
+	//   "web"
+	UsageContext []string `json:"usageContext,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AccountId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *Container) MarshalJSON() ([]byte, error) {
+	type noMethod Container
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}

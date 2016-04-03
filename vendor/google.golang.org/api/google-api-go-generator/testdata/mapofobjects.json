@@ -1,0 +1,30 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/3m5rB86FE5KuW1K3jAl88AxCreg\"",
+ "discoveryVersion": "v1",
+ "id": "additionalpropsobjs:v1",
+ "name": "additionalpropsobjs",
+ "version": "v1",
+ "title": "Example API",
+ "description": "The Example API demonstrates an associative array.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "protocol": "rest",
+ "schemas": {
+  "Entity": {
+   "id": "Entity",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.Entity",
+   "properties": {
+    "properties": {
+     "type": "object",
+     "description": "The entity's properties.",
+     "additionalProperties": {
+      "$ref": "Property",
+      "description": "The name of the property. Properties with names matching regex \"__.*__\" are reserved. A reserved property name is forbidden in certain documented contexts. The name cannot be \"\"."
+     }
+    }
+   }
+  }
+ }
+}

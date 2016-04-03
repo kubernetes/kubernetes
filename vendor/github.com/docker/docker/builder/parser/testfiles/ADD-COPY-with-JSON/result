@@ -1,0 +1,8 @@
+(from "ubuntu:14.04")
+(maintainer "Seongyeol Lim <seongyeol37@gmail.com>")
+(copy "." "/go/src/github.com/docker/docker")
+(add "." "/")
+(add "vimrc" "/tmp")
+(copy "bashrc" "/tmp")
+(copy "test file" "/tmp")
+(add "test file" "/tmp/test file")

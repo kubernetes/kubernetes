@@ -1,0 +1,185 @@
+# HELP cadvisor_version_info A metric with a constant '1' value labeled by kernel version, OS version, docker version, cadvisor version & cadvisor revision.
+# TYPE cadvisor_version_info gauge
+cadvisor_version_info{cadvisorRevision="abcdef",cadvisorVersion="0.16.0",dockerVersion="1.8.1",kernelVersion="4.1.6-200.fc22.x86_64",osVersion="Fedora 22 (Twenty Two)"} 1
+# HELP container_cpu_system_seconds_total Cumulative system cpu time consumed in seconds.
+# TYPE container_cpu_system_seconds_total counter
+container_cpu_system_seconds_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 7e-09
+# HELP container_cpu_usage_seconds_total Cumulative cpu time consumed per cpu in seconds.
+# TYPE container_cpu_usage_seconds_total counter
+container_cpu_usage_seconds_total{cpu="cpu00",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 2e-09
+container_cpu_usage_seconds_total{cpu="cpu01",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 3e-09
+container_cpu_usage_seconds_total{cpu="cpu02",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 4e-09
+container_cpu_usage_seconds_total{cpu="cpu03",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 5e-09
+# HELP container_cpu_user_seconds_total Cumulative user cpu time consumed in seconds.
+# TYPE container_cpu_user_seconds_total counter
+container_cpu_user_seconds_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 6e-09
+# HELP container_fs_io_current Number of I/Os currently in progress
+# TYPE container_fs_io_current gauge
+container_fs_io_current{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 42
+container_fs_io_current{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 47
+# HELP container_fs_io_time_seconds_total Cumulative count of seconds spent doing I/Os
+# TYPE container_fs_io_time_seconds_total counter
+container_fs_io_time_seconds_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 4.3e-08
+container_fs_io_time_seconds_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 4.8e-08
+# HELP container_fs_io_time_weighted_seconds_total Cumulative weighted I/O time in seconds
+# TYPE container_fs_io_time_weighted_seconds_total counter
+container_fs_io_time_weighted_seconds_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 4.4e-08
+container_fs_io_time_weighted_seconds_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 4.9e-08
+# HELP container_fs_limit_bytes Number of bytes that can be consumed by the container on this filesystem.
+# TYPE container_fs_limit_bytes gauge
+container_fs_limit_bytes{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 22
+container_fs_limit_bytes{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 37
+# HELP container_fs_read_seconds_total Cumulative count of seconds spent reading
+# TYPE container_fs_read_seconds_total counter
+container_fs_read_seconds_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 2.7e-08
+container_fs_read_seconds_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 4.2e-08
+# HELP container_fs_reads_merged_total Cumulative count of reads merged
+# TYPE container_fs_reads_merged_total counter
+container_fs_reads_merged_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 25
+container_fs_reads_merged_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 40
+# HELP container_fs_reads_total Cumulative count of reads completed
+# TYPE container_fs_reads_total counter
+container_fs_reads_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 24
+container_fs_reads_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 39
+# HELP container_fs_sector_reads_total Cumulative count of sector reads completed
+# TYPE container_fs_sector_reads_total counter
+container_fs_sector_reads_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 26
+container_fs_sector_reads_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 41
+# HELP container_fs_sector_writes_total Cumulative count of sector writes completed
+# TYPE container_fs_sector_writes_total counter
+container_fs_sector_writes_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 40
+container_fs_sector_writes_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 45
+# HELP container_fs_usage_bytes Number of bytes that are consumed by the container on this filesystem.
+# TYPE container_fs_usage_bytes gauge
+container_fs_usage_bytes{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 23
+container_fs_usage_bytes{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 38
+# HELP container_fs_write_seconds_total Cumulative count of seconds spent writing
+# TYPE container_fs_write_seconds_total counter
+container_fs_write_seconds_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 4.1e-08
+container_fs_write_seconds_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 4.6e-08
+# HELP container_fs_writes_merged_total Cumulative count of writes merged
+# TYPE container_fs_writes_merged_total counter
+container_fs_writes_merged_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 39
+container_fs_writes_merged_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 44
+# HELP container_fs_writes_total Cumulative count of writes completed
+# TYPE container_fs_writes_total counter
+container_fs_writes_total{device="sda1",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 28
+container_fs_writes_total{device="sda2",foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 43
+# HELP container_last_seen Last time a container was seen by the exporter
+# TYPE container_last_seen gauge
+container_last_seen{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 1.426203694e+09
+# HELP container_memory_cache Number of bytes of page cache memory.
+# TYPE container_memory_cache gauge
+container_memory_cache{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 14
+# HELP container_memory_failcnt Number of memory usage hits limits
+# TYPE container_memory_failcnt counter
+container_memory_failcnt{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 0
+# HELP container_memory_failures_total Cumulative count of memory allocation failures.
+# TYPE container_memory_failures_total counter
+container_memory_failures_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",scope="container",type="pgfault",zone_name="hello"} 10
+container_memory_failures_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",scope="container",type="pgmajfault",zone_name="hello"} 11
+container_memory_failures_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",scope="hierarchy",type="pgfault",zone_name="hello"} 12
+container_memory_failures_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",scope="hierarchy",type="pgmajfault",zone_name="hello"} 13
+# HELP container_memory_rss Size of RSS in bytes.
+# TYPE container_memory_rss gauge
+container_memory_rss{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 15
+# HELP container_memory_usage_bytes Current memory usage in bytes.
+# TYPE container_memory_usage_bytes gauge
+container_memory_usage_bytes{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 8
+# HELP container_memory_working_set_bytes Current working set in bytes.
+# TYPE container_memory_working_set_bytes gauge
+container_memory_working_set_bytes{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 9
+# HELP container_network_receive_bytes_total Cumulative count of bytes received
+# TYPE container_network_receive_bytes_total counter
+container_network_receive_bytes_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",interface="eth0",name="testcontaineralias",zone_name="hello"} 14
+# HELP container_network_receive_errors_total Cumulative count of errors encountered while receiving
+# TYPE container_network_receive_errors_total counter
+container_network_receive_errors_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",interface="eth0",name="testcontaineralias",zone_name="hello"} 16
+# HELP container_network_receive_packets_dropped_total Cumulative count of packets dropped while receiving
+# TYPE container_network_receive_packets_dropped_total counter
+container_network_receive_packets_dropped_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",interface="eth0",name="testcontaineralias",zone_name="hello"} 17
+# HELP container_network_receive_packets_total Cumulative count of packets received
+# TYPE container_network_receive_packets_total counter
+container_network_receive_packets_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",interface="eth0",name="testcontaineralias",zone_name="hello"} 15
+# HELP container_network_transmit_bytes_total Cumulative count of bytes transmitted
+# TYPE container_network_transmit_bytes_total counter
+container_network_transmit_bytes_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",interface="eth0",name="testcontaineralias",zone_name="hello"} 18
+# HELP container_network_transmit_errors_total Cumulative count of errors encountered while transmitting
+# TYPE container_network_transmit_errors_total counter
+container_network_transmit_errors_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",interface="eth0",name="testcontaineralias",zone_name="hello"} 20
+# HELP container_network_transmit_packets_dropped_total Cumulative count of packets dropped while transmitting
+# TYPE container_network_transmit_packets_dropped_total counter
+container_network_transmit_packets_dropped_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",interface="eth0",name="testcontaineralias",zone_name="hello"} 21
+# HELP container_network_transmit_packets_total Cumulative count of packets transmitted
+# TYPE container_network_transmit_packets_total counter
+container_network_transmit_packets_total{foo_env="prod",foo_label="bar",id="testcontainer",image="test",interface="eth0",name="testcontaineralias",zone_name="hello"} 19
+# HELP container_scrape_error 1 if there was an error while getting container metrics, 0 otherwise
+# TYPE container_scrape_error gauge
+container_scrape_error 0
+# HELP container_spec_cpu_period CPU period of the container.
+# TYPE container_spec_cpu_period gauge
+container_spec_cpu_period{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 10
+# HELP container_spec_cpu_quota CPU quota of the container.
+# TYPE container_spec_cpu_quota gauge
+container_spec_cpu_quota{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 10000
+# HELP container_spec_cpu_shares CPU share of the container.
+# TYPE container_spec_cpu_shares gauge
+container_spec_cpu_shares{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 1000
+# HELP container_start_time_seconds Start time of the container since unix epoch in seconds.
+# TYPE container_start_time_seconds gauge
+container_start_time_seconds{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",zone_name="hello"} 1.257894e+09
+# HELP container_tasks_state Number of tasks in given state
+# TYPE container_tasks_state gauge
+container_tasks_state{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",state="iowaiting",zone_name="hello"} 54
+container_tasks_state{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",state="running",zone_name="hello"} 51
+container_tasks_state{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",state="sleeping",zone_name="hello"} 50
+container_tasks_state{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",state="stopped",zone_name="hello"} 52
+container_tasks_state{foo_env="prod",foo_label="bar",id="testcontainer",image="test",name="testcontaineralias",state="uninterruptible",zone_name="hello"} 53
+# HELP http_request_duration_microseconds The HTTP request latencies in microseconds.
+# TYPE http_request_duration_microseconds summary
+http_request_duration_microseconds{handler="prometheus",quantile="0.5"} 0
+http_request_duration_microseconds{handler="prometheus",quantile="0.9"} 0
+http_request_duration_microseconds{handler="prometheus",quantile="0.99"} 0
+http_request_duration_microseconds_sum{handler="prometheus"} 0
+http_request_duration_microseconds_count{handler="prometheus"} 0
+# HELP http_request_size_bytes The HTTP request sizes in bytes.
+# TYPE http_request_size_bytes summary
+http_request_size_bytes{handler="prometheus",quantile="0.5"} 0
+http_request_size_bytes{handler="prometheus",quantile="0.9"} 0
+http_request_size_bytes{handler="prometheus",quantile="0.99"} 0
+http_request_size_bytes_sum{handler="prometheus"} 0
+http_request_size_bytes_count{handler="prometheus"} 0
+# HELP http_response_size_bytes The HTTP response sizes in bytes.
+# TYPE http_response_size_bytes summary
+http_response_size_bytes{handler="prometheus",quantile="0.5"} 0
+http_response_size_bytes{handler="prometheus",quantile="0.9"} 0
+http_response_size_bytes{handler="prometheus",quantile="0.99"} 0
+http_response_size_bytes_sum{handler="prometheus"} 0
+http_response_size_bytes_count{handler="prometheus"} 0
+# HELP machine_cpu_cores Number of CPU cores on the machine.
+# TYPE machine_cpu_cores gauge
+machine_cpu_cores 4
+# HELP machine_memory_bytes Amount of memory installed on the machine.
+# TYPE machine_memory_bytes gauge
+machine_memory_bytes 1024
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 0
+# HELP process_goroutines Number of goroutines that currently exist.
+# TYPE process_goroutines gauge
+process_goroutines 16
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1024
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 4
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 7.74144e+06
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.42620369439e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.16420608e+08

@@ -1,0 +1,66 @@
+#!/bin/bash
+set -e
+
+# subshell so that we can export PATH and TZ without breaking other things
+(
+	export TZ=UTC # make sure our "date" variables are UTC-based
+	bundle .integration-daemon-start
+
+	# TODO consider using frozen images for the dockercore/builder-deb tags
+
+	tilde='~' # ouch Bash 4.2 vs 4.3, you keel me
+	debVersion="${VERSION//-/$tilde}" # using \~ or '~' here works in 4.3, but not 4.2; just ~ causes $HOME to be inserted, hence the $tilde
+	# if we have a "-dev" suffix or have change in Git, let's make this package version more complex so it works better
+	if [[ "$VERSION" == *-dev ]] || [ -n "$(git status --porcelain)" ]; then
+		gitUnix="$(git log -1 --pretty='%at')"
+		gitDate="$(date --date "@$gitUnix" +'%Y%m%d.%H%M%S')"
+		gitCommit="$(git log -1 --pretty='%h')"
+		gitVersion="git${gitDate}.0.${gitCommit}"
+		# gitVersion is now something like 'git20150128.112847.0.17e840a'
+		debVersion="$debVersion~$gitVersion"
+
+		# $ dpkg --compare-versions 1.5.0 gt 1.5.0~rc1 && echo true || echo false
+		# true
+		# $ dpkg --compare-versions 1.5.0~rc1 gt 1.5.0~git20150128.112847.17e840a && echo true || echo false
+		# true
+		# $ dpkg --compare-versions 1.5.0~git20150128.112847.17e840a gt 1.5.0~dev~git20150128.112847.17e840a && echo true || echo false
+		# true
+
+		# ie, 1.5.0 > 1.5.0~rc1 > 1.5.0~git20150128.112847.17e840a > 1.5.0~dev~git20150128.112847.17e840a
+	fi
+
+	debSource="$(awk -F ': ' '$1 == "Source" { print $2; exit }' hack/make/.build-deb/control)"
+	debMaintainer="$(awk -F ': ' '$1 == "Maintainer" { print $2; exit }' hack/make/.build-deb/control)"
+	debDate="$(date --rfc-2822)"
+
+	# if go-md2man is available, pre-generate the man pages
+	./man/md2man-all.sh -q || true
+	# TODO decide if it's worth getting go-md2man in _each_ builder environment to avoid this
+
+	# TODO add a configurable knob for _which_ debs to build so we don't have to modify the file or build all of them every time we need to test
+	for dir in contrib/builder/deb/*/; do
+		version="$(basename "$dir")"
+		suite="${version##*-}"
+
+		image="dockercore/builder-deb:$version"
+		if ! docker inspect "$image" &> /dev/null; then
+			( set -x && docker build -t "$image" "$dir" )
+		fi
+
+		mkdir -p "$DEST/$version"
+		cat > "$DEST/$version/Dockerfile.build" <<-EOF
+			FROM $image
+			WORKDIR /usr/src/docker
+			COPY . /usr/src/docker
+			RUN ln -sfv hack/make/.build-deb debian
+			RUN { echo '$debSource (${debVersion}-0~${suite}) $suite; urgency=low'; echo; echo '  * Version: $VERSION'; echo; echo " -- $debMaintainer  $debDate"; } > debian/changelog && cat >&2 debian/changelog
+			RUN dpkg-buildpackage -uc -us
+		EOF
+		tempImage="docker-temp/build-deb:$version"
+		( set -x && docker build -t "$tempImage" -f "$DEST/$version/Dockerfile.build" . )
+		docker run --rm "$tempImage" bash -c 'cd .. && tar -c *_*' | tar -xvC "$DEST/$version"
+		docker rmi "$tempImage"
+	done
+
+	bundle .integration-daemon-stop
+) 2>&1 | tee -a "$DEST/test.log"

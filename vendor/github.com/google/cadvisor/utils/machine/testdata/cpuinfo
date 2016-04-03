@@ -1,0 +1,251 @@
+processor	: 0
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 1596.000
+cache size	: 12288 KB
+physical id	: 0
+siblings	: 6
+core id		: 0
+cpu cores	: 6
+apicid		: 0
+initial apicid	: 0
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 1
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 1596.000
+cache size	: 12288 KB
+physical id	: 0
+siblings	: 6
+core id		: 1
+cpu cores	: 6
+apicid		: 2
+initial apicid	: 2
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 2
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 1596.000
+cache size	: 12288 KB
+physical id	: 0
+siblings	: 6
+core id		: 2
+cpu cores	: 6
+apicid		: 4
+initial apicid	: 4
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 3
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 1596.000
+cache size	: 12288 KB
+physical id	: 1
+siblings	: 6
+core id		: 3
+cpu cores	: 6
+apicid		: 16
+initial apicid	: 16
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 4
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 1596.000
+cache size	: 12288 KB
+physical id	: 1
+siblings	: 6
+core id		: 4
+cpu cores	: 6
+apicid		: 18
+initial apicid	: 18
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 5
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 1596.000
+cache size	: 12288 KB
+physical id	: 1
+siblings	: 6
+core id		: 5
+cpu cores	: 6
+apicid		: 20
+initial apicid	: 20
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 6
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 2661.000
+cache size	: 12288 KB
+physical id	: 0
+siblings	: 6
+core id		: 0
+cpu cores	: 6
+apicid		: 1
+initial apicid	: 1
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 7
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 2661.000
+cache size	: 12288 KB
+physical id	: 0
+siblings	: 6
+core id		: 1
+cpu cores	: 6
+apicid		: 3
+initial apicid	: 3
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 8
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 1596.000
+cache size	: 12288 KB
+physical id	: 0
+siblings	: 6
+core id		: 2
+cpu cores	: 6
+apicid		: 5
+initial apicid	: 5
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 9
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 2661.000
+cache size	: 12288 KB
+physical id	: 1
+siblings	: 6
+core id		: 3
+cpu cores	: 6
+apicid		: 17
+initial apicid	: 17
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+
+processor	: 10
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 1596.000
+cache size	: 12288 KB
+physical id	: 1
+siblings	: 6
+core id		: 4
+cpu cores	: 6
+apicid		: 19
+initial apicid	: 19
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+processor	: 11
+cpu family	: 6
+stepping	: 2
+microcode	: 0x10
+cpu MHz		: 2661.000
+cache size	: 12288 KB
+physical id	: 1
+siblings	: 6
+core id		: 5
+cpu cores	: 6
+apicid		: 21
+initial apicid	: 21
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 11
+wp		: yes
+bogomips	: 5333.60
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 40 bits physical, 48 bits virtual
+

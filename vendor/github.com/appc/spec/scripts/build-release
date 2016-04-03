@@ -1,0 +1,20 @@
+#!/bin/bash -eu
+#
+# Build the appc release of the specified version.
+#
+# YMMV, no disclaimer or warranty, etc.
+
+if ! [[ "$1" =~ ^v[[:digit:]]+.[[:digit:]]+.[[:digit:]]$ ]]; then 
+	echo "Usage: scripts/build-release <VERSION>"
+	echo "   where VERSION must be vX.Y.Z"
+	exit 255
+fi
+
+ver="appc-${1}"
+mkdir "${ver}"
+git checkout "${1}"
+	./build
+	cp bin/actool "${ver}/"
+	cp SPEC.md "${ver}/"
+	tar czvf "${ver}.tar.gz" "${ver}"
+git checkout -

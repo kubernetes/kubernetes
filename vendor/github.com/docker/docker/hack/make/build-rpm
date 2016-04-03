@@ -1,0 +1,73 @@
+#!/bin/bash
+set -e
+
+# subshell so that we can export PATH and TZ without breaking other things
+(
+	export TZ=UTC # make sure our "date" variables are UTC-based
+
+	source "$(dirname "$BASH_SOURCE")/.integration-daemon-start"
+
+	# TODO consider using frozen images for the dockercore/builder-rpm tags
+
+	rpmName=docker-engine
+	rpmVersion="${VERSION%%-*}"
+	rpmRelease=1
+
+	# rpmRelease versioning is as follows
+	# Docker 1.7.0:  version=1.7.0, release=1
+	# Docker 1.7.0-rc1: version=1.7.0, release=0.1.rc1
+	# Docker 1.7.0-dev nightly: version=1.7.0, release=0.0.YYYYMMDD.HHMMSS.gitHASH
+
+	# if we have a "-rc*" suffix, set appropriate release
+	if [[ "$VERSION" == *-rc* ]]; then
+		rcVersion=${VERSION#*-rc}
+		rpmRelease="0.${rcVersion}.rc${rcVersion}"
+	fi
+
+	# if we have a "-dev" suffix or have change in Git, let's make this package version more complex so it works better
+	if [[ "$VERSION" == *-dev ]] || [ -n "$(git status --porcelain)" ]; then
+		gitUnix="$(git log -1 --pretty='%at')"
+		gitDate="$(date --date "@$gitUnix" +'%Y%m%d.%H%M%S')"
+		gitCommit="$(git log -1 --pretty='%h')"
+		gitVersion="${gitDate}.git${gitCommit}"
+		# gitVersion is now something like '20150128.112847.17e840a'
+		rpmRelease="0.0.$gitVersion"
+	fi
+
+	rpmPackager="$(awk -F ': ' '$1 == "Packager" { print $2; exit }' hack/make/.build-rpm/${rpmName}.spec)"
+	rpmDate="$(date +'%a %b %d %Y')"
+
+	# if go-md2man is available, pre-generate the man pages
+	./man/md2man-all.sh -q || true
+	# TODO decide if it's worth getting go-md2man in _each_ builder environment to avoid this
+
+	# TODO add a configurable knob for _which_ rpms to build so we don't have to modify the file or build all of them every time we need to test
+	for dir in contrib/builder/rpm/*/; do
+		version="$(basename "$dir")"
+		suite="${version##*-}"
+
+		image="dockercore/builder-rpm:$version"
+		if ! docker inspect "$image" &> /dev/null; then
+			( set -x && docker build -t "$image" "$dir" )
+		fi
+
+		mkdir -p "$DEST/$version"
+		cat > "$DEST/$version/Dockerfile.build" <<-EOF
+			FROM $image
+			COPY . /usr/src/${rpmName}
+			RUN mkdir -p /root/rpmbuild/SOURCES
+			WORKDIR /root/rpmbuild
+			RUN ln -sfv /usr/src/${rpmName}/hack/make/.build-rpm SPECS
+			RUN tar -cz -C /usr/src -f /root/rpmbuild/SOURCES/${rpmName}.tar.gz ${rpmName}
+			WORKDIR /root/rpmbuild/SPECS
+			RUN { echo '* $rpmDate $rpmPackager $rpmVersion-$rpmRelease'; echo '* Version: $VERSION'; } >> ${rpmName}.spec && tail >&2 ${rpmName}.spec
+			RUN rpmbuild -ba --define '_release $rpmRelease' --define '_version $rpmVersion' --define '_origversion $VERSION' ${rpmName}.spec
+		EOF
+		tempImage="docker-temp/build-rpm:$version"
+		( set -x && docker build -t "$tempImage" -f $DEST/$version/Dockerfile.build . )
+		docker run --rm "$tempImage" bash -c 'cd /root/rpmbuild && tar -c *RPMS' | tar -xvC "$DEST/$version"
+		docker rmi "$tempImage"
+	done
+
+	source "$(dirname "$BASH_SOURCE")/.integration-daemon-stop"
+) 2>&1 | tee -a $DEST/test.log

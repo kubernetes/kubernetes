@@ -1,0 +1,9 @@
+#!/bin/bash -e
+
+GOBUILD="go build -a -installsuffix netgo -ldflags '-s'"
+
+echo "building bin/oidc-example-app..."
+${GOBUILD} -o bin/oidc-example-app github.com/coreos/go-oidc/example/app
+echo "building bin/oidc-example-cli..."
+${GOBUILD} -o bin/oidc-example-cli github.com/coreos/go-oidc/example/cli
+echo "done"

@@ -1,0 +1,110 @@
+// Go support for Protocol Buffers - Google's data interchange format
+//
+// Copyright 2015 The Go Authors.  All rights reserved.
+// https://github.com/golang/protobuf
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto2";
+
+package jsonpb;
+
+// Test message for holding primitive types.
+message Simple {
+  optional bool o_bool = 1;
+  optional int32 o_int32 = 2;
+  optional int64 o_int64 = 3;
+  optional uint32 o_uint32 = 4;
+  optional uint64 o_uint64 = 5;
+  optional sint32 o_sint32 = 6;
+  optional sint64 o_sint64 = 7;
+  optional float o_float = 8;
+  optional double o_double = 9;
+  optional string o_string = 10;
+  optional bytes o_bytes = 11;
+}
+
+// Test message for holding repeated primitives.
+message Repeats {
+  repeated bool r_bool = 1;
+  repeated int32 r_int32 = 2;
+  repeated int64 r_int64 = 3;
+  repeated uint32 r_uint32 = 4;
+  repeated uint64 r_uint64 = 5;
+  repeated sint32 r_sint32 = 6;
+  repeated sint64 r_sint64 = 7;
+  repeated float r_float = 8;
+  repeated double r_double = 9;
+  repeated string r_string = 10;
+  repeated bytes r_bytes = 11;
+}
+
+// Test message for holding enums and nested messages.
+message Widget {
+  enum Color {
+    RED = 0;
+    GREEN = 1;
+    BLUE = 2;
+  };
+  optional Color color = 1;
+  repeated Color r_color = 2;
+
+  optional Simple simple = 10;
+  repeated Simple r_simple = 11;
+
+  optional Repeats repeats = 20;
+  repeated Repeats r_repeats = 21;
+}
+
+message Maps {
+  map<int64, string> m_int64_str = 1;
+  map<bool, Simple> m_bool_simple = 2;
+}
+
+message MsgWithOneof {
+  oneof union {
+    string title = 1;
+    int64 salary = 2;
+  }
+}
+
+message Real {
+  optional double value = 1;
+  extensions 100 to max;
+}
+
+extend Real {
+  optional string name = 124;
+}
+
+message Complex {
+  extend Real {
+    optional Complex real_extension = 123;
+  }
+  optional double imaginary = 1;
+  extensions 100 to max;
+}

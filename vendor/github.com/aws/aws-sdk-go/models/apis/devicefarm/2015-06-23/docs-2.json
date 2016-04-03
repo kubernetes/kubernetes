@@ -1,0 +1,1006 @@
+{
+  "version": "2.0",
+  "service": "<p>AWS Device Farm is a service that enables mobile app developers to test Android, iOS, and Fire OS apps on physical phones, tablets, and other devices in the cloud.</p>",
+  "operations": {
+    "CreateDevicePool": "<p>Creates a device pool.</p>",
+    "CreateProject": "<p>Creates a new project.</p>",
+    "CreateUpload": "<p>Uploads an app or test scripts.</p>",
+    "DeleteDevicePool": "<p>Deletes a device pool given the pool ARN. Does not allow deletion of curated pools owned by the system.</p>",
+    "DeleteProject": "<p>Deletes an AWS Device Farm project, given the project ARN.</p> <p><b>Note</b> Deleting this resource does not stop an in-progress run.</p>",
+    "DeleteRun": "<p>Deletes the run, given the run ARN.</p> <p><b>Note</b> Deleting this resource does not stop an in-progress run.</p>",
+    "DeleteUpload": "<p>Deletes an upload given the upload ARN.</p>",
+    "GetAccountSettings": "<p>Returns the number of unmetered iOS and/or unmetered Android devices that have been purchased by the account.</p>",
+    "GetDevice": "<p>Gets information about a unique device type.</p>",
+    "GetDevicePool": "<p>Gets information about a device pool.</p>",
+    "GetDevicePoolCompatibility": "<p>Gets information about compatibility with a device pool.</p>",
+    "GetJob": "<p>Gets information about a job.</p>",
+    "GetProject": "<p>Gets information about a project.</p>",
+    "GetRun": "<p>Gets information about a run.</p>",
+    "GetSuite": "<p>Gets information about a suite.</p>",
+    "GetTest": "<p>Gets information about a test.</p>",
+    "GetUpload": "<p>Gets information about an upload.</p>",
+    "ListArtifacts": "<p>Gets information about artifacts.</p>",
+    "ListDevicePools": "<p>Gets information about device pools.</p>",
+    "ListDevices": "<p>Gets information about unique device types.</p>",
+    "ListJobs": "<p>Gets information about jobs.</p>",
+    "ListProjects": "<p>Gets information about projects.</p>",
+    "ListRuns": "<p>Gets information about runs.</p>",
+    "ListSamples": "<p>Gets information about samples.</p>",
+    "ListSuites": "<p>Gets information about suites.</p>",
+    "ListTests": "<p>Gets information about tests.</p>",
+    "ListUniqueProblems": "<p>Gets information about unique problems.</p>",
+    "ListUploads": "<p>Gets information about uploads.</p>",
+    "ScheduleRun": "<p>Schedules a run.</p>",
+    "UpdateDevicePool": "<p>Modifies the name, description, and rules in a device pool given the attributes and the pool ARN. Rule updates are all-or-nothing, meaning they can only be updated as a whole (or not at all).</p>",
+    "UpdateProject": "<p>Modifies the specified project name, given the project ARN and a new name.</p>"
+  },
+  "shapes": {
+    "AWSAccountNumber": {
+      "base": null,
+      "refs": {
+        "AccountSettings$awsAccountNumber": "<p>The AWS account number specified in the <code>AccountSettings</code> container.</p>"
+      }
+    },
+    "AccountSettings": {
+      "base": "<p>A container for account-level settings within AWS Device Farm.</p>",
+      "refs": {
+        "GetAccountSettingsResult$accountSettings": null
+      }
+    },
+    "AmazonResourceName": {
+      "base": null,
+      "refs": {
+        "AmazonResourceNames$member": null,
+        "Artifact$arn": "<p>The artifact's ARN.</p>",
+        "CreateDevicePoolRequest$projectArn": "<p>The ARN of the project for the device pool.</p>",
+        "CreateUploadRequest$projectArn": "<p>The ARN of the project for the upload.</p>",
+        "DeleteDevicePoolRequest$arn": "<p>Represents the Amazon Resource Name (ARN) of the Device Farm device pool you wish to delete.</p>",
+        "DeleteProjectRequest$arn": "<p>Represents the Amazon Resource Name (ARN) of the Device Farm project you wish to delete.</p>",
+        "DeleteRunRequest$arn": "<p>The Amazon Resource Name (ARN) for the run you wish to delete.</p>",
+        "DeleteUploadRequest$arn": "<p>Represents the Amazon Resource Name (ARN) of the Device Farm upload you wish to delete.</p>",
+        "Device$arn": "<p>The device's ARN.</p>",
+        "DevicePool$arn": "<p>The device pool's ARN.</p>",
+        "GetDevicePoolCompatibilityRequest$devicePoolArn": "<p>The device pool's ARN.</p>",
+        "GetDevicePoolCompatibilityRequest$appArn": "<p>The ARN of the app that is associated with the specified device pool.</p>",
+        "GetDevicePoolRequest$arn": "<p>The device pool's ARN.</p>",
+        "GetDeviceRequest$arn": "<p>The device type's ARN.</p>",
+        "GetJobRequest$arn": "<p>The job's ARN.</p>",
+        "GetProjectRequest$arn": "<p>The project's ARN.</p>",
+        "GetRunRequest$arn": "<p>The run's ARN.</p>",
+        "GetSuiteRequest$arn": "<p>The suite's ARN.</p>",
+        "GetTestRequest$arn": "<p>The test's ARN.</p>",
+        "GetUploadRequest$arn": "<p>The upload's ARN.</p>",
+        "Job$arn": "<p>The job's ARN.</p>",
+        "ListArtifactsRequest$arn": "<p>The Run, Job, Suite, or Test ARN.</p>",
+        "ListDevicePoolsRequest$arn": "<p>The project ARN.</p>",
+        "ListDevicesRequest$arn": "<p>The device types' ARNs.</p>",
+        "ListJobsRequest$arn": "<p>The jobs' ARNs.</p>",
+        "ListProjectsRequest$arn": "<p>The projects' ARNs.</p>",
+        "ListRunsRequest$arn": "<p>The runs' ARNs.</p>",
+        "ListSamplesRequest$arn": "<p>The samples' ARNs.</p>",
+        "ListSuitesRequest$arn": "<p>The suites' ARNs.</p>",
+        "ListTestsRequest$arn": "<p>The tests' ARNs.</p>",
+        "ListUniqueProblemsRequest$arn": "<p>The unique problems' ARNs.</p>",
+        "ListUploadsRequest$arn": "<p>The uploads' ARNs.</p>",
+        "ProblemDetail$arn": "<p>The problem detail's ARN.</p>",
+        "Project$arn": "<p>The project's ARN.</p>",
+        "Run$arn": "<p>The run's ARN.</p>",
+        "Sample$arn": "<p>The sample's ARN.</p>",
+        "ScheduleRunConfiguration$extraDataPackageArn": "<p>The ARN of the extra data for the run. The extra data is a .zip file that AWS Device Farm will extract to external data for Android or the app's sandbox for iOS.</p>",
+        "ScheduleRunConfiguration$networkProfileArn": "<p>Reserved for internal use.</p>",
+        "ScheduleRunRequest$projectArn": "<p>The ARN of the project for the run to be scheduled.</p>",
+        "ScheduleRunRequest$appArn": "<p>The ARN of the app to schedule a run.</p>",
+        "ScheduleRunRequest$devicePoolArn": "<p>The ARN of the device pool for the run to be scheduled.</p>",
+        "ScheduleRunTest$testPackageArn": "<p>The ARN of the uploaded test that will be run.</p>",
+        "Suite$arn": "<p>The suite's ARN.</p>",
+        "Test$arn": "<p>The test's ARN.</p>",
+        "UpdateDevicePoolRequest$arn": "<p>The Amazon Resourc Name (ARN) of the Device Farm device pool you wish to update.</p>",
+        "UpdateProjectRequest$arn": "<p>The Amazon Resource Name (ARN) of the project whose name you wish to update.</p>",
+        "Upload$arn": "<p>The upload's ARN.</p>"
+      }
+    },
+    "AmazonResourceNames": {
+      "base": null,
+      "refs": {
+        "ScheduleRunConfiguration$auxiliaryApps": "<p>A list of auxiliary apps for the run.</p>"
+      }
+    },
+    "ArgumentException": {
+      "base": "<p>An invalid argument was specified.</p>",
+      "refs": {
+      }
+    },
+    "Artifact": {
+      "base": "<p>Represents the output of a test. Examples of artifacts include logs and screenshots.</p>",
+      "refs": {
+        "Artifacts$member": null
+      }
+    },
+    "ArtifactCategory": {
+      "base": null,
+      "refs": {
+        "ListArtifactsRequest$type": "<p>The artifacts' type.</p> <p>Allowed values include:</p> <ul> <li>FILE: The artifacts are files.</li> <li>LOG: The artifacts are logs.</li> <li>SCREENSHOT: The artifacts are screenshots.</li> </ul>"
+      }
+    },
+    "ArtifactType": {
+      "base": null,
+      "refs": {
+        "Artifact$type": "<p>The artifact's type.</p> <p>Allowed values include the following:</p> <ul> <li><p>APPIUM_JAVA_OUTPUT: The Appium Java output type.</p></li> <li><p>APPIUM_JAVA_XML_OUTPUT: The Appium Java XML output type.</p></li> <li><p>APPIUM_SERVER_OUTPUT: The Appium server output type.</p></li> <li><p>AUTOMATION_OUTPUT: The automation output type.</p></li> <li><p>CALABASH_JSON_OUTPUT: The Calabash JSON output type.</p></li> <li><p>CALABASH_JAVA_XML_OUTPUT: The Calabash Java XML output type.</p></li> <li><p>CALABASH_PRETTY_OUTPUT: The Calabash pretty output type.</p></li> <li><p>CALABASH_STANDARD_OUTPUT: The Calabash standard output type.</p></li> <li><p>DEVICE_LOG: The device log type.</p></li> <li><p>EXERCISER_MONKEY_OUTPUT: For Android, the artifact (log) generated by an Android fuzz test.</p></li> <li><p>INSTRUMENTATION_OUTPUT: The instrumentation type.</p></li> <li><p>MESSAGE_LOG: The message log type.</p></li> <li><p>RESULT_LOG: The result log type.</p></li> <li><p>SCREENSHOT: The screenshot type.</p></li> <li><p>SERVICE_LOG: The service log type.</p></li> <li><p>UNKNOWN: An unknown type.</p></li> </ul>"
+      }
+    },
+    "Artifacts": {
+      "base": null,
+      "refs": {
+        "ListArtifactsResult$artifacts": "<p>Information about the artifacts.</p>"
+      }
+    },
+    "BillingMethod": {
+      "base": null,
+      "refs": {
+        "Run$billingMethod": "<p>Specifies the billing method for a test run: <code>metered</code> or <code>unmetered</code>. If the parameter is not specified, the default value is <code>unmetered</code>.</p>",
+        "ScheduleRunConfiguration$billingMethod": "<p>Specifies the billing method for a test run: <code>metered</code> or <code>unmetered</code>. If the parameter is not specified, the default value is <code>unmetered</code>.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "DevicePoolCompatibilityResult$compatible": "<p>Whether the result was compatible with the device pool.</p>",
+        "Radios$wifi": "<p>True if Wi-Fi is enabled at the beginning of the test; otherwise, false.</p>",
+        "Radios$bluetooth": "<p>True if Bluetooth is enabled at the beginning of the test; otherwise, false.</p>",
+        "Radios$nfc": "<p>True if NFC is enabled at the beginning of the test; otherwise, false.</p>",
+        "Radios$gps": "<p>True if GPS is enabled at the beginning of the test; otherwise, false.</p>"
+      }
+    },
+    "CPU": {
+      "base": "<p>Represents the amount of CPU that an app is using on a physical device.</p> <p>Note that this does not represent system-wide CPU usage.</p>",
+      "refs": {
+        "Device$cpu": "<p>Information about the device's CPU.</p>"
+      }
+    },
+    "ContentType": {
+      "base": null,
+      "refs": {
+        "CreateUploadRequest$contentType": "<p>The upload's content type (for example, \"application/octet-stream\").</p>",
+        "Upload$contentType": "<p>The upload's content type (for example, \"application/octet-stream\").</p>"
+      }
+    },
+    "Counters": {
+      "base": "<p>Represents entity counters.</p>",
+      "refs": {
+        "Job$counters": "<p>The job's result counters.</p>",
+        "Run$counters": "<p>The run's result counters.</p>",
+        "Suite$counters": "<p>The suite's result counters.</p>",
+        "Test$counters": "<p>The test's result counters.</p>"
+      }
+    },
+    "CreateDevicePoolRequest": {
+      "base": "<p>Represents a request to the create device pool operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateDevicePoolResult": {
+      "base": "<p>Represents the result of a create device pool request.</p>",
+      "refs": {
+      }
+    },
+    "CreateProjectRequest": {
+      "base": "<p>Represents a request to the create project operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateProjectResult": {
+      "base": "<p>Represents the result of a create project request.</p>",
+      "refs": {
+      }
+    },
+    "CreateUploadRequest": {
+      "base": "<p>Represents a request to the create upload operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateUploadResult": {
+      "base": "<p>Represents the result of a create upload request.</p>",
+      "refs": {
+      }
+    },
+    "DateTime": {
+      "base": null,
+      "refs": {
+        "Job$created": "<p>When the job was created.</p>",
+        "Job$started": "<p>The job's start time.</p>",
+        "Job$stopped": "<p>The job's stop time.</p>",
+        "Project$created": "<p>When the project was created.</p>",
+        "Run$created": "<p>When the run was created.</p>",
+        "Run$started": "<p>The run's start time.</p>",
+        "Run$stopped": "<p>The run's stop time.</p>",
+        "Suite$created": "<p>When the suite was created.</p>",
+        "Suite$started": "<p>The suite's start time.</p>",
+        "Suite$stopped": "<p>The suite's stop time.</p>",
+        "Test$created": "<p>When the test was created.</p>",
+        "Test$started": "<p>The test's start time.</p>",
+        "Test$stopped": "<p>The test's stop time.</p>",
+        "Upload$created": "<p>When the upload was created.</p>"
+      }
+    },
+    "DeleteDevicePoolRequest": {
+      "base": "<p>Represents a request to the delete device pool operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteDevicePoolResult": {
+      "base": "<p>Represents the result of a delete device pool request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteProjectRequest": {
+      "base": "<p>Represents a request to the delete project operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteProjectResult": {
+      "base": "<p>Represents the result of a delete project request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteRunRequest": {
+      "base": "<p>Represents a request to the delete run operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteRunResult": {
+      "base": "<p>Represents the result of a delete run request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteUploadRequest": {
+      "base": "<p>Represents a request to the delete upload operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteUploadResult": {
+      "base": "<p>Represents the result of a delete upload request.</p>",
+      "refs": {
+      }
+    },
+    "Device": {
+      "base": "<p>Represents a device type that an app is tested against.</p>",
+      "refs": {
+        "DevicePoolCompatibilityResult$device": null,
+        "Devices$member": null,
+        "GetDeviceResult$device": null,
+        "Job$device": null,
+        "Problem$device": "<p>Information about the associated device.</p>"
+      }
+    },
+    "DeviceAttribute": {
+      "base": null,
+      "refs": {
+        "IncompatibilityMessage$type": "<p>The type of incompatibility.</p> <p>Allowed values include:</p> <ul> <li><p>ARN: The ARN.</p></li> <li><p>FORM_FACTOR: The form factor (for example, phone or tablet).</p></li> <li><p>MANUFACTURER: The manufacturer.</p></li> <li><p>PLATFORM: The platform (for example, Android or iOS).</p></li> </ul>",
+        "Rule$attribute": "<p>The rule's attribute.</p> <p>Allowed values include:</p> <ul> <li><p>ARN: The ARN.</p></li> <li><p>FORM_FACTOR: The form factor (for example, phone or tablet).</p></li> <li><p>MANUFACTURER: The manufacturer.</p></li> <li><p>PLATFORM: The platform (for example, Android or iOS).</p></li> </ul>"
+      }
+    },
+    "DeviceFormFactor": {
+      "base": null,
+      "refs": {
+        "Device$formFactor": "<p>The device's form factor.</p> <p>Allowed values include:</p> <ul> <li><p>PHONE: The phone form factor.</p></li> <li><p>TABLET: The tablet form factor.</p></li> </ul>"
+      }
+    },
+    "DeviceMinutes": {
+      "base": "<p>Represents the total (metered or unmetered) minutes used by the resource to run tests. Contains the sum of minutes consumed by all children.</p>",
+      "refs": {
+        "Job$deviceMinutes": "<p>Represents the total (metered or unmetered) minutes used by the job.</p>",
+        "Run$deviceMinutes": "<p>Represents the total (metered or unmetered) minutes used by the test run.</p>",
+        "Suite$deviceMinutes": "<p>Represents the total (metered or unmetered) minutes used by the test suite.</p>",
+        "Test$deviceMinutes": "<p>Represents the total (metered or unmetered) minutes used by the test.</p>"
+      }
+    },
+    "DevicePlatform": {
+      "base": null,
+      "refs": {
+        "Device$platform": "<p>The device's platform.</p> <p>Allowed values include:</p> <ul> <li><p>ANDROID: The Android platform.</p></li> <li><p>IOS: The iOS platform.</p></li> </ul>",
+        "PurchasedDevicesMap$key": null,
+        "Run$platform": "<p>The run's platform.</p> <p>Allowed values include:</p> <ul> <li><p>ANDROID: The Android platform.</p></li> <li><p>IOS: The iOS platform.</p></li> </ul>"
+      }
+    },
+    "DevicePool": {
+      "base": "<p>Represents a collection of device types.</p>",
+      "refs": {
+        "CreateDevicePoolResult$devicePool": "<p>The newly created device pool.</p>",
+        "DevicePools$member": null,
+        "GetDevicePoolResult$devicePool": null,
+        "UpdateDevicePoolResult$devicePool": null
+      }
+    },
+    "DevicePoolCompatibilityResult": {
+      "base": "<p>Represents a device pool compatibility result.</p>",
+      "refs": {
+        "DevicePoolCompatibilityResults$member": null
+      }
+    },
+    "DevicePoolCompatibilityResults": {
+      "base": null,
+      "refs": {
+        "GetDevicePoolCompatibilityResult$compatibleDevices": "<p>Information about compatible devices.</p>",
+        "GetDevicePoolCompatibilityResult$incompatibleDevices": "<p>Information about incompatible devices.</p>"
+      }
+    },
+    "DevicePoolType": {
+      "base": null,
+      "refs": {
+        "DevicePool$type": "<p>The device pool's type.</p> <p>Allowed values include:</p> <ul> <li><p>CURATED: A device pool that is created and managed by AWS Device Farm.</p></li> <li><p>PRIVATE: A device pool that is created and managed by the device pool developer.</p></li> </ul>",
+        "ListDevicePoolsRequest$type": "<p>The device pools' type.</p> <p>Allowed values include:</p> <ul> <li><p>CURATED: A device pool that is created and managed by AWS Device Farm.</p></li> <li><p>PRIVATE: A device pool that is created and managed by the device pool developer.</p></li> </ul>"
+      }
+    },
+    "DevicePools": {
+      "base": null,
+      "refs": {
+        "ListDevicePoolsResult$devicePools": "<p>Information about the device pools.</p>"
+      }
+    },
+    "Devices": {
+      "base": null,
+      "refs": {
+        "ListDevicesResult$devices": "<p>Information about the devices.</p>"
+      }
+    },
+    "Double": {
+      "base": null,
+      "refs": {
+        "CPU$clock": "<p>The clock speed of the device's CPU, expressed in hertz (Hz). For example, a 1.2 GHz CPU is expressed as 1200000000.</p>",
+        "DeviceMinutes$total": "<p>When specified, represents the total minutes used by the resource to run tests.</p>",
+        "DeviceMinutes$metered": "<p>When specified, represents only the sum of metered minutes used by the resource to run tests.</p>",
+        "DeviceMinutes$unmetered": "<p>When specified, represents only the sum of unmetered minutes used by the resource to run tests.</p>",
+        "Location$latitude": "<p>The latitude.</p>",
+        "Location$longitude": "<p>The longitude.</p>"
+      }
+    },
+    "ExecutionResult": {
+      "base": null,
+      "refs": {
+        "Job$result": "<p>The job's result.</p> <p>Allowed values include:</p> <ul> <li><p>ERRORED: An error condition.</p></li> <li><p>FAILED: A failed condition.</p></li> <li><p>SKIPPED: A skipped condition.</p></li> <li><p>STOPPED: A stopped condition.</p></li> <li><p>PASSED: A passing condition.</p></li> <li><p>PENDING: A pending condition.</p></li> <li><p>WARNED: A warning condition.</p></li> </ul>",
+        "Problem$result": "<p>The problem's result.</p> <p>Allowed values include:</p> <ul> <li><p>ERRORED: An error condition.</p></li> <li><p>FAILED: A failed condition.</p></li> <li><p>SKIPPED: A skipped condition.</p></li> <li><p>STOPPED: A stopped condition.</p></li> <li><p>PASSED: A passing condition.</p></li> <li><p>PENDING: A pending condition.</p></li> <li><p>WARNED: A warning condition.</p></li> </ul>",
+        "Run$result": "<p>The run's result.</p> <p>Allowed values include:</p> <ul> <li><p>ERRORED: An error condition.</p></li> <li><p>FAILED: A failed condition.</p></li> <li><p>SKIPPED: A skipped condition.</p></li> <li><p>STOPPED: A stopped condition.</p></li> <li><p>PASSED: A passing condition.</p></li> <li><p>PENDING: A pending condition.</p></li> <li><p>WARNED: A warning condition.</p></li> </ul>",
+        "Suite$result": "<p>The suite's result.</p> <p>Allowed values include:</p> <ul> <li><p>ERRORED: An error condition.</p></li> <li><p>FAILED: A failed condition.</p></li> <li><p>SKIPPED: A skipped condition.</p></li> <li><p>STOPPED: A stopped condition.</p></li> <li><p>PASSED: A passing condition.</p></li> <li><p>PENDING: A pending condition.</p></li> <li><p>WARNED: A warning condition.</p></li> </ul>",
+        "Test$result": "<p>The test's result.</p> <p>Allowed values include:</p> <ul> <li><p>ERRORED: An error condition.</p></li> <li><p>FAILED: A failed condition.</p></li> <li><p>SKIPPED: A skipped condition.</p></li> <li><p>STOPPED: A stopped condition.</p></li> <li><p>PASSED: A passing condition.</p></li> <li><p>PENDING: A pending condition.</p></li> <li><p>WARNED: A warning condition.</p></li> </ul>",
+        "UniqueProblemsByExecutionResultMap$key": null
+      }
+    },
+    "ExecutionStatus": {
+      "base": null,
+      "refs": {
+        "Job$status": "<p>The job's status.</p> <p>Allowed values include:</p> <ul> <li><p>COMPLETED: A completed status.</p></li> <li><p>PENDING: A pending status.</p></li> <li><p>PROCESSING: A processing status.</p></li> <li><p>RUNNING: A running status.</p></li> <li><p>SCHEDULING: A scheduling status.</p></li> </ul>",
+        "Run$status": "<p>The run's status.</p> <p>Allowed values include:</p> <ul> <li><p>COMPLETED: A completed status.</p></li> <li><p>PENDING: A pending status.</p></li> <li><p>PROCESSING: A processing status.</p></li> <li><p>RUNNING: A running status.</p></li> <li><p>SCHEDULING: A scheduling status.</p></li> </ul>",
+        "Suite$status": "<p>The suite's status.</p> <p>Allowed values include:</p> <ul> <li><p>COMPLETED: A completed status.</p></li> <li><p>PENDING: A pending status.</p></li> <li><p>PROCESSING: A processing status.</p></li> <li><p>RUNNING: A running status.</p></li> <li><p>SCHEDULING: A scheduling status.</p></li> </ul>",
+        "Test$status": "<p>The test's status.</p> <p>Allowed values include:</p> <ul> <li><p>COMPLETED: A completed status.</p></li> <li><p>PENDING: A pending status.</p></li> <li><p>PROCESSING: A processing status.</p></li> <li><p>RUNNING: A running status.</p></li> <li><p>SCHEDULING: A scheduling status.</p></li> </ul>"
+      }
+    },
+    "Filter": {
+      "base": null,
+      "refs": {
+        "ScheduleRunTest$filter": "<p>The test's filter.</p>"
+      }
+    },
+    "GetAccountSettingsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAccountSettingsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDevicePoolCompatibilityRequest": {
+      "base": "<p>Represents a request to the get device pool compatibility operation.</p>",
+      "refs": {
+      }
+    },
+    "GetDevicePoolCompatibilityResult": {
+      "base": "<p>Represents the result of describe device pool compatibility request.</p>",
+      "refs": {
+      }
+    },
+    "GetDevicePoolRequest": {
+      "base": "<p>Represents a request to the get device pool operation.</p>",
+      "refs": {
+      }
+    },
+    "GetDevicePoolResult": {
+      "base": "<p>Represents the result of a get device pool request.</p>",
+      "refs": {
+      }
+    },
+    "GetDeviceRequest": {
+      "base": "<p>Represents a request to the get device request.</p>",
+      "refs": {
+      }
+    },
+    "GetDeviceResult": {
+      "base": "<p>Represents the result of a get device request.</p>",
+      "refs": {
+      }
+    },
+    "GetJobRequest": {
+      "base": "<p>Represents a request to the get job operation.</p>",
+      "refs": {
+      }
+    },
+    "GetJobResult": {
+      "base": "<p>Represents the result of a get job request.</p>",
+      "refs": {
+      }
+    },
+    "GetProjectRequest": {
+      "base": "<p>Represents a request to the get project operation.</p>",
+      "refs": {
+      }
+    },
+    "GetProjectResult": {
+      "base": "<p>Represents the result of a get project request.</p>",
+      "refs": {
+      }
+    },
+    "GetRunRequest": {
+      "base": "<p>Represents a request to the get run operation.</p>",
+      "refs": {
+      }
+    },
+    "GetRunResult": {
+      "base": "<p>Represents the result of a get run request.</p>",
+      "refs": {
+      }
+    },
+    "GetSuiteRequest": {
+      "base": "<p>Represents a request to the get suite operation.</p>",
+      "refs": {
+      }
+    },
+    "GetSuiteResult": {
+      "base": "<p>Represents the result of a get suite request.</p>",
+      "refs": {
+      }
+    },
+    "GetTestRequest": {
+      "base": "<p>Represents a request to the get test operation.</p>",
+      "refs": {
+      }
+    },
+    "GetTestResult": {
+      "base": "<p>Represents the result of a get test request.</p>",
+      "refs": {
+      }
+    },
+    "GetUploadRequest": {
+      "base": "<p>Represents a request to the get upload operation.</p>",
+      "refs": {
+      }
+    },
+    "GetUploadResult": {
+      "base": "<p>Represents the result of a get upload request.</p>",
+      "refs": {
+      }
+    },
+    "IdempotencyException": {
+      "base": "<p>An entity with the same name already exists.</p>",
+      "refs": {
+      }
+    },
+    "IncompatibilityMessage": {
+      "base": "<p>Represents information about incompatibility.</p>",
+      "refs": {
+        "IncompatibilityMessages$member": null
+      }
+    },
+    "IncompatibilityMessages": {
+      "base": null,
+      "refs": {
+        "DevicePoolCompatibilityResult$incompatibilityMessages": "<p>Information about the compatibility.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "Counters$total": "<p>The total number of entities.</p>",
+        "Counters$passed": "<p>The number of passed entities.</p>",
+        "Counters$failed": "<p>The number of failed entities.</p>",
+        "Counters$warned": "<p>The number of warned entities.</p>",
+        "Counters$errored": "<p>The number of errored entities.</p>",
+        "Counters$stopped": "<p>The number of stopped entities.</p>",
+        "Counters$skipped": "<p>The number of skipped entities.</p>",
+        "PurchasedDevicesMap$value": null,
+        "Resolution$width": "<p>The screen resolution's width, expressed in pixels.</p>",
+        "Resolution$height": "<p>The screen resolution's height, expressed in pixels.</p>",
+        "Run$totalJobs": "<p>The total number of jobs for the run.</p>",
+        "Run$completedJobs": "<p>The total number of completed jobs.</p>"
+      }
+    },
+    "Job": {
+      "base": "<p>Represents a device.</p>",
+      "refs": {
+        "GetJobResult$job": null,
+        "Jobs$member": null
+      }
+    },
+    "Jobs": {
+      "base": null,
+      "refs": {
+        "ListJobsResult$jobs": "<p>Information about the jobs.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>A limit was exceeded.</p>",
+      "refs": {
+      }
+    },
+    "ListArtifactsRequest": {
+      "base": "<p>Represents a request to the list artifacts operation.</p>",
+      "refs": {
+      }
+    },
+    "ListArtifactsResult": {
+      "base": "<p>Represents the result of a list artifacts operation.</p>",
+      "refs": {
+      }
+    },
+    "ListDevicePoolsRequest": {
+      "base": "<p>Represents the result of a list device pools request.</p>",
+      "refs": {
+      }
+    },
+    "ListDevicePoolsResult": {
+      "base": "<p>Represents the result of a list device pools request.</p>",
+      "refs": {
+      }
+    },
+    "ListDevicesRequest": {
+      "base": "<p>Represents the result of a list devices request.</p>",
+      "refs": {
+      }
+    },
+    "ListDevicesResult": {
+      "base": "<p>Represents the result of a list devices operation.</p>",
+      "refs": {
+      }
+    },
+    "ListJobsRequest": {
+      "base": "<p>Represents a request to the list jobs operation.</p>",
+      "refs": {
+      }
+    },
+    "ListJobsResult": {
+      "base": "<p>Represents the result of a list jobs request.</p>",
+      "refs": {
+      }
+    },
+    "ListProjectsRequest": {
+      "base": "<p>Represents a request to the list projects operation.</p>",
+      "refs": {
+      }
+    },
+    "ListProjectsResult": {
+      "base": "<p>Represents the result of a list projects request.</p>",
+      "refs": {
+      }
+    },
+    "ListRunsRequest": {
+      "base": "<p>Represents a request to the list runs operation.</p>",
+      "refs": {
+      }
+    },
+    "ListRunsResult": {
+      "base": "<p>Represents the result of a list runs request.</p>",
+      "refs": {
+      }
+    },
+    "ListSamplesRequest": {
+      "base": "<p>Represents a request to the list samples operation.</p>",
+      "refs": {
+      }
+    },
+    "ListSamplesResult": {
+      "base": "<p>Represents the result of a list samples request.</p>",
+      "refs": {
+      }
+    },
+    "ListSuitesRequest": {
+      "base": "<p>Represents a request to the list suites operation.</p>",
+      "refs": {
+      }
+    },
+    "ListSuitesResult": {
+      "base": "<p>Represents the result of a list suites request.</p>",
+      "refs": {
+      }
+    },
+    "ListTestsRequest": {
+      "base": "<p>Represents a request to the list tests operation.</p>",
+      "refs": {
+      }
+    },
+    "ListTestsResult": {
+      "base": "<p>Represents the result of a list tests request.</p>",
+      "refs": {
+      }
+    },
+    "ListUniqueProblemsRequest": {
+      "base": "<p>Represents a request to the list unique problems operation.</p>",
+      "refs": {
+      }
+    },
+    "ListUniqueProblemsResult": {
+      "base": "<p>Represents the result of a list unique problems request.</p>",
+      "refs": {
+      }
+    },
+    "ListUploadsRequest": {
+      "base": "<p>Represents a request to the list uploads operation.</p>",
+      "refs": {
+      }
+    },
+    "ListUploadsResult": {
+      "base": "<p>Represents the result of a list uploads request.</p>",
+      "refs": {
+      }
+    },
+    "Location": {
+      "base": "<p>Represents a latitude and longitude pair, expressed in geographic coordinate system degrees (for example 47.6204, -122.3491).</p> <p>Elevation is currently not supported.</p>",
+      "refs": {
+        "ScheduleRunConfiguration$location": "<p>Information about the location that is used for the run.</p>"
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "Device$heapSize": "<p>The device's heap size, expressed in bytes.</p>",
+        "Device$memory": "<p>The device's total memory size, expressed in bytes.</p>"
+      }
+    },
+    "Message": {
+      "base": null,
+      "refs": {
+        "ArgumentException$message": "<p>Any additional information about the exception.</p>",
+        "CreateDevicePoolRequest$description": "<p>The device pool's description.</p>",
+        "DevicePool$description": "<p>The device pool's description.</p>",
+        "IdempotencyException$message": "<p>Any additional information about the exception.</p>",
+        "IncompatibilityMessage$message": "<p>A message about the incompatibility.</p>",
+        "Job$message": "<p>A message about the job's result.</p>",
+        "LimitExceededException$message": "<p>Any additional information about the exception.</p>",
+        "NotFoundException$message": "<p>Any additional information about the exception.</p>",
+        "Problem$message": "<p>A message about the problem's result.</p>",
+        "Run$message": "<p>A message about the run's result.</p>",
+        "ServiceAccountException$message": "<p>Any additional information about the exception.</p>",
+        "Suite$message": "<p>A message about the suite's result.</p>",
+        "Test$message": "<p>A message about the test's result.</p>",
+        "UniqueProblem$message": "<p>A message about the unique problems' result.</p>",
+        "UpdateDevicePoolRequest$description": "<p>A description of the device pool you wish to update.</p>",
+        "Upload$message": "<p>A message about the upload's result.</p>"
+      }
+    },
+    "Metadata": {
+      "base": null,
+      "refs": {
+        "Upload$metadata": "<p>The upload's metadata. For example, for Android, this contains information that is parsed from the manifest and is displayed in the AWS Device Farm console after the associated app is uploaded.</p>"
+      }
+    },
+    "Name": {
+      "base": null,
+      "refs": {
+        "Artifact$name": "<p>The artifact's name.</p>",
+        "CreateDevicePoolRequest$name": "<p>The device pool's name.</p>",
+        "CreateProjectRequest$name": "<p>The project's name.</p>",
+        "CreateUploadRequest$name": "<p>The upload's file name.</p>",
+        "Device$name": "<p>The device's display name.</p>",
+        "DevicePool$name": "<p>The device pool's name.</p>",
+        "Job$name": "<p>The job's name.</p>",
+        "ProblemDetail$name": "<p>The problem detail's name.</p>",
+        "Project$name": "<p>The project's name.</p>",
+        "Run$name": "<p>The run's name.</p>",
+        "ScheduleRunRequest$name": "<p>The name for the run to be scheduled.</p>",
+        "Suite$name": "<p>The suite's name.</p>",
+        "Test$name": "<p>The test's name.</p>",
+        "UpdateDevicePoolRequest$name": "<p>A string representing the name of the device pool you wish to update.</p>",
+        "UpdateProjectRequest$name": "<p>A string representing the new name of the project that you are updating.</p>",
+        "Upload$name": "<p>The upload's file name.</p>"
+      }
+    },
+    "NotFoundException": {
+      "base": "<p>The specified entity was not found.</p>",
+      "refs": {
+      }
+    },
+    "PaginationToken": {
+      "base": null,
+      "refs": {
+        "ListArtifactsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListArtifactsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListDevicePoolsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListDevicePoolsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListDevicesRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListDevicesResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListJobsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListJobsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListProjectsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListProjectsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListRunsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListRunsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListSamplesRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListSamplesResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListSuitesRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListSuitesResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListTestsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListTestsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListUniqueProblemsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListUniqueProblemsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>",
+        "ListUploadsRequest$nextToken": "<p>An identifier that was returned from the previous call to this operation, which can be used to return the next set of items in the list.</p>",
+        "ListUploadsResult$nextToken": "<p>If the number of items that are returned is significantly large, this is an identifier that is also returned, which can be used in a subsequent call to this operation to return the next set of items in the list.</p>"
+      }
+    },
+    "Problem": {
+      "base": "<p>Represents a specific warning or failure.</p>",
+      "refs": {
+        "Problems$member": null
+      }
+    },
+    "ProblemDetail": {
+      "base": "<p>Information about a problem detail.</p>",
+      "refs": {
+        "Problem$run": "<p>Information about the associated run.</p>",
+        "Problem$job": "<p>Information about the associated job.</p>",
+        "Problem$suite": "<p>Information about the associated suite.</p>",
+        "Problem$test": "<p>Information about the associated test.</p>"
+      }
+    },
+    "Problems": {
+      "base": null,
+      "refs": {
+        "UniqueProblem$problems": "<p>Information about the problems.</p>"
+      }
+    },
+    "Project": {
+      "base": "<p>Represents an operating-system neutral workspace for running and managing tests.</p>",
+      "refs": {
+        "CreateProjectResult$project": "<p>The newly created project.</p>",
+        "GetProjectResult$project": null,
+        "Projects$member": null,
+        "UpdateProjectResult$project": null
+      }
+    },
+    "Projects": {
+      "base": null,
+      "refs": {
+        "ListProjectsResult$projects": "<p>Information about the projects.</p>"
+      }
+    },
+    "PurchasedDevicesMap": {
+      "base": null,
+      "refs": {
+        "AccountSettings$unmeteredDevices": "<p>Returns the unmetered devices you have purchased.</p>"
+      }
+    },
+    "Radios": {
+      "base": "<p>Represents the set of radios and their states on a device. Examples of radios include Wi-Fi, GPS, Bluetooth, and NFC.</p>",
+      "refs": {
+        "ScheduleRunConfiguration$radios": "<p>Information about the radio states for the run.</p>"
+      }
+    },
+    "Resolution": {
+      "base": "<p>Represents the screen resolution of a device in height and width, expressed in pixels.</p>",
+      "refs": {
+        "Device$resolution": null
+      }
+    },
+    "Rule": {
+      "base": "<p>Represents a condition for a device pool.</p>",
+      "refs": {
+        "Rules$member": null
+      }
+    },
+    "RuleOperator": {
+      "base": null,
+      "refs": {
+        "Rule$operator": "<p>The rule's operator.</p> <ul> <li><p>EQUALS: The equals operator.</p></li> <li><p>GREATER_THAN: The greater-than operator.</p></li> <li><p>IN: The in operator.</p></li> <li><p>LESS_THAN: The less-than operator.</p></li> <li><p>NOT_IN: The not-in operator.</p></li> </ul>"
+      }
+    },
+    "Rules": {
+      "base": null,
+      "refs": {
+        "CreateDevicePoolRequest$rules": "<p>The device pool's rules.</p>",
+        "DevicePool$rules": "<p>Information about the device pool's rules.</p>",
+        "UpdateDevicePoolRequest$rules": "<p>Represents the rules you wish to modify for the device pool. Updating rules is optional; however, if you choose to update rules for your request, the update will replace the existing rules.</p>"
+      }
+    },
+    "Run": {
+      "base": "<p>Represents an app on a set of devices with a specific test and configuration.</p>",
+      "refs": {
+        "GetRunResult$run": null,
+        "Runs$member": null,
+        "ScheduleRunResult$run": "<p>Information about the scheduled run.</p>"
+      }
+    },
+    "Runs": {
+      "base": null,
+      "refs": {
+        "ListRunsResult$runs": "<p>Information about the runs.</p>"
+      }
+    },
+    "Sample": {
+      "base": "<p>Represents a sample of performance data.</p>",
+      "refs": {
+        "Samples$member": null
+      }
+    },
+    "SampleType": {
+      "base": null,
+      "refs": {
+        "Sample$type": "<p>The sample's type.</p> <p>Must be one of the following values:</p> <ul> <li><p>CPU: A CPU sample type. This is expressed as the app processing CPU time (including child processes) as reported by process, as a percentage.</p></li> <li><p>MEMORY: A memory usage sample type. This is expressed as the total proportional set size of an app process, in kilobytes.</p></li> <li><p>NATIVE_AVG_DRAWTIME</p></li> <li><p>NATIVE_FPS</p></li> <li><p>NATIVE_FRAMES</p></li> <li><p>NATIVE_MAX_DRAWTIME</p></li> <li><p>NATIVE_MIN_DRAWTIME</p></li> <li><p>OPENGL_AVG_DRAWTIME</p></li> <li><p>OPENGL_FPS</p></li> <li><p>OPENGL_FRAMES</p></li> <li><p>OPENGL_MAX_DRAWTIME</p></li> <li><p>OPENGL_MIN_DRAWTIME</p></li> <li><p>RX</p></li> <li><p>RX_RATE: The total number of bytes per second (TCP and UDP) that are sent, by app process.</p></li> <li><p>THREADS: A threads sample type. This is expressed as the total number of threads per app process.</p></li> <li><p>TX</p></li> <li><p>TX_RATE: The total number of bytes per second (TCP and UDP) that are received, by app process.</p></li> </ul>"
+      }
+    },
+    "Samples": {
+      "base": null,
+      "refs": {
+        "ListSamplesResult$samples": "<p>Information about the samples.</p>"
+      }
+    },
+    "ScheduleRunConfiguration": {
+      "base": "<p>Represents the settings for a run. Includes things like location, radio states, auxiliary apps, and network profiles.</p>",
+      "refs": {
+        "ScheduleRunRequest$configuration": "<p>Information about the settings for the run to be scheduled.</p>"
+      }
+    },
+    "ScheduleRunRequest": {
+      "base": "<p>Represents a request to the schedule run operation.</p>",
+      "refs": {
+      }
+    },
+    "ScheduleRunResult": {
+      "base": "<p>Represents the result of a schedule run request.</p>",
+      "refs": {
+      }
+    },
+    "ScheduleRunTest": {
+      "base": "<p>Represents additional test settings.</p>",
+      "refs": {
+        "ScheduleRunRequest$test": "<p>Information about the test for the run to be scheduled.</p>"
+      }
+    },
+    "ServiceAccountException": {
+      "base": "<p>There was a problem with the service account.</p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "Artifact$extension": "<p>The artifact's file extension.</p>",
+        "CPU$frequency": "<p>The CPU's frequency.</p>",
+        "CPU$architecture": "<p>The CPU's architecture, for example x86 or ARM.</p>",
+        "Device$manufacturer": "<p>The device's manufacturer name.</p>",
+        "Device$model": "<p>The device's model name.</p>",
+        "Device$os": "<p>The device's operating system type.</p>",
+        "Device$image": "<p>The device's image name.</p>",
+        "Device$carrier": "<p>The device's carrier.</p>",
+        "Device$radio": "<p>The device's radio.</p>",
+        "Rule$value": "<p>The rule's value.</p>",
+        "ScheduleRunConfiguration$locale": "<p>Information about the locale that is used for the run.</p>",
+        "TestParameters$key": null,
+        "TestParameters$value": null
+      }
+    },
+    "Suite": {
+      "base": "<p>Represents a collection of one or more tests.</p>",
+      "refs": {
+        "GetSuiteResult$suite": null,
+        "Suites$member": null
+      }
+    },
+    "Suites": {
+      "base": null,
+      "refs": {
+        "ListSuitesResult$suites": "<p>Information about the suites.</p>"
+      }
+    },
+    "Test": {
+      "base": "<p>Represents a condition that is evaluated.</p>",
+      "refs": {
+        "GetTestResult$test": null,
+        "Tests$member": null
+      }
+    },
+    "TestParameters": {
+      "base": null,
+      "refs": {
+        "ScheduleRunTest$parameters": "<p>The test's parameters, such as test framework parameters and fixture settings.</p>"
+      }
+    },
+    "TestType": {
+      "base": null,
+      "refs": {
+        "GetDevicePoolCompatibilityRequest$testType": "<p>The test type for the specified device pool.</p> <p>Allowed values include the following:</p> <ul> <li><p>BUILTIN_FUZZ: The built-in fuzz type.</p></li> <li><p>BUILTIN_EXPLORER: For Android, an app explorer that will traverse an Android app, interacting with it and capturing screenshots at the same time.</p></li> <li><p>APPIUM_JAVA_JUNIT: The Appium Java JUnit type.</p></li> <li><p>APPIUM_JAVA_TESTNG: The Appium Java TestNG type.</p></li> <li><p>CALABASH: The Calabash type.</p></li> <li><p>INSTRUMENTATION: The Instrumentation type.</p></li> <li><p>UIAUTOMATION: The uiautomation type.</p></li> <li><p>UIAUTOMATOR: The uiautomator type.</p></li> <li><p>XCTEST: The XCode test type.</p></li> </ul>",
+        "Job$type": "<p>The job's type.</p> <p>Allowed values include the following:</p> <ul> <li><p>BUILTIN_FUZZ: The built-in fuzz type.</p></li> <li><p>BUILTIN_EXPLORER: For Android, an app explorer that will traverse an Android app, interacting with it and capturing screenshots at the same time.</p></li> <li><p>APPIUM_JAVA_JUNIT: The Appium Java JUnit type.</p></li> <li><p>APPIUM_JAVA_TESTNG: The Appium Java TestNG type.</p></li> <li><p>CALABASH: The Calabash type.</p></li> <li><p>INSTRUMENTATION: The Instrumentation type.</p></li> <li><p>UIAUTOMATION: The uiautomation type.</p></li> <li><p>UIAUTOMATOR: The uiautomator type.</p></li> <li><p>XCTEST: The XCode test type.</p></li> </ul>",
+        "Run$type": "<p>The run's type.</p> <p>Must be one of the following values:</p> <ul> <li><p>BUILTIN_FUZZ: The built-in fuzz type.</p></li> <li><p>BUILTIN_EXPLORER: For Android, an app explorer that will traverse an Android app, interacting with it and capturing screenshots at the same time.</p></li> <li><p>APPIUM_JAVA_JUNIT: The Appium Java JUnit type.</p></li> <li><p>APPIUM_JAVA_TESTNG: The Appium Java TestNG type.</p></li> <li><p>CALABASH: The Calabash type.</p></li> <li><p>INSTRUMENTATION: The Instrumentation type.</p></li> <li><p>UIAUTOMATION: The uiautomation type.</p></li> <li><p>UIAUTOMATOR: The uiautomator type.</p></li> <li><p>XCTEST: The XCode test type.</p></li> </ul>",
+        "ScheduleRunTest$type": "<p>The test's type.</p> <p>Must be one of the following values:</p> <ul> <li><p>BUILTIN_FUZZ: The built-in fuzz type.</p></li> <li><p>BUILTIN_EXPLORER: For Android, an app explorer that will traverse an Android app, interacting with it and capturing screenshots at the same time.</p></li> <li><p>APPIUM_JAVA_JUNIT: The Appium Java JUnit type.</p></li> <li><p>APPIUM_JAVA_TESTNG: The Appium Java TestNG type.</p></li> <li><p>CALABASH: The Calabash type.</p></li> <li><p>INSTRUMENTATION: The Instrumentation type.</p></li> <li><p>UIAUTOMATION: The uiautomation type.</p></li> <li><p>UIAUTOMATOR: The uiautomator type.</p></li> <li><p>XCTEST: The XCode test type.</p></li> </ul>",
+        "Suite$type": "<p>The suite's type.</p> <p>Must be one of the following values:</p> <ul> <li><p>BUILTIN_FUZZ: The built-in fuzz type.</p></li> <li><p>BUILTIN_EXPLORER: For Android, an app explorer that will traverse an Android app, interacting with it and capturing screenshots at the same time.</p></li> <li><p>APPIUM_JAVA_JUNIT: The Appium Java JUnit type.</p></li> <li><p>APPIUM_JAVA_TESTNG: The Appium Java TestNG type.</p></li> <li><p>CALABASH: The Calabash type.</p></li> <li><p>INSTRUMENTATION: The Instrumentation type.</p></li> <li><p>UIAUTOMATION: The uiautomation type.</p></li> <li><p>UIAUTOMATOR: The uiautomator type.</p></li> <li><p>XCTEST: The XCode test type.</p></li> </ul>",
+        "Test$type": "<p>The test's type.</p> <p>Must be one of the following values:</p> <ul> <li><p>BUILTIN_FUZZ: The built-in fuzz type.</p></li> <li><p>BUILTIN_EXPLORER: For Android, an app explorer that will traverse an Android app, interacting with it and capturing screenshots at the same time.</p></li> <li><p>APPIUM_JAVA_JUNIT: The Appium Java JUnit type.</p></li> <li><p>APPIUM_JAVA_TESTNG: The Appium Java TestNG type.</p></li> <li><p>CALABASH: The Calabash type.</p></li> <li><p>INSTRUMENTATION: The Instrumentation type.</p></li> <li><p>UIAUTOMATION: The uiautomation type.</p></li> <li><p>UIAUTOMATOR: The uiautomator type.</p></li> <li><p>XCTEST: The XCode test type.</p></li> </ul>"
+      }
+    },
+    "Tests": {
+      "base": null,
+      "refs": {
+        "ListTestsResult$tests": "<p>Information about the tests.</p>"
+      }
+    },
+    "URL": {
+      "base": null,
+      "refs": {
+        "Artifact$url": "<p>The pre-signed Amazon S3 URL that can be used with a corresponding GET request to download the artifact's file.</p>",
+        "Sample$url": "<p>The pre-signed Amazon S3 URL that can be used with a corresponding GET request to download the sample's file.</p>",
+        "Upload$url": "<p>The pre-signed Amazon S3 URL that was used to store a file through a corresponding PUT request.</p>"
+      }
+    },
+    "UniqueProblem": {
+      "base": "<p>A collection of one or more problems, grouped by their result.</p>",
+      "refs": {
+        "UniqueProblems$member": null
+      }
+    },
+    "UniqueProblems": {
+      "base": null,
+      "refs": {
+        "UniqueProblemsByExecutionResultMap$value": null
+      }
+    },
+    "UniqueProblemsByExecutionResultMap": {
+      "base": null,
+      "refs": {
+        "ListUniqueProblemsResult$uniqueProblems": "<p>Information about the unique problems.</p> <p>Allowed values include:</p> <ul> <li><p>ERRORED: An error condition.</p></li> <li><p>FAILED: A failed condition.</p></li> <li><p>SKIPPED: A skipped condition.</p></li> <li><p>STOPPED: A stopped condition.</p></li> <li><p>PASSED: A passing condition.</p></li> <li><p>PENDING: A pending condition.</p></li> <li><p>WARNED: A warning condition.</p></li> </ul>"
+      }
+    },
+    "UpdateDevicePoolRequest": {
+      "base": "<p>Represents a request to the update device pool operation.</p>",
+      "refs": {
+      }
+    },
+    "UpdateDevicePoolResult": {
+      "base": "<p>Represents the result of an update device pool request.</p>",
+      "refs": {
+      }
+    },
+    "UpdateProjectRequest": {
+      "base": "<p>Represents a request to the update project operation.</p>",
+      "refs": {
+      }
+    },
+    "UpdateProjectResult": {
+      "base": "<p>Represents the result of an update project request.</p>",
+      "refs": {
+      }
+    },
+    "Upload": {
+      "base": "<p>An app or a set of one or more tests to upload or that have been uploaded.</p>",
+      "refs": {
+        "CreateUploadResult$upload": "<p>The newly created upload.</p>",
+        "GetUploadResult$upload": null,
+        "Uploads$member": null
+      }
+    },
+    "UploadStatus": {
+      "base": null,
+      "refs": {
+        "Upload$status": "<p>The upload's status.</p> <p>Must be one of the following values:</p> <ul> <li><p>FAILED: A failed status.</p></li> <li><p>INITIALIZED: An initialized status.</p></li> <li><p>PROCESSING: A processing status.</p></li> <li><p>SUCCEEDED: A succeeded status.</p></li> </ul>"
+      }
+    },
+    "UploadType": {
+      "base": null,
+      "refs": {
+        "CreateUploadRequest$type": "<p>The upload's upload type.</p> <p>Must be one of the following values:</p> <ul> <li><p>ANDROID_APP: An Android upload.</p></li> <li><p>IOS_APP: An iOS upload.</p></li> <li><p>EXTERNAL_DATA: An external data upload.</p></li> <li><p>APPIUM_JAVA_JUNIT_TEST_PACKAGE: An Appium Java JUnit test package upload.</p></li> <li><p>APPIUM_JAVA_TESTNG_TEST_PACKAGE: An Appium Java TestNG test package upload.</p></li> <li><p>CALABASH_TEST_PACKAGE: A Calabash test package upload.</p></li> <li><p>INSTRUMENTATION_TEST_PACKAGE: An instrumentation upload.</p></li> <li><p>UIAUTOMATOR_TEST_PACKAGE: A uiautomator test package upload.</p></li> <li><p>XCTEST_TEST_PACKAGE: An XCode test package upload.</p></li> <li><p>APPIUM_WEB_JAVA_JUNIT_TEST_PACKAGE: An Appium Java JUnit test package upload.</p></li> <li><p>APPIUM_WEB_JAVA_TESTNG_TEST_PACKAGE: An Appium Java TestNG test package upload.</p></li> </ul> <p><b>Note</b> If you call <code>CreateUpload</code> with <code>WEB_APP</code> specified, AWS Device Farm throws an <a>ArgumentException</a> error.</p>",
+        "Upload$type": "<p>The upload's type.</p> <p>Must be one of the following values:</p> <ul> <li><p>ANDROID_APP: An Android upload.</p></li> <li><p>IOS_APP: An iOS upload.</p></li> <li><p>EXTERNAL_DATA: An external data upload.</p></li> <li><p>APPIUM_JAVA_JUNIT_TEST_PACKAGE: An Appium Java JUnit test package upload.</p></li> <li><p>APPIUM_JAVA_TESTNG_TEST_PACKAGE: An Appium Java TestNG test package upload.</p></li> <li><p>CALABASH_TEST_PACKAGE: A Calabash test package upload.</p></li> <li><p>INSTRUMENTATION_TEST_PACKAGE: An instrumentation upload.</p></li> <li><p>UIAUTOMATOR_TEST_PACKAGE: A uiautomator test package upload.</p></li> <li><p>XCTEST_TEST_PACKAGE: An XCode test package upload.</p></li> <li><p>APPIUM_WEB_JAVA_JUNIT_TEST_PACKAGE: An Appium Java JUnit test package upload.</p></li> <li><p>APPIUM_WEB_JAVA_TESTNG_TEST_PACKAGE: An Appium Java TestNG test package upload.</p></li> </ul>"
+      }
+    },
+    "Uploads": {
+      "base": null,
+      "refs": {
+        "ListUploadsResult$uploads": "<p>Information about the uploads.</p>"
+      }
+    }
+  }
+}

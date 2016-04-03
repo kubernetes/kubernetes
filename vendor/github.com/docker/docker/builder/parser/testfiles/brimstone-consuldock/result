@@ -1,0 +1,5 @@
+(from "brimstone/ubuntu:14.04")
+(maintainer "brimstone@the.narro.ws")
+(env "GOPATH" "/go")
+(entrypoint "/usr/local/bin/consuldock")
+(run "apt-get update \t&& dpkg -l | awk '/^ii/ {print $2}' > /tmp/dpkg.clean     && apt-get install -y --no-install-recommends git golang ca-certificates     && apt-get clean     && rm -rf /var/lib/apt/lists \t&& go get -v github.com/brimstone/consuldock     && mv $GOPATH/bin/consuldock /usr/local/bin/consuldock \t&& dpkg -l | awk '/^ii/ {print $2}' > /tmp/dpkg.dirty \t&& apt-get remove --purge -y $(diff /tmp/dpkg.clean /tmp/dpkg.dirty | awk '/^>/ {print $2}') \t&& rm /tmp/dpkg.* \t&& rm -rf $GOPATH")

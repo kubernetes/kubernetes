@@ -1,0 +1,30 @@
+package mesosproto;
+
+import "mesos.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+// For use with detector callbacks
+message InternalMasterChangeDetected {
+	// will be present if there's a new master, otherwise nil
+	optional MasterInfo master = 1;
+}
+
+message InternalTryAuthentication {
+	// empty message, serves as a signal to the scheduler bindings
+}
+
+message InternalAuthenticationResult {
+	// true only if the authentication process completed and login was successful
+	required bool success = 1;
+	// true if the authentication process completed, successfully or not
+	required bool completed = 2;
+	// master pid that this result pertains to
+	required string pid = 3;
+}
+
+message InternalNetworkError {
+	// master pid that this event pertains to
+	required string pid = 1;
+	// driver session UUID
+	optional string session = 2;
+}

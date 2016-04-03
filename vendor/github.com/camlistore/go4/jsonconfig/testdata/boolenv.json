@@ -1,0 +1,11 @@
+{
+ "emptystr": ["_env", "${TEST_EMPTY}", ""],
+ "def_false": ["_env", "${TEST_EMPTY}", false],
+ "def_true": ["_env", "${TEST_EMPTY}", true],
+ "set_true_def_false": ["_env", "${TEST_TRUE}", false],
+ "set_false_def_true": ["_env", "${TEST_FALSE}", true],
+ "one": ["_env", "${TEST_ONE}"],
+ "zero": ["_env", "${TEST_ZERO}"],
+ "lit_true": true,
+ "lit_false": false
+}

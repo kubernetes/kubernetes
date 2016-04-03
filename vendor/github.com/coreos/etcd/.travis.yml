@@ -1,0 +1,25 @@
+language: go
+sudo: false
+
+go:
+  - 1.4
+  - 1.5
+  - 1.6
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+
+addons:
+  apt:
+    packages:
+    - libpcap-dev
+    - libaspell-dev
+    - libhunspell-dev
+
+before_install:
+ - go get -v github.com/chzchzchz/goword
+
+script:
+ - ./test

@@ -1,0 +1,52 @@
+#!/bin/bash -e
+#
+# Run all CNI tests 
+#   ./test
+#   ./test -v
+#
+# Run tests for one package
+#   PKG=./plugins/ipam/dhcp ./test
+#
+
+source ./build
+
+TESTABLE="plugins/ipam/dhcp"
+FORMATTABLE="$TESTABLE libcni pkg/ip pkg/ns pkg/invoke pkg/types pkg/ipam pkg/skel plugins/ipam/host-local plugins/main/bridge plugins/meta/flannel"
+
+# user has not provided PKG override
+if [ -z "$PKG" ]; then
+	TEST=$TESTABLE
+	FMT=$FORMATTABLE
+
+# user has provided PKG override
+else
+	# strip out slashes and dots from PKG=./foo/
+	TEST=${PKG//\//}
+	TEST=${TEST//./}
+
+	# only run gofmt on packages provided by user
+	FMT="$TEST"
+fi
+
+# split TEST into an array and prepend REPO_PATH to each local package
+split=(${TEST// / })
+TEST=${split[@]/#/${REPO_PATH}/}
+
+echo "Running tests..."
+go test ${COVER} $@ ${TEST}
+
+echo "Checking gofmt..."
+fmtRes=$(gofmt -l $FMT)
+if [ -n "${fmtRes}" ]; then
+	echo -e "gofmt checking failed:\n${fmtRes}"
+	exit 255
+fi
+
+echo "Checking govet..."
+vetRes=$(go vet $TEST)
+if [ -n "${vetRes}" ]; then
+	echo -e "govet checking failed:\n${vetRes}"
+	exit 255
+fi
+
+echo "Success"

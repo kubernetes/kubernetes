@@ -1,0 +1,65 @@
+// Copyright (c) 2015, Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package google.bigtable.admin.table.v1;
+
+import "google.golang.org/cloud/bigtable/internal/table_data_proto/bigtable_table_data.proto";
+import "google.golang.org/cloud/bigtable/internal/table_service_proto/bigtable_table_service_messages.proto";
+import "google.golang.org/cloud/bigtable/internal/empty/empty.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "BigtableTableServicesProto";
+option java_package = "com.google.bigtable.admin.table.v1";
+
+
+// Service for creating, configuring, and deleting Cloud Bigtable tables.
+// Provides access to the table schemas only, not the data stored within the tables.
+service BigtableTableService {
+  // Creates a new table, to be served from a specified cluster.
+  // The table can be created with a full set of initial column families,
+  // specified in the request.
+  rpc CreateTable(CreateTableRequest) returns (Table) {
+  }
+
+  // Lists the names of all tables served from a specified cluster.
+  rpc ListTables(ListTablesRequest) returns (ListTablesResponse) {
+  }
+
+  // Gets the schema of the specified table, including its column families.
+  rpc GetTable(GetTableRequest) returns (Table) {
+  }
+
+  // Permanently deletes a specified table and all of its data.
+  rpc DeleteTable(DeleteTableRequest) returns (google.protobuf.Empty) {
+  }
+
+  // Changes the name of a specified table.
+  // Cannot be used to move tables between clusters, zones, or projects.
+  rpc RenameTable(RenameTableRequest) returns (google.protobuf.Empty) {
+  }
+
+  // Creates a new column family within a specified table.
+  rpc CreateColumnFamily(CreateColumnFamilyRequest) returns (ColumnFamily) {
+  }
+
+  // Changes the configuration of a specified column family.
+  rpc UpdateColumnFamily(ColumnFamily) returns (ColumnFamily) {
+  }
+
+  // Permanently deletes a specified column family and all of its data.
+  rpc DeleteColumnFamily(DeleteColumnFamilyRequest) returns (google.protobuf.Empty) {
+  }
+}

@@ -1,0 +1,28 @@
+#!/bin/bash
+cat > /var/tmp/rkt-test.sh <<TESTEOF
+#!/bin/bash
+
+set -e
+set -x
+
+# Sometimes journald does not work well on old versions
+exec > >(tee -a "/var/tmp/rkt-test.log") 2>&1
+
+sudo groupadd rkt
+sudo gpasswd -a admin rkt
+
+export DEBIAN_FRONTEND=noninteractive
+echo 'deb http://cloudfront.debian.net/debian testing main' | tee -a /etc/apt/sources.list
+echo 'deb-src http://cloudfront.debian.net/debian testing main' | tee -a /etc/apt/sources.list
+apt-get update -y
+#apt-get dist-upgrade -y --force-yes
+apt-get install -y --force-yes build-essential autoconf
+apt-get install -y --force-yes wget squashfs-tools patch gnupg golang git dbus libacl1-dev systemd-container
+
+su - admin --command="cd /var/tmp ; git clone --branch @GIT_BRANCH@ @GIT_URL@ rkt"
+su - admin --command="PATH=\$PATH ; cd /var/tmp/rkt ; ./tests/run-build.sh @FLAVOR@"
+TESTEOF
+
+chmod +x /var/tmp/rkt-test.sh
+
+systemd-run --unit=rkt-test /var/tmp/rkt-test.sh

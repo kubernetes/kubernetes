@@ -1,0 +1,537 @@
+syntax = "proto3";
+package etcdserverpb;
+
+import "gogoproto/gogo.proto";
+import "etcd/storage/storagepb/kv.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+service KV {
+  // Range gets the keys in the range from the store.
+  rpc Range(RangeRequest) returns (RangeResponse) {}
+
+  // Put puts the given key into the store.
+  // A put request increases the revision of the store,
+  // and generates one event in the event history.
+  rpc Put(PutRequest) returns (PutResponse) {}
+
+  // Delete deletes the given range from the store.
+  // A delete request increase the revision of the store,
+  // and generates one event in the event history.
+  rpc DeleteRange(DeleteRangeRequest) returns (DeleteRangeResponse) {}
+
+  // Txn processes all the requests in one transaction.
+  // A txn request increases the revision of the store,
+  // and generates events with the same revision in the event history.
+  // It is not allowed to modify the same key several times within one txn.
+  rpc Txn(TxnRequest) returns (TxnResponse) {}
+
+  // Compact compacts the event history in etcd. User should compact the
+  // event history periodically, or it will grow infinitely.
+  rpc Compact(CompactionRequest) returns (CompactionResponse) {}
+
+  // Hash returns the hash of local KV state for consistency checking purpose.
+  // This is designed for testing purpose. Do not use this in production when there
+  // are ongoing transactions.
+  rpc Hash(HashRequest) returns (HashResponse) {}
+}
+
+service Watch {
+  // Watch watches the events happening or happened. Both input and output
+  // are stream. One watch rpc can watch for multiple keys or prefixs and
+  // get a stream of events. The whole events history can be watched unless
+  // compacted.
+  rpc Watch(stream WatchRequest) returns (stream WatchResponse) {}
+}
+
+service Lease {
+  // LeaseCreate creates a lease. A lease has a TTL. The lease will expire if the
+  // server does not receive a keepAlive within TTL from the lease holder.
+  // All keys attached to the lease will be expired and deleted if the lease expires.
+  // The key expiration generates an event in event history.
+  rpc LeaseCreate(LeaseCreateRequest) returns (LeaseCreateResponse) {}
+
+  // LeaseRevoke revokes a lease. All the key attached to the lease will be expired and deleted.
+  rpc LeaseRevoke(LeaseRevokeRequest) returns (LeaseRevokeResponse) {}
+
+  // KeepAlive keeps the lease alive.
+  rpc LeaseKeepAlive(stream LeaseKeepAliveRequest) returns (stream LeaseKeepAliveResponse) {}
+
+  // TODO(xiangli) List all existing Leases?
+  // TODO(xiangli) Get details information (expirations, leased keys, etc.) of a lease?
+}
+
+service Cluster {
+  // MemberAdd adds a member into the cluster.
+  rpc MemberAdd(MemberAddRequest) returns (MemberAddResponse) {}
+
+  // MemberRemove removes an existing member from the cluster.
+  rpc MemberRemove(MemberRemoveRequest) returns (MemberRemoveResponse) {}
+
+  // MemberUpdate updates the member configuration.
+  rpc MemberUpdate(MemberUpdateRequest) returns (MemberUpdateResponse) {}
+
+  // MemberList lists all the members in the cluster.
+  rpc MemberList(MemberListRequest) returns (MemberListResponse) {}
+}
+
+service Maintenance {
+  // TODO: move Hash from kv to Maintenance
+  rpc Defragment(DefragmentRequest) returns (DefragmentResponse) {}
+}
+
+service Auth {
+  // AuthEnable enables authentication.
+  rpc AuthEnable(AuthEnableRequest) returns (AuthEnableResponse) {}
+
+  // AuthDisable disables authentication.
+  rpc AuthDisable(AuthDisableRequest) returns (AuthDisableResponse) {}
+
+  // Authenticate processes authenticate request.
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse) {}
+
+  // UserAdd adds a new user.
+  rpc UserAdd(UserAddRequest) returns (UserAddResponse) {}
+
+  // UserGet gets a detailed information of a user or lists entire users.
+  rpc UserGet(UserGetRequest) returns (UserGetResponse) {}
+
+  // UserDelete deletes a specified user.
+  rpc UserDelete(UserDeleteRequest) returns (UserDeleteResponse) {}
+
+  // UserChangePassword changes password of a specified user.
+  rpc UserChangePassword(UserChangePasswordRequest) returns (UserChangePasswordResponse) {}
+
+  // UserGrant grants a role to a specified user.
+  rpc UserGrant(UserGrantRequest) returns (UserGrantResponse) {}
+
+  // UserRevoke revokes a role of specified user.
+  rpc UserRevoke(UserRevokeRequest) returns (UserRevokeResponse) {}
+
+  // RoleAdd adds a new role.
+  rpc RoleAdd(RoleAddRequest) returns (RoleAddResponse) {}
+
+  // RoleGet gets a detailed information of a role or lists entire roles.
+  rpc RoleGet(RoleGetRequest) returns (RoleGetResponse) {}
+
+  // RoleDelete deletes a specified role.
+  rpc RoleDelete(RoleDeleteRequest) returns (RoleDeleteResponse) {}
+
+  // RoleGrant grants a permission of a specified key or range to a specified role.
+  rpc RoleGrant(RoleGrantRequest) returns (RoleGrantResponse) {}
+
+  // RoleRevoke revokes a key or range permission of a specified role.
+  rpc RoleRevoke(RoleRevokeRequest) returns (RoleRevokeResponse) {}
+}
+
+message ResponseHeader {
+  uint64 cluster_id = 1;
+  uint64 member_id = 2;
+  // revision of the store when the request was applied.
+  int64 revision = 3;
+  // term of raft when the request was applied.
+  uint64 raft_term = 4;
+}
+
+message RangeRequest {
+  enum SortOrder {
+	NONE = 0; // default, no sorting
+	ASCEND = 1; // lowest target value first
+	DESCEND = 2; // highest target value first
+  }
+  enum SortTarget {
+	KEY = 0;
+	VERSION = 1;
+	CREATE = 2;
+	MOD = 3;
+	VALUE = 4;
+  }
+
+  // if the range_end is not given, the request returns the key.
+  bytes key = 1;
+  // if the range_end is given, it gets the keys in range [key, range_end)
+  // if range_end is nonempty, otherwise it returns all keys >= key.
+  bytes range_end = 2;
+  // limit the number of keys returned.
+  int64 limit = 3;
+  // range over the store at the given revision.
+  // if revision is less or equal to zero, range over the newest store.
+  // if the revision has been compacted, ErrCompaction will be returned in
+  // response.
+  int64 revision = 4;
+
+  // sort_order is the requested order for returned the results
+  SortOrder sort_order = 5;
+
+  // sort_target is the kv field to use for sorting
+  SortTarget sort_target = 6;
+
+  // range request is linearizable by default. Linearizable requests has a higher
+  // latency and lower throughput than serializable request.
+  // To reduce latency, serializable can be set. If serializable is set, range request 
+  // will be serializable, but not linearizable with other requests.
+  // Serializable range can be served locally without waiting for other nodes in the cluster.
+  bool serializable = 7;
+}
+
+message RangeResponse {
+  ResponseHeader header = 1;
+  repeated storagepb.KeyValue kvs = 2;
+  // more indicates if there are more keys to return in the requested range.
+  bool more = 3;
+}
+
+message PutRequest {
+  bytes key = 1;
+  bytes value = 2;
+  int64 lease = 3;
+}
+
+message PutResponse {
+  ResponseHeader header = 1;
+}
+
+message DeleteRangeRequest {
+  // if the range_end is not given, the request deletes the key.
+  bytes key = 1;
+  // if the range_end is given, it deletes the keys in range [key, range_end).
+  bytes range_end = 2;
+}
+
+message DeleteRangeResponse {
+  ResponseHeader header = 1;
+  // Deleted is the number of keys that got deleted.
+  int64 deleted = 2;
+}
+
+message RequestUnion {
+  oneof request {
+    RangeRequest request_range = 1;
+    PutRequest request_put = 2;
+    DeleteRangeRequest request_delete_range = 3;
+  }
+}
+
+message ResponseUnion {
+  oneof response {
+    RangeResponse response_range = 1;
+    PutResponse response_put = 2;
+    DeleteRangeResponse response_delete_range = 3;
+  }
+}
+
+message Compare {
+  enum CompareResult {
+    EQUAL = 0;
+    GREATER = 1;
+    LESS = 2;
+  }
+  enum CompareTarget {
+    VERSION = 0;
+    CREATE = 1;
+    MOD = 2;
+    VALUE= 3;
+  }
+  CompareResult result = 1;
+  CompareTarget target = 2;
+  // key path
+  bytes key = 3;
+  oneof target_union {
+    // version of the given key
+    int64 version = 4;
+    // create revision of the given key
+    int64 create_revision = 5;
+    // last modified revision of the given key
+    int64 mod_revision = 6;
+    // value of the given key
+    bytes value = 7;
+  }
+}
+
+// If the comparisons succeed, then the success requests will be processed in order,
+// and the response will contain their respective responses in order.
+// If the comparisons fail, then the failure requests will be processed in order,
+// and the response will contain their respective responses in order.
+
+// From google paxosdb paper:
+// Our implementation hinges around a powerful primitive which we call MultiOp. All other database
+// operations except for iteration are implemented as a single call to MultiOp. A MultiOp is applied atomically
+// and consists of three components:
+// 1. A list of tests called guard. Each test in guard checks a single entry in the database. It may check
+// for the absence or presence of a value, or compare with a given value. Two different tests in the guard
+// may apply to the same or different entries in the database. All tests in the guard are applied and
+// MultiOp returns the results. If all tests are true, MultiOp executes t op (see item 2 below), otherwise
+// it executes f op (see item 3 below).
+// 2. A list of database operations called t op. Each operation in the list is either an insert, delete, or
+// lookup operation, and applies to a single database entry. Two different operations in the list may apply
+// to the same or different entries in the database. These operations are executed
+// if guard evaluates to
+// true.
+// 3. A list of database operations called f op. Like t op, but executed if guard evaluates to false.
+message TxnRequest {
+  repeated Compare compare = 1;
+  repeated RequestUnion success = 2;
+  repeated RequestUnion failure = 3;
+}
+
+message TxnResponse {
+  ResponseHeader header = 1;
+  bool succeeded = 2;
+  repeated ResponseUnion responses = 3;
+}
+
+// Compaction compacts the kv store upto the given revision (including).
+// It removes the old versions of a key. It keeps the newest version of
+// the key even if its latest modification revision is smaller than the given
+// revision.
+message CompactionRequest {
+  int64 revision = 1;
+}
+
+message CompactionResponse {
+  ResponseHeader header = 1;
+}
+
+message HashRequest {
+}
+
+message HashResponse {
+  ResponseHeader header = 1;
+  uint32 hash = 2;
+}
+
+message WatchRequest {
+  oneof request_union {
+    WatchCreateRequest create_request = 1;
+    WatchCancelRequest cancel_request = 2;
+  }
+}
+
+message WatchCreateRequest {
+  // the key to be watched
+  bytes key = 1;
+  // if the range_end is given, keys in [key, range_end) are watched
+  // NOTE: only range_end == prefixEnd(key) is accepted now
+  bytes range_end = 2;
+  // start_revision is an optional revision (including) to watch from. No start_revision is "now".
+  int64 start_revision = 3;
+  // if progress_notify is set, etcd server sends WatchResponse with empty events to the 
+  // created watcher when there are no recent events. It is useful when clients want always to be
+  // able to recover a disconnected watcher from a recent known revision.
+  // etcdsever can decide how long it should send a notification based on current load.
+  bool progress_notify = 4;
+}
+
+message WatchCancelRequest {
+  int64 watch_id = 1;
+}
+
+message WatchResponse {
+  ResponseHeader header = 1;
+  // watch_id is the ID of the watching the response sent to.
+  int64 watch_id = 2;
+  // If the response is for a create watch request, created is set to true.
+  // Client should record the watch_id and prepare for receiving events for
+  // that watching from the same stream.
+  // All events sent to the created watching will attach with the same watch_id.
+  bool created = 3;
+  // If the response is for a cancel watch request, cancel is set to true.
+  // No further events will be sent to the canceled watching.
+  bool canceled = 4;
+  // CompactRevision is set to the minimum index if a watching tries to watch
+  // at a compacted index.
+  //
+  // This happens when creating a watching at a compacted revision or the watching cannot
+  // catch up with the progress of the KV.
+  //
+  // Client should treat the watching as canceled and should not try to create any
+  // watching with same start_revision again.
+  int64 compact_revision  = 5;
+
+  repeated storagepb.Event events = 11;
+}
+
+message LeaseCreateRequest {
+  // advisory ttl in seconds
+  int64 TTL = 1;
+  // requested ID to create; 0 lets lessor choose
+  int64 ID = 2;
+}
+
+message LeaseCreateResponse {
+  ResponseHeader header = 1;
+  int64 ID = 2;
+  // server decided ttl in second
+  int64 TTL = 3;
+  string error = 4;
+}
+
+message LeaseRevokeRequest {
+  int64 ID = 1;
+}
+
+message LeaseRevokeResponse {
+  ResponseHeader header = 1;
+}
+
+message LeaseKeepAliveRequest {
+  int64 ID = 1;
+}
+
+message LeaseKeepAliveResponse {
+  ResponseHeader header = 1;
+  int64 ID = 2;
+  int64 TTL = 3;
+}
+
+message Member {
+  uint64 ID = 1;
+  // If the member is not started, name will be an empty string.
+  string name = 2;
+  bool IsLeader = 3;
+  repeated string peerURLs = 4;
+  // If the member is not started, client_URLs will be an zero length
+  // string array.
+  repeated string clientURLs = 5;
+}
+
+message MemberAddRequest {
+  repeated string peerURLs = 1;
+}
+
+message MemberAddResponse {
+  ResponseHeader header = 1;
+  Member member = 2;
+}
+
+message MemberRemoveRequest {
+  uint64 ID = 1;
+}
+
+message MemberRemoveResponse {
+  ResponseHeader header = 1;
+}
+
+message MemberUpdateRequest {
+  uint64 ID = 1;
+  repeated string peerURLs = 2;
+}
+
+message MemberUpdateResponse{
+  ResponseHeader header = 1;
+}
+
+message MemberListRequest {
+}
+
+message MemberListResponse {
+  ResponseHeader header = 1;
+  repeated Member members = 2;
+}
+
+message DefragmentRequest {
+
+}
+
+message DefragmentResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthEnableRequest {
+}
+
+message AuthDisableRequest {
+}
+
+message AuthenticateRequest {
+}
+
+message UserAddRequest {
+}
+
+message UserGetRequest {
+}
+
+message UserDeleteRequest {
+}
+
+message UserChangePasswordRequest {
+}
+
+message UserGrantRequest {
+}
+
+message UserRevokeRequest {
+}
+
+message RoleAddRequest {
+}
+
+message RoleGetRequest {
+}
+
+message RoleDeleteRequest {
+}
+
+message RoleGrantRequest {
+}
+
+message RoleRevokeRequest {
+}
+
+message AuthEnableResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthDisableResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthenticateResponse {
+  ResponseHeader header = 1;
+}
+
+message UserAddResponse {
+  ResponseHeader header = 1;
+}
+
+message UserGetResponse {
+  ResponseHeader header = 1;
+}
+
+message UserDeleteResponse {
+  ResponseHeader header = 1;
+}
+
+message UserChangePasswordResponse {
+  ResponseHeader header = 1;
+}
+
+message UserGrantResponse {
+  ResponseHeader header = 1;
+}
+
+message UserRevokeResponse {
+  ResponseHeader header = 1;
+}
+
+message RoleAddResponse {
+  ResponseHeader header = 1;
+}
+
+message RoleGetResponse {
+  ResponseHeader header = 1;
+}
+
+message RoleDeleteResponse {
+  ResponseHeader header = 1;
+}
+
+message RoleGrantResponse {
+  ResponseHeader header = 1;
+}
+
+message RoleRevokeResponse {
+  ResponseHeader header = 1;
+}

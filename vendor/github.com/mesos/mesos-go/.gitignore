@@ -1,0 +1,98 @@
+## generic files to ignore
+*~
+*.lock
+*.DS_Store
+*.swp
+*.out
+
+# rails specific
+*.sqlite3
+config/database.yml
+log/*
+tmp/*
+
+# java specific
+*.class
+
+# python specific
+*.pyc
+
+# xcode/iphone specific
+build/*
+*.pbxuser
+*.mode2v3
+*.mode1v3
+*.perspective
+*.perspectivev3
+*~.nib
+
+# akka specific
+logs/*
+
+# sbt specific
+project/boot
+lib_managed/*
+project/build/target
+project/build/lib_managed
+project/build/src_managed
+project/plugins/lib_managed
+project/plugins/target
+project/plugins/src_managed
+project/plugins/project
+
+# eclipse specific
+.metadata
+jrebel.lic
+.idea/workspace.xml
+.idea/bashsupport_project.xml
+
+*.iml
+*.ipr
+*.iws
+
+target
+.idea
+.settings
+.classpath
+.project
+.ensime*
+*.sublime-*
+.cache
+.lib
+data
+.tags
+.tags_sorted_by_file
+atlassian-ide-plugin.xml
+node_modules
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+
+# Folders
+_obj
+_test
+
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.exe
+*.test
+junit_*
+
+# mesos-go specific
+/examples/_output
+/vendor
+/example-scheduler
+
+#webide
+.c9

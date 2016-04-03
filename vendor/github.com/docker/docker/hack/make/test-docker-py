@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+
+# subshell so that we can export PATH without breaking other things
+(
+	bundle .integration-daemon-start
+
+	dockerPy='/docker-py'
+	[ -d "$dockerPy" ] || {
+		dockerPy="$DEST/docker-py"
+		git clone https://github.com/docker/docker-py.git "$dockerPy"
+	}
+
+	# exporting PYTHONPATH to import "docker" from our local docker-py
+	test_env PYTHONPATH="$dockerPy" python "$dockerPy/tests/integration_test.py"
+
+	bundle .integration-daemon-stop
+) 2>&1 | tee -a "$DEST/test.log"

@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "pagination": {
+    "ListDomains": {
+      "limit_key": "MaxItems",
+      "input_token": "Marker",
+      "output_token": "NextPageMarker",
+      "result_key": "Domains"
+    },
+    "ListOperations": {
+      "limit_key": "MaxItems",
+      "input_token": "Marker",
+      "output_token": "NextPageMarker",
+      "result_key": "Operations"
+    }
+  }
+}

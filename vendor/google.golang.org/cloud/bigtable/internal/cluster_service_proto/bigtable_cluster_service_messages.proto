@@ -1,0 +1,126 @@
+// Copyright (c) 2015, Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package google.bigtable.admin.cluster.v1;
+
+import "google.golang.org/cloud/bigtable/internal/cluster_data_proto/bigtable_cluster_data.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "BigtableClusterServiceMessagesProto";
+option java_package = "com.google.bigtable.admin.cluster.v1";
+
+
+// Request message for BigtableClusterService.ListZones.
+message ListZonesRequest {
+  // The unique name of the project for which a list of supported zones is
+  // requested.
+  // Values are of the form projects/<project>
+  string name = 1;
+}
+
+// Response message for BigtableClusterService.ListZones.
+message ListZonesResponse {
+  // The list of requested zones.
+  repeated Zone zones = 1;
+}
+
+// Request message for BigtableClusterService.GetCluster.
+message GetClusterRequest {
+  // The unique name of the requested cluster.
+  // Values are of the form projects/<project>/zones/<zone>/clusters/<cluster>
+  string name = 1;
+}
+
+// Request message for BigtableClusterService.ListClusters.
+message ListClustersRequest {
+  // The unique name of the project for which a list of clusters is requested.
+  // Values are of the form projects/<project>
+  string name = 1;
+}
+
+// Response message for BigtableClusterService.ListClusters.
+message ListClustersResponse {
+  // The list of requested Clusters.
+  repeated Cluster clusters = 1;
+
+  // The zones for which clusters could not be retrieved.
+  repeated Zone failed_zones = 2;
+}
+
+// Request message for BigtableClusterService.CreateCluster.
+message CreateClusterRequest {
+  // The unique name of the zone in which to create the cluster.
+  // Values are of the form projects/<project>/zones/<zone>
+  string name = 1;
+
+  // The id to be used when referring to the new cluster within its zone,
+  // e.g. just the "test-cluster" section of the full name
+  // "projects/<project>/zones/<zone>/clusters/test-cluster".
+  string cluster_id = 2;
+
+  // The cluster to create.
+  // The "name", "delete_time", and "current_operation" fields must be left
+  // blank.
+  Cluster cluster = 3;
+}
+
+// Metadata type for the operation returned by
+// BigtableClusterService.CreateCluster.
+message CreateClusterMetadata {
+  // The request which prompted the creation of this operation.
+  CreateClusterRequest original_request = 1;
+
+  // The time at which original_request was received.
+
+  // The time at which this operation failed or was completed successfully.
+}
+
+// Metadata type for the operation returned by
+// BigtableClusterService.UpdateCluster.
+message UpdateClusterMetadata {
+  // The request which prompted the creation of this operation.
+  Cluster original_request = 1;
+
+  // The time at which original_request was received.
+
+  // The time at which this operation was cancelled. If set, this operation is
+  // in the process of undoing itself (which is guaranteed to succeed) and
+  // cannot be cancelled again.
+
+  // The time at which this operation failed or was completed successfully.
+}
+
+// Request message for BigtableClusterService.DeleteCluster.
+message DeleteClusterRequest {
+  // The unique name of the cluster to be deleted.
+  // Values are of the form projects/<project>/zones/<zone>/clusters/<cluster>
+  string name = 1;
+}
+
+// Request message for BigtableClusterService.UndeleteCluster.
+message UndeleteClusterRequest {
+  // The unique name of the cluster to be un-deleted.
+  // Values are of the form projects/<project>/zones/<zone>/clusters/<cluster>
+  string name = 1;
+}
+
+// Metadata type for the operation returned by
+// BigtableClusterService.UndeleteCluster.
+message UndeleteClusterMetadata {
+  // The time at which the original request was received.
+
+  // The time at which this operation failed or was completed successfully.
+}

@@ -1,0 +1,5585 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/vE-je_lw5xuMc7X-IbS1gcTrxEY\"",
+ "discoveryVersion": "v1",
+ "id": "admin:directory_v1",
+ "name": "admin",
+ "canonicalName": "directory",
+ "version": "directory_v1",
+ "revision": "20151208",
+ "title": "Admin Directory API",
+ "description": "The Admin SDK Directory API lets you view and manage enterprise resources such as users and groups, administrative notifications, security features, and more.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "packagePath": "admin",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/admin-sdk/directory/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/admin/directory/v1/",
+ "basePath": "/admin/directory/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "admin/directory/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/admin.directory.customer": {
+     "description": "View and manage customer related information"
+    },
+    "https://www.googleapis.com/auth/admin.directory.customer.readonly": {
+     "description": "View customer related information"
+    },
+    "https://www.googleapis.com/auth/admin.directory.device.chromeos": {
+     "description": "View and manage your Chrome OS devices' metadata"
+    },
+    "https://www.googleapis.com/auth/admin.directory.device.chromeos.readonly": {
+     "description": "View your Chrome OS devices' metadata"
+    },
+    "https://www.googleapis.com/auth/admin.directory.device.mobile": {
+     "description": "View and manage your mobile devices' metadata"
+    },
+    "https://www.googleapis.com/auth/admin.directory.device.mobile.action": {
+     "description": "Manage your mobile devices by performing administrative tasks"
+    },
+    "https://www.googleapis.com/auth/admin.directory.device.mobile.readonly": {
+     "description": "View your mobile devices' metadata"
+    },
+    "https://www.googleapis.com/auth/admin.directory.domain": {
+     "description": "View and manage the provisioning of domains for your customers"
+    },
+    "https://www.googleapis.com/auth/admin.directory.domain.readonly": {
+     "description": "View domains related to your customers"
+    },
+    "https://www.googleapis.com/auth/admin.directory.group": {
+     "description": "View and manage the provisioning of groups on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.group.member": {
+     "description": "View and manage group subscriptions on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.group.member.readonly": {
+     "description": "View group subscriptions on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.group.readonly": {
+     "description": "View groups on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.notifications": {
+     "description": "View and manage notifications received on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.orgunit": {
+     "description": "View and manage organization units on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.orgunit.readonly": {
+     "description": "View organization units on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.resource.calendar": {
+     "description": "View and manage the provisioning of calendar resources on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly": {
+     "description": "View calendar resources on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.rolemanagement": {
+     "description": "Manage delegated admin roles for your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly": {
+     "description": "View delegated admin roles for your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.user": {
+     "description": "View and manage the provisioning of users on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.user.alias": {
+     "description": "View and manage user aliases on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.user.alias.readonly": {
+     "description": "View user aliases on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.user.readonly": {
+     "description": "View users on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.user.security": {
+     "description": "Manage data access permissions for users on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.userschema": {
+     "description": "View and manage the provisioning of user schemas on your domain"
+    },
+    "https://www.googleapis.com/auth/admin.directory.userschema.readonly": {
+     "description": "View user schemas on your domain"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Alias": {
+   "id": "Alias",
+   "type": "object",
+   "description": "JSON template for Alias object in Directory API.",
+   "properties": {
+    "alias": {
+     "type": "string",
+     "description": "A alias email"
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "id": {
+     "type": "string",
+     "description": "Unique id of the group (Read-only) Unique id of the user (Read-only)"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#alias"
+    },
+    "primaryEmail": {
+     "type": "string",
+     "description": "Group's primary email (Read-only) User's primary email (Read-only)"
+    }
+   }
+  },
+  "Aliases": {
+   "id": "Aliases",
+   "type": "object",
+   "description": "JSON response template to list aliases in Directory API.",
+   "properties": {
+    "aliases": {
+     "type": "array",
+     "description": "List of alias objects.",
+     "items": {
+      "$ref": "Alias"
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#aliases"
+    }
+   }
+  },
+  "Asp": {
+   "id": "Asp",
+   "type": "object",
+   "description": "The template that returns individual ASP (Access Code) data.",
+   "properties": {
+    "codeId": {
+     "type": "integer",
+     "description": "The unique ID of the ASP.",
+     "format": "int32"
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "The time when the ASP was created. Expressed in Unix time format.",
+     "format": "int64"
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the ASP."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#asp.",
+     "default": "admin#directory#asp"
+    },
+    "lastTimeUsed": {
+     "type": "string",
+     "description": "The time when the ASP was last used. Expressed in Unix time format.",
+     "format": "int64"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the application that the user, represented by their userId, entered when the ASP was created."
+    },
+    "userKey": {
+     "type": "string",
+     "description": "The unique ID of the user who issued the ASP."
+    }
+   }
+  },
+  "Asps": {
+   "id": "Asps",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of ASP resources.",
+     "items": {
+      "$ref": "Asp"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#aspList.",
+     "default": "admin#directory#aspList"
+    }
+   }
+  },
+  "CalendarResource": {
+   "id": "CalendarResource",
+   "type": "object",
+   "description": "JSON template for Calendar Resource object in Directory API.",
+   "properties": {
+    "etags": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the resource. For calendar resources, the value is admin#directory#resources#calendars#CalendarResource.",
+     "default": "admin#directory#resources#calendars#CalendarResource"
+    },
+    "resourceDescription": {
+     "type": "string",
+     "description": "The brief description of the calendar resource."
+    },
+    "resourceEmail": {
+     "type": "string",
+     "description": "The read-only email ID for the calendar resource. Generated as part of creating a new calendar resource."
+    },
+    "resourceId": {
+     "type": "string",
+     "description": "The unique ID for the calendar resource.",
+     "annotations": {
+      "required": [
+       "directory.resources.calendars.insert"
+      ]
+     }
+    },
+    "resourceName": {
+     "type": "string",
+     "description": "The name of the calendar resource. For example, Training Room 1A",
+     "annotations": {
+      "required": [
+       "directory.resources.calendars.insert"
+      ]
+     }
+    },
+    "resourceType": {
+     "type": "string",
+     "description": "The type of the calendar resource. Used for grouping resources in the calendar user interface."
+    }
+   }
+  },
+  "CalendarResources": {
+   "id": "CalendarResources",
+   "type": "object",
+   "description": "JSON template for Calendar Resource List Response object in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "items": {
+     "type": "array",
+     "description": "The CalendarResources in this page of results.",
+     "items": {
+      "$ref": "CalendarResource"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this as a collection of CalendarResources. This is always admin#directory#resources#calendars#calendarResourcesList.",
+     "default": "admin#directory#resources#calendars#calendarResourcesList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The continuation token, used to page through large result sets. Provide this value in a subsequent request to return the next page of results."
+    }
+   }
+  },
+  "Channel": {
+   "id": "Channel",
+   "type": "object",
+   "description": "An notification channel used to watch for resource changes.",
+   "properties": {
+    "address": {
+     "type": "string",
+     "description": "The address where notifications are delivered for this channel."
+    },
+    "expiration": {
+     "type": "string",
+     "description": "Date and time of notification channel expiration, expressed as a Unix timestamp, in milliseconds. Optional.",
+     "format": "int64"
+    },
+    "id": {
+     "type": "string",
+     "description": "A UUID or similar unique string that identifies this channel."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this as a notification channel used to watch for changes to a resource. Value: the fixed string \"api#channel\".",
+     "default": "api#channel"
+    },
+    "params": {
+     "type": "object",
+     "description": "Additional parameters controlling delivery channel behavior. Optional.",
+     "additionalProperties": {
+      "type": "string",
+      "description": "Declares a new parameter by name."
+     }
+    },
+    "payload": {
+     "type": "boolean",
+     "description": "A Boolean value to indicate whether payload is wanted. Optional."
+    },
+    "resourceId": {
+     "type": "string",
+     "description": "An opaque ID that identifies the resource being watched on this channel. Stable across different API versions."
+    },
+    "resourceUri": {
+     "type": "string",
+     "description": "A version-specific identifier for the watched resource."
+    },
+    "token": {
+     "type": "string",
+     "description": "An arbitrary string delivered to the target address with each notification delivered over this channel. Optional."
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of delivery mechanism used for this channel."
+    }
+   }
+  },
+  "ChromeOsDevice": {
+   "id": "ChromeOsDevice",
+   "type": "object",
+   "description": "JSON template for Chrome Os Device resource in Directory API.",
+   "properties": {
+    "activeTimeRanges": {
+     "type": "array",
+     "description": "List of active time ranges (Read-only)",
+     "items": {
+      "type": "object",
+      "properties": {
+       "activeTime": {
+        "type": "integer",
+        "description": "Duration in milliseconds",
+        "format": "int32"
+       },
+       "date": {
+        "type": "string",
+        "description": "Date of usage",
+        "format": "date"
+       }
+      }
+     }
+    },
+    "annotatedAssetId": {
+     "type": "string",
+     "description": "AssetId specified during enrollment or through later annotation"
+    },
+    "annotatedLocation": {
+     "type": "string",
+     "description": "Address or location of the device as noted by the administrator"
+    },
+    "annotatedUser": {
+     "type": "string",
+     "description": "User of the device"
+    },
+    "bootMode": {
+     "type": "string",
+     "description": "Chromebook boot mode (Read-only)"
+    },
+    "deviceId": {
+     "type": "string",
+     "description": "Unique identifier of Chrome OS Device (Read-only)"
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "ethernetMacAddress": {
+     "type": "string",
+     "description": "Chromebook Mac Address on ethernet network interface (Read-only)"
+    },
+    "firmwareVersion": {
+     "type": "string",
+     "description": "Chromebook firmware version (Read-only)"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#chromeosdevice"
+    },
+    "lastEnrollmentTime": {
+     "type": "string",
+     "description": "Date and time the device was last enrolled (Read-only)",
+     "format": "date-time"
+    },
+    "lastSync": {
+     "type": "string",
+     "description": "Date and time the device was last synchronized with the policy settings in the Google Apps administrator control panel (Read-only)",
+     "format": "date-time"
+    },
+    "macAddress": {
+     "type": "string",
+     "description": "Chromebook Mac Address on wifi network interface (Read-only)"
+    },
+    "meid": {
+     "type": "string",
+     "description": "Mobile Equipment identifier for the 3G mobile card in the Chromebook (Read-only)"
+    },
+    "model": {
+     "type": "string",
+     "description": "Chromebook Model (Read-only)"
+    },
+    "notes": {
+     "type": "string",
+     "description": "Notes added by the administrator"
+    },
+    "orderNumber": {
+     "type": "string",
+     "description": "Chromebook order number (Read-only)"
+    },
+    "orgUnitPath": {
+     "type": "string",
+     "description": "OrgUnit of the device"
+    },
+    "osVersion": {
+     "type": "string",
+     "description": "Chromebook Os Version (Read-only)"
+    },
+    "platformVersion": {
+     "type": "string",
+     "description": "Chromebook platform version (Read-only)"
+    },
+    "recentUsers": {
+     "type": "array",
+     "description": "List of recent device users, in descending order by last login time (Read-only)",
+     "items": {
+      "type": "object",
+      "properties": {
+       "email": {
+        "type": "string",
+        "description": "Email address of the user. Present only if the user type is managed"
+       },
+       "type": {
+        "type": "string",
+        "description": "The type of the user"
+       }
+      }
+     }
+    },
+    "serialNumber": {
+     "type": "string",
+     "description": "Chromebook serial number (Read-only)"
+    },
+    "status": {
+     "type": "string",
+     "description": "status of the device (Read-only)"
+    },
+    "supportEndDate": {
+     "type": "string",
+     "description": "Final date the device will be supported (Read-only)",
+     "format": "date-time"
+    },
+    "willAutoRenew": {
+     "type": "boolean",
+     "description": "Will Chromebook auto renew after support end date (Read-only)"
+    }
+   }
+  },
+  "ChromeOsDevices": {
+   "id": "ChromeOsDevices",
+   "type": "object",
+   "description": "JSON response template for List Chrome OS Devices operation in Directory API.",
+   "properties": {
+    "chromeosdevices": {
+     "type": "array",
+     "description": "List of Chrome OS Device objects.",
+     "items": {
+      "$ref": "ChromeOsDevice"
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#chromeosdevices"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token used to access next page of this result."
+    }
+   }
+  },
+  "Customer": {
+   "id": "Customer",
+   "type": "object",
+   "description": "JSON template for Customer Resource object in Directory API.",
+   "properties": {
+    "alternateEmail": {
+     "type": "string",
+     "description": "The customer's secondary contact email address. This email address cannot be on the same domain as the customerDomain"
+    },
+    "customerCreationTime": {
+     "type": "string",
+     "description": "The customer's creation time (Readonly)",
+     "format": "date-time"
+    },
+    "customerDomain": {
+     "type": "string",
+     "description": "The customer's primary domain name string. Do not include the www prefix when creating a new customer."
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "id": {
+     "type": "string",
+     "description": "The unique ID for the customer's Google account. (Readonly)"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies the resource as a customer. Value: admin#directory#customer",
+     "default": "admin#directory#customer"
+    },
+    "language": {
+     "type": "string",
+     "description": "The customer's ISO 639-2 language code. The default value is en-US"
+    },
+    "phoneNumber": {
+     "type": "string",
+     "description": "The customer's contact phone number in E.164 format."
+    },
+    "postalAddress": {
+     "$ref": "CustomerPostalAddress",
+     "description": "The customer's postal address information."
+    }
+   }
+  },
+  "CustomerPostalAddress": {
+   "id": "CustomerPostalAddress",
+   "type": "object",
+   "description": "JSON template for postal address of a customer.",
+   "properties": {
+    "addressLine1": {
+     "type": "string",
+     "description": "A customer's physical address. The address can be composed of one to three lines."
+    },
+    "addressLine2": {
+     "type": "string",
+     "description": "Address line 2 of the address."
+    },
+    "addressLine3": {
+     "type": "string",
+     "description": "Address line 3 of the address."
+    },
+    "contactName": {
+     "type": "string",
+     "description": "The customer contact's name."
+    },
+    "countryCode": {
+     "type": "string",
+     "description": "This is a required property. For countryCode information see the ISO 3166 country code elements."
+    },
+    "locality": {
+     "type": "string",
+     "description": "Name of the locality. An example of a locality value is the city of San Francisco."
+    },
+    "organizationName": {
+     "type": "string",
+     "description": "The company or company division name."
+    },
+    "postalCode": {
+     "type": "string",
+     "description": "The postal code. A postalCode example is a postal zip code such as 10009. This is in accordance with - http://portablecontacts.net/draft-spec.html#address_element."
+    },
+    "region": {
+     "type": "string",
+     "description": "Name of the region. An example of a region value is NY for the state of New York."
+    }
+   }
+  },
+  "DomainAlias": {
+   "id": "DomainAlias",
+   "type": "object",
+   "description": "JSON template for Domain Alias object in Directory API.",
+   "properties": {
+    "creationTime": {
+     "type": "string",
+     "description": "The creation time of the domain alias. (Read-only).",
+     "format": "int64"
+    },
+    "domainAliasName": {
+     "type": "string",
+     "description": "The domain alias name."
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#domainAlias"
+    },
+    "parentDomainName": {
+     "type": "string",
+     "description": "The parent domain name that the domain alias is associated with. This can either be a primary or secondary domain name within a customer.",
+     "annotations": {
+      "required": [
+       "directory.domains.insert"
+      ]
+     }
+    },
+    "verified": {
+     "type": "boolean",
+     "description": "Indicates the verification state of a domain alias. (Read-only)"
+    }
+   }
+  },
+  "DomainAliases": {
+   "id": "DomainAliases",
+   "type": "object",
+   "description": "JSON response template to list domain aliases in Directory API.",
+   "properties": {
+    "domainAliases": {
+     "type": "array",
+     "description": "List of domain alias objects.",
+     "items": {
+      "$ref": "DomainAlias"
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#domainAliases"
+    }
+   }
+  },
+  "Domains": {
+   "id": "Domains",
+   "type": "object",
+   "description": "JSON template for Domain object in Directory API.",
+   "properties": {
+    "creationTime": {
+     "type": "string",
+     "description": "Creation time of the domain. (Read-only).",
+     "format": "int64"
+    },
+    "domainAliases": {
+     "type": "array",
+     "description": "List of domain alias objects. (Read-only)",
+     "items": {
+      "$ref": "DomainAlias"
+     }
+    },
+    "domainName": {
+     "type": "string",
+     "description": "The domain name of the customer.",
+     "annotations": {
+      "required": [
+       "directory.domains.insert"
+      ]
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "isPrimary": {
+     "type": "boolean",
+     "description": "Indicates if the domain is a primary domain (Read-only)."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#domain"
+    },
+    "verified": {
+     "type": "boolean",
+     "description": "Indicates the verification state of a domain. (Read-only)."
+    }
+   }
+  },
+  "Domains2": {
+   "id": "Domains2",
+   "type": "object",
+   "description": "JSON response template to list Domains in Directory API.",
+   "properties": {
+    "domains": {
+     "type": "array",
+     "description": "List of domain objects.",
+     "items": {
+      "$ref": "Domains"
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#domains"
+    }
+   }
+  },
+  "Group": {
+   "id": "Group",
+   "type": "object",
+   "description": "JSON template for Group resource in Directory API.",
+   "properties": {
+    "adminCreated": {
+     "type": "boolean",
+     "description": "Is the group created by admin (Read-only) *"
+    },
+    "aliases": {
+     "type": "array",
+     "description": "List of aliases (Read-only)",
+     "items": {
+      "type": "string"
+     }
+    },
+    "description": {
+     "type": "string",
+     "description": "Description of the group"
+    },
+    "directMembersCount": {
+     "type": "string",
+     "description": "Group direct members count",
+     "format": "int64"
+    },
+    "email": {
+     "type": "string",
+     "description": "Email of Group",
+     "annotations": {
+      "required": [
+       "directory.groups.insert"
+      ]
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "id": {
+     "type": "string",
+     "description": "Unique identifier of Group (Read-only)"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#group"
+    },
+    "name": {
+     "type": "string",
+     "description": "Group name"
+    },
+    "nonEditableAliases": {
+     "type": "array",
+     "description": "List of non editable aliases (Read-only)",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "Groups": {
+   "id": "Groups",
+   "type": "object",
+   "description": "JSON response template for List Groups operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "groups": {
+     "type": "array",
+     "description": "List of group objects.",
+     "items": {
+      "$ref": "Group"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#groups"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token used to access next page of this result."
+    }
+   }
+  },
+  "Member": {
+   "id": "Member",
+   "type": "object",
+   "description": "JSON template for Member resource in Directory API.",
+   "properties": {
+    "email": {
+     "type": "string",
+     "description": "Email of member (Read-only)"
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "id": {
+     "type": "string",
+     "description": "Unique identifier of customer member (Read-only) Unique identifier of group (Read-only) Unique identifier of member (Read-only)"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#member"
+    },
+    "role": {
+     "type": "string",
+     "description": "Role of member"
+    },
+    "type": {
+     "type": "string",
+     "description": "Type of member (Immutable)"
+    }
+   }
+  },
+  "Members": {
+   "id": "Members",
+   "type": "object",
+   "description": "JSON response template for List Members operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#members"
+    },
+    "members": {
+     "type": "array",
+     "description": "List of member objects.",
+     "items": {
+      "$ref": "Member"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token used to access next page of this result."
+    }
+   }
+  },
+  "MobileDevice": {
+   "id": "MobileDevice",
+   "type": "object",
+   "description": "JSON template for Mobile Device resource in Directory API.",
+   "properties": {
+    "adbStatus": {
+     "type": "boolean",
+     "description": "Adb (USB debugging) enabled or disabled on device (Read-only)"
+    },
+    "applications": {
+     "type": "array",
+     "description": "List of applications installed on Mobile Device",
+     "items": {
+      "type": "object",
+      "properties": {
+       "displayName": {
+        "type": "string",
+        "description": "Display name of application"
+       },
+       "packageName": {
+        "type": "string",
+        "description": "Package name of application"
+       },
+       "permission": {
+        "type": "array",
+        "description": "List of Permissions for application",
+        "items": {
+         "type": "string"
+        }
+       },
+       "versionCode": {
+        "type": "integer",
+        "description": "Version code of application",
+        "format": "int32"
+       },
+       "versionName": {
+        "type": "string",
+        "description": "Version name of application"
+       }
+      }
+     }
+    },
+    "basebandVersion": {
+     "type": "string",
+     "description": "Mobile Device Baseband version (Read-only)"
+    },
+    "buildNumber": {
+     "type": "string",
+     "description": "Mobile Device Build number (Read-only)"
+    },
+    "defaultLanguage": {
+     "type": "string",
+     "description": "The default locale used on the Mobile Device (Read-only)"
+    },
+    "developerOptionsStatus": {
+     "type": "boolean",
+     "description": "Developer options enabled or disabled on device (Read-only)"
+    },
+    "deviceCompromisedStatus": {
+     "type": "string",
+     "description": "Mobile Device compromised status (Read-only)"
+    },
+    "deviceId": {
+     "type": "string",
+     "description": "Mobile Device serial number (Read-only)"
+    },
+    "email": {
+     "type": "array",
+     "description": "List of owner user's email addresses (Read-only)",
+     "items": {
+      "type": "string"
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "firstSync": {
+     "type": "string",
+     "description": "Date and time the device was first synchronized with the policy settings in the Google Apps administrator control panel (Read-only)",
+     "format": "date-time"
+    },
+    "hardwareId": {
+     "type": "string",
+     "description": "Mobile Device Hardware Id (Read-only)"
+    },
+    "imei": {
+     "type": "string",
+     "description": "Mobile Device IMEI number (Read-only)"
+    },
+    "kernelVersion": {
+     "type": "string",
+     "description": "Mobile Device Kernel version (Read-only)"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#mobiledevice"
+    },
+    "lastSync": {
+     "type": "string",
+     "description": "Date and time the device was last synchronized with the policy settings in the Google Apps administrator control panel (Read-only)",
+     "format": "date-time"
+    },
+    "managedAccountIsOnOwnerProfile": {
+     "type": "boolean",
+     "description": "Boolean indicating if this account is on owner/primary profile or not (Read-only)"
+    },
+    "meid": {
+     "type": "string",
+     "description": "Mobile Device MEID number (Read-only)"
+    },
+    "model": {
+     "type": "string",
+     "description": "Name of the model of the device"
+    },
+    "name": {
+     "type": "array",
+     "description": "List of owner user's names (Read-only)",
+     "items": {
+      "type": "string"
+     }
+    },
+    "networkOperator": {
+     "type": "string",
+     "description": "Mobile Device mobile or network operator (if available) (Read-only)"
+    },
+    "os": {
+     "type": "string",
+     "description": "Name of the mobile operating system"
+    },
+    "otherAccountsInfo": {
+     "type": "array",
+     "description": "List of accounts added on device (Read-only)",
+     "items": {
+      "type": "string"
+     }
+    },
+    "resourceId": {
+     "type": "string",
+     "description": "Unique identifier of Mobile Device (Read-only)"
+    },
+    "serialNumber": {
+     "type": "string",
+     "description": "Mobile Device SSN or Serial Number (Read-only)"
+    },
+    "status": {
+     "type": "string",
+     "description": "Status of the device (Read-only)"
+    },
+    "supportsWorkProfile": {
+     "type": "boolean",
+     "description": "Work profile supported on device (Read-only)"
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of device (Read-only)"
+    },
+    "unknownSourcesStatus": {
+     "type": "boolean",
+     "description": "Unknown sources enabled or disabled on device (Read-only)"
+    },
+    "userAgent": {
+     "type": "string",
+     "description": "Mobile Device user agent"
+    },
+    "wifiMacAddress": {
+     "type": "string",
+     "description": "Mobile Device WiFi MAC address (Read-only)"
+    }
+   }
+  },
+  "MobileDeviceAction": {
+   "id": "MobileDeviceAction",
+   "type": "object",
+   "description": "JSON request template for firing commands on Mobile Device in Directory Devices API.",
+   "properties": {
+    "action": {
+     "type": "string",
+     "description": "Action to be taken on the Mobile Device",
+     "annotations": {
+      "required": [
+       "directory.mobiledevices.action"
+      ]
+     }
+    }
+   }
+  },
+  "MobileDevices": {
+   "id": "MobileDevices",
+   "type": "object",
+   "description": "JSON response template for List Mobile Devices operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#mobiledevices"
+    },
+    "mobiledevices": {
+     "type": "array",
+     "description": "List of Mobile Device objects.",
+     "items": {
+      "$ref": "MobileDevice"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token used to access next page of this result."
+    }
+   }
+  },
+  "Notification": {
+   "id": "Notification",
+   "type": "object",
+   "description": "Template for a notification resource.",
+   "properties": {
+    "body": {
+     "type": "string",
+     "description": "Body of the notification (Read-only)"
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "fromAddress": {
+     "type": "string",
+     "description": "Address from which the notification is received (Read-only)"
+    },
+    "isUnread": {
+     "type": "boolean",
+     "description": "Boolean indicating whether the notification is unread or not.",
+     "annotations": {
+      "required": [
+       "directory.notifications.patch",
+       "directory.notifications.update"
+      ]
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the resource.",
+     "default": "admin#directory#notification"
+    },
+    "notificationId": {
+     "type": "string"
+    },
+    "sendTime": {
+     "type": "string",
+     "description": "Time at which notification was sent (Read-only)",
+     "format": "date-time"
+    },
+    "subject": {
+     "type": "string",
+     "description": "Subject of the notification (Read-only)"
+    }
+   }
+  },
+  "Notifications": {
+   "id": "Notifications",
+   "type": "object",
+   "description": "Template for notifications list response.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "items": {
+     "type": "array",
+     "description": "List of notifications in this page.",
+     "items": {
+      "$ref": "Notification"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the resource.",
+     "default": "admin#directory#notifications"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token for fetching the next page of notifications."
+    },
+    "unreadNotificationsCount": {
+     "type": "integer",
+     "description": "Number of unread notification for the domain.",
+     "format": "int32"
+    }
+   }
+  },
+  "OrgUnit": {
+   "id": "OrgUnit",
+   "type": "object",
+   "description": "JSON template for Org Unit resource in Directory API.",
+   "properties": {
+    "blockInheritance": {
+     "type": "boolean",
+     "description": "Should block inheritance"
+    },
+    "description": {
+     "type": "string",
+     "description": "Description of OrgUnit"
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#orgUnit"
+    },
+    "name": {
+     "type": "string",
+     "description": "Name of OrgUnit",
+     "annotations": {
+      "required": [
+       "directory.orgunits.insert"
+      ]
+     }
+    },
+    "orgUnitId": {
+     "type": "string",
+     "description": "Id of OrgUnit"
+    },
+    "orgUnitPath": {
+     "type": "string",
+     "description": "Path of OrgUnit"
+    },
+    "parentOrgUnitId": {
+     "type": "string",
+     "description": "Id of parent OrgUnit"
+    },
+    "parentOrgUnitPath": {
+     "type": "string",
+     "description": "Path of parent OrgUnit"
+    }
+   }
+  },
+  "OrgUnits": {
+   "id": "OrgUnits",
+   "type": "object",
+   "description": "JSON response template for List Organization Units operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#orgUnits"
+    },
+    "organizationUnits": {
+     "type": "array",
+     "description": "List of user objects.",
+     "items": {
+      "$ref": "OrgUnit"
+     }
+    }
+   }
+  },
+  "Privilege": {
+   "id": "Privilege",
+   "type": "object",
+   "description": "JSON template for privilege resource in Directory API.",
+   "properties": {
+    "childPrivileges": {
+     "type": "array",
+     "description": "A list of child privileges. Privileges for a service form a tree. Each privilege can have a list of child privileges; this list is empty for a leaf privilege.",
+     "items": {
+      "$ref": "Privilege"
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "isOuScopable": {
+     "type": "boolean",
+     "description": "If the privilege can be restricted to an organization unit."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#privilege.",
+     "default": "admin#directory#privilege"
+    },
+    "privilegeName": {
+     "type": "string",
+     "description": "The name of the privilege."
+    },
+    "serviceId": {
+     "type": "string",
+     "description": "The obfuscated ID of the service this privilege is for."
+    },
+    "serviceName": {
+     "type": "string",
+     "description": "The name of the service this privilege is for."
+    }
+   }
+  },
+  "Privileges": {
+   "id": "Privileges",
+   "type": "object",
+   "description": "JSON response template for List privileges operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of Privilege resources.",
+     "items": {
+      "$ref": "Privilege"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#privileges.",
+     "default": "admin#directory#privileges"
+    }
+   }
+  },
+  "Role": {
+   "id": "Role",
+   "type": "object",
+   "description": "JSON template for role resource in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "isSuperAdminRole": {
+     "type": "boolean",
+     "description": "Returns true if the role is a super admin role."
+    },
+    "isSystemRole": {
+     "type": "boolean",
+     "description": "Returns true if this is a pre-defined system role."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#role.",
+     "default": "admin#directory#role"
+    },
+    "roleDescription": {
+     "type": "string",
+     "description": "A short description of the role."
+    },
+    "roleId": {
+     "type": "string",
+     "description": "ID of the role.",
+     "format": "int64"
+    },
+    "roleName": {
+     "type": "string",
+     "description": "Name of the role.",
+     "annotations": {
+      "required": [
+       "directory.roles.insert"
+      ]
+     }
+    },
+    "rolePrivileges": {
+     "type": "array",
+     "description": "The set of privileges that are granted to this role.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "privilegeName": {
+        "type": "string",
+        "description": "The name of the privilege."
+       },
+       "serviceId": {
+        "type": "string",
+        "description": "The obfuscated ID of the service this privilege is for."
+       }
+      }
+     },
+     "annotations": {
+      "required": [
+       "directory.roles.insert"
+      ]
+     }
+    }
+   }
+  },
+  "RoleAssignment": {
+   "id": "RoleAssignment",
+   "type": "object",
+   "description": "JSON template for roleAssignment resource in Directory API.",
+   "properties": {
+    "assignedTo": {
+     "type": "string",
+     "description": "The unique ID of the user this role is assigned to."
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#roleAssignment.",
+     "default": "admin#directory#roleAssignment"
+    },
+    "orgUnitId": {
+     "type": "string",
+     "description": "If the role is restricted to an organization unit, this contains the ID for the organization unit the exercise of this role is restricted to."
+    },
+    "roleAssignmentId": {
+     "type": "string",
+     "description": "ID of this roleAssignment.",
+     "format": "int64"
+    },
+    "roleId": {
+     "type": "string",
+     "description": "The ID of the role that is assigned.",
+     "format": "int64"
+    },
+    "scopeType": {
+     "type": "string",
+     "description": "The scope in which this role is assigned. Possible values are: \n- CUSTOMER\n- ORG_UNIT"
+    }
+   }
+  },
+  "RoleAssignments": {
+   "id": "RoleAssignments",
+   "type": "object",
+   "description": "JSON response template for List roleAssignments operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of RoleAssignment resources.",
+     "items": {
+      "$ref": "RoleAssignment"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#roleAssignments.",
+     "default": "admin#directory#roleAssignments"
+    },
+    "nextPageToken": {
+     "type": "string"
+    }
+   }
+  },
+  "Roles": {
+   "id": "Roles",
+   "type": "object",
+   "description": "JSON response template for List roles operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of Role resources.",
+     "items": {
+      "$ref": "Role"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#roles.",
+     "default": "admin#directory#roles"
+    },
+    "nextPageToken": {
+     "type": "string"
+    }
+   }
+  },
+  "Schema": {
+   "id": "Schema",
+   "type": "object",
+   "description": "JSON template for Schema resource in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "fields": {
+     "type": "array",
+     "description": "Fields of Schema",
+     "items": {
+      "$ref": "SchemaFieldSpec"
+     },
+     "annotations": {
+      "required": [
+       "directory.schemas.insert",
+       "directory.schemas.update"
+      ]
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#schema"
+    },
+    "schemaId": {
+     "type": "string",
+     "description": "Unique identifier of Schema (Read-only)"
+    },
+    "schemaName": {
+     "type": "string",
+     "description": "Schema name",
+     "annotations": {
+      "required": [
+       "directory.schemas.insert"
+      ]
+     }
+    }
+   }
+  },
+  "SchemaFieldSpec": {
+   "id": "SchemaFieldSpec",
+   "type": "object",
+   "description": "JSON template for FieldSpec resource for Schemas in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "fieldId": {
+     "type": "string",
+     "description": "Unique identifier of Field (Read-only)"
+    },
+    "fieldName": {
+     "type": "string",
+     "description": "Name of the field.",
+     "annotations": {
+      "required": [
+       "directory.schemas.insert",
+       "directory.schemas.update"
+      ]
+     }
+    },
+    "fieldType": {
+     "type": "string",
+     "description": "Type of the field.",
+     "annotations": {
+      "required": [
+       "directory.schemas.insert",
+       "directory.schemas.update"
+      ]
+     }
+    },
+    "indexed": {
+     "type": "boolean",
+     "description": "Boolean specifying whether the field is indexed or not.",
+     "default": "true"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#schema#fieldspec"
+    },
+    "multiValued": {
+     "type": "boolean",
+     "description": "Boolean specifying whether this is a multi-valued field or not."
+    },
+    "numericIndexingSpec": {
+     "type": "object",
+     "description": "Indexing spec for a numeric field. By default, only exact match queries will be supported for numeric fields. Setting the numericIndexingSpec allows range queries to be supported.",
+     "properties": {
+      "maxValue": {
+       "type": "number",
+       "description": "Maximum value of this field. This is meant to be indicative rather than enforced. Values outside this range will still be indexed, but search may not be as performant.",
+       "format": "double"
+      },
+      "minValue": {
+       "type": "number",
+       "description": "Minimum value of this field. This is meant to be indicative rather than enforced. Values outside this range will still be indexed, but search may not be as performant.",
+       "format": "double"
+      }
+     }
+    },
+    "readAccessType": {
+     "type": "string",
+     "description": "Read ACLs on the field specifying who can view values of this field. Valid values are \"ALL_DOMAIN_USERS\" and \"ADMINS_AND_SELF\".",
+     "default": "ALL_DOMAIN_USERS"
+    }
+   }
+  },
+  "Schemas": {
+   "id": "Schemas",
+   "type": "object",
+   "description": "JSON response template for List Schema operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#schemas"
+    },
+    "schemas": {
+     "type": "array",
+     "description": "List of UserSchema objects.",
+     "items": {
+      "$ref": "Schema"
+     }
+    }
+   }
+  },
+  "Token": {
+   "id": "Token",
+   "type": "object",
+   "description": "JSON template for token resource in Directory API.",
+   "properties": {
+    "anonymous": {
+     "type": "boolean",
+     "description": "Whether the application is registered with Google. The value is true if the application has an anonymous Client ID."
+    },
+    "clientId": {
+     "type": "string",
+     "description": "The Client ID of the application the token is issued to."
+    },
+    "displayText": {
+     "type": "string",
+     "description": "The displayable name of the application the token is issued to."
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#token.",
+     "default": "admin#directory#token"
+    },
+    "nativeApp": {
+     "type": "boolean",
+     "description": "Whether the token is issued to an installed application. The value is true if the application is installed to a desktop or mobile device."
+    },
+    "scopes": {
+     "type": "array",
+     "description": "A list of authorization scopes the application is granted.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "userKey": {
+     "type": "string",
+     "description": "The unique ID of the user that issued the token."
+    }
+   }
+  },
+  "Tokens": {
+   "id": "Tokens",
+   "type": "object",
+   "description": "JSON response template for List tokens operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of Token resources.",
+     "items": {
+      "$ref": "Token"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the API resource. This is always admin#directory#tokenList.",
+     "default": "admin#directory#tokenList"
+    }
+   }
+  },
+  "User": {
+   "id": "User",
+   "type": "object",
+   "description": "JSON template for User object in Directory API.",
+   "properties": {
+    "addresses": {
+     "type": "any"
+    },
+    "agreedToTerms": {
+     "type": "boolean",
+     "description": "Indicates if user has agreed to terms (Read-only)",
+     "readOnly": true
+    },
+    "aliases": {
+     "type": "array",
+     "description": "List of aliases (Read-only)",
+     "readOnly": true,
+     "items": {
+      "type": "string"
+     }
+    },
+    "changePasswordAtNextLogin": {
+     "type": "boolean",
+     "description": "Boolean indicating if the user should change password in next login"
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "User's Google account creation time. (Read-only)",
+     "format": "date-time",
+     "readOnly": true
+    },
+    "customSchemas": {
+     "type": "object",
+     "description": "Custom fields of the user.",
+     "additionalProperties": {
+      "$ref": "UserCustomProperties"
+     }
+    },
+    "customerId": {
+     "type": "string",
+     "description": "CustomerId of User (Read-only)",
+     "readOnly": true
+    },
+    "deletionTime": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true
+    },
+    "emails": {
+     "type": "any"
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource.",
+     "readOnly": true
+    },
+    "externalIds": {
+     "type": "any"
+    },
+    "hashFunction": {
+     "type": "string",
+     "description": "Hash function name for password. Supported are MD5, SHA-1 and crypt"
+    },
+    "id": {
+     "type": "string",
+     "description": "Unique identifier of User (Read-only)"
+    },
+    "ims": {
+     "type": "any"
+    },
+    "includeInGlobalAddressList": {
+     "type": "boolean",
+     "description": "Boolean indicating if user is included in Global Address List"
+    },
+    "ipWhitelisted": {
+     "type": "boolean",
+     "description": "Boolean indicating if ip is whitelisted"
+    },
+    "isAdmin": {
+     "type": "boolean",
+     "description": "Boolean indicating if the user is admin (Read-only)",
+     "readOnly": true
+    },
+    "isDelegatedAdmin": {
+     "type": "boolean",
+     "description": "Boolean indicating if the user is delegated admin (Read-only)",
+     "readOnly": true
+    },
+    "isMailboxSetup": {
+     "type": "boolean",
+     "description": "Is mailbox setup (Read-only)",
+     "readOnly": true
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#user",
+     "readOnly": true
+    },
+    "lastLoginTime": {
+     "type": "string",
+     "description": "User's last login time. (Read-only)",
+     "format": "date-time",
+     "readOnly": true
+    },
+    "name": {
+     "$ref": "UserName",
+     "description": "User's name",
+     "annotations": {
+      "required": [
+       "directory.users.insert"
+      ]
+     }
+    },
+    "nonEditableAliases": {
+     "type": "array",
+     "description": "List of non editable aliases (Read-only)",
+     "readOnly": true,
+     "items": {
+      "type": "string"
+     }
+    },
+    "notes": {
+     "type": "any"
+    },
+    "orgUnitPath": {
+     "type": "string",
+     "description": "OrgUnit of User"
+    },
+    "organizations": {
+     "type": "any"
+    },
+    "password": {
+     "type": "string",
+     "description": "User's password",
+     "annotations": {
+      "required": [
+       "directory.users.insert"
+      ]
+     }
+    },
+    "phones": {
+     "type": "any"
+    },
+    "primaryEmail": {
+     "type": "string",
+     "description": "username of User",
+     "annotations": {
+      "required": [
+       "directory.users.insert"
+      ]
+     }
+    },
+    "relations": {
+     "type": "any"
+    },
+    "suspended": {
+     "type": "boolean",
+     "description": "Indicates if user is suspended"
+    },
+    "suspensionReason": {
+     "type": "string",
+     "description": "Suspension reason if user is suspended (Read-only)",
+     "readOnly": true
+    },
+    "thumbnailPhotoEtag": {
+     "type": "string",
+     "description": "ETag of the user's photo (Read-only)",
+     "readOnly": true
+    },
+    "thumbnailPhotoUrl": {
+     "type": "string",
+     "description": "Photo Url of the user (Read-only)",
+     "readOnly": true
+    },
+    "websites": {
+     "type": "any"
+    }
+   }
+  },
+  "UserAbout": {
+   "id": "UserAbout",
+   "type": "object",
+   "description": "JSON template for About (notes) of a user in Directory API.",
+   "properties": {
+    "contentType": {
+     "type": "string",
+     "description": "About entry can have a type which indicates the content type. It can either be plain or html. By default, notes contents are assumed to contain plain text."
+    },
+    "value": {
+     "type": "string",
+     "description": "Actual value of notes."
+    }
+   }
+  },
+  "UserAddress": {
+   "id": "UserAddress",
+   "type": "object",
+   "description": "JSON template for address.",
+   "properties": {
+    "country": {
+     "type": "string",
+     "description": "Country."
+    },
+    "countryCode": {
+     "type": "string",
+     "description": "Country code."
+    },
+    "customType": {
+     "type": "string",
+     "description": "Custom type."
+    },
+    "extendedAddress": {
+     "type": "string",
+     "description": "Extended Address."
+    },
+    "formatted": {
+     "type": "string",
+     "description": "Formatted address."
+    },
+    "locality": {
+     "type": "string",
+     "description": "Locality."
+    },
+    "poBox": {
+     "type": "string",
+     "description": "Other parts of address."
+    },
+    "postalCode": {
+     "type": "string",
+     "description": "Postal code."
+    },
+    "primary": {
+     "type": "boolean",
+     "description": "If this is user's primary address. Only one entry could be marked as primary."
+    },
+    "region": {
+     "type": "string",
+     "description": "Region."
+    },
+    "sourceIsStructured": {
+     "type": "boolean",
+     "description": "User supplied address was structured. Structured addresses are NOT supported at this time. You might be able to write structured addresses, but any values will eventually be clobbered."
+    },
+    "streetAddress": {
+     "type": "string",
+     "description": "Street."
+    },
+    "type": {
+     "type": "string",
+     "description": "Each entry can have a type which indicates standard values of that entry. For example address could be of home, work etc. In addition to the standard type, an entry can have a custom type and can take any value. Such type should have the CUSTOM value as type and also have a customType value."
+    }
+   }
+  },
+  "UserCustomProperties": {
+   "id": "UserCustomProperties",
+   "type": "object",
+   "description": "JSON template for a set of custom properties (i.e. all fields in a particular schema)",
+   "additionalProperties": {
+    "type": "any"
+   }
+  },
+  "UserEmail": {
+   "id": "UserEmail",
+   "type": "object",
+   "description": "JSON template for an email.",
+   "properties": {
+    "address": {
+     "type": "string",
+     "description": "Email id of the user."
+    },
+    "customType": {
+     "type": "string",
+     "description": "Custom Type."
+    },
+    "primary": {
+     "type": "boolean",
+     "description": "If this is user's primary email. Only one entry could be marked as primary."
+    },
+    "type": {
+     "type": "string",
+     "description": "Each entry can have a type which indicates standard types of that entry. For example email could be of home, work etc. In addition to the standard type, an entry can have a custom type and can take any value Such types should have the CUSTOM value as type and also have a customType value."
+    }
+   }
+  },
+  "UserExternalId": {
+   "id": "UserExternalId",
+   "type": "object",
+   "description": "JSON template for an externalId entry.",
+   "properties": {
+    "customType": {
+     "type": "string",
+     "description": "Custom type."
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of the Id."
+    },
+    "value": {
+     "type": "string",
+     "description": "The value of the id."
+    }
+   }
+  },
+  "UserIm": {
+   "id": "UserIm",
+   "type": "object",
+   "description": "JSON template for instant messenger of an user.",
+   "properties": {
+    "customProtocol": {
+     "type": "string",
+     "description": "Custom protocol."
+    },
+    "customType": {
+     "type": "string",
+     "description": "Custom type."
+    },
+    "im": {
+     "type": "string",
+     "description": "Instant messenger id."
+    },
+    "primary": {
+     "type": "boolean",
+     "description": "If this is user's primary im. Only one entry could be marked as primary."
+    },
+    "protocol": {
+     "type": "string",
+     "description": "Protocol used in the instant messenger. It should be one of the values from ImProtocolTypes map. Similar to type, it can take a CUSTOM value and specify the custom name in customProtocol field."
+    },
+    "type": {
+     "type": "string",
+     "description": "Each entry can have a type which indicates standard types of that entry. For example instant messengers could be of home, work etc. In addition to the standard type, an entry can have a custom type and can take any value. Such types should have the CUSTOM value as type and also have a customType value."
+    }
+   }
+  },
+  "UserMakeAdmin": {
+   "id": "UserMakeAdmin",
+   "type": "object",
+   "description": "JSON request template for setting/revoking admin status of a user in Directory API.",
+   "properties": {
+    "status": {
+     "type": "boolean",
+     "description": "Boolean indicating new admin status of the user",
+     "annotations": {
+      "required": [
+       "directory.users.makeAdmin"
+      ]
+     }
+    }
+   }
+  },
+  "UserName": {
+   "id": "UserName",
+   "type": "object",
+   "description": "JSON template for name of a user in Directory API.",
+   "properties": {
+    "familyName": {
+     "type": "string",
+     "description": "Last Name",
+     "annotations": {
+      "required": [
+       "directory.users.insert"
+      ]
+     }
+    },
+    "fullName": {
+     "type": "string",
+     "description": "Full Name"
+    },
+    "givenName": {
+     "type": "string",
+     "description": "First Name",
+     "annotations": {
+      "required": [
+       "directory.users.insert"
+      ]
+     }
+    }
+   }
+  },
+  "UserOrganization": {
+   "id": "UserOrganization",
+   "type": "object",
+   "description": "JSON template for an organization entry.",
+   "properties": {
+    "costCenter": {
+     "type": "string",
+     "description": "The cost center of the users department."
+    },
+    "customType": {
+     "type": "string",
+     "description": "Custom type."
+    },
+    "department": {
+     "type": "string",
+     "description": "Department within the organization."
+    },
+    "description": {
+     "type": "string",
+     "description": "Description of the organization."
+    },
+    "domain": {
+     "type": "string",
+     "description": "The domain to which the organization belongs to."
+    },
+    "location": {
+     "type": "string",
+     "description": "Location of the organization. This need not be fully qualified address."
+    },
+    "name": {
+     "type": "string",
+     "description": "Name of the organization"
+    },
+    "primary": {
+     "type": "boolean",
+     "description": "If it user's primary organization."
+    },
+    "symbol": {
+     "type": "string",
+     "description": "Symbol of the organization."
+    },
+    "title": {
+     "type": "string",
+     "description": "Title (designation) of the user in the organization."
+    },
+    "type": {
+     "type": "string",
+     "description": "Each entry can have a type which indicates standard types of that entry. For example organization could be of school, work etc. In addition to the standard type, an entry can have a custom type and can give it any name. Such types should have the CUSTOM value as type and also have a CustomType value."
+    }
+   }
+  },
+  "UserPhone": {
+   "id": "UserPhone",
+   "type": "object",
+   "description": "JSON template for a phone entry.",
+   "properties": {
+    "customType": {
+     "type": "string",
+     "description": "Custom Type."
+    },
+    "primary": {
+     "type": "boolean",
+     "description": "If this is user's primary phone or not."
+    },
+    "type": {
+     "type": "string",
+     "description": "Each entry can have a type which indicates standard types of that entry. For example phone could be of home_fax, work, mobile etc. In addition to the standard type, an entry can have a custom type and can give it any name. Such types should have the CUSTOM value as type and also have a customType value."
+    },
+    "value": {
+     "type": "string",
+     "description": "Phone number."
+    }
+   }
+  },
+  "UserPhoto": {
+   "id": "UserPhoto",
+   "type": "object",
+   "description": "JSON template for Photo object in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "height": {
+     "type": "integer",
+     "description": "Height in pixels of the photo",
+     "format": "int32"
+    },
+    "id": {
+     "type": "string",
+     "description": "Unique identifier of User (Read-only)"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#user#photo"
+    },
+    "mimeType": {
+     "type": "string",
+     "description": "Mime Type of the photo"
+    },
+    "photoData": {
+     "type": "string",
+     "description": "Base64 encoded photo data",
+     "format": "byte",
+     "annotations": {
+      "required": [
+       "directory.users.photos.update"
+      ]
+     }
+    },
+    "primaryEmail": {
+     "type": "string",
+     "description": "Primary email of User (Read-only)"
+    },
+    "width": {
+     "type": "integer",
+     "description": "Width in pixels of the photo",
+     "format": "int32"
+    }
+   }
+  },
+  "UserRelation": {
+   "id": "UserRelation",
+   "type": "object",
+   "description": "JSON template for a relation entry.",
+   "properties": {
+    "customType": {
+     "type": "string",
+     "description": "Custom Type."
+    },
+    "type": {
+     "type": "string",
+     "description": "The relation of the user. Some of the possible values are mother, father, sister, brother, manager, assistant, partner."
+    },
+    "value": {
+     "type": "string",
+     "description": "The name of the relation."
+    }
+   }
+  },
+  "UserUndelete": {
+   "id": "UserUndelete",
+   "type": "object",
+   "description": "JSON request template to undelete a user in Directory API.",
+   "properties": {
+    "orgUnitPath": {
+     "type": "string",
+     "description": "OrgUnit of User"
+    }
+   }
+  },
+  "UserWebsite": {
+   "id": "UserWebsite",
+   "type": "object",
+   "description": "JSON template for a website entry.",
+   "properties": {
+    "customType": {
+     "type": "string",
+     "description": "Custom Type."
+    },
+    "primary": {
+     "type": "boolean",
+     "description": "If this is user's primary website or not."
+    },
+    "type": {
+     "type": "string",
+     "description": "Each entry can have a type which indicates standard types of that entry. For example website could be of home, work, blog etc. In addition to the standard type, an entry can have a custom type and can give it any name. Such types should have the CUSTOM value as type and also have a customType value."
+    },
+    "value": {
+     "type": "string",
+     "description": "Website."
+    }
+   }
+  },
+  "Users": {
+   "id": "Users",
+   "type": "object",
+   "description": "JSON response template for List Users operation in Apps Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#directory#users"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token used to access next page of this result."
+    },
+    "trigger_event": {
+     "type": "string",
+     "description": "Event that triggered this response (only used in case of Push Response)"
+    },
+    "users": {
+     "type": "array",
+     "description": "List of user objects.",
+     "items": {
+      "$ref": "User"
+     }
+    }
+   }
+  },
+  "VerificationCode": {
+   "id": "VerificationCode",
+   "type": "object",
+   "description": "JSON template for verification codes in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the resource. This is always admin#directory#verificationCode.",
+     "default": "admin#directory#verificationCode"
+    },
+    "userId": {
+     "type": "string",
+     "description": "The obfuscated unique ID of the user."
+    },
+    "verificationCode": {
+     "type": "string",
+     "description": "A current verification code for the user. Invalidated or used verification codes are not returned as part of the result."
+    }
+   }
+  },
+  "VerificationCodes": {
+   "id": "VerificationCodes",
+   "type": "object",
+   "description": "JSON response template for List verification codes operation in Directory API.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of verification code resources.",
+     "items": {
+      "$ref": "VerificationCode"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of the resource. This is always admin#directory#verificationCodesList.",
+     "default": "admin#directory#verificationCodesList"
+    }
+   }
+  }
+ },
+ "resources": {
+  "asps": {
+   "methods": {
+    "delete": {
+     "id": "directory.asps.delete",
+     "path": "users/{userKey}/asps/{codeId}",
+     "httpMethod": "DELETE",
+     "description": "Delete an ASP issued by a user.",
+     "parameters": {
+      "codeId": {
+       "type": "integer",
+       "description": "The unique ID of the ASP to be deleted.",
+       "required": true,
+       "format": "int32",
+       "location": "path"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey",
+      "codeId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user.security"
+     ]
+    },
+    "get": {
+     "id": "directory.asps.get",
+     "path": "users/{userKey}/asps/{codeId}",
+     "httpMethod": "GET",
+     "description": "Get information about an ASP issued by a user.",
+     "parameters": {
+      "codeId": {
+       "type": "integer",
+       "description": "The unique ID of the ASP.",
+       "required": true,
+       "format": "int32",
+       "location": "path"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey",
+      "codeId"
+     ],
+     "response": {
+      "$ref": "Asp"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user.security"
+     ]
+    },
+    "list": {
+     "id": "directory.asps.list",
+     "path": "users/{userKey}/asps",
+     "httpMethod": "GET",
+     "description": "List the ASPs issued by a user.",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "response": {
+      "$ref": "Asps"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user.security"
+     ]
+    }
+   }
+  },
+  "channels": {
+   "methods": {
+    "stop": {
+     "id": "admin.channels.stop",
+     "path": "/admin/directory_v1/channels/stop",
+     "httpMethod": "POST",
+     "description": "Stop watching resources through this channel",
+     "request": {
+      "$ref": "Channel",
+      "parameterName": "resource"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user",
+      "https://www.googleapis.com/auth/admin.directory.user.alias",
+      "https://www.googleapis.com/auth/admin.directory.user.alias.readonly",
+      "https://www.googleapis.com/auth/admin.directory.user.readonly"
+     ]
+    }
+   }
+  },
+  "chromeosdevices": {
+   "methods": {
+    "get": {
+     "id": "directory.chromeosdevices.get",
+     "path": "customer/{customerId}/devices/chromeos/{deviceId}",
+     "httpMethod": "GET",
+     "description": "Retrieve Chrome OS Device",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "deviceId": {
+       "type": "string",
+       "description": "Immutable id of Chrome OS Device",
+       "required": true,
+       "location": "path"
+      },
+      "projection": {
+       "type": "string",
+       "description": "Restrict information returned to a set of selected fields.",
+       "enum": [
+        "BASIC",
+        "FULL"
+       ],
+       "enumDescriptions": [
+        "Includes only the basic metadata fields (e.g., deviceId, serialNumber, status, and user)",
+        "Includes all metadata fields"
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "deviceId"
+     ],
+     "response": {
+      "$ref": "ChromeOsDevice"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.device.chromeos",
+      "https://www.googleapis.com/auth/admin.directory.device.chromeos.readonly"
+     ]
+    },
+    "list": {
+     "id": "directory.chromeosdevices.list",
+     "path": "customer/{customerId}/devices/chromeos",
+     "httpMethod": "GET",
+     "description": "Retrieve all Chrome OS Devices of a customer (paginated)",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return. Default is 100",
+       "format": "int32",
+       "minimum": "1",
+       "location": "query"
+      },
+      "orderBy": {
+       "type": "string",
+       "description": "Column to use for sorting results",
+       "enum": [
+        "annotatedLocation",
+        "annotatedUser",
+        "lastSync",
+        "notes",
+        "serialNumber",
+        "status",
+        "supportEndDate"
+       ],
+       "enumDescriptions": [
+        "Chromebook location as annotated by the administrator.",
+        "Chromebook user as annotated by administrator.",
+        "Chromebook last sync.",
+        "Chromebook notes as annotated by the administrator.",
+        "Chromebook Serial Number.",
+        "Chromebook status.",
+        "Chromebook support end date."
+       ],
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page in the list",
+       "location": "query"
+      },
+      "projection": {
+       "type": "string",
+       "description": "Restrict information returned to a set of selected fields.",
+       "enum": [
+        "BASIC",
+        "FULL"
+       ],
+       "enumDescriptions": [
+        "Includes only the basic metadata fields (e.g., deviceId, serialNumber, status, and user)",
+        "Includes all metadata fields"
+       ],
+       "location": "query"
+      },
+      "query": {
+       "type": "string",
+       "description": "Search string in the format given at http://support.google.com/chromeos/a/bin/answer.py?hl=en&answer=1698333",
+       "location": "query"
+      },
+      "sortOrder": {
+       "type": "string",
+       "description": "Whether to return results in ascending or descending order. Only of use when orderBy is also used",
+       "enum": [
+        "ASCENDING",
+        "DESCENDING"
+       ],
+       "enumDescriptions": [
+        "Ascending order.",
+        "Descending order."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customerId"
+     ],
+     "response": {
+      "$ref": "ChromeOsDevices"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.device.chromeos",
+      "https://www.googleapis.com/auth/admin.directory.device.chromeos.readonly"
+     ]
+    },
+    "patch": {
+     "id": "directory.chromeosdevices.patch",
+     "path": "customer/{customerId}/devices/chromeos/{deviceId}",
+     "httpMethod": "PATCH",
+     "description": "Update Chrome OS Device. This method supports patch semantics.",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "deviceId": {
+       "type": "string",
+       "description": "Immutable id of Chrome OS Device",
+       "required": true,
+       "location": "path"
+      },
+      "projection": {
+       "type": "string",
+       "description": "Restrict information returned to a set of selected fields.",
+       "enum": [
+        "BASIC",
+        "FULL"
+       ],
+       "enumDescriptions": [
+        "Includes only the basic metadata fields (e.g., deviceId, serialNumber, status, and user)",
+        "Includes all metadata fields"
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "deviceId"
+     ],
+     "request": {
+      "$ref": "ChromeOsDevice"
+     },
+     "response": {
+      "$ref": "ChromeOsDevice"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.device.chromeos"
+     ]
+    },
+    "update": {
+     "id": "directory.chromeosdevices.update",
+     "path": "customer/{customerId}/devices/chromeos/{deviceId}",
+     "httpMethod": "PUT",
+     "description": "Update Chrome OS Device",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "deviceId": {
+       "type": "string",
+       "description": "Immutable id of Chrome OS Device",
+       "required": true,
+       "location": "path"
+      },
+      "projection": {
+       "type": "string",
+       "description": "Restrict information returned to a set of selected fields.",
+       "enum": [
+        "BASIC",
+        "FULL"
+       ],
+       "enumDescriptions": [
+        "Includes only the basic metadata fields (e.g., deviceId, serialNumber, status, and user)",
+        "Includes all metadata fields"
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "deviceId"
+     ],
+     "request": {
+      "$ref": "ChromeOsDevice"
+     },
+     "response": {
+      "$ref": "ChromeOsDevice"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.device.chromeos"
+     ]
+    }
+   }
+  },
+  "customers": {
+   "methods": {
+    "get": {
+     "id": "directory.customers.get",
+     "path": "customers/{customerKey}",
+     "httpMethod": "GET",
+     "description": "Retrives a customer.",
+     "parameters": {
+      "customerKey": {
+       "type": "string",
+       "description": "Id of the customer to be retrieved",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerKey"
+     ],
+     "response": {
+      "$ref": "Customer"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.customer",
+      "https://www.googleapis.com/auth/admin.directory.customer.readonly"
+     ]
+    },
+    "patch": {
+     "id": "directory.customers.patch",
+     "path": "customers/{customerKey}",
+     "httpMethod": "PATCH",
+     "description": "Updates a customer. This method supports patch semantics.",
+     "parameters": {
+      "customerKey": {
+       "type": "string",
+       "description": "Id of the customer to be updated",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerKey"
+     ],
+     "request": {
+      "$ref": "Customer"
+     },
+     "response": {
+      "$ref": "Customer"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.customer"
+     ]
+    },
+    "update": {
+     "id": "directory.customers.update",
+     "path": "customers/{customerKey}",
+     "httpMethod": "PUT",
+     "description": "Updates a customer.",
+     "parameters": {
+      "customerKey": {
+       "type": "string",
+       "description": "Id of the customer to be updated",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerKey"
+     ],
+     "request": {
+      "$ref": "Customer"
+     },
+     "response": {
+      "$ref": "Customer"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.customer"
+     ]
+    }
+   }
+  },
+  "domainAliases": {
+   "methods": {
+    "delete": {
+     "id": "directory.domainAliases.delete",
+     "path": "customer/{customer}/domainaliases/{domainAliasName}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a Domain Alias of the customer.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "domainAliasName": {
+       "type": "string",
+       "description": "Name of domain alias to be retrieved.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "domainAliasName"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.domain"
+     ]
+    },
+    "get": {
+     "id": "directory.domainAliases.get",
+     "path": "customer/{customer}/domainaliases/{domainAliasName}",
+     "httpMethod": "GET",
+     "description": "Retrieves a domain alias of the customer.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "domainAliasName": {
+       "type": "string",
+       "description": "Name of domain alias to be retrieved.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "domainAliasName"
+     ],
+     "response": {
+      "$ref": "DomainAlias"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.domain",
+      "https://www.googleapis.com/auth/admin.directory.domain.readonly"
+     ]
+    },
+    "insert": {
+     "id": "directory.domainAliases.insert",
+     "path": "customer/{customer}/domainaliases",
+     "httpMethod": "POST",
+     "description": "Inserts a Domain alias of the customer.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "request": {
+      "$ref": "DomainAlias"
+     },
+     "response": {
+      "$ref": "DomainAlias"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.domain"
+     ]
+    },
+    "list": {
+     "id": "directory.domainAliases.list",
+     "path": "customer/{customer}/domainaliases",
+     "httpMethod": "GET",
+     "description": "Lists the domain aliases of the customer.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "parentDomainName": {
+       "type": "string",
+       "description": "Name of the parent domain for which domain aliases are to be fetched.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "response": {
+      "$ref": "DomainAliases"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.domain",
+      "https://www.googleapis.com/auth/admin.directory.domain.readonly"
+     ]
+    }
+   }
+  },
+  "domains": {
+   "methods": {
+    "delete": {
+     "id": "directory.domains.delete",
+     "path": "customer/{customer}/domains/{domainName}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a domain of the customer.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "domainName": {
+       "type": "string",
+       "description": "Name of domain to be deleted",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "domainName"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.domain"
+     ]
+    },
+    "get": {
+     "id": "directory.domains.get",
+     "path": "customer/{customer}/domains/{domainName}",
+     "httpMethod": "GET",
+     "description": "Retrives a domain of the customer.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "domainName": {
+       "type": "string",
+       "description": "Name of domain to be retrieved",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "domainName"
+     ],
+     "response": {
+      "$ref": "Domains"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.domain",
+      "https://www.googleapis.com/auth/admin.directory.domain.readonly"
+     ]
+    },
+    "insert": {
+     "id": "directory.domains.insert",
+     "path": "customer/{customer}/domains",
+     "httpMethod": "POST",
+     "description": "Inserts a domain of the customer.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "request": {
+      "$ref": "Domains"
+     },
+     "response": {
+      "$ref": "Domains"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.domain"
+     ]
+    },
+    "list": {
+     "id": "directory.domains.list",
+     "path": "customer/{customer}/domains",
+     "httpMethod": "GET",
+     "description": "Lists the domains of the customer.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "response": {
+      "$ref": "Domains2"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.domain",
+      "https://www.googleapis.com/auth/admin.directory.domain.readonly"
+     ]
+    }
+   }
+  },
+  "groups": {
+   "methods": {
+    "delete": {
+     "id": "directory.groups.delete",
+     "path": "groups/{groupKey}",
+     "httpMethod": "DELETE",
+     "description": "Delete Group",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupKey"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group"
+     ]
+    },
+    "get": {
+     "id": "directory.groups.get",
+     "path": "groups/{groupKey}",
+     "httpMethod": "GET",
+     "description": "Retrieve Group",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupKey"
+     ],
+     "response": {
+      "$ref": "Group"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group",
+      "https://www.googleapis.com/auth/admin.directory.group.readonly"
+     ]
+    },
+    "insert": {
+     "id": "directory.groups.insert",
+     "path": "groups",
+     "httpMethod": "POST",
+     "description": "Create Group",
+     "request": {
+      "$ref": "Group"
+     },
+     "response": {
+      "$ref": "Group"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group"
+     ]
+    },
+    "list": {
+     "id": "directory.groups.list",
+     "path": "groups",
+     "httpMethod": "GET",
+     "description": "Retrieve all groups in a domain (paginated)",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account. In case of multi-domain, to fetch all groups for a customer, fill this field instead of domain.",
+       "location": "query"
+      },
+      "domain": {
+       "type": "string",
+       "description": "Name of the domain. Fill this field to get groups from only this domain. To return all groups in a multi-domain fill customer field instead.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return. Default is 200",
+       "format": "int32",
+       "minimum": "1",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page in the list",
+       "location": "query"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user if only those groups are to be listed, the given user is a member of. If Id, it should match with id of user object",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "Groups"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group",
+      "https://www.googleapis.com/auth/admin.directory.group.readonly"
+     ]
+    },
+    "patch": {
+     "id": "directory.groups.patch",
+     "path": "groups/{groupKey}",
+     "httpMethod": "PATCH",
+     "description": "Update Group. This method supports patch semantics.",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group. If Id, it should match with id of group object",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupKey"
+     ],
+     "request": {
+      "$ref": "Group"
+     },
+     "response": {
+      "$ref": "Group"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group"
+     ]
+    },
+    "update": {
+     "id": "directory.groups.update",
+     "path": "groups/{groupKey}",
+     "httpMethod": "PUT",
+     "description": "Update Group",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group. If Id, it should match with id of group object",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupKey"
+     ],
+     "request": {
+      "$ref": "Group"
+     },
+     "response": {
+      "$ref": "Group"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group"
+     ]
+    }
+   },
+   "resources": {
+    "aliases": {
+     "methods": {
+      "delete": {
+       "id": "directory.groups.aliases.delete",
+       "path": "groups/{groupKey}/aliases/{alias}",
+       "httpMethod": "DELETE",
+       "description": "Remove a alias for the group",
+       "parameters": {
+        "alias": {
+         "type": "string",
+         "description": "The alias to be removed",
+         "required": true,
+         "location": "path"
+        },
+        "groupKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the group",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "groupKey",
+        "alias"
+       ],
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.group"
+       ]
+      },
+      "insert": {
+       "id": "directory.groups.aliases.insert",
+       "path": "groups/{groupKey}/aliases",
+       "httpMethod": "POST",
+       "description": "Add a alias for the group",
+       "parameters": {
+        "groupKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the group",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "groupKey"
+       ],
+       "request": {
+        "$ref": "Alias"
+       },
+       "response": {
+        "$ref": "Alias"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.group"
+       ]
+      },
+      "list": {
+       "id": "directory.groups.aliases.list",
+       "path": "groups/{groupKey}/aliases",
+       "httpMethod": "GET",
+       "description": "List all aliases for a group",
+       "parameters": {
+        "groupKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the group",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "groupKey"
+       ],
+       "response": {
+        "$ref": "Aliases"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.group",
+        "https://www.googleapis.com/auth/admin.directory.group.readonly"
+       ],
+       "supportsSubscription": true
+      }
+     }
+    }
+   }
+  },
+  "members": {
+   "methods": {
+    "delete": {
+     "id": "directory.members.delete",
+     "path": "groups/{groupKey}/members/{memberKey}",
+     "httpMethod": "DELETE",
+     "description": "Remove membership.",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group",
+       "required": true,
+       "location": "path"
+      },
+      "memberKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the member",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupKey",
+      "memberKey"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group",
+      "https://www.googleapis.com/auth/admin.directory.group.member"
+     ]
+    },
+    "get": {
+     "id": "directory.members.get",
+     "path": "groups/{groupKey}/members/{memberKey}",
+     "httpMethod": "GET",
+     "description": "Retrieve Group Member",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group",
+       "required": true,
+       "location": "path"
+      },
+      "memberKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the member",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupKey",
+      "memberKey"
+     ],
+     "response": {
+      "$ref": "Member"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group",
+      "https://www.googleapis.com/auth/admin.directory.group.member",
+      "https://www.googleapis.com/auth/admin.directory.group.member.readonly",
+      "https://www.googleapis.com/auth/admin.directory.group.readonly"
+     ]
+    },
+    "insert": {
+     "id": "directory.members.insert",
+     "path": "groups/{groupKey}/members",
+     "httpMethod": "POST",
+     "description": "Add user to the specified group.",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupKey"
+     ],
+     "request": {
+      "$ref": "Member"
+     },
+     "response": {
+      "$ref": "Member"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group",
+      "https://www.googleapis.com/auth/admin.directory.group.member"
+     ]
+    },
+    "list": {
+     "id": "directory.members.list",
+     "path": "groups/{groupKey}/members",
+     "httpMethod": "GET",
+     "description": "Retrieve all members in a group (paginated)",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return. Default is 200",
+       "format": "int32",
+       "minimum": "1",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page in the list",
+       "location": "query"
+      },
+      "roles": {
+       "type": "string",
+       "description": "Comma separated role values to filter list results on.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "groupKey"
+     ],
+     "response": {
+      "$ref": "Members"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group",
+      "https://www.googleapis.com/auth/admin.directory.group.member",
+      "https://www.googleapis.com/auth/admin.directory.group.member.readonly",
+      "https://www.googleapis.com/auth/admin.directory.group.readonly"
+     ]
+    },
+    "patch": {
+     "id": "directory.members.patch",
+     "path": "groups/{groupKey}/members/{memberKey}",
+     "httpMethod": "PATCH",
+     "description": "Update membership of a user in the specified group. This method supports patch semantics.",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group. If Id, it should match with id of group object",
+       "required": true,
+       "location": "path"
+      },
+      "memberKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user. If Id, it should match with id of member object",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupKey",
+      "memberKey"
+     ],
+     "request": {
+      "$ref": "Member"
+     },
+     "response": {
+      "$ref": "Member"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group",
+      "https://www.googleapis.com/auth/admin.directory.group.member"
+     ]
+    },
+    "update": {
+     "id": "directory.members.update",
+     "path": "groups/{groupKey}/members/{memberKey}",
+     "httpMethod": "PUT",
+     "description": "Update membership of a user in the specified group.",
+     "parameters": {
+      "groupKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the group. If Id, it should match with id of group object",
+       "required": true,
+       "location": "path"
+      },
+      "memberKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user. If Id, it should match with id of member object",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupKey",
+      "memberKey"
+     ],
+     "request": {
+      "$ref": "Member"
+     },
+     "response": {
+      "$ref": "Member"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.group",
+      "https://www.googleapis.com/auth/admin.directory.group.member"
+     ]
+    }
+   }
+  },
+  "mobiledevices": {
+   "methods": {
+    "action": {
+     "id": "directory.mobiledevices.action",
+     "path": "customer/{customerId}/devices/mobile/{resourceId}/action",
+     "httpMethod": "POST",
+     "description": "Take action on Mobile Device",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "resourceId": {
+       "type": "string",
+       "description": "Immutable id of Mobile Device",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "resourceId"
+     ],
+     "request": {
+      "$ref": "MobileDeviceAction"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.device.mobile",
+      "https://www.googleapis.com/auth/admin.directory.device.mobile.action"
+     ]
+    },
+    "delete": {
+     "id": "directory.mobiledevices.delete",
+     "path": "customer/{customerId}/devices/mobile/{resourceId}",
+     "httpMethod": "DELETE",
+     "description": "Delete Mobile Device",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "resourceId": {
+       "type": "string",
+       "description": "Immutable id of Mobile Device",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "resourceId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.device.mobile"
+     ]
+    },
+    "get": {
+     "id": "directory.mobiledevices.get",
+     "path": "customer/{customerId}/devices/mobile/{resourceId}",
+     "httpMethod": "GET",
+     "description": "Retrieve Mobile Device",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "projection": {
+       "type": "string",
+       "description": "Restrict information returned to a set of selected fields.",
+       "enum": [
+        "BASIC",
+        "FULL"
+       ],
+       "enumDescriptions": [
+        "Includes only the basic metadata fields (e.g., deviceId, model, status, type, and status)",
+        "Includes all metadata fields"
+       ],
+       "location": "query"
+      },
+      "resourceId": {
+       "type": "string",
+       "description": "Immutable id of Mobile Device",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "resourceId"
+     ],
+     "response": {
+      "$ref": "MobileDevice"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.device.mobile",
+      "https://www.googleapis.com/auth/admin.directory.device.mobile.action",
+      "https://www.googleapis.com/auth/admin.directory.device.mobile.readonly"
+     ]
+    },
+    "list": {
+     "id": "directory.mobiledevices.list",
+     "path": "customer/{customerId}/devices/mobile",
+     "httpMethod": "GET",
+     "description": "Retrieve all Mobile Devices of a customer (paginated)",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return. Default is 100",
+       "format": "int32",
+       "minimum": "1",
+       "location": "query"
+      },
+      "orderBy": {
+       "type": "string",
+       "description": "Column to use for sorting results",
+       "enum": [
+        "deviceId",
+        "email",
+        "lastSync",
+        "model",
+        "name",
+        "os",
+        "status",
+        "type"
+       ],
+       "enumDescriptions": [
+        "Mobile Device serial number.",
+        "Owner user email.",
+        "Last policy settings sync date time of the device.",
+        "Mobile Device model.",
+        "Owner user name.",
+        "Mobile operating system.",
+        "Status of the device.",
+        "Type of the device."
+       ],
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page in the list",
+       "location": "query"
+      },
+      "projection": {
+       "type": "string",
+       "description": "Restrict information returned to a set of selected fields.",
+       "enum": [
+        "BASIC",
+        "FULL"
+       ],
+       "enumDescriptions": [
+        "Includes only the basic metadata fields (e.g., deviceId, model, status, type, and status)",
+        "Includes all metadata fields"
+       ],
+       "location": "query"
+      },
+      "query": {
+       "type": "string",
+       "description": "Search string in the format given at http://support.google.com/a/bin/answer.py?hl=en&answer=1408863#search",
+       "location": "query"
+      },
+      "sortOrder": {
+       "type": "string",
+       "description": "Whether to return results in ascending or descending order. Only of use when orderBy is also used",
+       "enum": [
+        "ASCENDING",
+        "DESCENDING"
+       ],
+       "enumDescriptions": [
+        "Ascending order.",
+        "Descending order."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customerId"
+     ],
+     "response": {
+      "$ref": "MobileDevices"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.device.mobile",
+      "https://www.googleapis.com/auth/admin.directory.device.mobile.action",
+      "https://www.googleapis.com/auth/admin.directory.device.mobile.readonly"
+     ]
+    }
+   }
+  },
+  "notifications": {
+   "methods": {
+    "delete": {
+     "id": "directory.notifications.delete",
+     "path": "customer/{customer}/notifications/{notificationId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a notification",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "The unique ID for the customer's Google account. The customerId is also returned as part of the Users resource.",
+       "required": true,
+       "location": "path"
+      },
+      "notificationId": {
+       "type": "string",
+       "description": "The unique ID of the notification.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "notificationId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.notifications"
+     ]
+    },
+    "get": {
+     "id": "directory.notifications.get",
+     "path": "customer/{customer}/notifications/{notificationId}",
+     "httpMethod": "GET",
+     "description": "Retrieves a notification.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "The unique ID for the customer's Google account. The customerId is also returned as part of the Users resource.",
+       "required": true,
+       "location": "path"
+      },
+      "notificationId": {
+       "type": "string",
+       "description": "The unique ID of the notification.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "notificationId"
+     ],
+     "response": {
+      "$ref": "Notification"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.notifications"
+     ]
+    },
+    "list": {
+     "id": "directory.notifications.list",
+     "path": "customer/{customer}/notifications",
+     "httpMethod": "GET",
+     "description": "Retrieves a list of notifications.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "The unique ID for the customer's Google account.",
+       "required": true,
+       "location": "path"
+      },
+      "language": {
+       "type": "string",
+       "description": "The ISO 639-1 code of the language notifications are returned in. The default is English (en).",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of notifications to return per page. The default is 100.",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token to specify the page of results to retrieve.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "response": {
+      "$ref": "Notifications"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.notifications"
+     ]
+    },
+    "patch": {
+     "id": "directory.notifications.patch",
+     "path": "customer/{customer}/notifications/{notificationId}",
+     "httpMethod": "PATCH",
+     "description": "Updates a notification. This method supports patch semantics.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "The unique ID for the customer's Google account.",
+       "required": true,
+       "location": "path"
+      },
+      "notificationId": {
+       "type": "string",
+       "description": "The unique ID of the notification.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "notificationId"
+     ],
+     "request": {
+      "$ref": "Notification"
+     },
+     "response": {
+      "$ref": "Notification"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.notifications"
+     ]
+    },
+    "update": {
+     "id": "directory.notifications.update",
+     "path": "customer/{customer}/notifications/{notificationId}",
+     "httpMethod": "PUT",
+     "description": "Updates a notification.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "The unique ID for the customer's Google account.",
+       "required": true,
+       "location": "path"
+      },
+      "notificationId": {
+       "type": "string",
+       "description": "The unique ID of the notification.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "notificationId"
+     ],
+     "request": {
+      "$ref": "Notification"
+     },
+     "response": {
+      "$ref": "Notification"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.notifications"
+     ]
+    }
+   }
+  },
+  "orgunits": {
+   "methods": {
+    "delete": {
+     "id": "directory.orgunits.delete",
+     "path": "customer/{customerId}/orgunits{/orgUnitPath*}",
+     "httpMethod": "DELETE",
+     "description": "Remove Organization Unit",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "orgUnitPath": {
+       "type": "string",
+       "description": "Full path of the organization unit or its Id",
+       "required": true,
+       "repeated": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "orgUnitPath"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.orgunit"
+     ]
+    },
+    "get": {
+     "id": "directory.orgunits.get",
+     "path": "customer/{customerId}/orgunits{/orgUnitPath*}",
+     "httpMethod": "GET",
+     "description": "Retrieve Organization Unit",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "orgUnitPath": {
+       "type": "string",
+       "description": "Full path of the organization unit or its Id",
+       "required": true,
+       "repeated": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "orgUnitPath"
+     ],
+     "response": {
+      "$ref": "OrgUnit"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.orgunit",
+      "https://www.googleapis.com/auth/admin.directory.orgunit.readonly"
+     ]
+    },
+    "insert": {
+     "id": "directory.orgunits.insert",
+     "path": "customer/{customerId}/orgunits",
+     "httpMethod": "POST",
+     "description": "Add Organization Unit",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId"
+     ],
+     "request": {
+      "$ref": "OrgUnit"
+     },
+     "response": {
+      "$ref": "OrgUnit"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.orgunit"
+     ]
+    },
+    "list": {
+     "id": "directory.orgunits.list",
+     "path": "customer/{customerId}/orgunits",
+     "httpMethod": "GET",
+     "description": "Retrieve all Organization Units",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "orgUnitPath": {
+       "type": "string",
+       "description": "the URL-encoded organization unit's path or its Id",
+       "default": "",
+       "location": "query"
+      },
+      "type": {
+       "type": "string",
+       "description": "Whether to return all sub-organizations or just immediate children",
+       "enum": [
+        "all",
+        "children"
+       ],
+       "enumDescriptions": [
+        "All sub-organization units.",
+        "Immediate children only (default)."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customerId"
+     ],
+     "response": {
+      "$ref": "OrgUnits"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.orgunit",
+      "https://www.googleapis.com/auth/admin.directory.orgunit.readonly"
+     ]
+    },
+    "patch": {
+     "id": "directory.orgunits.patch",
+     "path": "customer/{customerId}/orgunits{/orgUnitPath*}",
+     "httpMethod": "PATCH",
+     "description": "Update Organization Unit. This method supports patch semantics.",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "orgUnitPath": {
+       "type": "string",
+       "description": "Full path of the organization unit or its Id",
+       "required": true,
+       "repeated": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "orgUnitPath"
+     ],
+     "request": {
+      "$ref": "OrgUnit"
+     },
+     "response": {
+      "$ref": "OrgUnit"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.orgunit"
+     ]
+    },
+    "update": {
+     "id": "directory.orgunits.update",
+     "path": "customer/{customerId}/orgunits{/orgUnitPath*}",
+     "httpMethod": "PUT",
+     "description": "Update Organization Unit",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "orgUnitPath": {
+       "type": "string",
+       "description": "Full path of the organization unit or its Id",
+       "required": true,
+       "repeated": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "orgUnitPath"
+     ],
+     "request": {
+      "$ref": "OrgUnit"
+     },
+     "response": {
+      "$ref": "OrgUnit"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.orgunit"
+     ]
+    }
+   }
+  },
+  "privileges": {
+   "methods": {
+    "list": {
+     "id": "directory.privileges.list",
+     "path": "customer/{customer}/roles/ALL/privileges",
+     "httpMethod": "GET",
+     "description": "Retrieves a paginated list of all privileges for a customer.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "response": {
+      "$ref": "Privileges"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement",
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly"
+     ]
+    }
+   }
+  },
+  "resources": {
+   "resources": {
+    "calendars": {
+     "methods": {
+      "delete": {
+       "id": "directory.resources.calendars.delete",
+       "path": "customer/{customer}/resources/calendars/{calendarResourceId}",
+       "httpMethod": "DELETE",
+       "description": "Deletes a calendar resource.",
+       "parameters": {
+        "calendarResourceId": {
+         "type": "string",
+         "description": "The unique ID of the calendar resource to delete.",
+         "required": true,
+         "location": "path"
+        },
+        "customer": {
+         "type": "string",
+         "description": "The unique ID for the customer's Google account. As an account administrator, you can also use the my_customer alias to represent your account's customer ID.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "customer",
+        "calendarResourceId"
+       ],
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.resource.calendar"
+       ]
+      },
+      "get": {
+       "id": "directory.resources.calendars.get",
+       "path": "customer/{customer}/resources/calendars/{calendarResourceId}",
+       "httpMethod": "GET",
+       "description": "Retrieves a calendar resource.",
+       "parameters": {
+        "calendarResourceId": {
+         "type": "string",
+         "description": "The unique ID of the calendar resource to retrieve.",
+         "required": true,
+         "location": "path"
+        },
+        "customer": {
+         "type": "string",
+         "description": "The unique ID for the customer's Google account. As an account administrator, you can also use the my_customer alias to represent your account's customer ID.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "customer",
+        "calendarResourceId"
+       ],
+       "response": {
+        "$ref": "CalendarResource"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.resource.calendar",
+        "https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly"
+       ]
+      },
+      "insert": {
+       "id": "directory.resources.calendars.insert",
+       "path": "customer/{customer}/resources/calendars",
+       "httpMethod": "POST",
+       "description": "Inserts a calendar resource.",
+       "parameters": {
+        "customer": {
+         "type": "string",
+         "description": "The unique ID for the customer's Google account. As an account administrator, you can also use the my_customer alias to represent your account's customer ID.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "customer"
+       ],
+       "request": {
+        "$ref": "CalendarResource"
+       },
+       "response": {
+        "$ref": "CalendarResource"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.resource.calendar"
+       ]
+      },
+      "list": {
+       "id": "directory.resources.calendars.list",
+       "path": "customer/{customer}/resources/calendars",
+       "httpMethod": "GET",
+       "description": "Retrieves a list of calendar resources for an account.",
+       "parameters": {
+        "customer": {
+         "type": "string",
+         "description": "The unique ID for the customer's Google account. As an account administrator, you can also use the my_customer alias to represent your account's customer ID.",
+         "required": true,
+         "location": "path"
+        },
+        "maxResults": {
+         "type": "integer",
+         "description": "Maximum number of results to return.",
+         "format": "int32",
+         "minimum": "1",
+         "maximum": "500",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "Token to specify the next page in the list.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "customer"
+       ],
+       "response": {
+        "$ref": "CalendarResources"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.resource.calendar",
+        "https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly"
+       ]
+      },
+      "patch": {
+       "id": "directory.resources.calendars.patch",
+       "path": "customer/{customer}/resources/calendars/{calendarResourceId}",
+       "httpMethod": "PATCH",
+       "description": "Updates a calendar resource. This method supports patch semantics.",
+       "parameters": {
+        "calendarResourceId": {
+         "type": "string",
+         "description": "The unique ID of the calendar resource to update.",
+         "required": true,
+         "location": "path"
+        },
+        "customer": {
+         "type": "string",
+         "description": "The unique ID for the customer's Google account. As an account administrator, you can also use the my_customer alias to represent your account's customer ID.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "customer",
+        "calendarResourceId"
+       ],
+       "request": {
+        "$ref": "CalendarResource"
+       },
+       "response": {
+        "$ref": "CalendarResource"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.resource.calendar"
+       ]
+      },
+      "update": {
+       "id": "directory.resources.calendars.update",
+       "path": "customer/{customer}/resources/calendars/{calendarResourceId}",
+       "httpMethod": "PUT",
+       "description": "Updates a calendar resource.",
+       "parameters": {
+        "calendarResourceId": {
+         "type": "string",
+         "description": "The unique ID of the calendar resource to update.",
+         "required": true,
+         "location": "path"
+        },
+        "customer": {
+         "type": "string",
+         "description": "The unique ID for the customer's Google account. As an account administrator, you can also use the my_customer alias to represent your account's customer ID.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "customer",
+        "calendarResourceId"
+       ],
+       "request": {
+        "$ref": "CalendarResource"
+       },
+       "response": {
+        "$ref": "CalendarResource"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.resource.calendar"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "roleAssignments": {
+   "methods": {
+    "delete": {
+     "id": "directory.roleAssignments.delete",
+     "path": "customer/{customer}/roleassignments/{roleAssignmentId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a role assignment.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "roleAssignmentId": {
+       "type": "string",
+       "description": "Immutable ID of the role assignment.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "roleAssignmentId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement"
+     ]
+    },
+    "get": {
+     "id": "directory.roleAssignments.get",
+     "path": "customer/{customer}/roleassignments/{roleAssignmentId}",
+     "httpMethod": "GET",
+     "description": "Retrieve a role assignment.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "roleAssignmentId": {
+       "type": "string",
+       "description": "Immutable ID of the role assignment.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "roleAssignmentId"
+     ],
+     "response": {
+      "$ref": "RoleAssignment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement",
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly"
+     ]
+    },
+    "insert": {
+     "id": "directory.roleAssignments.insert",
+     "path": "customer/{customer}/roleassignments",
+     "httpMethod": "POST",
+     "description": "Creates a role assignment.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "request": {
+      "$ref": "RoleAssignment"
+     },
+     "response": {
+      "$ref": "RoleAssignment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement"
+     ]
+    },
+    "list": {
+     "id": "directory.roleAssignments.list",
+     "path": "customer/{customer}/roleassignments",
+     "httpMethod": "GET",
+     "description": "Retrieves a paginated list of all roleAssignments.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "200",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify the next page in the list.",
+       "location": "query"
+      },
+      "roleId": {
+       "type": "string",
+       "description": "Immutable ID of a role. If included in the request, returns only role assignments containing this role ID.",
+       "location": "query"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "The user's primary email address, alias email address, or unique user ID. If included in the request, returns role assignments only for this user.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "response": {
+      "$ref": "RoleAssignments"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement",
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly"
+     ]
+    }
+   }
+  },
+  "roles": {
+   "methods": {
+    "delete": {
+     "id": "directory.roles.delete",
+     "path": "customer/{customer}/roles/{roleId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a role.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "roleId": {
+       "type": "string",
+       "description": "Immutable ID of the role.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "roleId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement"
+     ]
+    },
+    "get": {
+     "id": "directory.roles.get",
+     "path": "customer/{customer}/roles/{roleId}",
+     "httpMethod": "GET",
+     "description": "Retrieves a role.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "roleId": {
+       "type": "string",
+       "description": "Immutable ID of the role.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "roleId"
+     ],
+     "response": {
+      "$ref": "Role"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement",
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly"
+     ]
+    },
+    "insert": {
+     "id": "directory.roles.insert",
+     "path": "customer/{customer}/roles",
+     "httpMethod": "POST",
+     "description": "Creates a role.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "request": {
+      "$ref": "Role"
+     },
+     "response": {
+      "$ref": "Role"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement"
+     ]
+    },
+    "list": {
+     "id": "directory.roles.list",
+     "path": "customer/{customer}/roles",
+     "httpMethod": "GET",
+     "description": "Retrieves a paginated list of all the roles in a domain.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify the next page in the list.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "customer"
+     ],
+     "response": {
+      "$ref": "Roles"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement",
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly"
+     ]
+    },
+    "patch": {
+     "id": "directory.roles.patch",
+     "path": "customer/{customer}/roles/{roleId}",
+     "httpMethod": "PATCH",
+     "description": "Updates a role. This method supports patch semantics.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "roleId": {
+       "type": "string",
+       "description": "Immutable ID of the role.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "roleId"
+     ],
+     "request": {
+      "$ref": "Role"
+     },
+     "response": {
+      "$ref": "Role"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement"
+     ]
+    },
+    "update": {
+     "id": "directory.roles.update",
+     "path": "customer/{customer}/roles/{roleId}",
+     "httpMethod": "PUT",
+     "description": "Updates a role.",
+     "parameters": {
+      "customer": {
+       "type": "string",
+       "description": "Immutable ID of the Google Apps account.",
+       "required": true,
+       "location": "path"
+      },
+      "roleId": {
+       "type": "string",
+       "description": "Immutable ID of the role.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customer",
+      "roleId"
+     ],
+     "request": {
+      "$ref": "Role"
+     },
+     "response": {
+      "$ref": "Role"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.rolemanagement"
+     ]
+    }
+   }
+  },
+  "schemas": {
+   "methods": {
+    "delete": {
+     "id": "directory.schemas.delete",
+     "path": "customer/{customerId}/schemas/{schemaKey}",
+     "httpMethod": "DELETE",
+     "description": "Delete schema",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "schemaKey": {
+       "type": "string",
+       "description": "Name or immutable Id of the schema",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "schemaKey"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.userschema"
+     ]
+    },
+    "get": {
+     "id": "directory.schemas.get",
+     "path": "customer/{customerId}/schemas/{schemaKey}",
+     "httpMethod": "GET",
+     "description": "Retrieve schema",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "schemaKey": {
+       "type": "string",
+       "description": "Name or immutable Id of the schema",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "schemaKey"
+     ],
+     "response": {
+      "$ref": "Schema"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.userschema",
+      "https://www.googleapis.com/auth/admin.directory.userschema.readonly"
+     ]
+    },
+    "insert": {
+     "id": "directory.schemas.insert",
+     "path": "customer/{customerId}/schemas",
+     "httpMethod": "POST",
+     "description": "Create schema.",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId"
+     ],
+     "request": {
+      "$ref": "Schema"
+     },
+     "response": {
+      "$ref": "Schema"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.userschema"
+     ]
+    },
+    "list": {
+     "id": "directory.schemas.list",
+     "path": "customer/{customerId}/schemas",
+     "httpMethod": "GET",
+     "description": "Retrieve all schemas for a customer",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId"
+     ],
+     "response": {
+      "$ref": "Schemas"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.userschema",
+      "https://www.googleapis.com/auth/admin.directory.userschema.readonly"
+     ]
+    },
+    "patch": {
+     "id": "directory.schemas.patch",
+     "path": "customer/{customerId}/schemas/{schemaKey}",
+     "httpMethod": "PATCH",
+     "description": "Update schema. This method supports patch semantics.",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "schemaKey": {
+       "type": "string",
+       "description": "Name or immutable Id of the schema.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "schemaKey"
+     ],
+     "request": {
+      "$ref": "Schema"
+     },
+     "response": {
+      "$ref": "Schema"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.userschema"
+     ]
+    },
+    "update": {
+     "id": "directory.schemas.update",
+     "path": "customer/{customerId}/schemas/{schemaKey}",
+     "httpMethod": "PUT",
+     "description": "Update schema",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account",
+       "required": true,
+       "location": "path"
+      },
+      "schemaKey": {
+       "type": "string",
+       "description": "Name or immutable Id of the schema.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "customerId",
+      "schemaKey"
+     ],
+     "request": {
+      "$ref": "Schema"
+     },
+     "response": {
+      "$ref": "Schema"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.userschema"
+     ]
+    }
+   }
+  },
+  "tokens": {
+   "methods": {
+    "delete": {
+     "id": "directory.tokens.delete",
+     "path": "users/{userKey}/tokens/{clientId}",
+     "httpMethod": "DELETE",
+     "description": "Delete all access tokens issued by a user for an application.",
+     "parameters": {
+      "clientId": {
+       "type": "string",
+       "description": "The Client ID of the application the token is issued to.",
+       "required": true,
+       "location": "path"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey",
+      "clientId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user.security"
+     ]
+    },
+    "get": {
+     "id": "directory.tokens.get",
+     "path": "users/{userKey}/tokens/{clientId}",
+     "httpMethod": "GET",
+     "description": "Get information about an access token issued by a user.",
+     "parameters": {
+      "clientId": {
+       "type": "string",
+       "description": "The Client ID of the application the token is issued to.",
+       "required": true,
+       "location": "path"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey",
+      "clientId"
+     ],
+     "response": {
+      "$ref": "Token"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user.security"
+     ]
+    },
+    "list": {
+     "id": "directory.tokens.list",
+     "path": "users/{userKey}/tokens",
+     "httpMethod": "GET",
+     "description": "Returns the set of tokens specified user has issued to 3rd party applications.",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "response": {
+      "$ref": "Tokens"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user.security"
+     ]
+    }
+   }
+  },
+  "users": {
+   "methods": {
+    "delete": {
+     "id": "directory.users.delete",
+     "path": "users/{userKey}",
+     "httpMethod": "DELETE",
+     "description": "Delete user",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user"
+     ]
+    },
+    "get": {
+     "id": "directory.users.get",
+     "path": "users/{userKey}",
+     "httpMethod": "GET",
+     "description": "retrieve user",
+     "parameters": {
+      "customFieldMask": {
+       "type": "string",
+       "description": "Comma-separated list of schema names. All fields from these schemas are fetched. This should only be set when projection=custom.",
+       "location": "query"
+      },
+      "projection": {
+       "type": "string",
+       "description": "What subset of fields to fetch for this user.",
+       "default": "basic",
+       "enum": [
+        "basic",
+        "custom",
+        "full"
+       ],
+       "enumDescriptions": [
+        "Do not include any custom fields for the user.",
+        "Include custom fields from schemas mentioned in customFieldMask.",
+        "Include all fields associated with this user."
+       ],
+       "location": "query"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user",
+       "required": true,
+       "location": "path"
+      },
+      "viewType": {
+       "type": "string",
+       "description": "Whether to fetch the ADMIN_VIEW or DOMAIN_PUBLIC view of the user.",
+       "default": "admin_view",
+       "enum": [
+        "admin_view",
+        "domain_public"
+       ],
+       "enumDescriptions": [
+        "Fetches the ADMIN_VIEW of the user.",
+        "Fetches the DOMAIN_PUBLIC view of the user."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "response": {
+      "$ref": "User"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user",
+      "https://www.googleapis.com/auth/admin.directory.user.readonly"
+     ]
+    },
+    "insert": {
+     "id": "directory.users.insert",
+     "path": "users",
+     "httpMethod": "POST",
+     "description": "create user.",
+     "request": {
+      "$ref": "User"
+     },
+     "response": {
+      "$ref": "User"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user"
+     ]
+    },
+    "list": {
+     "id": "directory.users.list",
+     "path": "users",
+     "httpMethod": "GET",
+     "description": "Retrieve either deleted users or all users in a domain (paginated)",
+     "parameters": {
+      "customFieldMask": {
+       "type": "string",
+       "description": "Comma-separated list of schema names. All fields from these schemas are fetched. This should only be set when projection=custom.",
+       "location": "query"
+      },
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account. In case of multi-domain, to fetch all users for a customer, fill this field instead of domain.",
+       "location": "query"
+      },
+      "domain": {
+       "type": "string",
+       "description": "Name of the domain. Fill this field to get users from only this domain. To return all users in a multi-domain fill customer field instead.",
+       "location": "query"
+      },
+      "event": {
+       "type": "string",
+       "description": "Event on which subscription is intended (if subscribing)",
+       "enum": [
+        "add",
+        "delete",
+        "makeAdmin",
+        "undelete",
+        "update"
+       ],
+       "enumDescriptions": [
+        "User Created Event",
+        "User Deleted Event",
+        "User Admin Status Change Event",
+        "User Undeleted Event",
+        "User Updated Event"
+       ],
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return. Default is 100. Max allowed is 500",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "500",
+       "location": "query"
+      },
+      "orderBy": {
+       "type": "string",
+       "description": "Column to use for sorting results",
+       "enum": [
+        "email",
+        "familyName",
+        "givenName"
+       ],
+       "enumDescriptions": [
+        "Primary email of the user.",
+        "User's family name.",
+        "User's given name."
+       ],
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page in the list",
+       "location": "query"
+      },
+      "projection": {
+       "type": "string",
+       "description": "What subset of fields to fetch for this user.",
+       "default": "basic",
+       "enum": [
+        "basic",
+        "custom",
+        "full"
+       ],
+       "enumDescriptions": [
+        "Do not include any custom fields for the user.",
+        "Include custom fields from schemas mentioned in customFieldMask.",
+        "Include all fields associated with this user."
+       ],
+       "location": "query"
+      },
+      "query": {
+       "type": "string",
+       "description": "Query string search. Should be of the form \"\". Complete documentation is at https://developers.google.com/admin-sdk/directory/v1/guides/search-users",
+       "location": "query"
+      },
+      "showDeleted": {
+       "type": "string",
+       "description": "If set to true retrieves the list of deleted users. Default is false",
+       "location": "query"
+      },
+      "sortOrder": {
+       "type": "string",
+       "description": "Whether to return results in ascending or descending order.",
+       "enum": [
+        "ASCENDING",
+        "DESCENDING"
+       ],
+       "enumDescriptions": [
+        "Ascending order.",
+        "Descending order."
+       ],
+       "location": "query"
+      },
+      "viewType": {
+       "type": "string",
+       "description": "Whether to fetch the ADMIN_VIEW or DOMAIN_PUBLIC view of the user.",
+       "default": "admin_view",
+       "enum": [
+        "admin_view",
+        "domain_public"
+       ],
+       "enumDescriptions": [
+        "Fetches the ADMIN_VIEW of the user.",
+        "Fetches the DOMAIN_PUBLIC view of the user."
+       ],
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "Users"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user",
+      "https://www.googleapis.com/auth/admin.directory.user.readonly"
+     ],
+     "supportsSubscription": true
+    },
+    "makeAdmin": {
+     "id": "directory.users.makeAdmin",
+     "path": "users/{userKey}/makeAdmin",
+     "httpMethod": "POST",
+     "description": "change admin status of a user",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user as admin",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "request": {
+      "$ref": "UserMakeAdmin"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user"
+     ]
+    },
+    "patch": {
+     "id": "directory.users.patch",
+     "path": "users/{userKey}",
+     "httpMethod": "PATCH",
+     "description": "update user. This method supports patch semantics.",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user. If Id, it should match with id of user object",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "request": {
+      "$ref": "User"
+     },
+     "response": {
+      "$ref": "User"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user"
+     ]
+    },
+    "undelete": {
+     "id": "directory.users.undelete",
+     "path": "users/{userKey}/undelete",
+     "httpMethod": "POST",
+     "description": "Undelete a deleted user",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "The immutable id of the user",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "request": {
+      "$ref": "UserUndelete"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user"
+     ]
+    },
+    "update": {
+     "id": "directory.users.update",
+     "path": "users/{userKey}",
+     "httpMethod": "PUT",
+     "description": "update user",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user. If Id, it should match with id of user object",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "request": {
+      "$ref": "User"
+     },
+     "response": {
+      "$ref": "User"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user"
+     ]
+    },
+    "watch": {
+     "id": "directory.users.watch",
+     "path": "users/watch",
+     "httpMethod": "POST",
+     "description": "Watch for changes in users list",
+     "parameters": {
+      "customFieldMask": {
+       "type": "string",
+       "description": "Comma-separated list of schema names. All fields from these schemas are fetched. This should only be set when projection=custom.",
+       "location": "query"
+      },
+      "customer": {
+       "type": "string",
+       "description": "Immutable id of the Google Apps account. In case of multi-domain, to fetch all users for a customer, fill this field instead of domain.",
+       "location": "query"
+      },
+      "domain": {
+       "type": "string",
+       "description": "Name of the domain. Fill this field to get users from only this domain. To return all users in a multi-domain fill customer field instead.",
+       "location": "query"
+      },
+      "event": {
+       "type": "string",
+       "description": "Event on which subscription is intended (if subscribing)",
+       "enum": [
+        "add",
+        "delete",
+        "makeAdmin",
+        "undelete",
+        "update"
+       ],
+       "enumDescriptions": [
+        "User Created Event",
+        "User Deleted Event",
+        "User Admin Status Change Event",
+        "User Undeleted Event",
+        "User Updated Event"
+       ],
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return. Default is 100. Max allowed is 500",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "500",
+       "location": "query"
+      },
+      "orderBy": {
+       "type": "string",
+       "description": "Column to use for sorting results",
+       "enum": [
+        "email",
+        "familyName",
+        "givenName"
+       ],
+       "enumDescriptions": [
+        "Primary email of the user.",
+        "User's family name.",
+        "User's given name."
+       ],
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page in the list",
+       "location": "query"
+      },
+      "projection": {
+       "type": "string",
+       "description": "What subset of fields to fetch for this user.",
+       "default": "basic",
+       "enum": [
+        "basic",
+        "custom",
+        "full"
+       ],
+       "enumDescriptions": [
+        "Do not include any custom fields for the user.",
+        "Include custom fields from schemas mentioned in customFieldMask.",
+        "Include all fields associated with this user."
+       ],
+       "location": "query"
+      },
+      "query": {
+       "type": "string",
+       "description": "Query string search. Should be of the form \"\". Complete documentation is at https://developers.google.com/admin-sdk/directory/v1/guides/search-users",
+       "location": "query"
+      },
+      "showDeleted": {
+       "type": "string",
+       "description": "If set to true retrieves the list of deleted users. Default is false",
+       "location": "query"
+      },
+      "sortOrder": {
+       "type": "string",
+       "description": "Whether to return results in ascending or descending order.",
+       "enum": [
+        "ASCENDING",
+        "DESCENDING"
+       ],
+       "enumDescriptions": [
+        "Ascending order.",
+        "Descending order."
+       ],
+       "location": "query"
+      },
+      "viewType": {
+       "type": "string",
+       "description": "Whether to fetch the ADMIN_VIEW or DOMAIN_PUBLIC view of the user.",
+       "default": "admin_view",
+       "enum": [
+        "admin_view",
+        "domain_public"
+       ],
+       "enumDescriptions": [
+        "Fetches the ADMIN_VIEW of the user.",
+        "Fetches the DOMAIN_PUBLIC view of the user."
+       ],
+       "location": "query"
+      }
+     },
+     "request": {
+      "$ref": "Channel",
+      "parameterName": "resource"
+     },
+     "response": {
+      "$ref": "Channel"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user",
+      "https://www.googleapis.com/auth/admin.directory.user.readonly"
+     ],
+     "supportsSubscription": true
+    }
+   },
+   "resources": {
+    "aliases": {
+     "methods": {
+      "delete": {
+       "id": "directory.users.aliases.delete",
+       "path": "users/{userKey}/aliases/{alias}",
+       "httpMethod": "DELETE",
+       "description": "Remove a alias for the user",
+       "parameters": {
+        "alias": {
+         "type": "string",
+         "description": "The alias to be removed",
+         "required": true,
+         "location": "path"
+        },
+        "userKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "userKey",
+        "alias"
+       ],
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.user",
+        "https://www.googleapis.com/auth/admin.directory.user.alias"
+       ]
+      },
+      "insert": {
+       "id": "directory.users.aliases.insert",
+       "path": "users/{userKey}/aliases",
+       "httpMethod": "POST",
+       "description": "Add a alias for the user",
+       "parameters": {
+        "userKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "userKey"
+       ],
+       "request": {
+        "$ref": "Alias"
+       },
+       "response": {
+        "$ref": "Alias"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.user",
+        "https://www.googleapis.com/auth/admin.directory.user.alias"
+       ]
+      },
+      "list": {
+       "id": "directory.users.aliases.list",
+       "path": "users/{userKey}/aliases",
+       "httpMethod": "GET",
+       "description": "List all aliases for a user",
+       "parameters": {
+        "event": {
+         "type": "string",
+         "description": "Event on which subscription is intended (if subscribing)",
+         "enum": [
+          "add",
+          "delete"
+         ],
+         "enumDescriptions": [
+          "Alias Created Event",
+          "Alias Deleted Event"
+         ],
+         "location": "query"
+        },
+        "userKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "userKey"
+       ],
+       "response": {
+        "$ref": "Aliases"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.user",
+        "https://www.googleapis.com/auth/admin.directory.user.alias",
+        "https://www.googleapis.com/auth/admin.directory.user.alias.readonly",
+        "https://www.googleapis.com/auth/admin.directory.user.readonly"
+       ],
+       "supportsSubscription": true
+      },
+      "watch": {
+       "id": "directory.users.aliases.watch",
+       "path": "users/{userKey}/aliases/watch",
+       "httpMethod": "POST",
+       "description": "Watch for changes in user aliases list",
+       "parameters": {
+        "event": {
+         "type": "string",
+         "description": "Event on which subscription is intended (if subscribing)",
+         "enum": [
+          "add",
+          "delete"
+         ],
+         "enumDescriptions": [
+          "Alias Created Event",
+          "Alias Deleted Event"
+         ],
+         "location": "query"
+        },
+        "userKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "userKey"
+       ],
+       "request": {
+        "$ref": "Channel",
+        "parameterName": "resource"
+       },
+       "response": {
+        "$ref": "Channel"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.user",
+        "https://www.googleapis.com/auth/admin.directory.user.alias",
+        "https://www.googleapis.com/auth/admin.directory.user.alias.readonly",
+        "https://www.googleapis.com/auth/admin.directory.user.readonly"
+       ],
+       "supportsSubscription": true
+      }
+     }
+    },
+    "photos": {
+     "methods": {
+      "delete": {
+       "id": "directory.users.photos.delete",
+       "path": "users/{userKey}/photos/thumbnail",
+       "httpMethod": "DELETE",
+       "description": "Remove photos for the user",
+       "parameters": {
+        "userKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "userKey"
+       ],
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.user"
+       ]
+      },
+      "get": {
+       "id": "directory.users.photos.get",
+       "path": "users/{userKey}/photos/thumbnail",
+       "httpMethod": "GET",
+       "description": "Retrieve photo of a user",
+       "parameters": {
+        "userKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "userKey"
+       ],
+       "response": {
+        "$ref": "UserPhoto"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.user",
+        "https://www.googleapis.com/auth/admin.directory.user.readonly"
+       ]
+      },
+      "patch": {
+       "id": "directory.users.photos.patch",
+       "path": "users/{userKey}/photos/thumbnail",
+       "httpMethod": "PATCH",
+       "description": "Add a photo for the user. This method supports patch semantics.",
+       "parameters": {
+        "userKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "userKey"
+       ],
+       "request": {
+        "$ref": "UserPhoto"
+       },
+       "response": {
+        "$ref": "UserPhoto"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.user"
+       ]
+      },
+      "update": {
+       "id": "directory.users.photos.update",
+       "path": "users/{userKey}/photos/thumbnail",
+       "httpMethod": "PUT",
+       "description": "Add a photo for the user",
+       "parameters": {
+        "userKey": {
+         "type": "string",
+         "description": "Email or immutable Id of the user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "userKey"
+       ],
+       "request": {
+        "$ref": "UserPhoto"
+       },
+       "response": {
+        "$ref": "UserPhoto"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/admin.directory.user"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "verificationCodes": {
+   "methods": {
+    "generate": {
+     "id": "directory.verificationCodes.generate",
+     "path": "users/{userKey}/verificationCodes/generate",
+     "httpMethod": "POST",
+     "description": "Generate new backup verification codes for the user.",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user.security"
+     ]
+    },
+    "invalidate": {
+     "id": "directory.verificationCodes.invalidate",
+     "path": "users/{userKey}/verificationCodes/invalidate",
+     "httpMethod": "POST",
+     "description": "Invalidate the current backup verification codes for the user.",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "Email or immutable Id of the user",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user.security"
+     ]
+    },
+    "list": {
+     "id": "directory.verificationCodes.list",
+     "path": "users/{userKey}/verificationCodes",
+     "httpMethod": "GET",
+     "description": "Returns the current set of valid backup verification codes for the specified user.",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "response": {
+      "$ref": "VerificationCodes"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.directory.user.security"
+     ]
+    }
+   }
+  }
+ }
+}

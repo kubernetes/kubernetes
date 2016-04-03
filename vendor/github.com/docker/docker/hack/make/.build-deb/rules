@@ -1,0 +1,39 @@
+#!/usr/bin/make -f
+
+VERSION = $(shell cat VERSION)
+
+override_dh_gencontrol:
+	# if we're on Ubuntu, we need to Recommends: apparmor
+	echo 'apparmor:Recommends=$(shell dpkg-vendor --is Ubuntu && echo apparmor)' >> debian/docker-engine.substvars
+	dh_gencontrol
+
+override_dh_auto_build:
+	./hack/make.sh dynbinary
+	# ./man/md2man-all.sh runs outside the build container (if at all), since we don't have go-md2man here
+
+override_dh_auto_test:
+	./bundles/$(VERSION)/dynbinary/docker -v
+
+override_dh_strip:
+	# the SHA1 of dockerinit is important: don't strip it
+	# also, Go has lots of problems with stripping, so just don't
+
+override_dh_auto_install:
+	mkdir -p debian/docker-engine/usr/bin
+	cp -aT "$$(readlink -f bundles/$(VERSION)/dynbinary/docker)" debian/docker-engine/usr/bin/docker
+	mkdir -p debian/docker-engine/usr/lib/docker
+	cp -aT "$$(readlink -f bundles/$(VERSION)/dynbinary/dockerinit)" debian/docker-engine/usr/lib/docker/dockerinit
+
+override_dh_installinit:
+	# use "docker" as our service name, not "docker-engine"
+	dh_installinit --name=docker
+
+override_dh_installudev:
+	# match our existing priority
+	dh_installudev --priority=z80
+
+override_dh_install:
+	dh_apparmor --profile-name=docker -pdocker-engine
+
+%:
+	dh $@ --with=bash-completion $(shell command -v dh_systemd_enable > /dev/null 2>&1 && echo --with=systemd)

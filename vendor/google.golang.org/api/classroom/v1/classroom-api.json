@@ -1,0 +1,1109 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/VbFh0P5gIX42P6rhPLVK-GI_3-Y\"",
+ "discoveryVersion": "v1",
+ "id": "classroom:v1",
+ "name": "classroom",
+ "version": "v1",
+ "revision": "20151013",
+ "title": "Google Classroom API",
+ "description": "Google Classroom API",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/classroom/",
+ "protocol": "rest",
+ "baseUrl": "https://classroom.googleapis.com/",
+ "basePath": "/",
+ "rootUrl": "https://classroom.googleapis.com/",
+ "servicePath": "",
+ "batchPath": "batch",
+ "parameters": {
+  "access_token": {
+   "type": "string",
+   "description": "OAuth access token.",
+   "location": "query"
+  },
+  "alt": {
+   "type": "string",
+   "description": "Data format for response.",
+   "default": "json",
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json",
+    "Media download with context-dependent Content-Type",
+    "Responses with Content-Type of application/x-protobuf"
+   ],
+   "location": "query"
+  },
+  "bearer_token": {
+   "type": "string",
+   "description": "OAuth bearer token.",
+   "location": "query"
+  },
+  "callback": {
+   "type": "string",
+   "description": "JSONP",
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "pp": {
+   "type": "boolean",
+   "description": "Pretty-print response.",
+   "default": "true",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+   "location": "query"
+  },
+  "upload_protocol": {
+   "type": "string",
+   "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+   "location": "query"
+  },
+  "uploadType": {
+   "type": "string",
+   "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+   "location": "query"
+  },
+  "$.xgafv": {
+   "type": "string",
+   "description": "V1 error format.",
+   "enumDescriptions": [
+    "v1 error format",
+    "v2 error format"
+   ],
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/classroom.courses": {
+     "description": "Manage your Google Classroom classes"
+    },
+    "https://www.googleapis.com/auth/classroom.courses.readonly": {
+     "description": "View your Google Classroom classes"
+    },
+    "https://www.googleapis.com/auth/classroom.profile.emails": {
+     "description": "View the email addresses of people in your classes"
+    },
+    "https://www.googleapis.com/auth/classroom.profile.photos": {
+     "description": "View the profile photos of people in your classes"
+    },
+    "https://www.googleapis.com/auth/classroom.rosters": {
+     "description": "Manage your Google Classroom class rosters"
+    },
+    "https://www.googleapis.com/auth/classroom.rosters.readonly": {
+     "description": "View your Google Classroom class rosters"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Course": {
+   "id": "Course",
+   "type": "object",
+   "description": "A Course in Classroom.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Identifier for this course assigned by Classroom. When creating a course, you may optionally set this identifier to an alias string in the request to create a corresponding alias. The `id` is still assigned by Classroom and cannot be updated after the course is created. Specifying this field in a course update mask will result in an error."
+    },
+    "name": {
+     "type": "string",
+     "description": "Name of the course. For example, \"10th Grade Biology\". The name is required. It must be between 1 and 750 characters and a valid UTF-8 string."
+    },
+    "section": {
+     "type": "string",
+     "description": "Section of the course. For example, \"Period 2\". If set, this field must be a valid UTF-8 string and no longer than 2800 characters."
+    },
+    "descriptionHeading": {
+     "type": "string",
+     "description": "Optional heading for the description. For example, \"Welcome to 10th Grade Biology.\" If set, this field must be a valid UTF-8 string and no longer than 3600 characters."
+    },
+    "description": {
+     "type": "string",
+     "description": "Optional description. For example, \"We'll be learning about the structure of living creatures from a combination of textbooks, guest lectures, and lab work. Expect to be excited!\" If set, this field must be a valid UTF-8 string and no longer than 30,000 characters."
+    },
+    "room": {
+     "type": "string",
+     "description": "Optional room location. For example, \"301\". If set, this field must be a valid UTF-8 string and no longer than 650 characters."
+    },
+    "ownerId": {
+     "type": "string",
+     "description": "The identifier of the owner of a course. When specified as a parameter of a create course request, this field is required. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user This must be set in a create request. Specifying this field in a course update mask will result in an `INVALID_ARGUMENT` error."
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "Creation time of the course. Specifying this field in a course update mask will result in an error. Read-only."
+    },
+    "updateTime": {
+     "type": "string",
+     "description": "Time of the most recent update to this course. Specifying this field in a course update mask will result in an error. Read-only."
+    },
+    "enrollmentCode": {
+     "type": "string",
+     "description": "Enrollment code to use when joining this course. Specifying this field in a course update mask will result in an error. Read-only."
+    },
+    "courseState": {
+     "type": "string",
+     "description": "State of the course. If unspecified, the default state is `PROVISIONED`.",
+     "enum": [
+      "COURSE_STATE_UNSPECIFIED",
+      "ACTIVE",
+      "ARCHIVED",
+      "PROVISIONED",
+      "DECLINED"
+     ]
+    },
+    "alternateLink": {
+     "type": "string",
+     "description": "Absolute link to this course in the Classroom web UI. Read-only."
+    }
+   }
+  },
+  "Empty": {
+   "id": "Empty",
+   "type": "object",
+   "description": "A generic empty message that you can re-use to avoid defining duplicated empty messages in your APIs. A typical example is to use it as the request or the response type of an API method. For instance: service Foo { rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty); } The JSON representation for `Empty` is empty JSON object `{}`."
+  },
+  "ListCoursesResponse": {
+   "id": "ListCoursesResponse",
+   "type": "object",
+   "description": "Response when listing courses.",
+   "properties": {
+    "courses": {
+     "type": "array",
+     "description": "Courses that match the list request.",
+     "items": {
+      "$ref": "Course"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token identifying the next page of results to return. If empty, no further results are available."
+    }
+   }
+  },
+  "CourseAlias": {
+   "id": "CourseAlias",
+   "type": "object",
+   "description": "Alternative identifier for a course. An alias uniquely identifies a course. It must be unique within one of the following scopes: * domain: A domain-scoped alias is visible to all users within the alias creator's domain and can be created only by a domain admin. A domain-scoped alias is often used when a course has an identifier external to Classroom. * project: A project-scoped alias is visible to any request from an application using the Developer Console project ID that created the alias and can be created by any project. A project-scoped alias is often used when an application has alternative identifiers. A random value can also be used to avoid duplicate courses in the event of transmission failures, as retrying a request will return `ALREADY_EXISTS` if a previous one has succeeded.",
+   "properties": {
+    "alias": {
+     "type": "string",
+     "description": "Alias string. The format of the string indicates the desired alias scoping. * `d:` indicates a domain-scoped alias. Example: `d:math_101` * `p:` indicates a project-scoped alias. Example: `p:abc123` This field has a maximum length of 256 characters."
+    }
+   }
+  },
+  "ListCourseAliasesResponse": {
+   "id": "ListCourseAliasesResponse",
+   "type": "object",
+   "description": "Response when listing course aliases.",
+   "properties": {
+    "aliases": {
+     "type": "array",
+     "description": "The course aliases.",
+     "items": {
+      "$ref": "CourseAlias"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token identifying the next page of results to return. If empty, no further results are available."
+    }
+   }
+  },
+  "Invitation": {
+   "id": "Invitation",
+   "type": "object",
+   "description": "An invitation to join a course.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Identifier assigned by Classroom. Read-only."
+    },
+    "userId": {
+     "type": "string",
+     "description": "Identifier of the invited user. When specified as a parameter of a request, this identifier can be set to one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user"
+    },
+    "courseId": {
+     "type": "string",
+     "description": "Identifier of the course to invite the user to."
+    },
+    "role": {
+     "type": "string",
+     "description": "Role to invite the user to have. Must not be `COURSE_ROLE_UNSPECIFIED`.",
+     "enum": [
+      "COURSE_ROLE_UNSPECIFIED",
+      "STUDENT",
+      "TEACHER"
+     ]
+    }
+   }
+  },
+  "ListInvitationsResponse": {
+   "id": "ListInvitationsResponse",
+   "type": "object",
+   "description": "Response when listing invitations.",
+   "properties": {
+    "invitations": {
+     "type": "array",
+     "description": "Invitations that match the list request.",
+     "items": {
+      "$ref": "Invitation"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token identifying the next page of results to return. If empty, no further results are available."
+    }
+   }
+  },
+  "UserProfile": {
+   "id": "UserProfile",
+   "type": "object",
+   "description": "Global information for a user.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Identifier of the user. Read-only."
+    },
+    "name": {
+     "$ref": "Name",
+     "description": "Name of the user. Read-only."
+    },
+    "emailAddress": {
+     "type": "string",
+     "description": "Email address of the user. Read-only."
+    },
+    "photoUrl": {
+     "type": "string",
+     "description": "URL of user's profile photo. Read-only."
+    },
+    "permissions": {
+     "type": "array",
+     "description": "Global permissions of the user. Read-only.",
+     "items": {
+      "$ref": "GlobalPermission"
+     }
+    }
+   }
+  },
+  "Name": {
+   "id": "Name",
+   "type": "object",
+   "description": "Details of the user's name.",
+   "properties": {
+    "givenName": {
+     "type": "string",
+     "description": "The user's first name. Read-only."
+    },
+    "familyName": {
+     "type": "string",
+     "description": "The user's last name. Read-only."
+    },
+    "fullName": {
+     "type": "string",
+     "description": "The user's full name formed by concatenating the first and last name values. Read-only."
+    }
+   }
+  },
+  "GlobalPermission": {
+   "id": "GlobalPermission",
+   "type": "object",
+   "description": "Global user permission description.",
+   "properties": {
+    "permission": {
+     "type": "string",
+     "description": "Permission value.",
+     "enum": [
+      "PERMISSION_UNSPECIFIED",
+      "CREATE_COURSE"
+     ]
+    }
+   }
+  },
+  "Teacher": {
+   "id": "Teacher",
+   "type": "object",
+   "description": "Teacher of a course.",
+   "properties": {
+    "courseId": {
+     "type": "string",
+     "description": "Identifier of the course. Read-only."
+    },
+    "userId": {
+     "type": "string",
+     "description": "Identifier of the user. When specified as a parameter of a request, this identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user"
+    },
+    "profile": {
+     "$ref": "UserProfile",
+     "description": "Global user information for the teacher. Read-only."
+    }
+   }
+  },
+  "ListTeachersResponse": {
+   "id": "ListTeachersResponse",
+   "type": "object",
+   "description": "Response when listing teachers.",
+   "properties": {
+    "teachers": {
+     "type": "array",
+     "description": "Teachers who match the list request.",
+     "items": {
+      "$ref": "Teacher"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token identifying the next page of results to return. If empty, no further results are available."
+    }
+   }
+  },
+  "Student": {
+   "id": "Student",
+   "type": "object",
+   "description": "Student in a course.",
+   "properties": {
+    "courseId": {
+     "type": "string",
+     "description": "Identifier of the course. Read-only."
+    },
+    "userId": {
+     "type": "string",
+     "description": "Identifier of the user. When specified as a parameter of a request, this identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user"
+    },
+    "profile": {
+     "$ref": "UserProfile",
+     "description": "Global user information for the student. Read-only."
+    }
+   }
+  },
+  "ListStudentsResponse": {
+   "id": "ListStudentsResponse",
+   "type": "object",
+   "description": "Response when listing students.",
+   "properties": {
+    "students": {
+     "type": "array",
+     "description": "Students who match the list request.",
+     "items": {
+      "$ref": "Student"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token identifying the next page of results to return. If empty, no further results are available."
+    }
+   }
+  }
+ },
+ "resources": {
+  "courses": {
+   "methods": {
+    "create": {
+     "id": "classroom.courses.create",
+     "path": "v1/courses",
+     "httpMethod": "POST",
+     "description": "Creates a course. The user specified in `ownerId` is the owner of the created course and added as a teacher. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to create courses or for access errors. * `NOT_FOUND` if the primary teacher is not a valid user. * `FAILED_PRECONDITION` if the course owner's account is disabled or for the following request errors: * UserGroupsMembershipLimitReached * `ALREADY_EXISTS` if an alias was specified in the `id` and already exists.",
+     "request": {
+      "$ref": "Course"
+     },
+     "response": {
+      "$ref": "Course"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.courses"
+     ]
+    },
+    "get": {
+     "id": "classroom.courses.get",
+     "path": "v1/courses/{id}",
+     "httpMethod": "GET",
+     "description": "Returns a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to access the requested course or for access errors. * `NOT_FOUND` if no course exists with the requested ID.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "Identifier of the course to return. This identifier can be either the Classroom-assigned identifier or an alias.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Course"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.courses",
+      "https://www.googleapis.com/auth/classroom.courses.readonly"
+     ]
+    },
+    "update": {
+     "id": "classroom.courses.update",
+     "path": "v1/courses/{id}",
+     "httpMethod": "PUT",
+     "description": "Updates a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to modify the requested course or for access errors. * `NOT_FOUND` if no course exists with the requested ID. * `FAILED_PRECONDITION` for the following request errors: * CourseNotModifiable",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "Identifier of the course to update. This identifier can be either the Classroom-assigned identifier or an alias.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "request": {
+      "$ref": "Course"
+     },
+     "response": {
+      "$ref": "Course"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.courses"
+     ]
+    },
+    "patch": {
+     "id": "classroom.courses.patch",
+     "path": "v1/courses/{id}",
+     "httpMethod": "PATCH",
+     "description": "Updates one or more fields in a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to modify the requested course or for access errors. * `NOT_FOUND` if no course exists with the requested ID. * `INVALID_ARGUMENT` if invalid fields are specified in the update mask or if no update mask is supplied. * `FAILED_PRECONDITION` for the following request errors: * CourseNotModifiable",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "Identifier of the course to update. This identifier can be either the Classroom-assigned identifier or an alias.",
+       "required": true,
+       "location": "path"
+      },
+      "updateMask": {
+       "type": "string",
+       "description": "Mask that identifies which fields on the course to update. This field is required to do an update. The update will fail if invalid fields are specified. The following fields are valid: * `name` * `section` * `descriptionHeading` * `description` * `room` * `courseState` When set in a query parameter, this field should be specified as `updateMask=,,...`",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "request": {
+      "$ref": "Course"
+     },
+     "response": {
+      "$ref": "Course"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.courses"
+     ]
+    },
+    "delete": {
+     "id": "classroom.courses.delete",
+     "path": "v1/courses/{id}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to delete the requested course or for access errors. * `NOT_FOUND` if no course exists with the requested ID.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "Identifier of the course to delete. This identifier can be either the Classroom-assigned identifier or an alias.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Empty"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.courses"
+     ]
+    },
+    "list": {
+     "id": "classroom.courses.list",
+     "path": "v1/courses",
+     "httpMethod": "GET",
+     "description": "Returns a list of courses that the requesting user is permitted to view, restricted to those that match the request. This method returns the following error codes: * `PERMISSION_DENIED` for access errors. * `INVALID_ARGUMENT` if the query argument is malformed. * `NOT_FOUND` if any users specified in the query arguments do not exist.",
+     "parameters": {
+      "studentId": {
+       "type": "string",
+       "description": "Restricts returned courses to those having a student with the specified identifier. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user",
+       "location": "query"
+      },
+      "teacherId": {
+       "type": "string",
+       "description": "Restricts returned courses to those having a teacher with the specified identifier. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user",
+       "location": "query"
+      },
+      "pageSize": {
+       "type": "integer",
+       "description": "Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.",
+       "format": "int32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this token.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "ListCoursesResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.courses",
+      "https://www.googleapis.com/auth/classroom.courses.readonly"
+     ]
+    }
+   },
+   "resources": {
+    "aliases": {
+     "methods": {
+      "create": {
+       "id": "classroom.courses.aliases.create",
+       "path": "v1/courses/{courseId}/aliases",
+       "httpMethod": "POST",
+       "description": "Creates an alias for a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to create the alias or for access errors. * `NOT_FOUND` if the course does not exist. * `ALREADY_EXISTS` if the alias already exists.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course to alias. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "courseId"
+       ],
+       "request": {
+        "$ref": "CourseAlias"
+       },
+       "response": {
+        "$ref": "CourseAlias"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.courses"
+       ]
+      },
+      "delete": {
+       "id": "classroom.courses.aliases.delete",
+       "path": "v1/courses/{courseId}/aliases/{alias}",
+       "httpMethod": "DELETE",
+       "description": "Deletes an alias of a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to remove the alias or for access errors. * `NOT_FOUND` if the alias does not exist.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course whose alias should be deleted. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        },
+        "alias": {
+         "type": "string",
+         "description": "Alias to delete. This may not be the Classroom-assigned identifier.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "courseId",
+        "alias"
+       ],
+       "response": {
+        "$ref": "Empty"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.courses"
+       ]
+      },
+      "list": {
+       "id": "classroom.courses.aliases.list",
+       "path": "v1/courses/{courseId}/aliases",
+       "httpMethod": "GET",
+       "description": "Returns a list of aliases for a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to access the course or for access errors. * `NOT_FOUND` if the course does not exist.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "The identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        },
+        "pageSize": {
+         "type": "integer",
+         "description": "Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.",
+         "format": "int32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this token.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "courseId"
+       ],
+       "response": {
+        "$ref": "ListCourseAliasesResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.courses",
+        "https://www.googleapis.com/auth/classroom.courses.readonly"
+       ]
+      }
+     }
+    },
+    "teachers": {
+     "methods": {
+      "create": {
+       "id": "classroom.courses.teachers.create",
+       "path": "v1/courses/{courseId}/teachers",
+       "httpMethod": "POST",
+       "description": "Creates a teacher of a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to create teachers in this course or for access errors. * `NOT_FOUND` if the requested course ID does not exist. * `FAILED_PRECONDITION` if the requested user's account is disabled, for the following request errors: * CourseMemberLimitReached * CourseNotModifiable * CourseTeacherLimitReached * UserGroupsMembershipLimitReached * `ALREADY_EXISTS` if the user is already a teacher or student in the course.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "courseId"
+       ],
+       "request": {
+        "$ref": "Teacher"
+       },
+       "response": {
+        "$ref": "Teacher"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.profile.emails",
+        "https://www.googleapis.com/auth/classroom.profile.photos",
+        "https://www.googleapis.com/auth/classroom.rosters"
+       ]
+      },
+      "get": {
+       "id": "classroom.courses.teachers.get",
+       "path": "v1/courses/{courseId}/teachers/{userId}",
+       "httpMethod": "GET",
+       "description": "Returns a teacher of a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to view teachers of this course or for access errors. * `NOT_FOUND` if no teacher of this course has the requested ID or if the course does not exist.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        },
+        "userId": {
+         "type": "string",
+         "description": "Identifier of the teacher to return. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "courseId",
+        "userId"
+       ],
+       "response": {
+        "$ref": "Teacher"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.profile.emails",
+        "https://www.googleapis.com/auth/classroom.profile.photos",
+        "https://www.googleapis.com/auth/classroom.rosters",
+        "https://www.googleapis.com/auth/classroom.rosters.readonly"
+       ]
+      },
+      "delete": {
+       "id": "classroom.courses.teachers.delete",
+       "path": "v1/courses/{courseId}/teachers/{userId}",
+       "httpMethod": "DELETE",
+       "description": "Deletes a teacher of a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to delete teachers of this course or for access errors. * `NOT_FOUND` if no teacher of this course has the requested ID or if the course does not exist. * `FAILED_PRECONDITION` if the requested ID belongs to the primary teacher of this course.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        },
+        "userId": {
+         "type": "string",
+         "description": "Identifier of the teacher to delete. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "courseId",
+        "userId"
+       ],
+       "response": {
+        "$ref": "Empty"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.rosters"
+       ]
+      },
+      "list": {
+       "id": "classroom.courses.teachers.list",
+       "path": "v1/courses/{courseId}/teachers",
+       "httpMethod": "GET",
+       "description": "Returns a list of teachers of this course that the requester is permitted to view. This method returns the following error codes: * `NOT_FOUND` if the course does not exist. * `PERMISSION_DENIED` for access errors.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        },
+        "pageSize": {
+         "type": "integer",
+         "description": "Maximum number of items to return. Zero means no maximum. The server may return fewer than the specified number of results.",
+         "format": "int32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this token.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "courseId"
+       ],
+       "response": {
+        "$ref": "ListTeachersResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.profile.emails",
+        "https://www.googleapis.com/auth/classroom.profile.photos",
+        "https://www.googleapis.com/auth/classroom.rosters",
+        "https://www.googleapis.com/auth/classroom.rosters.readonly"
+       ]
+      }
+     }
+    },
+    "students": {
+     "methods": {
+      "create": {
+       "id": "classroom.courses.students.create",
+       "path": "v1/courses/{courseId}/students",
+       "httpMethod": "POST",
+       "description": "Adds a user as a student of a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to create students in this course or for access errors. * `NOT_FOUND` if the requested course ID does not exist. * `FAILED_PRECONDITION` if the requested user's account is disabled, for the following request errors: * CourseMemberLimitReached * CourseNotModifiable * UserGroupsMembershipLimitReached * `ALREADY_EXISTS` if the user is already a student or teacher in the course.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course to create the student in. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        },
+        "enrollmentCode": {
+         "type": "string",
+         "description": "Enrollment code of the course to create the student in. This code is required if userId corresponds to the requesting user; it may be omitted if the requesting user has administrative permissions to create students for any user.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "courseId"
+       ],
+       "request": {
+        "$ref": "Student"
+       },
+       "response": {
+        "$ref": "Student"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.profile.emails",
+        "https://www.googleapis.com/auth/classroom.profile.photos",
+        "https://www.googleapis.com/auth/classroom.rosters"
+       ]
+      },
+      "get": {
+       "id": "classroom.courses.students.get",
+       "path": "v1/courses/{courseId}/students/{userId}",
+       "httpMethod": "GET",
+       "description": "Returns a student of a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to view students of this course or for access errors. * `NOT_FOUND` if no student of this course has the requested ID or if the course does not exist.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        },
+        "userId": {
+         "type": "string",
+         "description": "Identifier of the student to return. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "courseId",
+        "userId"
+       ],
+       "response": {
+        "$ref": "Student"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.profile.emails",
+        "https://www.googleapis.com/auth/classroom.profile.photos",
+        "https://www.googleapis.com/auth/classroom.rosters",
+        "https://www.googleapis.com/auth/classroom.rosters.readonly"
+       ]
+      },
+      "delete": {
+       "id": "classroom.courses.students.delete",
+       "path": "v1/courses/{courseId}/students/{userId}",
+       "httpMethod": "DELETE",
+       "description": "Deletes a student of a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to delete students of this course or for access errors. * `NOT_FOUND` if no student of this course has the requested ID or if the course does not exist.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        },
+        "userId": {
+         "type": "string",
+         "description": "Identifier of the student to delete. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "courseId",
+        "userId"
+       ],
+       "response": {
+        "$ref": "Empty"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.rosters"
+       ]
+      },
+      "list": {
+       "id": "classroom.courses.students.list",
+       "path": "v1/courses/{courseId}/students",
+       "httpMethod": "GET",
+       "description": "Returns a list of students of this course that the requester is permitted to view. This method returns the following error codes: * `NOT_FOUND` if the course does not exist. * `PERMISSION_DENIED` for access errors.",
+       "parameters": {
+        "courseId": {
+         "type": "string",
+         "description": "Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias.",
+         "required": true,
+         "location": "path"
+        },
+        "pageSize": {
+         "type": "integer",
+         "description": "Maximum number of items to return. Zero means no maximum. The server may return fewer than the specified number of results.",
+         "format": "int32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this token.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "courseId"
+       ],
+       "response": {
+        "$ref": "ListStudentsResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/classroom.profile.emails",
+        "https://www.googleapis.com/auth/classroom.profile.photos",
+        "https://www.googleapis.com/auth/classroom.rosters",
+        "https://www.googleapis.com/auth/classroom.rosters.readonly"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "invitations": {
+   "methods": {
+    "create": {
+     "id": "classroom.invitations.create",
+     "path": "v1/invitations",
+     "httpMethod": "POST",
+     "description": "Creates an invitation. Only one invitation for a user and course may exist at a time. Delete and re-create an invitation to make changes. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to create invitations for this course or for access errors. * `NOT_FOUND` if the course or the user does not exist. * `FAILED_PRECONDITION` if the requested user's account is disabled or if the user already has this role or a role with greater permissions. * `ALREADY_EXISTS` if an invitation for the specified user and course already exists.",
+     "request": {
+      "$ref": "Invitation"
+     },
+     "response": {
+      "$ref": "Invitation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.rosters"
+     ]
+    },
+    "get": {
+     "id": "classroom.invitations.get",
+     "path": "v1/invitations/{id}",
+     "httpMethod": "GET",
+     "description": "Returns an invitation. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to view the requested invitation or for access errors. * `NOT_FOUND` if no invitation exists with the requested ID.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "Identifier of the invitation to return.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Invitation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.rosters",
+      "https://www.googleapis.com/auth/classroom.rosters.readonly"
+     ]
+    },
+    "delete": {
+     "id": "classroom.invitations.delete",
+     "path": "v1/invitations/{id}",
+     "httpMethod": "DELETE",
+     "description": "Deletes an invitation. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to delete the requested invitation or for access errors. * `NOT_FOUND` if no invitation exists with the requested ID.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "Identifier of the invitation to delete.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Empty"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.rosters"
+     ]
+    },
+    "list": {
+     "id": "classroom.invitations.list",
+     "path": "v1/invitations",
+     "httpMethod": "GET",
+     "description": "Returns a list of invitations that the requesting user is permitted to view, restricted to those that match the list request. *Note:* At least one of `user_id` or `course_id` must be supplied. Both fields can be supplied. This method returns the following error codes: * `PERMISSION_DENIED` for access errors.",
+     "parameters": {
+      "userId": {
+       "type": "string",
+       "description": "Restricts returned invitations to those for a specific user. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user",
+       "location": "query"
+      },
+      "courseId": {
+       "type": "string",
+       "description": "Restricts returned invitations to those for a course with the specified identifier.",
+       "location": "query"
+      },
+      "pageSize": {
+       "type": "integer",
+       "description": "Maximum number of items to return. Zero means no maximum. The server may return fewer than the specified number of results.",
+       "format": "int32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this token.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "ListInvitationsResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.rosters",
+      "https://www.googleapis.com/auth/classroom.rosters.readonly"
+     ]
+    },
+    "accept": {
+     "id": "classroom.invitations.accept",
+     "path": "v1/invitations/{id}:accept",
+     "httpMethod": "POST",
+     "description": "Accepts an invitation, removing it and adding the invited user to the teachers or students (as appropriate) of the specified course. Only the invited user may accept an invitation. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to accept the requested invitation or for access errors. * `FAILED_PRECONDITION` for the following request errors: * CourseMemberLimitReached * CourseNotModifiable * CourseTeacherLimitReached * UserGroupsMembershipLimitReached * `NOT_FOUND` if no invitation exists with the requested ID.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "Identifier of the invitation to accept.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Empty"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.rosters"
+     ]
+    }
+   }
+  },
+  "userProfiles": {
+   "methods": {
+    "get": {
+     "id": "classroom.userProfiles.get",
+     "path": "v1/userProfiles/{userId}",
+     "httpMethod": "GET",
+     "description": "Returns a user profile. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to access this user profile or if no profile exists with the requested ID or for access errors.",
+     "parameters": {
+      "userId": {
+       "type": "string",
+       "description": "Identifier of the profile to return. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userId"
+     ],
+     "response": {
+      "$ref": "UserProfile"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/classroom.profile.emails",
+      "https://www.googleapis.com/auth/classroom.profile.photos",
+      "https://www.googleapis.com/auth/classroom.rosters",
+      "https://www.googleapis.com/auth/classroom.rosters.readonly"
+     ]
+    }
+   }
+  }
+ }
+}

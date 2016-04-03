@@ -1,0 +1,1293 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Kubernetes Cluster",
+    "originalTitle": "Kubernetes Cluster",
+    "tags": [],
+    "style": "dark",
+    "timezone": "browser",
+    "editable": true,
+    "hideControls": false,
+    "sharedCrosshair": false,
+    "rows": [
+      {
+        "collapse": true,
+        "editable": true,
+        "height": "100px",
+        "panels": [
+          {
+            "content": "#### This dashboard displays Memory, CPU, Disk and Network metrics at both cluster and node levels. Select a node from the above dropdown to see metrics specific to that node. Select \"All\" to see metrics for all nodes side by side.\n\n##### * Cluster metrics are sum across all nodes.\n##### * Node metrics are displayed on one panel for easy comparison.\n##### * There's also a panel for each node so one could \"double-click\" into the node for further analysis.\n",
+            "editable": true,
+            "error": false,
+            "id": 1,
+            "links": [],
+            "mode": "markdown",
+            "span": 12,
+            "style": {},
+            "title": "",
+            "transparent": true,
+            "type": "text"
+          }
+        ],
+        "showTitle": true,
+        "title": "Documentation"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 3,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 2,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "span": 12,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Limit",
+                "fields": [
+                  {
+                    "func": "sum",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "memory/limit_bytes_gauge",
+                "query": "SELECT sum(\"value\") AS \"value\" FROM \"memory/limit_bytes_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval)",
+                "refId": "A",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              },
+              {
+                "alias": "Usage",
+                "fields": [
+                  {
+                    "func": "sum",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "memory/usage_bytes_gauge",
+                "query": "SELECT sum(\"value\") AS \"value\" FROM \"memory/usage_bytes_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval)",
+                "refId": "B",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              },
+              {
+                "alias": "Working Set",
+                "fields": [
+                  {
+                    "func": "sum",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "memory/working_set_bytes_gauge",
+                "query": "SELECT sum(\"value\") AS \"value\" FROM \"memory/working_set_bytes_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval)",
+                "refId": "C",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "bytes",
+              "bytes"
+            ]
+          }
+        ],
+        "showTitle": true,
+        "title": "Overall Cluster Memory Usage"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 1,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 3,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "span": 12,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Limit {$tag_hostname}",
+                "fields": [
+                  {
+                    "func": "max",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  },
+                  {
+                    "key": "hostname",
+                    "type": "tag"
+                  }
+                ],
+                "measurement": "memory/limit_bytes_gauge",
+                "query": "SELECT max(\"value\") AS \"value\" FROM \"memory/limit_bytes_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval), \"hostname\"",
+                "refId": "A",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              },
+              {
+                "alias": "Usage {$tag_hostname}",
+                "fields": [
+                  {
+                    "func": "max",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  },
+                  {
+                    "key": "hostname",
+                    "type": "tag"
+                  }
+                ],
+                "measurement": "memory/working_set_bytes_gauge",
+                "query": "SELECT max(\"value\") AS \"value\" FROM \"memory/working_set_bytes_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval), \"hostname\"",
+                "refId": "B",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "bytes",
+              "bytes"
+            ]
+          }
+        ],
+        "showTitle": true,
+        "title": "Memory Usage Group By Node"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 3,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 4,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "minSpan": 6,
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "repeat": "node",
+            "scopedVars": {},
+            "seriesOverrides": [],
+            "span": 6,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Limit",
+                "fields": [
+                  {
+                    "func": "max",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "memory/limit_bytes_gauge",
+                "query": "SELECT max(\"value\") AS \"value\" FROM \"memory/limit_bytes_gauge\" WHERE \"hostname\" =~ /$node/ AND \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval)",
+                "refId": "A",
+                "tags": [
+                  {
+                    "key": "hostname",
+                    "value": "/$node/"
+                  },
+                  {
+                    "condition": "AND",
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              },
+              {
+                "alias": "Usage",
+                "fields": [
+                  {
+                    "func": "max",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "memory/usage_bytes_gauge",
+                "query": "SELECT max(\"value\") AS \"value\" FROM \"memory/usage_bytes_gauge\" WHERE \"hostname\" =~ /$node/ AND \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval)",
+                "refId": "B",
+                "tags": [
+                  {
+                    "key": "hostname",
+                    "value": "/$node/"
+                  },
+                  {
+                    "condition": "AND",
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              },
+              {
+                "alias": "Working Set",
+                "fields": [
+                  {
+                    "func": "max",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "memory/working_set_bytes_gauge",
+                "query": "SELECT max(\"value\") AS \"value\" FROM \"memory/working_set_bytes_gauge\" WHERE \"hostname\" =~ /$node/ AND \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval)",
+                "refId": "C",
+                "tags": [
+                  {
+                    "key": "hostname",
+                    "value": "/$node/"
+                  },
+                  {
+                    "condition": "AND",
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "$node Memory Usage",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "bytes",
+              "bytes"
+            ]
+          }
+        ],
+        "repeat": null,
+        "scopedVars": {},
+        "showTitle": true,
+        "title": "Individual Node Memory Usage"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 1,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 5,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "span": 12,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Limit {$tag_hostname}",
+                "fields": [
+                  {
+                    "func": "last",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  },
+                  {
+                    "key": "hostname",
+                    "type": "tag"
+                  }
+                ],
+                "measurement": "cpu/limit_gauge",
+                "query": "SELECT last(\"value\") AS \"value\" FROM \"cpu/limit_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval), \"hostname\"",
+                "refId": "A",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              },
+              {
+                "alias": "Usage {$tag_hostname}",
+                "query": "SELECT non_negative_derivative(max(value),1u) FROM \"cpu/usage_ns_cumulative\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval), \"hostname\"",
+                "rawQuery": true,
+                "refId": "B",
+                "target": ""
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "ms",
+              "ms"
+            ]
+          }
+        ],
+        "showTitle": true,
+        "title": "CPU Usage Group By Node"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 3,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 6,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "minSpan": 6,
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "repeat": "node",
+            "scopedVars": {},
+            "seriesOverrides": [],
+            "span": 6,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Limit",
+                "fields": [
+                  {
+                    "func": "last",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "cpu/limit_gauge",
+                "query": "SELECT last(\"value\") AS \"value\" FROM \"cpu/limit_gauge\" WHERE \"container_name\" = 'machine' AND \"hostname\" =~ /$node/ AND $timeFilter GROUP BY time($interval)",
+                "refId": "A",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  },
+                  {
+                    "condition": "AND",
+                    "key": "hostname",
+                    "value": "/$node/"
+                  }
+                ]
+              },
+              {
+                "alias": "Usage",
+                "query": "SELECT non_negative_derivative(max(value),1u) FROM \"cpu/usage_ns_cumulative\" WHERE \"container_name\" = 'machine' AND \"hostname\" =~ /$node/ AND $timeFilter GROUP BY time($interval)",
+                "rawQuery": true,
+                "refId": "B",
+                "target": ""
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "$node CPU Usage",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "ms",
+              "ms"
+            ]
+          }
+        ],
+        "showTitle": true,
+        "title": "Individual Node CPU Usage"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 3,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 7,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "span": 12,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Limit",
+                "fields": [
+                  {
+                    "func": "sum",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "filesystem/limit_bytes_gauge",
+                "query": "SELECT sum(\"value\") AS \"value\" FROM \"filesystem/limit_bytes_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval)",
+                "refId": "A",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              },
+              {
+                "alias": "Usage",
+                "fields": [
+                  {
+                    "func": "sum",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "filesystem/usage_bytes_gauge",
+                "query": "SELECT sum(\"value\") AS \"value\" FROM \"filesystem/usage_bytes_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval)",
+                "refId": "B",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "bytes",
+              "bytes"
+            ]
+          }
+        ],
+        "showTitle": true,
+        "title": "Overall Cluster Disk Usage"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 1,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 8,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "span": 12,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Limit {$tag_hostname}",
+                "fields": [
+                  {
+                    "func": "last",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  },
+                  {
+                    "key": "hostname",
+                    "type": "tag"
+                  }
+                ],
+                "measurement": "filesystem/limit_bytes_gauge",
+                "query": "SELECT last(\"value\") AS \"value\" FROM \"filesystem/limit_bytes_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval), \"hostname\"",
+                "refId": "A",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              },
+              {
+                "alias": "Usage {$tag_hostname}",
+                "fields": [
+                  {
+                    "func": "last",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  },
+                  {
+                    "key": "hostname",
+                    "type": "tag"
+                  }
+                ],
+                "measurement": "filesystem/usage_bytes_gauge",
+                "query": "SELECT last(\"value\") AS \"value\" FROM \"filesystem/usage_bytes_gauge\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval), \"hostname\"",
+                "refId": "B",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  }
+                ]
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "bytes",
+              "bytes"
+            ]
+          }
+        ],
+        "showTitle": true,
+        "title": "Disk Usage Group By Node"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 3,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 9,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "minSpan": 6,
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "repeat": "node",
+            "scopedVars": {},
+            "seriesOverrides": [],
+            "span": 6,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Limit",
+                "fields": [
+                  {
+                    "func": "last",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "filesystem/limit_bytes_gauge",
+                "query": "SELECT last(\"value\") AS \"value\" FROM \"filesystem/limit_bytes_gauge\" WHERE \"container_name\" = 'machine' AND \"hostname\" =~ /$node/ AND $timeFilter GROUP BY time($interval)",
+                "refId": "A",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  },
+                  {
+                    "condition": "AND",
+                    "key": "hostname",
+                    "value": "/$node/"
+                  }
+                ]
+              },
+              {
+                "alias": "Usage",
+                "fields": [
+                  {
+                    "func": "last",
+                    "name": "value"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "interval": "auto",
+                    "type": "time"
+                  }
+                ],
+                "measurement": "filesystem/usage_bytes_gauge",
+                "query": "SELECT last(\"value\") AS \"value\" FROM \"filesystem/usage_bytes_gauge\" WHERE \"container_name\" = 'machine' AND \"hostname\" =~ /$node/ AND $timeFilter GROUP BY time($interval)",
+                "refId": "B",
+                "tags": [
+                  {
+                    "key": "container_name",
+                    "value": "machine"
+                  },
+                  {
+                    "condition": "AND",
+                    "key": "hostname",
+                    "value": "/$node/"
+                  }
+                ]
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "$node Disk Usage",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "bytes",
+              "bytes"
+            ]
+          }
+        ],
+        "showTitle": true,
+        "title": "Individual Node Disk Usage"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 1,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 10,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [
+              {
+                "alias": "/Rx /",
+                "transform": "negative-Y"
+              }
+            ],
+            "span": 12,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Tx {$tag_hostname}",
+                "query": "SELECT non_negative_derivative(max(value),1s) FROM \"network/tx_bytes_cumulative\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval), \"hostname\"",
+                "rawQuery": true,
+                "refId": "A",
+                "target": ""
+              },
+              {
+                "alias": "Rx {$tag_hostname}",
+                "query": "SELECT non_negative_derivative(max(value),1s) FROM \"network/rx_bytes_cumulative\" WHERE \"container_name\" = 'machine' AND $timeFilter GROUP BY time($interval), \"hostname\"",
+                "rawQuery": true,
+                "refId": "B",
+                "target": ""
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "Bps",
+              "Bps"
+            ]
+          }
+        ],
+        "showTitle": true,
+        "title": "Network Usage Group By Node"
+      },
+      {
+        "collapse": false,
+        "editable": true,
+        "height": "250px",
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "datasource": null,
+            "decimals": 2,
+            "editable": true,
+            "error": false,
+            "fill": 3,
+            "grid": {
+              "leftLogBase": 1,
+              "leftMax": null,
+              "leftMin": null,
+              "rightLogBase": 1,
+              "rightMax": null,
+              "rightMin": null,
+              "threshold1": null,
+              "threshold1Color": "rgba(216, 200, 27, 0.27)",
+              "threshold2": null,
+              "threshold2Color": "rgba(234, 112, 112, 0.22)"
+            },
+            "id": 11,
+            "interval": ">30s",
+            "legend": {
+              "avg": false,
+              "current": true,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": true
+            },
+            "lines": true,
+            "linewidth": 3,
+            "links": [],
+            "minSpan": 6,
+            "nullPointMode": "connected",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "repeat": "node",
+            "scopedVars": {},
+            "seriesOverrides": [],
+            "span": 6,
+            "stack": true,
+            "steppedLine": false,
+            "targets": [
+              {
+                "alias": "Tx",
+                "query": "SELECT non_negative_derivative(max(value),1s) FROM \"network/tx_bytes_cumulative\" WHERE \"container_name\" = 'machine' AND \"hostname\" =~ /$node/ AND $timeFilter GROUP BY time($interval)",
+                "rawQuery": true,
+                "refId": "A",
+                "target": ""
+              },
+              {
+                "alias": "Rx",
+                "query": "SELECT non_negative_derivative(max(value),1s) FROM \"network/rx_bytes_cumulative\" WHERE \"container_name\" = 'machine' AND \"hostname\" =~ /$node/ AND $timeFilter GROUP BY time($interval)",
+                "rawQuery": true,
+                "refId": "B",
+                "target": ""
+              }
+            ],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "$node Network Usage",
+            "tooltip": {
+              "shared": true,
+              "value_type": "cumulative"
+            },
+            "type": "graph",
+            "x-axis": true,
+            "y-axis": true,
+            "y_formats": [
+              "Bps",
+              "Bps"
+            ]
+          }
+        ],
+        "showTitle": true,
+        "title": "Individual Node Network Usage"
+      }
+    ],
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
+    "timepicker": {
+      "collapse": false,
+      "enable": true,
+      "notice": false,
+      "now": true,
+      "refresh_intervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ],
+      "status": "Stable",
+      "time_options": [
+        "15m",
+        "1h",
+        "3h",
+        "6h",
+        "12h",
+        "24h",
+        "2d",
+        "7d"
+      ],
+      "type": "timepicker"
+    },
+    "templating": {
+      "list": [
+        {
+          "allFormat": "glob",
+          "current": {
+            "text": "All",
+            "value": "{}"
+          },
+          "datasource": null,
+          "includeAll": true,
+          "label": "Node",
+          "multi": false,
+          "multiFormat": "glob",
+          "name": "node",
+          "options": [
+            {
+              "text": "All",
+              "value": "{}",
+              "selected": true
+            }
+          ],
+          "query": "SHOW TAG VALUES FROM \"uptime_ms_cumulative\" WITH KEY = \"hostname\"",
+          "refresh": true,
+          "refresh_on_load": true,
+          "regex": "",
+          "type": "query",
+          "useTags": false
+        }
+      ]
+    },
+    "annotations": {
+      "list": []
+    },
+    "schemaVersion": 7,
+    "version": 0,
+    "links": []
+  },
+  "overwrite": false
+}

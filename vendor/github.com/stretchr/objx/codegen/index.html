@@ -1,0 +1,86 @@
+<html>
+	<head>
+	<title>
+		Codegen
+	</title>
+	<style>
+		body {
+			width: 800px;
+			margin: auto;
+		}
+		textarea {
+			width: 100%;
+			min-height: 100px;
+			font-family: Courier;
+		}
+	</style>
+	</head>
+	<body>
+
+		<h2>
+			Template
+		</h2>
+		<p>
+			Use <code>{x}</code> as a placeholder for each argument.
+		</p>
+		<textarea id="template"></textarea>
+
+		<h2>
+			Arguments (comma separated)
+		</h2>
+		<p>
+			One block per line
+		</p>
+		<textarea id="args"></textarea>
+
+		<h2>
+			Output
+		</h2>
+		<input id="go" type="button" value="Generate code" />
+
+		<textarea id="output"></textarea>
+
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+		<script>
+
+			$(function(){
+
+				$("#go").click(function(){
+
+					var output = ""
+					var template = $("#template").val()
+					var args = $("#args").val()
+
+					// collect the args
+					var argLines = args.split("\n")
+					for (var line in argLines) {
+
+						var argLine = argLines[line];
+						var thisTemp = template
+
+						// get individual args
+						var args = argLine.split(",")
+
+						for (var argI in args) {
+							var argText = args[argI];
+							var argPlaceholder = "{" + argI + "}";
+
+							while (thisTemp.indexOf(argPlaceholder) > -1) {
+								thisTemp = thisTemp.replace(argPlaceholder, argText);
+							}
+
+						}
+
+						output += thisTemp
+
+					}
+
+					$("#output").val(output);
+
+				});
+
+			});
+
+		</script>
+	</body>
+</html>

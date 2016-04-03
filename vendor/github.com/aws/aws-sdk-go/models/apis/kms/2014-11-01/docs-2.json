@@ -1,0 +1,699 @@
+{
+  "version": "2.0",
+  "operations": {
+    "CancelKeyDeletion": "<p>Cancels the deletion of a customer master key (CMK). When this operation is successful, the CMK is set to the <code>Disabled</code> state. To enable a CMK, use <a>EnableKey</a>.</p> <p>For more information about scheduling and canceling deletion of a CMK, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html\">Deleting Customer Master Keys</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+    "CreateAlias": "<p>Creates a display name for a customer master key. An alias can be used to identify a key and should be unique. The console enforces a one-to-one mapping between the alias and a key. An alias name can contain only alphanumeric characters, forward slashes (/), underscores (_), and dashes (-). An alias must start with the word \"alias\" followed by a forward slash (alias/). An alias that begins with \"aws\" after the forward slash (alias/aws...) is reserved by Amazon Web Services (AWS). </p> <p>The alias and the key it is mapped to must be in the same AWS account and the same region.</p> <p>To map an alias to a different key, call <a>UpdateAlias</a>.</p>",
+    "CreateGrant": "<p>Adds a grant to a key to specify who can use the key and under what conditions. Grants are alternate permission mechanisms to key policies.</p> <p>For more information about grants, see <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/grants.html\">Grants</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+    "CreateKey": "<p>Creates a customer master key. Customer master keys can be used to encrypt small amounts of data (less than 4K) directly, but they are most commonly used to encrypt or envelope data keys that are then used to encrypt customer data. For more information about data keys, see <a>GenerateDataKey</a> and <a>GenerateDataKeyWithoutPlaintext</a>.</p>",
+    "Decrypt": "<p>Decrypts ciphertext. Ciphertext is plaintext that has been previously encrypted by using any of the following functions: <ul> <li><a>GenerateDataKey</a></li> <li><a>GenerateDataKeyWithoutPlaintext</a></li> <li><a>Encrypt</a></li> </ul> </p> <p>Note that if a caller has been granted access permissions to all keys (through, for example, IAM user policies that grant <code>Decrypt</code> permission on all resources), then ciphertext encrypted by using keys in other accounts where the key grants access to the caller can be decrypted. To remedy this, we recommend that you do not grant <code>Decrypt</code> access in an IAM user policy. Instead grant <code>Decrypt</code> access only in key policies. If you must grant <code>Decrypt</code> access in an IAM user policy, you should scope the resource to specific keys or to specific trusted accounts. </p>",
+    "DeleteAlias": "<p>Deletes the specified alias. To map an alias to a different key, call <a>UpdateAlias</a>.</p>",
+    "DescribeKey": "<p>Provides detailed information about the specified customer master key.</p>",
+    "DisableKey": "<p>Sets the state of a master key to disabled, thereby preventing its use for cryptographic operations. For more information about how key state affects the use of a master key, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/key-state.html\">How Key State Affects the Use of a Customer Master Key</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+    "DisableKeyRotation": "<p>Disables rotation of the specified key.</p>",
+    "EnableKey": "<p>Marks a key as enabled, thereby permitting its use.</p>",
+    "EnableKeyRotation": "<p>Enables rotation of the specified customer master key.</p>",
+    "Encrypt": "<p>Encrypts plaintext into ciphertext by using a customer master key. The <code>Encrypt</code> function has two primary use cases: <ul> <li>You can encrypt up to 4 KB of arbitrary data such as an RSA key, a database password, or other sensitive customer information.</li> <li>If you are moving encrypted data from one region to another, you can use this API to encrypt in the new region the plaintext data key that was used to encrypt the data in the original region. This provides you with an encrypted copy of the data key that can be decrypted in the new region and used there to decrypt the encrypted data. </li> </ul> </p> <p>Unless you are moving encrypted data from one region to another, you don't use this function to encrypt a generated data key within a region. You retrieve data keys already encrypted by calling the <a>GenerateDataKey</a> or <a>GenerateDataKeyWithoutPlaintext</a> function. Data keys don't need to be encrypted again by calling <code>Encrypt</code>. </p> <p>If you want to encrypt data locally in your application, you can use the <code>GenerateDataKey</code> function to return a plaintext data encryption key and a copy of the key encrypted under the customer master key (CMK) of your choosing. </p>",
+    "GenerateDataKey": "<p>Generates a data key that you can use in your application to locally encrypt data. This call returns a plaintext version of the key in the <code>Plaintext</code> field of the response object and an encrypted copy of the key in the <code>CiphertextBlob</code> field. The key is encrypted by using the master key specified by the <code>KeyId</code> field. To decrypt the encrypted key, pass it to the <code>Decrypt</code> API. </p> <p>We recommend that you use the following pattern to locally encrypt data: call the <code>GenerateDataKey</code> API, use the key returned in the <code>Plaintext</code> response field to locally encrypt data, and then erase the plaintext data key from memory. Store the encrypted data key (contained in the <code>CiphertextBlob</code> field) alongside of the locally encrypted data. </p> <note>You should not call the <code>Encrypt</code> function to re-encrypt your data keys within a region. <code>GenerateDataKey</code> always returns the data key encrypted and tied to the customer master key that will be used to decrypt it. There is no need to decrypt it twice. </note> <p>If you decide to use the optional <code>EncryptionContext</code> parameter, you must also store the context in full or at least store enough information along with the encrypted data to be able to reconstruct the context when submitting the ciphertext to the <code>Decrypt</code> API. It is a good practice to choose a context that you can reconstruct on the fly to better secure the ciphertext. For more information about how this parameter is used, see <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/encrypt-context.html\">Encryption Context</a>. </p> <p>To decrypt data, pass the encrypted data key to the <code>Decrypt</code> API. <code>Decrypt</code> uses the associated master key to decrypt the encrypted data key and returns it as plaintext. Use the plaintext data key to locally decrypt your data and then erase the key from memory. You must specify the encryption context, if any, that you specified when you generated the key. The encryption context is logged by CloudTrail, and you can use this log to help track the use of particular data. </p>",
+    "GenerateDataKeyWithoutPlaintext": "<p>Returns a data key encrypted by a customer master key without the plaintext copy of that key. Otherwise, this API functions exactly like <a>GenerateDataKey</a>. You can use this API to, for example, satisfy an audit requirement that an encrypted key be made available without exposing the plaintext copy of that key. </p>",
+    "GenerateRandom": "<p>Generates an unpredictable byte string. </p>",
+    "GetKeyPolicy": "<p>Retrieves a policy attached to the specified key.</p>",
+    "GetKeyRotationStatus": "<p>Retrieves a Boolean value that indicates whether key rotation is enabled for the specified key.</p>",
+    "ListAliases": "<p>Lists all of the key aliases in the account.</p>",
+    "ListGrants": "<p>List the grants for a specified key.</p>",
+    "ListKeyPolicies": "<p>Retrieves a list of policies attached to a key.</p>",
+    "ListKeys": "<p>Lists the customer master keys.</p>",
+    "ListRetirableGrants": "<p>Returns a list of all grants for which the grant's <code>RetiringPrincipal</code> matches the one specified.</p> <p>A typical use is to list all grants that you are able to retire. To retire a grant, use <a>RetireGrant</a>.</p>",
+    "PutKeyPolicy": "<p>Attaches a policy to the specified key.</p>",
+    "ReEncrypt": "<p>Encrypts data on the server side with a new customer master key without exposing the plaintext of the data on the client side. The data is first decrypted and then encrypted. This operation can also be used to change the encryption context of a ciphertext. </p> <p>Unlike other actions, <code>ReEncrypt</code> is authorized twice - once as <code>ReEncryptFrom</code> on the source key and once as <code>ReEncryptTo</code> on the destination key. We therefore recommend that you include the <code>\"action\":\"kms:ReEncrypt*\"</code> statement in your key policies to permit re-encryption from or to the key. The statement is included automatically when you authorize use of the key through the console but must be included manually when you set a policy by using the <a>PutKeyPolicy</a> function. </p>",
+    "RetireGrant": "<p>Retires a grant. You can retire a grant when you're done using it to clean up. You should revoke a grant when you intend to actively deny operations that depend on it. The following are permitted to call this API: <ul> <li>The account that created the grant</li> <li>The <code>RetiringPrincipal</code>, if present</li> <li>The <code>GranteePrincipal</code>, if <code>RetireGrant</code> is a grantee operation</li> </ul> The grant to retire must be identified by its grant token or by a combination of the key ARN and the grant ID. A grant token is a unique variable-length base64-encoded string. A grant ID is a 64 character unique identifier of a grant. Both are returned by the <code>CreateGrant</code> function. </p>",
+    "RevokeGrant": "<p>Revokes a grant. You can revoke a grant to actively deny operations that depend on it.</p>",
+    "ScheduleKeyDeletion": "<p>Schedules the deletion of a customer master key (CMK). You may provide a waiting period, specified in days, before deletion occurs. If you do not provide a waiting period, the default period of 30 days is used. When this operation is successful, the state of the CMK changes to <code>PendingDeletion</code>. Before the waiting period ends, you can use <a>CancelKeyDeletion</a> to cancel the deletion of the CMK. After the waiting period ends, AWS KMS deletes the CMK and all AWS KMS data associated with it, including all aliases that point to it.</p> <important> <p>Deleting a CMK is a destructive and potentially dangerous operation. When a CMK is deleted, all data that was encrypted under the CMK is rendered unrecoverable. To restrict the use of a CMK without deleting it, use <a>DisableKey</a>.</p> </important> <p>For more information about scheduling a CMK for deletion, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html\">Deleting Customer Master Keys</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+    "UpdateAlias": "<p>Updates an alias to map it to a different key.</p> <p>An alias is not a property of a key. Therefore, an alias can be mapped to and unmapped from an existing key without changing the properties of the key. </p> <p>An alias name can contain only alphanumeric characters, forward slashes (/), underscores (_), and dashes (-). An alias must start with the word \"alias\" followed by a forward slash (alias/). An alias that begins with \"aws\" after the forward slash (alias/aws...) is reserved by Amazon Web Services (AWS). </p> <p>The alias and the key it is mapped to must be in the same AWS account and the same region.</p>",
+    "UpdateKeyDescription": "<p>Updates the description of a key.</p>"
+  },
+  "service": "<fullname>AWS Key Management Service</fullname> <p>AWS Key Management Service (AWS KMS) is an encryption and key management web service. This guide describes the AWS KMS operations that you can call programmatically. For general information about AWS KMS, see the <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/\">AWS Key Management Service Developer Guide</a>.</p> <note> <p>AWS provides SDKs that consist of libraries and sample code for various programming languages and platforms (Java, Ruby, .Net, iOS, Android, etc.). The SDKs provide a convenient way to create programmatic access to AWS KMS and other AWS services. For example, the SDKs take care of tasks such as signing requests (see below), managing errors, and retrying requests automatically. For more information about the AWS SDKs, including how to download and install them, see <a href=\"http://aws.amazon.com/tools/\">Tools for Amazon Web Services</a>.</p> </note> <p>We recommend that you use the AWS SDKs to make programmatic API calls to AWS KMS.</p> <p>Clients must support TLS (Transport Layer Security) 1.0. We recommend TLS 1.2. Clients must also support cipher suites with Perfect Forward Secrecy (PFS) such as Ephemeral Diffie-Hellman (DHE) or Elliptic Curve Ephemeral Diffie-Hellman (ECDHE). Most modern systems such as Java 7 and later support these modes. </p> <p><b>Signing Requests</b></p> <p>Requests must be signed by using an access key ID and a secret access key. We strongly recommend that you <i>do not</i> use your AWS account access key ID and secret key for everyday work with AWS KMS. Instead, use the access key ID and secret access key for an IAM user, or you can use the AWS Security Token Service to generate temporary security credentials that you can use to sign requests.</p> <p>All AWS KMS operations require <a href=\"http://docs.aws.amazon.com/general/latest/gr/signature-version-4.html\">Signature Version 4</a>.</p> <p><b>Logging API Requests</b></p> <p>AWS KMS supports AWS CloudTrail, a service that logs AWS API calls and related events for your AWS account and delivers them to an Amazon S3 bucket that you specify. By using the information collected by CloudTrail, you can determine what requests were made to AWS KMS, who made the request, when it was made, and so on. To learn more about CloudTrail, including how to turn it on and find your log files, see the <a href=\"http://docs.aws.amazon.com/awscloudtrail/latest/userguide/\">AWS CloudTrail User Guide</a>.</p> <p><b>Additional Resources</b></p> <p>For more information about credentials and request signing, see the following:</p> <ul> <li> <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-security-credentials.html\">AWS Security Credentials</a> - This topic provides general information about the types of credentials used for accessing AWS. </li> <li> <a href=\"http://docs.aws.amazon.com/STS/latest/UsingSTS/\">AWS Security Token Service</a> - This guide describes how to create and use temporary security credentials. </li> <li> <a href=\"http://docs.aws.amazon.com/general/latest/gr/signing_aws_api_requests.html\">Signing AWS API Requests</a> - This set of topics walks you through the process of signing a request using an access key ID and a secret access key. </li> </ul> <p><b>Commonly Used APIs</b></p> <p> Of the APIs discussed in this guide, the following will prove the most useful for most applications. You will likely perform actions other than these, such as creating keys and assigning policies, by using the console.</p> <ul> <li><a>Encrypt</a></li> <li><a>Decrypt</a></li> <li><a>GenerateDataKey</a></li> <li><a>GenerateDataKeyWithoutPlaintext</a></li> </ul>",
+  "shapes": {
+    "AWSAccountIdType": {
+      "base": null,
+      "refs": {
+        "KeyMetadata$AWSAccountId": "<p>The twelve-digit account ID of the AWS account that owns the key.</p>"
+      }
+    },
+    "AliasList": {
+      "base": null,
+      "refs": {
+        "ListAliasesResponse$Aliases": "<p>A list of key aliases in the user's account.</p>"
+      }
+    },
+    "AliasListEntry": {
+      "base": "<p>Contains information about an alias.</p>",
+      "refs": {
+        "AliasList$member": null
+      }
+    },
+    "AliasNameType": {
+      "base": null,
+      "refs": {
+        "AliasListEntry$AliasName": "<p>String that contains the alias.</p>",
+        "CreateAliasRequest$AliasName": "<p>String that contains the display name. The name must start with the word \"alias\" followed by a forward slash (alias/). Aliases that begin with \"alias/AWS\" are reserved. </p>",
+        "DeleteAliasRequest$AliasName": "<p>The alias to be deleted. The name must start with the word \"alias\" followed by a forward slash (alias/). Aliases that begin with \"alias/AWS\" are reserved.</p>",
+        "UpdateAliasRequest$AliasName": "<p>String that contains the name of the alias to be modified. The name must start with the word \"alias\" followed by a forward slash (alias/). Aliases that begin with \"alias/aws\" are reserved.</p>"
+      }
+    },
+    "AlreadyExistsException": {
+      "base": "<p>The request was rejected because it attempted to create a resource that already exists.</p>",
+      "refs": {
+      }
+    },
+    "ArnType": {
+      "base": null,
+      "refs": {
+        "AliasListEntry$AliasArn": "<p>String that contains the key ARN.</p>",
+        "KeyListEntry$KeyArn": "<p>ARN of the key.</p>",
+        "KeyMetadata$Arn": "<p>The Amazon Resource Name (ARN) of the key. For examples, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-kms\">AWS Key Management Service (AWS KMS)</a> in the Example ARNs section of the <i>AWS General Reference</i>.</p>"
+      }
+    },
+    "BooleanType": {
+      "base": null,
+      "refs": {
+        "GetKeyRotationStatusResponse$KeyRotationEnabled": "<p>A Boolean value that specifies whether key rotation is enabled.</p>",
+        "KeyMetadata$Enabled": "<p>Specifies whether the key is enabled. When <code>KeyState</code> is <code>Enabled</code> this value is true, otherwise it is false.</p>",
+        "ListAliasesResponse$Truncated": "<p>A flag that indicates whether there are more items in the list. If your results were truncated, you can use the <code>Marker</code> parameter to make a subsequent pagination request to retrieve more items in the list.</p>",
+        "ListGrantsResponse$Truncated": "<p>A flag that indicates whether there are more items in the list. If your results were truncated, you can use the <code>Marker</code> parameter to make a subsequent pagination request to retrieve more items in the list.</p>",
+        "ListKeyPoliciesResponse$Truncated": "<p>A flag that indicates whether there are more items in the list. If your results were truncated, you can use the <code>Marker</code> parameter to make a subsequent pagination request to retrieve more items in the list.</p>",
+        "ListKeysResponse$Truncated": "<p>A flag that indicates whether there are more items in the list. If your results were truncated, you can use the <code>Marker</code> parameter to make a subsequent pagination request to retrieve more items in the list.</p>"
+      }
+    },
+    "CancelKeyDeletionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelKeyDeletionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CiphertextType": {
+      "base": null,
+      "refs": {
+        "DecryptRequest$CiphertextBlob": "<p>Ciphertext to be decrypted. The blob includes metadata.</p>",
+        "EncryptResponse$CiphertextBlob": "<p>The encrypted plaintext. If you are using the CLI, the value is Base64 encoded. Otherwise, it is not encoded.</p>",
+        "GenerateDataKeyResponse$CiphertextBlob": "<p>Ciphertext that contains the encrypted data key. You must store the blob and enough information to reconstruct the encryption context so that the data encrypted by using the key can later be decrypted. You must provide both the ciphertext blob and the encryption context to the <a>Decrypt</a> API to recover the plaintext data key and decrypt the object. </p> <p>If you are using the CLI, the value is Base64 encoded. Otherwise, it is not encoded.</p>",
+        "GenerateDataKeyWithoutPlaintextResponse$CiphertextBlob": "<p>Ciphertext that contains the wrapped data key. You must store the blob and encryption context so that the key can be used in a future decrypt operation. </p> <p>If you are using the CLI, the value is Base64 encoded. Otherwise, it is not encoded. </p>",
+        "ReEncryptRequest$CiphertextBlob": "<p>Ciphertext of the data to re-encrypt.</p>",
+        "ReEncryptResponse$CiphertextBlob": "<p>The re-encrypted data. If you are using the CLI, the value is Base64 encoded. Otherwise, it is not encoded.</p>"
+      }
+    },
+    "CreateAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateGrantRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateGrantResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateKeyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DataKeySpec": {
+      "base": null,
+      "refs": {
+        "GenerateDataKeyRequest$KeySpec": "<p>Value that identifies the encryption algorithm and key size to generate a data key for. Currently this can be AES_128 or AES_256. </p>",
+        "GenerateDataKeyWithoutPlaintextRequest$KeySpec": "<p>Value that identifies the encryption algorithm and key size. Currently this can be AES_128 or AES_256. </p>"
+      }
+    },
+    "DateType": {
+      "base": null,
+      "refs": {
+        "GrantListEntry$CreationDate": "<p>The date and time when the grant was created.</p>",
+        "KeyMetadata$CreationDate": "<p>The date and time when the key was created.</p>",
+        "KeyMetadata$DeletionDate": "<p>The date and time after which AWS KMS deletes the customer master key (CMK). This value is present only when <code>KeyState</code> is <code>PendingDeletion</code>, otherwise this value is null.</p>",
+        "ScheduleKeyDeletionResponse$DeletionDate": "<p>The date and time after which AWS KMS deletes the customer master key (CMK).</p>"
+      }
+    },
+    "DecryptRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DecryptResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DependencyTimeoutException": {
+      "base": "<p>The system timed out while trying to fulfill the request. The request can be retried.</p>",
+      "refs": {
+      }
+    },
+    "DescribeKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeKeyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescriptionType": {
+      "base": null,
+      "refs": {
+        "CreateKeyRequest$Description": "<p>Description of the key. We recommend that you choose a description that helps your customer decide whether the key is appropriate for a task. </p>",
+        "KeyMetadata$Description": "<p>The friendly description of the key.</p>",
+        "UpdateKeyDescriptionRequest$Description": "<p>New description for the key.</p>"
+      }
+    },
+    "DisableKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisableKeyRotationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisabledException": {
+      "base": "<p>The request was rejected because the specified key was marked as disabled.</p>",
+      "refs": {
+      }
+    },
+    "EnableKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EnableKeyRotationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EncryptRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EncryptResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EncryptionContextKey": {
+      "base": null,
+      "refs": {
+        "EncryptionContextType$key": null
+      }
+    },
+    "EncryptionContextType": {
+      "base": null,
+      "refs": {
+        "DecryptRequest$EncryptionContext": "<p>The encryption context. If this was specified in the <a>Encrypt</a> function, it must be specified here or the decryption operation will fail. For more information, see <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/encrypt-context.html\">Encryption Context</a>. </p>",
+        "EncryptRequest$EncryptionContext": "<p>Name/value pair that specifies the encryption context to be used for authenticated encryption. If used here, the same value must be supplied to the <code>Decrypt</code> API or decryption will fail. For more information, see <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/encrypt-context.html\">Encryption Context</a>. </p>",
+        "GenerateDataKeyRequest$EncryptionContext": "<p>Name/value pair that contains additional data to be authenticated during the encryption and decryption processes that use the key. This value is logged by AWS CloudTrail to provide context around the data encrypted by the key. </p>",
+        "GenerateDataKeyWithoutPlaintextRequest$EncryptionContext": "<p>Name:value pair that contains additional data to be authenticated during the encryption and decryption processes. </p>",
+        "GrantConstraints$EncryptionContextSubset": "<p>Contains a list of key-value pairs, a subset of which must be present in the encryption context of a subsequent operation permitted by the grant. When a subsequent operation permitted by the grant includes an encryption context that matches this list or is a subset of this list, the grant allows the operation. Otherwise, the operation is not allowed.</p>",
+        "GrantConstraints$EncryptionContextEquals": "<p>Contains a list of key-value pairs that must be present in the encryption context of a subsequent operation permitted by the grant. When a subsequent operation permitted by the grant includes an encryption context that matches this list, the grant allows the operation. Otherwise, the operation is not allowed.</p>",
+        "ReEncryptRequest$SourceEncryptionContext": "<p>Encryption context used to encrypt and decrypt the data specified in the <code>CiphertextBlob</code> parameter. </p>",
+        "ReEncryptRequest$DestinationEncryptionContext": "<p>Encryption context to be used when the data is re-encrypted.</p>"
+      }
+    },
+    "EncryptionContextValue": {
+      "base": null,
+      "refs": {
+        "EncryptionContextType$value": null
+      }
+    },
+    "ErrorMessageType": {
+      "base": null,
+      "refs": {
+        "AlreadyExistsException$message": null,
+        "DependencyTimeoutException$message": null,
+        "DisabledException$message": null,
+        "InvalidAliasNameException$message": null,
+        "InvalidArnException$message": null,
+        "InvalidCiphertextException$message": null,
+        "InvalidGrantIdException$message": null,
+        "InvalidGrantTokenException$message": null,
+        "InvalidKeyUsageException$message": null,
+        "InvalidMarkerException$message": null,
+        "KMSInternalException$message": null,
+        "KMSInvalidStateException$message": null,
+        "KeyUnavailableException$message": null,
+        "LimitExceededException$message": null,
+        "MalformedPolicyDocumentException$message": null,
+        "NotFoundException$message": null,
+        "UnsupportedOperationException$message": null
+      }
+    },
+    "GenerateDataKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GenerateDataKeyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GenerateDataKeyWithoutPlaintextRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GenerateDataKeyWithoutPlaintextResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GenerateRandomRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GenerateRandomResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetKeyPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetKeyPolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetKeyRotationStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetKeyRotationStatusResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GrantConstraints": {
+      "base": "<p>A structure for specifying the conditions under which the operations permitted by the grant are allowed.</p> <p>You can use this structure to allow the operations permitted by the grant only when a specified encryption context is present. For more information about encryption context, see <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/encrypt-context.html\">Encryption Context</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+      "refs": {
+        "CreateGrantRequest$Constraints": "<p>The conditions under which the operations permitted by the grant are allowed.</p> <p>You can use this value to allow the operations permitted by the grant only when a specified encryption context is present. For more information, see <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/encrypt-context.html\">Encryption Context</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+        "GrantListEntry$Constraints": "<p>The conditions under which the grant's operations are allowed.</p>"
+      }
+    },
+    "GrantIdType": {
+      "base": null,
+      "refs": {
+        "CreateGrantResponse$GrantId": "<p>The unique identifier for the grant.</p> <p>You can use the <code>GrantId</code> in a subsequent <a>RetireGrant</a> or <a>RevokeGrant</a> operation.</p>",
+        "GrantListEntry$GrantId": "<p>The unique identifier for the grant.</p>",
+        "RetireGrantRequest$GrantId": "<p> Unique identifier of the grant to be retired. The grant ID is returned by the <code>CreateGrant</code> function. <ul> <li>Grant ID Example - 0123456789012345678901234567890123456789012345678901234567890123</li> </ul> </p>",
+        "RevokeGrantRequest$GrantId": "<p>Identifier of the grant to be revoked.</p>"
+      }
+    },
+    "GrantList": {
+      "base": null,
+      "refs": {
+        "ListGrantsResponse$Grants": "<p>A list of grants.</p>"
+      }
+    },
+    "GrantListEntry": {
+      "base": "<p>Contains information about an entry in a list of grants.</p>",
+      "refs": {
+        "GrantList$member": null
+      }
+    },
+    "GrantNameType": {
+      "base": null,
+      "refs": {
+        "CreateGrantRequest$Name": "<p>A friendly name for identifying the grant. Use this value to prevent unintended creation of duplicate grants when retrying this request.</p> <p>When this value is absent, all <code>CreateGrant</code> requests result in a new grant with a unique <code>GrantId</code> even if all the supplied parameters are identical. This can result in unintended duplicates when you retry the <code>CreateGrant</code> request.</p> <p>When this value is present, you can retry a <code>CreateGrant</code> request with identical parameters; if the grant already exists, the original <code>GrantId</code> is returned without creating a new grant. Note that the returned grant token is unique with every <code>CreateGrant</code> request, even when a duplicate <code>GrantId</code> is returned. All grant tokens obtained in this way can be used interchangeably.</p>",
+        "GrantListEntry$Name": "<p>The friendly name that identifies the grant. If a name was provided in the <a>CreateGrant</a> request, that name is returned. Otherwise this value is null.</p>"
+      }
+    },
+    "GrantOperation": {
+      "base": null,
+      "refs": {
+        "GrantOperationList$member": null
+      }
+    },
+    "GrantOperationList": {
+      "base": null,
+      "refs": {
+        "CreateGrantRequest$Operations": "<p>A list of operations that the grant permits. The list can contain any combination of one or more of the following values: <ul> <li>Decrypt</li> <li>Encrypt</li> <li>GenerateDataKey</li> <li>GenerateDataKeyWithoutPlaintext</li> <li>ReEncryptFrom</li> <li>ReEncryptTo</li> <li>CreateGrant</li> <li>RetireGrant</li> </ul> </p>",
+        "GrantListEntry$Operations": "<p>The list of operations permitted by the grant.</p>"
+      }
+    },
+    "GrantTokenList": {
+      "base": null,
+      "refs": {
+        "CreateGrantRequest$GrantTokens": "<p>A list of grant tokens.</p> <p>For more information, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#grant_token\">Grant Tokens</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+        "DecryptRequest$GrantTokens": "<p>A list of grant tokens.</p> <p>For more information, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#grant_token\">Grant Tokens</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+        "DescribeKeyRequest$GrantTokens": "<p>A list of grant tokens.</p> <p>For more information, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#grant_token\">Grant Tokens</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+        "EncryptRequest$GrantTokens": "<p>A list of grant tokens.</p> <p>For more information, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#grant_token\">Grant Tokens</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+        "GenerateDataKeyRequest$GrantTokens": "<p>A list of grant tokens.</p> <p>For more information, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#grant_token\">Grant Tokens</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+        "GenerateDataKeyWithoutPlaintextRequest$GrantTokens": "<p>A list of grant tokens.</p> <p>For more information, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#grant_token\">Grant Tokens</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+        "ReEncryptRequest$GrantTokens": "<p>A list of grant tokens.</p> <p>For more information, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#grant_token\">Grant Tokens</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>"
+      }
+    },
+    "GrantTokenType": {
+      "base": null,
+      "refs": {
+        "CreateGrantResponse$GrantToken": "<p>The grant token.</p> <p>For more information about using grant tokens, see <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#grant_token\">Grant Tokens</a> in the <i>AWS Key Management Service Developer Guide</i>. </p>",
+        "GrantTokenList$member": null,
+        "RetireGrantRequest$GrantToken": "<p>Token that identifies the grant to be retired.</p>"
+      }
+    },
+    "InvalidAliasNameException": {
+      "base": "<p>The request was rejected because the specified alias name is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidArnException": {
+      "base": "<p>The request was rejected because a specified ARN was not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidCiphertextException": {
+      "base": "<p>The request was rejected because the specified ciphertext has been corrupted or is otherwise invalid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidGrantIdException": {
+      "base": "<p>The request was rejected because the specified <code>GrantId</code> is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidGrantTokenException": {
+      "base": "<p>The request was rejected because a grant token provided as part of the request is invalid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidKeyUsageException": {
+      "base": "<p>The request was rejected because the specified KeySpec parameter is not valid. The currently supported value is ENCRYPT/DECRYPT. </p>",
+      "refs": {
+      }
+    },
+    "InvalidMarkerException": {
+      "base": "<p>The request was rejected because the marker that specifies where pagination should next begin is not valid. </p>",
+      "refs": {
+      }
+    },
+    "KMSInternalException": {
+      "base": "<p>The request was rejected because an internal exception occurred. The request can be retried.</p>",
+      "refs": {
+      }
+    },
+    "KMSInvalidStateException": {
+      "base": "<p>The request was rejected because the state of the specified resource is not valid for this request.</p> <p>For more information about how key state affects the use of a customer master key (CMK), go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/key-state.html\">How Key State Affects the Use of a Customer Master Key</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+      "refs": {
+      }
+    },
+    "KeyIdType": {
+      "base": null,
+      "refs": {
+        "AliasListEntry$TargetKeyId": "<p>String that contains the key identifier pointed to by the alias.</p>",
+        "CancelKeyDeletionRequest$KeyId": "<p>The unique identifier for the customer master key (CMK) for which to cancel deletion.</p> <p>To specify this value, use the unique key ID or the Amazon Resource Name (ARN) of the CMK. Examples: <ul> <li>Unique key ID: 1234abcd-12ab-34cd-56ef-1234567890ab</li> <li>Key ARN: arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab</li> </ul> </p> <p>To obtain the unique key ID and key ARN for a given CMK, use <a>ListKeys</a> or <a>DescribeKey</a>.</p>",
+        "CancelKeyDeletionResponse$KeyId": "<p>The unique identifier of the master key for which deletion is canceled.</p>",
+        "CreateAliasRequest$TargetKeyId": "<p>An identifier of the key for which you are creating the alias. This value cannot be another alias but can be a globally unique identifier or a fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "CreateGrantRequest$KeyId": "<p>The unique identifier for the customer master key (CMK) that the grant applies to.</p> <p>To specify this value, use the globally unique key ID or the Amazon Resource Name (ARN) of the key. Examples: <ul> <li>Globally unique key ID: 12345678-1234-1234-1234-123456789012</li> <li>Key ARN: arn:aws:kms:us-west-2:123456789012:key/12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "DecryptResponse$KeyId": "<p>ARN of the key used to perform the decryption. This value is returned if no errors are encountered during the operation. </p>",
+        "DescribeKeyRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier, a fully specified ARN to either an alias or a key, or an alias name prefixed by \"alias/\". <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Alias ARN Example - arn:aws:kms:us-east-1:123456789012:alias/MyAliasName</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> <li>Alias Name Example - alias/MyAliasName</li> </ul> </p>",
+        "DisableKeyRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "DisableKeyRotationRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "EnableKeyRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "EnableKeyRotationRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "EncryptRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier, a fully specified ARN to either an alias or a key, or an alias name prefixed by \"alias/\". <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Alias ARN Example - arn:aws:kms:us-east-1:123456789012:alias/MyAliasName</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> <li>Alias Name Example - alias/MyAliasName</li> </ul> </p>",
+        "EncryptResponse$KeyId": "<p>The ID of the key used during encryption.</p>",
+        "GenerateDataKeyRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier, a fully specified ARN to either an alias or a key, or an alias name prefixed by \"alias/\". <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Alias ARN Example - arn:aws:kms:us-east-1:123456789012:alias/MyAliasName</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> <li>Alias Name Example - alias/MyAliasName</li> </ul> </p>",
+        "GenerateDataKeyResponse$KeyId": "<p>System generated unique identifier of the key to be used to decrypt the encrypted copy of the data key.</p>",
+        "GenerateDataKeyWithoutPlaintextRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier, a fully specified ARN to either an alias or a key, or an alias name prefixed by \"alias/\". <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Alias ARN Example - arn:aws:kms:us-east-1:123456789012:alias/MyAliasName</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> <li>Alias Name Example - alias/MyAliasName</li> </ul> </p>",
+        "GenerateDataKeyWithoutPlaintextResponse$KeyId": "<p>System generated unique identifier of the key to be used to decrypt the encrypted copy of the data key.</p>",
+        "GetKeyPolicyRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "GetKeyRotationStatusRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "GrantListEntry$KeyId": "<p>The unique identifier for the customer master key (CMK) to which the grant applies.</p>",
+        "KeyListEntry$KeyId": "<p>Unique identifier of the key.</p>",
+        "KeyMetadata$KeyId": "<p>The globally unique identifier for the key.</p>",
+        "ListGrantsRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "ListKeyPoliciesRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier, a fully specified ARN to either an alias or a key, or an alias name prefixed by \"alias/\". <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Alias ARN Example - arn:aws:kms:us-east-1:123456789012:alias/MyAliasName</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> <li>Alias Name Example - alias/MyAliasName</li> </ul> </p>",
+        "PutKeyPolicyRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "ReEncryptRequest$DestinationKeyId": "<p>A unique identifier for the customer master key used to re-encrypt the data. This value can be a globally unique identifier, a fully specified ARN to either an alias or a key, or an alias name prefixed by \"alias/\". <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Alias ARN Example - arn:aws:kms:us-east-1:123456789012:alias/MyAliasName</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> <li>Alias Name Example - alias/MyAliasName</li> </ul> </p>",
+        "ReEncryptResponse$SourceKeyId": "<p>Unique identifier of the key used to originally encrypt the data.</p>",
+        "ReEncryptResponse$KeyId": "<p>Unique identifier of the key used to re-encrypt the data.</p>",
+        "RetireGrantRequest$KeyId": "<p>A unique identifier for the customer master key associated with the grant. This value can be a globally unique identifier or a fully specified ARN of the key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "RevokeGrantRequest$KeyId": "<p>A unique identifier for the customer master key associated with the grant. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>",
+        "ScheduleKeyDeletionRequest$KeyId": "<p>The unique identifier for the customer master key (CMK) to delete.</p> <p>To specify this value, use the unique key ID or the Amazon Resource Name (ARN) of the CMK. Examples: <ul> <li>Unique key ID: 1234abcd-12ab-34cd-56ef-1234567890ab</li> <li>Key ARN: arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab</li> </ul> </p> <p>To obtain the unique key ID and key ARN for a given CMK, use <a>ListKeys</a> or <a>DescribeKey</a>.</p>",
+        "ScheduleKeyDeletionResponse$KeyId": "<p>The unique identifier of the customer master key (CMK) for which deletion is scheduled.</p>",
+        "UpdateAliasRequest$TargetKeyId": "<p>Unique identifier of the customer master key to be mapped to the alias. This value can be a globally unique identifier or the fully specified ARN of a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p> <p>You can call <a>ListAliases</a> to verify that the alias is mapped to the correct <code>TargetKeyId</code>.</p>",
+        "UpdateKeyDescriptionRequest$KeyId": "<p>A unique identifier for the customer master key. This value can be a globally unique identifier or the fully specified ARN to a key. <ul> <li>Key ARN Example - arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012</li> <li>Globally Unique Key ID Example - 12345678-1234-1234-1234-123456789012</li> </ul> </p>"
+      }
+    },
+    "KeyList": {
+      "base": null,
+      "refs": {
+        "ListKeysResponse$Keys": "<p>A list of keys.</p>"
+      }
+    },
+    "KeyListEntry": {
+      "base": "<p>Contains information about each entry in the key list.</p>",
+      "refs": {
+        "KeyList$member": null
+      }
+    },
+    "KeyMetadata": {
+      "base": "<p>Contains metadata about a customer master key (CMK).</p> <p>This data type is used as a response element for the <a>CreateKey</a> and <a>DescribeKey</a> operations.</p>",
+      "refs": {
+        "CreateKeyResponse$KeyMetadata": "<p>Metadata associated with the key.</p>",
+        "DescribeKeyResponse$KeyMetadata": "<p>Metadata associated with the key.</p>"
+      }
+    },
+    "KeyState": {
+      "base": null,
+      "refs": {
+        "KeyMetadata$KeyState": "<p>The state of the customer master key (CMK).</p> <p>For more information about how key state affects the use of a CMK, go to <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/key-state.html\">How Key State Affects the Use of a Customer Master Key</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>"
+      }
+    },
+    "KeyUnavailableException": {
+      "base": "<p>The request was rejected because the key was not available. The request can be retried.</p>",
+      "refs": {
+      }
+    },
+    "KeyUsageType": {
+      "base": null,
+      "refs": {
+        "CreateKeyRequest$KeyUsage": "<p>Specifies the intended use of the key. Currently this defaults to ENCRYPT/DECRYPT, and only symmetric encryption and decryption are supported. </p>",
+        "KeyMetadata$KeyUsage": "<p>The cryptographic operations for which you can use the key. Currently the only allowed value is <code>ENCRYPT_DECRYPT</code>, which means you can use the key for the <a>Encrypt</a> and <a>Decrypt</a> operations.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>The request was rejected because a limit was exceeded. For more information, see <a href=\"http://docs.aws.amazon.com/kms/latest/developerguide/limits.html\">Limits</a> in the <i>AWS Key Management Service Developer Guide</i>.</p>",
+      "refs": {
+      }
+    },
+    "LimitType": {
+      "base": null,
+      "refs": {
+        "ListAliasesRequest$Limit": "<p>When paginating results, specify the maximum number of items to return in the response. If additional items exist beyond the number you specify, the <code>Truncated</code> element in the response is set to true.</p><p>This value is optional. If you include a value, it must be between 1 and 100, inclusive. If you do not include a value, it defaults to 50.</p>",
+        "ListGrantsRequest$Limit": "<p>When paginating results, specify the maximum number of items to return in the response. If additional items exist beyond the number you specify, the <code>Truncated</code> element in the response is set to true.</p><p>This value is optional. If you include a value, it must be between 1 and 100, inclusive. If you do not include a value, it defaults to 50.</p>",
+        "ListKeyPoliciesRequest$Limit": "<p>When paginating results, specify the maximum number of items to return in the response. If additional items exist beyond the number you specify, the <code>Truncated</code> element in the response is set to true.</p><p>This value is optional. If you include a value, it must be between 1 and 1000, inclusive. If you do not include a value, it defaults to 100.</p><p>Currently only 1 policy can be attached to a key.</p>",
+        "ListKeysRequest$Limit": "<p>When paginating results, specify the maximum number of items to return in the response. If additional items exist beyond the number you specify, the <code>Truncated</code> element in the response is set to true.</p><p>This value is optional. If you include a value, it must be between 1 and 1000, inclusive. If you do not include a value, it defaults to 100.</p>",
+        "ListRetirableGrantsRequest$Limit": "<p>When paginating results, specify the maximum number of items to return in the response. If additional items exist beyond the number you specify, the <code>Truncated</code> element in the response is set to true.</p><p>This value is optional. If you include a value, it must be between 1 and 100, inclusive. If you do not include a value, it defaults to 50.</p>"
+      }
+    },
+    "ListAliasesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAliasesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGrantsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListGrantsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListKeyPoliciesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListKeyPoliciesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListKeysRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListKeysResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListRetirableGrantsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MalformedPolicyDocumentException": {
+      "base": "<p>The request was rejected because the specified policy is not syntactically or semantically correct. </p>",
+      "refs": {
+      }
+    },
+    "MarkerType": {
+      "base": null,
+      "refs": {
+        "ListAliasesRequest$Marker": "<p>Use this parameter only when paginating results and only in a subsequent request after you've received a response with truncated results. Set it to the value of <code>NextMarker</code> from the response you just received.</p>",
+        "ListAliasesResponse$NextMarker": "<p>When <code>Truncated</code> is true, this value is present and contains the value to use for the <code>Marker</code> parameter in a subsequent pagination request.</p>",
+        "ListGrantsRequest$Marker": "<p>Use this parameter only when paginating results and only in a subsequent request after you've received a response with truncated results. Set it to the value of <code>NextMarker</code> from the response you just received.</p>",
+        "ListGrantsResponse$NextMarker": "<p>When <code>Truncated</code> is true, this value is present and contains the value to use for the <code>Marker</code> parameter in a subsequent pagination request.</p>",
+        "ListKeyPoliciesRequest$Marker": "<p>Use this parameter only when paginating results and only in a subsequent request after you've received a response with truncated results. Set it to the value of <code>NextMarker</code> from the response you just received.</p>",
+        "ListKeyPoliciesResponse$NextMarker": "<p>When <code>Truncated</code> is true, this value is present and contains the value to use for the <code>Marker</code> parameter in a subsequent pagination request.</p>",
+        "ListKeysRequest$Marker": "<p>Use this parameter only when paginating results and only in a subsequent request after you've received a response with truncated results. Set it to the value of <code>NextMarker</code> from the response you just received.</p>",
+        "ListKeysResponse$NextMarker": "<p>When <code>Truncated</code> is true, this value is present and contains the value to use for the <code>Marker</code> parameter in a subsequent pagination request.</p>",
+        "ListRetirableGrantsRequest$Marker": "<p>Use this parameter only when paginating results and only in a subsequent request after you've received a response with truncated results. Set it to the value of <code>NextMarker</code> from the response you just received.</p>"
+      }
+    },
+    "NotFoundException": {
+      "base": "<p>The request was rejected because the specified entity or resource could not be found. </p>",
+      "refs": {
+      }
+    },
+    "NumberOfBytesType": {
+      "base": null,
+      "refs": {
+        "GenerateDataKeyRequest$NumberOfBytes": "<p>Integer that contains the number of bytes to generate. Common values are 128, 256, 512, and 1024. 1024 is the current limit. We recommend that you use the <code>KeySpec</code> parameter instead. </p>",
+        "GenerateDataKeyWithoutPlaintextRequest$NumberOfBytes": "<p>Integer that contains the number of bytes to generate. Common values are 128, 256, 512, 1024 and so on. We recommend that you use the <code>KeySpec</code> parameter instead. </p>",
+        "GenerateRandomRequest$NumberOfBytes": "<p>Integer that contains the number of bytes to generate. Common values are 128, 256, 512, 1024 and so on. The current limit is 1024 bytes. </p>"
+      }
+    },
+    "PendingWindowInDaysType": {
+      "base": null,
+      "refs": {
+        "ScheduleKeyDeletionRequest$PendingWindowInDays": "<p>The waiting period, specified in number of days. After the waiting period ends, AWS KMS deletes the customer master key (CMK).</p> <p>This value is optional. If you include a value, it must be between 7 and 30, inclusive. If you do not include a value, it defaults to 30.</p>"
+      }
+    },
+    "PlaintextType": {
+      "base": null,
+      "refs": {
+        "DecryptResponse$Plaintext": "<p>Decrypted plaintext data. This value may not be returned if the customer master key is not available or if you didn't have permission to use it.</p>",
+        "EncryptRequest$Plaintext": "<p>Data to be encrypted.</p>",
+        "GenerateDataKeyResponse$Plaintext": "<p>Plaintext that contains the data key. Use this for encryption and decryption and then remove it from memory as soon as possible. </p>",
+        "GenerateRandomResponse$Plaintext": "<p>Plaintext that contains the unpredictable byte string.</p>"
+      }
+    },
+    "PolicyNameList": {
+      "base": null,
+      "refs": {
+        "ListKeyPoliciesResponse$PolicyNames": "<p>A list of policy names. Currently, there is only one policy and it is named \"Default\".</p>"
+      }
+    },
+    "PolicyNameType": {
+      "base": null,
+      "refs": {
+        "GetKeyPolicyRequest$PolicyName": "<p>String that contains the name of the policy. Currently, this must be \"default\". Policy names can be discovered by calling <a>ListKeyPolicies</a>. </p>",
+        "PolicyNameList$member": null,
+        "PutKeyPolicyRequest$PolicyName": "<p>Name of the policy to be attached. Currently, the only supported name is \"default\".</p>"
+      }
+    },
+    "PolicyType": {
+      "base": null,
+      "refs": {
+        "CreateKeyRequest$Policy": "<p>Policy to attach to the key. This is required and delegates back to the account. The key is the root of trust. The policy size limit is 32 KiB (32768 bytes). </p>",
+        "GetKeyPolicyResponse$Policy": "<p>A policy document in JSON format.</p>",
+        "PutKeyPolicyRequest$Policy": "<p>The policy to attach to the key. This is required and delegates back to the account. The key is the root of trust. The policy size limit is 32 KiB (32768 bytes). </p>"
+      }
+    },
+    "PrincipalIdType": {
+      "base": null,
+      "refs": {
+        "CreateGrantRequest$GranteePrincipal": "<p>The principal that is given permission to perform the operations that the grant permits.</p> <p>To specify the principal, use the <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Name (ARN)</a> of an AWS principal. Valid AWS principals include AWS accounts (root), IAM users, federated users, and assumed role users. For examples of the ARN syntax to use for specifying a principal, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-iam\">AWS Identity and Access Management (IAM)</a> in the Example ARNs section of the <i>AWS General Reference</i>.</p>",
+        "CreateGrantRequest$RetiringPrincipal": "<p>The principal that is given permission to retire the grant by using <a>RetireGrant</a> operation.</p> <p>To specify the principal, use the <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Name (ARN)</a> of an AWS principal. Valid AWS principals include AWS accounts (root), IAM users, federated users, and assumed role users. For examples of the ARN syntax to use for specifying a principal, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-iam\">AWS Identity and Access Management (IAM)</a> in the Example ARNs section of the <i>AWS General Reference</i>.</p>",
+        "GrantListEntry$GranteePrincipal": "<p>The principal that receives the grant's permissions.</p>",
+        "GrantListEntry$RetiringPrincipal": "<p>The principal that can retire the grant.</p>",
+        "GrantListEntry$IssuingAccount": "<p>The AWS account under which the grant was issued.</p>",
+        "ListRetirableGrantsRequest$RetiringPrincipal": "<p>The retiring principal for which to list grants.</p> <p>To specify the retiring principal, use the <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Name (ARN)</a> of an AWS principal. Valid AWS principals include AWS accounts (root), IAM users, federated users, and assumed role users. For examples of the ARN syntax for specifying a principal, go to <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-iam\">AWS Identity and Access Management (IAM)</a> in the Example ARNs section of the <i>Amazon Web Services General Reference</i>.</p>"
+      }
+    },
+    "PutKeyPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReEncryptRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReEncryptResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RetireGrantRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RevokeGrantRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ScheduleKeyDeletionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ScheduleKeyDeletionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UnsupportedOperationException": {
+      "base": "<p>The request was rejected because a specified parameter is not supported.</p>",
+      "refs": {
+      }
+    },
+    "UpdateAliasRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateKeyDescriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    }
+  }
+}

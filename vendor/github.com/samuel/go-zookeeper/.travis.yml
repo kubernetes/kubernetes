@@ -1,0 +1,21 @@
+language: go
+go:
+  - 1.4.2
+
+sudo: false
+
+branches:
+  only:
+    - master
+
+before_install:
+  - wget http://apache.claz.org/zookeeper/zookeeper-3.4.6/zookeeper-3.4.6.tar.gz
+  - tar -zxvf zookeeper*tar.gz
+
+script:
+  - go build ./...
+  - go fmt ./...
+  - go get golang.org/x/tools/cmd/vet
+  - go vet ./...
+  - go test -i -race ./...
+  - go test -v -race ./...

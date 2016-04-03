@@ -1,0 +1,2 @@
+language: go
+install: go get -t

@@ -1,0 +1,7 @@
+(from "ubuntu:14.04")
+(maintainer "James Turnbull \"james@example.com\"")
+(env "REFRESHED_AT" "2014-06-01")
+(run "apt-get update")
+(run "apt-get -y install redis-server redis-tools")
+(expose "6379")
+(entrypoint "/usr/bin/redis-server")

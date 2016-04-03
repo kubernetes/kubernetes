@@ -1,0 +1,187 @@
+[{
+  "given": {
+    "foo": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "bar": {
+      "baz": 1
+    }
+  },
+  "cases": [
+    {
+      "expression": "bar[0:10]",
+      "result": null
+    },
+    {
+      "expression": "foo[0:10:1]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[0:10]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[0:10:]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[0::1]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[0::]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[0:]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[:10:1]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[::1]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[:10:]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[::]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[:]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[1:9]",
+      "result": [1, 2, 3, 4, 5, 6, 7, 8]
+    },
+    {
+      "expression": "foo[0:10:2]",
+      "result": [0, 2, 4, 6, 8]
+    },
+    {
+      "expression": "foo[5:]",
+      "result": [5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[5::2]",
+      "result": [5, 7, 9]
+    },
+    {
+      "expression": "foo[::2]",
+      "result": [0, 2, 4, 6, 8]
+    },
+    {
+      "expression": "foo[::-1]",
+      "result": [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+    },
+    {
+      "expression": "foo[1::2]",
+      "result": [1, 3, 5, 7, 9]
+    },
+    {
+      "expression": "foo[10:0:-1]",
+      "result": [9, 8, 7, 6, 5, 4, 3, 2, 1]
+    },
+    {
+      "expression": "foo[10:5:-1]",
+      "result": [9, 8, 7, 6]
+    },
+    {
+      "expression": "foo[8:2:-2]",
+      "result": [8, 6, 4]
+    },
+    {
+      "expression": "foo[0:20]",
+      "result": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    },
+    {
+      "expression": "foo[10:-20:-1]",
+      "result": [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+    },
+    {
+      "expression": "foo[10:-20]",
+      "result": []
+    },
+    {
+      "expression": "foo[-4:-1]",
+      "result": [6, 7, 8]
+    },
+    {
+      "expression": "foo[:-5:-1]",
+      "result": [9, 8, 7, 6]
+    },
+    {
+      "expression": "foo[8:2:0]",
+      "error": "invalid-value"
+    },
+    {
+      "expression": "foo[8:2:0:1]",
+      "error": "syntax"
+    },
+    {
+      "expression": "foo[8:2&]",
+      "error": "syntax"
+    },
+    {
+      "expression": "foo[2:a:3]",
+      "error": "syntax"
+    }
+  ]
+}, {
+  "given": {
+    "foo": [{"a": 1}, {"a": 2}, {"a": 3}],
+    "bar": [{"a": {"b": 1}}, {"a": {"b": 2}},
+	    {"a": {"b": 3}}],
+    "baz": 50
+  },
+  "cases": [
+    {
+      "expression": "foo[:2].a",
+      "result": [1, 2]
+    },
+    {
+      "expression": "foo[:2].b",
+      "result": []
+    },
+    {
+      "expression": "foo[:2].a.b",
+      "result": []
+    },
+    {
+      "expression": "bar[::-1].a.b",
+      "result": [3, 2, 1]
+    },
+    {
+      "expression": "bar[:2].a.b",
+      "result": [1, 2]
+    },
+    {
+      "expression": "baz[:2].a",
+      "result": null
+    }
+  ]
+}, {
+  "given": [{"a": 1}, {"a": 2}, {"a": 3}],
+  "cases": [
+    {
+      "expression": "[:]",
+      "result": [{"a": 1}, {"a": 2}, {"a": 3}]
+    },
+    {
+      "expression": "[:2].a",
+      "result": [1, 2]
+    },
+    {
+      "expression": "[::-1].a",
+      "result": [3, 2, 1]
+    },
+    {
+      "expression": "[:2].b",
+      "result": []
+    }
+  ]
+}]

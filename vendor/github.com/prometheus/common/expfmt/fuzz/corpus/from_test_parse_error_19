@@ -1,0 +1,3 @@
+
+# TYPE metric histogram
+metric_bucket{le="bla"} 3.14

@@ -1,0 +1,384 @@
+{
+  "version": "2.0",
+  "operations": {
+    "BatchGetRepositories": "<p>Gets information about one or more repositories.</p> <note><p>The description field for a repository accepts all HTML characters and all valid Unicode characters. Applications that do not HTML-encode the description and display it in a web page could expose users to potentially malicious code. Make sure that you HTML-encode the description field in any application that uses this API to display the repository description on a web page.</p></note>",
+    "CreateBranch": "<p>Creates a new branch in a repository and points the branch to a commit.</p> <note>Calling the create branch operation does not set a repository's default branch. To do this, call the update default branch operation.</note>",
+    "CreateRepository": "<p>Creates a new, empty repository.</p>",
+    "DeleteRepository": "<p>Deletes a repository. If a specified repository was already deleted, a null repository ID will be returned.</p> <important>Deleting a repository also deletes all associated objects and metadata. After a repository is deleted, all future push calls to the deleted repository will fail.</important>",
+    "GetBranch": "<p>Retrieves information about a repository branch, including its name and the last commit ID.</p>",
+    "GetRepository": "<p>Gets information about a repository.</p> <note><p>The description field for a repository accepts all HTML characters and all valid Unicode characters. Applications that do not HTML-encode the description and display it in a web page could expose users to potentially malicious code. Make sure that you HTML-encode the description field in any application that uses this API to display the repository description on a web page.</p></note>",
+    "ListBranches": "<p>Gets information about one or more branches in a repository.</p>",
+    "ListRepositories": "<p>Gets information about one or more repositories.</p>",
+    "UpdateDefaultBranch": "<p>Sets or changes the default branch name for the specified repository.</p> <note>If you use this operation to change the default branch name to the current default branch name, a success message is returned even though the default branch did not change.</note>",
+    "UpdateRepositoryDescription": "<p>Sets or changes the comment or description for a repository.</p> <note><p>The description field for a repository accepts all HTML characters and all valid Unicode characters. Applications that do not HTML-encode the description and display it in a web page could expose users to potentially malicious code. Make sure that you HTML-encode the description field in any application that uses this API to display the repository description on a web page.</p></note>",
+    "UpdateRepositoryName": "<p>Renames a repository.</p>"
+  },
+  "service": "<fullname>AWS CodeCommit</fullname> <p>This is the <i>AWS CodeCommit API Reference</i>. This reference provides descriptions of the AWS CodeCommit API.</p> <p>You can use the AWS CodeCommit API to work with the following objects:</p> <ul> <li>Repositories</li> <li>Branches</li> <li>Commits</li> </ul> <p>For information about how to use AWS CodeCommit, see the <i>AWS CodeCommit User Guide</i>.</p>",
+  "shapes": {
+    "AccountId": {
+      "base": null,
+      "refs": {
+        "RepositoryMetadata$accountId": "<p>The ID of the AWS account associated with the repository.</p>"
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "RepositoryMetadata$Arn": "<p>The Amazon Resource Name (ARN) of the repository.</p>"
+      }
+    },
+    "BatchGetRepositoriesInput": {
+      "base": "<p>Represents the input of a batch get repositories operation.</p>",
+      "refs": {
+      }
+    },
+    "BatchGetRepositoriesOutput": {
+      "base": "<p>Represents the output of a batch get repositories operation.</p>",
+      "refs": {
+      }
+    },
+    "BranchDoesNotExistException": {
+      "base": "<p>The specified branch does not exist.</p>",
+      "refs": {
+      }
+    },
+    "BranchInfo": {
+      "base": "<p>Returns information about a branch.</p>",
+      "refs": {
+        "GetBranchOutput$branch": "<p>The name of the branch.</p>"
+      }
+    },
+    "BranchName": {
+      "base": null,
+      "refs": {
+        "BranchInfo$branchName": "<p>The name of the branch.</p>",
+        "BranchNameList$member": null,
+        "CreateBranchInput$branchName": "<p>The name of the new branch to create.</p>",
+        "GetBranchInput$branchName": "<p>The name of the branch for which you want to retrieve information.</p>",
+        "RepositoryMetadata$defaultBranch": "<p>The repository's default branch name.</p>",
+        "UpdateDefaultBranchInput$defaultBranchName": "<p>The name of the branch to set as the default.</p>"
+      }
+    },
+    "BranchNameExistsException": {
+      "base": "<p>The specified branch name already exists.</p>",
+      "refs": {
+      }
+    },
+    "BranchNameList": {
+      "base": null,
+      "refs": {
+        "ListBranchesOutput$branches": "<p>The list of branch names.</p>"
+      }
+    },
+    "BranchNameRequiredException": {
+      "base": "<p>A branch name is required but was not specified.</p>",
+      "refs": {
+      }
+    },
+    "CloneUrlHttp": {
+      "base": null,
+      "refs": {
+        "RepositoryMetadata$cloneUrlHttp": "<p>The URL to use for cloning the repository over HTTPS.</p>"
+      }
+    },
+    "CloneUrlSsh": {
+      "base": null,
+      "refs": {
+        "RepositoryMetadata$cloneUrlSsh": "<p>The URL to use for cloning the repository over SSH.</p>"
+      }
+    },
+    "CommitDoesNotExistException": {
+      "base": "<p>The specified commit does not exist or no commit was specified, and the specified repository has no default branch.</p>",
+      "refs": {
+      }
+    },
+    "CommitId": {
+      "base": null,
+      "refs": {
+        "BranchInfo$commitId": "<p>The ID of the last commit made to the branch.</p>",
+        "CreateBranchInput$commitId": "<p>The ID of the commit to point the new branch to.</p> <note>If this commit ID is not specified, the new branch will point to the commit that is pointed to by the repository's default branch.</note>"
+      }
+    },
+    "CommitIdRequiredException": {
+      "base": "<p>A commit ID was not specified.</p>",
+      "refs": {
+      }
+    },
+    "CreateBranchInput": {
+      "base": "<p>Represents the input of a create branch operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateRepositoryInput": {
+      "base": "<p>Represents the input of a create repository operation.</p>",
+      "refs": {
+      }
+    },
+    "CreateRepositoryOutput": {
+      "base": "<p>Represents the output of a create repository operation.</p>",
+      "refs": {
+      }
+    },
+    "CreationDate": {
+      "base": null,
+      "refs": {
+        "RepositoryMetadata$creationDate": "<p>The date and time the repository was created, in timestamp format.</p>"
+      }
+    },
+    "DeleteRepositoryInput": {
+      "base": "<p>Represents the input of a delete repository operation.</p>",
+      "refs": {
+      }
+    },
+    "DeleteRepositoryOutput": {
+      "base": "<p>Represents the output of a delete repository operation.</p>",
+      "refs": {
+      }
+    },
+    "EncryptionIntegrityChecksFailedException": {
+      "base": "<p>An encryption integrity check failed.</p>",
+      "refs": {
+      }
+    },
+    "EncryptionKeyAccessDeniedException": {
+      "base": "<p>An encryption key could not be accessed.</p>",
+      "refs": {
+      }
+    },
+    "EncryptionKeyDisabledException": {
+      "base": "<p>The encryption key is disabled.</p>",
+      "refs": {
+      }
+    },
+    "EncryptionKeyNotFoundException": {
+      "base": "<p>No encryption key was found.</p>",
+      "refs": {
+      }
+    },
+    "EncryptionKeyUnavailableException": {
+      "base": "<p>The encryption key is not available.</p>",
+      "refs": {
+      }
+    },
+    "GetBranchInput": {
+      "base": "<p>Represents the input of a get branch operation.</p>",
+      "refs": {
+      }
+    },
+    "GetBranchOutput": {
+      "base": "<p>Represents the output of a get branch operation.</p>",
+      "refs": {
+      }
+    },
+    "GetRepositoryInput": {
+      "base": "<p>Represents the input of a get repository operation.</p>",
+      "refs": {
+      }
+    },
+    "GetRepositoryOutput": {
+      "base": "<p>Represents the output of a get repository operation.</p>",
+      "refs": {
+      }
+    },
+    "InvalidBranchNameException": {
+      "base": "<p>The specified branch name is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidCommitIdException": {
+      "base": "<p>The specified commit ID is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidContinuationTokenException": {
+      "base": "<p>The specified continuation token is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidOrderException": {
+      "base": "<p>The specified sort order is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRepositoryDescriptionException": {
+      "base": "<p>The specified repository description is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidRepositoryNameException": {
+      "base": "<p>At least one specified repository name is not valid.</p> <note>This exception only occurs when a specified repository name is not valid. Other exceptions occur when a required repository parameter is missing, or when a specified repository does not exist.</note>",
+      "refs": {
+      }
+    },
+    "InvalidSortByException": {
+      "base": "<p>The specified sort by value is not valid.</p>",
+      "refs": {
+      }
+    },
+    "LastModifiedDate": {
+      "base": null,
+      "refs": {
+        "RepositoryMetadata$lastModifiedDate": "<p>The date and time the repository was last modified, in timestamp format.</p>"
+      }
+    },
+    "ListBranchesInput": {
+      "base": "<p>Represents the input of a list branches operation.</p>",
+      "refs": {
+      }
+    },
+    "ListBranchesOutput": {
+      "base": "<p>Represents the output of a list branches operation.</p>",
+      "refs": {
+      }
+    },
+    "ListRepositoriesInput": {
+      "base": "<p>Represents the input of a list repositories operation.</p>",
+      "refs": {
+      }
+    },
+    "ListRepositoriesOutput": {
+      "base": "<p>Represents the output of a list repositories operation.</p>",
+      "refs": {
+      }
+    },
+    "MaximumRepositoryNamesExceededException": {
+      "base": "<p>The maximum number of allowed repository names was exceeded. Currently, this number is 25.</p>",
+      "refs": {
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListBranchesInput$nextToken": "<p>An enumeration token that allows the operation to batch the results. </p>",
+        "ListBranchesOutput$nextToken": "<p>An enumeration token that returns the batch of the results. </p>",
+        "ListRepositoriesInput$nextToken": "<p>An enumeration token that allows the operation to batch the results of the operation. Batch sizes are 1,000 for list repository operations. When the client sends the token back to AWS CodeCommit, another page of 1,000 records is retrieved.</p>",
+        "ListRepositoriesOutput$nextToken": "<p>An enumeration token that allows the operation to batch the results of the operation. Batch sizes are 1,000 for list repository operations. When the client sends the token back to AWS CodeCommit, another page of 1,000 records is retrieved.</p>"
+      }
+    },
+    "OrderEnum": {
+      "base": null,
+      "refs": {
+        "ListRepositoriesInput$order": "<p>The order in which to sort the results of a list repositories operation.</p>"
+      }
+    },
+    "RepositoryDescription": {
+      "base": null,
+      "refs": {
+        "CreateRepositoryInput$repositoryDescription": "<p>A comment or description about the new repository.</p>",
+        "RepositoryMetadata$repositoryDescription": "<p>A comment or description about the repository.</p>",
+        "UpdateRepositoryDescriptionInput$repositoryDescription": "<p>The new comment or description for the specified repository.</p>"
+      }
+    },
+    "RepositoryDoesNotExistException": {
+      "base": "<p>The specified repository does not exist.</p>",
+      "refs": {
+      }
+    },
+    "RepositoryId": {
+      "base": null,
+      "refs": {
+        "DeleteRepositoryOutput$repositoryId": "<p>The ID of the repository that was deleted.</p>",
+        "RepositoryMetadata$repositoryId": "<p>The ID of the repository.</p>",
+        "RepositoryNameIdPair$repositoryId": "<p>The ID associated with the repository name.</p>"
+      }
+    },
+    "RepositoryLimitExceededException": {
+      "base": "<p>A repository resource limit was exceeded.</p>",
+      "refs": {
+      }
+    },
+    "RepositoryMetadata": {
+      "base": "<p>Information about a repository.</p>",
+      "refs": {
+        "CreateRepositoryOutput$repositoryMetadata": "<p>Information about the newly created repository.</p>",
+        "GetRepositoryOutput$repositoryMetadata": "<p>Information about the repository.</p>",
+        "RepositoryMetadataList$member": null
+      }
+    },
+    "RepositoryMetadataList": {
+      "base": null,
+      "refs": {
+        "BatchGetRepositoriesOutput$repositories": "<p>A list of repositories returned by the batch get repositories operation.</p>"
+      }
+    },
+    "RepositoryName": {
+      "base": "Repository name is restricted to alphanumeric characters (a-z, A-Z, 0-9), \".\", \"_\", and \"-\". Additionally, the suffix \".git\" is prohibited in a repository name.",
+      "refs": {
+        "CreateBranchInput$repositoryName": "<p>The name of the repository in which you want to create the new branch.</p>",
+        "CreateRepositoryInput$repositoryName": "<p>The name of the new repository to be created.</p> <note>The repository name must be unique across the calling AWS account. In addition, repository names are restricted to alphanumeric characters. The suffix \".git\" is prohibited.</note>",
+        "DeleteRepositoryInput$repositoryName": "<p>The name of the repository to delete.</p>",
+        "GetBranchInput$repositoryName": null,
+        "GetRepositoryInput$repositoryName": "<p>The name of the repository to get information about.</p>",
+        "ListBranchesInput$repositoryName": "<p>The name of the repository that contains the branches.</p>",
+        "RepositoryMetadata$repositoryName": "<p>The repository's name.</p>",
+        "RepositoryNameIdPair$repositoryName": null,
+        "RepositoryNameList$member": null,
+        "RepositoryNotFoundList$member": null,
+        "UpdateDefaultBranchInput$repositoryName": "<p>The name of the repository to set or change the default branch for.</p>",
+        "UpdateRepositoryDescriptionInput$repositoryName": "<p>The name of the repository to set or change the comment or description for.</p>",
+        "UpdateRepositoryNameInput$oldName": null,
+        "UpdateRepositoryNameInput$newName": null
+      }
+    },
+    "RepositoryNameExistsException": {
+      "base": "<p>The specified repository name already exists.</p>",
+      "refs": {
+      }
+    },
+    "RepositoryNameIdPair": {
+      "base": "<p>Information about a repository name and ID.</p>",
+      "refs": {
+        "RepositoryNameIdPairList$member": null
+      }
+    },
+    "RepositoryNameIdPairList": {
+      "base": null,
+      "refs": {
+        "ListRepositoriesOutput$repositories": "<p>Lists the repositories called by the list repositories operation.</p>"
+      }
+    },
+    "RepositoryNameList": {
+      "base": null,
+      "refs": {
+        "BatchGetRepositoriesInput$repositoryNames": "<p>The names of the repositories to get information about.</p>"
+      }
+    },
+    "RepositoryNameRequiredException": {
+      "base": "<p>A repository name is required but was not specified.</p>",
+      "refs": {
+      }
+    },
+    "RepositoryNamesRequiredException": {
+      "base": "<p>A repository names object is required but was not specified.</p>",
+      "refs": {
+      }
+    },
+    "RepositoryNotFoundList": {
+      "base": null,
+      "refs": {
+        "BatchGetRepositoriesOutput$repositoriesNotFound": "<p>Returns a list of repository names for which information could not be found.</p>"
+      }
+    },
+    "SortByEnum": {
+      "base": null,
+      "refs": {
+        "ListRepositoriesInput$sortBy": "<p>The criteria used to sort the results of a list repositories operation.</p>"
+      }
+    },
+    "UpdateDefaultBranchInput": {
+      "base": "<p>Represents the input of an update default branch operation.</p>",
+      "refs": {
+      }
+    },
+    "UpdateRepositoryDescriptionInput": {
+      "base": "<p>Represents the input of an update repository description operation.</p>",
+      "refs": {
+      }
+    },
+    "UpdateRepositoryNameInput": {
+      "base": "<p>Represents the input of an update repository description operation.</p>",
+      "refs": {
+      }
+    }
+  }
+}

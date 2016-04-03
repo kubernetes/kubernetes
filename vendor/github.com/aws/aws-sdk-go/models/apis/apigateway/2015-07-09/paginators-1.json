@@ -1,0 +1,52 @@
+{
+  "pagination": {
+    "GetApiKeys": {
+      "input_token": "position",
+      "output_token": "position",
+      "limit_key": "limit",
+      "result_key": "items"
+    },
+    "GetBasePathMappings": {
+      "input_token": "position",
+      "output_token": "position",
+      "limit_key": "limit",
+      "result_key": "items"
+    },
+    "GetClientCertificates": {
+      "input_token": "position",
+      "output_token": "position",
+      "limit_key": "limit",
+      "result_key": "items"
+    },
+    "GetDeployments": {
+      "input_token": "position",
+      "output_token": "position",
+      "limit_key": "limit",
+      "result_key": "items"
+    },
+    "GetDomainNames": {
+      "input_token": "position",
+      "output_token": "position",
+      "limit_key": "limit",
+      "result_key": "items"
+    },
+    "GetModels": {
+      "input_token": "position",
+      "output_token": "position",
+      "limit_key": "limit",
+      "result_key": "items"
+    },
+    "GetResources": {
+      "input_token": "position",
+      "output_token": "position",
+      "limit_key": "limit",
+      "result_key": "items"
+    },
+    "GetRestApis": {
+      "input_token": "position",
+      "output_token": "position",
+      "limit_key": "limit",
+      "result_key": "items"
+    }
+  }
+}

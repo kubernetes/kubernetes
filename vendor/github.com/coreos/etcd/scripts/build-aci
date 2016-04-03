@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+set -e
+
+BINARYDIR=${BINARYDIR:-bin}
+BUILDDIR=${BUILDDIR:-bin}
+
+# A non-installed acbuild can be used, for example:
+# ACBUILD=../../appc/acbuild/bin/acbuild
+ACBUILD=${ACBUILD:-acbuild}
+
+VERSION=$1
+
+if ! command -v $ACBUILD >/dev/null; then
+    echo "acbuild ($ACBUILD) is not executable"
+    exit 1
+fi
+
+if [ ! -x $BINARYDIR/etcd ] ; then
+    echo "$BINARYDIR/etcd not found. Is it compiled?"
+    exit 1
+fi
+
+if [ -z "$VERSION" ] ; then
+    echo "Usage: scripts/build-aci VERSION"
+    exit 1
+fi
+
+acbuild --debug begin
+
+TMPHOSTS="$(mktemp)"
+
+acbuildEnd() {
+    rm "$TMPHOSTS"
+    export EXIT=$?
+    acbuild --debug end && exit $EXIT 
+}
+trap acbuildEnd EXIT
+
+cat <<DF > $TMPHOSTS
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+DF
+
+acbuild --debug set-name coreos.com/etcd
+
+acbuild --debug copy --to-dir $BINARYDIR/etcd $BINARYDIR/etcdctl /
+acbuild --debug copy README.md /README.md
+acbuild --debug copy etcdctl/README.md /README-etcdctl.md
+acbuild --debug copy --to-dir Documentation /
+
+acbuild --debug environment add ETCD_DATA_DIR /data-dir
+
+acbuild --debug label add version "$VERSION"
+
+acbuild --debug set-exec -- /etcd
+
+acbuild --debug mount add data-dir /data-dir
+
+acbuild --debug port add legacy-client tcp 4001
+acbuild --debug port add legacy-peer tcp 7001
+acbuild --debug port add client tcp 2379
+acbuild --debug port add peer tcp 2380
+
+acbuild --debug copy "$TMPHOSTS" /etc/hosts
+
+acbuild --debug write --overwrite $BUILDDIR/etcd-${1}-linux-amd64.aci

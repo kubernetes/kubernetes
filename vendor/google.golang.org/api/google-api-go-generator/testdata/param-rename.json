@@ -1,0 +1,86 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/3m5rB86FE5KuW1K3jAl88AxCreg\"",
+ "discoveryVersion": "v1",
+ "id": "paramrename:v1",
+ "name": "paramrename",
+ "version": "v1",
+ "title": "Example API",
+ "description": "The Example API demonstrates parameter renaming.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "protocol": "rest",
+ "schemas": {
+ },
+ "resources": {
+  "events": {
+   "methods": {
+    "move": {
+     "id": "calendar.events.move",
+     "path": "calendars/{calendarId}/events/{eventId}/move",
+     "httpMethod": "POST",
+     "description": "Moves an event to another calendar, i.e. changes an event's organizer.",
+     "parameters": {
+      "destination": {
+       "type": "string",
+       "description": "Calendar identifier of the target calendar where the event is to be moved to.",
+       "required": true,
+       "location": "query"
+      },
+      "source-param": {
+       "type": "string",
+       "description": "Some parameter.",
+       "required": false,
+       "location": "query"
+      },
+      "right-string": {
+       "type": "string",
+       "description": "Yet another parameter.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "destination",
+      "right-string"
+     ],
+     "response": {
+      "$ref": "Event"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/calendar"
+     ]
+    }
+   }
+  },
+  "reports": {
+   "methods": {
+    "query": {
+     "id": "youtubeAnalytics.reports.query",
+     "path": "reports",
+     "httpMethod": "GET",
+     "description": "Retrieve your YouTube Analytics reports.",
+     "parameters": {
+      "start-date": {
+       "type": "string",
+       "description": "The start date for fetching YouTube Analytics data. The value should be in YYYY-MM-DD format.",
+       "required": true,
+       "pattern": "[0-9]{4}-[0-9]{2}-[0-9]{2}",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "start-date"
+     ],
+     "response": {
+      "$ref": "ResultTable"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/yt-analytics-monetary.readonly",
+      "https://www.googleapis.com/auth/yt-analytics.readonly"
+     ]
+    }
+   }
+  }
+ }
+}

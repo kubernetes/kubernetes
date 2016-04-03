@@ -1,0 +1,444 @@
+/* This sample file is an example for mkseccomp.pl to produce a seccomp file
+ * which restricts syscalls that are only useful for an admin but allows the
+ * vast majority of normal userspace programs to run normally.
+ *
+ * The format of this file is one line per syscall.  This is then processed
+ * and passed to 'cpp' to convert the names to numbers using whatever is
+ * correct for your platform.  As such C-style comments are permitted.  Note
+ * this also means that C preprocessor macros are also allowed.  So it is
+ * possible to create groups surrounded by #ifdef/#endif and control their
+ * inclusion via #define (not #include).
+ *
+ * Syscalls that don't exist on your architecture are silently filtered out.
+ * Syscalls marked with (*) are required for a container to spawn a bash
+ * shell successfully (not necessarily full featured).  Listing the same
+ * syscall multiple times is no problem.
+ *
+ * If you want to make a list specifically for one application the easiest
+ * way is to run the application under strace, like so:
+ *
+ * $ strace -f -q -c -o strace.out application args...
+ *
+ * Once you have a reasonable sample of the execution of the program, exit
+ * it.  The file strace.out will have a summary of the syscalls used.  Copy
+ * that list into this file, comment out everything else except the starred
+ * syscalls (which you need for the container to start) and you're done.
+ *
+ * To get the list of syscalls from the strace output this works well for
+ * me
+ *
+ * $ cut -c52 < strace.out
+ *
+ * This sample list was compiled as a combination of all the syscalls
+ * available on i386 and amd64 on Ubuntu Precise, as such it may not contain
+ * everything and not everything may be relevent for your system.  This
+ * shouldn't be a problem.
+ */
+
+// Filesystem/File descriptor related
+access                 // (*)
+chdir                  // (*)
+chmod
+chown
+chown32
+close                  // (*)
+creat
+dup                    // (*)
+dup2                   // (*)
+dup3
+epoll_create
+epoll_create1
+epoll_ctl
+epoll_ctl_old
+epoll_pwait
+epoll_wait
+epoll_wait_old
+eventfd
+eventfd2
+faccessat              // (*)
+fadvise64
+fadvise64_64
+fallocate
+fanotify_init
+fanotify_mark
+ioctl                  // (*)
+fchdir
+fchmod
+fchmodat
+fchown
+fchown32
+fchownat
+fcntl                  // (*)
+fcntl64
+fdatasync
+fgetxattr
+flistxattr
+flock
+fremovexattr
+fsetxattr
+fstat                  // (*)
+fstat64
+fstatat64
+fstatfs
+fstatfs64
+fsync
+ftruncate
+ftruncate64
+getcwd                 // (*)
+getdents               // (*)
+getdents64
+getxattr
+inotify_add_watch
+inotify_init
+inotify_init1
+inotify_rm_watch
+io_cancel
+io_destroy
+io_getevents
+io_setup
+io_submit
+lchown
+lchown32
+lgetxattr
+link
+linkat
+listxattr
+llistxattr
+llseek
+_llseek
+lremovexattr
+lseek                  // (*)
+lsetxattr
+lstat
+lstat64
+mkdir
+mkdirat
+mknod
+mknodat
+newfstatat
+_newselect
+oldfstat
+oldlstat
+oldolduname
+oldstat
+olduname
+oldwait4
+open                   // (*)
+openat                 // (*)
+pipe                   // (*)
+pipe2
+poll
+ppoll
+pread64
+preadv
+futimesat
+pselect6
+pwrite64
+pwritev
+read                   // (*)
+readahead
+readdir
+readlink
+readlinkat
+readv
+removexattr
+rename
+renameat
+rmdir
+select
+sendfile
+sendfile64
+setxattr
+splice
+stat                   // (*)
+stat64
+statfs                 // (*)
+statfs64
+symlink
+symlinkat
+sync
+sync_file_range
+sync_file_range2
+syncfs
+tee
+truncate
+truncate64
+umask
+unlink
+unlinkat
+ustat
+utime
+utimensat
+utimes
+write                  // (*)
+writev
+
+// Network related
+accept
+accept4
+bind                   // (*)
+connect                // (*)
+getpeername
+getsockname            // (*)
+getsockopt
+listen
+recv
+recvfrom               // (*)
+recvmmsg
+recvmsg
+send
+sendmmsg
+sendmsg
+sendto                 // (*)
+setsockopt
+shutdown
+socket                 // (*)
+socketcall
+socketpair
+sethostname            // (*)
+
+// Signal related
+pause
+rt_sigaction           // (*)
+rt_sigpending
+rt_sigprocmask         // (*)
+rt_sigqueueinfo
+rt_sigreturn           // (*)
+rt_sigsuspend
+rt_sigtimedwait
+rt_tgsigqueueinfo
+sigaction
+sigaltstack            // (*)
+signal
+signalfd
+signalfd4
+sigpending
+sigprocmask
+sigreturn
+sigsuspend
+
+// Other needed POSIX
+alarm
+brk                    // (*)
+clock_adjtime
+clock_getres
+clock_gettime
+clock_nanosleep
+//clock_settime
+gettimeofday
+nanosleep
+nice
+sysinfo
+syslog
+time
+timer_create
+timer_delete
+timerfd_create
+timerfd_gettime
+timerfd_settime
+timer_getoverrun
+timer_gettime
+timer_settime
+times
+uname                  // (*)
+
+// Memory control
+madvise
+mbind
+mincore
+mlock
+mlockall
+mmap                   // (*)
+mmap2
+mprotect               // (*)
+mremap
+msync
+munlock
+munlockall
+munmap                 // (*)
+remap_file_pages
+set_mempolicy
+vmsplice
+
+// Process control
+capget
+capset                 // (*)
+clone                  // (*)
+execve                 // (*)
+exit                   // (*)
+exit_group             // (*)
+fork
+getcpu
+getpgid
+getpgrp                // (*)
+getpid                 // (*)
+getppid                // (*)
+getpriority
+getresgid
+getresgid32
+getresuid
+getresuid32
+getrlimit              // (*)
+getrusage
+getsid
+getuid                 // (*)
+getuid32
+getegid                // (*)
+getegid32
+geteuid                // (*)
+geteuid32
+getgid                 // (*)
+getgid32
+getgroups
+getgroups32
+getitimer
+get_mempolicy
+kill
+//personality
+prctl
+prlimit64
+sched_getaffinity
+sched_getparam
+sched_get_priority_max
+sched_get_priority_min
+sched_getscheduler
+sched_rr_get_interval
+//sched_setaffinity
+//sched_setparam
+//sched_setscheduler
+sched_yield
+setfsgid
+setfsgid32
+setfsuid
+setfsuid32
+setgid
+setgid32
+setgroups
+setgroups32
+setitimer
+setpgid                // (*)
+setpriority
+setregid
+setregid32
+setresgid
+setresgid32
+setresuid
+setresuid32
+setreuid
+setreuid32
+setrlimit
+setsid
+setuid
+setuid32
+ugetrlimit
+vfork
+wait4                  // (*)
+waitid
+waitpid
+
+// IPC
+ipc
+mq_getsetattr
+mq_notify
+mq_open
+mq_timedreceive
+mq_timedsend
+mq_unlink
+msgctl
+msgget
+msgrcv
+msgsnd
+semctl
+semget
+semop
+semtimedop
+shmat
+shmctl
+shmdt
+shmget
+
+// Linux specific, mostly needed for thread-related stuff
+arch_prctl             // (*)
+get_robust_list
+get_thread_area
+gettid
+futex                  // (*)
+restart_syscall        // (*)
+set_robust_list        // (*)
+set_thread_area
+set_tid_address        // (*)
+tgkill
+tkill
+
+// Admin syscalls, these are blocked
+//acct
+//adjtimex
+//bdflush
+//chroot
+//create_module
+//delete_module
+//get_kernel_syms      // Obsolete
+//idle                 // Obsolete
+//init_module
+//ioperm
+//iopl
+//ioprio_get
+//ioprio_set
+//kexec_load
+//lookup_dcookie       // oprofile only?
+//migrate_pages        // NUMA
+//modify_ldt
+//mount
+//move_pages           // NUMA
+//name_to_handle_at    // NFS server
+//nfsservctl           // NFS server
+//open_by_handle_at    // NFS server
+//perf_event_open
+//pivot_root
+//process_vm_readv     // For debugger
+//process_vm_writev    // For debugger
+//ptrace               // For debugger
+//query_module
+//quotactl
+//reboot
+//setdomainname
+//setns
+//settimeofday
+//sgetmask             // Obsolete
+//ssetmask             // Obsolete
+//stime
+//swapoff
+//swapon
+//_sysctl
+//sysfs
+//sys_setaltroot
+//umount
+//umount2
+//unshare
+//uselib
+//vhangup
+//vm86
+//vm86old
+
+// Kernel key management
+//add_key
+//keyctl
+//request_key
+
+// Unimplemented
+//afs_syscall
+//break
+//ftime
+//getpmsg
+//gtty
+//lock
+//madvise1
+//mpx
+//prof
+//profil
+//putpmsg
+//security
+//stty
+//tuxcall
+//ulimit
+//vserver

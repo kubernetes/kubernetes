@@ -1,0 +1,53 @@
+diff --git a/builtin-run.c b/builtin-run.c
+index 54e03be..fab97e0 100644
+--- a/builtin-run.c
++++ b/builtin-run.c
+@@ -633,16 +633,38 @@ static struct kvm *kvm_cmd_run_init(int argc, const char **argv)
+ 
+ static int kvm_cmd_run_work(struct kvm *kvm)
+ {
+-	int i;
+-	void *ret = NULL;
+-
+-	for (i = 0; i < kvm->nrcpus; i++) {
+-		if (pthread_create(&kvm->cpus[i]->thread, NULL, kvm_cpu_thread, kvm->cpus[i]) != 0)
+-			die("unable to create KVM VCPU thread");
+-	}
+-
+-	/* Only VCPU #0 is going to exit by itself when shutting down */
+-	return pthread_join(kvm->cpus[0]->thread, &ret);
++        int i;
++        int exit_status = 0;
++
++        for (i = 0; i < kvm->nrcpus; i++) {
++                if (pthread_create(&kvm->cpus[i]->thread, NULL, kvm_cpu_thread, kvm->cpus[i]) != 0)
++                        die("unable to create KVM VCPU thread");
++        }
++
++        /*
++         * Only VCPU #0 is going to exit by itself when shutting down
++         *
++         * BUT It's not actually true for reboot sequence
++         * Reboot is sending SIGKVMEXIT signal to all cpus
++         * and that is causing race condition on removing
++         * devices (which are pausing exiting cpus).
++         * This piece of code waits for death of all
++         * cpu threads
++         */
++         for (i = 0; i < kvm->nrcpus; i++) {
++
++                void* thrstatus = NULL;
++
++                int retval = pthread_join(kvm->cpus[i]->thread, &thrstatus);
++
++                if (retval != 0)
++                        die("unable to end KVM VCPU thread");
++
++                /* Set exit status if one of vcpus returns error code > 0 */
++                if ((intptr_t) thrstatus != 0)
++                        exit_status = (intptr_t) thrstatus;
++        }
++        return exit_status;
+ }
+ 
+ static void kvm_cmd_run_exit(struct kvm *kvm, int guest_ret)

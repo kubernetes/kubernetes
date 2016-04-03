@@ -1,0 +1,34 @@
+{
+	"ImportPath": "github.com/appc/spec",
+	"GoVersion": "go1.4.1",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/camlistore/go4/errorutil",
+			"Rev": "a4bbc1170bd4f25e69133ab72aceadd23be97b79"
+		},
+		{
+			"ImportPath": "github.com/coreos/go-semver/semver",
+			"Rev": "6fe83ccda8fb9b7549c9ab4ba47f47858bc950aa"
+		},
+		{
+			"ImportPath": "github.com/spf13/pflag",
+			"Rev": "94e98a55fb412fcbcfc302555cb990f5e1590627"
+		},
+		{
+			"ImportPath": "golang.org/x/net/html",
+			"Rev": "ccfcd82c7124abd517842acbacc3b8c1e390c73d"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/pkg/api/resource",
+			"Comment": "v1.0.2",
+			"Rev": "e310e619fc1ac4f3238bf5ebe9e7033bf5d47ee2"
+		},
+		{
+			"ImportPath": "speter.net/go/exp/math/dec/inf",
+			"Rev": "42ca6cd68aa922bc3f32f1e056e61b65945d9ad7"
+		}
+	]
+}

@@ -1,0 +1,73 @@
+// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// http://github.com/gogo/protobuf/gogoproto
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto2";
+
+package unmarshalmerge;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.stringer_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+
+option (gogoproto.testgen_all) = true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.benchgen_all) = true;
+
+message Big {
+	option (gogoproto.unmarshaler) = true;
+	optional Sub Sub = 1;
+	optional int64 Number = 2;
+}
+
+message BigUnsafe {
+	option (gogoproto.unsafe_unmarshaler) = true;
+	optional Sub Sub = 1;
+	optional int64 Number = 2;
+}
+
+message Sub {
+	option (gogoproto.unmarshaler) = true;
+	optional int64 SubNumber = 1;
+}
+
+message IntMerge {
+	option (gogoproto.unmarshaler) = true;
+	required int64 Int64 = 1 [(gogoproto.nullable) = false];
+	optional int32 Int32 = 2 [(gogoproto.nullable) = false];
+	required sint32 Sint32 = 3 [(gogoproto.nullable) = false];
+	optional sint64 Sint64 = 4 [(gogoproto.nullable) = false];
+	optional uint64 Uint64 = 5 [(gogoproto.nullable) = false];
+	required uint32 Uint32 = 6 [(gogoproto.nullable) = false];
+	optional fixed64 Fixed64 = 7 [(gogoproto.nullable) = false];
+	optional fixed32 Fixed32 = 8 [(gogoproto.nullable) = false];
+	required sfixed32 Sfixed32 = 9 [(gogoproto.nullable) = false];
+	optional sfixed64 Sfixed64 = 10 [(gogoproto.nullable) = false];
+	optional bool Bool = 11 [(gogoproto.nullable) = false];
+}

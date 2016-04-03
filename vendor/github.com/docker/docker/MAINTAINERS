@@ -1,0 +1,618 @@
+# Docker maintainers file
+#
+# This file describes who runs the Docker project and how.
+# This is a living document - if you see something out of date or missing,
+# speak up!
+#
+# It is structured to be consumable by both humans and programs.
+# To extract its contents programmatically, use any TOML-compliant
+# parser.
+
+[Rules]
+
+	[Rules.maintainers]
+
+		title = "What is a maintainer?"
+
+		text = """
+There are different types of maintainers, with different responsibilities, but
+all maintainers have 3 things in common:
+
+1) They share responsibility in the project's success.
+2) They have made a long-term, recurring time investment to improve the project.
+3) They spend that time doing whatever needs to be done, not necessarily what
+is the most interesting or fun.
+
+Maintainers are often under-appreciated, because their work is harder to appreciate.
+It's easy to appreciate a really cool and technically advanced feature. It's harder
+to appreciate the absence of bugs, the slow but steady improvement in stability,
+or the reliability of a release process. But those things distinguish a good
+project from a great one.
+"""
+
+	[Rules.bdfl]
+
+		title = "The Benevolent dictator for life (BDFL)"
+
+		text = """
+Docker follows the timeless, highly efficient and totally unfair system
+known as [Benevolent dictator for
+life](https://en.wikipedia.org/wiki/Benevolent_Dictator_for_Life), with
+yours truly, Solomon Hykes, in the role of BDFL. This means that all
+decisions are made, by default, by Solomon. Since making every decision
+myself would be highly un-scalable, in practice decisions are spread
+across multiple maintainers.
+
+Ideally, the BDFL role is like the Queen of England: awesome crown, but not
+an actual operational role day-to-day. The real job of a BDFL is to NEVER GO AWAY.
+Every other rule can change, perhaps drastically so, but the BDFL will always
+be there, preserving the philosophy and principles of the project, and keeping
+ultimate authority over its fate. This gives us great flexibility in experimenting
+with various governance models, knowing that we can always press the "reset" button
+without fear of fragmentation or deadlock. See the US congress for a counter-example.
+
+BDFL daily routine:
+
+* Is the project governance stuck in a deadlock or irreversibly fragmented?
+	* If yes: refactor the project governance
+* Are there issues or conflicts escalated by core?
+	* If yes: resolve them
+* Go back to polishing that crown.
+"""
+
+	[Rules.decisions]
+
+		title = "How are decisions made?"
+
+		text = """
+Short answer: EVERYTHING IS A PULL REQUEST.
+
+Docker is an open-source project with an open design philosophy. This
+means that the repository is the source of truth for EVERY aspect of the
+project, including its philosophy, design, road map, and APIs. *If it's
+part of the project, it's in the repo. If it's in the repo, it's part of
+the project.*
+
+As a result, all decisions can be expressed as changes to the
+repository. An implementation change is a change to the source code. An
+API change is a change to the API specification. A philosophy change is
+a change to the philosophy manifesto, and so on.
+
+All decisions affecting Docker, big and small, follow the same 3 steps:
+
+* Step 1: Open a pull request. Anyone can do this.
+
+* Step 2: Discuss the pull request. Anyone can do this.
+
+* Step 3: Merge or refuse the pull request. Who does this depends on the nature
+of the pull request and which areas of the project it affects. See *review flow*
+for details.
+
+Because Docker is such a large and active project, it's important for everyone to know
+who is responsible for deciding what. That is determined by a precise set of rules.
+
+* For every *decision* in the project, the rules should designate, in a deterministic way,
+who should *decide*.
+
+* For every *problem* in the project, the rules should designate, in a deterministic way,
+who should be responsible for *fixing* it.
+
+* For every *question* in the project, the rules should designate, in a deterministic way,
+who should be expected to have the *answer*.
+"""
+
+	[Rules.review]
+
+		title = "Review flow"
+
+		text = """
+Pull requests should be processed according to the following flow:
+
+* For each subsystem affected by the change, the maintainers of the subsystem must approve or refuse it.
+It is the responsibility of the subsystem maintainers to process patches affecting them in a timely
+manner.
+
+* If the change affects areas of the code which are not part of a subsystem,
+or if subsystem maintainers are unable to reach a timely decision, it must be approved by
+the core maintainers.
+
+* If the change affects the UI or public APIs, or if it represents a major change in architecture,
+the architects must approve or refuse it.
+
+* If the change affects the operations of the project, it must be approved or rejected by
+the relevant operators.
+
+* If the change affects the governance, philosophy, goals or principles of the project,
+it must be approved by BDFL.
+"""
+
+	[Rules.DCO]
+
+	title = "Helping contributors with the DCO"
+
+	text = """
+The [DCO or `Sign your work`](
+https://github.com/docker/docker/blob/master/CONTRIBUTING.md#sign-your-work)
+requirement is not intended as a roadblock or speed bump.
+
+Some Docker contributors are not as familiar with `git`, or have used a web based
+editor, and thus asking them to `git commit --amend -s` is not the best way forward.
+
+In this case, maintainers can update the commits based on clause (c) of the DCO. The
+most trivial way for a contributor to allow the maintainer to do this, is to add
+a DCO signature in a Pull Requests's comment, or a maintainer can simply note that
+the change is sufficiently trivial that it does not substantivly change the existing
+contribution - i.e., a spelling change.
+
+When you add someone's DCO, please also add your own to keep a log.
+"""
+
+	[Rules.holiday]
+
+	title = "I'm a maintainer, and I'm going on holiday"
+
+	text = """
+Please let your co-maintainers and other contributors know by raising a pull
+request that comments out your `MAINTAINERS` file entry using a `#`.
+"""
+
+	[Rules."no direct push"]
+
+	title = "I'm a maintainer. Should I make pull requests too?"
+
+	text = """
+Yes. Nobody should ever push to master directly. All changes should be
+made through a pull request.
+"""
+
+	[Rules.meta]
+
+	title = "How is this process changed?"
+
+	text = "Just like everything else: by making a pull request :)"
+
+# Current project organization
+[Org]
+
+	bdfl = "shykes"
+
+	# The chief architect is responsible for the overall integrity of the technical architecture
+	# across all subsystems, and the consistency of APIs and UI.
+	#
+	# Changes to UI, public APIs and overall architecture (for example a plugin system) must
+	# be approved by the chief architect.
+	"Chief Architect" = "shykes"
+
+	# The Chief Operator is responsible for the day-to-day operations of the project including:
+	# - facilitating communications amongst all the contributors;
+	# - tracking release schedules;
+	# - managing the relationship with downstream distributions and upstream dependencies;
+	# - helping new contributors to get involved and become successful contributors and maintainers
+	#
+	# The role is also responsible for managing and measuring the success of the overall project
+	# and ensuring it is governed properly working in concert with the Docker Governance Advisory Board (DGAB).
+	"Chief Operator" = "spf13"
+
+	[Org.Operators]
+
+	# The operators make sure the trains run on time. They are responsible for overall operations
+	# of the project. This includes facilitating communication between all the participants; helping
+	# newcomers get involved and become successful contributors and maintainers; tracking the schedule
+	# of releases; managing the relationship with downstream distributions and upstream dependencies;
+	# define measures of success for the project and measure progress; Devise and implement tools and
+	# processes which make contributors and maintainers happier and more efficient.
+
+
+		[Org.Operators.security]
+
+			people = [
+				"erw",
+				"diogomonica",
+				"nathanmccauley"
+			]
+
+		[Org.Operators."monthly meetings"]
+
+			people = [
+				"sven",
+				"tianon"
+			]
+
+		[Org.Operators.infrastructure]
+
+			people = [
+				"jfrazelle",
+				"crosbymichael"
+			]
+
+		[Org.Operators.community]
+			people = [
+				"theadactyl"
+			]
+
+	# The chief maintainer is responsible for all aspects of quality for the project including
+	# code reviews, usability, stability, security, performance, etc.
+	# The most important function of the chief maintainer is to lead by example. On the first
+	# day of a new maintainer, the best advice should be "follow the C.M.'s example and you'll
+	# be fine".
+	"Chief Maintainer" = "crosbymichael"
+
+	# The community manager is responsible for serving the project community, including users, 
+	# contributors and partners. This involves:
+	#	- facilitating communication between maintainers, contributors and users
+	#	- organizing contributor and maintainer events
+	#	- helping new contributors get involved
+	#	- anything the project community needs to be successful
+	#
+	# The community manager is a point of contact for any contributor who has questions, concerns 
+	# or feedback about project operations.
+	"Community Manager" = "theadactyl"
+
+	[Org."Core maintainers"]
+
+	# The Core maintainers are the ghostbusters of the project: when there's a problem others
+	# can't solve, they show up and fix it with bizarre devices and weaponry.
+	# They have final say on technical implementation and coding style.
+	# They are ultimately responsible for quality in all its forms: usability polish,
+	# bugfixes, performance, stability, etc. When ownership  can cleanly be passed to
+	# a subsystem, they are responsible for doing so and holding the
+	# subsystem maintainers accountable. If ownership is unclear, they are the de facto owners.
+
+	# For each release (including minor releases), a "release captain" is assigned from the
+	# pool of core maintainers. Rotation is encouraged across all maintainers, to ensure
+	# the release process is clear and up-to-date.
+	#
+	# It is common for core maintainers to "branch out" to join or start a subsystem.
+
+
+
+		people = [
+			"calavera",
+			"crosbymichael",
+			"erikh",
+			"estesp",
+			"icecrime",
+			"jfrazelle",
+			"lk4d4",
+			"runcom",
+			"tibor",
+			"unclejack",
+			"vbatts",
+			"vieux",
+			"vishh"
+		]
+
+
+	[Org.Subsystems]
+
+	# As the project grows, it gets separated into well-defined subsystems. Each subsystem
+	# has a dedicated group of maintainers, which are dedicated to that subsytem and responsible
+	# for its quality.
+	# This "cellular division" is the primary mechanism for scaling maintenance of the project as it grows.
+	#
+	# The maintainers of each subsytem are responsible for:
+	#
+	# 1. Exposing a clear road map for improving their subsystem.
+	# 2. Deliver prompt feedback and decisions on pull requests affecting their subsystem.
+	# 3. Be available to anyone with questions, bug reports, criticism etc.
+	#	on their component. This includes IRC, GitHub requests and the mailing
+	#	list.
+	# 4. Make sure their subsystem respects the philosophy, design and
+	#	road map of the project.
+	#
+	# #### How to review patches to your subsystem
+	#
+	# Accepting pull requests:
+	#
+	#	- If the pull request appears to be ready to merge, give it a `LGTM`, which
+	#	  stands for "Looks Good To Me".
+	#	- If the pull request has some small problems that need to be changed, make
+	#	  a comment adressing the issues.
+	#	- If the changes needed to a PR are small, you can add a "LGTM once the
+	#	  following comments are adressed..." this will reduce needless back and
+	#	  forth.
+	#	- If the PR only needs a few changes before being merged, any MAINTAINER can
+	#	  make a replacement PR that incorporates the existing commits and fixes the
+	#	  problems before a fast track merge.
+	#
+	# Closing pull requests:
+	#
+	#	- If a PR appears to be abandoned, after having attempted to contact the
+	#	  original contributor, then a replacement PR may be made. Once the
+	#	  replacement PR is made, any contributor may close the original one.
+	#	- If you are not sure if the pull request implements a good feature or you
+	#	  do not understand the purpose of the PR, ask the contributor to provide
+	#	  more documentation.  If the contributor is not able to adequately explain
+	#	  the purpose of the PR, the PR may be closed by any MAINTAINER.
+	#	- If a MAINTAINER feels that the pull request is sufficiently architecturally
+	#	  flawed, or if the pull request needs significantly more design discussion
+	#	  before being considered, the MAINTAINER should close the pull request with
+	#	  a short explanation of what discussion still needs to be had.  It is
+	#	  important not to leave such pull requests open, as this will waste both the
+	#	  MAINTAINER's time and the contributor's time.  It is not good to string a
+	#	  contributor on for weeks or months, having them make many changes to a PR
+	#	  that will eventually be rejected.
+
+		[Org.Subsystems.Documentation]
+
+			people = [
+				"fredlf",
+				"james",
+				"moxiegirl",
+				"thaJeztah",
+				"jamtur01",
+				"spf13",
+				"sven"
+			]
+
+		[Org.Subsystems.libcontainer]
+
+			people = [
+				"crosbymichael",
+				"jnagal",
+				"lk4d4",
+				"mpatel",
+				"vmarmol"
+			]
+
+		[Org.Subsystems.registry]
+
+			people = [
+				"dmcg",
+				"dmp42",
+				"jlhawn",
+				"samalba",
+				"sday",
+				"vbatts"
+			]
+
+		[Org.Subsystems."build tools"]
+
+			people = [
+				"shykes",
+				"tianon"
+			]
+
+		[Org.Subsystem."remote api"]
+
+			people = [
+				"vieux"
+			]
+
+		[Org.Subsystem.swarm]
+
+			people = [
+				"aluzzardi",
+				"vieux"
+			]
+
+		[Org.Subsystem.machine]
+
+			people = [
+				"bfirsh",
+				"ehazlett"
+			]
+
+		[Org.Subsystem.compose]
+
+			people = [
+				"aanand"
+			]
+
+		[Org.Subsystem.builder]
+
+			people = [
+				"duglin",
+				"erikh",
+				"tibor"
+			]
+
+	[Org.Curators]
+
+	# The curators help ensure that incoming issues and pull requests are properly triaged and
+	# that our various contribution and reviewing processes are respected. With their knowledge of
+	# the repository activity, they can also guide contributors to relevant material or
+	# discussions.
+	#
+	# They are neither code nor docs reviewers, so they are never expected to merge. They can
+	# however:
+	# - close an issue or pull request when it's an exact duplicate
+	# - close an issue or pull request when it's inappropriate or off-topic
+
+	people = [
+		"thajeztah"
+	]
+
+
+[people]
+
+# A reference list of all people associated with the project.
+# All other sections should refer to people by their canonical key
+# in the people section.
+
+	# ADD YOURSELF HERE IN ALPHABETICAL ORDER
+
+	[people.aanand]
+	Name = "Aanand Prasad"
+	Email = "aanand@docker.com"
+	GitHub = "aanand"
+
+	[people.aluzzardi]
+	Name = "Andrea Luzzardi"
+	Email = "aluzzardi@docker.com"
+	GitHub = "aluzzardi"
+
+	[people.bfirsh]
+	Name = "Ben Firshman"
+	Email = "ben@firshman.co.uk"
+	GitHub = "bfirsh"
+
+	[people.calavera]
+	Name = "David Calavera"
+	Email = "david.calavera@gmail.com"
+	GitHub = "calavera"
+
+	[people.cpuguy83]
+	Name = "Brian Goff"
+	Email = "cpuguy83@gmail.com"
+	Github = "cpuguy83"
+
+	[people.crosbymichael]
+	Name = "Michael Crosby"
+	Email = "crosbymichael@gmail.com"
+	GitHub = "crosbymichael"
+
+	[people.diogomonica]
+	Name = "Diogo Monica"
+	Email = "diogo@docker.com"
+	GitHub = "diogomonica"
+
+	[people.duglin]
+	Name = "Doug Davis"
+	Email = "dug@us.ibm.com"
+	GitHub = "duglin"
+
+	[people.dmcg]
+	Name = "Derek McGowan"
+	Email = "derek@docker.com"
+	Github = "dmcgowan"
+
+	[people.dmp42]
+	Name = "Olivier Gambier"
+	Email = "olivier@docker.com"
+	Github = "dmp42"
+
+	[people.ehazlett]
+	Name = "Evan Hazlett"
+	Email = "ejhazlett@gmail.com"
+	GitHub = "ehazlett"
+
+	[people.erikh]
+	Name = "Erik Hollensbe"
+	Email = "erik@docker.com"
+	GitHub = "erikh"
+
+	[people.erw]
+	Name = "Eric Windisch"
+	Email = "eric@windisch.us"
+	GitHub = "ewindisch"
+
+	[people.estesp]
+	Name = "Phil Estes"
+	Email = "estesp@linux.vnet.ibm.com"
+	GitHub = "estesp"
+
+	[people.fredlf]
+	Name = "Fred Lifton"
+	Email = "fred.lifton@docker.com"
+	GitHub = "fredlf"
+
+	[people.icecrime]
+	Name = "Arnaud Porterie"
+	Email = "arnaud@docker.com"
+	GitHub = "icecrime"
+
+	[people.jfrazelle]
+	Name = "Jessie Frazelle"
+	Email = "j@docker.com"
+	GitHub = "jfrazelle"
+
+	[people.jlhawn]
+	Name = "Josh Hawn"
+	Email = "josh.hawn@docker.com"
+	Github = "jlhawn"
+
+	[people.lk4d4]
+	Name = "Alexander Morozov"
+	Email = "lk4d4@docker.com"
+	GitHub = "lk4d4"
+
+	[people.moxiegirl]
+	Name = "Mary Anthony"
+	Email = "mary.anthony@docker.com"
+	GitHub = "moxiegirl"
+
+	[people.nathanmccauley]
+	Name = "Nathan McCauley"
+	Email = "nathan.mccauley@docker.com"
+	GitHub = "nathanmccauley"
+
+	[people.runcom]
+	Name = "Antonio Murdaca"
+	Email = "me@runcom.ninja"
+	GitHub = "runcom"
+
+	[people.sday]
+	Name = "Stephen Day"
+	Email = "stephen.day@docker.com"
+	Github = "stevvooe"
+
+	[people.shykes]
+	Name = "Solomon Hykes"
+	Email = "solomon@docker.com"
+	GitHub = "shykes"
+
+	[people.spf13]
+	Name = "Steve Francia"
+	Email = "steve.francia@gmail.com"
+	GitHub = "spf13"
+
+	[people.sven]
+	Name = "Sven Dowideit"
+	Email = "SvenDowideit@home.org.au"
+	GitHub = "SvenDowideit"
+
+	[people.thajeztah]
+	Name = "Sebastiaan van Stijn"
+	Email = "github@gone.nl"
+	GitHub = "thaJeztah"
+
+	[people.theadactyl]
+	Name = "Thea Lamkin"
+	Email = "thea@docker.com"
+	GitHub = "theadactyl"
+
+	[people.tianon]
+	Name = "Tianon Gravi"
+	Email = "admwiggin@gmail.com"
+	GitHub = "tianon"
+
+	[people.tibor]
+	Name = "Tibor Vass"
+	Email = "tibor@docker.com"
+	GitHub = "tiborvass"
+
+	[people.vbatts]
+	Name = "Vincent Batts"
+	Email = "vbatts@redhat.com"
+	GitHub = "vbatts"
+
+	[people.vieux]
+	Name = "Victor Vieux"
+	Email = "vieux@docker.com"
+	GitHub = "vieux"
+
+	[people.vmarmol]
+	Name = "Victor Marmol"
+	Email = "vmarmol@google.com"
+	GitHub = "vmarmol"
+
+	[people.jnagal]
+	Name = "Rohit Jnagal"
+	Email = "jnagal@google.com"
+	GitHub = "rjnagal"
+
+	[people.mpatel]
+	Name = "Mrunal Patel"
+	Email = "mpatel@redhat.com"
+	GitHub = "mrunalp"
+
+	[people.unclejack]
+	Name = "Cristian Staretu"
+	Email = "cristian.staretu@gmail.com"
+	GitHub = "unclejack"
+
+	[people.vishh]
+	Name = "Vishnu Kannan"
+	Email = "vishnuk@google.com"
+	GitHub = "vishh"

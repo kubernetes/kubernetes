@@ -1,0 +1,415 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/53c1pDum-m_4xRbboeMr9HDsJSk\"",
+ "discoveryVersion": "v1",
+ "id": "pagespeedonline:v1",
+ "name": "pagespeedonline",
+ "version": "v1",
+ "revision": "20150317",
+ "title": "PageSpeed Insights API",
+ "description": "Lets you analyze the performance of a web page and get tailored suggestions to make that page faster.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "https://www.google.com/images/icons/product/pagespeed-16.png",
+  "x32": "https://www.google.com/images/icons/product/pagespeed-32.png"
+ },
+ "documentationLink": "https://developers.google.com/speed/docs/insights/v1/getting_started",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/pagespeedonline/v1/",
+ "basePath": "/pagespeedonline/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "pagespeedonline/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "schemas": {
+  "Result": {
+   "id": "Result",
+   "type": "object",
+   "properties": {
+    "formattedResults": {
+     "type": "object",
+     "description": "Localized PageSpeed results. Contains a ruleResults entry for each PageSpeed rule instantiated and run by the server.",
+     "properties": {
+      "locale": {
+       "type": "string",
+       "description": "The locale of the formattedResults, e.g. \"en_US\"."
+      },
+      "ruleResults": {
+       "type": "object",
+       "description": "Dictionary of formatted rule results, with one entry for each PageSpeed rule instantiated and run by the server.",
+       "additionalProperties": {
+        "type": "object",
+        "description": "The enum-like identifier for this rule. For instance \"EnableKeepAlive\" or \"AvoidCssImport\". Not localized.",
+        "properties": {
+         "localizedRuleName": {
+          "type": "string",
+          "description": "Localized name of the rule, intended for presentation to a user."
+         },
+         "ruleImpact": {
+          "type": "number",
+          "description": "The impact (unbounded floating point value) that implementing the suggestions for this rule would have on making the page faster. Impact is comparable between rules to determine which rule's suggestions would have a higher or lower impact on making a page faster. For instance, if enabling compression would save 1MB, while optimizing images would save 500kB, the enable compression rule would have 2x the impact of the image optimization rule, all other things being equal.",
+          "format": "double"
+         },
+         "urlBlocks": {
+          "type": "array",
+          "description": "List of blocks of URLs. Each block may contain a heading and a list of URLs. Each URL may optionally include additional details.",
+          "items": {
+           "type": "object",
+           "properties": {
+            "header": {
+             "type": "object",
+             "description": "Heading to be displayed with the list of URLs.",
+             "properties": {
+              "args": {
+               "type": "array",
+               "description": "List of arguments for the format string.",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "type": {
+                  "type": "string",
+                  "description": "Type of argument. One of URL, STRING_LITERAL, INT_LITERAL, BYTES, or DURATION."
+                 },
+                 "value": {
+                  "type": "string",
+                  "description": "Argument value, as a localized string."
+                 }
+                }
+               }
+              },
+              "format": {
+               "type": "string",
+               "description": "A localized format string with $N placeholders, where N is the 1-indexed argument number, e.g. 'Minifying the following $1 resources would save a total of $2 bytes'."
+              }
+             }
+            },
+            "urls": {
+             "type": "array",
+             "description": "List of entries that provide information about URLs in the url block. Optional.",
+             "items": {
+              "type": "object",
+              "properties": {
+               "details": {
+                "type": "array",
+                "description": "List of entries that provide additional details about a single URL. Optional.",
+                "items": {
+                 "type": "object",
+                 "properties": {
+                  "args": {
+                   "type": "array",
+                   "description": "List of arguments for the format string.",
+                   "items": {
+                    "type": "object",
+                    "properties": {
+                     "type": {
+                      "type": "string",
+                      "description": "Type of argument. One of URL, STRING_LITERAL, INT_LITERAL, BYTES, or DURATION."
+                     },
+                     "value": {
+                      "type": "string",
+                      "description": "Argument value, as a localized string."
+                     }
+                    }
+                   }
+                  },
+                  "format": {
+                   "type": "string",
+                   "description": "A localized format string with $N placeholders, where N is the 1-indexed argument number, e.g. 'Unnecessary metadata for this resource adds an additional $1 bytes to its download size'."
+                  }
+                 }
+                }
+               },
+               "result": {
+                "type": "object",
+                "description": "A format string that gives information about the URL, and a list of arguments for that format string.",
+                "properties": {
+                 "args": {
+                  "type": "array",
+                  "description": "List of arguments for the format string.",
+                  "items": {
+                   "type": "object",
+                   "properties": {
+                    "type": {
+                     "type": "string",
+                     "description": "Type of argument. One of URL, STRING_LITERAL, INT_LITERAL, BYTES, or DURATION."
+                    },
+                    "value": {
+                     "type": "string",
+                     "description": "Argument value, as a localized string."
+                    }
+                   }
+                  }
+                 },
+                 "format": {
+                  "type": "string",
+                  "description": "A localized format string with $N placeholders, where N is the 1-indexed argument number, e.g. 'Minifying the resource at URL $1 can save $2 bytes'."
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "id": {
+     "type": "string",
+     "description": "Canonicalized and final URL for the document, after following page redirects (if any)."
+    },
+    "invalidRules": {
+     "type": "array",
+     "description": "List of rules that were specified in the request, but which the server did not know how to instantiate.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of result.",
+     "default": "pagespeedonline#result"
+    },
+    "pageStats": {
+     "type": "object",
+     "description": "Summary statistics for the page, such as number of JavaScript bytes, number of HTML bytes, etc.",
+     "properties": {
+      "cssResponseBytes": {
+       "type": "string",
+       "description": "Number of uncompressed response bytes for CSS resources on the page.",
+       "format": "int64"
+      },
+      "flashResponseBytes": {
+       "type": "string",
+       "description": "Number of response bytes for flash resources on the page.",
+       "format": "int64"
+      },
+      "htmlResponseBytes": {
+       "type": "string",
+       "description": "Number of uncompressed response bytes for the main HTML document and all iframes on the page.",
+       "format": "int64"
+      },
+      "imageResponseBytes": {
+       "type": "string",
+       "description": "Number of response bytes for image resources on the page.",
+       "format": "int64"
+      },
+      "javascriptResponseBytes": {
+       "type": "string",
+       "description": "Number of uncompressed response bytes for JS resources on the page.",
+       "format": "int64"
+      },
+      "numberCssResources": {
+       "type": "integer",
+       "description": "Number of CSS resources referenced by the page.",
+       "format": "int32"
+      },
+      "numberHosts": {
+       "type": "integer",
+       "description": "Number of unique hosts referenced by the page.",
+       "format": "int32"
+      },
+      "numberJsResources": {
+       "type": "integer",
+       "description": "Number of JavaScript resources referenced by the page.",
+       "format": "int32"
+      },
+      "numberResources": {
+       "type": "integer",
+       "description": "Number of HTTP resources loaded by the page.",
+       "format": "int32"
+      },
+      "numberStaticResources": {
+       "type": "integer",
+       "description": "Number of static (i.e. cacheable) resources on the page.",
+       "format": "int32"
+      },
+      "otherResponseBytes": {
+       "type": "string",
+       "description": "Number of response bytes for other resources on the page.",
+       "format": "int64"
+      },
+      "textResponseBytes": {
+       "type": "string",
+       "description": "Number of uncompressed response bytes for text resources not covered by other statistics (i.e non-HTML, non-script, non-CSS resources) on the page.",
+       "format": "int64"
+      },
+      "totalRequestBytes": {
+       "type": "string",
+       "description": "Total size of all request bytes sent by the page.",
+       "format": "int64"
+      }
+     }
+    },
+    "responseCode": {
+     "type": "integer",
+     "description": "Response code for the document. 200 indicates a normal page load. 4xx/5xx indicates an error.",
+     "format": "int32"
+    },
+    "score": {
+     "type": "integer",
+     "description": "The PageSpeed Score (0-100), which indicates how much faster a page could be. A high score indicates little room for improvement, while a lower score indicates more room for improvement.",
+     "format": "int32"
+    },
+    "screenshot": {
+     "type": "object",
+     "description": "Base64-encoded screenshot of the page that was analyzed.",
+     "properties": {
+      "data": {
+       "type": "string",
+       "description": "Image data base64 encoded.",
+       "format": "byte"
+      },
+      "height": {
+       "type": "integer",
+       "description": "Height of screenshot in pixels.",
+       "format": "int32"
+      },
+      "mime_type": {
+       "type": "string",
+       "description": "Mime type of image data. E.g. \"image/jpeg\"."
+      },
+      "width": {
+       "type": "integer",
+       "description": "Width of screenshot in pixels.",
+       "format": "int32"
+      }
+     }
+    },
+    "title": {
+     "type": "string",
+     "description": "Title of the page, as displayed in the browser's title bar."
+    },
+    "version": {
+     "type": "object",
+     "description": "The version of PageSpeed used to generate these results.",
+     "properties": {
+      "major": {
+       "type": "integer",
+       "description": "The major version number of PageSpeed used to generate these results.",
+       "format": "int32"
+      },
+      "minor": {
+       "type": "integer",
+       "description": "The minor version number of PageSpeed used to generate these results.",
+       "format": "int32"
+      }
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "pagespeedapi": {
+   "methods": {
+    "runpagespeed": {
+     "id": "pagespeedonline.pagespeedapi.runpagespeed",
+     "path": "runPagespeed",
+     "httpMethod": "GET",
+     "description": "Runs PageSpeed analysis on the page at the specified URL, and returns a PageSpeed score, a list of suggestions to make that page faster, and other information.",
+     "parameters": {
+      "filter_third_party_resources": {
+       "type": "boolean",
+       "description": "Indicates if third party resources should be filtered out before PageSpeed analysis.",
+       "default": "false",
+       "location": "query"
+      },
+      "locale": {
+       "type": "string",
+       "description": "The locale used to localize formatted results",
+       "pattern": "[a-zA-Z]+(_[a-zA-Z]+)?",
+       "location": "query"
+      },
+      "rule": {
+       "type": "string",
+       "description": "A PageSpeed rule to run; if none are given, all rules are run",
+       "pattern": "[a-zA-Z]+",
+       "repeated": true,
+       "location": "query"
+      },
+      "screenshot": {
+       "type": "boolean",
+       "description": "Indicates if binary data containing a screenshot should be included",
+       "default": "false",
+       "location": "query"
+      },
+      "strategy": {
+       "type": "string",
+       "description": "The analysis strategy to use",
+       "enum": [
+        "desktop",
+        "mobile"
+       ],
+       "enumDescriptions": [
+        "Fetch and analyze the URL for desktop browsers",
+        "Fetch and analyze the URL for mobile devices"
+       ],
+       "location": "query"
+      },
+      "url": {
+       "type": "string",
+       "description": "The URL to fetch and analyze",
+       "required": true,
+       "pattern": "http(s)?://.*",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "url"
+     ],
+     "response": {
+      "$ref": "Result"
+     }
+    }
+   }
+  }
+ }
+}

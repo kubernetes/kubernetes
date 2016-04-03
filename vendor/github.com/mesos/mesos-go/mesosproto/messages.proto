@@ -1,0 +1,705 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package mesosproto;
+
+import "mesos.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+// TODO(benh): Consider splitting these messages into different "packages"
+// which represent which messages get handled by which components (e.g., the
+// "mesos.executor" package includes messages that the executor handles).
+
+
+// TODO(bmahler): Add executor_uuid here, and send it to the master. This will
+// allow us to expose executor work directories for tasks in the webui when
+// looking from the master level. Currently only the slave knows which run the
+// task belongs to.
+/**
+ * Describes a task, similar to `TaskInfo`.
+ *
+ * `Task` is used in some of the Mesos messages found below.
+ * `Task` is used instead of `TaskInfo` if:
+ *   1) we need additional IDs, such as a specific
+ *      framework, executor, or agent; or
+ *   2) we do not need the additional data, such as the command run by the
+ *      task, the specific containerization, or health checks.  These
+ *      additional fields may be large and unnecessary for some Mesos messages.
+ *
+ * `Task` is generally constructed from a `TaskInfo`.  See protobuf::createTask.
+ */
+message Task {
+  required string name = 1;
+  required TaskID task_id = 2;
+  required FrameworkID framework_id = 3;
+  optional ExecutorID executor_id = 4;
+  required SlaveID slave_id = 5;
+  required TaskState state = 6; // Latest state of the task.
+  repeated Resource resources = 7;
+  repeated TaskStatus statuses = 8;
+
+  // These fields correspond to the state and uuid of the latest
+  // status update forwarded to the master.
+  // NOTE: Either both the fields must be set or both must be unset.
+  optional TaskState status_update_state = 9;
+  optional bytes status_update_uuid = 10;
+
+  optional Labels labels = 11;
+
+  // Service discovery information for the task. It is not interpreted
+  // or acted upon by Mesos. It is up to a service discovery system
+  // to use this information as needed and to handle tasks without
+  // service discovery information.
+  optional DiscoveryInfo discovery = 12;
+}
+
+
+// TODO(vinod): Create a new UUID message type.
+/**
+ * Describes a task's status.
+ *
+ * `StatusUpdate` is used in some of the Mesos messages found below.
+ * The master and agent use `StatusUpdate` to wrap a `TaskStatus` when
+ * passing it from the agent to the framework that spawned the task.
+ *
+ * See protobuf::createStatusUpdate.
+ */
+message StatusUpdate {
+  required FrameworkID framework_id = 1;
+  optional ExecutorID executor_id = 2;
+  optional SlaveID slave_id = 3;
+
+  // Since 0.23.0 we set 'status.uuid' in the executor
+  // driver for all retryable status updates.
+  required TaskStatus status = 4;
+
+  required double timestamp = 5;
+
+  // Since 0.26.0 this is deprecated in favor of 'status.uuid'.
+  optional bytes uuid = 6;
+
+  // This corresponds to the latest state of the task according to the
+  // agent. Note that this state might be different than the state in
+  // 'status' because status update manager queues updates. In other
+  // words, 'status' corresponds to the update at top of the queue and
+  // 'latest_state' corresponds to the update at bottom of the queue.
+  optional TaskState latest_state = 7;
+}
+
+
+/**
+ * Encapsulates how we checkpoint a `StatusUpdate` to disk.
+ *
+ * See the StatusUpdateManager and slave/state.cpp.
+ */
+message StatusUpdateRecord {
+  enum Type {
+    UPDATE = 0;
+    ACK = 1;
+  }
+
+  required Type type = 1;
+
+  // Required if type == UPDATE.
+  optional StatusUpdate update = 2;
+
+  // Required if type == ACK.
+  optional bytes uuid = 3;
+}
+
+
+// TODO(josephw): Check if this can be removed.  This appears to be
+// for backwards compatibility with very early versions of Mesos.
+message SubmitSchedulerRequest
+{
+  required string name = 1;
+}
+
+
+// TODO(josephw): Remove for the same reason as `SubmitSchedulerRequest`.
+message SubmitSchedulerResponse
+{
+  required bool okay = 1;
+}
+
+
+/**
+ * Sends a free-form message from the executor to the framework.
+ * Mesos forwards the message, if necessary, via the agents and the master.
+ *
+ * See scheduler::Event::Message.
+ */
+message ExecutorToFrameworkMessage {
+  required SlaveID slave_id = 1;
+  required FrameworkID framework_id = 2;
+  required ExecutorID executor_id = 3;
+  required bytes data = 4;
+}
+
+
+/**
+ * Sends a free-form message from the framework to the executor.
+ * Mesos forwards the message, if necessary, via the agents and the master.
+ *
+ * See scheduler::Call::Message.
+ */
+message FrameworkToExecutorMessage {
+  required SlaveID slave_id = 1;
+  required FrameworkID framework_id = 2;
+  required ExecutorID executor_id = 3;
+  required bytes data = 4;
+}
+
+
+/**
+ * Subscribes the framework with the master to receive events.
+ *
+ * Used by the pre-Event/Call Mesos scheduler driver.
+ * See scheduler::Call::Subscribe.
+ */
+message RegisterFrameworkMessage {
+  required FrameworkInfo framework = 1;
+}
+
+
+/**
+ * Subscribes the framework with the master to receive events.
+ * This is used when the framework has previously registered and
+ * the master changes to a newly elected master.
+ *
+ * Used by the pre-Event/Call Mesos scheduler driver.
+ * See scheduler::Call::Subscribe.
+ */
+message ReregisterFrameworkMessage {
+  required FrameworkInfo framework = 2;
+  required bool failover = 3;
+}
+
+
+/**
+ * Notifies the framework that the master has registered it.
+ * The `framework_id` holds a unique ID for distinguishing this framework.
+ *
+ * See scheduler::Event::Subscribed.
+ */
+message FrameworkRegisteredMessage {
+  required FrameworkID framework_id = 1;
+  required MasterInfo master_info = 2;
+}
+
+
+/**
+ * Notifies the framework that the master has reregistered it.
+ * This message is used in the same conditions as `ReregisterFrameworkMessage`.
+ *
+ * See scheduler::Event::Subscribed.
+ */
+message FrameworkReregisteredMessage {
+  required FrameworkID framework_id = 1;
+  required MasterInfo master_info = 2;
+}
+
+
+/**
+ * Stops the framework and shuts down all its tasks and executors.
+ *
+ * Used by the pre-Event/Call Mesos scheduler driver.
+ * See scheduler::Call::Teardown.
+ */
+message UnregisterFrameworkMessage {
+  required FrameworkID framework_id = 1;
+}
+
+
+/**
+ * Aborts the scheduler driver and prevents further callbacks to the driver.
+ *
+ * Used exclusively by the pre-Event/Call Mesos scheduler driver.
+ */
+message DeactivateFrameworkMessage {
+  required FrameworkID framework_id = 1;
+}
+
+
+/**
+ * Requests specific resources from Mesos's allocator.
+ * If the allocator supports resource requests, any corresponding
+ * resources will be sent like a normal resource offer.
+ *
+ * Used by the pre-Event/Call Mesos scheduler driver.
+ * See scheduler::Call::Request.
+ */
+message ResourceRequestMessage {
+  required FrameworkID framework_id = 1;
+  repeated Request requests = 2;
+}
+
+
+/**
+ * Sends resources offers to the scheduler.
+ *
+ * See scheduler::Event::Offers.
+ */
+message ResourceOffersMessage {
+  repeated Offer offers = 1;
+  repeated string pids = 2;
+
+  // The `inverse_offers` field is added here because we currently use it in
+  // `master.cpp` when constructing the message to send to schedulers. We use
+  // the original version of the proto API until we do a full refactor of all
+  // the messages being sent.
+  // It is not fully implemented in the old scheduler; only the V1 scheduler
+  // currently implements inverse offers.
+  repeated InverseOffer inverse_offers = 3;
+}
+
+
+/**
+ * Launches tasks using resources from the specified offers.
+ *
+ * Used by the pre-Event/Call Mesos scheduler driver.
+ * See scheduler::Call::Accept and scheduler::Call::Decline.
+ */
+message LaunchTasksMessage {
+  required FrameworkID framework_id = 1;
+  repeated TaskInfo tasks = 3;
+  required Filters filters = 5;
+  repeated OfferID offer_ids = 6;
+}
+
+
+/**
+ * Notifies the scheduler that a particular offer is not longer valid.
+ *
+ * See scheduler::Event::Rescind.
+ */
+message RescindResourceOfferMessage {
+  required OfferID offer_id = 1;
+}
+
+
+/**
+ * Removes all filters previously set by the scheduler.
+ *
+ * Used by the pre-Event/Call Mesos scheduler driver.
+ * See scheduler::Call::Revive.
+ */
+message ReviveOffersMessage {
+  required FrameworkID framework_id = 1;
+}
+
+
+/**
+ * Depending on the `TaskInfo`, this message either notifies an existing
+ * executor to run the task, or starts a new executor and runs the task.
+ * This message is sent when scheduler::Call::Accept is sent with
+ * Offer::Operation::Launch.
+ *
+ * See executor::Event::Launch.
+ */
+message RunTaskMessage {
+  // TODO(karya): Remove framework_id after MESOS-2559 has shipped.
+  optional FrameworkID framework_id = 1 [deprecated = true];
+  required FrameworkInfo framework = 2;
+  required TaskInfo task = 4;
+
+  // The pid of the framework. This was moved to 'optional' in
+  // 0.24.0 to support schedulers using the HTTP API. For now, we
+  // continue to always set pid since it was required in 0.23.x.
+  // When 'pid' is unset, or set to empty string, the agent will
+  // forward executor messages through the master. For schedulers
+  // still using the driver, this will remain set.
+  optional string pid = 3;
+}
+
+
+/**
+ * Kills a specific task.
+ *
+ * See scheduler::Call::Kill and executor::Event::Kill.
+ */
+message KillTaskMessage {
+  // TODO(bmahler): Include the SlaveID here to improve the Master's
+  // ability to respond for non-activated agents.
+  required FrameworkID framework_id = 1;
+  required TaskID task_id = 2;
+}
+
+
+/**
+ * Sends a task status update to the scheduler.
+ *
+ * See scheduler::Event::Update.
+ */
+message StatusUpdateMessage {
+  required StatusUpdate update = 1;
+
+  // If present, scheduler driver automatically sends an acknowledgement
+  // to the `pid`.  This only applies to the pre-Event/Call Mesos
+  // scheduler driver.
+  optional string pid = 2;
+}
+
+
+/**
+ * This message is used by the scheduler to acknowledge the receipt of a status
+ * update.  Mesos forwards the acknowledgement to the executor running the task.
+ *
+ * See scheduler::Call::Acknowledge and executor::Event::Acknowledged.
+ */
+message StatusUpdateAcknowledgementMessage {
+  required SlaveID slave_id = 1;
+  required FrameworkID framework_id = 2;
+  required TaskID task_id = 3;
+  required bytes uuid = 4;
+}
+
+
+/**
+ * Notifies the scheduler that the agent was lost.
+ *
+ * See scheduler::Event::Failure.
+ */
+message LostSlaveMessage {
+  required SlaveID slave_id = 1;
+}
+
+
+/**
+ * Allows the scheduler to query the status for non-terminal tasks.
+ * This causes the master to send back the latest task status for
+ * each task in `statuses`, if possible. Tasks that are no longer
+ * known will result in a `TASK_LOST` update. If `statuses` is empty,
+ * then the master will send the latest status for each task
+ * currently known.
+ */
+message ReconcileTasksMessage {
+  required FrameworkID framework_id = 1;
+  repeated TaskStatus statuses = 2; // Should be non-terminal only.
+}
+
+
+/**
+ * Notifies the framework about errors during registration.
+ *
+ * See scheduler::Event::Error.
+ */
+message FrameworkErrorMessage {
+  required string message = 2;
+}
+
+
+/**
+ * Registers the agent with the master.
+ *
+ * If registration fails, a `ShutdownMessage` is sent to the agent.
+ * Failure conditions are documented inline in Master::registerSlave.
+ */
+message RegisterSlaveMessage {
+  required SlaveInfo slave = 1;
+
+  // Resources that are checkpointed by the agent (e.g., persistent
+  // volume or dynamic reservation). Frameworks need to release
+  // checkpointed resources explicitly.
+  repeated Resource checkpointed_resources = 3;
+
+  // NOTE: This is a hack for the master to detect the agent's
+  // version. If unset the agent is < 0.21.0.
+  // TODO(bmahler): Do proper versioning: MESOS-986.
+  optional string version = 2;
+}
+
+
+/**
+ * Registers the agent with the master.
+ * This is used when the agent has previously registered and
+ * the master changes to a newly elected master.
+ *
+ * If registration fails, a `ShutdownMessage` is sent to the agent.
+ * Failure conditions are documented inline in Master::reregisterSlave.
+ */
+message ReregisterSlaveMessage {
+  required SlaveInfo slave = 2;
+
+  // Resources that are checkpointed by the agent (e.g., persistent
+  // volume or dynamic reservation). Frameworks need to release
+  // checkpointed resources explicitly.
+  repeated Resource checkpointed_resources = 7;
+
+  repeated ExecutorInfo executor_infos = 4;
+  repeated Task tasks = 3;
+  repeated Archive.Framework completed_frameworks = 5;
+
+  // NOTE: This is a hack for the master to detect the agent's
+  // version. If unset the agent is < 0.21.0.
+  // TODO(bmahler): Do proper versioning: MESOS-986.
+  optional string version = 6;
+}
+
+
+/**
+ * Notifies the agent that the master has registered it.
+ * The `slave_id` holds a unique ID for distinguishing this agent.
+ */
+message SlaveRegisteredMessage {
+  required SlaveID slave_id = 1;
+  optional MasterSlaveConnection connection = 2;
+}
+
+
+/**
+ * Notifies the agent that the master has reregistered it.
+ * This message is used in the same conditions as `ReregisterSlaveMessage`.
+ */
+message SlaveReregisteredMessage {
+  required SlaveID slave_id = 1;
+
+  // Contains a list of non-terminal tasks that the master believes to
+  // be running on the agent.  The agent should respond `TASK_LOST` to
+  // any tasks that are unknown, so the master knows to remove those.
+  repeated ReconcileTasksMessage reconciliations = 2;
+
+  optional MasterSlaveConnection connection = 3;
+}
+
+
+/**
+ * This message is sent by the agent to the master during agent shutdown.
+ * The master updates its state to reflect the removed agent.
+ */
+message UnregisterSlaveMessage {
+  required SlaveID slave_id = 1;
+}
+
+
+/**
+ * Describes the connection between the master and agent.
+ */
+message MasterSlaveConnection {
+  // Product of max_slave_ping_timeouts * slave_ping_timeout.
+  // If no pings are received within the total timeout,
+  // the master will remove the agent.
+  optional double total_ping_timeout_seconds = 1;
+}
+
+
+/**
+ * This message is periodically sent by the master to the agent.
+ * If the agent is connected to the master, "connected" is true.
+ */
+message PingSlaveMessage {
+  required bool connected = 1;
+}
+
+
+/**
+ * This message is sent by the agent to the master in response to the
+ * `PingSlaveMessage`.
+ */
+message PongSlaveMessage {}
+
+
+/**
+ * Tells an agent to shut down all executors of the given framework.
+ */
+message ShutdownFrameworkMessage {
+  required FrameworkID framework_id = 1;
+}
+
+
+/**
+ * Tells an agent (and consequently the executor) to shutdown an executor.
+ */
+message ShutdownExecutorMessage {
+  // TODO(vinod): Make these fields required. These are made optional
+  // for backwards compatibility between 0.23.0 agent and pre 0.23.0
+  // executor driver.
+  optional ExecutorID executor_id = 1;
+  optional FrameworkID framework_id = 2;
+}
+
+
+/**
+ * Broadcasts updated framework information from master to all agents.
+ */
+message UpdateFrameworkMessage {
+  required FrameworkID framework_id = 1;
+
+  // See the comment on RunTaskMessage.pid.
+  optional string pid = 2;
+}
+
+
+/**
+ * This message is sent to the agent whenever there is an update of
+ * the resources that need to be checkpointed (e.g., persistent volume
+ * or dynamic reservation).
+ */
+message CheckpointResourcesMessage {
+  repeated Resource resources = 1;
+}
+
+
+/**
+ * This message is sent by the agent to the master to inform the
+ * master about the total amount of oversubscribed (allocated and
+ * allocatable) resources.
+ */
+message UpdateSlaveMessage {
+  required SlaveID slave_id = 1;
+  repeated Resource oversubscribed_resources = 2;
+}
+
+
+/**
+ * Subscribes the executor with the agent to receive events.
+ *
+ * See executor::Call::Subscribe.
+ */
+message RegisterExecutorMessage {
+  required FrameworkID framework_id = 1;
+  required ExecutorID executor_id = 2;
+}
+
+
+/**
+ * Notifies the executor that the agent has registered it.
+ *
+ * See executor::Event::Subscribed.
+ */
+message ExecutorRegisteredMessage {
+  required ExecutorInfo executor_info = 2;
+  required FrameworkID framework_id = 3;
+  required FrameworkInfo framework_info = 4;
+  required SlaveID slave_id = 5;
+  required SlaveInfo slave_info = 6;
+}
+
+
+/**
+ * Notifies the executor that the agent has reregistered it.
+ *
+ * See executor::Event::Subscribed.
+ */
+message ExecutorReregisteredMessage {
+  required SlaveID slave_id = 1;
+  required SlaveInfo slave_info = 2;
+}
+
+
+/**
+ * Notifies the scheduler about terminated executors.
+ *
+ * See scheduler::Event::Failure.
+ */
+message ExitedExecutorMessage {
+  required SlaveID slave_id = 1;
+  required FrameworkID framework_id = 2;
+  required ExecutorID executor_id = 3;
+  required int32 status = 4;
+}
+
+
+/**
+ * Reestablishes the connection between executor and agent after agent failover.
+ * This message originates from the agent.
+ */
+message ReconnectExecutorMessage {
+  required SlaveID slave_id = 1;
+}
+
+
+/**
+ * Subscribes the executor with the agent to receive events.
+ * This is used after a disconnection.  The executor must include
+ * any unacknowledged tasks or updates.
+ *
+ * See executor::Call::Subscribe.
+ */
+message ReregisterExecutorMessage {
+  required ExecutorID executor_id = 1;
+  required FrameworkID framework_id = 2;
+  repeated TaskInfo tasks = 3;
+  repeated StatusUpdate updates = 4;
+}
+
+
+/**
+ * Sends a free-form message from the master to an agent.
+ * The agent should gracefully terminate in response, which includes
+ * shutting down all executors and tasks on the agent.
+ */
+message ShutdownMessage {
+  optional string message = 1;
+}
+
+
+// TODO(adam-mesos): Move this to an 'archive' package.
+/**
+ * Describes Completed Frameworks, etc. for archival.
+ */
+message Archive {
+  message Framework {
+    required FrameworkInfo framework_info = 1;
+    optional string pid = 2;
+    repeated Task tasks = 3;
+  }
+  repeated Framework frameworks = 1;
+}
+
+
+/**
+ * Message describing task current health status that is sent by
+ * the task health checker to the command executor.
+ * The command executor reports the task status back to the
+ * on each receive. If the health checker configured failure
+ * condition meets, then `kill_task` flag will be set to true which
+ * the executor on message receive will kill the task.
+ */
+message TaskHealthStatus {
+  required TaskID task_id = 1;
+
+  required bool healthy = 2;
+
+  // Flag to initiate task kill.
+  optional bool kill_task = 3 [default = false];
+
+  // Number of consecutive counts in current status.
+  // This will not be populated if task is healthy.
+  optional int32 consecutive_failures = 4;
+}
+
+
+/**
+ * Message to signal completion of an event within a module.
+ */
+message HookExecuted {
+  optional string module = 1;
+}
