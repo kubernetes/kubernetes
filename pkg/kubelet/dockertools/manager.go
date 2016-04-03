@@ -60,7 +60,7 @@ import (
 const (
 	DockerType = "docker"
 
-	minimumDockerAPIVersion = "1.18"
+	minimumDockerAPIVersion = "1.20"
 
 	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
 	// we want to able to consider SRV lookup names like _dns._udp.kube-dns.default.svc to be considered relative.
@@ -966,21 +966,6 @@ func (dm *DockerManager) checkVersionCompatibility() error {
 	return nil
 }
 
-// The first version of docker that supports exec natively is 1.3.0 == API 1.15
-var dockerAPIVersionWithExec = "1.15"
-
-func (dm *DockerManager) nativeExecSupportExists() (bool, error) {
-	version, err := dm.APIVersion()
-	if err != nil {
-		return false, err
-	}
-	result, err := version.Compare(dockerAPIVersionWithExec)
-	if result >= 0 {
-		return true, err
-	}
-	return false, err
-}
-
 func (dm *DockerManager) defaultSecurityOpt() ([]string, error) {
 	version, err := dm.APIVersion()
 	if err != nil {
@@ -997,32 +982,8 @@ func (dm *DockerManager) defaultSecurityOpt() ([]string, error) {
 	return nil, nil
 }
 
-func (dm *DockerManager) getRunInContainerCommand(containerID kubecontainer.ContainerID, cmd []string) (*exec.Cmd, error) {
-	args := append([]string{"exec"}, cmd...)
-	command := exec.Command("/usr/sbin/nsinit", args...)
-	command.Dir = fmt.Sprintf("/var/lib/docker/execdriver/native/%s", containerID.ID)
-	return command, nil
-}
-
-func (dm *DockerManager) runInContainerUsingNsinit(containerID kubecontainer.ContainerID, cmd []string) ([]byte, error) {
-	c, err := dm.getRunInContainerCommand(containerID, cmd)
-	if err != nil {
-		return nil, err
-	}
-	return c.CombinedOutput()
-}
-
-// RunInContainer uses nsinit to run the command inside the container identified by containerID
+// RunInContainer run the command inside the container identified by containerID
 func (dm *DockerManager) RunInContainer(containerID kubecontainer.ContainerID, cmd []string) ([]byte, error) {
-	// If native exec support does not exist in the local docker daemon use nsinit.
-	useNativeExec, err := dm.nativeExecSupportExists()
-	if err != nil {
-		return nil, err
-	}
-	if !useNativeExec {
-		glog.V(2).Infof("Using nsinit to run the command %+v inside container %s", cmd, containerID)
-		return dm.runInContainerUsingNsinit(containerID, cmd)
-	}
 	glog.V(2).Infof("Using docker native exec to run cmd %+v inside container %s", cmd, containerID)
 	createOpts := docker.CreateExecOptions{
 		Container:    containerID.ID,
