@@ -177,39 +177,6 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-func TestExecSupportExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.3.0", "ApiVersion=1.15"}}
-	runner := &DockerManager{client: fakeDocker}
-	useNativeExec, err := runner.nativeExecSupportExists()
-	if err != nil {
-		t.Errorf("got error while checking for exec support - %s", err)
-	}
-	if !useNativeExec {
-		t.Errorf("invalid exec support check output. Expected true")
-	}
-}
-
-func TestExecSupportNotExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.2", "ApiVersion=1.14"}}
-	runner := &DockerManager{client: fakeDocker}
-	useNativeExec, _ := runner.nativeExecSupportExists()
-	if useNativeExec {
-		t.Errorf("invalid exec support check output.")
-	}
-}
-
-func TestDockerContainerCommand(t *testing.T) {
-	runner := &DockerManager{}
-	containerID := kubecontainer.DockerID("1234").ContainerID()
-	command := []string{"ls"}
-	cmd, _ := runner.getRunInContainerCommand(containerID, command)
-	if cmd.Dir != "/var/lib/docker/execdriver/native/"+containerID.ID {
-		t.Errorf("unexpected command CWD: %s", cmd.Dir)
-	}
-	if !reflect.DeepEqual(cmd.Args, []string{"/usr/sbin/nsinit", "exec", "ls"}) {
-		t.Errorf("unexpected command args: %s", cmd.Args)
-	}
-}
 func TestParseImageName(t *testing.T) {
 	tests := []struct {
 		imageName string
