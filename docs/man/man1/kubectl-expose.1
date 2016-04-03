@@ -13,7 +13,7 @@ kubectl expose \- Take a replication controller, service, deployment or pod and 
 
 .SH DESCRIPTION
 .PP
-Take a deployment, service, replica set, replication controller, or pod and expose it as a new Kubernetes service.
+Expose a resource as a new Kubernetes service.
 
 .PP
 Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
@@ -22,6 +22,11 @@ will be exposed as a service only if its selector is convertible to a selector t
 i.e. when the selector contains only the matchLabels component. Note that if no port is specified via
 \-\-port and the exposed resource has multiple ports, all will be re\-used by the new service. Also if no
 labels are specified, the new service will re\-use the labels from the resource it exposes.
+
+.PP
+Possible resources include (case insensitive):
+  pod (po), service (svc), replicationcontroller (rc),
+  deployment, replicaset (rs)
 
 
 .SH OPTIONS
