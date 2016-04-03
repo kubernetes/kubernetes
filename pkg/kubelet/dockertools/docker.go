@@ -65,7 +65,7 @@ type DockerInterface interface {
 	StopContainer(id string, timeout int) error
 	RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error
 	InspectImage(image string) (*docker.Image, error)
-	ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error)
+	ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 	RemoveImage(image string) error
 	Logs(string, dockertypes.ContainerLogsOptions, StreamOptions) error

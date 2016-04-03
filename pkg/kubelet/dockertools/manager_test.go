@@ -363,7 +363,7 @@ func TestGetPods(t *testing.T) {
 
 func TestListImages(t *testing.T) {
 	manager, fakeDocker := newTestDockerManager()
-	dockerImages := []docker.APIImages{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
+	dockerImages := []dockertypes.Image{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
 	expected := sets.NewString([]string{"1111", "2222", "3333"}...)
 
 	fakeDocker.Images = dockerImages

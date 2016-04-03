@@ -112,7 +112,7 @@ func (in instrumentedDockerInterface) InspectImage(image string) (*docker.Image,
 	return out, err
 }
 
-func (in instrumentedDockerInterface) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
+func (in instrumentedDockerInterface) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
 	const operation = "list_images"
 	defer recordOperation(operation, time.Now())
 
