@@ -313,7 +313,8 @@ __kubectl_require_pod_and_container()
 
 __custom_func() {
     case ${last_command} in
-        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop | kubectl_edit | kubectl_patch)
+        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop | kubectl_edit | kubectl_patch |\
+        kubectl_annotate)
             __kubectl_get_resource
             return
             ;;
@@ -2782,7 +2783,42 @@ _kubectl_annotate()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    must_have_one_noun+=("componentstatuse")
+    must_have_one_noun+=("event")
+    must_have_one_noun+=("horizontalpodautoscaler")
+    must_have_one_noun+=("limitrange")
+    must_have_one_noun+=("node")
+    must_have_one_noun+=("persistentvolume")
+    must_have_one_noun+=("persistentvolumeclaim")
+    must_have_one_noun+=("pod")
+    must_have_one_noun+=("replicationcontroller")
+    must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("secret")
+    must_have_one_noun+=("service")
     noun_aliases=()
+    noun_aliases+=("componentstatuses")
+    noun_aliases+=("cs")
+    noun_aliases+=("ev")
+    noun_aliases+=("events")
+    noun_aliases+=("horizontalpodautoscalers")
+    noun_aliases+=("hpa")
+    noun_aliases+=("limitranges")
+    noun_aliases+=("limits")
+    noun_aliases+=("no")
+    noun_aliases+=("nodes")
+    noun_aliases+=("persistentvolumeclaims")
+    noun_aliases+=("persistentvolumes")
+    noun_aliases+=("po")
+    noun_aliases+=("pods")
+    noun_aliases+=("pv")
+    noun_aliases+=("pvc")
+    noun_aliases+=("quota")
+    noun_aliases+=("rc")
+    noun_aliases+=("replicationcontrollers")
+    noun_aliases+=("resourcequotas")
+    noun_aliases+=("secrets")
+    noun_aliases+=("services")
+    noun_aliases+=("svc")
 }
 
 _kubectl_config_view()
