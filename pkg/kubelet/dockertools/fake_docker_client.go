@@ -41,10 +41,11 @@ type FakeDockerClient struct {
 	ExitedContainerList  []dockertypes.Container
 	ContainerMap         map[string]*dockertypes.ContainerJSON
 	Image                *docker.Image
-	Images               []docker.APIImages
+	Images               []dockertypes.Image
 	Errors               map[string]error
 	called               []string
 	pulled               []string
+
 	// Created, Stopped and Removed all container docker ID
 	Created       []string
 	Stopped       []string
@@ -473,7 +474,7 @@ func (f *FakeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 	return f.ExecInspect, f.popError("inspect_exec")
 }
 
-func (f *FakeDockerClient) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
+func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
 	err := f.popError("list_images")
 	return f.Images, err
 }

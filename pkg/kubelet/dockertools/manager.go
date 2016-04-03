@@ -793,7 +793,7 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
 	var images []kubecontainer.Image
 
-	dockerImages, err := dm.client.ListImages(docker.ListImagesOptions{})
+	dockerImages, err := dm.client.ListImages(dockertypes.ImageListOptions{})
 	if err != nil {
 		return images, err
 	}
