@@ -24,6 +24,7 @@ package k8s.io.kubernetes.federation.apis.federation.v1alpha1;
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/extensions/v1beta1/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -115,5 +116,27 @@ message ServerAddressByClientCIDR {
   // Address of this server, suitable for a client that matches the above CIDR.
   // This can be a hostname, hostname:port, IP or IP:port.
   optional string serverAddress = 2;
+}
+
+// SubReplicaSet represents the configuration of a replica set scheduled to a Cluster.
+message SubReplicaSet {
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  // Spec defines the desired behavior of this SubReplicaSet.
+  optional k8s.io.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetSpec spec = 2;
+
+  // Status is the current status of this SubReplicaSet. This data may be
+  // out of date by some window of time.
+  optional k8s.io.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetStatus status = 3;
+}
+
+// A list of SubReplicaSets
+message SubReplicaSetList {
+  // Standard list metadata.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+
+  // List of SubReplicaSet objects.
+  repeated SubReplicaSet items = 2;
 }
 

@@ -17,8 +17,30 @@ limitations under the License.
 package v1alpha1
 
 import (
+	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) {
+	scheme.AddDefaultingFuncs(
+		func(obj *SubReplicaSet) {
+			labels := obj.Spec.Template.Labels
+
+			// TODO: support templates defined elsewhere when we support them in the API
+			if labels != nil {
+				if obj.Spec.Selector == nil {
+					obj.Spec.Selector = &extensionsv1.LabelSelector{
+						MatchLabels: labels,
+					}
+				}
+				if len(obj.Labels) == 0 {
+					obj.Labels = labels
+				}
+			}
+			if obj.Spec.Replicas == nil {
+				obj.Spec.Replicas = new(int32)
+				*obj.Spec.Replicas = 1
+			}
+		},
+	)
 }

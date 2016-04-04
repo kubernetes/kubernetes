@@ -25,6 +25,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -44,6 +45,10 @@ func init() {
 		Convert_federation_ClusterStatus_To_v1alpha1_ClusterStatus,
 		Convert_v1alpha1_ServerAddressByClientCIDR_To_federation_ServerAddressByClientCIDR,
 		Convert_federation_ServerAddressByClientCIDR_To_v1alpha1_ServerAddressByClientCIDR,
+		Convert_v1alpha1_SubReplicaSet_To_federation_SubReplicaSet,
+		Convert_federation_SubReplicaSet_To_v1alpha1_SubReplicaSet,
+		Convert_v1alpha1_SubReplicaSetList_To_federation_SubReplicaSetList,
+		Convert_federation_SubReplicaSetList_To_v1alpha1_SubReplicaSetList,
 	); err != nil {
 		// if one of the conversion functions is malformed, detect it immediately.
 		panic(err)
@@ -330,4 +335,98 @@ func autoConvert_federation_ServerAddressByClientCIDR_To_v1alpha1_ServerAddressB
 
 func Convert_federation_ServerAddressByClientCIDR_To_v1alpha1_ServerAddressByClientCIDR(in *federation.ServerAddressByClientCIDR, out *ServerAddressByClientCIDR, s conversion.Scope) error {
 	return autoConvert_federation_ServerAddressByClientCIDR_To_v1alpha1_ServerAddressByClientCIDR(in, out, s)
+}
+
+func autoConvert_v1alpha1_SubReplicaSet_To_federation_SubReplicaSet(in *SubReplicaSet, out *federation.SubReplicaSet, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := v1beta1.Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1alpha1_SubReplicaSet_To_federation_SubReplicaSet(in *SubReplicaSet, out *federation.SubReplicaSet, s conversion.Scope) error {
+	return autoConvert_v1alpha1_SubReplicaSet_To_federation_SubReplicaSet(in, out, s)
+}
+
+func autoConvert_federation_SubReplicaSet_To_v1alpha1_SubReplicaSet(in *federation.SubReplicaSet, out *SubReplicaSet, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := v1beta1.Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_federation_SubReplicaSet_To_v1alpha1_SubReplicaSet(in *federation.SubReplicaSet, out *SubReplicaSet, s conversion.Scope) error {
+	return autoConvert_federation_SubReplicaSet_To_v1alpha1_SubReplicaSet(in, out, s)
+}
+
+func autoConvert_v1alpha1_SubReplicaSetList_To_federation_SubReplicaSetList(in *SubReplicaSetList, out *federation.SubReplicaSetList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]federation.SubReplicaSet, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_SubReplicaSet_To_federation_SubReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1alpha1_SubReplicaSetList_To_federation_SubReplicaSetList(in *SubReplicaSetList, out *federation.SubReplicaSetList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_SubReplicaSetList_To_federation_SubReplicaSetList(in, out, s)
+}
+
+func autoConvert_federation_SubReplicaSetList_To_v1alpha1_SubReplicaSetList(in *federation.SubReplicaSetList, out *SubReplicaSetList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]SubReplicaSet, len(*in))
+		for i := range *in {
+			if err := Convert_federation_SubReplicaSet_To_v1alpha1_SubReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_federation_SubReplicaSetList_To_v1alpha1_SubReplicaSetList(in *federation.SubReplicaSetList, out *SubReplicaSetList, s conversion.Scope) error {
+	return autoConvert_federation_SubReplicaSetList_To_v1alpha1_SubReplicaSetList(in, out, s)
 }
