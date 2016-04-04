@@ -111,7 +111,7 @@ func makeSSHTunnel(user string, signer ssh.Signer, host string) (*SSHTunnel, err
 
 func (s *SSHTunnel) Open() error {
 	var err error
-	s.client, err = ssh.Dial("tcp", net.JoinHostPort(s.Host, s.SSHPort), s.Config)
+	s.client, err = realTimeoutDialer.Dial("tcp", net.JoinHostPort(s.Host, s.SSHPort), s.Config)
 	tunnelOpenCounter.Inc()
 	if err != nil {
 		tunnelOpenFailCounter.Inc()
@@ -163,11 +163,43 @@ func (d *realSSHDialer) Dial(network, addr string, config *ssh.ClientConfig) (*s
 	return ssh.Dial(network, addr, config)
 }
 
+// timeoutDialer wraps an sshDialer with a timeout around Dial(). The golang
+// ssh library can hang indefinitely inside the Dial() call (see issue #23835).
+// Wrapping all Dial() calls with a conservative timeout provides safety against
+// getting stuck on that.
+type timeoutDialer struct {
+	dialer  sshDialer
+	timeout time.Duration
+}
+
+// 150 seconds is longer than the underlying default TCP backoff delay (127
+// seconds). This timeout is only intended to catch otherwise uncaught hangs.
+const sshDialTimeout = 150 * time.Second
+
+var realTimeoutDialer sshDialer = &timeoutDialer{&realSSHDialer{}, sshDialTimeout}
+
+func (d *timeoutDialer) Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
+	var client *ssh.Client
+	errCh := make(chan error, 1)
+	go func() {
+		defer runtime.HandleCrash()
+		var err error
+		client, err = d.dialer.Dial(network, addr, config)
+		errCh <- err
+	}()
+	select {
+	case err := <-errCh:
+		return client, err
+	case <-time.After(d.timeout):
+		return nil, fmt.Errorf("timed out dialing %s:%s", network, addr)
+	}
+}
+
 // RunSSHCommand returns the stdout, stderr, and exit code from running cmd on
 // host as specific user, along with any SSH-level error.
 // If user=="", it will default (like SSH) to os.Getenv("USER")
 func RunSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
-	return runSSHCommand(&realSSHDialer{}, cmd, user, host, signer, true)
+	return runSSHCommand(realTimeoutDialer, cmd, user, host, signer, true)
 }
 
 // Internal implementation of runSSHCommand, for testing
