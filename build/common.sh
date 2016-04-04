@@ -102,28 +102,28 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables:v1
+          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v2
         );;
-    "arm") # TODO: Use image with iptables installed for kube-proxy for arm, arm64 and ppc64le
+    "arm")
         local targets=(
-          kube-apiserver,hypriot/armhf-busybox
-          kube-controller-manager,hypriot/armhf-busybox
-          kube-scheduler,hypriot/armhf-busybox
-          kube-proxy,hypriot/armhf-busybox
+          kube-apiserver,armel/busybox
+          kube-controller-manager,armel/busybox
+          kube-scheduler,armel/busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v2
         );;
     "arm64")
         local targets=(
           kube-apiserver,aarch64/busybox
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
-          kube-proxy,aarch64/busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v2
         );;
     "ppc64le")
         local targets=(
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
-          kube-proxy,ppc64le/busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v2
         );;
   esac
 
@@ -671,7 +671,12 @@ function kube::release::clean_cruft() {
 function kube::release::package_hyperkube() {
   # If we have these variables set then we want to build all docker images.
   if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-    REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" make -C cluster/images/hyperkube/ build
+    for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
+
+      local arch=${platform##*/}
+      kube::log::status "Building hyperkube image for arch: ${arch}"
+      REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
+    done
   fi
 }
 
@@ -737,7 +742,7 @@ function kube::release::package_client_tarballs() {
 # Package up all of the server binaries
 function kube::release::package_server_tarballs() {
   local platform
-  for platform in "${KUBE_SERVER_PLATFORMS[@]}" ; do
+  for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     local arch=$(basename ${platform})
     kube::log::status "Building tarball: server $platform_tag"
@@ -1536,24 +1541,18 @@ function kube::release::docker::release() {
   for arch in "${archs[@]}"; do
     for binary in "${binaries[@]}"; do
 
-      # Temporary fix. hyperkube-arm isn't built in the release process, so we can't push it
-      # This if statement skips the push for hyperkube-arm
-      if [[ ${arch} != "arm" || ${binary} != "hyperkube" ]]; then
+      local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+      kube::log::status "Pushing ${binary} to ${docker_target}"
+      "${docker_push_cmd[@]}" push "${docker_target}"
 
+      # If we have a amd64 docker image. Tag it without -amd64 also and push it for compatibility with earlier versions
+      if [[ ${arch} == "amd64" ]]; then
+        local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
 
-        local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-        kube::log::status "Pushing ${binary} to ${docker_target}"
-        "${docker_push_cmd[@]}" push "${docker_target}"
+        "${DOCKER[@]}" tag -f "${docker_target}" "${legacy_docker_target}" 2>/dev/null
 
-        # If we have a amd64 docker image. Tag it without -amd64 also and push it for compatibility with earlier versions
-        if [[ ${arch} == "amd64" ]]; then
-          local legacy_docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
-
-          "${DOCKER[@]}" tag -f "${docker_target}" "${legacy_docker_target}" 2>/dev/null
-
-          kube::log::status "Pushing ${binary} to ${legacy_docker_target}"
-          "${docker_push_cmd[@]}" push "${legacy_docker_target}"
-        fi
+        kube::log::status "Pushing ${binary} to ${legacy_docker_target}"
+        "${docker_push_cmd[@]}" push "${legacy_docker_target}"
       fi
     done
   done
