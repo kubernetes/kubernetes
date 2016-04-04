@@ -27,6 +27,7 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
+	dockercontainer "github.com/docker/engine-api/types/container"
 	docker "github.com/fsouza/go-dockerclient"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -38,7 +39,7 @@ type FakeDockerClient struct {
 	sync.Mutex
 	RunningContainerList []dockertypes.Container
 	ExitedContainerList  []dockertypes.Container
-	ContainerMap         map[string]*docker.Container
+	ContainerMap         map[string]*dockertypes.ContainerJSON
 	Image                *docker.Image
 	Images               []docker.APIImages
 	Errors               map[string]error
@@ -69,7 +70,7 @@ func NewFakeDockerClientWithVersion(version, apiVersion string) *FakeDockerClien
 		VersionInfo:   docker.Env{fmt.Sprintf("Version=%s", version), fmt.Sprintf("ApiVersion=%s", apiVersion)},
 		Errors:        make(map[string]error),
 		RemovedImages: sets.String{},
-		ContainerMap:  make(map[string]*docker.Container),
+		ContainerMap:  make(map[string]*dockertypes.ContainerJSON),
 	}
 }
 
@@ -103,25 +104,64 @@ func (f *FakeDockerClient) ClearCalls() {
 	f.Removed = []string{}
 }
 
-func (f *FakeDockerClient) SetFakeContainers(containers []*docker.Container) {
+// Because the new data type returned by engine-api is too complex to manually initialize, we need a
+// fake container which is easier to initialize.
+type FakeContainer struct {
+	ID         string
+	Name       string
+	Running    bool
+	ExitCode   int
+	Pid        int
+	CreatedAt  time.Time
+	StartedAt  time.Time
+	FinishedAt time.Time
+	Config     *dockercontainer.Config
+	HostConfig *dockercontainer.HostConfig
+}
+
+// convertFakeContainer converts the fake container to real container
+func convertFakeContainer(f *FakeContainer) *dockertypes.ContainerJSON {
+	if f.Config == nil {
+		f.Config = &dockercontainer.Config{}
+	}
+	if f.HostConfig == nil {
+		f.HostConfig = &dockercontainer.HostConfig{}
+	}
+	return &dockertypes.ContainerJSON{
+		ContainerJSONBase: &dockertypes.ContainerJSONBase{
+			ID:   f.ID,
+			Name: f.Name,
+			State: &dockertypes.ContainerState{
+				Running:    f.Running,
+				ExitCode:   f.ExitCode,
+				Pid:        f.Pid,
+				StartedAt:  dockerTimestampToString(f.StartedAt),
+				FinishedAt: dockerTimestampToString(f.FinishedAt),
+			},
+			Created:    dockerTimestampToString(f.CreatedAt),
+			HostConfig: f.HostConfig,
+		},
+		Config:          f.Config,
+		NetworkSettings: &dockertypes.NetworkSettings{},
+	}
+}
+
+func (f *FakeDockerClient) SetFakeContainers(containers []*FakeContainer) {
 	f.Lock()
 	defer f.Unlock()
 	// Reset the lists and the map.
-	f.ContainerMap = map[string]*docker.Container{}
+	f.ContainerMap = map[string]*dockertypes.ContainerJSON{}
 	f.RunningContainerList = []dockertypes.Container{}
 	f.ExitedContainerList = []dockertypes.Container{}
 
 	for i := range containers {
 		c := containers[i]
-		if c.Config == nil {
-			c.Config = &docker.Config{}
-		}
-		f.ContainerMap[c.ID] = c
+		f.ContainerMap[c.ID] = convertFakeContainer(c)
 		container := dockertypes.Container{
 			Names: []string{c.Name},
 			ID:    c.ID,
 		}
-		if c.State.Running {
+		if c.Running {
 			f.RunningContainerList = append(f.RunningContainerList, container)
 		} else {
 			f.ExitedContainerList = append(f.ExitedContainerList, container)
@@ -129,9 +169,9 @@ func (f *FakeDockerClient) SetFakeContainers(containers []*docker.Container) {
 	}
 }
 
-func (f *FakeDockerClient) SetFakeRunningContainers(containers []*docker.Container) {
+func (f *FakeDockerClient) SetFakeRunningContainers(containers []*FakeContainer) {
 	for _, c := range containers {
-		c.State.Running = true
+		c.Running = true
 	}
 	f.SetFakeContainers(containers)
 }
@@ -228,7 +268,7 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
 // It adds an entry "inspect" to the internal method call record.
-func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error) {
+func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "inspect_container")
@@ -280,11 +320,17 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	f.RunningContainerList = append([]dockertypes.Container{
 		{ID: name, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
 	}, f.RunningContainerList...)
-	container := docker.Container{ID: name, Name: name, Config: c.Config, HostConfig: c.HostConfig}
-	containerCopy := container
+	// TODO(random-liu): Remove this convertion when we refactor CreateContainer
+	config := &dockercontainer.Config{}
+	convertType(c.Config, config)
+	hostConfig := &dockercontainer.HostConfig{}
+	convertType(c.HostConfig, hostConfig)
+	container := convertFakeContainer(&FakeContainer{ID: name, Name: name, Config: config, HostConfig: hostConfig})
+	containerCopy := *container
 	f.ContainerMap[name] = &containerCopy
 	f.normalSleep(100, 25, 25)
-	return &container, nil
+	// TODO(random-liu): This will be refactored soon, we could do this because only the returned id is used.
+	return &docker.Container{ID: container.ID}, nil
 }
 
 // StartContainer is a test-spy implementation of DockerInterface.StartContainer.
@@ -302,14 +348,12 @@ func (f *FakeDockerClient) StartContainer(id string, _ *docker.HostConfig) error
 	}
 	container, ok := f.ContainerMap[id]
 	if !ok {
-		container = &docker.Container{ID: id, Name: id}
+		container = convertFakeContainer(&FakeContainer{ID: id, Name: id})
 	}
-	container.State = docker.State{
-		Running:   true,
-		Pid:       os.Getpid(),
-		StartedAt: time.Now(),
-	}
-	container.NetworkSettings = &docker.NetworkSettings{IPAddress: "2.3.4.5"}
+	container.State.Running = true
+	container.State.Pid = os.Getpid()
+	container.State.StartedAt = dockerTimestampToString(time.Now())
+	container.NetworkSettings.IPAddress = "2.3.4.5"
 	f.ContainerMap[id] = container
 	f.updateContainerStatus(id, statusRunningPrefix)
 	f.normalSleep(200, 50, 50)
@@ -340,17 +384,15 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.RunningContainerList = newList
 	container, ok := f.ContainerMap[id]
 	if !ok {
-		container = &docker.Container{
-			ID:   id,
-			Name: id,
-			State: docker.State{
-				Running:    false,
-				StartedAt:  time.Now().Add(-time.Second),
-				FinishedAt: time.Now(),
-			},
-		}
+		container = convertFakeContainer(&FakeContainer{
+			ID:         id,
+			Name:       id,
+			Running:    false,
+			StartedAt:  time.Now().Add(-time.Second),
+			FinishedAt: time.Now(),
+		})
 	} else {
-		container.State.FinishedAt = time.Now()
+		container.State.FinishedAt = dockerTimestampToString(time.Now())
 		container.State.Running = false
 	}
 	f.ContainerMap[id] = container

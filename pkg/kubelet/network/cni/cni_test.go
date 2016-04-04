@@ -30,7 +30,6 @@ import (
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
-	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -132,10 +131,10 @@ func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
 
 func (nh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
 	dm, fakeDockerClient := newTestDockerManager()
-	fakeDockerClient.SetFakeRunningContainers([]*docker.Container{
+	fakeDockerClient.SetFakeRunningContainers([]*dockertools.FakeContainer{
 		{
-			ID:    "test_infra_container",
-			State: docker.State{Pid: 12345},
+			ID:  "test_infra_container",
+			Pid: 12345,
 		},
 	})
 	return dm

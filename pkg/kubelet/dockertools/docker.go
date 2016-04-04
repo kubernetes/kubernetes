@@ -59,7 +59,7 @@ const (
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
 type DockerInterface interface {
 	ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error)
-	InspectContainer(id string) (*docker.Container, error)
+	InspectContainer(id string) (*dockertypes.ContainerJSON, error)
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error

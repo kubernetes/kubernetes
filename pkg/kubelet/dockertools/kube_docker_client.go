@@ -20,9 +20,11 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"strconv"
+	"time"
 
 	"github.com/docker/docker/pkg/stdcopy"
 	dockerapi "github.com/docker/engine-api/client"
@@ -112,20 +114,15 @@ func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 	return apiContainers, nil
 }
 
-func (d *kubeDockerClient) InspectContainer(id string) (*docker.Container, error) {
+func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
 	containerJSON, err := d.client.ContainerInspect(getDefaultContext(), id)
 	if err != nil {
-		// TODO(random-liu): Use IsErrContainerNotFound instead of NoSuchContainer error
 		if dockerapi.IsErrContainerNotFound(err) {
-			err = &docker.NoSuchContainer{ID: id, Err: err}
+			return nil, containerNotFoundError{ID: id}
 		}
 		return nil, err
 	}
-	container := &docker.Container{}
-	if err := convertType(&containerJSON, container); err != nil {
-		return nil, err
-	}
-	return container, nil
+	return &containerJSON, nil
 }
 
 func (d *kubeDockerClient) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
@@ -379,4 +376,26 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 		}
 	}
 	return nil
+}
+
+// parseDockerTimestamp parses the timestamp returned by DockerInterface from string to time.Time
+func parseDockerTimestamp(s string) (time.Time, error) {
+	// Timestamp returned by Docker is in time.RFC3339Nano format.
+	return time.Parse(time.RFC3339Nano, s)
+}
+
+// dockerTimestampToString converts the timestamp to string
+func dockerTimestampToString(t time.Time) string {
+	return t.Format(time.RFC3339Nano)
+}
+
+// containerNotFoundError is the error returned by InspectContainer when container not found. We
+// add this error type for testability. We don't use the original error returned by engine-api
+// because dockertypes.containerNotFoundError is private, we can't create and inject it in our test.
+type containerNotFoundError struct {
+	ID string
+}
+
+func (e containerNotFoundError) Error() string {
+	return fmt.Sprintf("Error: No such container: %s", e.ID)
 }
