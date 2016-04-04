@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	dockertypes "github.com/docker/engine-api/types"
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
@@ -338,7 +339,7 @@ func TestGetPods(t *testing.T) {
 	// because the conversion is tested separately in convert_test.go
 	containers := make([]*kubecontainer.Container, len(dockerContainers))
 	for i := range containers {
-		c, err := toRuntimeContainer(&docker.APIContainers{
+		c, err := toRuntimeContainer(&dockertypes.Container{
 			ID:    dockerContainers[i].ID,
 			Names: []string{dockerContainers[i].Name},
 		})
@@ -392,40 +393,6 @@ func TestListImages(t *testing.T) {
 	if !reflect.DeepEqual(expected.List(), actual.List()) {
 		t.Errorf("expected %#v, got %#v", expected.List(), actual.List())
 	}
-}
-
-func apiContainerToContainer(c docker.APIContainers) kubecontainer.Container {
-	dockerName, hash, err := ParseDockerName(c.Names[0])
-	if err != nil {
-		return kubecontainer.Container{}
-	}
-	return kubecontainer.Container{
-		ID:   kubecontainer.ContainerID{Type: "docker", ID: c.ID},
-		Name: dockerName.ContainerName,
-		Hash: hash,
-	}
-}
-
-func dockerContainersToPod(containers []*docker.APIContainers) kubecontainer.Pod {
-	var pod kubecontainer.Pod
-	for _, c := range containers {
-		dockerName, hash, err := ParseDockerName(c.Names[0])
-		if err != nil {
-			continue
-		}
-		pod.Containers = append(pod.Containers, &kubecontainer.Container{
-			ID:    kubecontainer.ContainerID{Type: "docker", ID: c.ID},
-			Name:  dockerName.ContainerName,
-			Hash:  hash,
-			Image: c.Image,
-		})
-		// TODO(yifan): Only one evaluation is enough.
-		pod.ID = dockerName.PodUID
-		name, namespace, _ := kubecontainer.ParsePodFullName(dockerName.PodFullName)
-		pod.Name = name
-		pod.Namespace = namespace
-	}
-	return pod
 }
 
 func TestKillContainerInPod(t *testing.T) {
@@ -634,13 +601,13 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 	fakeDocker.Lock()
 
 	found := false
-	for _, c := range fakeDocker.ContainerList {
+	for _, c := range fakeDocker.RunningContainerList {
 		if c.Image == "pod_infra_image" && strings.HasPrefix(c.Names[0], "/k8s_POD") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("Custom pod infra container not found: %v", fakeDocker.ContainerList)
+		t.Errorf("Custom pod infra container not found: %v", fakeDocker.RunningContainerList)
 	}
 
 	if len(fakeDocker.Created) != 2 ||
@@ -1199,7 +1166,7 @@ func TestGetRestartCount(t *testing.T) {
 	verifyRestartCount(&pod, 3)
 
 	// All exited containers have been garbage collected, restart count should be got from old api pod status
-	fakeDocker.ExitedContainerList = []docker.APIContainers{}
+	fakeDocker.ExitedContainerList = []dockertypes.Container{}
 	verifyRestartCount(&pod, 3)
 	killOneContainer(&pod)
 
@@ -1228,7 +1195,7 @@ func TestGetTerminationMessagePath(t *testing.T) {
 
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
-	containerList := fakeDocker.ContainerList
+	containerList := fakeDocker.RunningContainerList
 	if len(containerList) != 2 {
 		// One for infra container, one for container "bar"
 		t.Fatalf("unexpected container list length %d", len(containerList))

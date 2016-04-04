@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	dockertypes "github.com/docker/engine-api/types"
 	docker "github.com/fsouza/go-dockerclient"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -35,14 +36,14 @@ import (
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
 type FakeDockerClient struct {
 	sync.Mutex
-	ContainerList       []docker.APIContainers
-	ExitedContainerList []docker.APIContainers
-	ContainerMap        map[string]*docker.Container
-	Image               *docker.Image
-	Images              []docker.APIImages
-	Errors              map[string]error
-	called              []string
-	pulled              []string
+	RunningContainerList []dockertypes.Container
+	ExitedContainerList  []dockertypes.Container
+	ContainerMap         map[string]*docker.Container
+	Image                *docker.Image
+	Images               []docker.APIImages
+	Errors               map[string]error
+	called               []string
+	pulled               []string
 	// Created, Stopped and Removed all container docker ID
 	Created       []string
 	Stopped       []string
@@ -107,8 +108,8 @@ func (f *FakeDockerClient) SetFakeContainers(containers []*docker.Container) {
 	defer f.Unlock()
 	// Reset the lists and the map.
 	f.ContainerMap = map[string]*docker.Container{}
-	f.ContainerList = []docker.APIContainers{}
-	f.ExitedContainerList = []docker.APIContainers{}
+	f.RunningContainerList = []dockertypes.Container{}
+	f.ExitedContainerList = []dockertypes.Container{}
 
 	for i := range containers {
 		c := containers[i]
@@ -116,14 +117,14 @@ func (f *FakeDockerClient) SetFakeContainers(containers []*docker.Container) {
 			c.Config = &docker.Config{}
 		}
 		f.ContainerMap[c.ID] = c
-		apiContainer := docker.APIContainers{
+		container := dockertypes.Container{
 			Names: []string{c.Name},
 			ID:    c.ID,
 		}
 		if c.State.Running {
-			f.ContainerList = append(f.ContainerList, apiContainer)
+			f.RunningContainerList = append(f.RunningContainerList, container)
 		} else {
-			f.ExitedContainerList = append(f.ExitedContainerList, apiContainer)
+			f.ExitedContainerList = append(f.ExitedContainerList, container)
 		}
 	}
 }
@@ -210,12 +211,12 @@ func (f *FakeDockerClient) popError(op string) error {
 
 // ListContainers is a test-spy implementation of DockerInterface.ListContainers.
 // It adds an entry "list" to the internal method call record.
-func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
+func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "list")
 	err := f.popError("list")
-	containerList := append([]docker.APIContainers{}, f.ContainerList...)
+	containerList := append([]dockertypes.Container{}, f.RunningContainerList...)
 	if options.All {
 		// Although the container is not sorted, but the container with the same name should be in order,
 		// that is enough for us now.
@@ -276,9 +277,9 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	name := "/" + c.Name
 	f.Created = append(f.Created, name)
 	// The newest container should be in front, because we assume so in GetPodStatus()
-	f.ContainerList = append([]docker.APIContainers{
+	f.RunningContainerList = append([]dockertypes.Container{
 		{ID: name, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
-	}, f.ContainerList...)
+	}, f.RunningContainerList...)
 	container := docker.Container{ID: name, Name: name, Config: c.Config, HostConfig: c.HostConfig}
 	containerCopy := container
 	f.ContainerMap[name] = &containerCopy
@@ -327,16 +328,16 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.Stopped = append(f.Stopped, id)
 	// Container status should be Updated before container moved to ExitedContainerList
 	f.updateContainerStatus(id, statusExitedPrefix)
-	var newList []docker.APIContainers
-	for _, container := range f.ContainerList {
+	var newList []dockertypes.Container
+	for _, container := range f.RunningContainerList {
 		if container.ID == id {
 			// The newest exited container should be in front. Because we assume so in GetPodStatus()
-			f.ExitedContainerList = append([]docker.APIContainers{container}, f.ExitedContainerList...)
+			f.ExitedContainerList = append([]dockertypes.Container{container}, f.ExitedContainerList...)
 			continue
 		}
 		newList = append(newList, container)
 	}
-	f.ContainerList = newList
+	f.RunningContainerList = newList
 	container, ok := f.ContainerMap[id]
 	if !ok {
 		container = &docker.Container{
@@ -455,9 +456,9 @@ func (f *FakeDockerClient) RemoveImage(image string) error {
 }
 
 func (f *FakeDockerClient) updateContainerStatus(id, status string) {
-	for i := range f.ContainerList {
-		if f.ContainerList[i].ID == id {
-			f.ContainerList[i].Status = status
+	for i := range f.RunningContainerList {
+		if f.RunningContainerList[i].ID == id {
+			f.RunningContainerList[i].Status = status
 		}
 	}
 }

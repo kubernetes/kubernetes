@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-semver/semver"
+	dockertypes "github.com/docker/engine-api/types"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -695,7 +696,7 @@ func setEntrypointAndCommand(container *api.Container, opts *kubecontainer.RunCo
 
 // A helper function to get the KubeletContainerName and hash from a docker
 // container.
-func getDockerContainerNameInfo(c *docker.APIContainers) (*KubeletContainerName, uint64, error) {
+func getDockerContainerNameInfo(c *dockertypes.Container) (*KubeletContainerName, uint64, error) {
 	if len(c.Names) == 0 {
 		return nil, 0, fmt.Errorf("cannot parse empty docker container name: %#v", c.Names)
 	}
@@ -707,7 +708,7 @@ func getDockerContainerNameInfo(c *docker.APIContainers) (*KubeletContainerName,
 }
 
 // Get pod UID, name, and namespace by examining the container names.
-func getPodInfoFromContainer(c *docker.APIContainers) (types.UID, string, string, error) {
+func getPodInfoFromContainer(c *dockertypes.Container) (types.UID, string, string, error) {
 	dockerName, _, err := getDockerContainerNameInfo(c)
 	if err != nil {
 		return types.UID(""), "", "", err
@@ -779,8 +780,8 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	}
 
 	// Convert map to list.
-	for _, c := range pods {
-		result = append(result, c)
+	for _, p := range pods {
+		result = append(result, p)
 	}
 	return result, nil
 }
@@ -2150,7 +2151,7 @@ func (dm *DockerManager) GetPodStatus(uid types.UID, name, namespace string) (*k
 	// However, there may be some old containers without these labels, so at least now we can't do that.
 	// TODO(random-liu): Do only one list and pass in the list result in the future
 	// TODO(random-liu): Add filter when we are sure that all the containers have the labels
-	containers, err := dm.client.ListContainers(docker.ListContainersOptions{All: true})
+	containers, err := dm.client.ListContainers(dockertypes.ContainerListOptions{All: true})
 	if err != nil {
 		return podStatus, err
 	}

@@ -100,21 +100,14 @@ func convertEnv(src interface{}) (*docker.Env, error) {
 	return env, nil
 }
 
-func (k *kubeDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
-	containers, err := k.client.ContainerList(getDefaultContext(), dockertypes.ContainerListOptions{
-		Size:   options.Size,
-		All:    options.All,
-		Limit:  options.Limit,
-		Since:  options.Since,
-		Before: options.Before,
-		Filter: convertFilters(options.Filters),
-	})
+func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
+	containers, err := k.client.ContainerList(getDefaultContext(), options)
 	if err != nil {
 		return nil, err
 	}
-	apiContainers := []docker.APIContainers{}
-	if err := convertType(&containers, &apiContainers); err != nil {
-		return nil, err
+	apiContainers := []dockertypes.Container{}
+	for _, c := range containers {
+		apiContainers = append(apiContainers, dockertypes.Container(c))
 	}
 	return apiContainers, nil
 }
