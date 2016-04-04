@@ -40,11 +40,15 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Cluster{},
 		&ClusterList{},
+		&SubReplicaSet{},
+		&SubReplicaSetList{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 	)
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
 }
 
-func (obj *Cluster) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *ClusterList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *Cluster) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *ClusterList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
+func (obj *SubReplicaSet) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *SubReplicaSetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
