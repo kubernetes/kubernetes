@@ -19,6 +19,7 @@ package validation
 import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api/validation"
+	extensionsvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -52,5 +53,27 @@ func ValidateClusterUpdate(cluster, oldCluster *federation.Cluster) field.ErrorL
 
 func ValidateClusterStatusUpdate(cluster, oldCluster *federation.Cluster) field.ErrorList {
 	allErrs := validation.ValidateObjectMetaUpdate(&cluster.ObjectMeta, &oldCluster.ObjectMeta, field.NewPath("metadata"))
+	return allErrs
+}
+
+func ValidateSubReplicaSet(rs *federation.SubReplicaSet) field.ErrorList {
+	allErrs := validation.ValidateObjectMeta(&rs.ObjectMeta, true, extensionsvalidation.ValidateReplicaSetName, field.NewPath("metadata"))
+	allErrs = append(allErrs, extensionsvalidation.ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateSubReplicaSetUpdate(rs, oldRs *federation.SubReplicaSet) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, extensionsvalidation.ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateSubReplicaSetStatusUpdate(rs, oldRs *federation.SubReplicaSet) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validation.ValidateNonnegativeField(int64(rs.Status.Replicas), field.NewPath("status", "replicas"))...)
+	allErrs = append(allErrs, validation.ValidateNonnegativeField(int64(rs.Status.FullyLabeledReplicas), field.NewPath("status", "fullyLabeledReplicas"))...)
+	allErrs = append(allErrs, validation.ValidateNonnegativeField(int64(rs.Status.ObservedGeneration), field.NewPath("status", "observedGeneration"))...)
 	return allErrs
 }
