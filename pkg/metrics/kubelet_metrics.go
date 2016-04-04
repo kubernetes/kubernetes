@@ -59,6 +59,7 @@ var NecessaryKubeletMetrics = map[string][]string{
 	"container_network_transmit_packets_dropped_total":       {"id", "interface", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_network_transmit_packets_total":               {"id", "interface", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_scrape_error":                                 {},
+	"container_spec_cpu_period":                              {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_spec_cpu_shares":                              {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_spec_memory_limit_bytes":                      {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_spec_memory_swap_limit_bytes":                 {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
