@@ -83,7 +83,7 @@ func findPodContainer(dockerContainers []*dockertypes.Container, podFullName str
 
 func TestGetContainerID(t *testing.T) {
 	fakeDocker := NewFakeDockerClient()
-	fakeDocker.SetFakeRunningContainers([]*docker.Container{
+	fakeDocker.SetFakeRunningContainers([]*FakeContainer{
 		{
 			ID:   "foobar",
 			Name: "/k8s_foo_qux_ns_1234_42",

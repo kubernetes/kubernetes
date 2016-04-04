@@ -58,7 +58,7 @@ func (in instrumentedDockerInterface) ListContainers(options dockertypes.Contain
 	return out, err
 }
 
-func (in instrumentedDockerInterface) InspectContainer(id string) (*docker.Container, error) {
+func (in instrumentedDockerInterface) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
 	const operation = "inspect_container"
 	defer recordOperation(operation, time.Now())
 

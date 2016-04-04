@@ -145,14 +145,20 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			continue
 		} else if data.State.Running {
 			continue
-		} else if newestGCTime.Before(data.Created) {
+		}
+
+		created, err := parseDockerTimestamp(data.Created)
+		if err != nil {
+			glog.Errorf("Failed to parse Created timestamp %q for container %q", data.Created, container.ID)
+		}
+		if newestGCTime.Before(created) {
 			continue
 		}
 
 		containerInfo := containerGCInfo{
 			id:         container.ID,
 			name:       container.Names[0],
-			createTime: data.Created,
+			createTime: created,
 		}
 
 		containerName, _, err := ParseDockerName(container.Names[0])
