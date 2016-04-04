@@ -67,7 +67,7 @@ The status of the submit-queue is [online.](http://submit-queue.k8s.io/)
 A PR is considered "ready for merging" if it matches the following:
    * it has the `lgtm` label, and that `lgtm` is newer than the latest commit
    * it has passed the cla pre-submit and has the `cla:yes` label
-   * it has passed the travis and shippable pre-submit tests
+   * it has passed the travis pre-submit tests
    * one (or all) of
       * its author is in kubernetes/contrib/submit-queue/whitelist.txt
       * its author is in contributors.txt via the github API.
@@ -103,7 +103,7 @@ Currently this runs:
    * needs-rebase - Adds `needs-rebase` to PRs that aren't currently mergeable, and removes it from those that are.
    * size - Adds `size/xs` - `size/xxl` labels to PRs
    * ok-to-test - Adds the `ok-to-test` message to PRs that have an `lgtm` but the e2e-builder would otherwise not test due to whitelist
-   * ping-ci - Attempts to ping the ci systems (Travis/Shippable) if they are missing from a PR.
+   * ping-ci - Attempts to ping the ci systems (Travis) if they are missing from a PR.
    * lgtm-after-commit - Removes the `lgtm` label from PRs where there are commits that are newer than the `lgtm` label
 
 In the works:
@@ -130,7 +130,7 @@ PR builder to re-run the tests.  To do this, reply to the PR with a message that
 
 Right now you have to ask a contributor (this may be you!) to re-run the test with "@k8s-bot test this"
 
-### How can I kick Shippable to re-test on a failure?
+### How can I kick Travis to re-test on a failure?
 
 Right now the easiest way is to close and then immediately re-open the PR.
 
