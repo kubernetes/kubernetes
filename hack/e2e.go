@@ -60,16 +60,12 @@ func absOrDie(path string) string {
 	return out
 }
 
-type TestResult struct {
-	Pass int
-	Fail int
-}
-
-type ResultsByTest map[string]TestResult
-
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
+
+	setEnvIfUnset("KUBECTL", path.Join(*root, "/cluster/kubectl.sh")+kubectlArgs())
+	setEnvIfUnset("KUBE_CONFIG_FILE", "config-test.sh")
 
 	if *isup {
 		status := 1
@@ -83,16 +79,10 @@ func main() {
 	}
 
 	if *build {
-		// The build-release script needs stdin to ask the user whether
-		// it's OK to download the docker image.
-		cmd := exec.Command(path.Join(*root, "hack/e2e-internal/build-release.sh"))
-		cmd.Stdin = os.Stdin
-		if !finishRunning("build-release", cmd) {
+		if !finishRunning("build-release", utilCommand("test-build-release")) {
 			log.Fatal("Error building. Aborting.")
 		}
 	}
-
-	os.Setenv("KUBECTL", *root+`/cluster/kubectl.sh`+kubectlArgs())
 
 	if *pushup {
 		if IsUp() {
@@ -110,7 +100,7 @@ func main() {
 			log.Fatal("Error starting e2e cluster. Aborting.")
 		}
 	} else if *push {
-		if !finishRunning("push", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-push.sh"))) {
+		if !finishRunning("push", utilCommand("\"${KUBE_ROOT}/cluster/kube-push.sh\"")) {
 			log.Fatal("Error pushing e2e cluster. Aborting.")
 		}
 	}
@@ -119,7 +109,6 @@ func main() {
 	switch {
 	case *ctlCmd != "":
 		ctlArgs := strings.Fields(*ctlCmd)
-		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
 		success = finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(*root, "cluster/kubectl.sh"), ctlArgs...))
 	case *test:
 		success = Test()
@@ -135,7 +124,7 @@ func main() {
 }
 
 func TearDown() bool {
-	return finishRunning("teardown", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-down.sh")))
+	return finishRunning("teardown", utilCommand("test-teardown"))
 }
 
 // Up brings an e2e cluster up, recreating it if one is already running.
@@ -146,13 +135,13 @@ func Up() bool {
 			return false
 		}
 	}
-	return finishRunning("up", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-up.sh")))
+	return finishRunning("up", utilCommand("test-setup"))
 }
 
 // Ensure that the cluster is large engough to run the e2e tests.
 func ValidateClusterSize() {
 	// Check that there are at least minNodeCount nodes running
-	cmd := exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh"))
+	cmd := utilCommand("${KUBECTL} get nodes --no-headers | wc -l")
 	if *verbose {
 		cmd.Stderr = os.Stderr
 	}
@@ -173,7 +162,7 @@ func ValidateClusterSize() {
 
 // Is the e2e cluster up?
 func IsUp() bool {
-	return finishRunning("get status", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-status.sh")))
+	return finishRunning("get status", utilCommand("${KUBECTL} version"))
 }
 
 func Test() bool {
@@ -184,6 +173,22 @@ func Test() bool {
 	ValidateClusterSize()
 
 	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
+}
+
+// Sets environment variable env to value if it is unset.
+func setEnvIfUnset(env, value string) {
+	if oldVal := os.Getenv(env); oldVal == "" {
+		os.Setenv(env, value)
+	}
+}
+
+// Returns an exec.Cmd that sources cluster/kube-util.sh, runs prepare-e2e,
+// and then runs command.
+func utilCommand(command string) *exec.Cmd {
+	expandedCommand := os.ExpandEnv(command)
+	cmd := exec.Command("bash", "-s")
+	cmd.Stdin = strings.NewReader("source \"" + path.Join(*root, "cluster/kube-util.sh") + "\" && prepare-e2e && " + expandedCommand)
+	return cmd
 }
 
 func finishRunning(stepName string, cmd *exec.Cmd) bool {
