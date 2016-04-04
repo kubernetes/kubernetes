@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"runtime"
 
-	docker "github.com/fsouza/go-dockerclient"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -103,7 +101,6 @@ func main() {
 		containerManager := cm.NewStubContainerManager()
 
 		fakeDockerClient := dockertools.NewFakeDockerClient()
-		fakeDockerClient.VersionInfo = docker.Env{"Version=1.1.3", "ApiVersion=1.18"}
 		fakeDockerClient.EnableSleep = true
 
 		hollowKubelet := kubemark.NewHollowKubelet(
