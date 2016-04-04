@@ -33,6 +33,7 @@ python gen_html.py kubernetes-soak > static/tests-soak.html
 python gen_html.py kubernetes-e2e-gce > static/tests-e2e-gce.html
 python gen_html.py kubernetes-e2e-gke > static/tests-e2e-gke.html
 python gen_html.py kubernetes-upgrade > static/tests-upgrade.html
+python gen_html.py kubernetes-test-go > static/test-go.html
 
 # Fill in the last updated time into the template.
 cat index_template.html | sed -e "s/TIME/Last updated: ${datestr}/" > static/index.html
