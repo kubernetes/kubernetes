@@ -176,7 +176,7 @@ start_k8s(){
             ;;
         centos)
             DOCKER_CONF="/etc/sysconfig/docker"
-            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | tee -a ${DOCKER_CONF}
+            sed -i "/^OPTIONS=/ s|\( --mtu=.*\)\?'$| --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}'|" ${DOCKER_CONF}
             if ! command_exists ifconfig; then
                 yum -y -q install net-tools
             fi
