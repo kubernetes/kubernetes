@@ -161,8 +161,7 @@
 - project:
     name: kubernetes-e2e-gke-master
     trigger-job: 'kubernetes-build'
-    test-owner: 'GKE on-call'
-    emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
+    test-owner: 'Build Cop'
     provider-env: '{gke-provider-env}'
     suffix:
         - 'gke':
@@ -293,7 +292,7 @@
 - project:
     name: kubernetes-e2e-gke-1-2
     trigger-job: 'kubernetes-build-1.2'
-    test-owner: 'GKE on-call'
+    test-owner: 'Build Cop'
     provider-env: |
         {gke-provider-env}
         export JENKINS_PUBLISHED_VERSION="ci/latest-1.2"
@@ -409,11 +408,10 @@
 - project:
     name: kubernetes-e2e-gke-1.1
     trigger-job: 'kubernetes-build-1.1'
-    test-owner: 'GKE on-call'
+    test-owner: 'Build Cop'
     branch: 'release-1.1'
     runner: '{old-runner-1-1}'
     post-env: ''
-    emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
     suffix:
         - 'gke-1.1':
             timeout: 150
