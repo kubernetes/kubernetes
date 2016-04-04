@@ -416,6 +416,16 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				framework.Failf("Container port output missing expected value. Wanted:'%s', got: %s", nginxDefaultOutput, body)
 			}
 		})
+
+		It("should support env var overrides", func() {
+			By(fmt.Sprintf("setting KUBERNETES_NAMESPACE=%q", ns))
+			output := framework.NewKubectlCommand("get", "pod").
+				WithEnv(append(os.Environ(), fmt.Sprintf("KUBERNETES_NAMESPACE=%s", ns))).
+				ExecOrDie()
+			if !strings.Contains(output, simplePodName) {
+				framework.Failf("Failed finding the simple pod %q", simplePodName)
+			}
+		})
 	})
 
 	framework.KubeDescribe("Kubectl api-versions", func() {
