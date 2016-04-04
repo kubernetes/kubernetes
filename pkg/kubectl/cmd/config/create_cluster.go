@@ -82,7 +82,8 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess ConfigAccess) *cobra.Com
 	cmd.Flags().Var(&options.apiVersion, clientcmd.FlagAPIVersion, clientcmd.FlagAPIVersion+" for the cluster entry in kubeconfig")
 	f := cmd.Flags().VarPF(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, "", clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
 	f.NoOptDefVal = "true"
-	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "path to "+clientcmd.FlagCAFile+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "path to "+clientcmd.FlagCAFile+" file for the cluster entry in kubeconfig")
+	cmd.MarkFlagFilename(clientcmd.FlagCAFile)
 	f = cmd.Flags().VarPF(&options.embedCAData, clientcmd.FlagEmbedCerts, "", clientcmd.FlagEmbedCerts+" for the cluster entry in kubeconfig")
 	f.NoOptDefVal = "true"
 

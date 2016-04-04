@@ -29,6 +29,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilsets "k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -39,6 +40,12 @@ const DefaultPluginName = "kubernetes.io/no-op"
 // controller manager's --allocate-node-cidrs=true option
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE = "pod-cidr-change"
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
+
+// Plugin capabilities
+const (
+	// Indicates the plugin handles Kubernetes bandwidth shaping annotations internally
+	NET_PLUGIN_CAPABILITY_SHAPING int = 1
+)
 
 // Plugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
@@ -53,6 +60,9 @@ type NetworkPlugin interface {
 	// Name returns the plugin's name. This will be used when searching
 	// for a plugin by name, e.g.
 	Name() string
+
+	// Returns a set of NET_PLUGIN_CAPABILITY_*
+	Capabilities() utilsets.Int
 
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
@@ -94,7 +104,7 @@ type Host interface {
 func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
-		plug := &noopNetworkPlugin{}
+		plug := &NoopNetworkPlugin{}
 		if err := plug.Init(host); err != nil {
 			return nil, err
 		}
@@ -137,12 +147,12 @@ func UnescapePluginName(in string) string {
 	return strings.Replace(in, "~", "/", -1)
 }
 
-type noopNetworkPlugin struct {
+type NoopNetworkPlugin struct {
 }
 
 const sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
 
-func (plugin *noopNetworkPlugin) Init(host Host) error {
+func (plugin *NoopNetworkPlugin) Init(host Host) error {
 	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
 	// kubernetes versions to ensure the iptables-based kube proxy functions
 	// correctly.  Other plugins are responsible for setting this correctly
@@ -159,21 +169,25 @@ func (plugin *noopNetworkPlugin) Init(host Host) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) Event(name string, details map[string]interface{}) {
+func (plugin *NoopNetworkPlugin) Event(name string, details map[string]interface{}) {
 }
 
-func (plugin *noopNetworkPlugin) Name() string {
+func (plugin *NoopNetworkPlugin) Name() string {
 	return DefaultPluginName
 }
 
-func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.DockerID) error {
+func (plugin *NoopNetworkPlugin) Capabilities() utilsets.Int {
+	return utilsets.NewInt()
+}
+
+func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.DockerID) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.DockerID) error {
+func (plugin *NoopNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.DockerID) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubecontainer.DockerID) (*PodNetworkStatus, error) {
+func (plugin *NoopNetworkPlugin) Status(namespace string, name string, id kubecontainer.DockerID) (*PodNetworkStatus, error) {
 	return nil, nil
 }

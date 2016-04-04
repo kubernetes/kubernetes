@@ -77,8 +77,8 @@ func (c *cloudContext) service(name string, fill func(*http.Client) interface{})
 // Google Cloud client's user-agent to the original
 // request's user-agent header.
 type Transport struct {
-	// Base represents the actual http.RoundTripper
-	// the requests will be delegated to.
+	// Base is the actual http.RoundTripper
+	// requests will use. It must not be nil.
 	Base http.RoundTripper
 }
 
@@ -90,7 +90,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if ua == "" {
 		ua = userAgent
 	} else {
-		ua = fmt.Sprintf("%s;%s", ua, userAgent)
+		ua = fmt.Sprintf("%s %s", ua, userAgent)
 	}
 	req.Header.Set("User-Agent", ua)
 	return t.Base.RoundTrip(req)

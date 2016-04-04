@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/pkg/jsonmessage"
+	dockerapi "github.com/docker/engine-api/client"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -32,8 +33,8 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
@@ -107,7 +108,7 @@ type dockerPuller struct {
 
 type throttledDockerPuller struct {
 	puller  dockerPuller
-	limiter util.RateLimiter
+	limiter flowcontrol.RateLimiter
 }
 
 // newDockerPuller creates a new instance of the default implementation of DockerPuller.
@@ -122,7 +123,7 @@ func newDockerPuller(client DockerInterface, qps float32, burst int) DockerPulle
 	}
 	return &throttledDockerPuller{
 		puller:  dp,
-		limiter: util.NewTokenBucketRateLimiter(qps, burst),
+		limiter: flowcontrol.NewTokenBucketRateLimiter(qps, burst),
 	}
 }
 
@@ -276,16 +277,19 @@ func LogSymlink(containerLogsDir, podFullName, containerName, dockerId string) s
 	return path.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s.%s", podFullName, containerName, dockerId, LogSuffix))
 }
 
-// Get a *docker.Client, either using the endpoint passed in, or using
+// Get a *dockerapi.Client, either using the endpoint passed in, or using
 // DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_CERT path per their spec
-func getDockerClient(dockerEndpoint string) (*docker.Client, error) {
+func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	if len(dockerEndpoint) > 0 {
 		glog.Infof("Connecting to docker on %s", dockerEndpoint)
-		return docker.NewClient(dockerEndpoint)
+		return dockerapi.NewClient(dockerEndpoint, "", nil, nil)
 	}
-	return docker.NewClientFromEnv()
+	return dockerapi.NewEnvClient()
 }
 
+// ConnectToDockerOrDie creates docker client connecting to docker daemon.
+// If the endpoint passed in is "fake://", a fake docker client
+// will be returned. The program exits if error occurs.
 func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 	if dockerEndpoint == "fake://" {
 		return &FakeDockerClient{
@@ -296,7 +300,7 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 	if err != nil {
 		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}
-	return client
+	return newKubeDockerClient(client)
 }
 
 // milliCPUToQuota converts milliCPU to CFS quota and period values

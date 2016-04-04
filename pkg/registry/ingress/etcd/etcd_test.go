@@ -32,7 +32,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
-	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	restOptions := generic.RESTOptions{Storage: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
 	ingressStorage, statusStorage := NewREST(restOptions)
 	return ingressStorage, statusStorage, server
 }
@@ -153,12 +153,6 @@ func TestUpdate(t *testing.T) {
 		// invalid updateFunc: ObjeceMeta is not to be tampered with.
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.Ingress)
-			object.UID = "newUID"
-			return object
-		},
-
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Ingress)
 			object.Name = ""
 			return object
 		},
@@ -167,15 +161,6 @@ func TestUpdate(t *testing.T) {
 			object := obj.(*extensions.Ingress)
 			object.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
 				"foo.bar.com": {"/invalid[": "svc"}})
-			return object
-		},
-
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Ingress)
-			object.Spec.TLS = append(object.Spec.TLS, extensions.IngressTLS{
-				Hosts:      []string{"foo.bar.com"},
-				SecretName: "",
-			})
 			return object
 		},
 	)

@@ -103,7 +103,7 @@ type ContainerAttacher interface {
 // CommandRunner encapsulates the command runner interfaces for testability.
 type ContainerCommandRunner interface {
 	// TODO(vmarmol): Merge RunInContainer and ExecInContainer.
-	// Runs the command in the container of the specified pod using nsinit.
+	// Runs the command in the container of the specified pod.
 	RunInContainer(containerID ContainerID, cmd []string) ([]byte, error)
 	// Runs the command in the container of the specified pod using nsenter.
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
@@ -367,8 +367,8 @@ type RunContainerOptions struct {
 
 // VolumeInfo contains information about the volume.
 type VolumeInfo struct {
-	// Builder is the volume's builder
-	Builder volume.Builder
+	// Mounter is the volume's mounter
+	Mounter volume.Mounter
 	// SELinuxLabeled indicates whether this volume has had the
 	// pod's SELinux label applied to it or not
 	SELinuxLabeled bool

@@ -380,7 +380,7 @@ const (
 	// PersistentVolumeReclaimDelete means the volume will be deleted from Kubernetes on release from its claim.
 	// The volume plugin must support Deletion.
 	PersistentVolumeReclaimDelete PersistentVolumeReclaimPolicy = "Delete"
-	// PersistentVolumeReclaimRetain means the volume will left in its current phase (Released) for manual reclamation by the administrator.
+	// PersistentVolumeReclaimRetain means the volume will be left in its current phase (Released) for manual reclamation by the administrator.
 	// The default policy is Retain.
 	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
 )
@@ -1419,7 +1419,7 @@ type NodeAffinity struct {
 // (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
 type PreferredSchedulingTerm struct {
 	// Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
-	Weight int `json:"weight"`
+	Weight int32 `json:"weight"`
 	// A node selector term, associated with the corresponding weight.
 	Preference NodeSelectorTerm `json:"preference"`
 }
@@ -1816,6 +1816,7 @@ type ServiceSpec struct {
 	// API for compatibility until at least 8/20/2016.  It will be removed from
 	// any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
 	// set, deprecatedPublicIPs is used.
+	// +genconversion=false
 	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
 
 	// Supports "ClientIP" and "None". Used to maintain session affinity.
@@ -2292,6 +2293,12 @@ type Binding struct {
 	Target ObjectReference `json:"target"`
 }
 
+// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+type Preconditions struct {
+	// Specifies the target UID.
+	UID *types.UID `json:"uid,omitempty"`
+}
+
 // DeleteOptions may be provided when deleting an API object
 type DeleteOptions struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -2300,7 +2307,11 @@ type DeleteOptions struct {
 	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
 	// specified type will be used.
 	// Defaults to a per object value if not specified. zero means delete immediately.
-	GracePeriodSeconds *int64 `json:"gracePeriodSeconds"`
+	GracePeriodSeconds *int64 `json:"gracePeriodSeconds,omitempty"`
+
+	// Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
+	// returned.
+	Preconditions *Preconditions `json:"preconditions,omitempty"`
 }
 
 // ExportOptions is the query options to the standard REST get call.

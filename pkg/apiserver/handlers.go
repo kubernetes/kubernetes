@@ -398,17 +398,12 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 	attribs.Path = requestInfo.Path
 	attribs.Verb = requestInfo.Verb
 
-	// If the request was for a resource in an API group, include that info
 	attribs.APIGroup = requestInfo.APIGroup
-
-	// If a path follows the conventions of the REST object store, then
-	// we can extract the resource.  Otherwise, not.
+	attribs.APIVersion = requestInfo.APIVersion
 	attribs.Resource = requestInfo.Resource
-
-	// If the request specifies a namespace, then the namespace is filled in.
-	// Assumes there is no empty string namespace.  Unspecified results
-	// in empty (does not understand defaulting rules.)
+	attribs.Subresource = requestInfo.Subresource
 	attribs.Namespace = requestInfo.Namespace
+	attribs.Name = requestInfo.Name
 
 	return &attribs
 }

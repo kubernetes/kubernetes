@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -65,19 +65,8 @@ type HorizontalController struct {
 var downscaleForbiddenWindow = 5 * time.Minute
 var upscaleForbiddenWindow = 3 * time.Minute
 
-func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, scaleNamespacer unversionedextensions.ScalesGetter, hpaNamespacer unversionedextensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient, resyncPeriod time.Duration) *HorizontalController {
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{evtNamespacer.Events("")})
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
-
-	controller := &HorizontalController{
-		metricsClient:   metricsClient,
-		eventRecorder:   recorder,
-		scaleNamespacer: scaleNamespacer,
-		hpaNamespacer:   hpaNamespacer,
-	}
-
-	controller.store, controller.controller = framework.NewInformer(
+func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, *framework.Controller) {
+	return framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return controller.hpaNamespacer.HorizontalPodAutoscalers(api.NamespaceAll).List(options)
@@ -111,6 +100,22 @@ func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, scaleNa
 			// We are not interested in deletions.
 		},
 	)
+}
+
+func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, scaleNamespacer unversionedextensions.ScalesGetter, hpaNamespacer unversionedextensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient, resyncPeriod time.Duration) *HorizontalController {
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{evtNamespacer.Events("")})
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
+
+	controller := &HorizontalController{
+		metricsClient:   metricsClient,
+		eventRecorder:   recorder,
+		scaleNamespacer: scaleNamespacer,
+		hpaNamespacer:   hpaNamespacer,
+	}
+	store, frameworkController := newInformer(controller, resyncPeriod)
+	controller.store = store
+	controller.controller = frameworkController
 
 	return controller
 }

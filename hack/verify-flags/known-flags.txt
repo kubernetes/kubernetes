@@ -162,6 +162,7 @@ ignore-daemonsets
 ignore-not-found
 image-gc-high-threshold
 image-gc-low-threshold
+include-extended-apis
 input-dirs
 insecure-bind-address
 insecure-port
@@ -284,6 +285,7 @@ oidc-issuer-url
 oidc-username-claim
 only-idl
 oom-score-adj
+os-distro
 out-version
 outofdisk-transition-frequency
 output-base
@@ -338,6 +340,7 @@ resource-container
 resource-quota-sync-period
 resource-version
 retry_time
+rkt-api-endpoint
 rkt-path
 rkt-stage1-image
 root-ca-file

@@ -89,7 +89,10 @@ func TestHTTPProbeChecker(t *testing.T) {
 			handleReq(FailureCode, "fail body"),
 			nil,
 			probe.Failure,
-			[]string{fmt.Sprintf("HTTP probe failed with statuscode: %d", FailureCode)},
+			[]string{
+				fmt.Sprintf("HTTP probe failed with statuscode: %d", FailureCode),
+				fmt.Sprintf("malformed HTTP status code \"%d\"", FailureCode),
+			},
 		},
 		{
 			func(w http.ResponseWriter, r *http.Request) {

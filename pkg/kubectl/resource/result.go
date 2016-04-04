@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -241,6 +242,11 @@ func AsVersionedObjects(infos []*Info, version string, encoder runtime.Encoder) 
 		}
 
 		// TODO: use info.VersionedObject as the value?
+		switch obj := info.Object.(type) {
+		case *extensions.ThirdPartyResourceData:
+			objects = append(objects, &runtime.Unknown{Raw: obj.Data})
+			continue
+		}
 
 		// objects that are not part of api.Scheme must be converted to JSON
 		// TODO: convert to map[string]interface{}, attach to runtime.Unknown?

@@ -943,7 +943,7 @@ func TestDeletionTimestamp(t *testing.T) {
 		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
 	}
 	pod := newPodList(nil, 1, api.PodPending, controllerSpec, "pod").Items[0]
-	pod.DeletionTimestamp = &unversioned.Time{time.Now()}
+	pod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
 	manager.expectations.ExpectDeletions(rcKey, []string{controller.PodKey(&pod)})
 
 	// A pod added with a deletion timestamp should decrement deletions, not creations.
@@ -987,7 +987,7 @@ func TestDeletionTimestamp(t *testing.T) {
 		},
 	}
 	manager.expectations.ExpectDeletions(rcKey, []string{controller.PodKey(secondPod)})
-	oldPod.DeletionTimestamp = &unversioned.Time{time.Now()}
+	oldPod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
 	manager.updatePod(&oldPod, &pod)
 
 	podExp, exists, err = manager.expectations.GetExpectations(rcKey)

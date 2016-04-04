@@ -22,9 +22,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	"k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -51,7 +51,7 @@ func calledOnce(h bool, ret runtime.Object, err error) (<-chan struct{}, func(co
 
 func TestRegister_withUnknownNode(t *testing.T) {
 	fc := &core.Fake{}
-	nodes := &fakeNodes{&fake.FakeNodes{&fake.FakeCore{fc}}}
+	nodes := &fakeNodes{&fake.FakeNodes{&fake.FakeCore{Fake: fc}}}
 	createCalled, createOnce := calledOnce(true, nil, nil)
 	fc.AddReactor("create", "nodes", createOnce)
 
@@ -84,7 +84,7 @@ func TestRegister_withUnknownNode(t *testing.T) {
 
 func TestRegister_withKnownNode(t *testing.T) {
 	fc := &core.Fake{}
-	nodes := &fakeNodes{&fake.FakeNodes{&fake.FakeCore{fc}}}
+	nodes := &fakeNodes{&fake.FakeNodes{&fake.FakeCore{Fake: fc}}}
 	updateCalled, updateOnce := calledOnce(true, nil, nil)
 	fc.AddReactor("update", "nodes", updateOnce)
 
@@ -122,9 +122,9 @@ func TestRegister_withSemiKnownNode(t *testing.T) {
 	// CreateOrUpdate should proceed to attempt an update.
 
 	fc := &core.Fake{}
-	nodes := &fakeNodes{&fake.FakeNodes{&fake.FakeCore{fc}}}
+	nodes := &fakeNodes{&fake.FakeNodes{&fake.FakeCore{Fake: fc}}}
 
-	createCalled, createOnce := calledOnce(true, nil, errors.NewAlreadyExists(unversioned.GroupResource{"", ""}, "nodes"))
+	createCalled, createOnce := calledOnce(true, nil, errors.NewAlreadyExists(unversioned.GroupResource{Group: "", Resource: ""}, "nodes"))
 	fc.AddReactor("create", "nodes", createOnce)
 
 	updateCalled, updateOnce := calledOnce(true, nil, nil)

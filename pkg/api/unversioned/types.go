@@ -174,10 +174,10 @@ const (
 	// Status code 409
 	StatusReasonAlreadyExists StatusReason = "AlreadyExists"
 
-	// StatusReasonConflict means the requested update operation cannot be completed
-	// due to a conflict in the operation. The client may need to alter the request.
-	// Each resource may define custom details that indicate the nature of the
-	// conflict.
+	// StatusReasonConflict means the requested operation cannot be completed
+	// due to a conflict in the operation. The client may need to alter the
+	// request. Each resource may define custom details that indicate the
+	// nature of the conflict.
 	// Status code 409
 	StatusReasonConflict StatusReason = "Conflict"
 

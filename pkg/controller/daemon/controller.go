@@ -30,9 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -103,7 +103,7 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 
 	dsc := &DaemonSetsController{
 		kubeClient:    kubeClient,
@@ -627,7 +627,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 	everything := unversioned.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {
-		dsc.eventRecorder.Eventf(ds, api.EventTypeWarning, "SelectingAll", "This controller is selecting all pods. Skipping sync.")
+		dsc.eventRecorder.Eventf(ds, api.EventTypeWarning, "SelectingAll", "This daemon set is selecting all pods. A non-empty selector is required.")
 		return nil
 	}
 
@@ -683,11 +683,13 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 	}
 	_, notFittingCPU, notFittingMemory := predicates.CheckPodsExceedingFreeResources(pods, node.Status.Allocatable)
 	if len(notFittingCPU)+len(notFittingMemory) != 0 {
+		dsc.eventRecorder.Eventf(ds, api.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: insufficent free resources", node.ObjectMeta.Name)
 		return false
 	}
 	ports := sets.String{}
 	for _, pod := range pods {
 		if errs := validation.AccumulateUniqueHostPorts(pod.Spec.Containers, &ports, field.NewPath("spec", "containers")); len(errs) > 0 {
+			dsc.eventRecorder.Eventf(ds, api.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: host port conflict", node.ObjectMeta.Name)
 			return false
 		}
 	}

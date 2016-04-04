@@ -207,8 +207,9 @@ fi
 cd kubernetes
 
 # Upload build start time and k8s version to GCS, but not on PR Jenkins.
+# On PR Jenkins this is done before the build.
 if [[ ! "${JOB_NAME}" =~ -pull- ]]; then
-    bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-started.sh")
+    JENKINS_BUILD_STARTED=true bash <(curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh")
 fi
 
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
@@ -328,7 +329,9 @@ fi
 # * started and destroyed (normal e2e)
 # * neither started nor destroyed (soak test)
 if [[ "${E2E_UP:-}" == "${E2E_DOWN:-}" && -f "${gcp_resources_before}" && -f "${gcp_resources_after}" ]]; then
-  if ! diff -sw -U0 -F'^\[.*\]$' "${gcp_resources_before}" "${gcp_resources_after}" && [[ "${FAIL_ON_GCP_RESOURCE_LEAK:-}" == "true" ]]; then
+  difference=$(diff -sw -U0 -F'^\[.*\]$' "${gcp_resources_before}" "${gcp_resources_after}") || true
+  if [[ -n $(echo "${difference}" | tail -n +3 | grep -E "^\+") ]] && [[ "${FAIL_ON_GCP_RESOURCE_LEAK:-}" == "true" ]]; then
+    echo "${difference}"
     echo "!!! FAIL: Google Cloud Platform resources leaked while running tests!"
     exit 1
   fi

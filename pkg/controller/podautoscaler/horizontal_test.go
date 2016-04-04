@@ -29,6 +29,8 @@ import (
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
@@ -329,13 +331,29 @@ func (tc *testCase) verifyResults(t *testing.T) {
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
-	hpaController := NewHorizontalController(testClient.Core(), testClient.Extensions(), testClient.Extensions(), metricsClient, 0)
+
+	broadcaster := record.NewBroadcasterForTests(0)
+	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{testClient.Core().Events("")})
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
+
+	hpaController := &HorizontalController{
+		metricsClient:   metricsClient,
+		eventRecorder:   recorder,
+		scaleNamespacer: testClient.Extensions(),
+		hpaNamespacer:   testClient.Extensions(),
+	}
+
+	store, frameworkController := newInformer(hpaController, time.Minute)
+	hpaController.store = store
+	hpaController.controller = frameworkController
+
 	stop := make(chan struct{})
 	defer close(stop)
 	go hpaController.Run(stop)
+
 	if tc.verifyEvents {
 		// We need to wait for events to be broadcasted (sleep for longer than record.sleepDuration).
-		time.Sleep(12 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 	// Wait for HPA to be processed.
 	<-tc.processed

@@ -32,6 +32,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -84,6 +84,11 @@ func (f *fakeRuntimeHelper) GetClusterDNS(pod *api.Pod) ([]string, []string, err
 	return nil, nil, fmt.Errorf("not implemented")
 }
 
+// This is not used by docker runtime.
+func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
+	return "", ""
+}
+
 func newTestDockerManagerWithHTTPClientWithVersion(fakeHTTPClient *fakeHTTP, version, apiVersion string) (*DockerManager, *FakeDockerClient) {
 	fakeDocker := NewFakeDockerClientWithVersion(version, apiVersion)
 	fakeRecorder := &record.FakeRecorder{}
@@ -95,7 +100,7 @@ func newTestDockerManagerWithHTTPClientWithVersion(fakeHTTPClient *fakeHTTP, ver
 		proberesults.NewManager(),
 		containerRefManager,
 		&cadvisorapi.MachineInfo{},
-		kubetypes.PodInfraContainerImage,
+		options.GetDefaultPodInfraContainerImage(),
 		0, 0, "",
 		containertest.FakeOS{},
 		networkPlugin,
@@ -394,7 +399,7 @@ func apiContainerToContainer(c docker.APIContainers) kubecontainer.Container {
 		return kubecontainer.Container{}
 	}
 	return kubecontainer.Container{
-		ID:   kubecontainer.ContainerID{"docker", c.ID},
+		ID:   kubecontainer.ContainerID{Type: "docker", ID: c.ID},
 		Name: dockerName.ContainerName,
 		Hash: hash,
 	}
@@ -408,7 +413,7 @@ func dockerContainersToPod(containers []*docker.APIContainers) kubecontainer.Pod
 			continue
 		}
 		pod.Containers = append(pod.Containers, &kubecontainer.Container{
-			ID:    kubecontainer.ContainerID{"docker", c.ID},
+			ID:    kubecontainer.ContainerID{Type: "docker", ID: c.ID},
 			Name:  dockerName.ContainerName,
 			Hash:  hash,
 			Image: c.Image,
@@ -572,7 +577,7 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 
 	container := &api.Container{
 		Name:            PodInfraContainerName,
-		Image:           kubetypes.PodInfraContainerImage,
+		Image:           options.GetDefaultPodInfraContainerImage(),
 		Ports:           ports,
 		ImagePullPolicy: podInfraContainerImagePullPolicy,
 	}
@@ -1064,8 +1069,8 @@ func TestSyncPodBackoff(t *testing.T) {
 
 	startCalls := []string{"create", "start", "inspect_container"}
 	backOffCalls := []string{}
-	startResult := &kubecontainer.SyncResult{kubecontainer.StartContainer, "bad", nil, ""}
-	backoffResult := &kubecontainer.SyncResult{kubecontainer.StartContainer, "bad", kubecontainer.ErrCrashLoopBackOff, ""}
+	startResult := &kubecontainer.SyncResult{Action: kubecontainer.StartContainer, Target: "bad", Error: nil, Message: ""}
+	backoffResult := &kubecontainer.SyncResult{Action: kubecontainer.StartContainer, Target: "bad", Error: kubecontainer.ErrCrashLoopBackOff, Message: ""}
 	tests := []struct {
 		tick      int
 		backoff   int

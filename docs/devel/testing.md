@@ -32,11 +32,11 @@ Documentation for other releases can be found at
 This assumes you already read the [development guide](development.md) to
 install go, godeps, and configure your git client.
 
-In order to send pull requests you need to make sure you changes pass
-unit and integration tests.
+Before sending pull requests you should at least make sure your changes have
+passed both unit and integration tests.
 
-Kubernetes only merges pull requests when e2e tests are passing, so it is often
-a good idea to make sure these work as well.
+Kubernetes only merges pull requests when unit, integration, and e2e tests are
+passing, so it is often a good idea to make sure the e2e tests work as well.
 
 ## Unit tests
 
@@ -155,13 +155,13 @@ Kubernetes includes a script to help install etcd on your machine.
 # Option a) install inside kubernetes root
 cd kubernetes
 hack/install-etcd.sh  # Installs in ./third_party/etcd
-echo export PATH="$PATH:$(pwd)/third_party/etcd" >> .profile  # Add to PATH
+echo export PATH="$PATH:$(pwd)/third_party/etcd" >> ~/.profile  # Add to PATH
 
 # Option b) install manually
 cd kubernetes
 grep -E "image.*etcd" cluster/saltbase/etcd/etcd.manifest  # Find version
 # Install that version using yum/apt-get/etc
-echo export PATH="$PATH:<LOCATION>" >> .profile  # Add to PATH
+echo export PATH="$PATH:<LOCATION>" >> ~/.profile  # Add to PATH
 ```
 
 ### Run integration tests
@@ -174,55 +174,7 @@ hack/test-integration.sh  # Run all integration tests.
 
 ## End-to-End tests
 
-* e2e tests build kubernetes and deploy a cluster of nodes.
-  - Generally on a specific cloud provider.
-* Access gcr.io images
-* Access a specific, non-latest image tag (unless testing pulling).
-* Tests may not flake due to intermittent issues.
-* Use ginko to desribe steps.
-  - See [should run a job to completion when tasks succeed](../../test/e2e/job.go)
-* Use [NewDefaultFramework](../../test/e2e/framework.go)
-  - Contains clients, namespace and auto resource cleanup
-* See [coding conventions](coding-conventions.md).
-
-### e2e test philosophy
-
-In general passing unit and integration tests should provide sufficient
-confidence to allow code to merge.  If that is not the case,
-please *invest more time adding unit and integration test coverage*.
-These tests run faster and have a smaller failure domain.
-
-However, end-to-end (e2e) tests provide maximum confidence that
-the system is working in exchange for reduced performance and a
-higher debugging cost.
-
-e2e tests deploy a real kubernetes cluster of real nodes on a concrete provider
-such as GCE. The tests then manipulate the cluster in certain ways and
-assert the expected results.
-
-For a more in depth discussion please read [End-to-End Testing in Kubernetes](e2e-tests.md).
-
-### Running e2e tests
-
-```sh
-cd kubernetes
-go run hack/e2e.go -v --build --up --test --down
-
-# Change code, run unit and integration tests
-# Push to an existing cluster, or bring up a cluster if it's down.
-go run hack/e2e.go -v --pushup
-
-# Run all tests on an already up cluster
-go run hack/e2e.go -v --test
-
-# Run only conformance tests
-go run hack/e2e.go -v -test --test_args="--ginkgo.focus=\[Conformance\]"
-
-# Run tests on a specific provider
-KUBERNETES_PROVIDER=aws go run hack/e2e.go --build --pushup --test --down
-```
-
-For a more in depth discussion please read [End-to-End Testing in Kubernetes](e2e-tests.md).
+Please refer to [End-to-End Testing in Kubernetes](e2e-tests.md).
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/testing.md?pixel)]()

@@ -35,6 +35,7 @@ import (
 // referencing the cmd.Flags()
 type ReplaceOptions struct {
 	Filenames []string
+	Recursive bool
 }
 
 const (
@@ -82,9 +83,12 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("grace-period", -1, "Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object")
 	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
+
 	return cmd
 }
 
@@ -112,12 +116,12 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		return forceReplace(f, out, cmd, args, shortOutput, options)
 	}
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Filenames...).
+		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -180,11 +184,11 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		}
 	}
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Filenames...).
+		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
 		Do()
@@ -209,7 +213,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Filenames...).
+		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		Flatten().
 		Do()
 	err = r.Err()

@@ -42,8 +42,16 @@ If the resource is scalable it will be scaled to 0 before deletion.
     Treat "resource not found" as a successful stop.
 
 .PP
+\fB\-\-include\-extended\-apis\fP=true
+    If true, include definitions of new APIs via calls to the API server. [default true]
+
+.PP
 \fB\-o\fP, \fB\-\-output\fP=""
     Output mode. Use "\-o name" for shorter output (resource/name).
+
+.PP
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    If true, process directory recursively.
 
 .PP
 \fB\-l\fP, \fB\-\-selector\fP=""

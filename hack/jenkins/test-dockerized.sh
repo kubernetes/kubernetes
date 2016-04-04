@@ -19,6 +19,13 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+retry() {
+  for i in {1..5}; do
+    "$@" && return 0 || sleep $i
+  done
+  "$@"
+}
+
 # Runs the unit and integration tests, producing JUnit-style XML test
 # reports in ${WORKSPACE}/artifacts. This script is intended to be run from
 # kubekins-test container with a kubernetes repo mapped in. See
@@ -26,8 +33,8 @@ set -o xtrace
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-go get github.com/tools/godep && godep version
-go get github.com/jstemmer/go-junit-report
+retry go get github.com/tools/godep && godep version
+retry go get github.com/jstemmer/go-junit-report
 
 # Enable the Go race detector.
 export KUBE_RACE=-race
@@ -53,5 +60,3 @@ godep go install ./...
 ./hack/test-cmd.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
-
-

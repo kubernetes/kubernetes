@@ -28,10 +28,11 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -329,6 +330,11 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
 	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
+	cmd.MarkFlagFilename("schema-cache-dir")
+}
+
+func AddRecursiveFlag(cmd *cobra.Command, value *bool) {
+	cmd.Flags().BoolVarP(value, "recursive", "R", *value, "If true, process directory recursively.")
 }
 
 func AddApplyAnnotationFlags(cmd *cobra.Command) {
@@ -469,14 +475,16 @@ func GetRecordFlag(cmd *cobra.Command) bool {
 
 // RecordChangeCause annotate change-cause to input runtime object.
 func RecordChangeCause(obj runtime.Object, changeCause string) error {
-	meta, err := api.ObjectMetaFor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
-	if meta.Annotations == nil {
-		meta.Annotations = make(map[string]string)
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
 	}
-	meta.Annotations[kubectl.ChangeCauseAnnotation] = changeCause
+	annotations[kubectl.ChangeCauseAnnotation] = changeCause
+	accessor.SetAnnotations(annotations)
 	return nil
 }
 
@@ -509,4 +517,54 @@ func ContainsChangeCause(info *resource.Info) bool {
 // ShouldRecord checks if we should record current change cause
 func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
 	return GetRecordFlag(cmd) || ContainsChangeCause(info)
+}
+
+func GetThirdPartyGroupVersions(discovery discovery.DiscoveryInterface) ([]unversioned.GroupVersion, []unversioned.GroupVersionKind, error) {
+	result := []unversioned.GroupVersion{}
+	gvks := []unversioned.GroupVersionKind{}
+
+	groupList, err := discovery.ServerGroups()
+	if err != nil {
+		// On forbidden or not found, just return empty lists.
+		if errors.IsForbidden(err) || errors.IsNotFound(err) {
+			return result, gvks, nil
+		}
+
+		return nil, nil, err
+	}
+
+	for ix := range groupList.Groups {
+		group := &groupList.Groups[ix]
+		for jx := range group.Versions {
+			gv, err2 := unversioned.ParseGroupVersion(group.Versions[jx].GroupVersion)
+			if err2 != nil {
+				return nil, nil, err
+			}
+			// Skip GroupVersionKinds that have been statically registered.
+			if registered.IsRegisteredVersion(gv) {
+				continue
+			}
+			result = append(result, gv)
+
+			resourceList, err := discovery.ServerResourcesForGroupVersion(group.Versions[jx].GroupVersion)
+			if err != nil {
+				return nil, nil, err
+			}
+			for kx := range resourceList.APIResources {
+				gvks = append(gvks, gv.WithKind(resourceList.APIResources[kx].Kind))
+			}
+		}
+	}
+	return result, gvks, nil
+}
+
+func GetIncludeThirdPartyAPIs(cmd *cobra.Command) bool {
+	if cmd.Flags().Lookup("include-extended-apis") == nil {
+		return false
+	}
+	return GetFlagBool(cmd, "include-extended-apis")
+}
+
+func AddInclude3rdPartyFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
 }

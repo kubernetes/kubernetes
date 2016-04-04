@@ -32,6 +32,10 @@ to change to output destination.
     Filename, directory, or URL to file to need to get converted.
 
 .PP
+\fB\-\-include\-extended\-apis\fP=true
+    If true, include definitions of new APIs via calls to the API server. [default true]
+
+.PP
 \fB\-\-local\fP=true
     If true, convert will NOT try to contact api\-server but run locally.
 
@@ -48,6 +52,10 @@ to change to output destination.
 .PP
 \fB\-\-output\-version\fP=""
     Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
+
+.PP
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    If true, process directory recursively.
 
 .PP
 \fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"

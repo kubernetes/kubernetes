@@ -23,28 +23,52 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+create_token() {
+  echo $(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
+}
+
 # Additional address of the API server to be added to the
 # list of Subject Alternative Names of the server TLS certificate
 # Should contain internal IP, i.e. IP:10.0.0.1 for 10.0.0.0/24 cluster IP range
 EXTRA_SANS=$1
 
-create_token() {
-  echo $(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
-}
+# Files in /data are persistent across reboots, so we don't want to re-create the files if they already
+# exist, because the state is persistent in etcd too, and we don't want a conflict between "old" data in
+# etcd and "new" data that this script would create for apiserver. Therefore, if the file exist, skip it.
+if [[ ! -f /data/ca.crt ]]; then
 
-# Create basic token authorization
-echo "admin,admin,admin" > /data/basic_auth.csv
+	# Create HTTPS certificates
+	groupadd -f -r kube-cert-test
 
-# Create HTTPS certificates
-groupadd -f -r kube-cert-test
+	# hostname -I gets the ip of the node
+	CERT_DIR=/data CERT_GROUP=kube-cert-test /make-ca-cert.sh $(hostname -I | awk '{print $1}') ${EXTRA_SANS}
 
-# hostname -I gets the ip of the node
-CERT_DIR=/data CERT_GROUP=kube-cert-test /make-ca-cert.sh $(hostname -I | awk '{print $1}') ${EXTRA_SANS}
+	echo "Certificates created $(date)"
+else
+	echo "Certificates already found, not recreating."
+fi
 
-# Create known tokens for service accounts
-echo "$(create_token),admin,admin" >> /data/known_tokens.csv
-echo "$(create_token),kubelet,kubelet" >> /data/known_tokens.csv
-echo "$(create_token),kube_proxy,kube_proxy" >> /data/known_tokens.csv
+if [[ ! -f /data/basic_auth.csv ]]; then
+
+	# Create basic token authorization
+	echo "admin,admin,admin" > /data/basic_auth.csv
+
+	echo "basic_auth.csv created $(date)"
+else
+	echo "basic_auth.csv already found, not recreating."
+fi
+
+if [[ ! -f /data/known_tokens.csv ]]; then
+
+	# Create known tokens for service accounts
+	echo "$(create_token),admin,admin" >> /data/known_tokens.csv
+	echo "$(create_token),kubelet,kubelet" >> /data/known_tokens.csv
+	echo "$(create_token),kube_proxy,kube_proxy" >> /data/known_tokens.csv
+
+	echo "known_tokens.csv created $(date)"
+else
+	echo "known_tokens.csv already found, not recreating."
+fi
 
 while true; do
   sleep 3600

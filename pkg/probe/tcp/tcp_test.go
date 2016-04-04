@@ -66,7 +66,12 @@ func TestTcpHealthChecker(t *testing.T) {
 		// A connection is made and probing would succeed
 		{tHost, tPort, probe.Success, nil, []string{""}},
 		// No connection can be made and probing would fail
-		{tHost, -1, probe.Failure, nil, []string{"unknown port", "Servname not supported for ai_socktype", "nodename nor servname provided, or not known"}},
+		{tHost, -1, probe.Failure, nil, []string{
+			"unknown port",
+			"Servname not supported for ai_socktype",
+			"nodename nor servname provided, or not known",
+			"dial tcp: invalid port",
+		}},
 	}
 
 	prober := New()

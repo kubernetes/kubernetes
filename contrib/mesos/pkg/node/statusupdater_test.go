@@ -39,8 +39,8 @@ func Test_nodeWithUpdatedStatus(t *testing.T) {
 					Status:             s,
 					Reason:             r,
 					Message:            "some message we don't care about here",
-					LastTransitionTime: unversioned.Time{now.Add(-time.Minute)},
-					LastHeartbeatTime:  unversioned.Time{now.Add(d)},
+					LastTransitionTime: unversioned.Time{Time: now.Add(-time.Minute)},
+					LastHeartbeatTime:  unversioned.Time{Time: now.Add(d)},
 				}},
 			},
 		}

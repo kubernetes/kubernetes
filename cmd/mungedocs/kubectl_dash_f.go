@@ -106,6 +106,15 @@ func gotDashF(lineNum int, fields []string, fieldNum int) error {
 		// Absolute paths tend to be /tmp/* and created in the same example.
 		return nil
 	}
+	if strings.HasPrefix(target, "$") {
+		// Allow the start of the target to be an environment
+		// variable that points to the root of the kubernetes
+		// repo.
+		split := strings.SplitN(target, "/", 2)
+		if len(split) == 2 {
+			target = split[1]
+		}
+	}
 
 	// If we got here we expect the file to exist.
 	_, err := os.Stat(path.Join(repoRoot, target))

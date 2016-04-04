@@ -32,7 +32,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
-	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	restOptions := generic.RESTOptions{Storage: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
 	daemonSetStorage, statusStorage := NewREST(restOptions)
 	return daemonSetStorage, statusStorage, server
 }
@@ -108,11 +108,6 @@ func TestUpdate(t *testing.T) {
 			return object
 		},
 		// invalid updateFunc
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.DaemonSet)
-			object.UID = "newUID"
-			return object
-		},
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.DaemonSet)
 			object.Name = ""

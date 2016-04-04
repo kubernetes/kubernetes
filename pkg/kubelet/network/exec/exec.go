@@ -72,6 +72,8 @@ import (
 )
 
 type execNetworkPlugin struct {
+	network.NoopNetworkPlugin
+
 	execName string
 	execPath string
 	host     network.Host
@@ -118,9 +120,6 @@ func (plugin *execNetworkPlugin) getExecutable() string {
 	parts := strings.Split(plugin.execName, "/")
 	execName := parts[len(parts)-1]
 	return path.Join(plugin.execPath, execName)
-}
-
-func (plugin *execNetworkPlugin) Event(name string, details map[string]interface{}) {
 }
 
 func (plugin *execNetworkPlugin) Name() string {

@@ -37,7 +37,7 @@ const defaultReplicas = 100
 
 func newStorage(t *testing.T) (*ReplicaSetStorage, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
-	restOptions := generic.RESTOptions{etcdStorage, generic.UndecoratedStorage, 1}
+	restOptions := generic.RESTOptions{Storage: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
 	replicaSetStorage := NewStorage(restOptions)
 	return &replicaSetStorage, server
 }
@@ -121,11 +121,6 @@ func TestUpdate(t *testing.T) {
 			return object
 		},
 		// invalid updateFunc
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.ReplicaSet)
-			object.UID = "newUID"
-			return object
-		},
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.ReplicaSet)
 			object.Name = ""

@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl expose \- Take a replication controller, service, or pod and expose it as a new Kubernetes Service
+kubectl expose \- Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service
 
 
 .SH SYNOPSIS
@@ -90,6 +90,10 @@ labels are specified, the new service will re\-use the labels from the resource 
 .PP
 \fB\-\-record\fP=false
     Record current kubectl command in the resource annotation.
+
+.PP
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    If true, process directory recursively.
 
 .PP
 \fB\-\-save\-config\fP=false

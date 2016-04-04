@@ -14,40 +14,33 @@
         - postbuildscript:
             builders:
                 - shell: |
-                    curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-finished.sh" > upload-finished.sh
-                    chmod +x upload-finished.sh
+                    mkdir -p _tmp
+                    curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" > ./_tmp/upload-to-gcs.sh
+                    chmod +x ./_tmp/upload-to-gcs.sh
                 - conditional-step:
                     condition-kind: current-status
                     condition-worst: SUCCESS
                     condition-best: SUCCESS
                     steps:
-                        - shell: './upload-finished.sh SUCCESS'
+                        - shell: 'JENKINS_BUILD_FINISHED=SUCCESS ./_tmp/upload-to-gcs.sh'
                 - conditional-step:
                     condition-kind: current-status
                     condition-worst: UNSTABLE
                     condition-best: UNSTABLE
                     steps:
-                        - shell: './upload-finished.sh UNSTABLE'
+                        - shell: 'JENKINS_BUILD_FINISHED=UNSTABLE ./_tmp/upload-to-gcs.sh'
                 - conditional-step:
                     condition-kind: current-status
                     condition-worst: FAILURE
                     condition-best: FAILURE
                     steps:
-                        - shell: './upload-finished.sh FAILURE'
+                        - shell: 'JENKINS_BUILD_FINISHED=FAILURE ./_tmp/upload-to-gcs.sh'
                 - conditional-step:
                     condition-kind: current-status
                     condition-worst: ABORTED
                     condition-best: ABORTED
                     steps:
-                        - shell: './upload-finished.sh ABORTED'
-                # Use our script for build artifacts, since it's more flexible.
-                # Run last since it updates latest-build.txt.
-                - shell: |
-                    if [[ -x ./hack/jenkins/upload-to-gcs.sh ]]; then
-                      ./hack/jenkins/upload-to-gcs.sh
-                    else
-                      curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" | bash -
-                    fi
+                        - shell: 'JENKINS_BUILD_FINISHED=ABORTED ./_tmp/upload-to-gcs.sh'
             script-only-if-succeeded: False
             script-only-if-failed: False
         # Use the plugin for the build log, since it isn't available on Jenkins slaves.

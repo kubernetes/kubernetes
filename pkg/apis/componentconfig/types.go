@@ -257,16 +257,18 @@ type KubeletConfiguration struct {
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
-	// rktPath is hte path of rkt binary. Leave empty to use the first rkt in
+	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath,omitempty"`
+	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
+	RktAPIEndpoint string `json:"rktAPIEndpoint,omitempty"`
+	// rktStage1Image is the image to use as stage1. Local paths and
+	// http/https URLs are supported.
+	RktStage1Image string `json:"rktStage1Image,omitempty"`
 	// lockFilePath is the path that kubelet will use to as a lock file.
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
 	LockFilePath string `json:"lockFilePath"`
-	// rktStage1Image is the image to use as stage1. Local paths and
-	// http/https URLs are supported.
-	RktStage1Image string `json:"rktStage1Image,omitempty"`
 	// configureCBR0 enables the kublet to configure cbr0 based on
 	// Node.Spec.PodCIDR.
 	ConfigureCBR0 bool `json:"configureCbr0"`

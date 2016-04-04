@@ -26,7 +26,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
 const (
@@ -53,7 +55,7 @@ type RESTClient struct {
 	contentConfig ContentConfig
 
 	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
-	Throttle util.RateLimiter
+	Throttle flowcontrol.RateLimiter
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
@@ -77,9 +79,9 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 		config.ContentType = "application/json"
 	}
 
-	var throttle util.RateLimiter
+	var throttle flowcontrol.RateLimiter
 	if maxQPS > 0 {
-		throttle = util.NewTokenBucketRateLimiter(maxQPS, maxBurst)
+		throttle = flowcontrol.NewTokenBucketRateLimiter(maxQPS, maxBurst)
 	}
 	return &RESTClient{
 		base:             &base,
@@ -157,4 +159,8 @@ func (c *RESTClient) Delete() *Request {
 // APIVersion returns the APIVersion this RESTClient is expected to use.
 func (c *RESTClient) APIVersion() unversioned.GroupVersion {
 	return *c.contentConfig.GroupVersion
+}
+
+func (c *RESTClient) Codec() runtime.Codec {
+	return c.contentConfig.Codec
 }

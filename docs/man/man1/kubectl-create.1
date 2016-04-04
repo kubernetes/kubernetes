@@ -25,12 +25,20 @@ JSON and YAML formats are accepted.
     Filename, directory, or URL to file to use to create the resource
 
 .PP
+\fB\-\-include\-extended\-apis\fP=true
+    If true, include definitions of new APIs via calls to the API server. [default true]
+
+.PP
 \fB\-o\fP, \fB\-\-output\fP=""
     Output mode. Use "\-o name" for shorter output (resource/name).
 
 .PP
 \fB\-\-record\fP=false
     Record current kubectl command in the resource annotation.
+
+.PP
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    If true, process directory recursively.
 
 .PP
 \fB\-\-save\-config\fP=false

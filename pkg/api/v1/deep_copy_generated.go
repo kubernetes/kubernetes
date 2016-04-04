@@ -26,6 +26,7 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	types "k8s.io/kubernetes/pkg/types"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -137,6 +138,7 @@ func init() {
 		DeepCopy_v1_PodTemplate,
 		DeepCopy_v1_PodTemplateList,
 		DeepCopy_v1_PodTemplateSpec,
+		DeepCopy_v1_Preconditions,
 		DeepCopy_v1_PreferredSchedulingTerm,
 		DeepCopy_v1_Probe,
 		DeepCopy_v1_RBDVolumeSource,
@@ -594,6 +596,15 @@ func DeepCopy_v1_DeleteOptions(in DeleteOptions, out *DeleteOptions, c *conversi
 		**out = *in
 	} else {
 		out.GracePeriodSeconds = nil
+	}
+	if in.Preconditions != nil {
+		in, out := in.Preconditions, &out.Preconditions
+		*out = new(Preconditions)
+		if err := DeepCopy_v1_Preconditions(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Preconditions = nil
 	}
 	return nil
 }
@@ -2191,6 +2202,21 @@ func DeepCopy_v1_PodTemplateSpec(in PodTemplateSpec, out *PodTemplateSpec, c *co
 	}
 	if err := DeepCopy_v1_PodSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
+	}
+	return nil
+}
+
+func DeepCopy_v1_Preconditions(in Preconditions, out *Preconditions, c *conversion.Cloner) error {
+	if in.UID != nil {
+		in, out := in.UID, &out.UID
+		*out = new(types.UID)
+		if newVal, err := c.DeepCopy(*in); err != nil {
+			return err
+		} else {
+			**out = newVal.(types.UID)
+		}
+	} else {
+		out.UID = nil
 	}
 	return nil
 }

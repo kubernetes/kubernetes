@@ -40,9 +40,9 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -243,6 +243,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Reservation:                    *reservation,
 		KubeletCgroups:                 s.KubeletCgroups,
 		RktPath:                        s.RktPath,
+		RktAPIEndpoint:                 s.RktAPIEndpoint,
 		RktStage1Image:                 s.RktStage1Image,
 		RootDirectory:                  s.RootDirectory,
 		Runonce:                        s.RunOnce,
@@ -553,7 +554,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		NodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		OOMAdjuster:               oom.NewFakeOOMAdjuster(),
 		OSInterface:               osInterface,
-		PodInfraContainerImage:    kubetypes.PodInfraContainerImage,
+		PodInfraContainerImage:    options.GetDefaultPodInfraContainerImage(),
 		Port:                port,
 		ReadOnlyPort:        readOnlyPort,
 		RegisterNode:        true,
@@ -608,7 +609,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kcfg.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kcfg.EventClient.Events("")})
+		eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kcfg.EventClient.Events("")})
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
@@ -757,6 +758,7 @@ type KubeletConfig struct {
 	ResolverConfig                 string
 	KubeletCgroups                 string
 	RktPath                        string
+	RktAPIEndpoint                 string
 	RktStage1Image                 string
 	RootDirectory                  string
 	Runonce                        bool
@@ -839,6 +841,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
 		kc.RktPath,
+		kc.RktAPIEndpoint,
 		kc.RktStage1Image,
 		kc.Mounter,
 		kc.Writer,

@@ -32,12 +32,20 @@ scale is sent to the server.
     Filename, directory, or URL to a file identifying the resource to set a new size
 
 .PP
+\fB\-\-include\-extended\-apis\fP=true
+    If true, include definitions of new APIs via calls to the API server. [default true]
+
+.PP
 \fB\-o\fP, \fB\-\-output\fP=""
     Output mode. Use "\-o name" for shorter output (resource/name).
 
 .PP
 \fB\-\-record\fP=false
     Record current kubectl command in the resource annotation.
+
+.PP
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    If true, process directory recursively.
 
 .PP
 \fB\-\-replicas\fP=\-1

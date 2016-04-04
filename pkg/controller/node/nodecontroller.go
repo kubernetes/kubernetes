@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -69,7 +69,7 @@ type NodeController struct {
 	allocateNodeCIDRs       bool
 	cloud                   cloudprovider.Interface
 	clusterCIDR             *net.IPNet
-	deletingPodsRateLimiter util.RateLimiter
+	deletingPodsRateLimiter flowcontrol.RateLimiter
 	knownNodeSet            sets.String
 	kubeClient              clientset.Interface
 	// Method for easy mocking in unittest.
@@ -129,8 +129,8 @@ func NewNodeController(
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
-	deletionEvictionLimiter util.RateLimiter,
-	terminationEvictionLimiter util.RateLimiter,
+	deletionEvictionLimiter flowcontrol.RateLimiter,
+	terminationEvictionLimiter flowcontrol.RateLimiter,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
@@ -141,7 +141,7 @@ func NewNodeController(
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
 		glog.Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{kubeClient.Core().Events("")})
+		eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 	} else {
 		glog.Infof("No api server defined - no events will be sent to API server.")
 	}
@@ -869,7 +869,7 @@ func (nc *NodeController) markAllPodsNotReady(nodeName string) error {
 				glog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
 				pod, err := nc.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(&pod)
 				if err != nil {
-					glog.Warningf("Failed to updated status for pod %q: %v", format.Pod(pod), err)
+					glog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
 					errMsg = append(errMsg, fmt.Sprintf("%v", err))
 				}
 				break

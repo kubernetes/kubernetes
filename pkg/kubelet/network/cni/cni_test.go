@@ -33,6 +33,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -152,7 +152,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 		proberesults.NewManager(),
 		containerRefManager,
 		&cadvisorapi.MachineInfo{},
-		kubetypes.PodInfraContainerImage,
+		options.GetDefaultPodInfraContainerImage(),
 		0, 0, "",
 		containertest.FakeOS{},
 		networkPlugin,

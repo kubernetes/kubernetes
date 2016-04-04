@@ -30,10 +30,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -76,7 +80,6 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	etcdmetrics "k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
@@ -182,7 +185,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	// Install v1 unless disabled.
-	if !m.ApiGroupVersionOverrides["api/v1"].Disable {
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
 		// Install v1 API.
 		m.initV1ResourcesStorage(c)
 		apiGroupInfo := genericapiserver.APIGroupInfo{
@@ -227,7 +230,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	allGroups := []unversioned.APIGroup{}
 
 	// Install extensions unless disabled.
-	if !m.ApiGroupVersionOverrides["extensions/v1beta1"].Disable {
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
 		m.thirdPartyStorage = c.StorageDestinations.APIGroups[extensions.GroupName].Default
 		m.thirdPartyResources = map[string]thirdPartyEntry{}
 
@@ -269,12 +272,12 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 
 	// Install autoscaling unless disabled.
-	if !m.ApiGroupVersionOverrides["autoscaling/v1"].Disable {
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(autoscalingapiv1.SchemeGroupVersion) {
 		autoscalingResources := m.getAutoscalingResources(c)
 		autoscalingGroupMeta := registered.GroupOrDie(autoscaling.GroupName)
 
 		// Hard code preferred group version to autoscaling/v1
-		autoscalingGroupMeta.GroupVersion = unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}
+		autoscalingGroupMeta.GroupVersion = autoscalingapiv1.SchemeGroupVersion
 
 		apiGroupInfo := genericapiserver.APIGroupInfo{
 			GroupMeta: *autoscalingGroupMeta,
@@ -301,12 +304,12 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 
 	// Install batch unless disabled.
-	if !m.ApiGroupVersionOverrides["batch/v1"].Disable {
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv1.SchemeGroupVersion) {
 		batchResources := m.getBatchResources(c)
 		batchGroupMeta := registered.GroupOrDie(batch.GroupName)
 
 		// Hard code preferred group version to batch/v1
-		batchGroupMeta.GroupVersion = unversioned.GroupVersion{Group: "batch", Version: "v1"}
+		batchGroupMeta.GroupVersion = batchapiv1.SchemeGroupVersion
 
 		apiGroupInfo := genericapiserver.APIGroupInfo{
 			GroupMeta: *batchGroupMeta,
@@ -631,7 +634,7 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(
-		generic.RESTOptions{m.thirdPartyStorage, generic.UndecoratedStorage, m.deleteCollectionWorkers}, group, kind)
+		generic.RESTOptions{Storage: m.thirdPartyStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: m.deleteCollectionWorkers}, group, kind)
 
 	apiRoot := makeThirdPartyPath("")
 
@@ -668,17 +671,6 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 
 // getExperimentalResources returns the resources for extensions api
 func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
-	// All resources except these are disabled by default.
-	enabledResources := sets.NewString("daemonsets", "deployments", "horizontalpodautoscalers", "ingresses", "jobs", "replicasets", "thirdpartyresources")
-	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
-	isEnabled := func(resource string) bool {
-		// Check if the resource has been overriden.
-		enabled, ok := resourceOverrides[resource]
-		if !ok {
-			return enabledResources.Has(resource)
-		}
-		return enabled
-	}
 	restOptions := func(resource string) generic.RESTOptions {
 		return generic.RESTOptions{
 			Storage:                 c.StorageDestinations.Get(extensions.GroupName, resource),
@@ -686,18 +678,20 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 			DeleteCollectionWorkers: m.deleteCollectionWorkers,
 		}
 	}
+	// TODO update when we support more than one version of this group
+	version := extensionsapiv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
 
-	if isEnabled("horizontalpodautoscalers") {
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
 		m.constructHPAResources(c, storage)
 		controllerStorage := expcontrolleretcd.NewStorage(
-			generic.RESTOptions{c.StorageDestinations.Get("", "replicationControllers"), m.StorageDecorator(), m.deleteCollectionWorkers})
+			generic.RESTOptions{Storage: c.StorageDestinations.Get("", "replicationControllers"), Decorator: m.StorageDecorator(), DeleteCollectionWorkers: m.deleteCollectionWorkers})
 		storage["replicationcontrollers"] = controllerStorage.ReplicationController
 		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}
-	if isEnabled("thirdpartyresources") {
-		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(restOptions("thirdpartyresources"))
+	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(restOptions("thirdpartyresources"))
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("thirdpartyresources")) {
 		thirdPartyControl := ThirdPartyController{
 			master: m,
 			thirdPartyResourceRegistry: thirdPartyResourceStorage,
@@ -712,32 +706,32 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
 	}
 
-	if isEnabled("daemonsets") {
-		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptions("daemonsets"))
+	daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptions("daemonsets"))
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
 	}
-	if isEnabled("deployments") {
-		deploymentStorage := deploymentetcd.NewStorage(restOptions("deployments"))
+	deploymentStorage := deploymentetcd.NewStorage(restOptions("deployments"))
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 		storage["deployments/scale"] = deploymentStorage.Scale
 	}
-	if isEnabled("jobs") {
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
 		m.constructJobResources(c, storage)
 	}
-	if isEnabled("ingresses") {
-		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptions("ingresses"))
+	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptions("ingresses"))
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("ingresses")) {
 		storage["ingresses"] = ingressStorage
 		storage["ingresses/status"] = ingressStatusStorage
 	}
-	if isEnabled("podsecuritypolicy") {
-		podSecurityPolicyStorage := pspetcd.NewREST(restOptions("podsecuritypolicy"))
+	podSecurityPolicyStorage := pspetcd.NewREST(restOptions("podsecuritypolicy"))
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("podsecuritypolicy")) {
 		storage["podSecurityPolicies"] = podSecurityPolicyStorage
 	}
-	if isEnabled("replicasets") {
-		replicaSetStorage := replicasetetcd.NewStorage(restOptions("replicasets"))
+	replicaSetStorage := replicasetetcd.NewStorage(restOptions("replicasets"))
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
 		storage["replicasets"] = replicaSetStorage.ReplicaSet
 		storage["replicasets/status"] = replicaSetStorage.Status
 		storage["replicasets/scale"] = replicaSetStorage.Scale
@@ -767,17 +761,11 @@ func (m *Master) constructHPAResources(c *Config, restStorage map[string]rest.St
 
 // getAutoscalingResources returns the resources for autoscaling api
 func (m *Master) getAutoscalingResources(c *Config) map[string]rest.Storage {
-	resourceOverrides := m.ApiGroupVersionOverrides["autoscaling/v1"].ResourceOverrides
-	isEnabled := func(resource string) bool {
-		// Check if the resource has been overriden.
-		if enabled, ok := resourceOverrides[resource]; ok {
-			return enabled
-		}
-		return !m.ApiGroupVersionOverrides["autoscaling/v1"].Disable
-	}
+	// TODO update when we support more than one version of this group
+	version := autoscalingapiv1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
-	if isEnabled("horizontalpodautoscalers") {
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
 		m.constructHPAResources(c, storage)
 	}
 	return storage
@@ -804,17 +792,11 @@ func (m *Master) constructJobResources(c *Config, restStorage map[string]rest.St
 
 // getBatchResources returns the resources for batch api
 func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
-	resourceOverrides := m.ApiGroupVersionOverrides["batch/v1"].ResourceOverrides
-	isEnabled := func(resource string) bool {
-		// Check if the resource has been overriden.
-		if enabled, ok := resourceOverrides[resource]; ok {
-			return enabled
-		}
-		return !m.ApiGroupVersionOverrides["batch/v1"].Disable
-	}
+	// TODO update when we support more than one version of this group
+	version := batchapiv1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
-	if isEnabled("jobs") {
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
 		m.constructJobResources(c, storage)
 	}
 	return storage
@@ -868,4 +850,22 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 		return fmt.Errorf("SSHKey sync is taking to long: %d", sshKeyLag)
 	}
 	return nil
+}
+
+func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
+	ret := genericapiserver.NewResourceConfig()
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion)
+
+	// all extensions resources except these are disabled by default
+	ret.EnableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("jobs"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"),
+	)
+
+	return ret
 }

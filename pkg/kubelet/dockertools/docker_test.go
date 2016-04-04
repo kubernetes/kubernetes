@@ -29,6 +29,7 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -36,7 +37,6 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -177,39 +177,6 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-func TestExecSupportExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.3.0", "ApiVersion=1.15"}}
-	runner := &DockerManager{client: fakeDocker}
-	useNativeExec, err := runner.nativeExecSupportExists()
-	if err != nil {
-		t.Errorf("got error while checking for exec support - %s", err)
-	}
-	if !useNativeExec {
-		t.Errorf("invalid exec support check output. Expected true")
-	}
-}
-
-func TestExecSupportNotExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.2", "ApiVersion=1.14"}}
-	runner := &DockerManager{client: fakeDocker}
-	useNativeExec, _ := runner.nativeExecSupportExists()
-	if useNativeExec {
-		t.Errorf("invalid exec support check output.")
-	}
-}
-
-func TestDockerContainerCommand(t *testing.T) {
-	runner := &DockerManager{}
-	containerID := kubecontainer.DockerID("1234").ContainerID()
-	command := []string{"ls"}
-	cmd, _ := runner.getRunInContainerCommand(containerID, command)
-	if cmd.Dir != "/var/lib/docker/execdriver/native/"+containerID.ID {
-		t.Errorf("unexpected command CWD: %s", cmd.Dir)
-	}
-	if !reflect.DeepEqual(cmd.Args, []string{"/usr/sbin/nsinit", "exec", "ls"}) {
-		t.Errorf("unexpected command args: %s", cmd.Args)
-	}
-}
 func TestParseImageName(t *testing.T) {
 	tests := []struct {
 		imageName string
@@ -707,7 +674,7 @@ func TestFindContainersByPod(t *testing.T) {
 	fakeClient := &FakeDockerClient{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
 	// image back-off is set to nil, this test should not pull images
-	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, kubetypes.PodInfraContainerImage, 0, 0, "", containertest.FakeOS{}, np, nil, nil, nil)
+	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, options.GetDefaultPodInfraContainerImage(), 0, 0, "", containertest.FakeOS{}, np, nil, nil, nil)
 	for i, test := range tests {
 		fakeClient.ContainerList = test.containerList
 		fakeClient.ExitedContainerList = test.exitedContainerList

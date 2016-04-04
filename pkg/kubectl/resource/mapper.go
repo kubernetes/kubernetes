@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -50,8 +52,16 @@ type Mapper struct {
 func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	versions := &runtime.VersionedObjects{}
 	_, gvk, err := m.Decode(data, nil, versions)
+	var obj runtime.Object
+	var versioned runtime.Object
+	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
+		obj, err = runtime.Decode(thirdpartyresourcedata.NewCodec(nil, gvk.Kind), data)
+		versioned = obj
+	} else {
+		obj, versioned = versions.Last(), versions.First()
+	}
 	if err != nil {
-		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
+		return nil, fmt.Errorf("unable to decode %q: %v [%v]", source, err, gvk)
 	}
 	mapping, err := m.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
@@ -63,10 +73,6 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 	}
 
-	// TODO: decoding the version object is convenient, but questionable. This is used by apply
-	// and rolling-update today, but both of those cases should probably be requesting the raw
-	// object and performing their own decoding.
-	obj, versioned := versions.Last(), versions.First()
 	name, _ := mapping.MetadataAccessor.Name(obj)
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)

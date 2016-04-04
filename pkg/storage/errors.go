@@ -16,12 +16,17 @@ limitations under the License.
 
 package storage
 
-import "fmt"
+import (
+	"fmt"
+
+	"k8s.io/kubernetes/pkg/util/validation/field"
+)
 
 const (
 	ErrCodeKeyNotFound int = iota + 1
 	ErrCodeKeyExists
 	ErrCodeResourceVersionConflicts
+	ErrCodeInvalidObj
 	ErrCodeUnreachable
 )
 
@@ -29,6 +34,7 @@ var errCodeToMessage = map[int]string{
 	ErrCodeKeyNotFound:              "key not found",
 	ErrCodeKeyExists:                "key exists",
 	ErrCodeResourceVersionConflicts: "resource version conflicts",
+	ErrCodeInvalidObj:               "invalid object",
 	ErrCodeUnreachable:              "server unreachable",
 }
 
@@ -64,15 +70,24 @@ func NewUnreachableError(key string, rv int64) *StorageError {
 	}
 }
 
+func NewInvalidObjError(key, msg string) *StorageError {
+	return &StorageError{
+		Code:               ErrCodeInvalidObj,
+		Key:                key,
+		AdditionalErrorMsg: msg,
+	}
+}
+
 type StorageError struct {
-	Code            int
-	Key             string
-	ResourceVersion int64
+	Code               int
+	Key                string
+	ResourceVersion    int64
+	AdditionalErrorMsg string
 }
 
 func (e *StorageError) Error() string {
-	return fmt.Sprintf("StorageError: %s, Code: %d, Key: %s, ResourceVersion: %d",
-		errCodeToMessage[e.Code], e.Code, e.Key, e.ResourceVersion)
+	return fmt.Sprintf("StorageError: %s, Code: %d, Key: %s, ResourceVersion: %d, AdditionalErrorMsg: %s",
+		errCodeToMessage[e.Code], e.Code, e.Key, e.ResourceVersion, e.AdditionalErrorMsg)
 }
 
 // IsNotFound returns true if and only if err is "key" not found error.
@@ -92,15 +107,68 @@ func IsUnreachable(err error) bool {
 
 // IsTestFailed returns true if and only if err is a write conflict.
 func IsTestFailed(err error) bool {
-	return isErrCode(err, ErrCodeResourceVersionConflicts)
+	return isErrCode(err, ErrCodeResourceVersionConflicts, ErrCodeInvalidObj)
 }
 
-func isErrCode(err error, code int) bool {
+// IsInvalidUID returns true if and only if err is invalid UID error
+func IsInvalidObj(err error) bool {
+	return isErrCode(err, ErrCodeInvalidObj)
+}
+
+func isErrCode(err error, codes ...int) bool {
 	if err == nil {
 		return false
 	}
 	if e, ok := err.(*StorageError); ok {
-		return e.Code == code
+		for _, code := range codes {
+			if e.Code == code {
+				return true
+			}
+		}
 	}
 	return false
+}
+
+// InvalidError is generated when an error caused by invalid API object occurs
+// in the storage package.
+type InvalidError struct {
+	Errs field.ErrorList
+}
+
+func (e InvalidError) Error() string {
+	return e.Errs.ToAggregate().Error()
+}
+
+// IsInvalidError returns true if and only if err is an InvalidError.
+func IsInvalidError(err error) bool {
+	_, ok := err.(InvalidError)
+	return ok
+}
+
+func NewInvalidError(errors field.ErrorList) InvalidError {
+	return InvalidError{errors}
+}
+
+// InternalError is generated when an error occurs in the storage package, i.e.,
+// not from the underlying storage backend (e.g., etcd).
+type InternalError struct {
+	Reason string
+}
+
+func (e InternalError) Error() string {
+	return e.Reason
+}
+
+// IsInternalError returns true if and only if err is an InternalError.
+func IsInternalError(err error) bool {
+	_, ok := err.(InternalError)
+	return ok
+}
+
+func NewInternalError(reason string) InternalError {
+	return InternalError{reason}
+}
+
+func NewInternalErrorf(format string, a ...interface{}) InternalError {
+	return InternalError{fmt.Sprintf(format, a)}
 }

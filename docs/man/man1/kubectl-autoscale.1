@@ -38,6 +38,10 @@ An autoscaler can automatically increase or decrease number of pods deployed wit
     The name of the API generator to use. Currently there is only 1 generator.
 
 .PP
+\fB\-\-include\-extended\-apis\fP=true
+    If true, include definitions of new APIs via calls to the API server. [default true]
+
+.PP
 \fB\-\-max\fP=\-1
     The upper limit for the number of pods that can be set by the autoscaler. Required.
 
@@ -66,6 +70,10 @@ An autoscaler can automatically increase or decrease number of pods deployed wit
 .PP
 \fB\-\-record\fP=false
     Record current kubectl command in the resource annotation.
+
+.PP
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    If true, process directory recursively.
 
 .PP
 \fB\-\-save\-config\fP=false

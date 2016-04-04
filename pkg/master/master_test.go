@@ -95,6 +95,7 @@ func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *ass
 	config.KubeletClient = client.FakeKubeletClient{}
 	config.APIPrefix = "/api"
 	config.APIGroupPrefix = "/apis"
+	config.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
@@ -126,7 +127,6 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.tunneler, config.Tunneler)
 	assert.Equal(master.APIPrefix, config.APIPrefix)
 	assert.Equal(master.APIGroupPrefix, config.APIGroupPrefix)
-	assert.Equal(master.ApiGroupVersionOverrides, config.APIGroupVersionOverrides)
 	assert.Equal(master.RequestContextMapper, config.RequestContextMapper)
 	assert.Equal(master.MasterCount, config.MasterCount)
 	assert.Equal(master.ClusterIP, config.PublicAddress)
@@ -370,7 +370,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 }
 
 func TestDiscoveryAtAPIS(t *testing.T) {
-	// TODO(caesarxuchao): make this pass  now that batch is added,
+	// TODO(caesarxuchao): make this pass now that batch is added,
 	// and rewrite it so that the indexes do not need to change each time a new api group is added.
 	/*
 		master, etcdserver, config, assert := newMaster(t)

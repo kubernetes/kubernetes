@@ -18,9 +18,9 @@ package internalclientset
 
 import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 )
 

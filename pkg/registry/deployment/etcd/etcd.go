@@ -97,6 +97,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *RollbackREST) {
 
 		// Used to validate deployment updates.
 		UpdateStrategy: deployment.Strategy,
+		DeleteStrategy: deployment.Strategy,
 
 		Storage: storageInterface,
 	}
@@ -162,7 +163,7 @@ func (r *RollbackREST) setDeploymentRollback(ctx api.Context, deploymentID strin
 	if err != nil {
 		return nil, err
 	}
-	err = r.store.Storage.GuaranteedUpdate(ctx, dKey, &extensions.Deployment{}, false, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+	err = r.store.Storage.GuaranteedUpdate(ctx, dKey, &extensions.Deployment{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 		d, ok := obj.(*extensions.Deployment)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)

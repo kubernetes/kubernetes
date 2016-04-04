@@ -81,7 +81,7 @@ func TestGC(t *testing.T) {
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
 			gcc.podStore.Store.Add(&api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: pod.name, CreationTimestamp: unversioned.Time{creationTime}},
+				ObjectMeta: api.ObjectMeta{Name: pod.name, CreationTimestamp: unversioned.Time{Time: creationTime}},
 				Status:     api.PodStatus{Phase: pod.phase},
 			})
 		}

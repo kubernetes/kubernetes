@@ -95,7 +95,7 @@ func TestRunHandlerExec(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil)
 
-	containerID := kubecontainer.ContainerID{"test", "abc1234"}
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
 
 	container := api.Container{
@@ -137,7 +137,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	fakeHttp := fakeHTTP{}
 	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
 
-	containerID := kubecontainer.ContainerID{"test", "abc1234"}
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
 
 	container := api.Container{
@@ -168,7 +168,7 @@ func TestRunHandlerHttp(t *testing.T) {
 
 func TestRunHandlerNil(t *testing.T) {
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil)
-	containerID := kubecontainer.ContainerID{"test", "abc1234"}
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	podName := "podFoo"
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"

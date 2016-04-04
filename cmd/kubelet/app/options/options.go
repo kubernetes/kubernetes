@@ -19,12 +19,14 @@ package options
 
 import (
 	_ "net/http/pprof"
+	"runtime"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
@@ -36,7 +38,19 @@ import (
 const (
 	defaultRootDir             = "/var/lib/kubelet"
 	experimentalFlannelOverlay = false
+
+	defaultPodInfraContainerImageName    = "gcr.io/google_containers/pause"
+	defaultPodInfraContainerImageVersion = "2.0"
 )
+
+// Returns the arch-specific pause image that kubelet should use as the default
+func GetDefaultPodInfraContainerImage() string {
+	if runtime.GOARCH == "amd64" {
+		return defaultPodInfraContainerImageName + ":" + defaultPodInfraContainerImageVersion
+	} else {
+		return defaultPodInfraContainerImageName + "-" + runtime.GOARCH + ":" + defaultPodInfraContainerImageVersion
+	}
+}
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
 // a kubelet. These can either be set via command line or directly.
@@ -68,7 +82,7 @@ func NewKubeletServer() *KubeletServer {
 		KubeletConfiguration: componentconfig.KubeletConfiguration{
 			Address:                     "0.0.0.0",
 			CAdvisorPort:                4194,
-			VolumeStatsAggPeriod:        unversioned.Duration{time.Minute},
+			VolumeStatsAggPeriod:        unversioned.Duration{Duration: time.Minute},
 			CertDirectory:               "/var/run/kubernetes",
 			CgroupRoot:                  "",
 			ConfigureCBR0:               false,
@@ -80,14 +94,14 @@ func NewKubeletServer() *KubeletServer {
 			EnableCustomMetrics:         false,
 			EnableDebuggingHandlers:     true,
 			EnableServer:                true,
-			FileCheckFrequency:          unversioned.Duration{20 * time.Second},
+			FileCheckFrequency:          unversioned.Duration{Duration: 20 * time.Second},
 			HealthzBindAddress:          "127.0.0.1",
 			HealthzPort:                 10248,
 			HostNetworkSources:          kubetypes.AllSource,
 			HostPIDSources:              kubetypes.AllSource,
 			HostIPCSources:              kubetypes.AllSource,
-			HTTPCheckFrequency:          unversioned.Duration{20 * time.Second},
-			ImageMinimumGCAge:           unversioned.Duration{2 * time.Minute},
+			HTTPCheckFrequency:          unversioned.Duration{Duration: 20 * time.Second},
+			ImageMinimumGCAge:           unversioned.Duration{Duration: 2 * time.Minute},
 			ImageGCHighThresholdPercent: 90,
 			ImageGCLowThresholdPercent:  80,
 			LowDiskSpaceThresholdMB:     256,
@@ -96,16 +110,16 @@ func NewKubeletServer() *KubeletServer {
 			MaxPerPodContainerCount:     2,
 			MaxOpenFiles:                1000000,
 			MaxPods:                     110,
-			MinimumGCAge:                unversioned.Duration{1 * time.Minute},
+			MinimumGCAge:                unversioned.Duration{Duration: 1 * time.Minute},
 			NetworkPluginDir:            "/usr/libexec/kubernetes/kubelet-plugins/net/exec/",
 			NetworkPluginName:           "",
 			NonMasqueradeCIDR:           "10.0.0.0/8",
 			VolumePluginDir:             "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
-			NodeStatusUpdateFrequency:   unversioned.Duration{10 * time.Second},
+			NodeStatusUpdateFrequency:   unversioned.Duration{Duration: 10 * time.Second},
 			NodeLabels:                  make(map[string]string),
 			OOMScoreAdj:                 qos.KubeletOOMScoreAdj,
 			LockFilePath:                "",
-			PodInfraContainerImage:      kubetypes.PodInfraContainerImage,
+			PodInfraContainerImage:      GetDefaultPodInfraContainerImage(),
 			Port:                           ports.KubeletPort,
 			ReadOnlyPort:                   ports.KubeletReadOnlyPort,
 			RegisterNode:                   true, // will be ignored if no apiserver is configured
@@ -114,18 +128,19 @@ func NewKubeletServer() *KubeletServer {
 			RegistryPullQPS:                5.0,
 			KubeletCgroups:                 "",
 			RktPath:                        "",
+			RktAPIEndpoint:                 rkt.DefaultRktAPIServiceEndpoint,
 			RktStage1Image:                 "",
 			RootDirectory:                  defaultRootDir,
 			RuntimeCgroups:                 "",
 			SerializeImagePulls:            true,
-			StreamingConnectionIdleTimeout: unversioned.Duration{4 * time.Hour},
-			SyncFrequency:                  unversioned.Duration{1 * time.Minute},
+			StreamingConnectionIdleTimeout: unversioned.Duration{Duration: 4 * time.Hour},
+			SyncFrequency:                  unversioned.Duration{Duration: 1 * time.Minute},
 			SystemCgroups:                  "",
 			ReconcileCIDR:                  true,
 			KubeAPIQPS:                     5.0,
 			KubeAPIBurst:                   10,
 			ExperimentalFlannelOverlay:     experimentalFlannelOverlay,
-			OutOfDiskTransitionFrequency:   unversioned.Duration{5 * time.Minute},
+			OutOfDiskTransitionFrequency:   unversioned.Duration{Duration: 5 * time.Minute},
 			HairpinMode:                    componentconfig.PromiscuousBridge,
 			BabysitDaemons:                 false,
 		},
@@ -141,7 +156,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ManifestURL, "manifest-url", s.ManifestURL, "URL for accessing the container manifest")
 	fs.StringVar(&s.ManifestURLHeader, "manifest-url-header", s.ManifestURLHeader, "HTTP header to use when accessing the manifest URL, with the key separated from the value with a ':', as in 'key:value'")
 	fs.BoolVar(&s.EnableServer, "enable-server", s.EnableServer, "Enable the Kubelet's server")
-	fs.Var(componentconfig.IPVar{&s.Address}, "address", "The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.UintVar(&s.Port, "port", s.Port, "The port for the Kubelet to serve on.")
 	fs.UintVar(&s.ReadOnlyPort, "read-only-port", s.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
@@ -173,13 +188,13 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
 	fs.UintVar(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
-	fs.Var(componentconfig.IPVar{&s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
+	fs.Var(componentconfig.IPVar{Val: &s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")
 	fs.StringSliceVar(&s.APIServerList, "api-servers", []string{}, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.BoolVar(&s.RegisterNode, "register-node", s.RegisterNode, "Register the node with the apiserver (defaults to true if --api-servers is set)")
 	fs.StringVar(&s.ClusterDomain, "cluster-domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
-	fs.StringVar(&s.ClusterDNS, "cluster-dns", s.ClusterDNS, "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
+	fs.StringVar(&s.ClusterDNS, "cluster-dns", s.ClusterDNS, "IP address for a cluster DNS server.  This value is used for containers' DNS server in case of Pods with \"dnsPolicy=ClusterFirst\"")
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout.Duration, "streaming-connection-idle-timeout", s.StreamingConnectionIdleTimeout.Duration, "Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s")
 	bindableNodeLabels := config.ConfigurationMap(s.NodeLabels)
@@ -206,8 +221,10 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CgroupRoot, "cgroup-root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 	fs.StringVar(&s.LockFilePath, "lock-file", s.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
-	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'")
-	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used")
+	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'.")
+	fs.StringVar(&s.RktAPIEndpoint, "rkt-api-endpoint", s.RktAPIEndpoint, "The endpoint of the rkt API service to communicate with. Only used if --container-runtime='rkt'.")
+	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used.")
+	fs.MarkDeprecated("rkt-stage1-image", "Will be removed in a future version. The default stage1 image will be specified by the rkt configurations, see https://github.com/coreos/rkt/blob/master/Documentation/configuration.md for more details.")
 	fs.BoolVar(&s.ConfigureCBR0, "configure-cbr0", s.ConfigureCBR0, "If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.")
 	fs.StringVar(&s.HairpinMode, "hairpin-mode", s.HairpinMode, "How should the kubelet setup hairpin NAT. This allows endpoints of a Service to loadbalance back to themselves if they should try to access their own Service. Valid values are \"promiscuous-bridge\", \"hairpin-veth\" and \"none\".")
 	fs.BoolVar(&s.BabysitDaemons, "babysit-daemons", s.BabysitDaemons, "If true, the node has babysitter process monitoring docker and kubelet.")

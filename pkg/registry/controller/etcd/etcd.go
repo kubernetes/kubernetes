@@ -97,6 +97,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 		// Used to validate controller updates
 		UpdateStrategy: controller.Strategy,
+		DeleteStrategy: controller.Strategy,
 
 		Storage: storageInterface,
 	}

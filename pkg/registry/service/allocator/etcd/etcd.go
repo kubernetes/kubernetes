@@ -143,7 +143,7 @@ func (e *Etcd) Release(item int) error {
 
 // tryUpdate performs a read-update to persist the latest snapshot state of allocation.
 func (e *Etcd) tryUpdate(fn func() error) error {
-	err := e.storage.GuaranteedUpdate(context.TODO(), e.baseKey, &api.RangeAllocation{}, true,
+	err := e.storage.GuaranteedUpdate(context.TODO(), e.baseKey, &api.RangeAllocation{}, true, nil,
 		storage.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
 			if len(existing.ResourceVersion) == 0 {
@@ -200,7 +200,7 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 	defer e.lock.Unlock()
 
 	last := ""
-	err := e.storage.GuaranteedUpdate(context.TODO(), e.baseKey, &api.RangeAllocation{}, true,
+	err := e.storage.GuaranteedUpdate(context.TODO(), e.baseKey, &api.RangeAllocation{}, true, nil,
 		storage.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
 			switch {

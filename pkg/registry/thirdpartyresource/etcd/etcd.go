@@ -58,6 +58,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 		CreateStrategy:          thirdpartyresource.Strategy,
 		UpdateStrategy:          thirdpartyresource.Strategy,
+		DeleteStrategy:          thirdpartyresource.Strategy,
 
 		Storage: storageInterface,
 	}

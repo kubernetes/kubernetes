@@ -28,7 +28,10 @@ import (
 )
 
 const (
-	serviceCreateTimeout = 2 * time.Minute
+	retryTimeout      = time.Minute * 4
+	pollInterval      = time.Second * 5
+	imageRetryTimeout = time.Minute * 2
+	imagePullInterval = time.Second * 15
 )
 
 var _ = Describe("Container Conformance Test", func() {
@@ -54,10 +57,10 @@ var _ = Describe("Container Conformance Test", func() {
 					conformImages = append(conformImages, image)
 				}
 				for _, image := range conformImages {
-					if err := image.Pull(); err != nil {
-						Expect(err).NotTo(HaveOccurred())
-						break
-					}
+					// Pulling images from gcr.io is flaky, so retry failures
+					Eventually(func() error {
+						return image.Pull()
+					}, imageRetryTimeout, imagePullInterval).ShouldNot(HaveOccurred())
 				}
 			})
 			It("it should list pulled images [Conformance]", func() {
@@ -97,7 +100,7 @@ var _ = Describe("Container Conformance Test", func() {
 		})
 		Context("when running a container that terminates", func() {
 			var terminateCase ConformanceContainer
-			It("it should start successfully [Conformance]", func() {
+			It("it should run successfully to completion [Conformance]", func() {
 				terminateCase = ConformanceContainer{
 					Container: api.Container{
 						Image:           "gcr.io/google_containers/busybox",
@@ -112,15 +115,11 @@ var _ = Describe("Container Conformance Test", func() {
 				err := terminateCase.Create()
 				Expect(err).NotTo(HaveOccurred())
 
-				phase := api.PodPending
-				for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(time.Second * 30) {
-					ccontainer, err := terminateCase.Get()
-					if err != nil || ccontainer.Phase != api.PodPending {
-						phase = ccontainer.Phase
-						break
-					}
-				}
-				Expect(phase).Should(Equal(terminateCase.Phase))
+				// TODO: Check that the container enters running state by sleeping in the container #23309
+				Eventually(func() (api.PodPhase, error) {
+					pod, err := terminateCase.Get()
+					return pod.Phase, err
+				}, retryTimeout, pollInterval).Should(Equal(terminateCase.Phase))
 			})
 			It("it should report its phase as 'succeeded' [Conformance]", func() {
 				ccontainer, err := terminateCase.Get()
@@ -148,16 +147,10 @@ var _ = Describe("Container Conformance Test", func() {
 				}
 				err := invalidImageCase.Create()
 				Expect(err).NotTo(HaveOccurred())
-
-				phase := api.PodPending
-				for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(time.Second * 30) {
-					ccontainer, err := invalidImageCase.Get()
-					if err != nil || ccontainer.Phase != api.PodPending {
-						phase = ccontainer.Phase
-						break
-					}
-				}
-				Expect(phase).Should(Equal(invalidImageCase.Phase))
+				Eventually(func() (api.PodPhase, error) {
+					pod, err := invalidImageCase.Get()
+					return pod.Phase, err
+				}, retryTimeout, pollInterval).Should(Equal(invalidImageCase.Phase))
 			})
 			It("it should report its phase as 'pending' [Conformance]", func() {
 				ccontainer, err := invalidImageCase.Get()

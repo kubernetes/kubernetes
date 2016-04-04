@@ -536,8 +536,8 @@ func TestStaticPodStatus(t *testing.T) {
 }
 
 func TestSetContainerReadiness(t *testing.T) {
-	cID1 := kubecontainer.ContainerID{"test", "1"}
-	cID2 := kubecontainer.ContainerID{"test", "2"}
+	cID1 := kubecontainer.ContainerID{Type: "test", ID: "1"}
+	cID2 := kubecontainer.ContainerID{Type: "test", ID: "2"}
 	containerStatuses := []api.ContainerStatus{
 		{
 			Name:        "c1",
@@ -618,7 +618,7 @@ func TestSetContainerReadiness(t *testing.T) {
 	verifyReadiness("all ready", &status, true, true, true)
 
 	t.Log("Setting non-existant container readiness should fail.")
-	m.SetContainerReadiness(pod.UID, kubecontainer.ContainerID{"test", "foo"}, true)
+	m.SetContainerReadiness(pod.UID, kubecontainer.ContainerID{Type: "test", ID: "foo"}, true)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("ignore non-existant", &status, true, true, true)

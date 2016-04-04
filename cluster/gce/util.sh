@@ -224,7 +224,7 @@ function upload-server-tars() {
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
-    if ! gsutil ls "${staging_bucket}" > /dev/null 2>&1 ; then
+    if ! gsutil ls "${staging_bucket}" ; then
       echo "Creating ${staging_bucket}"
       gsutil mb -l "${region}" "${staging_bucket}"
     fi
@@ -249,14 +249,17 @@ function upload-server-tars() {
     fi
   done
 
-  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
-    # TODO: Support fallback .tar.gz settings on CoreOS/Trusty
+  if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
+    # TODO: Support fallback .tar.gz settings on CoreOS
     SERVER_BINARY_TAR_URL="${server_binary_tar_urls[0]}"
     SALT_TAR_URL="${salt_tar_urls[0]}"
     KUBE_MANIFESTS_TAR_URL="${kube_manifests_tar_urls[0]}"
   else
     SERVER_BINARY_TAR_URL=$(join_csv "${server_binary_tar_urls[@]}")
     SALT_TAR_URL=$(join_csv "${salt_tar_urls[@]}")
+    if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
+      KUBE_MANIFESTS_TAR_URL=$(join_csv "${kube_manifests_tar_urls[@]}")
+    fi
   fi
 }
 

@@ -190,6 +190,7 @@ type TestContextType struct {
 	MinStartupPods        int
 	UpgradeTarget         string
 	PrometheusPushGateway string
+	OSDistro              string
 	VerifyServiceAccount  bool
 	DeleteNamespace       bool
 	CleanStart            bool
@@ -3254,7 +3255,7 @@ type extractRT struct {
 
 func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	rt.Header = req.Header
-	return nil, nil
+	return &http.Response{}, nil
 }
 
 // headersForConfig extracts any http client logic necessary for the provided

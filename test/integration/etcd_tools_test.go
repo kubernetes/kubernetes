@@ -98,7 +98,7 @@ func TestWriteTTL(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		result := &api.ServiceAccount{}
-		err := etcdStorage.GuaranteedUpdate(ctx, key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		err := etcdStorage.GuaranteedUpdate(ctx, key, result, false, nil, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "foo" {
 				t.Fatalf("unexpected existing object: %v", obj)
 			}
@@ -120,7 +120,7 @@ func TestWriteTTL(t *testing.T) {
 		}
 
 		result = &api.ServiceAccount{}
-		err = etcdStorage.GuaranteedUpdate(ctx, key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		err = etcdStorage.GuaranteedUpdate(ctx, key, result, false, nil, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "out" {
 				t.Fatalf("unexpected existing object: %v", obj)
 			}

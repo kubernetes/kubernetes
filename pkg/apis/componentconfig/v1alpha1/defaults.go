@@ -46,11 +46,11 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				obj.ResourceContainer = "/kube-proxy"
 			}
 			if obj.IPTablesSyncPeriod.Duration == 0 {
-				obj.IPTablesSyncPeriod = unversioned.Duration{30 * time.Second}
+				obj.IPTablesSyncPeriod = unversioned.Duration{Duration: 30 * time.Second}
 			}
 			zero := unversioned.Duration{}
 			if obj.UDPIdleTimeout == zero {
-				obj.UDPIdleTimeout = unversioned.Duration{250 * time.Millisecond}
+				obj.UDPIdleTimeout = unversioned.Duration{Duration: 250 * time.Millisecond}
 			}
 			if obj.ConntrackMax == 0 {
 				obj.ConntrackMax = 256 * 1024 // 4x default (64k)
@@ -86,13 +86,13 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		func(obj *LeaderElectionConfiguration) {
 			zero := unversioned.Duration{}
 			if obj.LeaseDuration == zero {
-				obj.LeaseDuration = unversioned.Duration{15 * time.Second}
+				obj.LeaseDuration = unversioned.Duration{Duration: 15 * time.Second}
 			}
 			if obj.RenewDeadline == zero {
-				obj.RenewDeadline = unversioned.Duration{10 * time.Second}
+				obj.RenewDeadline = unversioned.Duration{Duration: 10 * time.Second}
 			}
 			if obj.RetryPeriod == zero {
-				obj.RetryPeriod = unversioned.Duration{2 * time.Second}
+				obj.RetryPeriod = unversioned.Duration{Duration: 2 * time.Second}
 			}
 		},
 	)

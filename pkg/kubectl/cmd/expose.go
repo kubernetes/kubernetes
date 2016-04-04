@@ -34,6 +34,7 @@ import (
 // referencing the cmd.Flags()
 type ExposeOptions struct {
 	Filenames []string
+	Recursive bool
 }
 
 const (
@@ -73,7 +74,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
-		Short:   "Take a replication controller, service, or pod and expose it as a new Kubernetes Service",
+		Short:   "Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -102,6 +103,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	return cmd
@@ -113,11 +115,11 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(false)
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Filenames...).
+		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
@@ -227,7 +229,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	info.Refresh(object, true)
 	// TODO: extract this flag to a central location, when such a location exists.
 	if cmdutil.GetFlagBool(cmd, "dry-run") {
-		return f.PrintObject(cmd, object, out)
+		return f.PrintObject(cmd, mapper, object, out)
 	}
 	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
 		return err
@@ -240,7 +242,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-		return f.PrintObject(cmd, object, out)
+		return f.PrintObject(cmd, mapper, object, out)
 	}
 	cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "exposed")
 	return nil

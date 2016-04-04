@@ -36,6 +36,7 @@ import (
 // referencing the cmd.Flags()
 type DescribeOptions struct {
 	Filenames []string
+	Recursive bool
 }
 
 const (
@@ -86,7 +87,9 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	usage := "Filename, directory, or URL to a file containing the resource to describe"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 
@@ -101,11 +104,11 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Filenames...).
+		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
 		Flatten().

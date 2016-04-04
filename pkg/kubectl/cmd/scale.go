@@ -34,6 +34,7 @@ import (
 // referencing the cmd.Flags()
 type ScaleOptions struct {
 	Filenames []string
+	Recursive bool
 }
 
 const (
@@ -84,9 +85,11 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait.")
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	usage := "Filename, directory, or URL to a file identifying the resource to set a new size"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	return cmd
 }
 
@@ -106,11 +109,11 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return err
 	}
 
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Filenames...).
+		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()

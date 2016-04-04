@@ -259,7 +259,17 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
-	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	meta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return nil, false, kubeerr.NewInternalError(err)
+	}
+	var preconditions *storage.Preconditions
+	// If the UID of the new object is specified, we use it as an Update precondition.
+	if len(meta.UID) != 0 {
+		UIDCopy := meta.UID
+		preconditions = &storage.Preconditions{UID: &UIDCopy}
+	}
+	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, preconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		// Since we return 'obj' from this function and it can be modified outside this
 		// function, we are resetting resourceVersion to the initial value here.
 		//
@@ -305,7 +315,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 				// TODO: The Invalid error should has a field for Resource.
 				// After that field is added, we should fill the Resource and
 				// leave the Kind field empty. See the discussion in #18526.
-				qualifiedKind := unversioned.GroupKind{e.QualifiedResource.Group, e.QualifiedResource.Resource}
+				qualifiedKind := unversioned.GroupKind{Group: e.QualifiedResource.Group, Kind: e.QualifiedResource.Resource}
 				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), newVersion, "must be specified for an update")}
 				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
@@ -395,6 +405,10 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	if options == nil {
 		options = api.NewDeleteOptions(0)
 	}
+	var preconditions storage.Preconditions
+	if options.Preconditions != nil {
+		preconditions.UID = options.Preconditions.UID
+	}
 	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
 	if err != nil {
 		return nil, err
@@ -408,7 +422,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		out := e.NewFunc()
 		lastGraceful := int64(0)
 		err := e.Storage.GuaranteedUpdate(
-			ctx, key, out, false,
+			ctx, key, out, false, &preconditions,
 			storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
 				graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
 				if err != nil {
@@ -451,7 +465,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
-	if err := e.Storage.Delete(ctx, key, out); err != nil {
+	if err := e.Storage.Delete(ctx, key, out, &preconditions); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
 		// why we ignore the NotFound error .
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
@@ -629,17 +643,17 @@ func (e *Etcd) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) (
 	return ttl, err
 }
 
-func exportObjectMeta(objMeta *api.ObjectMeta, exact bool) {
-	objMeta.UID = ""
+func exportObjectMeta(accessor meta.Object, exact bool) {
+	accessor.SetUID("")
 	if !exact {
-		objMeta.Namespace = ""
+		accessor.SetNamespace("")
 	}
-	objMeta.CreationTimestamp = unversioned.Time{}
-	objMeta.DeletionTimestamp = nil
-	objMeta.ResourceVersion = ""
-	objMeta.SelfLink = ""
-	if len(objMeta.GenerateName) > 0 && !exact {
-		objMeta.Name = ""
+	accessor.SetCreationTimestamp(unversioned.Time{})
+	accessor.SetDeletionTimestamp(nil)
+	accessor.SetResourceVersion("")
+	accessor.SetSelfLink("")
+	if len(accessor.GetGenerateName()) > 0 && !exact {
+		accessor.SetName("")
 	}
 }
 
@@ -649,8 +663,8 @@ func (e *Etcd) Export(ctx api.Context, name string, opts unversioned.ExportOptio
 	if err != nil {
 		return nil, err
 	}
-	if meta, err := api.ObjectMetaFor(obj); err == nil {
-		exportObjectMeta(meta, opts.Exact)
+	if accessor, err := meta.Accessor(obj); err == nil {
+		exportObjectMeta(accessor, opts.Exact)
 	} else {
 		glog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
 	}

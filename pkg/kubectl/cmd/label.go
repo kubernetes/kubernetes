@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -39,6 +40,7 @@ import (
 // referencing the cmd.Flags()
 type LabelOptions struct {
 	Filenames []string
+	Recursive bool
 }
 
 const (
@@ -96,16 +98,18 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("resource-version", "", "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "Filename, directory, or URL to a file identifying the resource to update the labels"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	return cmd
 }
 
-func validateNoOverwrites(meta *api.ObjectMeta, labels map[string]string) error {
+func validateNoOverwrites(accessor meta.Object, labels map[string]string) error {
 	allErrs := []error{}
 	for key := range labels {
-		if value, found := meta.Labels[key]; found {
+		if value, found := accessor.GetLabels()[key]; found {
 			allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, value))
 		}
 	}
@@ -137,29 +141,31 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 }
 
 func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) error {
-	meta, err := api.ObjectMetaFor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
 	if !overwrite {
-		if err := validateNoOverwrites(meta, labels); err != nil {
+		if err := validateNoOverwrites(accessor, labels); err != nil {
 			return err
 		}
 	}
 
-	if meta.Labels == nil {
-		meta.Labels = make(map[string]string)
+	objLabels := accessor.GetLabels()
+	if objLabels == nil {
+		objLabels = make(map[string]string)
 	}
 
 	for key, value := range labels {
-		meta.Labels[key] = value
+		objLabels[key] = value
 	}
 	for _, label := range remove {
-		delete(meta.Labels, label)
+		delete(objLabels, label)
 	}
+	accessor.SetLabels(objLabels)
 
 	if len(resourceVersion) != 0 {
-		meta.ResourceVersion = resourceVersion
+		accessor.SetResourceVersion(resourceVersion)
 	}
 	return nil
 }
@@ -202,11 +208,11 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if err != nil {
 		return cmdutil.UsageError(cmd, err.Error())
 	}
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Filenames...).
+		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(all, resources...).
 		Flatten().
@@ -247,9 +253,12 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			if err != nil {
 				return err
 			}
-			meta, err := api.ObjectMetaFor(obj)
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return err
+			}
 			for _, label := range remove {
-				if _, ok := meta.Labels[label]; !ok {
+				if _, ok := accessor.GetLabels()[label]; !ok {
 					fmt.Fprintf(out, "label %q not found.\n", label)
 				}
 			}
@@ -293,7 +302,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 		outputFormat := cmdutil.GetFlagString(cmd, "output")
 		if outputFormat != "" {
-			return f.PrintObject(cmd, outputObj, out)
+			return f.PrintObject(cmd, mapper, outputObj, out)
 		}
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, dataChangeMsg)
 		return nil

@@ -20,8 +20,27 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
+
+func ExtractGroupVersionKind(list *extensions.ThirdPartyResourceList) ([]unversioned.GroupVersion, []unversioned.GroupVersionKind, error) {
+	gvs := []unversioned.GroupVersion{}
+	gvks := []unversioned.GroupVersionKind{}
+	for ix := range list.Items {
+		rsrc := &list.Items[ix]
+		kind, group, err := ExtractApiGroupAndKind(rsrc)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, version := range rsrc.Versions {
+			gv := unversioned.GroupVersion{Group: group, Version: version.Name}
+			gvs = append(gvs, gv)
+			gvks = append(gvks, unversioned.GroupVersionKind{Group: group, Version: version.Name, Kind: kind})
+		}
+	}
+	return gvs, gvks, nil
+}
 
 func convertToCamelCase(input string) string {
 	result := ""

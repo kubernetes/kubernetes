@@ -43,12 +43,20 @@ Please refer to the models in
     Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.
 
 .PP
+\fB\-\-include\-extended\-apis\fP=true
+    If true, include definitions of new APIs via calls to the API server. [default true]
+
+.PP
 \fB\-o\fP, \fB\-\-output\fP=""
     Output mode. Use "\-o name" for shorter output (resource/name).
 
 .PP
 \fB\-\-record\fP=false
     Record current kubectl command in the resource annotation.
+
+.PP
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    If true, process directory recursively.
 
 .PP
 \fB\-\-save\-config\fP=false
