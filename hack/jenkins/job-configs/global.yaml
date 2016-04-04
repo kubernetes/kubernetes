@@ -146,6 +146,7 @@
         export E2E_MIN_STARTUP_PODS="1"
         export KUBE_GCE_ZONE="us-central1-f"
         export FAIL_ON_GCP_RESOURCE_LEAK="true"
+        export CLOUDSDK_CORE_PRINT_UNHANDLED_TRACEBACKS="1"
     gke-provider-env: |
         export KUBERNETES_PROVIDER="gke"
         export ZONE="us-central1-f"
