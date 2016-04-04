@@ -19,6 +19,7 @@ package dockertools
 import (
 	"time"
 
+	dockertypes "github.com/docker/engine-api/types"
 	docker "github.com/fsouza/go-dockerclient"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -48,7 +49,7 @@ func recordError(operation string, err error) {
 	}
 }
 
-func (in instrumentedDockerInterface) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
+func (in instrumentedDockerInterface) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
 	const operation = "list_containers"
 	defer recordOperation(operation, time.Now())
 

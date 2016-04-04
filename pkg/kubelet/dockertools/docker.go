@@ -26,6 +26,7 @@ import (
 
 	"github.com/docker/docker/pkg/jsonmessage"
 	dockerapi "github.com/docker/engine-api/client"
+	dockertypes "github.com/docker/engine-api/types"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -57,7 +58,7 @@ const (
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
 type DockerInterface interface {
-	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
+	ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error)
 	InspectContainer(id string) (*docker.Container, error)
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
@@ -346,9 +347,9 @@ func milliCPUToShares(milliCPU int64) int64 {
 // GetKubeletDockerContainers lists all container or just the running ones.
 // Returns a list of docker containers that we manage
 // TODO: Move this function with dockerCache to DockerManager.
-func GetKubeletDockerContainers(client DockerInterface, allContainers bool) ([]*docker.APIContainers, error) {
-	result := []*docker.APIContainers{}
-	containers, err := client.ListContainers(docker.ListContainersOptions{All: allContainers})
+func GetKubeletDockerContainers(client DockerInterface, allContainers bool) ([]*dockertypes.Container, error) {
+	result := []*dockertypes.Container{}
+	containers, err := client.ListContainers(dockertypes.ContainerListOptions{All: allContainers})
 	if err != nil {
 		return nil, err
 	}
