@@ -417,6 +417,8 @@ func TestOIDCAuthentication(t *testing.T) {
 			err:         "oidc: JWT claims invalid: token is expired",
 		},
 		{
+			// handlers are attached, but the path is not one that gets bypassed
+			// by OIDC auth.
 			userClaim:        "sub",
 			groupsClaim:      "",
 			token:            "",
@@ -424,8 +426,21 @@ func TestOIDCAuthentication(t *testing.T) {
 			verified:         false,
 			err:              "",
 			handlersAttached: true,
+			path:             "/not_an_oidc_path",
 		},
 		{
+			// The path is an OIDC path, but handlers are not attached.
+			userClaim:        "sub",
+			groupsClaim:      "",
+			token:            "",
+			userInfo:         nil,
+			verified:         false,
+			err:              "",
+			handlersAttached: false,
+			path:             PathExchangeRefreshToken,
+		},
+		{
+			// handlers are attached, and path is an OIDC path.
 			userClaim:        "sub",
 			groupsClaim:      "",
 			token:            "",
@@ -436,6 +451,7 @@ func TestOIDCAuthentication(t *testing.T) {
 			path:             PathExchangeRefreshToken,
 		},
 		{
+			// handlers are attached, and path is an OIDC path.
 			userClaim:        "sub",
 			groupsClaim:      "",
 			token:            "",
@@ -446,6 +462,7 @@ func TestOIDCAuthentication(t *testing.T) {
 			path:             PathAuthenticate,
 		},
 		{
+			// handlers are attached, and path is an OIDC path.
 			userClaim:        "sub",
 			groupsClaim:      "",
 			token:            "",
@@ -456,6 +473,7 @@ func TestOIDCAuthentication(t *testing.T) {
 			path:             PathAuthCallback,
 		},
 		{
+			// handlers are attached, and path is an OIDC path.
 			userClaim:        "sub",
 			groupsClaim:      "",
 			token:            "",
@@ -466,6 +484,8 @@ func TestOIDCAuthentication(t *testing.T) {
 			path:             PathExchangeCode,
 		},
 		{
+			// A valid token is passed, but this is an OIDC path and handlers
+			// are attached, so we bypass the token auth.
 			userClaim:        "sub",
 			groupsClaim:      "",
 			token:            op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
