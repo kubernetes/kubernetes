@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // ClusterSpec describes the attributes of a kubernetes cluster.
@@ -98,4 +99,28 @@ type ClusterList struct {
 
 	// List of Cluster objects.
 	Items []Cluster `json:"items"`
+}
+
+// SubReplicaSet represents the configuration of a replica set scheduled to a Cluster.
+type SubReplicaSet struct {
+	unversioned.TypeMeta `json:",inline"`
+	v1.ObjectMeta        `json:"metadata,omitempty"`
+
+	// Spec defines the desired behavior of this SubReplicaSet.
+	Spec extensionsv1.ReplicaSetSpec `json:"spec,omitempty"`
+
+	// Status is the current status of this SubReplicaSet. This data may be
+	// out of date by some window of time.
+	Status extensionsv1.ReplicaSetStatus `json:"status,omitempty"`
+}
+
+// A list of SubReplicaSets
+type SubReplicaSetList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// List of SubReplicaSet objects.
+	Items []SubReplicaSet `json:"items"`
 }
