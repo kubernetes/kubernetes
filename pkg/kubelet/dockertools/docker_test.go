@@ -81,7 +81,7 @@ func findPodContainer(dockerContainers []*docker.APIContainers, podFullName stri
 }
 
 func TestGetContainerID(t *testing.T) {
-	fakeDocker := &FakeDockerClient{}
+	fakeDocker := NewFakeDockerClient()
 	fakeDocker.SetFakeRunningContainers([]*docker.Container{
 		{
 			ID:   "foobar",
@@ -156,7 +156,7 @@ func TestContainerNaming(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.3", "ApiVersion=1.15"}}
+	fakeDocker := NewFakeDockerClientWithVersion("1.1.3", "1.15")
 	manager := &DockerManager{client: fakeDocker}
 	version, err := manager.Version()
 	if err != nil {
@@ -214,7 +214,7 @@ func TestPullWithNoSecrets(t *testing.T) {
 	}
 	for _, test := range tests {
 		fakeKeyring := &credentialprovider.FakeKeyring{}
-		fakeClient := &FakeDockerClient{}
+		fakeClient := NewFakeDockerClient()
 
 		dp := dockerPuller{
 			client:  fakeClient,
@@ -257,9 +257,9 @@ func TestPullWithJSONError(t *testing.T) {
 	}
 	for i, test := range tests {
 		fakeKeyring := &credentialprovider.FakeKeyring{}
-		fakeClient := &FakeDockerClient{
-			Errors: map[string]error{"pull": test.err},
-		}
+		fakeClient := NewFakeDockerClient()
+		fakeClient.InjectError("pull", test.err)
+
 		puller := &dockerPuller{
 			client:  fakeClient,
 			keyring: fakeKeyring,
@@ -327,7 +327,7 @@ func TestPullWithSecrets(t *testing.T) {
 		builtInKeyRing := &credentialprovider.BasicDockerKeyring{}
 		builtInKeyRing.Add(test.builtInDockerConfig)
 
-		fakeClient := &FakeDockerClient{}
+		fakeClient := NewFakeDockerClient()
 
 		dp := dockerPuller{
 			client:  fakeClient,
@@ -353,9 +353,8 @@ func TestPullWithSecrets(t *testing.T) {
 
 func TestDockerKeyringLookupFails(t *testing.T) {
 	fakeKeyring := &credentialprovider.FakeKeyring{}
-	fakeClient := &FakeDockerClient{
-		Errors: map[string]error{"pull": fmt.Errorf("test error")},
-	}
+	fakeClient := NewFakeDockerClient()
+	fakeClient.InjectError("pull", fmt.Errorf("test error"))
 
 	dp := dockerPuller{
 		client:  fakeClient,
@@ -493,7 +492,7 @@ func (f *imageTrackingDockerClient) InspectImage(name string) (image *docker.Ima
 }
 
 func TestIsImagePresent(t *testing.T) {
-	cl := &imageTrackingDockerClient{&FakeDockerClient{}, ""}
+	cl := &imageTrackingDockerClient{NewFakeDockerClient(), ""}
 	puller := &dockerPuller{
 		client: cl,
 	}
@@ -671,7 +670,7 @@ func TestFindContainersByPod(t *testing.T) {
 			nil,
 		},
 	}
-	fakeClient := &FakeDockerClient{}
+	fakeClient := NewFakeDockerClient()
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
 	// image back-off is set to nil, this test should not pull images
 	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, options.GetDefaultPodInfraContainerImage(), 0, 0, "", containertest.FakeOS{}, np, nil, nil, nil)
