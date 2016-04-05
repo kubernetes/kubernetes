@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"sync"
 
 	"github.com/gogo/protobuf/proto"
 
@@ -41,11 +40,6 @@ var (
 	//
 	// This encoding scheme is experimental, and is subject to change at any time.
 	protoEncodingPrefix = []byte{0x6b, 0x38, 0x73, 0x00}
-
-	bufferSize       = uint64(16384)
-	availableBuffers = sync.Pool{New: func() interface{} {
-		return make([]byte, bufferSize)
-	}}
 )
 
 type errNotMarshalable struct {
@@ -76,9 +70,10 @@ func NewSerializer(creater runtime.ObjectCreater, typer runtime.Typer, defaultCo
 }
 
 type Serializer struct {
-	prefix  []byte
-	creater runtime.ObjectCreater
-	typer   runtime.Typer
+	prefix      []byte
+	creater     runtime.ObjectCreater
+	typer       runtime.Typer
+	contentType string
 }
 
 var _ runtime.Serializer = &Serializer{}
@@ -168,7 +163,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 		return nil, actual, runtime.NewMissingVersionErr(fmt.Sprintf("%#v", unk.TypeMeta))
 	}
 
-	return unmarshalToObject(s.typer, s.creater, actual, into)
+	return unmarshalToObject(s.typer, s.creater, actual, into, unk.Raw)
 }
 
 // EncodeToStream serializes the provided object to the given writer. Overrides is ignored.
@@ -374,13 +369,13 @@ func (s *RawSerializer) Decode(originalData []byte, gvk *unversioned.GroupVersio
 		return nil, actual, runtime.NewMissingVersionErr("<protobuf encoded body - must provide default type>")
 	}
 
-	return unmarshalToObject(s.typer, s.creater, actual, into)
+	return unmarshalToObject(s.typer, s.creater, actual, into, data)
 }
 
 // unmarshalToObject is the common code between decode in the raw and normal serializer.
-func unmarshalToObject(typer runtime.Typer, creater runtime.ObjectCreater, actual *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func unmarshalToObject(typer runtime.Typer, creater runtime.ObjectCreater, actual *unversioned.GroupVersionKind, into runtime.Object, data []byte) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	// use the target if necessary
-	obj, err := runtime.UseOrCreateObject(s.typer, s.creater, *actual, into)
+	obj, err := runtime.UseOrCreateObject(typer, creater, *actual, into)
 	if err != nil {
 		return nil, actual, err
 	}
