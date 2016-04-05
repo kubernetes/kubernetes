@@ -17,12 +17,15 @@ limitations under the License.
 package unversioned
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // DefaultRetry is the recommended retry for a conflict where multiple clients
@@ -166,5 +169,57 @@ func DeploymentHasDesiredReplicas(c ExtensionsInterface, deployment *extensions.
 		}
 		return deployment.Status.ObservedGeneration >= desiredGeneration &&
 			deployment.Status.UpdatedReplicas == deployment.Spec.Replicas, nil
+	}
+}
+
+// ErrPodCompleted is returned by PodRunning or PodContainerRunning to indicate that
+// the pod has already reached completed state.
+var ErrPodCompleted = fmt.Errorf("pod ran to completion")
+
+// PodRunning returns true if the pod is running, false if the pod has not yet reached running state,
+// returns ErrPodCompleted if the pod has run to completion, or an error in any other case.
+func PodRunning(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *api.Pod:
+		switch t.Status.Phase {
+		case api.PodRunning:
+			return true, nil
+		case api.PodFailed, api.PodSucceeded:
+			return false, ErrPodCompleted
+		}
+	}
+	return false, nil
+}
+
+// PodContainerRunning returns false until the named container has ContainerStatus running (at least once),
+// and will return an error if the pod is deleted, runs to completion, or the container pod is not available.
+func PodContainerRunning(containerName string) watch.ConditionFunc {
+	return func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		}
+		switch t := event.Object.(type) {
+		case *api.Pod:
+			switch t.Status.Phase {
+			case api.PodRunning, api.PodPending:
+			case api.PodFailed, api.PodSucceeded:
+				return false, ErrPodCompleted
+			default:
+				return false, nil
+			}
+			for _, s := range t.Status.ContainerStatuses {
+				if s.Name != containerName {
+					continue
+				}
+				return s.State.Running != nil, nil
+			}
+			return false, nil
+		}
+		return false, nil
 	}
 }
