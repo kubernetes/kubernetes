@@ -15,17 +15,19 @@
 # Build the hyperkube image.
 #
 # Usage:
-#   VERSION=v1.1.2 [REGISTRY="gcr.io/google_containers"] make build
+#   VERSION=v1.2.0 [ARCH=amd64] [REGISTRY="gcr.io/google_containers"] make build
 
 REGISTRY?="gcr.io/google_containers"
-ARCH=amd64
-BASEIMAGE=debian:jessie
+ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 
-## Comment in for arm builds, must be run on an arm machine
-# ARCH=arm
-# need to escape '/' for the regexp below
-# BASEIMAGE=armbuild\\/debian:jessie
+
+ifeq ($(ARCH),amd64)
+	BASEIMAGE?=debian:jessie
+endif
+ifeq ($(ARCH),arm)
+	BASEIMAGE?=armel/debian:jessie
+endif
 
 all: build
 
@@ -38,18 +40,27 @@ endif
 	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" master-multi.json master.json kube-proxy.json
-	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" master-multi.json master.json kube-proxy.json
+	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" master-multi.json master.json kube-proxy.json etcd.json Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 	rm ${TEMP_DIR}/*.back
-	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
-	# Backward compatibility.  TODO: deprecate this image tag
+
 ifeq ($(ARCH),amd64)
-	docker tag -f ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
+	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
+	cd ${TEMP_DIR} && sed -i "/CROSS_BUILD_/d" Dockerfile
+else
+	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
+	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
+	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-${ARCH}-static.tar.xz | tar -xJ -C ${TEMP_DIR}
+	cd ${TEMP_DIR} && sed -i "s/CROSS_BUILD_//g" Dockerfile
 endif
+
+	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 
 push: build
 	gcloud docker push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
+	docker tag -f ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
 	gcloud docker push ${REGISTRY}/hyperkube:${VERSION}
 endif
 
