@@ -38,7 +38,6 @@ KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*
 # kube::release::parse_and_validate_ci_version()
 KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
 
-
 # Generate kubeconfig data for the created cluster.
 # Assumed vars:
 #   KUBE_USER
@@ -200,6 +199,15 @@ function get-kubeconfig-bearertoken() {
 #   KUBE_BEARER_TOKEN
 function gen-kube-bearertoken() {
     KUBE_BEARER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+}
+
+# Generate uuid
+# This function only works on systems with /proc/sys/kernel/random/uuid.
+#
+# Vars set:
+#   KUBE_UUID
+function gen-uuid {
+    KUBE_UUID=$(cat /proc/sys/kernel/random/uuid)
 }
 
 
@@ -456,6 +464,7 @@ function build-kube-env {
   local file=$2
 
   build-runtime-config
+  gen-uuid
 
   rm -f ${file}
   cat >$file <<EOF
@@ -503,6 +512,7 @@ KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
 KUBE_ADDON_REGISTRY: $(yaml-quote ${KUBE_ADDON_REGISTRY:-})
 MULTIZONE: $(yaml-quote ${MULTIZONE:-})
 NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
+KUBE_UUID: $(yaml-quote ${KUBE_UUID:-})
 EOF
   if [ -n "${KUBELET_PORT:-}" ]; then
     cat >>$file <<EOF
