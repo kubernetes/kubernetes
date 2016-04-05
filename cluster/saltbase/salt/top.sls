@@ -57,6 +57,9 @@ base:
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
     - cni
 {% endif %}
+{% if pillar.get('enable_l7_loadbalancing', '').lower() == 'glbc' %}
+    - l7-gcp
+{% endif %}
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler
