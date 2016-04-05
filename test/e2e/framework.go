@@ -199,7 +199,7 @@ func (f *Framework) afterEach() {
 	summaries := make([]TestDataSummary, 0)
 	if testContext.GatherKubeSystemResourceUsageData && f.gatherer != nil {
 		By("Collecting resource usage data")
-		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99}, f.addonResourceConstraints))
+		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99, 100}, f.addonResourceConstraints))
 	}
 
 	if testContext.GatherLogsSizes {
