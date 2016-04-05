@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // An interface for chaos-monkey-testing a specific feature
@@ -25,6 +26,7 @@ type Interface interface {
 type disruption func() error
 
 type test struct {
+	name        string
 	Interface
 	setupErr    error
 	testErr     error
@@ -34,94 +36,107 @@ type test struct {
 
 // A jig for testing functionality across a disruptive event.
 type Jig struct {
+	name       string
 	disruption disruption
 	tests      []test
 }
 
-func New(d disruption, ins ...Interface) *Jig {
-	tests := make([]test, len(ins))
-	for i, in := range ins {
-		tests[i] = test{in, nil, nil, nil, nil}
-	}
-	return &Jig{d, tests}
+func New(name string, d disruption) *Jig {
+	return &Jig{name, d, []test{}}
 }
 
-func (j *Jig) Run() {
+func (j *Jig) Register(name string, in Interface) {
+	j.tests = append(j.tests, test{name, in, nil, nil, nil, nil})
+}
+
+// Because upgrading is a destructive and long-running operation, we must setup
+// and run tests all at once, before beginning the upgrade, then run the
+// upgrade, then aggregate the tests.
+//
+// It's awkward to rely on Ginkgo's parallelism model because it doesn't have a
+// good way of ensuring that all tests can be run simultaneously, which
+// presents a risk of deadlock: if all tests aren't running simultaneously, we
+// can't start the disruption.
+// 
+// However, because Ginkgo must compute test tree beforehand, we can't put any
+// of the logic outside of BeforeEach or It.  So, we do the entire test inside
+// of a sync.Once nested in a BeforeEach.
+//
+// This model does, however, place nice with Ginkgo's parallelism model,
+// (though running these tests in parallel won't add much, just faster
+// reporting): if more than one test runner is kicked off, the Its will block
+// on BeforeEach, which itself blocks on the once.Do returning the first time.
+func (j *Jig) Do() {
 	var wg sync.WaitGroup
-	failed := false
+	var once sync.Once
 
-	// Run Setup for all registered tests, and wait to finish
-	//
-	// TODO(ihmccreery) Consider breaking this into a separate BeforeEach
-	// call.
-	for _, test := range j.tests {
-		wg.Add(1)
-		go func(t Interface) {
-			defer wg.Done()
-			test.setupErr = t.Setup()
-		}(test)
-	}
-	wg.Wait()
+	var _ = Describe(fmt.Sprintf("Chaos monkey %v", j.name), func() {
+		BeforeEach(func() {
+			// No call to Do returns until the one call to f
+			// returns, so this will block any Its from commencing
+			once.Do(func() {
+				// Run Setup for all registered tests, and wait
+				// to finish
+				for _, test := range j.tests {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						test.setupErr = test.Setup()
+					}()
+				}
+				wg.Wait()
 
-	// go run Test for all registered tests
-	for _, test := range j.tests {
-		test.channel = make(chan int)
-		wg.Add(1)
-		go func(t Interface) {
-			defer wg.Done()
-			test.testErr = t.Test(test.channel)
-		}(test)
-	}
-	// Trigger upgrade
-	if err := j.disruption(); err != nil {
-		// TODO(ihmccreery) Make this Logf, once it's factored into its
-		// own package
-		fmt.Fprintf(GinkgoWriter, err.Error())
-	}
-	// Once upgrade is done, signal to all Tests that upgrade is finished, and wait for all
-	// tests to finish
-	for _, test := range j.tests {
-		test.channel <- 1
-	}
-	wg.Wait()
+				// go run Test for all registered tests
+				for _, test := range j.tests {
+					test.channel = make(chan int)
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						test.testErr = test.Test(test.channel)
+					}()
+				}
+				// Trigger upgrade
+				if err := j.disruption(); err != nil {
+					// TODO(ihmccreery) Make this Logf,
+					// once it's factored into its own
+					// package
+					fmt.Fprintf(GinkgoWriter, err.Error())
+				}
+				// Once upgrade is done, signal to all Tests
+				// that upgrade is finished, and wait for all
+				// tests to finish
+				for _, test := range j.tests {
+					test.channel <- 1
+				}
+				wg.Wait()
 
-	// Call Teardown on all tests
-	//
-	// TODO(ihmccreery) Consider breaking this into a separate AfterEach
-	// call.
-	for _, test := range j.tests {
-		wg.Add(1)
-		go func(t Interface) {
-			defer wg.Done()
-			test.teardownErr = t.Teardown()
-		}(test)
-	}
-	wg.Wait()
+				// Call Teardown on all tests
+				//
+				// TODO(ihmccreery) Consider breaking this into a separate AfterEach
+				// call.
+				for _, test := range j.tests {
+					wg.Add(1)
+					go func(t Interface) {
+						defer wg.Done()
+						test.teardownErr = t.Teardown()
+					}(test)
+				}
+				wg.Wait()
+			})
+		})
 
-	// Collect & aggregate results of Tests, and report
-	for _, test := range j.tests {
-		if test.setupErr != nil{
-			// TODO(ihmccreery) Make this Logf, once it's factored
-			// into its own package
-			fmt.Fprintf(GinkgoWriter, test.setupErr.Error())
-			failed = true
+		It(j.name, func() {
+			// Check to make sure that the upgrade actually worked.
+			// Not sure what the right abstraction here is.
+		})
+		for _, test := range j.tests {
+			It(test.name, func() {
+				// TODO(ihmccreery) Make this expectNoError,
+				// once it's factored into its own package
+				Expect(test.setupErr).NotTo(HaveOccurred())
+				Expect(test.testErr).NotTo(HaveOccurred())
+				Expect(test.teardownErr).NotTo(HaveOccurred())
+			})
 		}
-		if test.testErr != nil{
-			// TODO(ihmccreery) Make this Logf, once it's factored
-			// into its own package
-			fmt.Fprintf(GinkgoWriter, test.testErr.Error())
-			failed = true
-		}
-		if test.teardownErr != nil{
-			// TODO(ihmccreery) Make this Logf, once it's factored
-			// into its own package
-			fmt.Fprintf(GinkgoWriter, test.teardownErr.Error())
-			failed = true
-		}
-	}
-	if failed {
-		// TODO(ihmccreery) Make this Failf, once it's factored into
-		// its own package
-		Fail("At least one error encountered during test", 1)
-	}
+	})
 }
