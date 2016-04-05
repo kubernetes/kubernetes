@@ -15,7 +15,7 @@
 # This file creates a standard build environment for building cross
 # platform go binary for the architecture kubernetes cares about.
 
-FROM  golang:1.4.2
+FROM golang:1.6.0
 
 ENV GOARM 6
 ENV KUBE_DYNAMIC_CROSSPLATFORMS \
@@ -27,24 +27,24 @@ ENV KUBE_CROSSPLATFORMS \
   darwin/amd64 darwin/386 \
   windows/amd64 windows/386
 
-RUN cd /usr/src/go/src \
-  && for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean; done
+# Pre-compile the standard go library when cross-compiling. This is much easier now when we have go1.5+
+RUN for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} go install std; done
 
 # Install g++, then download and install protoc for generating protobuf output
 RUN apt-get update \
   && apt-get install -y g++ rsync \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /usr/local/src/protobuf && cd /usr/local/src/protobuf &&\
-    wget -q https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protobuf-cpp-3.0.0-beta-2.tar.gz &&\
-    tar xzvf protobuf-cpp-3.0.0-beta-2.tar.gz &&\
-    cd protobuf-3.0.0-beta-2 &&\
-    ./configure &&\
-    make install &&\
-    ldconfig &&\
-    cd .. &&\
-    rm -rf protobuf-3.0.0-beta-2 &&\
-    protoc --version
+RUN mkdir -p /usr/local/src/protobuf \
+  && cd /usr/local/src/protobuf \
+  && curl -sSL https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protobuf-cpp-3.0.0-beta-2.tar.gz | tar -xzv \
+  && cd protobuf-3.0.0-beta-2 \
+  && ./configure \
+  && make install \
+  && ldconfig \
+  && cd .. \
+  && rm -rf protobuf-3.0.0-beta-2 \
+  && protoc --version
 
 # Use dynamic cgo linking for architectures other than amd64 for the server platforms
 # More info here: https://wiki.debian.org/CrossToolchains
@@ -60,13 +60,12 @@ RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.
 ENV TMPDIR /tmp.k8s
 
 # Get the code coverage tool and godep
-RUN mkdir $TMPDIR && \
-    go get golang.org/x/tools/cmd/cover github.com/tools/godep
+RUN mkdir $TMPDIR \
+  && go get golang.org/x/tools/cmd/cover github.com/tools/godep
 
-# Download and symlink etcd.  We need this for our integration tests.
+# Download and symlink etcd. We need this for our integration tests.
 RUN export ETCD_VERSION=v2.2.1; \
-    mkdir -p /usr/local/src/etcd &&\
-    cd /usr/local/src/etcd &&\
-    curl -fsSLO https://github.com/coreos/etcd/releases/download/$ETCD_VERSION/etcd-$ETCD_VERSION-linux-amd64.tar.gz &&\
-    tar xzf etcd-$ETCD_VERSION-linux-amd64.tar.gz &&\
-    ln -s ../src/etcd/etcd-$ETCD_VERSION-linux-amd64/etcd /usr/local/bin/
+  mkdir -p /usr/local/src/etcd \
+  && cd /usr/local/src/etcd \
+  && curl -fsSL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz | tar -xz \
+  && ln -s ../src/etcd/etcd-${ETCD_VERSION}-linux-amd64/etcd /usr/local/bin/
