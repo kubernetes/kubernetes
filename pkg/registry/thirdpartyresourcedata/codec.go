@@ -432,7 +432,8 @@ func (t *thirdPartyResourceDataCreator) New(kind unversioned.GroupVersionKind) (
 			return nil, fmt.Errorf("unknown kind %v", kind)
 		}
 		return &extensions.ThirdPartyResourceDataList{}, nil
-	case "ListOptions":
+	// TODO: this list needs to be formalized higher in the chain
+	case "ListOptions", "WatchEvent":
 		if apiutil.GetGroupVersion(t.group, t.version) == kind.GroupVersion().String() {
 			// Translate third party group to external group.
 			gvk := registered.EnabledVersionsForGroup(api.GroupName)[0].WithKind(kind.Kind)

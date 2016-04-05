@@ -38,7 +38,7 @@ import (
 
 func init() {
 	codecsToTest = append(codecsToTest, func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error) {
-		s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme))
+		s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), "application/arbitrary.content.type")
 		return api.Codecs.CodecForVersions(s, testapi.ExternalGroupVersions(), nil), nil
 	})
 }
@@ -65,7 +65,7 @@ func TestProtobufRoundTrip(t *testing.T) {
 func BenchmarkEncodeCodecProtobuf(b *testing.B) {
 	items := benchmarkItems()
 	width := len(items)
-	s := protobuf.NewSerializer(nil, nil)
+	s := protobuf.NewSerializer(nil, nil, "application/arbitrary.content.type")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if _, err := runtime.Encode(s, &items[i%width]); err != nil {
@@ -86,7 +86,7 @@ func BenchmarkEncodeCodecFromInternalProtobuf(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
-	s := protobuf.NewSerializer(nil, nil)
+	s := protobuf.NewSerializer(nil, nil, "application/arbitrary.content.type")
 	codec := api.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

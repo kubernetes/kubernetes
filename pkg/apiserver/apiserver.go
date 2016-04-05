@@ -84,8 +84,13 @@ type APIGroupVersion struct {
 
 	Mapper meta.RESTMapper
 
-	Serializer     runtime.NegotiatedSerializer
-	ParameterCodec runtime.ParameterCodec
+	// Serializer is used to determine how to convert responses from API methods into bytes to send over
+	// the wire.
+	Serializer runtime.NegotiatedSerializer
+	// StreamSerializer is used for sending a series of objects to the client over a single channel, where
+	// the underlying channel has no innate framing (such as an io.Writer)
+	StreamSerializer runtime.NegotiatedSerializer
+	ParameterCodec   runtime.ParameterCodec
 
 	Typer     runtime.ObjectTyper
 	Creater   runtime.ObjectCreater
