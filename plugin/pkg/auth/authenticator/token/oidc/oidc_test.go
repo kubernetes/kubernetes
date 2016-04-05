@@ -25,6 +25,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -571,5 +572,128 @@ func TestNewOIDCHttpHandler(t *testing.T) {
 		if !tt.wantErr && hdlr == nil {
 			t.Errorf("#%d: Want non-nil hdlr", i)
 		}
+	}
+}
+
+type fakeClient struct {
+	err        error
+	idTokenJWT jose.JWT
+}
+
+func (f *fakeClient) RefreshToken(rt string) (jose.JWT, error) {
+	return f.idTokenJWT, f.err
+}
+
+func TestHandleExchangeRefreshToken(t *testing.T) {
+	op := newOIDCProvider(t)
+	goodToken := op.generateGoodToken(t, "http://auth.example.com", "client-foo", "client-foo", "sub", "user-foo", "", nil)
+	goodTokenBytes := []byte(goodToken)
+	goodTokenJWT, err := jose.ParseJWT(goodToken)
+	if err != nil {
+		t.Fatalf("Could not parse JWT: %v", err)
+	}
+
+	tests := []struct {
+		// creating the request
+		path   string
+		method string
+		rt     string
+
+		// response from OIDC Client
+		returnIDToken jose.JWT
+		returnErr     error
+
+		// expectations
+		wantIDTokenBytes []byte
+		wantStatus       int
+	}{
+		{
+			// The Happy Path
+			path:   PathExchangeRefreshToken,
+			method: "POST",
+			rt:     "rt_good",
+
+			returnIDToken: goodTokenJWT,
+
+			wantIDTokenBytes: goodTokenBytes,
+			wantStatus:       http.StatusOK,
+		},
+		{
+			// Wrong method
+			path:   PathExchangeRefreshToken,
+			method: "GET",
+			rt:     "rt_good",
+
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			// Wrong Path
+			path:   PathExchangeRefreshToken + "_oops",
+			method: "POST",
+			rt:     "rt_good",
+
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			// No refresh token provided
+			path:   PathExchangeRefreshToken,
+			method: "POST",
+
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			// Error during exchange
+			path:   PathExchangeRefreshToken,
+			method: "POST",
+			rt:     "rt_good",
+
+			returnErr: errors.New("No such Refresh Token"),
+
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+
+	for i, tt := range tests {
+		req, err := http.NewRequest(
+			tt.method,
+			"https://auth.example.com"+tt.path,
+			strings.NewReader(
+				url.Values{
+					"refresh_token": []string{tt.rt},
+				}.Encode(),
+			))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if err != nil {
+			t.Errorf("case %d: could not make request: %v", i, err)
+		}
+
+		client := &fakeClient{
+			err:        tt.returnErr,
+			idTokenJWT: tt.returnIDToken,
+		}
+		h := OIDCHTTPHandler{
+			client: client,
+		}
+
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+
+		if w.Code != tt.wantStatus {
+			t.Errorf("case %d: want %d, got %d", i, tt.wantStatus, w.Code)
+		}
+
+		if tt.wantIDTokenBytes != nil {
+			resVals, err := url.ParseQuery(w.Body.String())
+			if err != nil {
+				t.Errorf("case %d: unexpected error parsing response body: %v", i, err)
+				continue
+			}
+
+			gotIDTokenBytes := []byte(resVals.Get("id_token"))
+			if string(gotIDTokenBytes) != string(tt.wantIDTokenBytes) {
+				t.Errorf("case %d: want %v, got %v", i, tt.wantIDTokenBytes, gotIDTokenBytes)
+			}
+		}
+
 	}
 }

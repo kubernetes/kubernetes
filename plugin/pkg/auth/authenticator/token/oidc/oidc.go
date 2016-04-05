@@ -74,7 +74,13 @@ type OIDCAuthenticator struct {
 }
 
 type OIDCHTTPHandler struct {
-	client *oidc.Client
+	client OIDCClient
+}
+
+// OIDCClient peforms the subset of OIDC related operations necessary for the HTTP Handler.
+type OIDCClient interface {
+	// RefreshToken exchanges a refresh token for an ID token.
+	RefreshToken(rt string) (jose.JWT, error)
 }
 
 // New creates a new request Authenticator which uses OpenID Connect ID Tokens for authentication.
@@ -274,7 +280,7 @@ func (t *OIDCHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		t.handleExchangeCode(w, r)
 		return
 	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 }
