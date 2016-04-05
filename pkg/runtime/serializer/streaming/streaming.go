@@ -20,6 +20,7 @@ package streaming
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -52,9 +53,11 @@ type Serializer interface {
 }
 
 type decoder struct {
-	reader  io.Reader
-	decoder runtime.Decoder
-	buf     []byte
+	reader    io.Reader
+	decoder   runtime.Decoder
+	buf       []byte
+	maxBytes  int
+	resetRead bool
 }
 
 // NewDecoder creates a streaming decoder that reads object chunks from r and decodes them with d.
@@ -62,22 +65,50 @@ type decoder struct {
 // an entire object.
 func NewDecoder(r io.Reader, d runtime.Decoder) Decoder {
 	return &decoder{
-		reader:  r,
-		decoder: d,
-		buf:     make([]byte, 1024*1024),
+		reader:   r,
+		decoder:  d,
+		buf:      make([]byte, 1024),
+		maxBytes: 1024 * 1024,
 	}
 }
 
+var ErrObjectTooLarge = fmt.Errorf("object to decode was longer than maximum allowed size")
+
 // Decode reads the next object from the stream and decodes it.
 func (d *decoder) Decode(defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
-	// TODO: instead of depending on a fixed sized buffer, we should handle ErrShortRead specially and
-	// grow the buffer capacity up to a maximum amount. Requires the framer to allow repeated reads to
-	// the stream until the frame is finished.
-	n, err := d.reader.Read(d.buf)
-	if err != nil {
-		return nil, nil, err
+	base := 0
+	for {
+		n, err := d.reader.Read(d.buf[base:])
+		if err == io.ErrShortBuffer {
+			if n == 0 {
+				return nil, nil, fmt.Errorf("got short buffer with n=0, base=%d, cap=%d", base, cap(d.buf))
+			}
+			if d.resetRead {
+				continue
+			}
+			// double the buffer size up to maxBytes
+			if cap(d.buf) < d.maxBytes {
+				base += n
+				d.buf = append(d.buf, make([]byte, cap(d.buf))...)
+				continue
+			}
+			// must read the rest of the frame (until we stop getting ErrShortBuffer)
+			d.resetRead = true
+			base = 0
+			return nil, nil, ErrObjectTooLarge
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		if d.resetRead {
+			// now that we have drained the large read, continue
+			d.resetRead = false
+			continue
+		}
+		base += n
+		break
 	}
-	return d.decoder.Decode(d.buf[:n], defaults, into)
+	return d.decoder.Decode(d.buf[:base], defaults, into)
 }
 
 type encoder struct {
