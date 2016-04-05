@@ -1,37 +1,41 @@
-# Proposal: Self-hosted Kubelet
+# Proposal: Self-hosted kubelet
 
 ## Abstract
 
-In a self-hosted Kubernetes deployment, we have the initial bootstrap problem. This proposal presents a solution to the Kubelet bootstrap, and assumes a functioning "bootstrap" control plane, and a Kubelet that can securely contact the API server.
+In a self-hosted Kubernetes deployment, we have the initial bootstrap problem. This proposal presents a solution to the kubelet bootstrap, and assumes a functioning control plane, and a kubelet that can securely contact the API server.
 
 ## Background
 
-Our current approach to a self-hosted Kubelet is a "pivot" style installation. This procedure assumes a short-lived “bootstrap” Kubelet will run and start a long-running “self-hosted” Kubelet. Once the self-hosted Kubelet is running the bootstrap Kubelet will exit. Briefly, the following steps summarize a generic outline for this pivot:
-
-1. "bootstrap" Kubelet run by $init_system starts with `--runonce`, `--lock-file`, `--api-servers`, repeatedly until it pulls down Kubelet pod and starts it.
-1. "bootstrap" Kubelet exits.
-1. "managed" Kubelet is now ready to begin functioning in the cluster.
-
-Additionally, this process could be made simpler via [Taints and Tolerations](https://github.com/kubernetes/kubernetes/blob/master/docs/design/taint-toleration-dedicated.md), where the “bootstrap” Kubelet would register itself with a given taint, which would be tolerated by the “self-hosted” Kubelet.
+Our current approach to a self-hosted kubelet is a "pivot" style installation. This procedure assumes a short-lived “bootstrap” kubelet will run and start a long-running “self-hosted” kubelet. Once the self-hosted kubelet is running the bootstrap kubelet will exit. As part of this, we propose introducing a new `--bootstrap` flag to the kubelet. The behaviour of that flag will be explained in detail below.
 
 ## Proposal
 
-We propose adding a patch to the Kubelet that would allow it to contact an API server while in “runonce” mode (e.g. running with the `--runonce` flag set). Additionally, we intend to remove the hard-coded timeout for a Kubelet in “runonce” mode, and introduce another flag `--runonce-timeout` which will control the duration of time to wait before forcing the Kubelet to exit. This work has already been started (**Issue:** https://github.com/kubernetes/kubernetes/issues/23073, **PR:** https://github.com/kubernetes/kubernetes/pull/23074).
+We propose adding a new flag to the kubelet, the `--bootstrap` flag, which is assumed to be used in conjunction with the `--lock-file` flag. When the `--bootstrap` flag is provided, after the kubelet acquires the file lock, it will begin asynchronously waiting on [inotify](http://man7.org/linux/man-pages/man7/inotify.7.html) events. Once an "open" event is received, the kubelet will assume another kubelet is attempting to take control and will exit. In this process, the $init system would be responsible for ensuring a kubelet is always running on the node.
 
-Additionally, [Taints and Tolerations](https://github.com/kubernetes/kubernetes/blob/master/docs/design/taint-toleration-dedicated.md), whose design has already been accepted, would make the overall Kubelet bootstrap more deterministic. With this, we would also need the ability for a Kubelet to register itself with a given taint when it first contacts the API server. Given that, a Kubelet could register itself with a given taint such as “component=kubelet”, and a Kubelet pod could exist that has a toleration to that taint, ensuring it is the only pod the “bootstrap” Kubelet runs.
+Thus, the initial bootstrap becomes:
 
-This will allow a "self-hosted" Kubelet with minimal new concepts introduced into the core Kubernetes code base, and remains flexible enough to work well with future [bootstrapping services](https://github.com/kubernetes/kubernetes/issues/5754).
+1. "bootstrap" kubelet is started by $init system.
+1. "bootstrap" kubelet pulls down "self-hosted" kubelet as a pod from a daemonset
+1. "self-hosted" kubelet attempts to acquire the file lock, causing "bootstrap" kubelet to exit
+1. "self-hosted" kubelet acquires lock and takes over
+1. "bootstrap" kubelet is restarted by $init system and blocks on acquiring the file lock
 
-To expand on this, we envision a flow similar to the following:
+During an upgrade of the kubelet, for simplicity we will consider 3 kubelets, namely "bootstrap", "v1", and "v2". We imagine the following scenario for upgrades:
 
-1. Systemd (or $init_system) continually runs “bootstrap” Kubelet in “runonce” mode with a file lock until it pulls down a “self-hosted” Kubelet pod and runs it.
-1. “Self-hosted” Kubelet starts up and acquires file lock.
-1. Systemd (or $init_system) loop sees that the file lock has been acquired and does nothing.
+1. Cluster administrator introduces "v2" kubelet daemonset
+1. "v1" kubelet pulls down and starts "v2"
+1. Cluster administrator removes "v1" kubelet daemonset
+1. "v1" kubelet is killed
+1. Both "bootstrap" and "v2" kubelets race for file lock
+1. If "v2" kubelet acquires lock, process has completed
+1. If "bootstrap" kubelet acquires lock, it is assumed that "v2" kubelet will fail a health check and be killed. Once restarted, it will try to acquire the lock, triggering the "bootstrap" kubelet to exit.
 
-In this process, the init system would be responsible for ensuring a Kubelet is always running on the node.
+Alternatively, it would also be possible via this mechanism to delete the "v1" daemonset first, allow the "bootstrap" kubelet to take over, and then introduce the "v2" kubelet daemonset, effectively eliminating the race between "bootstrap" and "v2" for lock acquisition, and the reliance on the failing health check procedure.
 
+This will allow a "self-hosted" kubelet with minimal new concepts introduced into the core Kubernetes code base, and remains flexible enough to work well with future [bootstrapping services](https://github.com/kubernetes/kubernetes/issues/5754).
 
 ## Other discussion
 
-Various similar approaches have been discussed [here](https://github.com/kubernetes/kubernetes/issues/246#issuecomment-64533959) and [here](https://github.com/kubernetes/kubernetes/issues/23073#issuecomment-198478997). This also relies on the Kubelet being able to be run inside a container, more discussion on that is [here](https://github.com/kubernetes/kubernetes/issues/4869).
+Various similar approaches have been discussed [here](https://github.com/kubernetes/kubernetes/issues/246#issuecomment-64533959) and [here](https://github.com/kubernetes/kubernetes/issues/23073#issuecomment-198478997). This also relies on the kubelet being able to be run inside a container, more discussion on that is [here](https://github.com/kubernetes/kubernetes/issues/4869).
 
+Additionally, [Taints and Tolerations](https://github.com/kubernetes/kubernetes/blob/master/docs/design/taint-toleration-dedicated.md), whose design has already been accepted, would make the overall kubelet bootstrap more deterministic. With this, we would also need the ability for a kubelet to register itself with a given taint when it first contacts the API server. Given that, a kubelet could register itself with a given taint such as “component=kubelet”, and a kubelet pod could exist that has a toleration to that taint, ensuring it is the only pod the “bootstrap” kubelet runs.
