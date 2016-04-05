@@ -20,7 +20,6 @@ package oom
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -49,16 +48,6 @@ func getPids(cgroupName string) ([]int, error) {
 	return fsManager.GetPids()
 }
 
-func syscallNotExists(err error) bool {
-	if err == nil {
-		return false
-	}
-	if e, ok := err.(*os.SyscallError); ok && os.IsNotExist(e) {
-		return true
-	}
-	return false
-}
-
 // Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
 // Returns os.ErrNotExist if the `pid` does not exist.
 func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
@@ -78,12 +67,19 @@ func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	value := strconv.Itoa(oomScoreAdj)
 	var err error
 	for i := 0; i < maxTries; i++ {
-		if err = ioutil.WriteFile(oomScoreAdjPath, []byte(value), 0700); err != nil {
-			if syscallNotExists(err) {
+		f, err := os.Open(oomScoreAdjPath)
+		if err != nil {
+			if os.IsNotExist(err) {
 				return os.ErrNotExist
 			}
-			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", err)
+			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", pid, err)
+			continue
 		}
+		if _, err := f.Write([]byte(value)); err != nil {
+			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", pid, err)
+			continue
+		}
+		return nil
 	}
 	return err
 }
@@ -96,20 +92,26 @@ func (oomAdjuster *OOMAdjuster) applyOOMScoreAdjContainer(cgroupName string, oom
 		continueAdjusting := false
 		pidList, err := oomAdjuster.pidLister(cgroupName)
 		if err != nil {
-			if syscallNotExists(err) {
+			if os.IsNotExist(err) {
 				// Nothing to do since the container doesn't exist anymore.
 				return os.ErrNotExist
 			}
 			continueAdjusting = true
-			glog.Errorf("Error getting process list for cgroup %s: %+v", cgroupName, err)
+			glog.V(10).Infof("Error getting process list for cgroup %s: %+v", cgroupName, err)
 		} else if len(pidList) == 0 {
+			glog.V(10).Infof("Pid list is empty")
 			continueAdjusting = true
 		} else {
 			for _, pid := range pidList {
 				if !adjustedProcessSet[pid] {
-					continueAdjusting = true
+					glog.V(10).Infof("pid %d needs to be set", pid)
 					if err = oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err == nil {
 						adjustedProcessSet[pid] = true
+					} else if err == os.ErrNotExist {
+						continue
+					} else {
+						glog.V(10).Infof("cannot adjust oom score for pid %d - %v", pid, err)
+						continueAdjusting = true
 					}
 					// Processes can come and go while we try to apply oom score adjust value. So ignore errors here.
 				}

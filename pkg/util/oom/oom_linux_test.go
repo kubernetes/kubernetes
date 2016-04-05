@@ -19,7 +19,10 @@ limitations under the License.
 package oom
 
 import (
+	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Converts a sequence of PID lists into a PID lister.
@@ -62,10 +65,9 @@ func applyOOMScoreAdjContainerTester(pidListSequence [][]int, maxTries int, appl
 	} else if err != nil {
 		return
 	}
-
 	// Check that OOM scores were applied to the right processes.
 	if len(appliedPids) != len(pidOOMs) {
-		t.Errorf("Applied OOM scores to incorrect number of processes")
+		t.Errorf("Applied OOM scores to incorrect number of processes - %+v vs %v", appliedPids, pidOOMs)
 		return
 	}
 	for _, pid := range appliedPids {
@@ -82,29 +84,21 @@ func TestOOMScoreAdjContainer(t *testing.T) {
 	pidListSequence1 := [][]int{
 		{1, 2},
 	}
-	applyOOMScoreAdjContainerTester(pidListSequence1, 1, nil, true, t)
-	applyOOMScoreAdjContainerTester(pidListSequence1, 2, []int{1, 2}, false, t)
-	applyOOMScoreAdjContainerTester(pidListSequence1, 3, []int{1, 2}, false, t)
-
-	pidListSequence3 := [][]int{
-		{1, 2},
-		{1, 2, 4, 5},
-		{2, 1, 4, 5, 3},
-	}
-	applyOOMScoreAdjContainerTester(pidListSequence3, 1, nil, true, t)
-	applyOOMScoreAdjContainerTester(pidListSequence3, 2, nil, true, t)
-	applyOOMScoreAdjContainerTester(pidListSequence3, 3, nil, true, t)
-	applyOOMScoreAdjContainerTester(pidListSequence3, 4, []int{1, 2, 3, 4, 5}, false, t)
+	applyOOMScoreAdjContainerTester(pidListSequence1, 1, []int{1, 2}, false, t)
 
 	pidListSequenceLag := [][]int{
 		{},
 		{},
 		{},
 		{1, 2, 4},
-		{1, 2, 4, 5},
 	}
-	for i := 1; i < 5; i++ {
+	for i := 1; i < 4; i++ {
 		applyOOMScoreAdjContainerTester(pidListSequenceLag, i, nil, true, t)
 	}
-	applyOOMScoreAdjContainerTester(pidListSequenceLag, 6, []int{1, 2, 4, 5}, false, t)
+	applyOOMScoreAdjContainerTester(pidListSequenceLag, 4, []int{1, 2, 4}, false, t)
+}
+
+func TestPidListerFailure(t *testing.T) {
+	_, err := getPids("/does/not/exist")
+	assert.True(t, os.IsNotExist(err), "expected getPids to return not exists error. Got %v", err)
 }
