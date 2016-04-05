@@ -856,14 +856,22 @@ func describeContainers(containers []api.Container, containerStatuses []api.Cont
 		}
 		fmt.Fprintf(out, "    Environment Variables:%s\n", none)
 		for _, e := range container.Env {
-			if e.ValueFrom != nil && e.ValueFrom.FieldRef != nil {
+			if e.ValueFrom == nil {
+				fmt.Fprintf(out, "      %s:\t%s\n", e.Name, e.Value)
+				continue
+			}
+
+			switch {
+			case e.ValueFrom.FieldRef != nil:
 				var valueFrom string
 				if resolverFn != nil {
 					valueFrom = resolverFn(e)
 				}
 				fmt.Fprintf(out, "      %s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
-			} else {
-				fmt.Fprintf(out, "      %s:\t%s\n", e.Name, e.Value)
+			case e.ValueFrom.SecretKeyRef != nil:
+				fmt.Fprintf(out, "      %s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
+			case e.ValueFrom.ConfigMapKeyRef != nil:
+				fmt.Fprintf(out, "      %s:\t<set to the key '%s' of config map '%s'>\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name)
 			}
 		}
 	}
