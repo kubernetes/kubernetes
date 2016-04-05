@@ -33,10 +33,15 @@ Logo (with border):
    * [PNG format](https://github.com/kubernetes/kubernetes/raw/master/logo/logo_with_border.png)
    * [PDF format](https://github.com/kubernetes/kubernetes/raw/master/logo/logo_with_border.pdf)
 
-Name:
-   * [SVG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name.svg)
-   * [PNG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name.png)
-   * [PDF format](https://github.com/kubernetes/kubernetes/raw/master/logo/name.pdf)
+Name (white):
+   * [SVG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_white.svg)
+   * [PNG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_white.png)
+   * [PDF format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_white.pdf)
+
+Name (blue):
+   * [SVG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_blue.svg)
+   * [PNG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_blue.png)
+   * [PDF format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_blue.pdf)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/logo/usage_guidelines.md?pixel)]()
