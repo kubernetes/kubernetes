@@ -3439,6 +3439,24 @@ func Convert_extensions_JobStatus_To_v1beta1_JobStatus(in *extensions.JobStatus,
 	return autoConvert_extensions_JobStatus_To_v1beta1_JobStatus(in, out, s)
 }
 
+func autoConvert_extensions_Parameter_To_v1beta1_Parameter(in *extensions.Parameter, out *Parameter, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.Parameter))(in)
+	}
+	out.Name = in.Name
+	out.DisplayName = in.DisplayName
+	out.Description = in.Description
+	out.Value = in.Value
+	out.Generate = in.Generate
+	out.From = in.From
+	out.Required = in.Required
+	return nil
+}
+
+func Convert_extensions_Parameter_To_v1beta1_Parameter(in *extensions.Parameter, out *Parameter, s conversion.Scope) error {
+	return autoConvert_extensions_Parameter_To_v1beta1_Parameter(in, out, s)
+}
+
 func autoConvert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *extensions.PodSecurityPolicy, out *PodSecurityPolicy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.PodSecurityPolicy))(in)
@@ -3758,6 +3776,78 @@ func autoConvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference
 
 func Convert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in *extensions.SubresourceReference, out *SubresourceReference, s conversion.Scope) error {
 	return autoConvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(in, out, s)
+}
+
+func autoConvert_extensions_Template_To_v1beta1_Template(in *extensions.Template, out *Template, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.Template))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if in.Parameters != nil {
+		out.Parameters = make([]Parameter, len(in.Parameters))
+		for i := range in.Parameters {
+			if err := Convert_extensions_Parameter_To_v1beta1_Parameter(&in.Parameters[i], &out.Parameters[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Parameters = nil
+	}
+	if in.Objects != nil {
+		out.Objects = make([]runtime.Object, len(in.Objects))
+		for i := range in.Objects {
+			if err := s.Convert(&in.Objects[i], &out.Objects[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Objects = nil
+	}
+	if in.ObjectLabels != nil {
+		out.ObjectLabels = make(map[string]string)
+		for key, val := range in.ObjectLabels {
+			out.ObjectLabels[key] = val
+		}
+	} else {
+		out.ObjectLabels = nil
+	}
+	return nil
+}
+
+func Convert_extensions_Template_To_v1beta1_Template(in *extensions.Template, out *Template, s conversion.Scope) error {
+	return autoConvert_extensions_Template_To_v1beta1_Template(in, out, s)
+}
+
+func autoConvert_extensions_TemplateList_To_v1beta1_TemplateList(in *extensions.TemplateList, out *TemplateList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.TemplateList))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Template, len(in.Items))
+		for i := range in.Items {
+			if err := Convert_extensions_Template_To_v1beta1_Template(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_extensions_TemplateList_To_v1beta1_TemplateList(in *extensions.TemplateList, out *TemplateList, s conversion.Scope) error {
+	return autoConvert_extensions_TemplateList_To_v1beta1_TemplateList(in, out, s)
 }
 
 func autoConvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *extensions.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
@@ -4684,6 +4774,24 @@ func Convert_v1beta1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.Li
 	return autoConvert_v1beta1_ListOptions_To_api_ListOptions(in, out, s)
 }
 
+func autoConvert_v1beta1_Parameter_To_extensions_Parameter(in *Parameter, out *extensions.Parameter, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Parameter))(in)
+	}
+	out.Name = in.Name
+	out.DisplayName = in.DisplayName
+	out.Description = in.Description
+	out.Value = in.Value
+	out.Generate = in.Generate
+	out.From = in.From
+	out.Required = in.Required
+	return nil
+}
+
+func Convert_v1beta1_Parameter_To_extensions_Parameter(in *Parameter, out *extensions.Parameter, s conversion.Scope) error {
+	return autoConvert_v1beta1_Parameter_To_extensions_Parameter(in, out, s)
+}
+
 func autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(in *PodSecurityPolicy, out *extensions.PodSecurityPolicy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodSecurityPolicy))(in)
@@ -5000,6 +5108,78 @@ func Convert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in 
 	return autoConvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(in, out, s)
 }
 
+func autoConvert_v1beta1_Template_To_extensions_Template(in *Template, out *extensions.Template, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Template))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if in.Parameters != nil {
+		out.Parameters = make([]extensions.Parameter, len(in.Parameters))
+		for i := range in.Parameters {
+			if err := Convert_v1beta1_Parameter_To_extensions_Parameter(&in.Parameters[i], &out.Parameters[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Parameters = nil
+	}
+	if in.Objects != nil {
+		out.Objects = make([]runtime.Object, len(in.Objects))
+		for i := range in.Objects {
+			if err := s.Convert(&in.Objects[i], &out.Objects[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Objects = nil
+	}
+	if in.ObjectLabels != nil {
+		out.ObjectLabels = make(map[string]string)
+		for key, val := range in.ObjectLabels {
+			out.ObjectLabels[key] = val
+		}
+	} else {
+		out.ObjectLabels = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_Template_To_extensions_Template(in *Template, out *extensions.Template, s conversion.Scope) error {
+	return autoConvert_v1beta1_Template_To_extensions_Template(in, out, s)
+}
+
+func autoConvert_v1beta1_TemplateList_To_extensions_TemplateList(in *TemplateList, out *extensions.TemplateList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*TemplateList))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]extensions.Template, len(in.Items))
+		for i := range in.Items {
+			if err := Convert_v1beta1_Template_To_extensions_Template(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_TemplateList_To_extensions_TemplateList(in *TemplateList, out *extensions.TemplateList, s conversion.Scope) error {
+	return autoConvert_v1beta1_TemplateList_To_extensions_TemplateList(in, out, s)
+}
+
 func autoConvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *ThirdPartyResource, out *extensions.ThirdPartyResource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ThirdPartyResource))(in)
@@ -5186,6 +5366,7 @@ func init() {
 		autoConvert_extensions_JobSpec_To_v1beta1_JobSpec,
 		autoConvert_extensions_JobStatus_To_v1beta1_JobStatus,
 		autoConvert_extensions_Job_To_v1beta1_Job,
+		autoConvert_extensions_Parameter_To_v1beta1_Parameter,
 		autoConvert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList,
 		autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec,
 		autoConvert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy,
@@ -5202,6 +5383,8 @@ func init() {
 		autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
 		autoConvert_extensions_Scale_To_v1beta1_Scale,
 		autoConvert_extensions_SubresourceReference_To_v1beta1_SubresourceReference,
+		autoConvert_extensions_TemplateList_To_v1beta1_TemplateList,
+		autoConvert_extensions_Template_To_v1beta1_Template,
 		autoConvert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList,
 		autoConvert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData,
 		autoConvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList,
@@ -5291,6 +5474,7 @@ func init() {
 		autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
 		autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector,
 		autoConvert_v1beta1_ListOptions_To_api_ListOptions,
+		autoConvert_v1beta1_Parameter_To_extensions_Parameter,
 		autoConvert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyList,
 		autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec,
 		autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy,
@@ -5307,6 +5491,8 @@ func init() {
 		autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
 		autoConvert_v1beta1_Scale_To_extensions_Scale,
 		autoConvert_v1beta1_SubresourceReference_To_extensions_SubresourceReference,
+		autoConvert_v1beta1_TemplateList_To_extensions_TemplateList,
+		autoConvert_v1beta1_Template_To_extensions_Template,
 		autoConvert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResourceDataList,
 		autoConvert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData,
 		autoConvert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList,

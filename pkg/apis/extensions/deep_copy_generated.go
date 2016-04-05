@@ -25,6 +25,7 @@ import (
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -67,6 +68,7 @@ func init() {
 		DeepCopy_extensions_JobList,
 		DeepCopy_extensions_JobSpec,
 		DeepCopy_extensions_JobStatus,
+		DeepCopy_extensions_Parameter,
 		DeepCopy_extensions_PodSecurityPolicy,
 		DeepCopy_extensions_PodSecurityPolicyList,
 		DeepCopy_extensions_PodSecurityPolicySpec,
@@ -83,6 +85,8 @@ func init() {
 		DeepCopy_extensions_ScaleSpec,
 		DeepCopy_extensions_ScaleStatus,
 		DeepCopy_extensions_SubresourceReference,
+		DeepCopy_extensions_Template,
+		DeepCopy_extensions_TemplateList,
 		DeepCopy_extensions_ThirdPartyResource,
 		DeepCopy_extensions_ThirdPartyResourceData,
 		DeepCopy_extensions_ThirdPartyResourceDataList,
@@ -703,6 +707,17 @@ func DeepCopy_extensions_JobStatus(in JobStatus, out *JobStatus, c *conversion.C
 	return nil
 }
 
+func DeepCopy_extensions_Parameter(in Parameter, out *Parameter, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.DisplayName = in.DisplayName
+	out.Description = in.Description
+	out.Value = in.Value
+	out.Generate = in.Generate
+	out.From = in.From
+	out.Required = in.Required
+	return nil
+}
+
 func DeepCopy_extensions_PodSecurityPolicy(in PodSecurityPolicy, out *PodSecurityPolicy, c *conversion.Cloner) error {
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -933,6 +948,70 @@ func DeepCopy_extensions_SubresourceReference(in SubresourceReference, out *Subr
 	out.Name = in.Name
 	out.APIVersion = in.APIVersion
 	out.Subresource = in.Subresource
+	return nil
+}
+
+func DeepCopy_extensions_Template(in Template, out *Template, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.Parameters != nil {
+		in, out := in.Parameters, &out.Parameters
+		*out = make([]Parameter, len(in))
+		for i := range in {
+			if err := DeepCopy_extensions_Parameter(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Parameters = nil
+	}
+	if in.Objects != nil {
+		in, out := in.Objects, &out.Objects
+		*out = make([]runtime.Object, len(in))
+		for i := range in {
+			if newVal, err := c.DeepCopy(in[i]); err != nil {
+				return err
+			} else {
+				(*out)[i] = newVal.(runtime.Object)
+			}
+		}
+	} else {
+		out.Objects = nil
+	}
+	if in.ObjectLabels != nil {
+		in, out := in.ObjectLabels, &out.ObjectLabels
+		*out = make(map[string]string)
+		for key, val := range in {
+			(*out)[key] = val
+		}
+	} else {
+		out.ObjectLabels = nil
+	}
+	return nil
+}
+
+func DeepCopy_extensions_TemplateList(in TemplateList, out *TemplateList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]Template, len(in))
+		for i := range in {
+			if err := DeepCopy_extensions_Template(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
