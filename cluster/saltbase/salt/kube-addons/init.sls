@@ -35,6 +35,7 @@ addon-dir-create:
   file.recurse:
     - source: salt://kube-addons/cluster-loadbalancing/glbc
     - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - template: jinja
     - user: root
     - group: root
     - dir_mode: 755
