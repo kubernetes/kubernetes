@@ -32,9 +32,9 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-## Persistent Volume Provisioning
+## Dynamic Provisioning of Persistent Volumes
 
-This example shows how to use experimental persistent volume provisioning.
+This example shows how to use the experimental dynamic provisioning of persistent volumes feature.
 
 ### Pre-requisites
 
@@ -43,10 +43,15 @@ scripts that launch kube-controller-manager.
 
 ### Admin Configuration
 
-No configuration is required by the admin!  3 cloud providers will be provided in the alpha version
-of this feature: EBS, GCE, and Cinder.
+Cluster Admin must enable "experimental features" to use this feature:
+* Ensure that the `--enable-experimental-features=true` flag is passed to the `kube-controller-manager` binary.
 
-When Kubernetes is running in one of those clouds, there will be an implied provisioner.
+The alpha version of this feature supports provisioning of 3 types of volumes: GCE PD, AWS EBS, and Cinder.
+Kubernetes determines which provisioner to use based on the cloud provider the cluster is running in:
+* When running on GCE it provisions GCE PD volumes.
+* When running on AWS it provisions AWS EBS volumes.
+* When running on OpenStack it provisions Cinder volumes.
+
 There is no provisioner when running outside of any of those 3 cloud providers.
 
 A fourth provisioner is included for testing and development only.  It creates HostPath volumes,

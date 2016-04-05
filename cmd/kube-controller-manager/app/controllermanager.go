@@ -330,6 +330,11 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Fatal("A Provisioner could not be created, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.")
 	}
 
+	if !s.EnableExperimentalFeatures {
+		// Disable dynamic volume provisioning unless experimental features are explicitly enabled
+		provisioner = nil
+	}
+
 	pvclaimBinder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-binder")), s.PVClaimBinderSyncPeriod.Duration)
 	pvclaimBinder.Run()
 

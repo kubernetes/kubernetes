@@ -510,6 +510,8 @@ type KubeControllerManagerConfiguration struct {
 	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
 	// vloumeConfiguration holds configuration for volume related features.
 	VolumeConfiguration VolumeConfiguration `json:"volumeConfiguration"`
+	// enableExperimentalFeatures enables experimental features.
+	EnableExperimentalFeatures bool `json:"enableExperimentalFeatures"`
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume
