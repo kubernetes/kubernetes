@@ -20,7 +20,12 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 )
+
+// terminationSignals are signals that cause the program to exit in the
+// supported platforms (linux, darwin, windows).
+var terminationSignals = []os.Signal{syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT}
 
 // Handler guarantees execution of notifications after a critical section (the function passed
 // to a Run method), even in the presence of process termination. It guarantees exactly once
@@ -82,7 +87,7 @@ func (h *Handler) Signal(s os.Signal) {
 // per Handler instance, so calling Run more than once will not behave as the user expects.
 func (h *Handler) Run(fn func() error) error {
 	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, childSignals...)
+	signal.Notify(ch, terminationSignals...)
 	defer func() {
 		signal.Stop(ch)
 		close(ch)
