@@ -89,9 +89,9 @@ func IsWebSocketRequest(req *http.Request) bool {
 	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection"))) && strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
 }
 
-// ignoreReceives reads from a WebSocket until it is closed, then returns. If timeout is set, the
+// IgnoreReceives reads from a WebSocket until it is closed, then returns. If timeout is set, the
 // read and write deadlines are pushed every time a new message is received.
-func ignoreReceives(ws *websocket.Conn, timeout time.Duration) {
+func IgnoreReceives(ws *websocket.Conn, timeout time.Duration) {
 	defer runtime.HandleCrash()
 	var data []byte
 	for {

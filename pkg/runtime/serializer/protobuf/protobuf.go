@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/framer"
 )
 
 var (
@@ -241,6 +242,16 @@ func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
 	return bytes.Equal(s.prefix, prefix), nil
 }
 
+// NewFrameWriter implements stream framing for this serializer
+func (s *Serializer) NewFrameWriter(w io.Writer) io.Writer {
+	return framer.NewLengthDelimitedFrameWriter(w)
+}
+
+// NewFrameReader implements stream framing for this serializer
+func (s *Serializer) NewFrameReader(r io.Reader) io.Reader {
+	return framer.NewLengthDelimitedFrameReader(r)
+}
+
 // copyKindDefaults defaults dst to the value in src if dst does not have a value set.
 func copyKindDefaults(dst, src *unversioned.GroupVersionKind) {
 	if src == nil {
@@ -424,4 +435,14 @@ func (s *RawSerializer) EncodeToStream(obj runtime.Object, w io.Writer, override
 // have no innate identifying information and so cannot be recognized.
 func (s *RawSerializer) RecognizesData(peek io.Reader) (bool, error) {
 	return false, nil
+}
+
+// NewFrameWriter implements stream framing for this serializer
+func (s *RawSerializer) NewFrameWriter(w io.Writer) io.Writer {
+	return framer.NewLengthDelimitedFrameWriter(w)
+}
+
+// NewFrameReader implements stream framing for this serializer
+func (s *RawSerializer) NewFrameReader(r io.Reader) io.Reader {
+	return framer.NewLengthDelimitedFrameReader(r)
 }

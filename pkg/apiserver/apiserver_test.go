@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 
@@ -160,6 +161,7 @@ func addTestTypes() {
 	// served in the tests.
 	api.Scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{})
+	versioned.AddToGroupVersion(api.Scheme, testGroupVersion)
 }
 
 func addNewTestTypes() {
@@ -174,8 +176,10 @@ func addNewTestTypes() {
 	}
 	api.Scheme.AddKnownTypes(newGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{},
-		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(newGroupVersion, &v1.Pod{})
+		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{},
+		&v1.Pod{},
+	)
+	versioned.AddToGroupVersion(api.Scheme, newGroupVersion)
 }
 
 func init() {
@@ -283,6 +287,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = grouplessGroupVersion
 		group.OptionsExternalVersion = &grouplessGroupVersion
 		group.Serializer = api.Codecs
+		group.StreamSerializer = api.StreamCodecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -295,6 +300,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = testGroupVersion
 		group.OptionsExternalVersion = &testGroupVersion
 		group.Serializer = api.Codecs
+		group.StreamSerializer = api.StreamCodecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -307,6 +313,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = newGroupVersion
 		group.OptionsExternalVersion = &newGroupVersion
 		group.Serializer = api.Codecs
+		group.StreamSerializer = api.StreamCodecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -2408,8 +2415,9 @@ func TestUpdateREST(t *testing.T) {
 			GroupVersion:           newGroupVersion,
 			OptionsExternalVersion: &newGroupVersion,
 
-			Serializer:     api.Codecs,
-			ParameterCodec: api.ParameterCodec,
+			Serializer:       api.Codecs,
+			StreamSerializer: api.StreamCodecs,
+			ParameterCodec:   api.ParameterCodec,
 		}
 	}
 
@@ -2492,8 +2500,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
 
-		Serializer:     api.Codecs,
-		ParameterCodec: api.ParameterCodec,
+		Serializer:       api.Codecs,
+		StreamSerializer: api.StreamCodecs,
+		ParameterCodec:   api.ParameterCodec,
 	}
 	container := restful.NewContainer()
 	if err := group.InstallREST(container); err == nil {
@@ -2523,8 +2532,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
 
-		Serializer:     api.Codecs,
-		ParameterCodec: api.ParameterCodec,
+		Serializer:       api.Codecs,
+		StreamSerializer: api.StreamCodecs,
+		ParameterCodec:   api.ParameterCodec,
 	}
 	container = restful.NewContainer()
 	if err := group.InstallREST(container); err != nil {
@@ -3236,6 +3246,7 @@ func TestXGSubresource(t *testing.T) {
 		GroupVersion:           testGroupVersion,
 		OptionsExternalVersion: &testGroupVersion,
 		Serializer:             api.Codecs,
+		StreamSerializer:       api.StreamCodecs,
 
 		SubresourceGroupVersionKind: map[string]unversioned.GroupVersionKind{
 			"simple/subsimple": testGroup2Version.WithKind("SimpleXGSubresource"),

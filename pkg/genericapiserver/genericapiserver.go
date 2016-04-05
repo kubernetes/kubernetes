@@ -184,6 +184,8 @@ type APIGroupInfo struct {
 	Scheme *runtime.Scheme
 	// NegotiatedSerializer controls how this group encodes and decodes data
 	NegotiatedSerializer runtime.NegotiatedSerializer
+	// NegotiatedStreamSerializer controls how streaming responses are encoded and decoded.
+	NegotiatedStreamSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
 
@@ -864,6 +866,7 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	version.Storage = storage
 	version.ParameterCodec = apiGroupInfo.ParameterCodec
 	version.Serializer = apiGroupInfo.NegotiatedSerializer
+	version.StreamSerializer = apiGroupInfo.NegotiatedStreamSerializer
 	version.Creater = apiGroupInfo.Scheme
 	version.Convertor = apiGroupInfo.Scheme
 	version.Typer = apiGroupInfo.Scheme
