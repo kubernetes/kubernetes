@@ -1,3 +1,32 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Proposal: Self-hosted kubelet
 
 ## Abstract
@@ -38,4 +67,9 @@ This will allow a "self-hosted" kubelet with minimal new concepts introduced int
 
 Various similar approaches have been discussed [here](https://github.com/kubernetes/kubernetes/issues/246#issuecomment-64533959) and [here](https://github.com/kubernetes/kubernetes/issues/23073#issuecomment-198478997). This also relies on the kubelet being able to be run inside a container, more discussion on that is [here](https://github.com/kubernetes/kubernetes/issues/4869).
 
-Additionally, [Taints and Tolerations](https://github.com/kubernetes/kubernetes/blob/master/docs/design/taint-toleration-dedicated.md), whose design has already been accepted, would make the overall kubelet bootstrap more deterministic. With this, we would also need the ability for a kubelet to register itself with a given taint when it first contacts the API server. Given that, a kubelet could register itself with a given taint such as “component=kubelet”, and a kubelet pod could exist that has a toleration to that taint, ensuring it is the only pod the “bootstrap” kubelet runs.
+Additionally, [Taints and Tolerations](../../docs/design/taint-toleration-dedicated.md), whose design has already been accepted, would make the overall kubelet bootstrap more deterministic. With this, we would also need the ability for a kubelet to register itself with a given taint when it first contacts the API server. Given that, a kubelet could register itself with a given taint such as “component=kubelet”, and a kubelet pod could exist that has a toleration to that taint, ensuring it is the only pod the “bootstrap” kubelet runs.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/self-hosted-kubelet.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
