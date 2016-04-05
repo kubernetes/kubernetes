@@ -32,9 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const PluginName = "NamespaceLifecycle"
+
 func init() {
-	admission.RegisterPlugin("NamespaceLifecycle", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewLifecycle(client), nil
+	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+		return NewLifecycle(client, sets.NewString(api.NamespaceDefault)), nil
 	})
 }
 
@@ -109,7 +111,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 }
 
 // NewLifecycle creates a new namespace lifecycle admission control handler
-func NewLifecycle(c clientset.Interface) admission.Interface {
+func NewLifecycle(c clientset.Interface, immortalNamespaces sets.String) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
@@ -129,6 +131,6 @@ func NewLifecycle(c clientset.Interface) admission.Interface {
 		Handler:            admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		client:             c,
 		store:              store,
-		immortalNamespaces: sets.NewString(api.NamespaceDefault),
+		immortalNamespaces: immortalNamespaces,
 	}
 }

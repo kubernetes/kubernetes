@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // TestAdmission
@@ -60,7 +61,7 @@ func TestAdmission(t *testing.T) {
 		return true, &api.NamespaceList{Items: []api.Namespace{*namespaceObj}}, nil
 	})
 
-	lfhandler := NewLifecycle(mockClient).(*lifecycle)
+	lfhandler := NewLifecycle(mockClient, sets.NewString("default")).(*lifecycle)
 	lfhandler.store = store
 	handler := admission.NewChainHandler(lfhandler)
 	pod := api.Pod{
