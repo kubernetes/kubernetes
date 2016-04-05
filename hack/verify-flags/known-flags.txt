@@ -205,6 +205,7 @@ kubelet-https
 kubelet-kubeconfig
 kubelet-network-plugin
 kubelet-pod-infra-container-image
+kubelet-pod-infra-container-image-pull-secret-file
 kubelet-port
 kubelet-read-only-port
 kubelet-root-dir
@@ -296,6 +297,7 @@ path-override
 pod-cidr
 pod-eviction-timeout
 pod-infra-container-image
+pod-infra-container-image-pull-secret-file
 pod-running
 policy-config-file
 poll-interval
