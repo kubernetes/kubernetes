@@ -45,6 +45,8 @@ import (
 	"github.com/coreos/go-oidc/key"
 	"github.com/coreos/go-oidc/oidc"
 	"k8s.io/kubernetes/pkg/auth/user"
+
+	oidctesting "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc/testing"
 )
 
 type oidcProvider struct {
@@ -575,15 +577,6 @@ func TestNewOIDCHttpHandler(t *testing.T) {
 	}
 }
 
-type fakeClient struct {
-	err        error
-	idTokenJWT jose.JWT
-}
-
-func (f *fakeClient) RefreshToken(rt string) (jose.JWT, error) {
-	return f.idTokenJWT, f.err
-}
-
 func TestHandleExchangeRefreshToken(t *testing.T) {
 	op := newOIDCProvider(t)
 	goodToken := op.generateGoodToken(t, "http://auth.example.com", "client-foo", "client-foo", "sub", "user-foo", "", nil)
@@ -667,13 +660,11 @@ func TestHandleExchangeRefreshToken(t *testing.T) {
 			t.Errorf("case %d: could not make request: %v", i, err)
 		}
 
-		client := &fakeClient{
-			err:        tt.returnErr,
-			idTokenJWT: tt.returnIDToken,
+		client := &oidctesting.FakeClient{
+			Err:     tt.returnErr,
+			IDToken: tt.returnIDToken,
 		}
-		h := OIDCHTTPHandler{
-			client: client,
-		}
+		h := NewOIDCHTTPHandler(client)
 
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, req)

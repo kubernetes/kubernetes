@@ -191,11 +191,15 @@ func (a *OIDCAuthenticator) NewOIDCHTTPHandler() (*OIDCHTTPHandler, error) {
 	if a.clientConfig.Credentials.Secret == "" {
 		return nil, errors.New("OIDCHTTPHandler requires a client config with a client secret")
 	}
-	return &OIDCHTTPHandler{
-		client: a.client,
-	}, nil
-
+	return NewOIDCHTTPHandler(a.client), nil
 }
+
+func NewOIDCHTTPHandler(o OIDCClient) *OIDCHTTPHandler {
+	return &OIDCHTTPHandler{
+		client: o,
+	}
+}
+
 func (a *OIDCAuthenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	if a.handlersAttached {
 		if _, ok := bypassAuthPaths[req.URL.Path]; ok {
