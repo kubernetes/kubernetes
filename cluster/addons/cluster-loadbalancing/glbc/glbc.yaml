@@ -1,3 +1,8 @@
+{% set kube_uid = "" -%}
+{% if pillar['kube_uid'] is defined -%}
+  {% set kube_uid = pillar['kube_uid'] %}
+{% endif -%}
+
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -65,4 +70,5 @@ spec:
             memory: 50Mi
         args:
         - --default-backend-service=kube-system/default-http-backend
-        - --sync-period=300s
+        - --sync-period=60s
+        - --cluster-uid={{kube_uid}}
