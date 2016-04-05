@@ -74,8 +74,8 @@ $ export OPENSHIFT_EXAMPLE=$(pwd)/examples/openshift-origin
 $ export OPENSHIFT_CONFIG=${OPENSHIFT_EXAMPLE}/config
 $ mkdir ${OPENSHIFT_CONFIG}
 
-$ export ETCD_INITIAL_CLUSTER_TOKEN=$(python -c "import string; import random; print(''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(40)))")
-$ export ETCD_DISCOVERY_TOKEN=$(python -c "import string; import random; print(\"etcd-cluster-\" + ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5)))")
+$ export ETCD_INITIAL_CLUSTER_TOKEN=$(python3 -c "import string; import random; print(''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(40)))")
+$ export ETCD_DISCOVERY_TOKEN=$(python3 -c "import string; import random; print(\"etcd-cluster-\" + ''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(5)))")
 $ sed -i.bak -e "s/INSERT_ETCD_INITIAL_CLUSTER_TOKEN/\"${ETCD_INITIAL_CLUSTER_TOKEN}\"/g" -e "s/INSERT_ETCD_DISCOVERY_TOKEN/\"${ETCD_DISCOVERY_TOKEN}\"/g" ${OPENSHIFT_EXAMPLE}/etcd-controller.yaml
 ```
 
