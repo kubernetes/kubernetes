@@ -305,7 +305,7 @@ function start_kubelet {
          which chcon > /dev/null ; then
          if [[ ! $(ls -Zd /var/lib/kubelet) =~ system_u:object_r:svirt_sandbox_file_t:s0 ]] ; then
             echo "Applying SELinux label to /var/lib/kubelet directory."
-            if ! chcon -R system_u:object_r:svirt_sandbox_file_t:s0 /var/lib/kubelet; then
+            if ! sudo chcon -Rt svirt_sandbox_file_t /var/lib/kubelet; then
                echo "Failed to apply selinux label to /var/lib/kubelet."
             fi
 	 fi
