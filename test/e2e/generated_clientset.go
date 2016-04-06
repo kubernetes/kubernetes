@@ -129,7 +129,9 @@ var _ = KubeDescribe("Generated release_1_2 clientset", func() {
 		deleted := false
 		timeout := false
 		var lastPod *api.Pod
-		timer := time.After(30 * time.Second)
+		// The 30s grace period is not an upper-bound of the time it takes to
+		// delete the pod from etcd.
+		timer := time.After(60 * time.Second)
 		for !deleted && !timeout {
 			select {
 			case event, _ := <-w.ResultChan():
