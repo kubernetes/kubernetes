@@ -93,10 +93,14 @@ test_e2e:
 
 # Build and run node end-to-end tests.
 #
+# Args:
+#  FOCUS: regexp that matches the tests to be run
+#  SKIP: regexp that matches the tests that needs to be skipped
 # Example:
-#   make test_e2e_node
+#   make test_e2e_node FOCUS=kubelet SKIP=container
+# Build and run tests.
 test_e2e_node:
-	hack/e2e-node-test.sh
+	hack/e2e-node-test.sh FOCUS=$(FOCUS) SKIP=$(SKIP)
 .PHONY: test_e2e_node
 
 
