@@ -35,8 +35,8 @@ Documentation for other releases can be found at
 # Development Guide
 
 This document is intended to be the canonical source of truth for things like
-supported toolchain versions for building Kubernetes.  If you find a
-requirement that this doc does not capture, please file a bug.  If you find
+supported toolchain versions for building Kubernetes. If you find a
+requirement that this doc does not capture, please file a bug. If you find
 other docs with references to requirements that are not simply links to this
 doc, please file a bug.
 
@@ -44,23 +44,32 @@ This document is intended to be relative to the branch in which it is found.
 It is guaranteed that requirements will change over time for the development
 branch, but release branches of Kubernetes should not change.
 
-## Releases and Official Builds
+## Building Kubernetes
 
-Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/HEAD/build/README.md).  You can do simple builds and development with just a local Docker installation.  If you want to build go code locally outside of docker, please continue below.
+Official releases are built using Docker containers. To build Kubernetes using
+Docker please follow [these instructions](http://releases.k8s.io/HEAD/build/README.md).
 
-## Go development environment
+### Go development environment
 
-Kubernetes is written in the [Go](http://golang.org) programming language. If you haven't set up a Go development environment, please follow [these instructions](http://golang.org/doc/code.html) to install the go tools and set up a GOPATH.
+Kubernetes is written in the [Go](http://golang.org) programming language.
+To build Kubernetes without using Docker containers, you'll need a Go
+development environment. Builds for Kubernetes 1.0 - 1.2 require Go version
+1.4.2. Builds for Kubernetes 1.3 and higher require Go version 1.6.0. If you
+haven't set up a Go development environment, please follow [these instructions](http://golang.org/doc/code.html)
+to install the go tools and set up a GOPATH.
 
-### Go versions
+To build Kubernetes using your local Go development environment (generate linux
+binaries):
 
-Kubernetes 1.0 - 1.2 only supports Go 1.4.2
+        hack/build-go.sh
+You may pass build options and packages to the script as necessary. To build binaries for all platforms:
 
-Kubernetes 1.3 and higher supports Go 1.6.0
+        hack/build-cross.sh
 
-## Git setup
+## Workflow
 
-Below, we outline one of the more common git workflows that core developers use. Other git workflows are also valid.
+Below, we outline one of the more common git workflows that core developers use.
+Other git workflows are also valid.
 
 ### Visual overview
 
@@ -73,7 +82,8 @@ Below, we outline one of the more common git workflows that core developers use.
 
 ### Clone your fork
 
-The commands below require that you have $GOPATH set ([$GOPATH docs](https://golang.org/doc/code.html#GOPATH)). We highly recommend you put Kubernetes' code into your GOPATH. Note: the commands below will not work if there is more than one directory in your `$GOPATH`.
+The commands below require that you have $GOPATH set ([$GOPATH docs](https://golang.org/doc/code.html#GOPATH)). We highly recommend you put Kubernetes' code into your GOPATH. Note: the commands below will not work if
+there is more than one directory in your `$GOPATH`.
 
 ```sh
 mkdir -p $GOPATH/src/k8s.io
@@ -107,7 +117,7 @@ git remote set-url --push upstream no_push
 ### Committing changes to your fork
 
 Before committing any changes, please link/copy these pre-commit hooks into your .git
-directory. This will keep you from accidentally committing non-gofmt'd go code.
+directory. This will keep you from accidentally committing non-gofmt'd Go code.
 
 ```sh
 cd kubernetes/.git/hooks/
@@ -133,10 +143,10 @@ Upon merge, all git commits should represent meaningful milestones or units of
 work.  Use commits to add clarity to the development and review process.
 
 Before merging a PR, squash any "fix review feedback", "typo", and "rebased"
-sorts of commits.  It is not imperative that every commit in a PR compile and
-pass tests independently, but it is worth striving for.  For mass automated
+sorts of commits. It is not imperative that every commit in a PR compile and
+pass tests independently, but it is worth striving for. For mass automated
 fixups (e.g. automated doc formatting), use one or more commits for the
-changes to tooling and a final commit to apply the fixup en masse.  This makes
+changes to tooling and a final commit to apply the fixup en masse. This makes
 reviews much easier.
 
 See [Faster Reviews](faster_reviews.md) for more details.
@@ -147,10 +157,10 @@ Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. 
 
 ### Installing godep
 
-There are many ways to build and host go binaries. Here is an easy way to get utilities like `godep` installed:
+There are many ways to build and host Go binaries. Here is an easy way to get utilities like `godep` installed:
 
 1) Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
-source control system).  Use `apt-get install mercurial` or `yum install mercurial` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
+source control system). Use `apt-get install mercurial` or `yum install mercurial` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
 directly from mercurial.
 
 2) Create a new GOPATH for your tools and install godep:
@@ -228,13 +238,13 @@ godep update path/to/dependency/...
 ```
 
 _If `go get -u path/to/dependency` fails with compilation errors, instead try `go get -d -u path/to/dependency`
-to fetch the dependencies without compiling them.  This can happen when updating the cadvisor dependency._
+to fetch the dependencies without compiling them. This can happen when updating the cadvisor dependency._
 
 
 5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by running `hack/verify-godeps.sh`
 
 _If hack/verify-godeps.sh fails after a `godep update`, it is possible that a transitive dependency was added or removed but not
-updated by godeps.  It then may be necessary to perform a `godep save ./...` to pick up the transitive dependency changes._
+updated by godeps. It then may be necessary to perform a `godep save ./...` to pick up the transitive dependency changes._
 
 It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 
