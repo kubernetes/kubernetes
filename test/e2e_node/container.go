@@ -102,3 +102,16 @@ func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
 	}
 	return ConformanceContainer{containers[0], cc.Client, pod.Status.Phase, cc.NodeName}, nil
 }
+
+func (cc *ConformanceContainer) List() (containerList []string, err error) {
+	podList, err := cc.Client.Pods(api.NamespaceDefault).List(api.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range podList.Items {
+		for _, container := range pod.Spec.Containers {
+			containerList = append(containerList, container.Name)
+		}
+	}
+	return containerList, nil
+}

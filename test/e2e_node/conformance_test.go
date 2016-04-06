@@ -27,13 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	retryTimeout      = time.Minute * 4
-	pollInterval      = time.Second * 5
-	imageRetryTimeout = time.Minute * 2
-	imagePullInterval = time.Second * 15
-)
-
 var _ = Describe("Container Conformance Test", func() {
 	var cl *client.Client
 
@@ -115,11 +108,22 @@ var _ = Describe("Container Conformance Test", func() {
 				err := terminateCase.Create()
 				Expect(err).NotTo(HaveOccurred())
 
-				// TODO: Check that the container enters running state by sleeping in the container #23309
+				for start := time.Now(); time.Since(start) < retryTimeout; time.Sleep(pollInterval) {
+					pod, err := terminateCase.Get()
+					Expect(err).NotTo(HaveOccurred())
+					if pod.Phase != api.PodPending {
+						break
+					}
+				}
 				Eventually(func() (api.PodPhase, error) {
 					pod, err := terminateCase.Get()
 					return pod.Phase, err
 				}, retryTimeout, pollInterval).Should(Equal(terminateCase.Phase))
+			})
+			It("it should list the testing container [Conformance]", func() {
+				ccontainers, err := terminateCase.List()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ccontainers).To(ContainElement(terminateCase.Container.Name))
 			})
 			It("it should report its phase as 'succeeded' [Conformance]", func() {
 				ccontainer, err := terminateCase.Get()
@@ -147,10 +151,23 @@ var _ = Describe("Container Conformance Test", func() {
 				}
 				err := invalidImageCase.Create()
 				Expect(err).NotTo(HaveOccurred())
+
+				for start := time.Now(); time.Since(start) < retryTimeout; time.Sleep(pollInterval) {
+					pod, err := invalidImageCase.Get()
+					Expect(err).NotTo(HaveOccurred())
+					if pod.Phase != api.PodPending {
+						break
+					}
+				}
 				Eventually(func() (api.PodPhase, error) {
 					pod, err := invalidImageCase.Get()
 					return pod.Phase, err
 				}, retryTimeout, pollInterval).Should(Equal(invalidImageCase.Phase))
+			})
+			It("it should list the testing container [Conformance]", func() {
+				ccontainers, err := invalidImageCase.List()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ccontainers).To(ContainElement(invalidImageCase.Container.Name))
 			})
 			It("it should report its phase as 'pending' [Conformance]", func() {
 				ccontainer, err := invalidImageCase.Get()

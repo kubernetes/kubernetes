@@ -40,6 +40,11 @@ var buildServices = flag.Bool("build-services", true, "If true, build local exec
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 
+var retryTimeout = time.Minute * 4
+var pollInterval = time.Second * 5
+var imageRetryTimeout = time.Minute * 2
+var imagePullInterval = time.Second * 15
+
 var e2es *e2eService
 
 func TestE2eNode(t *testing.T) {
