@@ -54,7 +54,9 @@ Kubernetes is written in the [Go](http://golang.org) programming language. If yo
 
 ### Go versions
 
-Requires Go version 1.4.x, 1.5.x or 1.6.x
+Kubernetes 1.0 - 1.2 only supports Go 1.4.2
+
+Kubernetes 1.3 and higher supports Go 1.6.0
 
 ## Git setup
 
