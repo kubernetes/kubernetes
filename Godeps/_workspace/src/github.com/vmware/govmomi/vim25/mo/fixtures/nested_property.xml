@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RetrievePropertiesResponse xmlns="urn:vim25" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <returnval>
+    <obj type="VirtualMachine">vm-411</obj>
+    <propSet>
+      <name>config.name</name>
+      <val xsi:type="xsd:string">kubernetes-master</val>
+    </propSet>
+    <propSet>
+      <name>config.uuid</name>
+      <val xsi:type="xsd:string">422ec880-ab06-06b4-23f3-beb7a052a4c9</val>
+    </propSet>
+  </returnval>
+</RetrievePropertiesResponse>

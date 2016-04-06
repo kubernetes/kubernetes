@@ -1028,6 +1028,11 @@
 			"Rev": "1e2e08e8a2dcdacaae3f14ac44c5cfa31361f270"
 		},
 		{
+			"ImportPath": "github.com/vmware/govmomi",
+			"Comment": "v0.5.0",
+			"Rev": "c1b29993f383c32fc3fadb90892909668699810a"
+		},
+		{
 			"ImportPath": "github.com/xiang90/probing",
 			"Rev": "6a0cc1ae81b4cc11db5e491e030e4b98fba79c19"
 		},
