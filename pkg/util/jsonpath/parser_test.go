@@ -50,6 +50,8 @@ var parserTests = []parserTest{
 	{"arraydict", `{['book.price']}`, []Node{newList(),
 		newField("book"), newField("price"),
 	}, false},
+	{"quotedictkey", `{."book.price"}`, []Node{newList(), newField("book.price")}, false},
+	{"quotearraydictkey", `{["book.price"]}`, []Node{newList(), newField("book.price")}, false},
 	{"union", `{['bicycle.price', 3, 'book.price']}`, []Node{newList(), newUnion([]*ListNode{}),
 		newList(), newField("bicycle"), newField("price"),
 		newList(), newArray([3]ParamsEntry{{3, true}, {4, true}, {0, false}}),
