@@ -46,7 +46,6 @@ import (
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func init() {
@@ -171,7 +170,6 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 func InstallSupport(mux Mux, ws *restful.WebService, checks ...healthz.HealthzChecker) {
 	// TODO: convert healthz and metrics to restful and remove container arg
 	healthz.InstallHandler(mux, checks...)
-	mux.Handle("/metrics", prometheus.Handler())
 
 	// Set up a service to return the git code version.
 	ws.Path("/version")
