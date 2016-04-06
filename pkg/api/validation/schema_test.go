@@ -162,14 +162,15 @@ func TestVersionRegex(t *testing.T) {
 	}
 }
 
-// Tests that validation works fine when spec contains "type": "object" instead of "type": "any"
-func TestTypeObject(t *testing.T) {
+// Tests that validation works fine when spec contains "type": "any" instead of "type": "object"
+// Ref: https://github.com/kubernetes/kubernetes/issues/24309
+func TestTypeOAny(t *testing.T) {
 	data, err := readSwaggerFile()
 	if err != nil {
 		t.Errorf("failed to read swagger file: %v", err)
 	}
 	// Replace type: "any" in the spec by type: "object" and verify that the validation still passes.
-	newData := strings.Replace(string(data), `"type": "any"`, `"type": "object"`, -1)
+	newData := strings.Replace(string(data), `"type": "object"`, `"type": "any"`, -1)
 	schema, err := NewSwaggerSchemaFromBytes([]byte(newData))
 	if err != nil {
 		t.Errorf("Failed to load: %v", err)
