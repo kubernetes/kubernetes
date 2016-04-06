@@ -26,6 +26,7 @@ type Interface interface {
 	Get() (item interface{}, shutdown bool)
 	Done(item interface{})
 	ShutDown()
+	ShuttingDown() bool
 }
 
 // New constructs a new workqueue (see the package comment).
@@ -142,4 +143,11 @@ func (q *Type) ShutDown() {
 	defer q.cond.L.Unlock()
 	q.shuttingDown = true
 	q.cond.Broadcast()
+}
+
+func (q *Type) ShuttingDown() bool {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	return q.shuttingDown
 }

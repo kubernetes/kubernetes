@@ -33,6 +33,9 @@ func TestSimpleQueue(t *testing.T) {
 	first := "foo"
 
 	q.AddAfter(first, 50*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
@@ -40,14 +43,7 @@ func TestSimpleQueue(t *testing.T) {
 
 	fakeClock.Step(60 * time.Millisecond)
 
-	err := wait.Poll(1*time.Millisecond, 30*time.Millisecond, func() (done bool, err error) {
-		if q.Len() == 1 {
-			return true, nil
-		}
-
-		return false, nil
-	})
-	if err != nil {
+	if err := waitForAdded(q, 1); err != nil {
 		t.Errorf("should have added")
 	}
 	item, _ := q.Get()
@@ -56,7 +52,7 @@ func TestSimpleQueue(t *testing.T) {
 	// step past the next heartbeat
 	fakeClock.Step(10 * time.Second)
 
-	err = wait.Poll(1*time.Millisecond, 30*time.Millisecond, func() (done bool, err error) {
+	err := wait.Poll(1*time.Millisecond, 30*time.Millisecond, func() (done bool, err error) {
 		if q.Len() > 0 {
 			return false, fmt.Errorf("added to queue")
 		}
@@ -82,21 +78,18 @@ func TestAddTwoFireEarly(t *testing.T) {
 
 	q.AddAfter(first, 1*time.Second)
 	q.AddAfter(second, 50*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
 
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
 	}
 
 	fakeClock.Step(60 * time.Millisecond)
-	err := wait.Poll(1*time.Millisecond, 30*time.Millisecond, func() (done bool, err error) {
-		if q.Len() == 1 {
-			return true, nil
-		}
 
-		return false, nil
-	})
-	if err != nil {
-		t.Fatalf("should have added")
+	if err := waitForAdded(q, 1); err != nil {
+		t.Fatalf("unexpected err: %v", err)
 	}
 	item, _ := q.Get()
 	if !reflect.DeepEqual(item, second) {
@@ -106,15 +99,8 @@ func TestAddTwoFireEarly(t *testing.T) {
 	q.AddAfter(third, 2*time.Second)
 
 	fakeClock.Step(1 * time.Second)
-	err = wait.Poll(1*time.Millisecond, 30*time.Millisecond, func() (done bool, err error) {
-		if q.Len() == 1 {
-			return true, nil
-		}
-
-		return false, nil
-	})
-	if err != nil {
-		t.Fatalf("should have added")
+	if err := waitForAdded(q, 1); err != nil {
+		t.Fatalf("unexpected err: %v", err)
 	}
 	item, _ = q.Get()
 	if !reflect.DeepEqual(item, first) {
@@ -122,19 +108,70 @@ func TestAddTwoFireEarly(t *testing.T) {
 	}
 
 	fakeClock.Step(2 * time.Second)
-	err = wait.Poll(1*time.Millisecond, 30*time.Millisecond, func() (done bool, err error) {
-		if q.Len() == 1 {
-			return true, nil
-		}
-
-		return false, nil
-	})
-	if err != nil {
-		t.Fatalf("should have added")
+	if err := waitForAdded(q, 1); err != nil {
+		t.Fatalf("unexpected err: %v", err)
 	}
 	item, _ = q.Get()
 	if !reflect.DeepEqual(item, third) {
 		t.Errorf("expected %v, got %v", third, item)
 	}
 
+}
+
+func TestCopyShifting(t *testing.T) {
+	fakeClock := util.NewFakeClock(time.Now())
+	q := newDelayingQueue(fakeClock)
+
+	first := "foo"
+	second := "bar"
+	third := "baz"
+
+	q.AddAfter(first, 1*time.Second)
+	q.AddAfter(second, 500*time.Millisecond)
+	q.AddAfter(third, 250*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	fakeClock.Step(2 * time.Second)
+
+	if err := waitForAdded(q, 3); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	actualFirst, _ := q.Get()
+	if !reflect.DeepEqual(actualFirst, third) {
+		t.Errorf("expected %v, got %v", third, actualFirst)
+	}
+	actualSecond, _ := q.Get()
+	if !reflect.DeepEqual(actualSecond, second) {
+		t.Errorf("expected %v, got %v", second, actualSecond)
+	}
+	actualThird, _ := q.Get()
+	if !reflect.DeepEqual(actualThird, first) {
+		t.Errorf("expected %v, got %v", first, actualThird)
+	}
+}
+
+func waitForAdded(q DelayingInterface, depth int) error {
+	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		if q.Len() == depth {
+			return true, nil
+		}
+
+		return false, nil
+	})
+}
+
+func waitForWaitingQueueToFill(q DelayingInterface) error {
+	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		if len(q.(*delayingType).waitingForAddCh) == 0 {
+			return true, nil
+		}
+
+		return false, nil
+	})
 }
