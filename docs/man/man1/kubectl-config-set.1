@@ -15,7 +15,13 @@ kubectl config set \- Sets an individual value in a kubeconfig file
 .PP
 Sets an individual value in a kubeconfig file
 PROPERTY\_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
-PROPERTY\_VALUE is the new value you wish to set.
+PROPERTY\_VALUE is the new value you wish to set. Binary fields such as 'certificate\-authority\-data' expect a base64 encoded string unless the \-\-set\-raw\-bytes flag is used.
+
+
+.SH OPTIONS
+.PP
+\fB\-\-set\-raw\-bytes\fP=false
+    When writing a []byte PROPERTY\_VALUE, write the given string directly without base64 decoding.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

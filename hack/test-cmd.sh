@@ -271,6 +271,26 @@ runTests() {
   ! kubectl create
 
   #######################
+  # kubectl config set #
+  #######################
+
+  kube::log::status "Testing kubectl(${version}:config set)"
+
+  kubectl config set-cluster test-cluster --server="https://does-not-work"
+
+  # Get the api cert and add a comment to avoid flag parsing problems
+  cert_data=$(echo "#Comment" && cat "${TMPDIR:-/tmp/}apiserver.crt")
+
+  kubectl config set clusters.test-cluster.certificate-authority-data "$cert_data" --set-raw-bytes
+  r_writen=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
+
+  encoded=$(echo -n "$cert_data" | base64 --wrap=0)
+  kubectl config set clusters.test-cluster.certificate-authority-data "$encoded"
+  e_writen=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
+
+  test "$e_writen" == "$r_writen"
+
+  #######################
   # kubectl local proxy #
   #######################
 
