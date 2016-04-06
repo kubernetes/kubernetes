@@ -29,21 +29,30 @@ import (
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
+	subreplicasetetcd "k8s.io/kubernetes/federation/registry/subreplicaset/etcd"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func installFederationAPIs(s *options.APIServer, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
-	storage, err := f.New(federation.Resource("clusters"))
+func createRESTOptionsOrDie(s *options.APIServer, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
+	storage, err := f.New(resource)
 	if err != nil {
-		glog.Fatalf("Unable to find storage destination for %v, due to %v", "clusters", err.Error())
+		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
 	}
-	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(generic.RESTOptions{
+	return generic.RESTOptions{
 		Storage:                 storage,
 		Decorator:               g.StorageDecorator(),
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
-	})
+	}
+}
+
+func installFederationAPIs(s *options.APIServer, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
+	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(createRESTOptionsOrDie(s, g, f, federation.Resource("clusters")))
+	subReplicaSetStorage, subReplicaSetStatusStorage := subreplicasetetcd.NewREST(createRESTOptionsOrDie(s, g, f, federation.Resource("subreplicasets")))
 	clusterResources := map[string]rest.Storage{
-		"clusters":        clusterStorage,
-		"clusters/status": clusterStatusStorage,
+		"clusters":              clusterStorage,
+		"clusters/status":       clusterStatusStorage,
+		"subreplicasets":        subReplicaSetStorage,
+		"subreplicasets/status": subReplicaSetStatusStorage,
 	}
 	clusterGroupMeta := registered.GroupOrDie(federation.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
