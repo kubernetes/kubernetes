@@ -30,10 +30,8 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
-	containertypes "github.com/docker/engine-api/types/container"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
-	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -1434,7 +1432,7 @@ func TestVerifyNonRoot(t *testing.T) {
 		"numeric non-root image user": {
 			container: &api.Container{},
 			inspectImage: &dockertypes.ImageInspect{
-				Config: &containertypes.Config{
+				Config: &dockercontainer.Config{
 					User: "1",
 				},
 			},
@@ -1442,7 +1440,7 @@ func TestVerifyNonRoot(t *testing.T) {
 		"numeric non-root image user with gid": {
 			container: &api.Container{},
 			inspectImage: &dockertypes.ImageInspect{
-				Config: &containertypes.Config{
+				Config: &dockercontainer.Config{
 					User: "1:2",
 				},
 			},
@@ -1460,7 +1458,7 @@ func TestVerifyNonRoot(t *testing.T) {
 		"non-numeric image user": {
 			container: &api.Container{},
 			inspectImage: &dockertypes.ImageInspect{
-				Config: &containertypes.Config{
+				Config: &dockercontainer.Config{
 					User: "foo",
 				},
 			},
@@ -1469,7 +1467,7 @@ func TestVerifyNonRoot(t *testing.T) {
 		"numeric root image user": {
 			container: &api.Container{},
 			inspectImage: &dockertypes.ImageInspect{
-				Config: &containertypes.Config{
+				Config: &dockercontainer.Config{
 					User: "0",
 				},
 			},
@@ -1478,7 +1476,7 @@ func TestVerifyNonRoot(t *testing.T) {
 		"numeric root image user with gid": {
 			container: &api.Container{},
 			inspectImage: &dockertypes.ImageInspect{
-				Config: &containertypes.Config{
+				Config: &dockercontainer.Config{
 					User: "0:1",
 				},
 			},

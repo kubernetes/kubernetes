@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	dockertypes "github.com/docker/engine-api/types"
-	docker "github.com/fsouza/go-dockerclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
