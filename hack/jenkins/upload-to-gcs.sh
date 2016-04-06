@@ -54,7 +54,7 @@ readonly artifacts_path="${WORKSPACE}/_artifacts"
 readonly gcs_job_path="${JENKINS_GCS_LOGS_PATH}/${JOB_NAME}"
 readonly gcs_build_path="${gcs_job_path}/${BUILD_NUMBER}"
 readonly gcs_acl="public-read"
-readonly results_url=${gcs_build_path//"gs:/"/"https://storage.cloud.google.com"}
+readonly results_url=${gcs_build_path//"gs:/"/"https://console.cloud.google.com/storage/browser"}
 readonly timestamp=$(date +%s)
 
 function upload_version() {
