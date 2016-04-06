@@ -14,16 +14,13 @@
 
 package fileutil
 
-type Lock interface {
-	// Name returns the name of the file.
-	Name() string
-	// TryLock acquires exclusivity on the lock without blocking.
-	TryLock() error
-	// Lock acquires exclusivity on the lock.
-	Lock() error
-	// Unlock unlocks the lock.
-	Unlock() error
-	// Destroy should be called after Unlock to clean up
-	// the resources.
-	Destroy() error
-}
+import (
+	"errors"
+	"os"
+)
+
+var (
+	ErrLocked = errors.New("fileutil: file already locked")
+)
+
+type LockedFile struct{ *os.File }

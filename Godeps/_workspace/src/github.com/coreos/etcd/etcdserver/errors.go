@@ -35,6 +35,7 @@ var (
 	ErrNotEnoughStartedMembers    = errors.New("etcdserver: re-configuration failed due to not enough started members")
 	ErrNoLeader                   = errors.New("etcdserver: no leader")
 	ErrRequestTooLarge            = errors.New("etcdserver: request is too large")
+	ErrNoSpace                    = errors.New("etcdserver: no space")
 )
 
 func isKeyNotFound(err error) bool {

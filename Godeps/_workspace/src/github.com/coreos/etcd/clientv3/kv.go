@@ -138,7 +138,7 @@ func (kv *kv) Do(ctx context.Context, op Op) (OpResponse, error) {
 		// TODO: handle other ops
 		case tRange:
 			var resp *pb.RangeResponse
-			r := &pb.RangeRequest{Key: op.key, RangeEnd: op.end, Limit: op.limit, Revision: op.rev}
+			r := &pb.RangeRequest{Key: op.key, RangeEnd: op.end, Limit: op.limit, Revision: op.rev, Serializable: op.serializable}
 			if op.sort != nil {
 				r.SortOrder = pb.RangeRequest_SortOrder(op.sort.Order)
 				r.SortTarget = pb.RangeRequest_SortTarget(op.sort.Target)
@@ -183,13 +183,17 @@ func (kv *kv) Do(ctx context.Context, op Op) (OpResponse, error) {
 }
 
 func (kv *kv) switchRemote(prevErr error) error {
+	// Usually it's a bad idea to lock on network i/o but here it's OK
+	// since the link is down and new requests can't be processed anyway.
+	// Likewise, if connecting stalls, closing the Client can break the
+	// lock via context cancelation.
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+
 	newConn, err := kv.c.retryConnection(kv.conn, prevErr)
 	if err != nil {
 		return err
 	}
-
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
 
 	kv.conn = newConn
 	kv.remote = pb.NewKVClient(kv.conn)
