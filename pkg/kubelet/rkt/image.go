@@ -28,7 +28,7 @@ import (
 
 	appcschema "github.com/appc/spec/schema"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"github.com/fsouza/go-dockerclient"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
@@ -183,7 +183,7 @@ func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []credentialpro
 		return nil
 	}
 
-	creds := docker.AuthConfiguration{}
+	creds := dockertypes.AuthConfig{}
 	// TODO handle multiple creds
 	if len(credsSlice) >= 1 {
 		creds = credentialprovider.LazyProvide(credsSlice[0])
