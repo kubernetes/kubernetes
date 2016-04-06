@@ -30,6 +30,7 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
+	containertypes "github.com/docker/engine-api/types/container"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
 	docker "github.com/fsouza/go-dockerclient"
@@ -1419,7 +1420,7 @@ func TestVerifyNonRoot(t *testing.T) {
 
 	tests := map[string]struct {
 		container     *api.Container
-		inspectImage  *docker.Image
+		inspectImage  *dockertypes.ImageInspect
 		expectedError string
 	}{
 		// success cases
@@ -1432,16 +1433,16 @@ func TestVerifyNonRoot(t *testing.T) {
 		},
 		"numeric non-root image user": {
 			container: &api.Container{},
-			inspectImage: &docker.Image{
-				Config: &docker.Config{
+			inspectImage: &dockertypes.ImageInspect{
+				Config: &containertypes.Config{
 					User: "1",
 				},
 			},
 		},
 		"numeric non-root image user with gid": {
 			container: &api.Container{},
-			inspectImage: &docker.Image{
-				Config: &docker.Config{
+			inspectImage: &dockertypes.ImageInspect{
+				Config: &containertypes.Config{
 					User: "1:2",
 				},
 			},
@@ -1458,8 +1459,8 @@ func TestVerifyNonRoot(t *testing.T) {
 		},
 		"non-numeric image user": {
 			container: &api.Container{},
-			inspectImage: &docker.Image{
-				Config: &docker.Config{
+			inspectImage: &dockertypes.ImageInspect{
+				Config: &containertypes.Config{
 					User: "foo",
 				},
 			},
@@ -1467,8 +1468,8 @@ func TestVerifyNonRoot(t *testing.T) {
 		},
 		"numeric root image user": {
 			container: &api.Container{},
-			inspectImage: &docker.Image{
-				Config: &docker.Config{
+			inspectImage: &dockertypes.ImageInspect{
+				Config: &containertypes.Config{
 					User: "0",
 				},
 			},
@@ -1476,8 +1477,8 @@ func TestVerifyNonRoot(t *testing.T) {
 		},
 		"numeric root image user with gid": {
 			container: &api.Container{},
-			inspectImage: &docker.Image{
-				Config: &docker.Config{
+			inspectImage: &dockertypes.ImageInspect{
+				Config: &containertypes.Config{
 					User: "0:1",
 				},
 			},
@@ -1489,7 +1490,7 @@ func TestVerifyNonRoot(t *testing.T) {
 		},
 		"nil config in image inspect": {
 			container:     &api.Container{},
-			inspectImage:  &docker.Image{},
+			inspectImage:  &dockertypes.ImageInspect{},
 			expectedError: "unable to inspect image",
 		},
 	}
