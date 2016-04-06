@@ -102,7 +102,7 @@ const (
 	// String used to mark pod deletion
 	nonExist = "NonExist"
 
-	// How often to poll pods and nodes.
+	// How often to poll pods, nodes and claims.
 	poll = 2 * time.Second
 
 	// service accounts are provisioned after namespace creation
@@ -126,6 +126,9 @@ const (
 	podRespondingTimeout     = 2 * time.Minute
 	serviceRespondingTimeout = 2 * time.Minute
 	endpointRegisterTimeout  = time.Minute
+
+	// How long claims have to become dynamically provisioned
+	claimProvisionTimeout = 5 * time.Minute
 )
 
 // SubResource proxy should have been functional in v1.0.0, but SubResource
@@ -774,6 +777,46 @@ func waitForPersistentVolumePhase(phase api.PersistentVolumePhase, c *client.Cli
 	return fmt.Errorf("PersistentVolume %s not in phase %s within %v", pvName, phase, timeout)
 }
 
+// waitForPersistentVolumeDeleted waits for a PersistentVolume to get deleted or until timeout occurs, whichever comes first.
+func waitForPersistentVolumeDeleted(c *client.Client, pvName string, poll, timeout time.Duration) error {
+	Logf("Waiting up to %v for PersistentVolume %s to get deleted", timeout, pvName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		pv, err := c.PersistentVolumes().Get(pvName)
+		if err == nil {
+			Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
+			continue
+		} else {
+			if apierrs.IsNotFound(err) {
+				Logf("PersistentVolume %s was removed", pvName)
+				return nil
+			} else {
+				Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, poll, err)
+			}
+		}
+	}
+	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
+}
+
+// waitForPersistentVolumeClaimPhase waits for a PersistentVolumeClaim to be in a specific phase or until timeout occurs, whichever comes first.
+func waitForPersistentVolumeClaimPhase(phase api.PersistentVolumeClaimPhase, c *client.Client, ns string, pvcName string, poll, timeout time.Duration) error {
+	Logf("Waiting up to %v for PersistentVolumeClaim %s to have phase %s", timeout, pvcName, phase)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		pvc, err := c.PersistentVolumeClaims(ns).Get(pvcName)
+		if err != nil {
+			Logf("Get persistent volume claim %s in failed, ignoring for %v: %v", pvcName, poll, err)
+			continue
+		} else {
+			if pvc.Status.Phase == phase {
+				Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
+				return nil
+			} else {
+				Logf("PersistentVolumeClaim %s found but phase is %s instead of %s.", pvcName, pvc.Status.Phase, phase)
+			}
+		}
+	}
+	return fmt.Errorf("PersistentVolumeClaim %s not in phase %s within %v", pvcName, phase, timeout)
+}
+
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
 func CreateTestingNS(baseName string, c *client.Client, labels map[string]string) (*api.Namespace, error) {
@@ -976,9 +1019,9 @@ func waitForPodTerminatedInNamespace(c *client.Client, podName, reason, namespac
 	})
 }
 
-// waitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-func waitForPodSuccessInNamespace(c *client.Client, podName string, contName string, namespace string) error {
-	return waitForPodCondition(c, namespace, podName, "success or failure", podStartTimeout, func(pod *api.Pod) (bool, error) {
+// waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
+func waitForPodSuccessInNamespaceTimeout(c *client.Client, podName string, contName string, namespace string, timeout time.Duration) error {
+	return waitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *api.Pod) (bool, error) {
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
 		if !ok {
@@ -995,6 +1038,16 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 		}
 		return false, nil
 	})
+}
+
+// waitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or until podStartupTimeout.
+func waitForPodSuccessInNamespace(c *client.Client, podName string, contName string, namespace string) error {
+	return waitForPodSuccessInNamespaceTimeout(c, podName, contName, namespace, podStartTimeout)
+}
+
+// waitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.
+func waitForPodSuccessInNamespaceSlow(c *client.Client, podName string, contName string, namespace string) error {
+	return waitForPodSuccessInNamespaceTimeout(c, podName, contName, namespace, slowPodStartTimeout)
 }
 
 // waitForRCPodOnNode returns the pod from the given replication controller (described by rcName) which is scheduled on the given node.
