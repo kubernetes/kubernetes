@@ -172,3 +172,24 @@ func NewInternalError(reason string) InternalError {
 func NewInternalErrorf(format string, a ...interface{}) InternalError {
 	return InternalError{fmt.Sprintf(format, a)}
 }
+
+// GoneError is generated when an item no longer available and
+// no forwarding address is known.
+type GoneError struct {
+	resourceVersion uint64
+	oldest          uint64
+}
+
+func (e GoneError) Error() string {
+	return fmt.Sprintf("too old resource version: %d (%d)", e.resourceVersion, e.oldest)
+}
+
+func NewGoneError(resourceVersion, oldest uint64) GoneError {
+	return GoneError{resourceVersion, oldest}
+}
+
+// IsInvalidError returns true if and only if err is an GoneError.
+func IsGoneError(err error) bool {
+	_, ok := err.(GoneError)
+	return ok
+}

@@ -1,0 +1,13 @@
+{
+  "Rules": [
+    {
+      "SelectorRegexp": "k8s[.]io",
+      "AllowedPrefixes": [
+        "/"
+      ],
+      "ForbiddenPrefixes": [
+        "k8s.io/kubernetes/pkg/api/errors"
+      ]
+    }
+  ]
+}

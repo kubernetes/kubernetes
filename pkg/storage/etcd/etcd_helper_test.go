@@ -23,9 +23,6 @@ import (
 	"testing"
 	"time"
 
-	etcd "github.com/coreos/etcd/client"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -36,6 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
+
+	etcd "github.com/coreos/etcd/client"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 const validEtcdVersion = "etcd 2.0.9"

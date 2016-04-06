@@ -16,7 +16,9 @@ limitations under the License.
 
 package storage
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestEtcdParseWatchResourceVersion(t *testing.T) {
 	testCases := []struct {
