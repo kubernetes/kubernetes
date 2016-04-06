@@ -19,7 +19,7 @@ import (
 type Interface interface {
 	Setup() error
 	// Test runs inside a goroutine, finishing when it receives a signal on the channel
-	Test(chan int) error
+	Test(<-chan struct{}) error
 	Teardown() error
 }
 
@@ -31,18 +31,17 @@ type test struct {
 	setupErr    error
 	testErr     error
 	teardownErr error
-	channel     chan int
+	channel     chan struct{}
 }
 
 // A jig for testing functionality across a disruptive event.
 type Jig struct {
-	name       string
 	disruption disruption
 	tests      []test
 }
 
-func New(name string, d disruption) *Jig {
-	return &Jig{name, d, []test{}}
+func New(d disruption) *Jig {
+	return &Jig{d, []test{}}
 }
 
 func (j *Jig) Register(name string, in Interface) {
@@ -70,62 +69,58 @@ func (j *Jig) Do() {
 	var wg sync.WaitGroup
 	var once sync.Once
 
-	var _ = Describe(fmt.Sprintf("Chaos monkey %v", j.name), func() {
-		BeforeEach(func() {
-			// No call to Do returns until the one call to f
-			// returns, so this will block any Its from commencing
-			once.Do(func() {
-				// Run Setup for all registered tests, and wait
-				// to finish
-				for _, test := range j.tests {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						test.setupErr = test.Setup()
-					}()
-				}
-				wg.Wait()
+	BeforeEach(func() {
+		// No call to Do returns until the one call to f
+		// returns, so this will block any Its from commencing
+		once.Do(func() {
+			// Run Setup for all registered tests, and wait
+			// to finish
+			for _, test := range j.tests {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					test.setupErr = test.Setup()
+				}()
+			}
+			wg.Wait()
 
-				// go run Test for all registered tests
-				for _, test := range j.tests {
-					test.channel = make(chan int)
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						test.testErr = test.Test(test.channel)
-					}()
-				}
-				// Trigger upgrade
-				if err := j.disruption(); err != nil {
-					// TODO(ihmccreery) Make this Logf,
-					// once it's factored into its own
-					// package
-					fmt.Fprintf(GinkgoWriter, err.Error())
-				}
-				// Once upgrade is done, signal to all Tests
-				// that upgrade is finished, and wait for all
-				// tests to finish
-				for _, test := range j.tests {
-					test.channel <- 1
-				}
-				wg.Wait()
+			// go run Test for all registered tests
+			ch := make(chan struct{})
+			for _, test := range j.tests {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					test.testErr = test.Test(ch)
+				}()
+			}
+			// Trigger upgrade
+			if err := j.disruption(); err != nil {
+				// TODO(ihmccreery) Make this Logf,
+				// once it's factored into its own
+				// package
+				fmt.Fprintf(GinkgoWriter, err.Error())
+			}
+			// Once upgrade is done, signal to all Tests
+			// that upgrade is finished, and wait for all
+			// tests to finish
+			close(ch)
+			wg.Wait()
 
-				// Call Teardown on all tests
-				//
-				// TODO(ihmccreery) Consider breaking this into a separate AfterEach
-				// call.
-				for _, test := range j.tests {
-					wg.Add(1)
-					go func(t Interface) {
-						defer wg.Done()
-						test.teardownErr = t.Teardown()
-					}(test)
-				}
-				wg.Wait()
-			})
+			// Call Teardown on all tests
+			//
+			// TODO(ihmccreery) Consider breaking this into a separate AfterEach
+			// call.
+			for _, test := range j.tests {
+				wg.Add(1)
+				go func(t Interface) {
+					defer wg.Done()
+					test.teardownErr = t.Teardown()
+				}(test)
+			}
+			wg.Wait()
 		})
 
-		It(j.name, func() {
+		It("disruption succeeds", func() {
 			// Check to make sure that the upgrade actually worked.
 			// Not sure what the right abstraction here is.
 		})
