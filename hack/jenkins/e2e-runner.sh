@@ -248,7 +248,14 @@ fi
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
 # at HEAD, release candidate.
 if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
-    gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~
+    # Retry the download a few times to mitigate transient server errors and
+    # race conditions where the bucket contents change under us as we download.
+    for n in $(seq 3); do
+        gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~ && break || sleep 1
+        # Delete any temporary files from the download so that we start from
+        # scratch when we retry.
+        rm -rf ~/.gsutil
+    done
     rm -rf ~/repo ~/cloudsdk
     mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
     mkdir ~/cloudsdk
