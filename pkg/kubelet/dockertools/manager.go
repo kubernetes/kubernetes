@@ -34,7 +34,6 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
 	dockernat "github.com/docker/go-connections/nat"
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
@@ -821,7 +820,9 @@ func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, er
 
 // Removes the specified image.
 func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
-	return dm.client.RemoveImage(image.Image)
+	// TODO(harryz) currently Runtime interface does not provide other remove options.
+	_, err := dm.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{})
+	return err
 }
 
 // podInfraContainerChanged returns true if the pod infra container has changed.

@@ -24,9 +24,9 @@ import (
 	"sort"
 	"strings"
 
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 
+	dockertypes "github.com/docker/engine-api/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -54,17 +54,17 @@ type lazyDockerKeyring struct {
 	Providers []DockerConfigProvider
 }
 
-// LazyAuthConfiguration wraps AuthConfiguration, potentially deferring its
+// LazyAuthConfiguration wraps dockertypes.AuthConfig, potentially deferring its
 // binding. If Provider is non-nil, it will be used to obtain new credentials
 // by calling LazyProvide() on it.
 type LazyAuthConfiguration struct {
-	docker.AuthConfiguration
+	dockertypes.AuthConfig
 	Provider DockerConfigProvider
 }
 
 func DockerConfigEntryToLazyAuthConfiguration(ident DockerConfigEntry) LazyAuthConfiguration {
 	return LazyAuthConfiguration{
-		AuthConfiguration: docker.AuthConfiguration{
+		AuthConfig: dockertypes.AuthConfig{
 			Username: ident.Username,
 			Password: ident.Password,
 			Email:    ident.Email,
@@ -291,7 +291,6 @@ type unionDockerKeyring struct {
 
 func (k *unionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
 	authConfigs := []LazyAuthConfiguration{}
-
 	for _, subKeyring := range k.keyrings {
 		if subKeyring == nil {
 			continue
