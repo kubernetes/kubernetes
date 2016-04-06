@@ -663,6 +663,8 @@ func TestHandleExchangeRefreshToken(t *testing.T) {
 		client := &oidctesting.FakeClient{
 			Err:     tt.returnErr,
 			IDToken: tt.returnIDToken,
+
+			ExpectRefreshToken: tt.rt,
 		}
 		h := NewOIDCHTTPHandler(client)
 
