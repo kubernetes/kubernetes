@@ -180,7 +180,7 @@ func TestCNIPlugin(t *testing.T) {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}
 
-	err = plug.SetUpPod("podNamespace", "podName", "test_infra_container")
+	err = plug.SetUpPod("podNamespace", "podName", kubecontainer.ContainerID{"docker", "test_infra_container"})
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestCNIPlugin(t *testing.T) {
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))
 	}
-	err = plug.TearDownPod("podNamespace", "podName", "test_infra_container")
+	err = plug.TearDownPod("podNamespace", "podName", kubecontainer.ContainerID{"docker", "test_infra_container"})
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}

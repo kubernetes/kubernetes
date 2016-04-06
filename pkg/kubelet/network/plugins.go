@@ -67,13 +67,13 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.DockerID) error
+	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.DockerID) error
+	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
-	Status(namespace string, name string, podInfraContainerID kubecontainer.DockerID) (*PodNetworkStatus, error)
+	Status(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
 }
 
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
@@ -180,14 +180,14 @@ func (plugin *NoopNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt()
 }
 
-func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.DockerID) error {
+func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	return nil
 }
 
-func (plugin *NoopNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.DockerID) error {
+func (plugin *NoopNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	return nil
 }
 
-func (plugin *NoopNetworkPlugin) Status(namespace string, name string, id kubecontainer.DockerID) (*PodNetworkStatus, error) {
+func (plugin *NoopNetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
 	return nil, nil
 }
