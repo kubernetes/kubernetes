@@ -281,7 +281,7 @@ coreos:
         [Service]
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests/
         ExecStart=/opt/kubernetes/server/bin/kubelet \
-            --docker-endpoint=unix:/var/run/weave/weave.sock \
+            --docker-endpoint=unix://var/run/weave/weave.sock \
             --address=0.0.0.0 \
             --port=10250 \
             --hostname-override=%H \
