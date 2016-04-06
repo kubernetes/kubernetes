@@ -391,7 +391,7 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 		return body, nil, fmt.Errorf("unable to decode object %s into %v", gvk.String(), reflect.TypeOf(objPtr))
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	_ = h.versioner.UpdateObject(objPtr, node.Expiration, node.ModifiedIndex)
+	_ = h.versioner.UpdateObject(objPtr, node.ModifiedIndex)
 	return body, node, err
 }
 
@@ -465,7 +465,7 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 				return err
 			}
 			// being unable to set the version does not prevent the object from being extracted
-			_ = h.versioner.UpdateObject(obj, node.Expiration, node.ModifiedIndex)
+			_ = h.versioner.UpdateObject(obj, node.ModifiedIndex)
 			if filter(obj) {
 				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 			}
@@ -556,9 +556,6 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 		meta := storage.ResponseMeta{}
 		if node != nil {
 			meta.TTL = node.TTL
-			if node.Expiration != nil {
-				meta.Expiration = node.Expiration
-			}
 			meta.ResourceVersion = node.ModifiedIndex
 		}
 		// Get the object to be written by calling tryUpdate.
@@ -590,7 +587,7 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 		}
 
 		// Since update object may have a resourceVersion set, we need to clear it here.
-		if err := h.versioner.UpdateObject(ret, meta.Expiration, 0); err != nil {
+		if err := h.versioner.UpdateObject(ret, 0); err != nil {
 			return errors.New("resourceVersion cannot be set on objects store in etcd")
 		}
 
