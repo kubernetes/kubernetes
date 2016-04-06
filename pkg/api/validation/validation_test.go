@@ -98,6 +98,56 @@ func TestValidateObjectMetaNamespaces(t *testing.T) {
 	}
 }
 
+func TestValidateObjectMetaOwnerReferences(t *testing.T) {
+	testCases := []struct {
+		ownerReferences []api.OwnerReference
+		expectError     bool
+	}{
+		{
+			[]api.OwnerReference{
+				{
+					APIVersion: "thirdpartyVersion",
+					Kind:       "thirdpartyKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			false,
+		},
+		{
+			// event shouldn't be set as an owner
+			[]api.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Event",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			true,
+		},
+	}
+
+	for _, tc := range testCases {
+		errs := ValidateObjectMeta(
+			&api.ObjectMeta{Name: "test", Namespace: "test", OwnerReferences: tc.ownerReferences},
+			true,
+			func(s string, prefix bool) (bool, string) {
+				return true, ""
+			},
+			field.NewPath("field"))
+		if len(errs) != 0 && !tc.expectError {
+			t.Errorf("unexpected error: %v", errs)
+		}
+		if len(errs) == 0 && tc.expectError {
+			t.Errorf("expect error")
+		}
+		if len(errs) != 0 && !strings.Contains(errs[0].Error(), "is disallowed from being an owner") {
+			t.Errorf("unexpected error message: %v", errs)
+		}
+	}
+}
+
 func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 	if errs := ValidateObjectMetaUpdate(
 		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
@@ -214,6 +264,21 @@ func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
 		field.NewPath("field"))
 	if len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
+	}
+}
+
+// Ensure updating finalizers is disallowed
+func TestValidateObjectMetaUpdateDisallowsUpdatingFinalizers(t *testing.T) {
+	errs := ValidateObjectMetaUpdate(
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{"orphaning"}},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+		field.NewPath("field"),
+	)
+	if len(errs) != 1 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if !strings.Contains(errs[0].Error(), "field is immutable") {
+		t.Errorf("unexpected error message: %v", errs)
 	}
 }
 
