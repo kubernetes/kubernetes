@@ -481,6 +481,8 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		// Change the services to LoadBalancer.
 
+		// Here we test that LoadBalancers can receive static IP addresses.  This isn't
+		// necessary, but is an additional feature this monolithic test checks.
 		requestedIP := ""
 		staticIPName := ""
 		if framework.ProviderIs("gce", "gke") {
