@@ -217,10 +217,10 @@ coreos:
         ExecStart=/opt/kubernetes/server/bin/kube-apiserver \
             --insecure-bind-address=0.0.0.0 \
             --advertise-address=$public_ipv4 \
-            --port=8080 \
+            --insecure-port=8080 \
             $ETCD_SERVERS \
             --service-cluster-ip-range=10.16.0.0/12 \
-            --cloud-provider=vagrant \
+            --cloud-provider= \
             --logtostderr=true
         Restart=always
         RestartSec=10
