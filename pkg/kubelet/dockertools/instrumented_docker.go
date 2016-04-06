@@ -20,7 +20,6 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
-	docker "github.com/fsouza/go-dockerclient"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -121,22 +120,21 @@ func (in instrumentedDockerInterface) ListImages(opts dockertypes.ImageListOptio
 	return out, err
 }
 
-func (in instrumentedDockerInterface) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+func (in instrumentedDockerInterface) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
-
-	err := in.client.PullImage(opts, auth)
+	err := in.client.PullImage(imageID, auth, opts)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedDockerInterface) RemoveImage(image string) error {
+func (in instrumentedDockerInterface) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
 	const operation = "remove_image"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.RemoveImage(image)
+	imageDelete, err := in.client.RemoveImage(image, opts)
 	recordError(operation, err)
-	return err
+	return imageDelete, err
 }
 
 func (in instrumentedDockerInterface) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {

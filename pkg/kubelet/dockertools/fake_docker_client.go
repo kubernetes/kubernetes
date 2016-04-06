@@ -28,7 +28,6 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
-	docker "github.com/fsouza/go-dockerclient"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -422,18 +421,14 @@ func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 
 // PullImage is a test-spy implementation of DockerInterface.PullImage.
 // It adds an entry "pull" to the internal method call record.
-func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+func (f *FakeDockerClient) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "pull")
 	err := f.popError("pull")
 	if err == nil {
-		registry := opts.Registry
-		if len(registry) != 0 {
-			registry = registry + "/"
-		}
 		authJson, _ := json.Marshal(auth)
-		f.pulled = append(f.pulled, fmt.Sprintf("%s%s:%s using %s", registry, opts.Repository, opts.Tag, string(authJson)))
+		f.pulled = append(f.pulled, fmt.Sprintf("%s:%s using %s", imageID, opts.Tag, string(authJson)))
 	}
 	return err
 }
@@ -479,12 +474,12 @@ func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dock
 	return f.Images, err
 }
 
-func (f *FakeDockerClient) RemoveImage(image string) error {
+func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
 	err := f.popError("remove_image")
 	if err == nil {
 		f.RemovedImages.Insert(image)
 	}
-	return err
+	return []dockertypes.ImageDelete{{Deleted: image}}, err
 }
 
 func (f *FakeDockerClient) updateContainerStatus(id, status string) {
