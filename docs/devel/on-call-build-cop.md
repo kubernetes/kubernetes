@@ -87,9 +87,9 @@ Build-copping
 * Jobs that are not in [critical e2e tests] (https://goto.google.com/k8s-test/view/Critical%20Builds/) or [flaky test builds](https://goto.google.com/k8s-test/view/Flaky/) are not your responsibility to monitor. The `Test owner:` in the job description will be automatically emailed if the job is failing.
 * If you are a weekday oncall, ensure that PRs confirming to the following pre-requisites are being merged at a reasonable rate:
   * [Have been LGTMd](https://github.com/kubernetes/kubernetes/labels/lgtm)
-  * Pass Travis and Shippable.
+  * Pass Travis and Jenkins per-PR tests.
   * Author has signed CLA if applicable.
-* If you are a weekend oncall, [never merge PRs manually](collab.md), instead add the label "lgtm" to the PRs once they have been LGTMd and passed Travis and Shippable; this will cause merge-bot to merge them automatically (or make them easy to find by the next oncall, who will merge them).
+* If you are a weekend oncall, [never merge PRs manually](collab.md), instead add the label "lgtm" to the PRs once they have been LGTMd and passed Travis; this will cause merge-bot to merge them automatically (or make them easy to find by the next oncall, who will merge them).
 * When the build is broken, roll back the PRs responsible ASAP
 * When E2E tests are unstable, a "merge freeze" may be instituted. During a merge freeze:
   * Oncall should slowly merge LGTMd changes throughout the day while monitoring E2E to ensure stability.
