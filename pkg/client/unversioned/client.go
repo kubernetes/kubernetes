@@ -54,6 +54,10 @@ func (c *Client) ReplicationControllers(namespace string) ReplicationControllerI
 	return newReplicationControllers(c, namespace)
 }
 
+func (c *Client) Clusters() ClusterInterface {
+	return newClusters(c)
+}
+
 func (c *Client) Nodes() NodeInterface {
 	return newNodes(c)
 }

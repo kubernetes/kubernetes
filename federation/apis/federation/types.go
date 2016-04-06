@@ -21,6 +21,18 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+
+var ClusterSelectorKey = "kubernetes.io/cluster-names"
+var TargetClusterKey = "kubernetes.io/target-cluster"
+var FederationReplicaSetKey = "kubernetes.io/created-by"
+
+// ClusterResources is an object for conveying resource information about a cluster.
+// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+type ClusterResources struct {
+	// Capacity represents the available resources of a node
+	Capacity api.ResourceList `json:"capacity,omitempty"`
+}
+
 // Address of a cluster
 type ClusterAddress struct {
 	// URL to access the cluster
@@ -88,4 +100,11 @@ type ClusterList struct {
 
 	// List of Cluster objects.
 	Items []Cluster `json:"items"`
+}
+// A cluster selector represents the union of the results of one or more label queries
+// over a set of nodes; that is, it represents the OR of the selectors represented
+// by the node selector terms.
+type ClusterSelector struct {
+	//Required. A list of node selector terms. The terms are ORed.
+	NodeSelectorTerms []api.NodeSelectorTerm `json:"nodeSelectorTerms"`
 }

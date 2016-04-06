@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/federation/apis/federation"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -555,4 +556,42 @@ func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id st
 	}
 
 	return o.(*api.PersistentVolumeClaim), nil
+}
+type StoreToClusterLister struct {
+	Store
+}
+// ClusterConditionPredicate is a function that indicates whether the given node's conditions meet
+// some set of criteria defined by the function.
+type ClusterConditionPredicate func(cluster federation.Cluster) bool
+
+// storeToClusterConditionLister filters and returns nodes matching the given type and status from the store.
+type storeToClusterConditionLister struct {
+	store     Store
+	predicate ClusterConditionPredicate
+}
+
+// NodeCondition returns a storeToNodeConditionLister
+func (s *StoreToClusterLister) ClusterCondition(predicate ClusterConditionPredicate) storeToClusterConditionLister {
+	// TODO: Move this filtering server side. Currently our selectors don't facilitate searching through a list so we
+	// have the reflector filter out the Unschedulable field and sift through node conditions in the lister.
+	return storeToClusterConditionLister{s.Store, predicate}
+}
+
+func (s *StoreToClusterLister) List() (clusters federation.ClusterList, err error) {
+	for _, m := range s.Store.List() {
+		clusters.Items = append(clusters.Items, *(m.(*federation.Cluster)))
+	}
+	return clusters, nil
+}
+// List returns a list of nodes that match the conditions defined by the predicate functions in the storeToNodeConditionLister.
+func (s storeToClusterConditionLister) List() (clusters federation.ClusterList, err error) {
+	for _, m := range s.store.List() {
+		cluster := *m.(*federation.Cluster)
+		if s.predicate(cluster) {
+			clusters.Items = append(clusters.Items, cluster)
+		} else {
+			glog.V(5).Infof("Cluster %s matches none of the conditions", cluster.Name)
+		}
+	}
+	return
 }

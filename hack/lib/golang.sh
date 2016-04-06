@@ -36,6 +36,7 @@ kube::golang::server_targets() {
     cmd/hyperkube
     cmd/linkcheck
     plugin/cmd/kube-scheduler
+    federation/plugin/cmd/scheduler
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     for contrib in "${KUBERNETES_CONTRIB}"; do
@@ -429,6 +430,9 @@ kube::golang::build_binaries_for_platform() {
   else
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
+    echo  go install "${goflags[@]:+${goflags[@]}}" \
+        -ldflags "${goldflags}" \
+        "${nonstatics[@]:+${nonstatics[@]}}"
       go install "${goflags[@]:+${goflags[@]}}" \
         -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
