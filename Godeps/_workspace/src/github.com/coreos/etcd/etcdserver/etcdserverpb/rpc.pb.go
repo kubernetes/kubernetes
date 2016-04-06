@@ -8,16 +8,15 @@ import (
 	"fmt"
 
 	proto "github.com/gogo/protobuf/proto"
-)
 
-import math "math"
+	math "math"
 
-import storagepb "github.com/coreos/etcd/storage/storagepb"
-
-import (
 	context "golang.org/x/net/context"
+
 	grpc "google.golang.org/grpc"
 )
+
+import storagepb "github.com/coreos/etcd/storage/storagepb"
 
 import io "io"
 
@@ -25,6 +24,26 @@ import io "io"
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
+
+type AlarmType int32
+
+const (
+	AlarmType_NONE    AlarmType = 0
+	AlarmType_NOSPACE AlarmType = 1
+)
+
+var AlarmType_name = map[int32]string{
+	0: "NONE",
+	1: "NOSPACE",
+}
+var AlarmType_value = map[string]int32{
+	"NONE":    0,
+	"NOSPACE": 1,
+}
+
+func (x AlarmType) String() string {
+	return proto.EnumName(AlarmType_name, int32(x))
+}
 
 type RangeRequest_SortOrder int32
 
@@ -125,6 +144,29 @@ var Compare_CompareTarget_value = map[string]int32{
 
 func (x Compare_CompareTarget) String() string {
 	return proto.EnumName(Compare_CompareTarget_name, int32(x))
+}
+
+type AlarmRequest_AlarmAction int32
+
+const (
+	AlarmRequest_GET        AlarmRequest_AlarmAction = 0
+	AlarmRequest_ACTIVATE   AlarmRequest_AlarmAction = 1
+	AlarmRequest_DEACTIVATE AlarmRequest_AlarmAction = 2
+)
+
+var AlarmRequest_AlarmAction_name = map[int32]string{
+	0: "GET",
+	1: "ACTIVATE",
+	2: "DEACTIVATE",
+}
+var AlarmRequest_AlarmAction_value = map[string]int32{
+	"GET":        0,
+	"ACTIVATE":   1,
+	"DEACTIVATE": 2,
+}
+
+func (x AlarmRequest_AlarmAction) String() string {
+	return proto.EnumName(AlarmRequest_AlarmAction_name, int32(x))
 }
 
 type ResponseHeader struct {
@@ -722,6 +764,10 @@ func (m *TxnResponse) GetResponses() []*ResponseUnion {
 // revision.
 type CompactionRequest struct {
 	Revision int64 `protobuf:"varint,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	// physical is set so the RPC will wait until the compaction is physically
+	// applied to the local database such that compacted entries are totally
+	// removed from the backing store.
+	Physical bool `protobuf:"varint,2,opt,name=physical,proto3" json:"physical,omitempty"`
 }
 
 func (m *CompactionRequest) Reset()         { *m = CompactionRequest{} }
@@ -936,18 +982,18 @@ func (m *WatchResponse) GetEvents() []*storagepb.Event {
 	return nil
 }
 
-type LeaseCreateRequest struct {
+type LeaseGrantRequest struct {
 	// advisory ttl in seconds
 	TTL int64 `protobuf:"varint,1,opt,name=TTL,proto3" json:"TTL,omitempty"`
 	// requested ID to create; 0 lets lessor choose
 	ID int64 `protobuf:"varint,2,opt,name=ID,proto3" json:"ID,omitempty"`
 }
 
-func (m *LeaseCreateRequest) Reset()         { *m = LeaseCreateRequest{} }
-func (m *LeaseCreateRequest) String() string { return proto.CompactTextString(m) }
-func (*LeaseCreateRequest) ProtoMessage()    {}
+func (m *LeaseGrantRequest) Reset()         { *m = LeaseGrantRequest{} }
+func (m *LeaseGrantRequest) String() string { return proto.CompactTextString(m) }
+func (*LeaseGrantRequest) ProtoMessage()    {}
 
-type LeaseCreateResponse struct {
+type LeaseGrantResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 	ID     int64           `protobuf:"varint,2,opt,name=ID,proto3" json:"ID,omitempty"`
 	// server decided ttl in second
@@ -955,11 +1001,11 @@ type LeaseCreateResponse struct {
 	Error string `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
 }
 
-func (m *LeaseCreateResponse) Reset()         { *m = LeaseCreateResponse{} }
-func (m *LeaseCreateResponse) String() string { return proto.CompactTextString(m) }
-func (*LeaseCreateResponse) ProtoMessage()    {}
+func (m *LeaseGrantResponse) Reset()         { *m = LeaseGrantResponse{} }
+func (m *LeaseGrantResponse) String() string { return proto.CompactTextString(m) }
+func (*LeaseGrantResponse) ProtoMessage()    {}
 
-func (m *LeaseCreateResponse) GetHeader() *ResponseHeader {
+func (m *LeaseGrantResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
@@ -1159,6 +1205,72 @@ func (m *DefragmentResponse) GetHeader() *ResponseHeader {
 	return nil
 }
 
+type AlarmRequest struct {
+	Action AlarmRequest_AlarmAction `protobuf:"varint,1,opt,name=action,proto3,enum=etcdserverpb.AlarmRequest_AlarmAction" json:"action,omitempty"`
+	// MemberID is the member raising the alarm request
+	MemberID uint64    `protobuf:"varint,2,opt,name=memberID,proto3" json:"memberID,omitempty"`
+	Alarm    AlarmType `protobuf:"varint,3,opt,name=alarm,proto3,enum=etcdserverpb.AlarmType" json:"alarm,omitempty"`
+}
+
+func (m *AlarmRequest) Reset()         { *m = AlarmRequest{} }
+func (m *AlarmRequest) String() string { return proto.CompactTextString(m) }
+func (*AlarmRequest) ProtoMessage()    {}
+
+type AlarmMember struct {
+	MemberID uint64    `protobuf:"varint,1,opt,name=memberID,proto3" json:"memberID,omitempty"`
+	Alarm    AlarmType `protobuf:"varint,2,opt,name=alarm,proto3,enum=etcdserverpb.AlarmType" json:"alarm,omitempty"`
+}
+
+func (m *AlarmMember) Reset()         { *m = AlarmMember{} }
+func (m *AlarmMember) String() string { return proto.CompactTextString(m) }
+func (*AlarmMember) ProtoMessage()    {}
+
+type AlarmResponse struct {
+	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
+	Alarms []*AlarmMember  `protobuf:"bytes,2,rep,name=alarms" json:"alarms,omitempty"`
+}
+
+func (m *AlarmResponse) Reset()         { *m = AlarmResponse{} }
+func (m *AlarmResponse) String() string { return proto.CompactTextString(m) }
+func (*AlarmResponse) ProtoMessage()    {}
+
+func (m *AlarmResponse) GetHeader() *ResponseHeader {
+	if m != nil {
+		return m.Header
+	}
+	return nil
+}
+
+func (m *AlarmResponse) GetAlarms() []*AlarmMember {
+	if m != nil {
+		return m.Alarms
+	}
+	return nil
+}
+
+type StatusRequest struct {
+}
+
+func (m *StatusRequest) Reset()         { *m = StatusRequest{} }
+func (m *StatusRequest) String() string { return proto.CompactTextString(m) }
+func (*StatusRequest) ProtoMessage()    {}
+
+type StatusResponse struct {
+	Header  *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
+	Version string          `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+}
+
+func (m *StatusResponse) Reset()         { *m = StatusResponse{} }
+func (m *StatusResponse) String() string { return proto.CompactTextString(m) }
+func (*StatusResponse) ProtoMessage()    {}
+
+func (m *StatusResponse) GetHeader() *ResponseHeader {
+	if m != nil {
+		return m.Header
+	}
+	return nil
+}
+
 type AuthEnableRequest struct {
 }
 
@@ -1180,82 +1292,88 @@ func (m *AuthenticateRequest) Reset()         { *m = AuthenticateRequest{} }
 func (m *AuthenticateRequest) String() string { return proto.CompactTextString(m) }
 func (*AuthenticateRequest) ProtoMessage()    {}
 
-type UserAddRequest struct {
+type AuthUserAddRequest struct {
+	Name     string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Password string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 }
 
-func (m *UserAddRequest) Reset()         { *m = UserAddRequest{} }
-func (m *UserAddRequest) String() string { return proto.CompactTextString(m) }
-func (*UserAddRequest) ProtoMessage()    {}
+func (m *AuthUserAddRequest) Reset()         { *m = AuthUserAddRequest{} }
+func (m *AuthUserAddRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthUserAddRequest) ProtoMessage()    {}
 
-type UserGetRequest struct {
+type AuthUserGetRequest struct {
 }
 
-func (m *UserGetRequest) Reset()         { *m = UserGetRequest{} }
-func (m *UserGetRequest) String() string { return proto.CompactTextString(m) }
-func (*UserGetRequest) ProtoMessage()    {}
+func (m *AuthUserGetRequest) Reset()         { *m = AuthUserGetRequest{} }
+func (m *AuthUserGetRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthUserGetRequest) ProtoMessage()    {}
 
-type UserDeleteRequest struct {
+type AuthUserDeleteRequest struct {
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 }
 
-func (m *UserDeleteRequest) Reset()         { *m = UserDeleteRequest{} }
-func (m *UserDeleteRequest) String() string { return proto.CompactTextString(m) }
-func (*UserDeleteRequest) ProtoMessage()    {}
+func (m *AuthUserDeleteRequest) Reset()         { *m = AuthUserDeleteRequest{} }
+func (m *AuthUserDeleteRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthUserDeleteRequest) ProtoMessage()    {}
 
-type UserChangePasswordRequest struct {
+type AuthUserChangePasswordRequest struct {
+	Name     string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Password string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 }
 
-func (m *UserChangePasswordRequest) Reset()         { *m = UserChangePasswordRequest{} }
-func (m *UserChangePasswordRequest) String() string { return proto.CompactTextString(m) }
-func (*UserChangePasswordRequest) ProtoMessage()    {}
+func (m *AuthUserChangePasswordRequest) Reset()         { *m = AuthUserChangePasswordRequest{} }
+func (m *AuthUserChangePasswordRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthUserChangePasswordRequest) ProtoMessage()    {}
 
-type UserGrantRequest struct {
+type AuthUserGrantRequest struct {
 }
 
-func (m *UserGrantRequest) Reset()         { *m = UserGrantRequest{} }
-func (m *UserGrantRequest) String() string { return proto.CompactTextString(m) }
-func (*UserGrantRequest) ProtoMessage()    {}
+func (m *AuthUserGrantRequest) Reset()         { *m = AuthUserGrantRequest{} }
+func (m *AuthUserGrantRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthUserGrantRequest) ProtoMessage()    {}
 
-type UserRevokeRequest struct {
+type AuthUserRevokeRequest struct {
 }
 
-func (m *UserRevokeRequest) Reset()         { *m = UserRevokeRequest{} }
-func (m *UserRevokeRequest) String() string { return proto.CompactTextString(m) }
-func (*UserRevokeRequest) ProtoMessage()    {}
+func (m *AuthUserRevokeRequest) Reset()         { *m = AuthUserRevokeRequest{} }
+func (m *AuthUserRevokeRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthUserRevokeRequest) ProtoMessage()    {}
 
-type RoleAddRequest struct {
+type AuthRoleAddRequest struct {
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 }
 
-func (m *RoleAddRequest) Reset()         { *m = RoleAddRequest{} }
-func (m *RoleAddRequest) String() string { return proto.CompactTextString(m) }
-func (*RoleAddRequest) ProtoMessage()    {}
+func (m *AuthRoleAddRequest) Reset()         { *m = AuthRoleAddRequest{} }
+func (m *AuthRoleAddRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleAddRequest) ProtoMessage()    {}
 
-type RoleGetRequest struct {
+type AuthRoleGetRequest struct {
 }
 
-func (m *RoleGetRequest) Reset()         { *m = RoleGetRequest{} }
-func (m *RoleGetRequest) String() string { return proto.CompactTextString(m) }
-func (*RoleGetRequest) ProtoMessage()    {}
+func (m *AuthRoleGetRequest) Reset()         { *m = AuthRoleGetRequest{} }
+func (m *AuthRoleGetRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleGetRequest) ProtoMessage()    {}
 
-type RoleDeleteRequest struct {
+type AuthRoleDeleteRequest struct {
 }
 
-func (m *RoleDeleteRequest) Reset()         { *m = RoleDeleteRequest{} }
-func (m *RoleDeleteRequest) String() string { return proto.CompactTextString(m) }
-func (*RoleDeleteRequest) ProtoMessage()    {}
+func (m *AuthRoleDeleteRequest) Reset()         { *m = AuthRoleDeleteRequest{} }
+func (m *AuthRoleDeleteRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleDeleteRequest) ProtoMessage()    {}
 
-type RoleGrantRequest struct {
+type AuthRoleGrantRequest struct {
 }
 
-func (m *RoleGrantRequest) Reset()         { *m = RoleGrantRequest{} }
-func (m *RoleGrantRequest) String() string { return proto.CompactTextString(m) }
-func (*RoleGrantRequest) ProtoMessage()    {}
+func (m *AuthRoleGrantRequest) Reset()         { *m = AuthRoleGrantRequest{} }
+func (m *AuthRoleGrantRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleGrantRequest) ProtoMessage()    {}
 
-type RoleRevokeRequest struct {
+type AuthRoleRevokeRequest struct {
 }
 
-func (m *RoleRevokeRequest) Reset()         { *m = RoleRevokeRequest{} }
-func (m *RoleRevokeRequest) String() string { return proto.CompactTextString(m) }
-func (*RoleRevokeRequest) ProtoMessage()    {}
+func (m *AuthRoleRevokeRequest) Reset()         { *m = AuthRoleRevokeRequest{} }
+func (m *AuthRoleRevokeRequest) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleRevokeRequest) ProtoMessage()    {}
 
 type AuthEnableResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
@@ -1302,165 +1420,165 @@ func (m *AuthenticateResponse) GetHeader() *ResponseHeader {
 	return nil
 }
 
-type UserAddResponse struct {
+type AuthUserAddResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *UserAddResponse) Reset()         { *m = UserAddResponse{} }
-func (m *UserAddResponse) String() string { return proto.CompactTextString(m) }
-func (*UserAddResponse) ProtoMessage()    {}
+func (m *AuthUserAddResponse) Reset()         { *m = AuthUserAddResponse{} }
+func (m *AuthUserAddResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthUserAddResponse) ProtoMessage()    {}
 
-func (m *UserAddResponse) GetHeader() *ResponseHeader {
+func (m *AuthUserAddResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type UserGetResponse struct {
+type AuthUserGetResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *UserGetResponse) Reset()         { *m = UserGetResponse{} }
-func (m *UserGetResponse) String() string { return proto.CompactTextString(m) }
-func (*UserGetResponse) ProtoMessage()    {}
+func (m *AuthUserGetResponse) Reset()         { *m = AuthUserGetResponse{} }
+func (m *AuthUserGetResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthUserGetResponse) ProtoMessage()    {}
 
-func (m *UserGetResponse) GetHeader() *ResponseHeader {
+func (m *AuthUserGetResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type UserDeleteResponse struct {
+type AuthUserDeleteResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *UserDeleteResponse) Reset()         { *m = UserDeleteResponse{} }
-func (m *UserDeleteResponse) String() string { return proto.CompactTextString(m) }
-func (*UserDeleteResponse) ProtoMessage()    {}
+func (m *AuthUserDeleteResponse) Reset()         { *m = AuthUserDeleteResponse{} }
+func (m *AuthUserDeleteResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthUserDeleteResponse) ProtoMessage()    {}
 
-func (m *UserDeleteResponse) GetHeader() *ResponseHeader {
+func (m *AuthUserDeleteResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type UserChangePasswordResponse struct {
+type AuthUserChangePasswordResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *UserChangePasswordResponse) Reset()         { *m = UserChangePasswordResponse{} }
-func (m *UserChangePasswordResponse) String() string { return proto.CompactTextString(m) }
-func (*UserChangePasswordResponse) ProtoMessage()    {}
+func (m *AuthUserChangePasswordResponse) Reset()         { *m = AuthUserChangePasswordResponse{} }
+func (m *AuthUserChangePasswordResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthUserChangePasswordResponse) ProtoMessage()    {}
 
-func (m *UserChangePasswordResponse) GetHeader() *ResponseHeader {
+func (m *AuthUserChangePasswordResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type UserGrantResponse struct {
+type AuthUserGrantResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *UserGrantResponse) Reset()         { *m = UserGrantResponse{} }
-func (m *UserGrantResponse) String() string { return proto.CompactTextString(m) }
-func (*UserGrantResponse) ProtoMessage()    {}
+func (m *AuthUserGrantResponse) Reset()         { *m = AuthUserGrantResponse{} }
+func (m *AuthUserGrantResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthUserGrantResponse) ProtoMessage()    {}
 
-func (m *UserGrantResponse) GetHeader() *ResponseHeader {
+func (m *AuthUserGrantResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type UserRevokeResponse struct {
+type AuthUserRevokeResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *UserRevokeResponse) Reset()         { *m = UserRevokeResponse{} }
-func (m *UserRevokeResponse) String() string { return proto.CompactTextString(m) }
-func (*UserRevokeResponse) ProtoMessage()    {}
+func (m *AuthUserRevokeResponse) Reset()         { *m = AuthUserRevokeResponse{} }
+func (m *AuthUserRevokeResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthUserRevokeResponse) ProtoMessage()    {}
 
-func (m *UserRevokeResponse) GetHeader() *ResponseHeader {
+func (m *AuthUserRevokeResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type RoleAddResponse struct {
+type AuthRoleAddResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *RoleAddResponse) Reset()         { *m = RoleAddResponse{} }
-func (m *RoleAddResponse) String() string { return proto.CompactTextString(m) }
-func (*RoleAddResponse) ProtoMessage()    {}
+func (m *AuthRoleAddResponse) Reset()         { *m = AuthRoleAddResponse{} }
+func (m *AuthRoleAddResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleAddResponse) ProtoMessage()    {}
 
-func (m *RoleAddResponse) GetHeader() *ResponseHeader {
+func (m *AuthRoleAddResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type RoleGetResponse struct {
+type AuthRoleGetResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *RoleGetResponse) Reset()         { *m = RoleGetResponse{} }
-func (m *RoleGetResponse) String() string { return proto.CompactTextString(m) }
-func (*RoleGetResponse) ProtoMessage()    {}
+func (m *AuthRoleGetResponse) Reset()         { *m = AuthRoleGetResponse{} }
+func (m *AuthRoleGetResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleGetResponse) ProtoMessage()    {}
 
-func (m *RoleGetResponse) GetHeader() *ResponseHeader {
+func (m *AuthRoleGetResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type RoleDeleteResponse struct {
+type AuthRoleDeleteResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *RoleDeleteResponse) Reset()         { *m = RoleDeleteResponse{} }
-func (m *RoleDeleteResponse) String() string { return proto.CompactTextString(m) }
-func (*RoleDeleteResponse) ProtoMessage()    {}
+func (m *AuthRoleDeleteResponse) Reset()         { *m = AuthRoleDeleteResponse{} }
+func (m *AuthRoleDeleteResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleDeleteResponse) ProtoMessage()    {}
 
-func (m *RoleDeleteResponse) GetHeader() *ResponseHeader {
+func (m *AuthRoleDeleteResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type RoleGrantResponse struct {
+type AuthRoleGrantResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *RoleGrantResponse) Reset()         { *m = RoleGrantResponse{} }
-func (m *RoleGrantResponse) String() string { return proto.CompactTextString(m) }
-func (*RoleGrantResponse) ProtoMessage()    {}
+func (m *AuthRoleGrantResponse) Reset()         { *m = AuthRoleGrantResponse{} }
+func (m *AuthRoleGrantResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleGrantResponse) ProtoMessage()    {}
 
-func (m *RoleGrantResponse) GetHeader() *ResponseHeader {
+func (m *AuthRoleGrantResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
 	return nil
 }
 
-type RoleRevokeResponse struct {
+type AuthRoleRevokeResponse struct {
 	Header *ResponseHeader `protobuf:"bytes,1,opt,name=header" json:"header,omitempty"`
 }
 
-func (m *RoleRevokeResponse) Reset()         { *m = RoleRevokeResponse{} }
-func (m *RoleRevokeResponse) String() string { return proto.CompactTextString(m) }
-func (*RoleRevokeResponse) ProtoMessage()    {}
+func (m *AuthRoleRevokeResponse) Reset()         { *m = AuthRoleRevokeResponse{} }
+func (m *AuthRoleRevokeResponse) String() string { return proto.CompactTextString(m) }
+func (*AuthRoleRevokeResponse) ProtoMessage()    {}
 
-func (m *RoleRevokeResponse) GetHeader() *ResponseHeader {
+func (m *AuthRoleRevokeResponse) GetHeader() *ResponseHeader {
 	if m != nil {
 		return m.Header
 	}
@@ -1488,8 +1606,8 @@ func init() {
 	proto.RegisterType((*WatchCreateRequest)(nil), "etcdserverpb.WatchCreateRequest")
 	proto.RegisterType((*WatchCancelRequest)(nil), "etcdserverpb.WatchCancelRequest")
 	proto.RegisterType((*WatchResponse)(nil), "etcdserverpb.WatchResponse")
-	proto.RegisterType((*LeaseCreateRequest)(nil), "etcdserverpb.LeaseCreateRequest")
-	proto.RegisterType((*LeaseCreateResponse)(nil), "etcdserverpb.LeaseCreateResponse")
+	proto.RegisterType((*LeaseGrantRequest)(nil), "etcdserverpb.LeaseGrantRequest")
+	proto.RegisterType((*LeaseGrantResponse)(nil), "etcdserverpb.LeaseGrantResponse")
 	proto.RegisterType((*LeaseRevokeRequest)(nil), "etcdserverpb.LeaseRevokeRequest")
 	proto.RegisterType((*LeaseRevokeResponse)(nil), "etcdserverpb.LeaseRevokeResponse")
 	proto.RegisterType((*LeaseKeepAliveRequest)(nil), "etcdserverpb.LeaseKeepAliveRequest")
@@ -1505,38 +1623,45 @@ func init() {
 	proto.RegisterType((*MemberListResponse)(nil), "etcdserverpb.MemberListResponse")
 	proto.RegisterType((*DefragmentRequest)(nil), "etcdserverpb.DefragmentRequest")
 	proto.RegisterType((*DefragmentResponse)(nil), "etcdserverpb.DefragmentResponse")
+	proto.RegisterType((*AlarmRequest)(nil), "etcdserverpb.AlarmRequest")
+	proto.RegisterType((*AlarmMember)(nil), "etcdserverpb.AlarmMember")
+	proto.RegisterType((*AlarmResponse)(nil), "etcdserverpb.AlarmResponse")
+	proto.RegisterType((*StatusRequest)(nil), "etcdserverpb.StatusRequest")
+	proto.RegisterType((*StatusResponse)(nil), "etcdserverpb.StatusResponse")
 	proto.RegisterType((*AuthEnableRequest)(nil), "etcdserverpb.AuthEnableRequest")
 	proto.RegisterType((*AuthDisableRequest)(nil), "etcdserverpb.AuthDisableRequest")
 	proto.RegisterType((*AuthenticateRequest)(nil), "etcdserverpb.AuthenticateRequest")
-	proto.RegisterType((*UserAddRequest)(nil), "etcdserverpb.UserAddRequest")
-	proto.RegisterType((*UserGetRequest)(nil), "etcdserverpb.UserGetRequest")
-	proto.RegisterType((*UserDeleteRequest)(nil), "etcdserverpb.UserDeleteRequest")
-	proto.RegisterType((*UserChangePasswordRequest)(nil), "etcdserverpb.UserChangePasswordRequest")
-	proto.RegisterType((*UserGrantRequest)(nil), "etcdserverpb.UserGrantRequest")
-	proto.RegisterType((*UserRevokeRequest)(nil), "etcdserverpb.UserRevokeRequest")
-	proto.RegisterType((*RoleAddRequest)(nil), "etcdserverpb.RoleAddRequest")
-	proto.RegisterType((*RoleGetRequest)(nil), "etcdserverpb.RoleGetRequest")
-	proto.RegisterType((*RoleDeleteRequest)(nil), "etcdserverpb.RoleDeleteRequest")
-	proto.RegisterType((*RoleGrantRequest)(nil), "etcdserverpb.RoleGrantRequest")
-	proto.RegisterType((*RoleRevokeRequest)(nil), "etcdserverpb.RoleRevokeRequest")
+	proto.RegisterType((*AuthUserAddRequest)(nil), "etcdserverpb.AuthUserAddRequest")
+	proto.RegisterType((*AuthUserGetRequest)(nil), "etcdserverpb.AuthUserGetRequest")
+	proto.RegisterType((*AuthUserDeleteRequest)(nil), "etcdserverpb.AuthUserDeleteRequest")
+	proto.RegisterType((*AuthUserChangePasswordRequest)(nil), "etcdserverpb.AuthUserChangePasswordRequest")
+	proto.RegisterType((*AuthUserGrantRequest)(nil), "etcdserverpb.AuthUserGrantRequest")
+	proto.RegisterType((*AuthUserRevokeRequest)(nil), "etcdserverpb.AuthUserRevokeRequest")
+	proto.RegisterType((*AuthRoleAddRequest)(nil), "etcdserverpb.AuthRoleAddRequest")
+	proto.RegisterType((*AuthRoleGetRequest)(nil), "etcdserverpb.AuthRoleGetRequest")
+	proto.RegisterType((*AuthRoleDeleteRequest)(nil), "etcdserverpb.AuthRoleDeleteRequest")
+	proto.RegisterType((*AuthRoleGrantRequest)(nil), "etcdserverpb.AuthRoleGrantRequest")
+	proto.RegisterType((*AuthRoleRevokeRequest)(nil), "etcdserverpb.AuthRoleRevokeRequest")
 	proto.RegisterType((*AuthEnableResponse)(nil), "etcdserverpb.AuthEnableResponse")
 	proto.RegisterType((*AuthDisableResponse)(nil), "etcdserverpb.AuthDisableResponse")
 	proto.RegisterType((*AuthenticateResponse)(nil), "etcdserverpb.AuthenticateResponse")
-	proto.RegisterType((*UserAddResponse)(nil), "etcdserverpb.UserAddResponse")
-	proto.RegisterType((*UserGetResponse)(nil), "etcdserverpb.UserGetResponse")
-	proto.RegisterType((*UserDeleteResponse)(nil), "etcdserverpb.UserDeleteResponse")
-	proto.RegisterType((*UserChangePasswordResponse)(nil), "etcdserverpb.UserChangePasswordResponse")
-	proto.RegisterType((*UserGrantResponse)(nil), "etcdserverpb.UserGrantResponse")
-	proto.RegisterType((*UserRevokeResponse)(nil), "etcdserverpb.UserRevokeResponse")
-	proto.RegisterType((*RoleAddResponse)(nil), "etcdserverpb.RoleAddResponse")
-	proto.RegisterType((*RoleGetResponse)(nil), "etcdserverpb.RoleGetResponse")
-	proto.RegisterType((*RoleDeleteResponse)(nil), "etcdserverpb.RoleDeleteResponse")
-	proto.RegisterType((*RoleGrantResponse)(nil), "etcdserverpb.RoleGrantResponse")
-	proto.RegisterType((*RoleRevokeResponse)(nil), "etcdserverpb.RoleRevokeResponse")
+	proto.RegisterType((*AuthUserAddResponse)(nil), "etcdserverpb.AuthUserAddResponse")
+	proto.RegisterType((*AuthUserGetResponse)(nil), "etcdserverpb.AuthUserGetResponse")
+	proto.RegisterType((*AuthUserDeleteResponse)(nil), "etcdserverpb.AuthUserDeleteResponse")
+	proto.RegisterType((*AuthUserChangePasswordResponse)(nil), "etcdserverpb.AuthUserChangePasswordResponse")
+	proto.RegisterType((*AuthUserGrantResponse)(nil), "etcdserverpb.AuthUserGrantResponse")
+	proto.RegisterType((*AuthUserRevokeResponse)(nil), "etcdserverpb.AuthUserRevokeResponse")
+	proto.RegisterType((*AuthRoleAddResponse)(nil), "etcdserverpb.AuthRoleAddResponse")
+	proto.RegisterType((*AuthRoleGetResponse)(nil), "etcdserverpb.AuthRoleGetResponse")
+	proto.RegisterType((*AuthRoleDeleteResponse)(nil), "etcdserverpb.AuthRoleDeleteResponse")
+	proto.RegisterType((*AuthRoleGrantResponse)(nil), "etcdserverpb.AuthRoleGrantResponse")
+	proto.RegisterType((*AuthRoleRevokeResponse)(nil), "etcdserverpb.AuthRoleRevokeResponse")
+	proto.RegisterEnum("etcdserverpb.AlarmType", AlarmType_name, AlarmType_value)
 	proto.RegisterEnum("etcdserverpb.RangeRequest_SortOrder", RangeRequest_SortOrder_name, RangeRequest_SortOrder_value)
 	proto.RegisterEnum("etcdserverpb.RangeRequest_SortTarget", RangeRequest_SortTarget_name, RangeRequest_SortTarget_value)
 	proto.RegisterEnum("etcdserverpb.Compare_CompareResult", Compare_CompareResult_name, Compare_CompareResult_value)
 	proto.RegisterEnum("etcdserverpb.Compare_CompareTarget", Compare_CompareTarget_name, Compare_CompareTarget_value)
+	proto.RegisterEnum("etcdserverpb.AlarmRequest_AlarmAction", AlarmRequest_AlarmAction_name, AlarmRequest_AlarmAction_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1564,10 +1689,6 @@ type KVClient interface {
 	// Compact compacts the event history in etcd. User should compact the
 	// event history periodically, or it will grow infinitely.
 	Compact(ctx context.Context, in *CompactionRequest, opts ...grpc.CallOption) (*CompactionResponse, error)
-	// Hash returns the hash of local KV state for consistency checking purpose.
-	// This is designed for testing purpose. Do not use this in production when there
-	// are ongoing transactions.
-	Hash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*HashResponse, error)
 }
 
 type kVClient struct {
@@ -1623,15 +1744,6 @@ func (c *kVClient) Compact(ctx context.Context, in *CompactionRequest, opts ...g
 	return out, nil
 }
 
-func (c *kVClient) Hash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*HashResponse, error) {
-	out := new(HashResponse)
-	err := grpc.Invoke(ctx, "/etcdserverpb.KV/Hash", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // Server API for KV service
 
 type KVServer interface {
@@ -1653,10 +1765,6 @@ type KVServer interface {
 	// Compact compacts the event history in etcd. User should compact the
 	// event history periodically, or it will grow infinitely.
 	Compact(context.Context, *CompactionRequest) (*CompactionResponse, error)
-	// Hash returns the hash of local KV state for consistency checking purpose.
-	// This is designed for testing purpose. Do not use this in production when there
-	// are ongoing transactions.
-	Hash(context.Context, *HashRequest) (*HashResponse, error)
 }
 
 func RegisterKVServer(s *grpc.Server, srv KVServer) {
@@ -1723,18 +1831,6 @@ func _KV_Compact_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return out, nil
 }
 
-func _KV_Hash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(HashRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(KVServer).Hash(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 var _KV_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "etcdserverpb.KV",
 	HandlerType: (*KVServer)(nil),
@@ -1758,10 +1854,6 @@ var _KV_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Compact",
 			Handler:    _KV_Compact_Handler,
-		},
-		{
-			MethodName: "Hash",
-			Handler:    _KV_Hash_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{},
@@ -1873,11 +1965,11 @@ var _Watch_serviceDesc = grpc.ServiceDesc{
 // Client API for Lease service
 
 type LeaseClient interface {
-	// LeaseCreate creates a lease. A lease has a TTL. The lease will expire if the
+	// LeaseGrant creates a lease. A lease has a TTL. The lease will expire if the
 	// server does not receive a keepAlive within TTL from the lease holder.
 	// All keys attached to the lease will be expired and deleted if the lease expires.
 	// The key expiration generates an event in event history.
-	LeaseCreate(ctx context.Context, in *LeaseCreateRequest, opts ...grpc.CallOption) (*LeaseCreateResponse, error)
+	LeaseGrant(ctx context.Context, in *LeaseGrantRequest, opts ...grpc.CallOption) (*LeaseGrantResponse, error)
 	// LeaseRevoke revokes a lease. All the key attached to the lease will be expired and deleted.
 	LeaseRevoke(ctx context.Context, in *LeaseRevokeRequest, opts ...grpc.CallOption) (*LeaseRevokeResponse, error)
 	// KeepAlive keeps the lease alive.
@@ -1892,9 +1984,9 @@ func NewLeaseClient(cc *grpc.ClientConn) LeaseClient {
 	return &leaseClient{cc}
 }
 
-func (c *leaseClient) LeaseCreate(ctx context.Context, in *LeaseCreateRequest, opts ...grpc.CallOption) (*LeaseCreateResponse, error) {
-	out := new(LeaseCreateResponse)
-	err := grpc.Invoke(ctx, "/etcdserverpb.Lease/LeaseCreate", in, out, c.cc, opts...)
+func (c *leaseClient) LeaseGrant(ctx context.Context, in *LeaseGrantRequest, opts ...grpc.CallOption) (*LeaseGrantResponse, error) {
+	out := new(LeaseGrantResponse)
+	err := grpc.Invoke(ctx, "/etcdserverpb.Lease/LeaseGrant", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1944,11 +2036,11 @@ func (x *leaseLeaseKeepAliveClient) Recv() (*LeaseKeepAliveResponse, error) {
 // Server API for Lease service
 
 type LeaseServer interface {
-	// LeaseCreate creates a lease. A lease has a TTL. The lease will expire if the
+	// LeaseGrant creates a lease. A lease has a TTL. The lease will expire if the
 	// server does not receive a keepAlive within TTL from the lease holder.
 	// All keys attached to the lease will be expired and deleted if the lease expires.
 	// The key expiration generates an event in event history.
-	LeaseCreate(context.Context, *LeaseCreateRequest) (*LeaseCreateResponse, error)
+	LeaseGrant(context.Context, *LeaseGrantRequest) (*LeaseGrantResponse, error)
 	// LeaseRevoke revokes a lease. All the key attached to the lease will be expired and deleted.
 	LeaseRevoke(context.Context, *LeaseRevokeRequest) (*LeaseRevokeResponse, error)
 	// KeepAlive keeps the lease alive.
@@ -1959,12 +2051,12 @@ func RegisterLeaseServer(s *grpc.Server, srv LeaseServer) {
 	s.RegisterService(&_Lease_serviceDesc, srv)
 }
 
-func _Lease_LeaseCreate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(LeaseCreateRequest)
+func _Lease_LeaseGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(LeaseGrantRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(LeaseServer).LeaseCreate(ctx, in)
+	out, err := srv.(LeaseServer).LeaseGrant(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -2014,8 +2106,8 @@ var _Lease_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*LeaseServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "LeaseCreate",
-			Handler:    _Lease_LeaseCreate_Handler,
+			MethodName: "LeaseGrant",
+			Handler:    _Lease_LeaseGrant_Handler,
 		},
 		{
 			MethodName: "LeaseRevoke",
@@ -2181,8 +2273,15 @@ var _Cluster_serviceDesc = grpc.ServiceDesc{
 // Client API for Maintenance service
 
 type MaintenanceClient interface {
-	// TODO: move Hash from kv to Maintenance
+	// Alarm activates, deactivates, and queries alarms regarding cluster health.
+	Alarm(ctx context.Context, in *AlarmRequest, opts ...grpc.CallOption) (*AlarmResponse, error)
+	// Status gets the status of the member.
+	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	Defragment(ctx context.Context, in *DefragmentRequest, opts ...grpc.CallOption) (*DefragmentResponse, error)
+	// Hash returns the hash of the local KV state for consistency checking purpose.
+	// This is designed for testing; do not use this in production when there
+	// are ongoing transactions.
+	Hash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*HashResponse, error)
 }
 
 type maintenanceClient struct {
@@ -2191,6 +2290,24 @@ type maintenanceClient struct {
 
 func NewMaintenanceClient(cc *grpc.ClientConn) MaintenanceClient {
 	return &maintenanceClient{cc}
+}
+
+func (c *maintenanceClient) Alarm(ctx context.Context, in *AlarmRequest, opts ...grpc.CallOption) (*AlarmResponse, error) {
+	out := new(AlarmResponse)
+	err := grpc.Invoke(ctx, "/etcdserverpb.Maintenance/Alarm", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *maintenanceClient) Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	out := new(StatusResponse)
+	err := grpc.Invoke(ctx, "/etcdserverpb.Maintenance/Status", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *maintenanceClient) Defragment(ctx context.Context, in *DefragmentRequest, opts ...grpc.CallOption) (*DefragmentResponse, error) {
@@ -2202,15 +2319,55 @@ func (c *maintenanceClient) Defragment(ctx context.Context, in *DefragmentReques
 	return out, nil
 }
 
+func (c *maintenanceClient) Hash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*HashResponse, error) {
+	out := new(HashResponse)
+	err := grpc.Invoke(ctx, "/etcdserverpb.Maintenance/Hash", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for Maintenance service
 
 type MaintenanceServer interface {
-	// TODO: move Hash from kv to Maintenance
+	// Alarm activates, deactivates, and queries alarms regarding cluster health.
+	Alarm(context.Context, *AlarmRequest) (*AlarmResponse, error)
+	// Status gets the status of the member.
+	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	Defragment(context.Context, *DefragmentRequest) (*DefragmentResponse, error)
+	// Hash returns the hash of the local KV state for consistency checking purpose.
+	// This is designed for testing; do not use this in production when there
+	// are ongoing transactions.
+	Hash(context.Context, *HashRequest) (*HashResponse, error)
 }
 
 func RegisterMaintenanceServer(s *grpc.Server, srv MaintenanceServer) {
 	s.RegisterService(&_Maintenance_serviceDesc, srv)
+}
+
+func _Maintenance_Alarm_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(AlarmRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(MaintenanceServer).Alarm(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func _Maintenance_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(StatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(MaintenanceServer).Status(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func _Maintenance_Defragment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
@@ -2225,13 +2382,37 @@ func _Maintenance_Defragment_Handler(srv interface{}, ctx context.Context, dec f
 	return out, nil
 }
 
+func _Maintenance_Hash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(HashRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(MaintenanceServer).Hash(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 var _Maintenance_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "etcdserverpb.Maintenance",
 	HandlerType: (*MaintenanceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "Alarm",
+			Handler:    _Maintenance_Alarm_Handler,
+		},
+		{
+			MethodName: "Status",
+			Handler:    _Maintenance_Status_Handler,
+		},
+		{
 			MethodName: "Defragment",
 			Handler:    _Maintenance_Defragment_Handler,
+		},
+		{
+			MethodName: "Hash",
+			Handler:    _Maintenance_Hash_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{},
@@ -2247,27 +2428,27 @@ type AuthClient interface {
 	// Authenticate processes authenticate request.
 	Authenticate(ctx context.Context, in *AuthenticateRequest, opts ...grpc.CallOption) (*AuthenticateResponse, error)
 	// UserAdd adds a new user.
-	UserAdd(ctx context.Context, in *UserAddRequest, opts ...grpc.CallOption) (*UserAddResponse, error)
+	UserAdd(ctx context.Context, in *AuthUserAddRequest, opts ...grpc.CallOption) (*AuthUserAddResponse, error)
 	// UserGet gets a detailed information of a user or lists entire users.
-	UserGet(ctx context.Context, in *UserGetRequest, opts ...grpc.CallOption) (*UserGetResponse, error)
+	UserGet(ctx context.Context, in *AuthUserGetRequest, opts ...grpc.CallOption) (*AuthUserGetResponse, error)
 	// UserDelete deletes a specified user.
-	UserDelete(ctx context.Context, in *UserDeleteRequest, opts ...grpc.CallOption) (*UserDeleteResponse, error)
+	UserDelete(ctx context.Context, in *AuthUserDeleteRequest, opts ...grpc.CallOption) (*AuthUserDeleteResponse, error)
 	// UserChangePassword changes password of a specified user.
-	UserChangePassword(ctx context.Context, in *UserChangePasswordRequest, opts ...grpc.CallOption) (*UserChangePasswordResponse, error)
+	UserChangePassword(ctx context.Context, in *AuthUserChangePasswordRequest, opts ...grpc.CallOption) (*AuthUserChangePasswordResponse, error)
 	// UserGrant grants a role to a specified user.
-	UserGrant(ctx context.Context, in *UserGrantRequest, opts ...grpc.CallOption) (*UserGrantResponse, error)
+	UserGrant(ctx context.Context, in *AuthUserGrantRequest, opts ...grpc.CallOption) (*AuthUserGrantResponse, error)
 	// UserRevoke revokes a role of specified user.
-	UserRevoke(ctx context.Context, in *UserRevokeRequest, opts ...grpc.CallOption) (*UserRevokeResponse, error)
+	UserRevoke(ctx context.Context, in *AuthUserRevokeRequest, opts ...grpc.CallOption) (*AuthUserRevokeResponse, error)
 	// RoleAdd adds a new role.
-	RoleAdd(ctx context.Context, in *RoleAddRequest, opts ...grpc.CallOption) (*RoleAddResponse, error)
+	RoleAdd(ctx context.Context, in *AuthRoleAddRequest, opts ...grpc.CallOption) (*AuthRoleAddResponse, error)
 	// RoleGet gets a detailed information of a role or lists entire roles.
-	RoleGet(ctx context.Context, in *RoleGetRequest, opts ...grpc.CallOption) (*RoleGetResponse, error)
+	RoleGet(ctx context.Context, in *AuthRoleGetRequest, opts ...grpc.CallOption) (*AuthRoleGetResponse, error)
 	// RoleDelete deletes a specified role.
-	RoleDelete(ctx context.Context, in *RoleDeleteRequest, opts ...grpc.CallOption) (*RoleDeleteResponse, error)
+	RoleDelete(ctx context.Context, in *AuthRoleDeleteRequest, opts ...grpc.CallOption) (*AuthRoleDeleteResponse, error)
 	// RoleGrant grants a permission of a specified key or range to a specified role.
-	RoleGrant(ctx context.Context, in *RoleGrantRequest, opts ...grpc.CallOption) (*RoleGrantResponse, error)
+	RoleGrant(ctx context.Context, in *AuthRoleGrantRequest, opts ...grpc.CallOption) (*AuthRoleGrantResponse, error)
 	// RoleRevoke revokes a key or range permission of a specified role.
-	RoleRevoke(ctx context.Context, in *RoleRevokeRequest, opts ...grpc.CallOption) (*RoleRevokeResponse, error)
+	RoleRevoke(ctx context.Context, in *AuthRoleRevokeRequest, opts ...grpc.CallOption) (*AuthRoleRevokeResponse, error)
 }
 
 type authClient struct {
@@ -2305,8 +2486,8 @@ func (c *authClient) Authenticate(ctx context.Context, in *AuthenticateRequest, 
 	return out, nil
 }
 
-func (c *authClient) UserAdd(ctx context.Context, in *UserAddRequest, opts ...grpc.CallOption) (*UserAddResponse, error) {
-	out := new(UserAddResponse)
+func (c *authClient) UserAdd(ctx context.Context, in *AuthUserAddRequest, opts ...grpc.CallOption) (*AuthUserAddResponse, error) {
+	out := new(AuthUserAddResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/UserAdd", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2314,8 +2495,8 @@ func (c *authClient) UserAdd(ctx context.Context, in *UserAddRequest, opts ...gr
 	return out, nil
 }
 
-func (c *authClient) UserGet(ctx context.Context, in *UserGetRequest, opts ...grpc.CallOption) (*UserGetResponse, error) {
-	out := new(UserGetResponse)
+func (c *authClient) UserGet(ctx context.Context, in *AuthUserGetRequest, opts ...grpc.CallOption) (*AuthUserGetResponse, error) {
+	out := new(AuthUserGetResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/UserGet", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2323,8 +2504,8 @@ func (c *authClient) UserGet(ctx context.Context, in *UserGetRequest, opts ...gr
 	return out, nil
 }
 
-func (c *authClient) UserDelete(ctx context.Context, in *UserDeleteRequest, opts ...grpc.CallOption) (*UserDeleteResponse, error) {
-	out := new(UserDeleteResponse)
+func (c *authClient) UserDelete(ctx context.Context, in *AuthUserDeleteRequest, opts ...grpc.CallOption) (*AuthUserDeleteResponse, error) {
+	out := new(AuthUserDeleteResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/UserDelete", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2332,8 +2513,8 @@ func (c *authClient) UserDelete(ctx context.Context, in *UserDeleteRequest, opts
 	return out, nil
 }
 
-func (c *authClient) UserChangePassword(ctx context.Context, in *UserChangePasswordRequest, opts ...grpc.CallOption) (*UserChangePasswordResponse, error) {
-	out := new(UserChangePasswordResponse)
+func (c *authClient) UserChangePassword(ctx context.Context, in *AuthUserChangePasswordRequest, opts ...grpc.CallOption) (*AuthUserChangePasswordResponse, error) {
+	out := new(AuthUserChangePasswordResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/UserChangePassword", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2341,8 +2522,8 @@ func (c *authClient) UserChangePassword(ctx context.Context, in *UserChangePassw
 	return out, nil
 }
 
-func (c *authClient) UserGrant(ctx context.Context, in *UserGrantRequest, opts ...grpc.CallOption) (*UserGrantResponse, error) {
-	out := new(UserGrantResponse)
+func (c *authClient) UserGrant(ctx context.Context, in *AuthUserGrantRequest, opts ...grpc.CallOption) (*AuthUserGrantResponse, error) {
+	out := new(AuthUserGrantResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/UserGrant", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2350,8 +2531,8 @@ func (c *authClient) UserGrant(ctx context.Context, in *UserGrantRequest, opts .
 	return out, nil
 }
 
-func (c *authClient) UserRevoke(ctx context.Context, in *UserRevokeRequest, opts ...grpc.CallOption) (*UserRevokeResponse, error) {
-	out := new(UserRevokeResponse)
+func (c *authClient) UserRevoke(ctx context.Context, in *AuthUserRevokeRequest, opts ...grpc.CallOption) (*AuthUserRevokeResponse, error) {
+	out := new(AuthUserRevokeResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/UserRevoke", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2359,8 +2540,8 @@ func (c *authClient) UserRevoke(ctx context.Context, in *UserRevokeRequest, opts
 	return out, nil
 }
 
-func (c *authClient) RoleAdd(ctx context.Context, in *RoleAddRequest, opts ...grpc.CallOption) (*RoleAddResponse, error) {
-	out := new(RoleAddResponse)
+func (c *authClient) RoleAdd(ctx context.Context, in *AuthRoleAddRequest, opts ...grpc.CallOption) (*AuthRoleAddResponse, error) {
+	out := new(AuthRoleAddResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/RoleAdd", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2368,8 +2549,8 @@ func (c *authClient) RoleAdd(ctx context.Context, in *RoleAddRequest, opts ...gr
 	return out, nil
 }
 
-func (c *authClient) RoleGet(ctx context.Context, in *RoleGetRequest, opts ...grpc.CallOption) (*RoleGetResponse, error) {
-	out := new(RoleGetResponse)
+func (c *authClient) RoleGet(ctx context.Context, in *AuthRoleGetRequest, opts ...grpc.CallOption) (*AuthRoleGetResponse, error) {
+	out := new(AuthRoleGetResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/RoleGet", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2377,8 +2558,8 @@ func (c *authClient) RoleGet(ctx context.Context, in *RoleGetRequest, opts ...gr
 	return out, nil
 }
 
-func (c *authClient) RoleDelete(ctx context.Context, in *RoleDeleteRequest, opts ...grpc.CallOption) (*RoleDeleteResponse, error) {
-	out := new(RoleDeleteResponse)
+func (c *authClient) RoleDelete(ctx context.Context, in *AuthRoleDeleteRequest, opts ...grpc.CallOption) (*AuthRoleDeleteResponse, error) {
+	out := new(AuthRoleDeleteResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/RoleDelete", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2386,8 +2567,8 @@ func (c *authClient) RoleDelete(ctx context.Context, in *RoleDeleteRequest, opts
 	return out, nil
 }
 
-func (c *authClient) RoleGrant(ctx context.Context, in *RoleGrantRequest, opts ...grpc.CallOption) (*RoleGrantResponse, error) {
-	out := new(RoleGrantResponse)
+func (c *authClient) RoleGrant(ctx context.Context, in *AuthRoleGrantRequest, opts ...grpc.CallOption) (*AuthRoleGrantResponse, error) {
+	out := new(AuthRoleGrantResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/RoleGrant", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2395,8 +2576,8 @@ func (c *authClient) RoleGrant(ctx context.Context, in *RoleGrantRequest, opts .
 	return out, nil
 }
 
-func (c *authClient) RoleRevoke(ctx context.Context, in *RoleRevokeRequest, opts ...grpc.CallOption) (*RoleRevokeResponse, error) {
-	out := new(RoleRevokeResponse)
+func (c *authClient) RoleRevoke(ctx context.Context, in *AuthRoleRevokeRequest, opts ...grpc.CallOption) (*AuthRoleRevokeResponse, error) {
+	out := new(AuthRoleRevokeResponse)
 	err := grpc.Invoke(ctx, "/etcdserverpb.Auth/RoleRevoke", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -2414,27 +2595,27 @@ type AuthServer interface {
 	// Authenticate processes authenticate request.
 	Authenticate(context.Context, *AuthenticateRequest) (*AuthenticateResponse, error)
 	// UserAdd adds a new user.
-	UserAdd(context.Context, *UserAddRequest) (*UserAddResponse, error)
+	UserAdd(context.Context, *AuthUserAddRequest) (*AuthUserAddResponse, error)
 	// UserGet gets a detailed information of a user or lists entire users.
-	UserGet(context.Context, *UserGetRequest) (*UserGetResponse, error)
+	UserGet(context.Context, *AuthUserGetRequest) (*AuthUserGetResponse, error)
 	// UserDelete deletes a specified user.
-	UserDelete(context.Context, *UserDeleteRequest) (*UserDeleteResponse, error)
+	UserDelete(context.Context, *AuthUserDeleteRequest) (*AuthUserDeleteResponse, error)
 	// UserChangePassword changes password of a specified user.
-	UserChangePassword(context.Context, *UserChangePasswordRequest) (*UserChangePasswordResponse, error)
+	UserChangePassword(context.Context, *AuthUserChangePasswordRequest) (*AuthUserChangePasswordResponse, error)
 	// UserGrant grants a role to a specified user.
-	UserGrant(context.Context, *UserGrantRequest) (*UserGrantResponse, error)
+	UserGrant(context.Context, *AuthUserGrantRequest) (*AuthUserGrantResponse, error)
 	// UserRevoke revokes a role of specified user.
-	UserRevoke(context.Context, *UserRevokeRequest) (*UserRevokeResponse, error)
+	UserRevoke(context.Context, *AuthUserRevokeRequest) (*AuthUserRevokeResponse, error)
 	// RoleAdd adds a new role.
-	RoleAdd(context.Context, *RoleAddRequest) (*RoleAddResponse, error)
+	RoleAdd(context.Context, *AuthRoleAddRequest) (*AuthRoleAddResponse, error)
 	// RoleGet gets a detailed information of a role or lists entire roles.
-	RoleGet(context.Context, *RoleGetRequest) (*RoleGetResponse, error)
+	RoleGet(context.Context, *AuthRoleGetRequest) (*AuthRoleGetResponse, error)
 	// RoleDelete deletes a specified role.
-	RoleDelete(context.Context, *RoleDeleteRequest) (*RoleDeleteResponse, error)
+	RoleDelete(context.Context, *AuthRoleDeleteRequest) (*AuthRoleDeleteResponse, error)
 	// RoleGrant grants a permission of a specified key or range to a specified role.
-	RoleGrant(context.Context, *RoleGrantRequest) (*RoleGrantResponse, error)
+	RoleGrant(context.Context, *AuthRoleGrantRequest) (*AuthRoleGrantResponse, error)
 	// RoleRevoke revokes a key or range permission of a specified role.
-	RoleRevoke(context.Context, *RoleRevokeRequest) (*RoleRevokeResponse, error)
+	RoleRevoke(context.Context, *AuthRoleRevokeRequest) (*AuthRoleRevokeResponse, error)
 }
 
 func RegisterAuthServer(s *grpc.Server, srv AuthServer) {
@@ -2478,7 +2659,7 @@ func _Auth_Authenticate_Handler(srv interface{}, ctx context.Context, dec func(i
 }
 
 func _Auth_UserAdd_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(UserAddRequest)
+	in := new(AuthUserAddRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2490,7 +2671,7 @@ func _Auth_UserAdd_Handler(srv interface{}, ctx context.Context, dec func(interf
 }
 
 func _Auth_UserGet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(UserGetRequest)
+	in := new(AuthUserGetRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2502,7 +2683,7 @@ func _Auth_UserGet_Handler(srv interface{}, ctx context.Context, dec func(interf
 }
 
 func _Auth_UserDelete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(UserDeleteRequest)
+	in := new(AuthUserDeleteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2514,7 +2695,7 @@ func _Auth_UserDelete_Handler(srv interface{}, ctx context.Context, dec func(int
 }
 
 func _Auth_UserChangePassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(UserChangePasswordRequest)
+	in := new(AuthUserChangePasswordRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2526,7 +2707,7 @@ func _Auth_UserChangePassword_Handler(srv interface{}, ctx context.Context, dec 
 }
 
 func _Auth_UserGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(UserGrantRequest)
+	in := new(AuthUserGrantRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2538,7 +2719,7 @@ func _Auth_UserGrant_Handler(srv interface{}, ctx context.Context, dec func(inte
 }
 
 func _Auth_UserRevoke_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(UserRevokeRequest)
+	in := new(AuthUserRevokeRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2550,7 +2731,7 @@ func _Auth_UserRevoke_Handler(srv interface{}, ctx context.Context, dec func(int
 }
 
 func _Auth_RoleAdd_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(RoleAddRequest)
+	in := new(AuthRoleAddRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2562,7 +2743,7 @@ func _Auth_RoleAdd_Handler(srv interface{}, ctx context.Context, dec func(interf
 }
 
 func _Auth_RoleGet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(RoleGetRequest)
+	in := new(AuthRoleGetRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2574,7 +2755,7 @@ func _Auth_RoleGet_Handler(srv interface{}, ctx context.Context, dec func(interf
 }
 
 func _Auth_RoleDelete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(RoleDeleteRequest)
+	in := new(AuthRoleDeleteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2586,7 +2767,7 @@ func _Auth_RoleDelete_Handler(srv interface{}, ctx context.Context, dec func(int
 }
 
 func _Auth_RoleGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(RoleGrantRequest)
+	in := new(AuthRoleGrantRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -2598,7 +2779,7 @@ func _Auth_RoleGrant_Handler(srv interface{}, ctx context.Context, dec func(inte
 }
 
 func _Auth_RoleRevoke_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(RoleRevokeRequest)
+	in := new(AuthRoleRevokeRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -3291,6 +3472,16 @@ func (m *CompactionRequest) MarshalTo(data []byte) (int, error) {
 		i++
 		i = encodeVarintRpc(data, i, uint64(m.Revision))
 	}
+	if m.Physical {
+		data[i] = 0x10
+		i++
+		if m.Physical {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
 	return i, nil
 }
 
@@ -3568,7 +3759,7 @@ func (m *WatchResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *LeaseCreateRequest) Marshal() (data []byte, err error) {
+func (m *LeaseGrantRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -3578,7 +3769,7 @@ func (m *LeaseCreateRequest) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *LeaseCreateRequest) MarshalTo(data []byte) (int, error) {
+func (m *LeaseGrantRequest) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -3596,7 +3787,7 @@ func (m *LeaseCreateRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *LeaseCreateResponse) Marshal() (data []byte, err error) {
+func (m *LeaseGrantResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -3606,7 +3797,7 @@ func (m *LeaseCreateResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *LeaseCreateResponse) MarshalTo(data []byte) (int, error) {
+func (m *LeaseGrantResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4113,6 +4304,159 @@ func (m *DefragmentResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *AlarmRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AlarmRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Action != 0 {
+		data[i] = 0x8
+		i++
+		i = encodeVarintRpc(data, i, uint64(m.Action))
+	}
+	if m.MemberID != 0 {
+		data[i] = 0x10
+		i++
+		i = encodeVarintRpc(data, i, uint64(m.MemberID))
+	}
+	if m.Alarm != 0 {
+		data[i] = 0x18
+		i++
+		i = encodeVarintRpc(data, i, uint64(m.Alarm))
+	}
+	return i, nil
+}
+
+func (m *AlarmMember) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AlarmMember) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.MemberID != 0 {
+		data[i] = 0x8
+		i++
+		i = encodeVarintRpc(data, i, uint64(m.MemberID))
+	}
+	if m.Alarm != 0 {
+		data[i] = 0x10
+		i++
+		i = encodeVarintRpc(data, i, uint64(m.Alarm))
+	}
+	return i, nil
+}
+
+func (m *AlarmResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AlarmResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Header != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintRpc(data, i, uint64(m.Header.Size()))
+		n29, err := m.Header.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n29
+	}
+	if len(m.Alarms) > 0 {
+		for _, msg := range m.Alarms {
+			data[i] = 0x12
+			i++
+			i = encodeVarintRpc(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *StatusRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *StatusRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	return i, nil
+}
+
+func (m *StatusResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *StatusResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Header != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintRpc(data, i, uint64(m.Header.Size()))
+		n30, err := m.Header.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n30
+	}
+	if len(m.Version) > 0 {
+		data[i] = 0x12
+		i++
+		i = encodeVarintRpc(data, i, uint64(len(m.Version)))
+		i += copy(data[i:], m.Version)
+	}
+	return i, nil
+}
+
 func (m *AuthEnableRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -4167,7 +4511,7 @@ func (m *AuthenticateRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserAddRequest) Marshal() (data []byte, err error) {
+func (m *AuthUserAddRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4177,7 +4521,37 @@ func (m *UserAddRequest) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserAddRequest) MarshalTo(data []byte) (int, error) {
+func (m *AuthUserAddRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Name) > 0 {
+		data[i] = 0xa
+		i++
+		i = encodeVarintRpc(data, i, uint64(len(m.Name)))
+		i += copy(data[i:], m.Name)
+	}
+	if len(m.Password) > 0 {
+		data[i] = 0x12
+		i++
+		i = encodeVarintRpc(data, i, uint64(len(m.Password)))
+		i += copy(data[i:], m.Password)
+	}
+	return i, nil
+}
+
+func (m *AuthUserGetRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AuthUserGetRequest) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4185,7 +4559,7 @@ func (m *UserAddRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserGetRequest) Marshal() (data []byte, err error) {
+func (m *AuthUserDeleteRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4195,7 +4569,61 @@ func (m *UserGetRequest) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserGetRequest) MarshalTo(data []byte) (int, error) {
+func (m *AuthUserDeleteRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Name) > 0 {
+		data[i] = 0xa
+		i++
+		i = encodeVarintRpc(data, i, uint64(len(m.Name)))
+		i += copy(data[i:], m.Name)
+	}
+	return i, nil
+}
+
+func (m *AuthUserChangePasswordRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AuthUserChangePasswordRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Name) > 0 {
+		data[i] = 0xa
+		i++
+		i = encodeVarintRpc(data, i, uint64(len(m.Name)))
+		i += copy(data[i:], m.Name)
+	}
+	if len(m.Password) > 0 {
+		data[i] = 0x12
+		i++
+		i = encodeVarintRpc(data, i, uint64(len(m.Password)))
+		i += copy(data[i:], m.Password)
+	}
+	return i, nil
+}
+
+func (m *AuthUserGrantRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AuthUserGrantRequest) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4203,7 +4631,7 @@ func (m *UserGetRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserDeleteRequest) Marshal() (data []byte, err error) {
+func (m *AuthUserRevokeRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4213,7 +4641,7 @@ func (m *UserDeleteRequest) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserDeleteRequest) MarshalTo(data []byte) (int, error) {
+func (m *AuthUserRevokeRequest) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4221,7 +4649,7 @@ func (m *UserDeleteRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserChangePasswordRequest) Marshal() (data []byte, err error) {
+func (m *AuthRoleAddRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4231,7 +4659,31 @@ func (m *UserChangePasswordRequest) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserChangePasswordRequest) MarshalTo(data []byte) (int, error) {
+func (m *AuthRoleAddRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Name) > 0 {
+		data[i] = 0xa
+		i++
+		i = encodeVarintRpc(data, i, uint64(len(m.Name)))
+		i += copy(data[i:], m.Name)
+	}
+	return i, nil
+}
+
+func (m *AuthRoleGetRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AuthRoleGetRequest) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4239,7 +4691,7 @@ func (m *UserChangePasswordRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserGrantRequest) Marshal() (data []byte, err error) {
+func (m *AuthRoleDeleteRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4249,7 +4701,7 @@ func (m *UserGrantRequest) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserGrantRequest) MarshalTo(data []byte) (int, error) {
+func (m *AuthRoleDeleteRequest) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4257,7 +4709,7 @@ func (m *UserGrantRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserRevokeRequest) Marshal() (data []byte, err error) {
+func (m *AuthRoleGrantRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4267,7 +4719,7 @@ func (m *UserRevokeRequest) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserRevokeRequest) MarshalTo(data []byte) (int, error) {
+func (m *AuthRoleGrantRequest) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4275,7 +4727,7 @@ func (m *UserRevokeRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleAddRequest) Marshal() (data []byte, err error) {
+func (m *AuthRoleRevokeRequest) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4285,79 +4737,7 @@ func (m *RoleAddRequest) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *RoleAddRequest) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	return i, nil
-}
-
-func (m *RoleGetRequest) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *RoleGetRequest) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	return i, nil
-}
-
-func (m *RoleDeleteRequest) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *RoleDeleteRequest) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	return i, nil
-}
-
-func (m *RoleGrantRequest) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *RoleGrantRequest) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	return i, nil
-}
-
-func (m *RoleRevokeRequest) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *RoleRevokeRequest) MarshalTo(data []byte) (int, error) {
+func (m *AuthRoleRevokeRequest) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4384,11 +4764,11 @@ func (m *AuthEnableResponse) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintRpc(data, i, uint64(m.Header.Size()))
-		n29, err := m.Header.MarshalTo(data[i:])
+		n31, err := m.Header.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n29
+		i += n31
 	}
 	return i, nil
 }
@@ -4412,11 +4792,11 @@ func (m *AuthDisableResponse) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintRpc(data, i, uint64(m.Header.Size()))
-		n30, err := m.Header.MarshalTo(data[i:])
+		n32, err := m.Header.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n30
+		i += n32
 	}
 	return i, nil
 }
@@ -4440,62 +4820,6 @@ func (m *AuthenticateResponse) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintRpc(data, i, uint64(m.Header.Size()))
-		n31, err := m.Header.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n31
-	}
-	return i, nil
-}
-
-func (m *UserAddResponse) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *UserAddResponse) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Header != nil {
-		data[i] = 0xa
-		i++
-		i = encodeVarintRpc(data, i, uint64(m.Header.Size()))
-		n32, err := m.Header.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n32
-	}
-	return i, nil
-}
-
-func (m *UserGetResponse) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *UserGetResponse) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if m.Header != nil {
-		data[i] = 0xa
-		i++
-		i = encodeVarintRpc(data, i, uint64(m.Header.Size()))
 		n33, err := m.Header.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
@@ -4505,7 +4829,7 @@ func (m *UserGetResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserDeleteResponse) Marshal() (data []byte, err error) {
+func (m *AuthUserAddResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4515,7 +4839,7 @@ func (m *UserDeleteResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserDeleteResponse) MarshalTo(data []byte) (int, error) {
+func (m *AuthUserAddResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4533,7 +4857,7 @@ func (m *UserDeleteResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserChangePasswordResponse) Marshal() (data []byte, err error) {
+func (m *AuthUserGetResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4543,7 +4867,7 @@ func (m *UserChangePasswordResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserChangePasswordResponse) MarshalTo(data []byte) (int, error) {
+func (m *AuthUserGetResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4561,7 +4885,7 @@ func (m *UserChangePasswordResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserGrantResponse) Marshal() (data []byte, err error) {
+func (m *AuthUserDeleteResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4571,7 +4895,7 @@ func (m *UserGrantResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserGrantResponse) MarshalTo(data []byte) (int, error) {
+func (m *AuthUserDeleteResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4589,7 +4913,7 @@ func (m *UserGrantResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *UserRevokeResponse) Marshal() (data []byte, err error) {
+func (m *AuthUserChangePasswordResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4599,7 +4923,7 @@ func (m *UserRevokeResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *UserRevokeResponse) MarshalTo(data []byte) (int, error) {
+func (m *AuthUserChangePasswordResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4617,7 +4941,7 @@ func (m *UserRevokeResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleAddResponse) Marshal() (data []byte, err error) {
+func (m *AuthUserGrantResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4627,7 +4951,7 @@ func (m *RoleAddResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *RoleAddResponse) MarshalTo(data []byte) (int, error) {
+func (m *AuthUserGrantResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4645,7 +4969,7 @@ func (m *RoleAddResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleGetResponse) Marshal() (data []byte, err error) {
+func (m *AuthUserRevokeResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4655,7 +4979,7 @@ func (m *RoleGetResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *RoleGetResponse) MarshalTo(data []byte) (int, error) {
+func (m *AuthUserRevokeResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4673,7 +4997,7 @@ func (m *RoleGetResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleDeleteResponse) Marshal() (data []byte, err error) {
+func (m *AuthRoleAddResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4683,7 +5007,7 @@ func (m *RoleDeleteResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *RoleDeleteResponse) MarshalTo(data []byte) (int, error) {
+func (m *AuthRoleAddResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4701,7 +5025,7 @@ func (m *RoleDeleteResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleGrantResponse) Marshal() (data []byte, err error) {
+func (m *AuthRoleGetResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4711,7 +5035,7 @@ func (m *RoleGrantResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *RoleGrantResponse) MarshalTo(data []byte) (int, error) {
+func (m *AuthRoleGetResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4729,7 +5053,7 @@ func (m *RoleGrantResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleRevokeResponse) Marshal() (data []byte, err error) {
+func (m *AuthRoleDeleteResponse) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -4739,7 +5063,7 @@ func (m *RoleRevokeResponse) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *RoleRevokeResponse) MarshalTo(data []byte) (int, error) {
+func (m *AuthRoleDeleteResponse) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -4753,6 +5077,62 @@ func (m *RoleRevokeResponse) MarshalTo(data []byte) (int, error) {
 			return 0, err
 		}
 		i += n42
+	}
+	return i, nil
+}
+
+func (m *AuthRoleGrantResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AuthRoleGrantResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Header != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintRpc(data, i, uint64(m.Header.Size()))
+		n43, err := m.Header.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n43
+	}
+	return i, nil
+}
+
+func (m *AuthRoleRevokeResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AuthRoleRevokeResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Header != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintRpc(data, i, uint64(m.Header.Size()))
+		n44, err := m.Header.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n44
 	}
 	return i, nil
 }
@@ -5085,6 +5465,9 @@ func (m *CompactionRequest) Size() (n int) {
 	if m.Revision != 0 {
 		n += 1 + sovRpc(uint64(m.Revision))
 	}
+	if m.Physical {
+		n += 2
+	}
 	return n
 }
 
@@ -5205,7 +5588,7 @@ func (m *WatchResponse) Size() (n int) {
 	return n
 }
 
-func (m *LeaseCreateRequest) Size() (n int) {
+func (m *LeaseGrantRequest) Size() (n int) {
 	var l int
 	_ = l
 	if m.TTL != 0 {
@@ -5217,7 +5600,7 @@ func (m *LeaseCreateRequest) Size() (n int) {
 	return n
 }
 
-func (m *LeaseCreateResponse) Size() (n int) {
+func (m *LeaseGrantResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5417,6 +5800,69 @@ func (m *DefragmentResponse) Size() (n int) {
 	return n
 }
 
+func (m *AlarmRequest) Size() (n int) {
+	var l int
+	_ = l
+	if m.Action != 0 {
+		n += 1 + sovRpc(uint64(m.Action))
+	}
+	if m.MemberID != 0 {
+		n += 1 + sovRpc(uint64(m.MemberID))
+	}
+	if m.Alarm != 0 {
+		n += 1 + sovRpc(uint64(m.Alarm))
+	}
+	return n
+}
+
+func (m *AlarmMember) Size() (n int) {
+	var l int
+	_ = l
+	if m.MemberID != 0 {
+		n += 1 + sovRpc(uint64(m.MemberID))
+	}
+	if m.Alarm != 0 {
+		n += 1 + sovRpc(uint64(m.Alarm))
+	}
+	return n
+}
+
+func (m *AlarmResponse) Size() (n int) {
+	var l int
+	_ = l
+	if m.Header != nil {
+		l = m.Header.Size()
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	if len(m.Alarms) > 0 {
+		for _, e := range m.Alarms {
+			l = e.Size()
+			n += 1 + l + sovRpc(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *StatusRequest) Size() (n int) {
+	var l int
+	_ = l
+	return n
+}
+
+func (m *StatusResponse) Size() (n int) {
+	var l int
+	_ = l
+	if m.Header != nil {
+		l = m.Header.Size()
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	l = len(m.Version)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	return n
+}
+
 func (m *AuthEnableRequest) Size() (n int) {
 	var l int
 	_ = l
@@ -5435,67 +5881,91 @@ func (m *AuthenticateRequest) Size() (n int) {
 	return n
 }
 
-func (m *UserAddRequest) Size() (n int) {
+func (m *AuthUserAddRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	l = len(m.Password)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	return n
+}
+
+func (m *AuthUserGetRequest) Size() (n int) {
 	var l int
 	_ = l
 	return n
 }
 
-func (m *UserGetRequest) Size() (n int) {
+func (m *AuthUserDeleteRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	return n
+}
+
+func (m *AuthUserChangePasswordRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	l = len(m.Password)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	return n
+}
+
+func (m *AuthUserGrantRequest) Size() (n int) {
 	var l int
 	_ = l
 	return n
 }
 
-func (m *UserDeleteRequest) Size() (n int) {
+func (m *AuthUserRevokeRequest) Size() (n int) {
 	var l int
 	_ = l
 	return n
 }
 
-func (m *UserChangePasswordRequest) Size() (n int) {
+func (m *AuthRoleAddRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovRpc(uint64(l))
+	}
+	return n
+}
+
+func (m *AuthRoleGetRequest) Size() (n int) {
 	var l int
 	_ = l
 	return n
 }
 
-func (m *UserGrantRequest) Size() (n int) {
+func (m *AuthRoleDeleteRequest) Size() (n int) {
 	var l int
 	_ = l
 	return n
 }
 
-func (m *UserRevokeRequest) Size() (n int) {
+func (m *AuthRoleGrantRequest) Size() (n int) {
 	var l int
 	_ = l
 	return n
 }
 
-func (m *RoleAddRequest) Size() (n int) {
-	var l int
-	_ = l
-	return n
-}
-
-func (m *RoleGetRequest) Size() (n int) {
-	var l int
-	_ = l
-	return n
-}
-
-func (m *RoleDeleteRequest) Size() (n int) {
-	var l int
-	_ = l
-	return n
-}
-
-func (m *RoleGrantRequest) Size() (n int) {
-	var l int
-	_ = l
-	return n
-}
-
-func (m *RoleRevokeRequest) Size() (n int) {
+func (m *AuthRoleRevokeRequest) Size() (n int) {
 	var l int
 	_ = l
 	return n
@@ -5531,7 +6001,7 @@ func (m *AuthenticateResponse) Size() (n int) {
 	return n
 }
 
-func (m *UserAddResponse) Size() (n int) {
+func (m *AuthUserAddResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5541,7 +6011,7 @@ func (m *UserAddResponse) Size() (n int) {
 	return n
 }
 
-func (m *UserGetResponse) Size() (n int) {
+func (m *AuthUserGetResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5551,7 +6021,7 @@ func (m *UserGetResponse) Size() (n int) {
 	return n
 }
 
-func (m *UserDeleteResponse) Size() (n int) {
+func (m *AuthUserDeleteResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5561,7 +6031,7 @@ func (m *UserDeleteResponse) Size() (n int) {
 	return n
 }
 
-func (m *UserChangePasswordResponse) Size() (n int) {
+func (m *AuthUserChangePasswordResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5571,7 +6041,7 @@ func (m *UserChangePasswordResponse) Size() (n int) {
 	return n
 }
 
-func (m *UserGrantResponse) Size() (n int) {
+func (m *AuthUserGrantResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5581,7 +6051,7 @@ func (m *UserGrantResponse) Size() (n int) {
 	return n
 }
 
-func (m *UserRevokeResponse) Size() (n int) {
+func (m *AuthUserRevokeResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5591,7 +6061,7 @@ func (m *UserRevokeResponse) Size() (n int) {
 	return n
 }
 
-func (m *RoleAddResponse) Size() (n int) {
+func (m *AuthRoleAddResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5601,7 +6071,7 @@ func (m *RoleAddResponse) Size() (n int) {
 	return n
 }
 
-func (m *RoleGetResponse) Size() (n int) {
+func (m *AuthRoleGetResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5611,7 +6081,7 @@ func (m *RoleGetResponse) Size() (n int) {
 	return n
 }
 
-func (m *RoleDeleteResponse) Size() (n int) {
+func (m *AuthRoleDeleteResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5621,7 +6091,7 @@ func (m *RoleDeleteResponse) Size() (n int) {
 	return n
 }
 
-func (m *RoleGrantResponse) Size() (n int) {
+func (m *AuthRoleGrantResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -5631,7 +6101,7 @@ func (m *RoleGrantResponse) Size() (n int) {
 	return n
 }
 
-func (m *RoleRevokeResponse) Size() (n int) {
+func (m *AuthRoleRevokeResponse) Size() (n int) {
 	var l int
 	_ = l
 	if m.Header != nil {
@@ -7376,6 +7846,26 @@ func (m *CompactionRequest) Unmarshal(data []byte) error {
 					break
 				}
 			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Physical", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Physical = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipRpc(data[iNdEx:])
@@ -8158,7 +8648,7 @@ func (m *WatchResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *LeaseCreateRequest) Unmarshal(data []byte) error {
+func (m *LeaseGrantRequest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -8181,10 +8671,10 @@ func (m *LeaseCreateRequest) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: LeaseCreateRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: LeaseGrantRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: LeaseCreateRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: LeaseGrantRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -8246,7 +8736,7 @@ func (m *LeaseCreateRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *LeaseCreateResponse) Unmarshal(data []byte) error {
+func (m *LeaseGrantResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -8269,10 +8759,10 @@ func (m *LeaseCreateResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: LeaseCreateResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: LeaseGrantResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: LeaseCreateResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: LeaseGrantResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -9739,6 +10229,477 @@ func (m *DefragmentResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
+func (m *AlarmRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AlarmRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AlarmRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Action", wireType)
+			}
+			m.Action = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				m.Action |= (AlarmRequest_AlarmAction(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MemberID", wireType)
+			}
+			m.MemberID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				m.MemberID |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Alarm", wireType)
+			}
+			m.Alarm = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				m.Alarm |= (AlarmType(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AlarmMember) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AlarmMember: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AlarmMember: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MemberID", wireType)
+			}
+			m.MemberID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				m.MemberID |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Alarm", wireType)
+			}
+			m.Alarm = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				m.Alarm |= (AlarmType(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AlarmResponse) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AlarmResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AlarmResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Header == nil {
+				m.Header = &ResponseHeader{}
+			}
+			if err := m.Header.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Alarms", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Alarms = append(m.Alarms, &AlarmMember{})
+			if err := m.Alarms[len(m.Alarms)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StatusRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StatusRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StatusRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StatusResponse) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StatusResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StatusResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Header == nil {
+				m.Header = &ResponseHeader{}
+			}
+			if err := m.Header.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Version", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Version = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *AuthEnableRequest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
@@ -9889,7 +10850,7 @@ func (m *AuthenticateRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserAddRequest) Unmarshal(data []byte) error {
+func (m *AuthUserAddRequest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -9912,10 +10873,118 @@ func (m *UserAddRequest) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserAddRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthUserAddRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserAddRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthUserAddRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Password", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Password = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AuthUserGetRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AuthUserGetRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AuthUserGetRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -9939,7 +11008,7 @@ func (m *UserAddRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserGetRequest) Unmarshal(data []byte) error {
+func (m *AuthUserDeleteRequest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -9962,10 +11031,197 @@ func (m *UserGetRequest) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserGetRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthUserDeleteRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserGetRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthUserDeleteRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AuthUserChangePasswordRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AuthUserChangePasswordRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AuthUserChangePasswordRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Password", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Password = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AuthUserGrantRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AuthUserGrantRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AuthUserGrantRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -9989,7 +11245,7 @@ func (m *UserGetRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserDeleteRequest) Unmarshal(data []byte) error {
+func (m *AuthUserRevokeRequest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -10012,10 +11268,10 @@ func (m *UserDeleteRequest) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserDeleteRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthUserRevokeRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserDeleteRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthUserRevokeRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -10039,7 +11295,7 @@ func (m *UserDeleteRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserChangePasswordRequest) Unmarshal(data []byte) error {
+func (m *AuthRoleAddRequest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -10062,10 +11318,89 @@ func (m *UserChangePasswordRequest) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserChangePasswordRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthRoleAddRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserChangePasswordRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthRoleAddRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AuthRoleGetRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AuthRoleGetRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AuthRoleGetRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -10089,7 +11424,7 @@ func (m *UserChangePasswordRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserGrantRequest) Unmarshal(data []byte) error {
+func (m *AuthRoleDeleteRequest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -10112,10 +11447,10 @@ func (m *UserGrantRequest) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserGrantRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthRoleDeleteRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserGrantRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthRoleDeleteRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -10139,7 +11474,7 @@ func (m *UserGrantRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserRevokeRequest) Unmarshal(data []byte) error {
+func (m *AuthRoleGrantRequest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -10162,10 +11497,10 @@ func (m *UserRevokeRequest) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserRevokeRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthRoleGrantRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserRevokeRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthRoleGrantRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -10189,7 +11524,7 @@ func (m *UserRevokeRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleAddRequest) Unmarshal(data []byte) error {
+func (m *AuthRoleRevokeRequest) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -10212,210 +11547,10 @@ func (m *RoleAddRequest) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RoleAddRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthRoleRevokeRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleAddRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		default:
-			iNdEx = preIndex
-			skippy, err := skipRpc(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *RoleGetRequest) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowRpc
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: RoleGetRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleGetRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		default:
-			iNdEx = preIndex
-			skippy, err := skipRpc(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *RoleDeleteRequest) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowRpc
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: RoleDeleteRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleDeleteRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		default:
-			iNdEx = preIndex
-			skippy, err := skipRpc(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *RoleGrantRequest) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowRpc
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: RoleGrantRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleGrantRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		default:
-			iNdEx = preIndex
-			skippy, err := skipRpc(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *RoleRevokeRequest) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowRpc
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: RoleRevokeRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleRevokeRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthRoleRevokeRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:
@@ -10688,7 +11823,7 @@ func (m *AuthenticateResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserAddResponse) Unmarshal(data []byte) error {
+func (m *AuthUserAddResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -10711,10 +11846,10 @@ func (m *UserAddResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserAddResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthUserAddResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserAddResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthUserAddResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -10771,7 +11906,7 @@ func (m *UserAddResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserGetResponse) Unmarshal(data []byte) error {
+func (m *AuthUserGetResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -10794,10 +11929,10 @@ func (m *UserGetResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserGetResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthUserGetResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserGetResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthUserGetResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -10854,7 +11989,7 @@ func (m *UserGetResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserDeleteResponse) Unmarshal(data []byte) error {
+func (m *AuthUserDeleteResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -10877,10 +12012,10 @@ func (m *UserDeleteResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserDeleteResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthUserDeleteResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserDeleteResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthUserDeleteResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -10937,7 +12072,7 @@ func (m *UserDeleteResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserChangePasswordResponse) Unmarshal(data []byte) error {
+func (m *AuthUserChangePasswordResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -10960,10 +12095,10 @@ func (m *UserChangePasswordResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserChangePasswordResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthUserChangePasswordResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserChangePasswordResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthUserChangePasswordResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -11020,7 +12155,7 @@ func (m *UserChangePasswordResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserGrantResponse) Unmarshal(data []byte) error {
+func (m *AuthUserGrantResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -11043,10 +12178,10 @@ func (m *UserGrantResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserGrantResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthUserGrantResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserGrantResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthUserGrantResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -11103,7 +12238,7 @@ func (m *UserGrantResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *UserRevokeResponse) Unmarshal(data []byte) error {
+func (m *AuthUserRevokeResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -11126,10 +12261,10 @@ func (m *UserRevokeResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: UserRevokeResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthUserRevokeResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: UserRevokeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthUserRevokeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -11186,7 +12321,7 @@ func (m *UserRevokeResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleAddResponse) Unmarshal(data []byte) error {
+func (m *AuthRoleAddResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -11209,10 +12344,10 @@ func (m *RoleAddResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RoleAddResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthRoleAddResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleAddResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthRoleAddResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -11269,7 +12404,7 @@ func (m *RoleAddResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleGetResponse) Unmarshal(data []byte) error {
+func (m *AuthRoleGetResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -11292,10 +12427,10 @@ func (m *RoleGetResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RoleGetResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthRoleGetResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleGetResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthRoleGetResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -11352,7 +12487,7 @@ func (m *RoleGetResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleDeleteResponse) Unmarshal(data []byte) error {
+func (m *AuthRoleDeleteResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -11375,10 +12510,10 @@ func (m *RoleDeleteResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RoleDeleteResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthRoleDeleteResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleDeleteResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthRoleDeleteResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -11435,7 +12570,7 @@ func (m *RoleDeleteResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleGrantResponse) Unmarshal(data []byte) error {
+func (m *AuthRoleGrantResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -11458,10 +12593,10 @@ func (m *RoleGrantResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RoleGrantResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthRoleGrantResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleGrantResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthRoleGrantResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -11518,7 +12653,7 @@ func (m *RoleGrantResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleRevokeResponse) Unmarshal(data []byte) error {
+func (m *AuthRoleRevokeResponse) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -11541,10 +12676,10 @@ func (m *RoleRevokeResponse) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RoleRevokeResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: AuthRoleRevokeResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RoleRevokeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: AuthRoleRevokeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:

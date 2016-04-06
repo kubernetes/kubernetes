@@ -22,6 +22,7 @@ import (
 	"time"
 )
 
+// WaitSchedule briefly sleeps in order to invoke the go scheduler.
 // TODO: improve this when we are able to know the schedule or status of target go-routine.
 func WaitSchedule() {
 	time.Sleep(10 * time.Millisecond)

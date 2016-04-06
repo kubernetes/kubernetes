@@ -15,65 +15,31 @@
 package fileutil
 
 import (
-	"errors"
 	"os"
 	"syscall"
 	"time"
 )
 
-var (
-	ErrLocked = errors.New("file already locked")
-)
-
-type lock struct {
-	fname string
-	file  *os.File
+func TryLockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
+	if err := os.Chmod(path, syscall.DMEXCL|0600); err != nil {
+		return nil, err
+	}
+	f, err := os.Open(path, flag, perm)
+	if err != nil {
+		return nil, ErrLocked
+	}
+	return &LockedFile{f}, nil
 }
 
-func (l *lock) Name() string {
-	return l.fname
-}
-
-func (l *lock) TryLock() error {
-	err := os.Chmod(l.fname, syscall.DMEXCL|0600)
-	if err != nil {
-		return err
+func LockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
+	if err := os.Chmod(path, syscall.DMEXCL|0600); err != nil {
+		return nil, err
 	}
-
-	f, err := os.Open(l.fname)
-	if err != nil {
-		return ErrLocked
-	}
-
-	l.file = f
-	return nil
-}
-
-func (l *lock) Lock() error {
-	err := os.Chmod(l.fname, syscall.DMEXCL|0600)
-	if err != nil {
-		return err
-	}
-
 	for {
-		f, err := os.Open(l.fname)
+		f, err := os.OpenFile(path, flag, perm)
 		if err == nil {
-			l.file = f
-			return nil
+			return &LockedFile{f}, nil
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-}
-
-func (l *lock) Unlock() error {
-	return l.file.Close()
-}
-
-func (l *lock) Destroy() error {
-	return nil
-}
-
-func NewLock(file string) (Lock, error) {
-	l := &lock{fname: file}
-	return l, nil
 }

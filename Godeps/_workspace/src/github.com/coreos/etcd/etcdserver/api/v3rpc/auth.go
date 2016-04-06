@@ -29,7 +29,11 @@ func NewAuthServer(s *etcdserver.EtcdServer) *AuthServer {
 }
 
 func (as *AuthServer) AuthEnable(ctx context.Context, r *pb.AuthEnableRequest) (*pb.AuthEnableResponse, error) {
-	return as.authenticator.AuthEnable(ctx, r)
+	resp, err := as.authenticator.AuthEnable(ctx, r)
+	if err != nil {
+		return nil, togRPCError(err)
+	}
+	return resp, nil
 }
 
 func (as *AuthServer) AuthDisable(ctx context.Context, r *pb.AuthDisableRequest) (*pb.AuthDisableResponse, error) {
@@ -42,57 +46,69 @@ func (as *AuthServer) Authenticate(ctx context.Context, r *pb.AuthenticateReques
 	return nil, nil
 }
 
-func (as *AuthServer) RoleAdd(ctx context.Context, r *pb.RoleAddRequest) (*pb.RoleAddResponse, error) {
+func (as *AuthServer) RoleAdd(ctx context.Context, r *pb.AuthRoleAddRequest) (*pb.AuthRoleAddResponse, error) {
+	resp, err := as.authenticator.RoleAdd(ctx, r)
+	if err != nil {
+		return nil, togRPCError(err)
+	}
+	return resp, nil
+}
+
+func (as *AuthServer) RoleDelete(ctx context.Context, r *pb.AuthRoleDeleteRequest) (*pb.AuthRoleDeleteResponse, error) {
 	plog.Info("not implemented yet")
 	return nil, nil
 }
 
-func (as *AuthServer) RoleDelete(ctx context.Context, r *pb.RoleDeleteRequest) (*pb.RoleDeleteResponse, error) {
+func (as *AuthServer) RoleGet(ctx context.Context, r *pb.AuthRoleGetRequest) (*pb.AuthRoleGetResponse, error) {
 	plog.Info("not implemented yet")
 	return nil, nil
 }
 
-func (as *AuthServer) RoleGet(ctx context.Context, r *pb.RoleGetRequest) (*pb.RoleGetResponse, error) {
+func (as *AuthServer) RoleRevoke(ctx context.Context, r *pb.AuthRoleRevokeRequest) (*pb.AuthRoleRevokeResponse, error) {
 	plog.Info("not implemented yet")
 	return nil, nil
 }
 
-func (as *AuthServer) RoleRevoke(ctx context.Context, r *pb.RoleRevokeRequest) (*pb.RoleRevokeResponse, error) {
+func (as *AuthServer) RoleGrant(ctx context.Context, r *pb.AuthRoleGrantRequest) (*pb.AuthRoleGrantResponse, error) {
 	plog.Info("not implemented yet")
 	return nil, nil
 }
 
-func (as *AuthServer) RoleGrant(ctx context.Context, r *pb.RoleGrantRequest) (*pb.RoleGrantResponse, error) {
+func (as *AuthServer) UserAdd(ctx context.Context, r *pb.AuthUserAddRequest) (*pb.AuthUserAddResponse, error) {
+	resp, err := as.authenticator.UserAdd(ctx, r)
+	if err != nil {
+		return nil, togRPCError(err)
+	}
+	return resp, nil
+}
+
+func (as *AuthServer) UserDelete(ctx context.Context, r *pb.AuthUserDeleteRequest) (*pb.AuthUserDeleteResponse, error) {
+	resp, err := as.authenticator.UserDelete(ctx, r)
+	if err != nil {
+		return nil, togRPCError(err)
+	}
+	return resp, nil
+}
+
+func (as *AuthServer) UserGet(ctx context.Context, r *pb.AuthUserGetRequest) (*pb.AuthUserGetResponse, error) {
 	plog.Info("not implemented yet")
 	return nil, nil
 }
 
-func (as *AuthServer) UserAdd(ctx context.Context, r *pb.UserAddRequest) (*pb.UserAddResponse, error) {
+func (as *AuthServer) UserGrant(ctx context.Context, r *pb.AuthUserGrantRequest) (*pb.AuthUserGrantResponse, error) {
 	plog.Info("not implemented yet")
 	return nil, nil
 }
 
-func (as *AuthServer) UserDelete(ctx context.Context, r *pb.UserDeleteRequest) (*pb.UserDeleteResponse, error) {
+func (as *AuthServer) UserRevoke(ctx context.Context, r *pb.AuthUserRevokeRequest) (*pb.AuthUserRevokeResponse, error) {
 	plog.Info("not implemented yet")
 	return nil, nil
 }
 
-func (as *AuthServer) UserGet(ctx context.Context, r *pb.UserGetRequest) (*pb.UserGetResponse, error) {
-	plog.Info("not implemented yet")
-	return nil, nil
-}
-
-func (as *AuthServer) UserGrant(ctx context.Context, r *pb.UserGrantRequest) (*pb.UserGrantResponse, error) {
-	plog.Info("not implemented yet")
-	return nil, nil
-}
-
-func (as *AuthServer) UserRevoke(ctx context.Context, r *pb.UserRevokeRequest) (*pb.UserRevokeResponse, error) {
-	plog.Info("not implemented yet")
-	return nil, nil
-}
-
-func (as *AuthServer) UserChangePassword(ctx context.Context, r *pb.UserChangePasswordRequest) (*pb.UserChangePasswordResponse, error) {
-	plog.Info("not implemented yet")
-	return nil, nil
+func (as *AuthServer) UserChangePassword(ctx context.Context, r *pb.AuthUserChangePasswordRequest) (*pb.AuthUserChangePasswordResponse, error) {
+	resp, err := as.authenticator.UserChangePassword(ctx, r)
+	if err != nil {
+		return nil, togRPCError(err)
+	}
+	return resp, nil
 }

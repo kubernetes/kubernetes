@@ -374,12 +374,6 @@ func (cr *streamReader) stop() {
 	<-cr.done
 }
 
-func (cr *streamReader) isWorking() bool {
-	cr.mu.Lock()
-	defer cr.mu.Unlock()
-	return cr.closer != nil
-}
-
 func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 	u := cr.picker.pick()
 	uu := u
@@ -417,14 +411,14 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 	rv := serverVersion(resp.Header)
 	lv := semver.Must(semver.NewVersion(version.Version))
 	if compareMajorMinorVersion(rv, lv) == -1 && !checkStreamSupport(rv, t) {
-		resp.Body.Close()
+		httputil.GracefulClose(resp)
 		cr.picker.unreachable(u)
 		return nil, errUnsupportedStreamType
 	}
 
 	switch resp.StatusCode {
 	case http.StatusGone:
-		resp.Body.Close()
+		httputil.GracefulClose(resp)
 		cr.picker.unreachable(u)
 		err := fmt.Errorf("the member has been permanently removed from the cluster")
 		select {
@@ -435,7 +429,7 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 	case http.StatusOK:
 		return resp.Body, nil
 	case http.StatusNotFound:
-		resp.Body.Close()
+		httputil.GracefulClose(resp)
 		cr.picker.unreachable(u)
 		return nil, fmt.Errorf("remote member %s could not recognize local member", cr.remote)
 	case http.StatusPreconditionFailed:
@@ -444,7 +438,7 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 			cr.picker.unreachable(u)
 			return nil, err
 		}
-		resp.Body.Close()
+		httputil.GracefulClose(resp)
 		cr.picker.unreachable(u)
 
 		switch strings.TrimSuffix(string(b), "\n") {
@@ -459,7 +453,7 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 			return nil, fmt.Errorf("unhandled error %q when precondition failed", string(b))
 		}
 	default:
-		resp.Body.Close()
+		httputil.GracefulClose(resp)
 		cr.picker.unreachable(u)
 		return nil, fmt.Errorf("unhandled http status %d", resp.StatusCode)
 	}
@@ -499,9 +493,4 @@ func checkStreamSupport(v *semver.Version, t streamType) bool {
 		}
 	}
 	return false
-}
-
-func isNetworkTimeoutError(err error) bool {
-	nerr, ok := err.(net.Error)
-	return ok && nerr.Timeout()
 }

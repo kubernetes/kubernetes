@@ -30,11 +30,6 @@ service KV {
   // Compact compacts the event history in etcd. User should compact the
   // event history periodically, or it will grow infinitely.
   rpc Compact(CompactionRequest) returns (CompactionResponse) {}
-
-  // Hash returns the hash of local KV state for consistency checking purpose.
-  // This is designed for testing purpose. Do not use this in production when there
-  // are ongoing transactions.
-  rpc Hash(HashRequest) returns (HashResponse) {}
 }
 
 service Watch {
@@ -46,11 +41,11 @@ service Watch {
 }
 
 service Lease {
-  // LeaseCreate creates a lease. A lease has a TTL. The lease will expire if the
+  // LeaseGrant creates a lease. A lease has a TTL. The lease will expire if the
   // server does not receive a keepAlive within TTL from the lease holder.
   // All keys attached to the lease will be expired and deleted if the lease expires.
   // The key expiration generates an event in event history.
-  rpc LeaseCreate(LeaseCreateRequest) returns (LeaseCreateResponse) {}
+  rpc LeaseGrant(LeaseGrantRequest) returns (LeaseGrantResponse) {}
 
   // LeaseRevoke revokes a lease. All the key attached to the lease will be expired and deleted.
   rpc LeaseRevoke(LeaseRevokeRequest) returns (LeaseRevokeResponse) {}
@@ -77,8 +72,18 @@ service Cluster {
 }
 
 service Maintenance {
-  // TODO: move Hash from kv to Maintenance
+  // Alarm activates, deactivates, and queries alarms regarding cluster health.
+  rpc Alarm(AlarmRequest) returns (AlarmResponse) {}
+
+  // Status gets the status of the member.
+  rpc Status(StatusRequest) returns (StatusResponse) {}
+
   rpc Defragment(DefragmentRequest) returns (DefragmentResponse) {}
+
+  // Hash returns the hash of the local KV state for consistency checking purpose.
+  // This is designed for testing; do not use this in production when there
+  // are ongoing transactions.
+  rpc Hash(HashRequest) returns (HashResponse) {}
 }
 
 service Auth {
@@ -92,37 +97,37 @@ service Auth {
   rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse) {}
 
   // UserAdd adds a new user.
-  rpc UserAdd(UserAddRequest) returns (UserAddResponse) {}
+  rpc UserAdd(AuthUserAddRequest) returns (AuthUserAddResponse) {}
 
   // UserGet gets a detailed information of a user or lists entire users.
-  rpc UserGet(UserGetRequest) returns (UserGetResponse) {}
+  rpc UserGet(AuthUserGetRequest) returns (AuthUserGetResponse) {}
 
   // UserDelete deletes a specified user.
-  rpc UserDelete(UserDeleteRequest) returns (UserDeleteResponse) {}
+  rpc UserDelete(AuthUserDeleteRequest) returns (AuthUserDeleteResponse) {}
 
   // UserChangePassword changes password of a specified user.
-  rpc UserChangePassword(UserChangePasswordRequest) returns (UserChangePasswordResponse) {}
+  rpc UserChangePassword(AuthUserChangePasswordRequest) returns (AuthUserChangePasswordResponse) {}
 
   // UserGrant grants a role to a specified user.
-  rpc UserGrant(UserGrantRequest) returns (UserGrantResponse) {}
+  rpc UserGrant(AuthUserGrantRequest) returns (AuthUserGrantResponse) {}
 
   // UserRevoke revokes a role of specified user.
-  rpc UserRevoke(UserRevokeRequest) returns (UserRevokeResponse) {}
+  rpc UserRevoke(AuthUserRevokeRequest) returns (AuthUserRevokeResponse) {}
 
   // RoleAdd adds a new role.
-  rpc RoleAdd(RoleAddRequest) returns (RoleAddResponse) {}
+  rpc RoleAdd(AuthRoleAddRequest) returns (AuthRoleAddResponse) {}
 
   // RoleGet gets a detailed information of a role or lists entire roles.
-  rpc RoleGet(RoleGetRequest) returns (RoleGetResponse) {}
+  rpc RoleGet(AuthRoleGetRequest) returns (AuthRoleGetResponse) {}
 
   // RoleDelete deletes a specified role.
-  rpc RoleDelete(RoleDeleteRequest) returns (RoleDeleteResponse) {}
+  rpc RoleDelete(AuthRoleDeleteRequest) returns (AuthRoleDeleteResponse) {}
 
   // RoleGrant grants a permission of a specified key or range to a specified role.
-  rpc RoleGrant(RoleGrantRequest) returns (RoleGrantResponse) {}
+  rpc RoleGrant(AuthRoleGrantRequest) returns (AuthRoleGrantResponse) {}
 
   // RoleRevoke revokes a key or range permission of a specified role.
-  rpc RoleRevoke(RoleRevokeRequest) returns (RoleRevokeResponse) {}
+  rpc RoleRevoke(AuthRoleRevokeRequest) returns (AuthRoleRevokeResponse) {}
 }
 
 message ResponseHeader {
@@ -287,6 +292,10 @@ message TxnResponse {
 // revision.
 message CompactionRequest {
   int64 revision = 1;
+  // physical is set so the RPC will wait until the compaction is physically
+  // applied to the local database such that compacted entries are totally
+  // removed from the backing store.
+  bool physical = 2;
 }
 
 message CompactionResponse {
@@ -352,14 +361,14 @@ message WatchResponse {
   repeated storagepb.Event events = 11;
 }
 
-message LeaseCreateRequest {
+message LeaseGrantRequest {
   // advisory ttl in seconds
   int64 TTL = 1;
   // requested ID to create; 0 lets lessor choose
   int64 ID = 2;
 }
 
-message LeaseCreateResponse {
+message LeaseGrantResponse {
   ResponseHeader header = 1;
   int64 ID = 2;
   // server decided ttl in second
@@ -438,6 +447,41 @@ message DefragmentResponse {
   ResponseHeader header = 1;
 }
 
+enum AlarmType {
+	NONE = 0; // default, used to query if any alarm is active
+	NOSPACE = 1;
+}
+
+message AlarmRequest {
+  enum AlarmAction {
+	GET = 0;
+	ACTIVATE = 1;
+	DEACTIVATE = 2;
+  }
+  AlarmAction action = 1;
+  // MemberID is the member raising the alarm request
+  uint64 memberID = 2;
+  AlarmType alarm = 3;
+}
+
+message AlarmMember {
+	uint64	memberID = 1;
+	AlarmType alarm = 2;
+}
+
+message AlarmResponse {
+  ResponseHeader header = 1;
+  repeated AlarmMember alarms = 2;
+}
+
+message StatusRequest {
+}
+
+message StatusResponse {
+  ResponseHeader header = 1;
+  string version = 2;
+}
+
 message AuthEnableRequest {
 }
 
@@ -447,37 +491,43 @@ message AuthDisableRequest {
 message AuthenticateRequest {
 }
 
-message UserAddRequest {
+message AuthUserAddRequest {
+  string name = 1;
+  string password = 2;
 }
 
-message UserGetRequest {
+message AuthUserGetRequest {
 }
 
-message UserDeleteRequest {
+message AuthUserDeleteRequest {
+  string name = 1;
 }
 
-message UserChangePasswordRequest {
+message AuthUserChangePasswordRequest {
+  string name = 1;
+  string password = 2;
 }
 
-message UserGrantRequest {
+message AuthUserGrantRequest {
 }
 
-message UserRevokeRequest {
+message AuthUserRevokeRequest {
 }
 
-message RoleAddRequest {
+message AuthRoleAddRequest {
+  string name = 1;
 }
 
-message RoleGetRequest {
+message AuthRoleGetRequest {
 }
 
-message RoleDeleteRequest {
+message AuthRoleDeleteRequest {
 }
 
-message RoleGrantRequest {
+message AuthRoleGrantRequest {
 }
 
-message RoleRevokeRequest {
+message AuthRoleRevokeRequest {
 }
 
 message AuthEnableResponse {
@@ -492,46 +542,46 @@ message AuthenticateResponse {
   ResponseHeader header = 1;
 }
 
-message UserAddResponse {
+message AuthUserAddResponse {
   ResponseHeader header = 1;
 }
 
-message UserGetResponse {
+message AuthUserGetResponse {
   ResponseHeader header = 1;
 }
 
-message UserDeleteResponse {
+message AuthUserDeleteResponse {
   ResponseHeader header = 1;
 }
 
-message UserChangePasswordResponse {
+message AuthUserChangePasswordResponse {
   ResponseHeader header = 1;
 }
 
-message UserGrantResponse {
+message AuthUserGrantResponse {
   ResponseHeader header = 1;
 }
 
-message UserRevokeResponse {
+message AuthUserRevokeResponse {
   ResponseHeader header = 1;
 }
 
-message RoleAddResponse {
+message AuthRoleAddResponse {
   ResponseHeader header = 1;
 }
 
-message RoleGetResponse {
+message AuthRoleGetResponse {
   ResponseHeader header = 1;
 }
 
-message RoleDeleteResponse {
+message AuthRoleDeleteResponse {
   ResponseHeader header = 1;
 }
 
-message RoleGrantResponse {
+message AuthRoleGrantResponse {
   ResponseHeader header = 1;
 }
 
-message RoleRevokeResponse {
+message AuthRoleRevokeResponse {
   ResponseHeader header = 1;
 }
