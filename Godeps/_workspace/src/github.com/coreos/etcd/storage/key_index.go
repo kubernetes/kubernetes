@@ -131,14 +131,7 @@ func (ki *keyIndex) get(atRev int64) (modified, created revision, ver int64, err
 		return revision{}, revision{}, 0, ErrRevisionNotFound
 	}
 
-	f := func(rev revision) bool {
-		if rev.main <= atRev {
-			return false
-		}
-		return true
-	}
-
-	n := g.walk(f)
+	n := g.walk(func(rev revision) bool { return rev.main > atRev })
 	if n != -1 {
 		return g.revs[n], g.created, g.ver - int64(len(g.revs)-n-1), nil
 	}

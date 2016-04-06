@@ -56,7 +56,7 @@ type Op struct {
 func (op Op) toRequestUnion() *pb.RequestUnion {
 	switch op.t {
 	case tRange:
-		r := &pb.RangeRequest{Key: op.key, RangeEnd: op.end, Limit: op.limit, Revision: op.rev}
+		r := &pb.RangeRequest{Key: op.key, RangeEnd: op.end, Limit: op.limit, Revision: op.rev, Serializable: op.serializable}
 		if op.sort != nil {
 			r.SortOrder = pb.RangeRequest_SortOrder(op.sort.Order)
 			r.SortTarget = pb.RangeRequest_SortTarget(op.sort.Target)
@@ -95,7 +95,7 @@ func OpDelete(key string, opts ...OpOption) Op {
 		panic("unexpected revision in delete")
 	case ret.sort != nil:
 		panic("unexpected sort in delete")
-	case ret.serializable != false:
+	case ret.serializable:
 		panic("unexpected serializable in delete")
 	}
 	return ret
@@ -113,7 +113,7 @@ func OpPut(key, val string, opts ...OpOption) Op {
 		panic("unexpected revision in put")
 	case ret.sort != nil:
 		panic("unexpected sort in put")
-	case ret.serializable != false:
+	case ret.serializable:
 		panic("unexpected serializable in delete")
 	}
 	return ret
@@ -129,7 +129,7 @@ func opWatch(key string, opts ...OpOption) Op {
 		panic("unexpected limit in watch")
 	case ret.sort != nil:
 		panic("unexpected sort in watch")
-	case ret.serializable != false:
+	case ret.serializable:
 		panic("unexpected serializable in watch")
 	}
 	return ret
@@ -209,10 +209,10 @@ func WithSerializable() OpOption {
 }
 
 // WithFirstCreate gets the key with the oldest creation revision in the request range.
-func WithFirstCreate() []OpOption { return withTop(SortByCreatedRev, SortAscend) }
+func WithFirstCreate() []OpOption { return withTop(SortByCreateRevision, SortAscend) }
 
 // WithLastCreate gets the key with the latest creation revision in the request range.
-func WithLastCreate() []OpOption { return withTop(SortByCreatedRev, SortDescend) }
+func WithLastCreate() []OpOption { return withTop(SortByCreateRevision, SortDescend) }
 
 // WithFirstKey gets the lexically first key in the request range.
 func WithFirstKey() []OpOption { return withTop(SortByKey, SortAscend) }
@@ -221,10 +221,10 @@ func WithFirstKey() []OpOption { return withTop(SortByKey, SortAscend) }
 func WithLastKey() []OpOption { return withTop(SortByKey, SortDescend) }
 
 // WithFirstRev gets the key with the oldest modification revision in the request range.
-func WithFirstRev() []OpOption { return withTop(SortByModifiedRev, SortAscend) }
+func WithFirstRev() []OpOption { return withTop(SortByModRevision, SortAscend) }
 
 // WithLastRev gets the key with the latest modification revision in the request range.
-func WithLastRev() []OpOption { return withTop(SortByModifiedRev, SortDescend) }
+func WithLastRev() []OpOption { return withTop(SortByModRevision, SortDescend) }
 
 // withTop gets the first key over the get's prefix given a sort order
 func withTop(target SortTarget, order SortOrder) []OpOption {

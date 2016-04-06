@@ -17,13 +17,14 @@ package etcdserver
 import (
 	"time"
 
+	"github.com/coreos/etcd/etcdserver/membership"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/rafthttp"
 )
 
 // isConnectedToQuorumSince checks whether the local member is connected to the
 // quorum of the cluster since the given time.
-func isConnectedToQuorumSince(transport rafthttp.Transporter, since time.Time, self types.ID, members []*Member) bool {
+func isConnectedToQuorumSince(transport rafthttp.Transporter, since time.Time, self types.ID, members []*membership.Member) bool {
 	var connectedNum int
 	for _, m := range members {
 		if m.ID == self || isConnectedSince(transport, since, m.ID) {

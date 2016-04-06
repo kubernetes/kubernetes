@@ -235,7 +235,7 @@ func isKeyCurrent(k string, r *v3.GetResponse) v3.Cmp {
 	if len(r.Kvs) != 0 {
 		rev = r.Kvs[0].ModRevision + 1
 	}
-	return v3.Compare(v3.ModifiedRevision(k), "<", rev)
+	return v3.Compare(v3.ModRevision(k), "<", rev)
 }
 
 func respToValue(resp *v3.GetResponse) string {

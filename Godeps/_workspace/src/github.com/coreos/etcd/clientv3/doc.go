@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// clientv3 is the official Go etcd client for v3.
+// Package clientv3 implements the official Go etcd client for v3.
 //
 // Create client using `clientv3.New`:
 //
 //	cli, err := clientv3.New(clientv3.Config{
-//		Endpoints:   []string{"localhost:12378", "localhost:22378", "localhost:32378"},
+//		Endpoints:   []string{"localhost:2379", "localhost:22379", "localhost:32379"},
 //		DialTimeout: 5 * time.Second,
 //	})
 //	if err != nil {
@@ -37,6 +37,9 @@
 //	    // handle error!
 //	}
 //	// use the response
+//
+// The Client has internal state (watchers and leases), so Clients should be reused instead of created as needed.
+// Clients are safe for concurrent use by multiple goroutines.
 //
 // etcd client returns 2 types of errors:
 //

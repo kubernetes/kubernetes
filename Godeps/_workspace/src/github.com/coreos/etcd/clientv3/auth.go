@@ -21,12 +21,28 @@ import (
 )
 
 type (
-	AuthEnableResponse pb.AuthEnableResponse
+	AuthEnableResponse             pb.AuthEnableResponse
+	AuthUserAddResponse            pb.AuthUserAddResponse
+	AuthUserDeleteResponse         pb.AuthUserDeleteResponse
+	AuthUserChangePasswordResponse pb.AuthUserChangePasswordResponse
+	AuthRoleAddResponse            pb.AuthRoleAddResponse
 )
 
 type Auth interface {
-	// AuthEnable enables auth of a etcd cluster.
+	// AuthEnable enables auth of an etcd cluster.
 	AuthEnable(ctx context.Context) (*AuthEnableResponse, error)
+
+	// UserAdd adds a new user to an etcd cluster.
+	UserAdd(ctx context.Context, name string, password string) (*AuthUserAddResponse, error)
+
+	// UserDelete deletes a user from an etcd cluster.
+	UserDelete(ctx context.Context, name string) (*AuthUserDeleteResponse, error)
+
+	// UserChangePassword changes a password of a user.
+	UserChangePassword(ctx context.Context, name string, password string) (*AuthUserChangePasswordResponse, error)
+
+	// RoleAdd adds a new user to an etcd cluster.
+	RoleAdd(ctx context.Context, name string) (*AuthRoleAddResponse, error)
 }
 
 type auth struct {
@@ -48,4 +64,24 @@ func NewAuth(c *Client) Auth {
 func (auth *auth) AuthEnable(ctx context.Context) (*AuthEnableResponse, error) {
 	resp, err := auth.remote.AuthEnable(ctx, &pb.AuthEnableRequest{})
 	return (*AuthEnableResponse)(resp), err
+}
+
+func (auth *auth) UserAdd(ctx context.Context, name string, password string) (*AuthUserAddResponse, error) {
+	resp, err := auth.remote.UserAdd(ctx, &pb.AuthUserAddRequest{Name: name, Password: password})
+	return (*AuthUserAddResponse)(resp), err
+}
+
+func (auth *auth) UserDelete(ctx context.Context, name string) (*AuthUserDeleteResponse, error) {
+	resp, err := auth.remote.UserDelete(ctx, &pb.AuthUserDeleteRequest{Name: name})
+	return (*AuthUserDeleteResponse)(resp), err
+}
+
+func (auth *auth) UserChangePassword(ctx context.Context, name string, password string) (*AuthUserChangePasswordResponse, error) {
+	resp, err := auth.remote.UserChangePassword(ctx, &pb.AuthUserChangePasswordRequest{Name: name, Password: password})
+	return (*AuthUserChangePasswordResponse)(resp), err
+}
+
+func (auth *auth) RoleAdd(ctx context.Context, name string) (*AuthRoleAddResponse, error) {
+	resp, err := auth.remote.RoleAdd(ctx, &pb.AuthRoleAddRequest{Name: name})
+	return (*AuthRoleAddResponse)(resp), err
 }

@@ -22,6 +22,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/coreos/etcd/etcdserver/membership"
+	"github.com/coreos/etcd/pkg/httputil"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/version"
 	"github.com/coreos/go-semver/semver"
@@ -29,7 +31,7 @@ import (
 
 // isMemberBootstrapped tries to check if the given member has been bootstrapped
 // in the given cluster.
-func isMemberBootstrapped(cl *cluster, member string, rt http.RoundTripper, timeout time.Duration) bool {
+func isMemberBootstrapped(cl *membership.RaftCluster, member string, rt http.RoundTripper, timeout time.Duration) bool {
 	rcl, err := getClusterFromRemotePeers(getRemotePeerURLs(cl, member), timeout, false, rt)
 	if err != nil {
 		return false
@@ -52,12 +54,12 @@ func isMemberBootstrapped(cl *cluster, member string, rt http.RoundTripper, time
 // response, an error is returned.
 // Each request has a 10-second timeout. Because the upper limit of TTL is 5s,
 // 10 second is enough for building connection and finishing request.
-func GetClusterFromRemotePeers(urls []string, rt http.RoundTripper) (*cluster, error) {
+func GetClusterFromRemotePeers(urls []string, rt http.RoundTripper) (*membership.RaftCluster, error) {
 	return getClusterFromRemotePeers(urls, 10*time.Second, true, rt)
 }
 
 // If logerr is true, it prints out more error messages.
-func getClusterFromRemotePeers(urls []string, timeout time.Duration, logerr bool, rt http.RoundTripper) (*cluster, error) {
+func getClusterFromRemotePeers(urls []string, timeout time.Duration, logerr bool, rt http.RoundTripper) (*membership.RaftCluster, error) {
 	cc := &http.Client{
 		Transport: rt,
 		Timeout:   timeout,
@@ -77,7 +79,7 @@ func getClusterFromRemotePeers(urls []string, timeout time.Duration, logerr bool
 			}
 			continue
 		}
-		var membs []*Member
+		var membs []*membership.Member
 		if err = json.Unmarshal(b, &membs); err != nil {
 			if logerr {
 				plog.Warningf("could not unmarshal cluster response: %v", err)
@@ -91,14 +93,14 @@ func getClusterFromRemotePeers(urls []string, timeout time.Duration, logerr bool
 			}
 			continue
 		}
-		return newClusterFromMembers("", id, membs), nil
+		return membership.NewClusterFromMembers("", id, membs), nil
 	}
 	return nil, fmt.Errorf("could not retrieve cluster information from the given urls")
 }
 
 // getRemotePeerURLs returns peer urls of remote members in the cluster. The
 // returned list is sorted in ascending lexicographical order.
-func getRemotePeerURLs(cl Cluster, local string) []string {
+func getRemotePeerURLs(cl *membership.RaftCluster, local string) []string {
 	us := make([]string, 0)
 	for _, m := range cl.Members() {
 		if m.Name == local {
@@ -114,7 +116,7 @@ func getRemotePeerURLs(cl Cluster, local string) []string {
 // The key of the returned map is the member's ID. The value of the returned map
 // is the semver versions string, including server and cluster.
 // If it fails to get the version of a member, the key will be nil.
-func getVersions(cl Cluster, local types.ID, rt http.RoundTripper) map[string]*version.Versions {
+func getVersions(cl *membership.RaftCluster, local types.ID, rt http.RoundTripper) map[string]*version.Versions {
 	members := cl.Members()
 	vers := make(map[string]*version.Versions)
 	for _, m := range members {
@@ -172,7 +174,7 @@ func decideClusterVersion(vers map[string]*version.Versions) *semver.Version {
 // cluster version in the range of [MinClusterVersion, Version] and no known members has a cluster version
 // out of the range.
 // We set this rule since when the local member joins, another member might be offline.
-func isCompatibleWithCluster(cl Cluster, local types.ID, rt http.RoundTripper) bool {
+func isCompatibleWithCluster(cl *membership.RaftCluster, local types.ID, rt http.RoundTripper) bool {
 	vers := getVersions(cl, local, rt)
 	minV := semver.Must(semver.NewVersion(version.MinClusterVersion))
 	maxV := semver.Must(semver.NewVersion(version.Version))
@@ -214,7 +216,7 @@ func isCompatibleWithVers(vers map[string]*version.Versions, local types.ID, min
 
 // getVersion returns the Versions of the given member via its
 // peerURLs. Returns the last error if it fails to get the version.
-func getVersion(m *Member, rt http.RoundTripper) (*version.Versions, error) {
+func getVersion(m *membership.Member, rt http.RoundTripper) (*version.Versions, error) {
 	cc := &http.Client{
 		Transport: rt,
 	}
@@ -231,7 +233,7 @@ func getVersion(m *Member, rt http.RoundTripper) (*version.Versions, error) {
 		}
 		// etcd 2.0 does not have version endpoint on peer url.
 		if resp.StatusCode == http.StatusNotFound {
-			resp.Body.Close()
+			httputil.GracefulClose(resp)
 			return &version.Versions{
 				Server:  "2.0.0",
 				Cluster: "2.0.0",
@@ -253,13 +255,4 @@ func getVersion(m *Member, rt http.RoundTripper) (*version.Versions, error) {
 		return &vers, nil
 	}
 	return nil, err
-}
-
-func MustDetectDowngrade(cv *semver.Version) {
-	lv := semver.Must(semver.NewVersion(version.Version))
-	// only keep major.minor version for comparison against cluster version
-	lv = &semver.Version{Major: lv.Major, Minor: lv.Minor}
-	if cv != nil && lv.LessThan(*cv) {
-		plog.Fatalf("cluster cannot be downgraded (current version: %s is lower than determined cluster version: %s).", version.Version, version.Cluster(cv.String()))
-	}
 }
