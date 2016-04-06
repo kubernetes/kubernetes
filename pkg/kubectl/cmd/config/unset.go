@@ -72,7 +72,7 @@ func (o unsetOptions) run() error {
 	if err != nil {
 		return err
 	}
-	err = modifyConfig(reflect.ValueOf(config), steps, "", true)
+	err = modifyConfig(reflect.ValueOf(config), steps, "", true, true)
 	if err != nil {
 		return err
 	}
