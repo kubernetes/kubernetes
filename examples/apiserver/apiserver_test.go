@@ -41,7 +41,7 @@ var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
 
 func TestRun(t *testing.T) {
 	go func() {
-		if err := Run(); err != nil {
+		if err := Run(NewServerRunOptions()); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
