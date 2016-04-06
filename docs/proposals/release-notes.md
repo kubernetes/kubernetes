@@ -31,7 +31,7 @@ Documentation for other releases can be found at
 # Kubernetes Release Notes
 
 [djmm@google.com](mailto:djmm@google.com)<BR>
-Last Updated: 2016-3-25
+Last Updated: 2016-04-06
 
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
@@ -115,14 +115,19 @@ hundreds of entries.  The goal is to highlight the major changes for a release.
 
 The munger/bot option fits most cleanly into the existing workflow.
 
-The design will include:
+All `release-note-*` labeling is managed on the master branch PR only.
+No `release-note-*` labels are needed on cherry-pick PRs and no information
+will be collected from that cherry-pick PR.
+
+The only exception to this rule is when a PR is not a cherry-pick and is
+targeted directly to the non-master branch.  In this case, a `release-note-*`
+label is optional (and not enforced).
 
 1. New labels added to github: `release-note-none`, maybe others for new release note categories - see Layout section below
 1. A [new munger](https://github.com/kubernetes/kubernetes/issues/23409) that will:
-  * Initiate a `release-note-needed` label on all new PRs
-  * Block merge by the submit queue on all PRs labeled as `release-note-needed`
-  * Auto-remove `release-note-needed` when one of the release-note-\* labels is added
-  * Special case for cherry-picked/branch PRs, release-note-none is not allowed
+  * Add a `release-note-label-needed` label to all new master branch PRs
+  * Block merge by the submit queue on all PRs labeled as `release-note-label-needed`
+  * Auto-remove `release-note-label-needed` when one of the `release-note-*` labels is added
 
 ## Publishing Design
 
