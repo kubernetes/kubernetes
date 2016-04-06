@@ -28,13 +28,17 @@ import (
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
+	subreplicasetetcd "k8s.io/kubernetes/federation/registry/subreplicaset/etcd"
 )
 
 func installFederationAPIs(s *genericoptions.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
 	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(createRESTOptionsOrDie(s, g, f, federation.Resource("clusters")))
+	subReplicaSetStorage, subReplicaSetStatusStorage := subreplicasetetcd.NewREST(createRESTOptionsOrDie(s, g, f, federation.Resource("subreplicasets")))
 	federationResources := map[string]rest.Storage{
-		"clusters":        clusterStorage,
-		"clusters/status": clusterStatusStorage,
+		"clusters":              clusterStorage,
+		"clusters/status":       clusterStatusStorage,
+		"subreplicasets":        subReplicaSetStorage,
+		"subreplicasets/status": subReplicaSetStatusStorage,
 	}
 	federationGroupMeta := registered.GroupOrDie(federation.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{

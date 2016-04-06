@@ -107,7 +107,7 @@ func (rsStrategy) AllowUnconditionalUpdate() bool {
 func SubReplicaSetToSelectableFields(rs *federation.SubReplicaSet) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(rs.ObjectMeta, true)
 	rsSpecificFieldsSet := fields.Set{
-		"status.replicas": strconv.Itoa(rs.Status.Replicas),
+		"status.replicas": strconv.Itoa(int(rs.Status.Replicas)),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, rsSpecificFieldsSet)
 }
