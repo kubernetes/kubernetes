@@ -41,7 +41,7 @@ func newDelayingQueue(clock util.Clock) DelayingInterface {
 	ret := &delayingType{
 		Interface:       New(),
 		clock:           clock,
-		heartbeat:       time.Tick(maxWait),
+		heartbeat:       clock.Tick(maxWait),
 		stopCh:          make(chan struct{}),
 		waitingForAddCh: make(chan waitFor, 1000),
 	}
