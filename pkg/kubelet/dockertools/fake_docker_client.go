@@ -40,7 +40,7 @@ type FakeDockerClient struct {
 	RunningContainerList []dockertypes.Container
 	ExitedContainerList  []dockertypes.Container
 	ContainerMap         map[string]*dockertypes.ContainerJSON
-	Image                *docker.Image
+	Image                *dockertypes.ImageInspect
 	Images               []dockertypes.Image
 	Errors               map[string]error
 	called               []string
@@ -282,7 +282,7 @@ func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 
 // InspectImage is a test-spy implementation of DockerInterface.InspectImage.
 // It adds an entry "inspect" to the internal method call record.
-func (f *FakeDockerClient) InspectImage(name string) (*docker.Image, error) {
+func (f *FakeDockerClient) InspectImage(name string) (*dockertypes.ImageInspect, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "inspect_image")
