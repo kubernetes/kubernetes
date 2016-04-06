@@ -141,7 +141,7 @@ func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	return d.client.ContainerRemove(getDefaultContext(), opts)
 }
 
-func (d *kubeDockerClient) InspectImage(image string) (*docker.Image, error) {
+func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect, error) {
 	resp, _, err := d.client.ImageInspectWithRaw(getDefaultContext(), image, true)
 	if err != nil {
 		// TODO(random-liu): Use IsErrImageNotFound instead of ErrNoSuchImage
@@ -150,7 +150,7 @@ func (d *kubeDockerClient) InspectImage(image string) (*docker.Image, error) {
 		}
 		return nil, err
 	}
-	imageInfo := &docker.Image{}
+	imageInfo := &dockertypes.ImageInspect{}
 	if err := convertType(&resp, imageInfo); err != nil {
 		return nil, err
 	}
