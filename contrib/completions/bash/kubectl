@@ -3086,6 +3086,7 @@ _kubectl_config_set()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--set-raw-bytes=")
     flags+=("--alsologtostderr")
     flags+=("--api-version=")
     flags+=("--as=")
