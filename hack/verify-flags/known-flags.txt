@@ -81,6 +81,7 @@ deleting-pods-burst
 deleting-pods-qps
 deployment-controller-sync-period
 deployment-label-key
+deserialization-cache-size
 dest-file
 disable-filter
 docker-email
