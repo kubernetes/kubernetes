@@ -183,7 +183,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 			return err
 		}
 		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModifiedRevision(key), "=", origState.rev),
+			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
 			clientv3.OpDelete(key),
 		).Else(
@@ -236,7 +236,7 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 		}
 
 		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModifiedRevision(key), "=", origState.rev),
+			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
 			clientv3.OpPut(key, string(data)),
 		).Else(
@@ -420,5 +420,5 @@ func checkPreconditions(key string, preconditions *storage.Preconditions, out ru
 }
 
 func notFound(key string) clientv3.Cmp {
-	return clientv3.Compare(clientv3.ModifiedRevision(key), "=", 0)
+	return clientv3.Compare(clientv3.ModRevision(key), "=", 0)
 }
