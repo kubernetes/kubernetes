@@ -128,10 +128,13 @@ type CPUStats struct {
 type MemoryStats struct {
 	// The time at which these stats were updated.
 	Time unversioned.Time `json:"time"`
+	// Available memory for use.  This is defined as the memory limit - workingSetBytes.
+	// If memory limit is undefined, the available bytes is omitted.
+	AvailableBytes *uint64 `json:"availableBytes,omitempty"`
 	// Total memory in use. This includes all memory regardless of when it was accessed.
 	UsageBytes *uint64 `json:"usageBytes,omitempty"`
 	// The amount of working set memory. This includes recently accessed memory,
-	// dirty memory, and kernel memory. UsageBytes is <= TotalBytes.
+	// dirty memory, and kernel memory. WorkingSetBytes is <= UsageBytes
 	WorkingSetBytes *uint64 `json:"workingSetBytes,omitempty"`
 	// Cumulative number of minor page faults.
 	PageFaults *uint64 `json:"pageFaults,omitempty"`
