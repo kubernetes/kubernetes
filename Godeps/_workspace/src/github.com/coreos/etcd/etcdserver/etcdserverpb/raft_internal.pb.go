@@ -22,16 +22,21 @@ var _ = math.Inf
 // An InternalRaftRequest is the union of all requests which can be
 // sent via raft.
 type InternalRaftRequest struct {
-	ID          uint64              `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	V2          *Request            `protobuf:"bytes,2,opt,name=v2" json:"v2,omitempty"`
-	Range       *RangeRequest       `protobuf:"bytes,3,opt,name=range" json:"range,omitempty"`
-	Put         *PutRequest         `protobuf:"bytes,4,opt,name=put" json:"put,omitempty"`
-	DeleteRange *DeleteRangeRequest `protobuf:"bytes,5,opt,name=delete_range" json:"delete_range,omitempty"`
-	Txn         *TxnRequest         `protobuf:"bytes,6,opt,name=txn" json:"txn,omitempty"`
-	Compaction  *CompactionRequest  `protobuf:"bytes,7,opt,name=compaction" json:"compaction,omitempty"`
-	LeaseCreate *LeaseCreateRequest `protobuf:"bytes,8,opt,name=lease_create" json:"lease_create,omitempty"`
-	LeaseRevoke *LeaseRevokeRequest `protobuf:"bytes,9,opt,name=lease_revoke" json:"lease_revoke,omitempty"`
-	AuthEnable  *AuthEnableRequest  `protobuf:"bytes,10,opt,name=auth_enable" json:"auth_enable,omitempty"`
+	ID                     uint64                         `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	V2                     *Request                       `protobuf:"bytes,2,opt,name=v2" json:"v2,omitempty"`
+	Range                  *RangeRequest                  `protobuf:"bytes,3,opt,name=range" json:"range,omitempty"`
+	Put                    *PutRequest                    `protobuf:"bytes,4,opt,name=put" json:"put,omitempty"`
+	DeleteRange            *DeleteRangeRequest            `protobuf:"bytes,5,opt,name=delete_range" json:"delete_range,omitempty"`
+	Txn                    *TxnRequest                    `protobuf:"bytes,6,opt,name=txn" json:"txn,omitempty"`
+	Compaction             *CompactionRequest             `protobuf:"bytes,7,opt,name=compaction" json:"compaction,omitempty"`
+	LeaseCreate            *LeaseCreateRequest            `protobuf:"bytes,8,opt,name=lease_create" json:"lease_create,omitempty"`
+	LeaseRevoke            *LeaseRevokeRequest            `protobuf:"bytes,9,opt,name=lease_revoke" json:"lease_revoke,omitempty"`
+	AuthEnable             *AuthEnableRequest             `protobuf:"bytes,10,opt,name=auth_enable" json:"auth_enable,omitempty"`
+	AuthUserAdd            *AuthUserAddRequest            `protobuf:"bytes,11,opt,name=auth_user_add" json:"auth_user_add,omitempty"`
+	AuthUserDelete         *AuthUserDeleteRequest         `protobuf:"bytes,12,opt,name=auth_user_delete" json:"auth_user_delete,omitempty"`
+	AuthUserChangePassword *AuthUserChangePasswordRequest `protobuf:"bytes,13,opt,name=auth_user_change_password" json:"auth_user_change_password,omitempty"`
+	AuthRoleAdd            *AuthRoleAddRequest            `protobuf:"bytes,14,opt,name=auth_role_add" json:"auth_role_add,omitempty"`
+	Alarm                  *AlarmRequest                  `protobuf:"bytes,15,opt,name=alarm" json:"alarm,omitempty"`
 }
 
 func (m *InternalRaftRequest) Reset()         { *m = InternalRaftRequest{} }
@@ -159,6 +164,56 @@ func (m *InternalRaftRequest) MarshalTo(data []byte) (int, error) {
 		}
 		i += n9
 	}
+	if m.AuthUserAdd != nil {
+		data[i] = 0x5a
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserAdd.Size()))
+		n10, err := m.AuthUserAdd.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n10
+	}
+	if m.AuthUserDelete != nil {
+		data[i] = 0x62
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserDelete.Size()))
+		n11, err := m.AuthUserDelete.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n11
+	}
+	if m.AuthUserChangePassword != nil {
+		data[i] = 0x6a
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserChangePassword.Size()))
+		n12, err := m.AuthUserChangePassword.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n12
+	}
+	if m.AuthRoleAdd != nil {
+		data[i] = 0x72
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleAdd.Size()))
+		n13, err := m.AuthRoleAdd.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n13
+	}
+	if m.Alarm != nil {
+		data[i] = 0x7a
+		i++
+		i = encodeVarintRaftInternal(data, i, uint64(m.Alarm.Size()))
+		n14, err := m.Alarm.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n14
+	}
 	return i, nil
 }
 
@@ -247,6 +302,26 @@ func (m *InternalRaftRequest) Size() (n int) {
 	}
 	if m.AuthEnable != nil {
 		l = m.AuthEnable.Size()
+		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthUserAdd != nil {
+		l = m.AuthUserAdd.Size()
+		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthUserDelete != nil {
+		l = m.AuthUserDelete.Size()
+		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthUserChangePassword != nil {
+		l = m.AuthUserChangePassword.Size()
+		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthRoleAdd != nil {
+		l = m.AuthRoleAdd.Size()
+		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	if m.Alarm != nil {
+		l = m.Alarm.Size()
 		n += 1 + l + sovRaftInternal(uint64(l))
 	}
 	return n
@@ -613,6 +688,171 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				m.AuthEnable = &AuthEnableRequest{}
 			}
 			if err := m.AuthEnable.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthUserAdd", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthUserAdd == nil {
+				m.AuthUserAdd = &AuthUserAddRequest{}
+			}
+			if err := m.AuthUserAdd.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 12:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthUserDelete", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthUserDelete == nil {
+				m.AuthUserDelete = &AuthUserDeleteRequest{}
+			}
+			if err := m.AuthUserDelete.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 13:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthUserChangePassword", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthUserChangePassword == nil {
+				m.AuthUserChangePassword = &AuthUserChangePasswordRequest{}
+			}
+			if err := m.AuthUserChangePassword.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 14:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthRoleAdd", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AuthRoleAdd == nil {
+				m.AuthRoleAdd = &AuthRoleAddRequest{}
+			}
+			if err := m.AuthRoleAdd.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 15:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Alarm", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRaftInternal
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Alarm == nil {
+				m.Alarm = &AlarmRequest{}
+			}
+			if err := m.Alarm.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

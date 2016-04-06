@@ -10,10 +10,12 @@
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
-// limitations under the License.package recipe
+// limitations under the License.
+
 package integration
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -35,8 +37,8 @@ import (
 	"github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver"
+	"github.com/coreos/etcd/etcdserver/api/v2http"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc"
-	"github.com/coreos/etcd/etcdserver/etcdhttp"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/coreos/etcd/pkg/transport"
@@ -70,7 +72,6 @@ type ClusterConfig struct {
 	PeerTLS      *transport.TLSInfo
 	ClientTLS    *transport.TLSInfo
 	DiscoveryURL string
-	UseV3        bool
 	UseGRPC      bool
 }
 
@@ -197,7 +198,6 @@ func (c *cluster) mustNewMember(t *testing.T) *member {
 	name := c.name(rand.Int())
 	m := mustNewMember(t, name, c.cfg.PeerTLS, c.cfg.ClientTLS)
 	m.DiscoveryURL = c.cfg.DiscoveryURL
-	m.V3demo = c.cfg.UseV3
 	if c.cfg.UseGRPC {
 		if err := m.listenGRPC(); err != nil {
 			t.Fatal(err)
@@ -469,9 +469,6 @@ func mustNewMember(t *testing.T, name string, peerTLS *transport.TLSInfo, client
 
 // listenGRPC starts a grpc server over a unix domain socket on the member
 func (m *member) listenGRPC() error {
-	if m.V3demo == false {
-		return fmt.Errorf("starting grpc server without v3 configured")
-	}
 	// prefix with localhost so cert has right domain
 	m.grpcAddr = "localhost:" + m.Name + ".sock"
 	if err := os.RemoveAll(m.grpcAddr); err != nil {
@@ -549,7 +546,7 @@ func (m *member) Launch() error {
 	m.s.SyncTicker = time.Tick(500 * time.Millisecond)
 	m.s.Start()
 
-	m.raftHandler = &testutil.PauseableHandler{Next: etcdhttp.NewPeerHandler(m.s)}
+	m.raftHandler = &testutil.PauseableHandler{Next: v2http.NewPeerHandler(m.s)}
 
 	for _, ln := range m.PeerListeners {
 		hs := &httptest.Server{
@@ -570,7 +567,7 @@ func (m *member) Launch() error {
 	for _, ln := range m.ClientListeners {
 		hs := &httptest.Server{
 			Listener: ln,
-			Config:   &http.Server{Handler: etcdhttp.NewClientHandler(m.s, m.ServerConfig.ReqTimeout())},
+			Config:   &http.Server{Handler: v2http.NewClientHandler(m.s, m.ServerConfig.ReqTimeout())},
 		}
 		if m.ClientTLSInfo == nil {
 			hs.Start()
@@ -584,7 +581,16 @@ func (m *member) Launch() error {
 		m.hss = append(m.hss, hs)
 	}
 	if m.grpcListener != nil {
-		m.grpcServer, err = v3rpc.Server(m.s, m.ClientTLSInfo)
+		var (
+			tlscfg *tls.Config
+		)
+		if m.ClientTLSInfo != nil && !m.ClientTLSInfo.Empty() {
+			tlscfg, err = m.ClientTLSInfo.ServerConfig()
+			if err != nil {
+				return err
+			}
+		}
+		m.grpcServer = v3rpc.Server(m.s, tlscfg)
 		go m.grpcServer.Serve(m.grpcListener)
 	}
 	return nil
@@ -712,7 +718,6 @@ type ClusterV3 struct {
 // NewClusterV3 returns a launched cluster with a grpc client connection
 // for each cluster member.
 func NewClusterV3(t *testing.T, cfg *ClusterConfig) *ClusterV3 {
-	cfg.UseV3 = true
 	cfg.UseGRPC = true
 	clus := &ClusterV3{cluster: NewClusterByConfig(t, cfg)}
 	for _, m := range clus.Members {
@@ -752,6 +757,8 @@ type grpcAPI struct {
 	Lease pb.LeaseClient
 	// Watch is the watch API for the client's connection.
 	Watch pb.WatchClient
+	// Maintenance is the maintenance API for the client's connection.
+	Maintenance pb.MaintenanceClient
 }
 
 func toGRPC(c *clientv3.Client) grpcAPI {
@@ -760,5 +767,6 @@ func toGRPC(c *clientv3.Client) grpcAPI {
 		pb.NewKVClient(c.ActiveConnection()),
 		pb.NewLeaseClient(c.ActiveConnection()),
 		pb.NewWatchClient(c.ActiveConnection()),
+		pb.NewMaintenanceClient(c.ActiveConnection()),
 	}
 }

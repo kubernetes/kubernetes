@@ -36,7 +36,6 @@ func Repair(dirpath string) bool {
 	rec := &walpb.Record{}
 
 	decoder := newDecoder(f)
-	defer decoder.close()
 	for {
 		err := decoder.decode(rec)
 		switch err {

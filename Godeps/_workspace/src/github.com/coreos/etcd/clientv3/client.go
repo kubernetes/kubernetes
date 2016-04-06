@@ -15,8 +15,9 @@
 package clientv3
 
 import (
-	"crypto/tls"
 	"errors"
+	"io/ioutil"
+	"log"
 	"net"
 	"net/url"
 	"strings"
@@ -51,23 +52,6 @@ type Client struct {
 	cancel context.CancelFunc
 }
 
-// EndpointDialer is a policy for choosing which endpoint to dial next
-type EndpointDialer func(*Client) (*grpc.ClientConn, error)
-
-type Config struct {
-	// Endpoints is a list of URLs
-	Endpoints []string
-
-	// RetryDialer chooses the next endpoint to use
-	RetryDialer EndpointDialer
-
-	// DialTimeout is the timeout for failing to establish a connection.
-	DialTimeout time.Duration
-
-	// TLS holds the client secure credentials, if any.
-	TLS *tls.Config
-}
-
 // New creates a new etcdv3 client from a given configuration.
 func New(cfg Config) (*Client, error) {
 	if cfg.RetryDialer == nil {
@@ -83,6 +67,15 @@ func New(cfg Config) (*Client, error) {
 // NewFromURL creates a new etcdv3 client from a URL.
 func NewFromURL(url string) (*Client, error) {
 	return New(Config{Endpoints: []string{url}})
+}
+
+// NewFromConfigFile creates a new etcdv3 client from a configuration file.
+func NewFromConfigFile(path string) (*Client, error) {
+	cfg, err := configFromFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return New(*cfg)
 }
 
 // Close shuts down the client's etcd connections.
@@ -179,7 +172,13 @@ func newClient(cfg *Config) (*Client, error) {
 	client.Lease = NewLease(client)
 	client.Watcher = NewWatcher(client)
 	client.Auth = NewAuth(client)
-	client.Maintenance = &maintenance{c: client}
+	client.Maintenance = NewMaintenance(client)
+	if cfg.Logger != nil {
+		logger.Set(cfg.Logger)
+	} else {
+		// disable client side grpc by default
+		logger.Set(log.New(ioutil.Discard, "", 0))
+	}
 
 	return client, nil
 }

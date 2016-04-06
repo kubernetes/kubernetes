@@ -22,6 +22,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/coreos/etcd/pkg/httputil"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/version"
 	"github.com/coreos/go-semver/semver"
@@ -231,7 +232,7 @@ func getVersion(m *Member, rt http.RoundTripper) (*version.Versions, error) {
 		}
 		// etcd 2.0 does not have version endpoint on peer url.
 		if resp.StatusCode == http.StatusNotFound {
-			resp.Body.Close()
+			httputil.GracefulClose(resp)
 			return &version.Versions{
 				Server:  "2.0.0",
 				Cluster: "2.0.0",

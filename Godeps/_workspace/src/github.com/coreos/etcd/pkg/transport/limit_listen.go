@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package netutil provides network utility functions, complementing the more
+// Package transport provides network utility functions, complementing the more
 // common ones in the net package.
 package transport
 
