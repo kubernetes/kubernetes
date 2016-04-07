@@ -110,9 +110,63 @@ var (
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
 	podProbeParametersVersion = version.MustParse("v1.2.0-alpha.4")
+
+	kubectl_guestbookController  = "kubectl_guestbookController.json"
+	kubectl_guestbookSvc         = "kubectl_guestbookService.json"
+	kubectl_updateDemonautilusRC = "kubectl_updateDemonautilusRC.json"
+	kubectl_updateDemoKittyRC    = "kubectl_updateDemoKitty.json"
+	kubectl_userguidePod         = "kubectl_userguidePod.json"
 )
 
+// This map allows us to pass Conformance tests without relying on repo-root
+var kubectlExampleFiles = map[string]string{
+	// 1 pod instead of 3 for fast testing.
+	kubectl_guestbookController: `{"kind":"ReplicationController",
+			"apiVersion":"v1",
+			"metadata":{"name":"guestbook","labels":{"app":"guestbook"}},
+			"spec":{"replicas":1,"selector":{"app":"guestbook"},"template":{"metadata":{"labels":{"app":"guestbook"}},
+			"spec":{"containers":[{"name":"guestbook","image":"gcr.io/google_containers/guestbook:v3","ports":[{"name":"http-server","containerPort":3000}]}]}}}}`,
+	kubectl_guestbookSvc: `{
+			"kind":"Service",
+			"apiVersion":"v1",
+			"metadata":{"name":"guestbook","labels":{"app":"guestbook"}},
+			"spec":{"ports":[{"port":3000,"targetPort":"http-server"}],"selector":{"app":"guestbook"},"type":"LoadBalancer"}}`,
+	kubectl_updateDemonautilusRC: `{"apiVersion":"v1","kind":"ReplicationController",
+				"metadata":{"name":"update-demo-nautilus"},
+				"spec":{"replicas":2,"selector":{"name":"update-demo","version":"nautilus"},
+				"template":{
+					"metadata":{"labels":{"name":"update-demo","version":"nautilus"}},
+					"spec":{"containers":[{"image":"gcr.io/google_containers/update-demo:nautilus",
+						"name":"update-demo","ports":[{"containerPort":80, "protocol":"TCP"}]}]}}}}`,
+	kubectl_updateDemoKittyRC: `{"apiVersion":"v1","kind":"ReplicationController",
+				"metadata":{"name":"update-demo-kitten"},
+				"spec":{"selector":{"name":"update-demo","version":"kitten"},
+				"template":{"metadata":{"labels":{"name":"update-demo","version":"kitten"}},
+				"spec":{"containers":[{"image":"gcr.io/google_containers/update-demo:kitten",
+				"name":"update-demo","ports":[{"containerPort":80,"protocol":"TCP"}]}]}}}}`,
+	kubectl_userguidePod: `{"apiVersion":"v1",
+			"kind":"Pod",
+			"metadata":{"labels":{"app":"nginx"},"name":"nginx"},
+			"spec":{"containers":[{"image":"nginx","name":"nginx","ports":[{"containerPort":80}]}]}}`,
+}
+
+var writeExampleFiles = func() {
+	for fileName, contents := range kubectlExampleFiles {
+		f, _ := os.Create(fileName)
+		_, err := f.Write([]byte(contents))
+		if err != nil {
+			framework.Failf("Failed while writing input files: %v.  This test expects write permissions in the CWD.", err)
+		}
+	}
+}
+var cleanExampleFiles = func() {
+	for fileName := range kubectlExampleFiles {
+		os.Remove(fileName)
+	}
+}
+
 var _ = framework.KubeDescribe("Kubectl client", func() {
+	defer cleanExampleFiles()
 	defer GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
 
@@ -120,7 +174,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	clusterState := func() *framework.ClusterVerification {
 		return f.NewClusterVerification(
 			framework.PodStateVerification{
-				Selectors:   map[string]string{"app": "redis"},
+				Selectors:   map[string]string{"app": "guestbook"},
 				ValidPhases: []api.PodPhase{api.PodRunning /*api.PodPending*/},
 			})
 	}
@@ -136,9 +190,13 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	}
 	var c *client.Client
 	var ns string
+
+	// [Conformance] tests shouldn't rely on repo_root
+	// TODO remove this in lieu of #23897 (if it pans out) for all tests needing static content.
 	BeforeEach(func() {
 		c = f.Client
 		ns = f.Namespace.Name
+		writeExampleFiles()
 	})
 
 	framework.KubeDescribe("Update Demo", func() {
@@ -149,18 +207,17 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			kittenPath = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 		})
 		It("should create and stop a replication controller [Conformance]", func() {
-			defer framework.Cleanup(nautilusPath, ns, updateDemoSelector)
+			defer framework.Cleanup(kubectl_updateDemonautilusRC, ns, updateDemoSelector)
 
 			By("creating a replication controller")
-			framework.RunKubectlOrDie("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDie("create", "-f", kubectl_updateDemonautilusRC, fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
 		It("should scale a replication controller [Conformance]", func() {
-			defer framework.Cleanup(nautilusPath, ns, updateDemoSelector)
-
+			defer framework.Cleanup(kubectl_updateDemonautilusRC, ns, updateDemoSelector)
 			By("creating a replication controller")
-			framework.RunKubectlOrDie("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDie("create", "-f", kubectl_updateDemonautilusRC, fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("scaling down the replication controller")
 			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=1", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
@@ -172,10 +229,10 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 		It("should do a rolling update of a replication controller [Conformance]", func() {
 			By("creating the initial replication controller")
-			framework.RunKubectlOrDie("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDie("create", "-f", kubectl_updateDemonautilusRC, fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("rolling-update to new replication controller")
-			framework.RunKubectlOrDie("rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", kittenPath, fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDie("rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", kubectl_updateDemoKittyRC, fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
 			// Everything will hopefully be cleaned up when the namespace is deleted.
 		})
@@ -597,11 +654,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
 			framework.SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
 
-			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/guestbook-go", file)
-			}
-			controllerJson := mkpath("redis-master-controller.json")
-			serviceJson := mkpath("redis-master-service.json")
+			controllerJson := kubectl_guestbookController
+			serviceJson := kubectl_guestbookSvc
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDie("create", "-f", controllerJson, nsFlag)
@@ -613,28 +667,32 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			forEachPod(func(pod api.Pod) {
 				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
 				requiredStrings := [][]string{
-					{"Name:", "redis-master-"},
+					{"Name:", "guestbook-"},
 					{"Namespace:", ns},
 					{"Node:"},
-					{"Labels:", "app=redis", "role=master"},
+					{"Labels:", "app=guestbook"},
 					{"Status:", "Running"},
 					{"IP:"},
-					{"Controllers:", "ReplicationController/redis-master"},
-					{"Image:", "redis"},
+					{"Controllers:", "ReplicationController/guestbook"},
+					{"Image:", "gcr.io/google_containers/guestbook:v3"},
 					{"cpu:", "BestEffort"},
 					{"State:", "Running"},
 				}
 				checkOutput(output, requiredStrings)
 			})
 
+			// Since we are waiting for several pods, we wait a couple of seconds before validating that they
+			// are stable.
+			time.Sleep(5 * time.Second)
+
 			// Rc
-			output := framework.RunKubectlOrDie("describe", "rc", "redis-master", nsFlag)
+			output := framework.RunKubectlOrDie("describe", "rc", "guestbook", nsFlag)
 			requiredStrings := [][]string{
-				{"Name:", "redis-master"},
+				{"Name:", "guestbook"},
 				{"Namespace:", ns},
-				{"Image(s):", "redis"},
-				{"Selector:", "app=redis,role=master"},
-				{"Labels:", "app=redis,role=master"},
+				{"Image(s):", "gcr.io/google_containers/guestbook:v3"},
+				{"Selector:", "app=guestbook"},
+				{"Labels:", "app=guestbook"},
 				{"Replicas:", "1 current", "1 desired"},
 				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
 				// {"Events:"} would ordinarily go in the list
@@ -646,15 +704,15 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			checkOutput(output, requiredStrings)
 
 			// Service
-			output = framework.RunKubectlOrDie("describe", "service", "redis-master", nsFlag)
+			output = framework.RunKubectlOrDie("describe", "service", "guestbook", nsFlag)
 			requiredStrings = [][]string{
-				{"Name:", "redis-master"},
+				{"Name:", "guestbook"},
 				{"Namespace:", ns},
-				{"Labels:", "app=redis", "role=master"},
-				{"Selector:", "app=redis", "role=master"},
-				{"Type:", "ClusterIP"},
+				{"Labels:", "app=guestbook"},
+				{"Selector:", "app=guestbook"},
+				{"Type:", "LoadBalancer"},
 				{"IP:"},
-				{"Port:", "<unset>", "6379/TCP"},
+				{"Port:", "<unset>", "3000/TCP"},
 				{"Endpoints:"},
 				{"Session Affinity:", "None"}}
 			checkOutput(output, requiredStrings)
@@ -696,23 +754,22 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl expose", func() {
 		It("should create services for rc [Conformance]", func() {
-			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/guestbook-go", file)
-			}
-			controllerJson := mkpath("redis-master-controller.json")
+			// Create the controller, but we won't create a service explicitly.
+			// Rather wait for the endpoints based service to be constructed by kube.
+			controllerJson := kubectl_guestbookController
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			redisPort := 6379
 
-			By("creating Redis RC")
-
-			framework.Logf("namespace %v", ns)
+			By("creating Guestbook RC")
 			framework.RunKubectlOrDie("create", "-f", controllerJson, nsFlag)
+
 			forEachPod(func(pod api.Pod) {
-				framework.Logf("wait on %v ", ns)
-				framework.LookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", framework.PodStartTimeout)
+				framework.LookForStringInLog(ns, pod.Name, "guestbook", "[negroni]", framework.PodStartTimeout)
 			})
-			validateService := func(name string, servicePort int, timeout time.Duration) {
+
+			By("validating Guestbook endpoints")
+			validateService := func(name string, servicePort int, timeout time.Duration, numEndpoints int) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
 					endpoints, err := c.Endpoints(ns).Get(name)
 					if err != nil {
@@ -727,9 +784,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 					if len(uidToPort) == 0 {
 						framework.Logf("No endpoint found, retrying")
 						return false, nil
-					}
-					if len(uidToPort) > 1 {
-						Fail("Too many endpoints found")
+					} else if len(uidToPort) > numEndpoints {
+						Fail("Too many endpoints found %v ", len(uidToPort))
 					}
 					for _, port := range uidToPort {
 						if port[0] != redisPort {
@@ -739,7 +795,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 					return true, nil
 				})
 				Expect(err).NotTo(HaveOccurred())
-
+				By("validating Redis service")
 				service, err := c.Services(ns).Get(name)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -755,23 +811,24 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				}
 			}
 
-			By("exposing RC")
-			framework.RunKubectlOrDie("expose", "rc", "redis-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
-			framework.WaitForService(c, ns, "rm2", true, framework.Poll, framework.ServiceStartTimeout)
-			validateService("rm2", 1234, framework.ServiceStartTimeout)
+			By("creating serivce by exposing RC")
+			svc1, numEp := "gb-rc", 1
+			framework.RunKubectlOrDie("expose", "rc", "guestbook", "--name="+svc1, "--port=1234", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			framework.WaitForService(c, ns, svc1, true, framework.Poll, framework.ServiceStartTimeout)
+			validateService(svc1, 1234, framework.ServiceStartTimeout, numEp)
 
-			By("exposing service")
-			framework.RunKubectlOrDie("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
-			framework.WaitForService(c, ns, "rm3", true, framework.Poll, framework.ServiceStartTimeout)
-			validateService("rm3", 2345, framework.ServiceStartTimeout)
+			By("creating service by exposing another service")
+			svc2 := "gb-service"
+			framework.RunKubectlOrDie("expose", "service", svc1, "--name="+svc2, "--port=2345", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			framework.WaitForService(c, ns, svc2, true, framework.Poll, framework.ServiceStartTimeout)
+			validateService(svc2, 2345, framework.ServiceStartTimeout, numEp)
 		})
 	})
 
 	framework.KubeDescribe("Kubectl label", func() {
-		var podPath string
+		var podPath = kubectl_userguidePod
 		var nsFlag string
 		BeforeEach(func() {
-			podPath = filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/pod.yaml")
 			By("creating the pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDie("create", "-f", podPath, nsFlag)
@@ -866,10 +923,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl patch", func() {
 		It("should add annotations for pods in rc [Conformance]", func() {
-			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/guestbook-go", file)
-			}
-			controllerJson := mkpath("redis-master-controller.json")
+			controllerJson := kubectl_guestbookController
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
 			framework.RunKubectlOrDie("create", "-f", controllerJson, nsFlag)
@@ -909,6 +963,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		var nsFlag string
 		var name string
 
+		// TODO at some point we don't need variable cleanUp logic.  Revise once we don't care about testing non-deployments installations.
 		var cleanUp func()
 
 		BeforeEach(func() {
@@ -1169,7 +1224,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			}
 		})
 	})
-})
+
+}) // end of all kubectl client tests
 
 // Checks whether the output split by line contains the required elements.
 func checkOutput(output string, required [][]string) {
