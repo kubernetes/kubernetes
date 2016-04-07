@@ -1,3 +1,5 @@
+// +build linux
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -44,21 +46,21 @@ const (
 )
 
 // A Kubelet to flannel bridging helper.
-type FlannelHelper struct {
+type flannelHelper struct {
 	subnetFile     string
 	iptablesHelper utiliptables.Interface
 }
 
 // NewFlannelHelper creates a new flannel helper.
-func NewFlannelHelper() *FlannelHelper {
-	return &FlannelHelper{
+func NewFlannelHelper() FlannelHelper {
+	return &flannelHelper{
 		subnetFile:     flannelSubnetFile,
 		iptablesHelper: utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4),
 	}
 }
 
 // Ensure the required MASQUERADE rules exist for the given network/cidr.
-func (f *FlannelHelper) ensureFlannelMasqRule(kubeNetwork, podCIDR string) error {
+func (f *flannelHelper) ensureFlannelMasqRule(kubeNetwork, podCIDR string) error {
 	// TODO: Investigate delegation to flannel via -ip-masq=true once flannel
 	// issue #374 is resolved.
 	comment := "Flannel masquerade facilitates pod<->node traffic."
@@ -76,7 +78,7 @@ func (f *FlannelHelper) ensureFlannelMasqRule(kubeNetwork, podCIDR string) error
 
 // Handshake waits for the flannel subnet file and installs a few IPTables
 // rules, returning the pod CIDR allocated for this node.
-func (f *FlannelHelper) Handshake() (podCIDR string, err error) {
+func (f *flannelHelper) Handshake() (podCIDR string, err error) {
 	// TODO: Using a file to communicate is brittle
 	if _, err = os.Stat(f.subnetFile); err != nil {
 		return "", fmt.Errorf("Waiting for subnet file %v", f.subnetFile)
