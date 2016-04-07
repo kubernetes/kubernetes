@@ -77,7 +77,7 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
-func NewJobController(podInformer framework.SharedInformer, kubeClient clientset.Interface) *JobController {
+func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -126,7 +126,7 @@ func NewJobController(podInformer framework.SharedInformer, kubeClient clientset
 		UpdateFunc: jm.updatePod,
 		DeleteFunc: jm.deletePod,
 	})
-	jm.podStore.Store = podInformer.GetStore()
+	jm.podStore.Indexer = podInformer.GetIndexer()
 	jm.podStoreSynced = podInformer.HasSynced
 
 	jm.updateHandler = jm.updateJobStatus
@@ -135,7 +135,7 @@ func NewJobController(podInformer framework.SharedInformer, kubeClient clientset
 }
 
 func NewJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
-	podInformer := informers.CreateSharedPodInformer(kubeClient, resyncPeriod())
+	podInformer := informers.CreateSharedIndexPodInformer(kubeClient, resyncPeriod(), cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	jm := NewJobController(podInformer, kubeClient)
 	jm.internalPodInformer = podInformer
 

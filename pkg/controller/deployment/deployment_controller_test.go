@@ -746,7 +746,7 @@ func (f *fixture) run(deploymentName string) {
 		c.rsStore.Store.Add(rs)
 	}
 	for _, pod := range f.podStore {
-		c.podStore.Store.Add(pod)
+		c.podStore.Indexer.Add(pod)
 	}
 
 	err := c.syncDeployment(deploymentName)

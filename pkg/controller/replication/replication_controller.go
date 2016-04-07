@@ -73,7 +73,7 @@ type ReplicationManager struct {
 	// we have a personal informer, we must start it ourselves.   If you start
 	// the controller using NewReplicationManager(passing SharedInformer), this
 	// will be null
-	internalPodInformer framework.SharedInformer
+	internalPodInformer framework.SharedIndexInformer
 
 	// An rc is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
@@ -102,7 +102,7 @@ type ReplicationManager struct {
 	queue *workqueue.Type
 }
 
-func NewReplicationManager(podInformer framework.SharedInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
+func NewReplicationManager(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
@@ -122,7 +122,7 @@ func NewReplicationManager(podInformer framework.SharedInformer, kubeClient clie
 		queue:         workqueue.New(),
 	}
 
-	rm.rcStore.Store, rm.rcController = framework.NewInformer(
+	rm.rcStore.Indexer, rm.rcController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rm.kubeClient.Core().ReplicationControllers(api.NamespaceAll).List(options)
@@ -177,6 +177,7 @@ func NewReplicationManager(podInformer framework.SharedInformer, kubeClient clie
 			// way of achieving this is by performing a `stop` operation on the controller.
 			DeleteFunc: rm.enqueueController,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
@@ -187,7 +188,7 @@ func NewReplicationManager(podInformer framework.SharedInformer, kubeClient clie
 		UpdateFunc: rm.updatePod,
 		DeleteFunc: rm.deletePod,
 	})
-	rm.podStore.Store = podInformer.GetStore()
+	rm.podStore.Indexer = podInformer.GetIndexer()
 	rm.podController = podInformer.GetController()
 
 	rm.syncHandler = rm.syncReplicationController
@@ -199,7 +200,7 @@ func NewReplicationManager(podInformer framework.SharedInformer, kubeClient clie
 
 // NewReplicationManagerFromClient creates a new ReplicationManager that runs its own informer.
 func NewReplicationManagerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
-	podInformer := informers.CreateSharedPodInformer(kubeClient, resyncPeriod())
+	podInformer := informers.CreateSharedIndexPodInformer(kubeClient, resyncPeriod(), cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	rm := NewReplicationManager(podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize)
 	rm.internalPodInformer = podInformer
 
@@ -276,7 +277,7 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 
 // isCacheValid check if the cache is valid
 func (rm *ReplicationManager) isCacheValid(pod *api.Pod, cachedRC *api.ReplicationController) bool {
-	_, exists, err := rm.rcStore.Get(cachedRC)
+	exists, err := rm.rcStore.Exists(cachedRC)
 	// rc has been deleted or updated, cache is invalid
 	if err != nil || !exists || !isControllerMatch(pod, cachedRC) {
 		return false
@@ -522,7 +523,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		return nil
 	}
 
-	obj, exists, err := rm.rcStore.Store.GetByKey(key)
+	obj, exists, err := rm.rcStore.Indexer.GetByKey(key)
 	if !exists {
 		glog.Infof("Replication Controller has been deleted %v", key)
 		rm.expectations.DeleteExpectations(key)

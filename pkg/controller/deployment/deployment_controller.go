@@ -144,7 +144,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 		},
 	)
 
-	dc.podStore.Store, dc.podController = framework.NewInformer(
+	dc.podStore.Indexer, dc.podController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.client.Core().Pods(api.NamespaceAll).List(options)
@@ -160,6 +160,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 			UpdateFunc: dc.updatePod,
 			DeleteFunc: dc.deletePod,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	dc.syncHandler = dc.syncDeployment
