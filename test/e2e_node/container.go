@@ -17,88 +17,89 @@ limitations under the License.
 package e2e_node
 
 import (
-	"errors"
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/util"
 
-	"github.com/onsi/gomega/format"
-	"github.com/onsi/gomega/types"
+	. "github.com/onsi/gomega"
+)
+
+const (
+	pollInterval = time.Second * 5
 )
 
 //One pod one container
 type ConformanceContainer struct {
-	Container api.Container
-	Client    *client.Client
-	Phase     api.PodPhase
-	NodeName  string
+	pod       *api.Pod
+	container *api.Container
+	client    *client.Client
 }
 
-type ConformanceContainerEqualMatcher struct {
-	Expected interface{}
-}
-
-func CContainerEqual(expected interface{}) types.GomegaMatcher {
-	return &ConformanceContainerEqualMatcher{
-		Expected: expected,
-	}
-}
-
-func (matcher *ConformanceContainerEqualMatcher) Match(actual interface{}) (bool, error) {
-	if actual == nil && matcher.Expected == nil {
-		return false, fmt.Errorf("Refusing to compare <nil> to <nil>.\nBe explicit and use BeNil() instead.  This is to avoid mistakes where both sides of an assertion are erroneously uninitialized.")
-	}
-	val := api.Semantic.DeepDerivative(matcher.Expected, actual)
-	return val, nil
-}
-
-func (matcher *ConformanceContainerEqualMatcher) FailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "to equal", matcher.Expected)
-}
-
-func (matcher *ConformanceContainerEqualMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "not to equal", matcher.Expected)
-}
-
-func (cc *ConformanceContainer) Create() error {
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			//Same with the container name
-			Name:      cc.Container.Name,
-			Namespace: api.NamespaceDefault,
-		},
-		Spec: api.PodSpec{
-			NodeName:      cc.NodeName,
-			RestartPolicy: api.RestartPolicyNever,
-			Containers: []api.Container{
-				cc.Container,
+func NewConformanceContainer(c *client.Client, node string, container api.Container) *ConformanceContainer {
+	return &ConformanceContainer{
+		client:    c,
+		container: &container,
+		pod: &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      container.Name + "-" + string(util.NewUUID()),
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: api.PodSpec{
+				NodeName:      node,
+				RestartPolicy: api.RestartPolicyNever,
+				Containers:    []api.Container{container},
 			},
 		},
 	}
+}
 
-	_, err := cc.Client.Pods(api.NamespaceDefault).Create(pod)
+func (cc *ConformanceContainer) Create() error {
+	_, err := cc.client.Pods(api.NamespaceDefault).Create(cc.pod)
 	return err
 }
 
-//Same with 'delete'
-func (cc *ConformanceContainer) Stop() error {
-	return cc.Client.Pods(api.NamespaceDefault).Delete(cc.Container.Name, &api.DeleteOptions{})
-}
-
 func (cc *ConformanceContainer) Delete() error {
-	return cc.Client.Pods(api.NamespaceDefault).Delete(cc.Container.Name, &api.DeleteOptions{})
+	return cc.client.Pods(api.NamespaceDefault).Delete(cc.pod.Name, &api.DeleteOptions{})
 }
 
-func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
-	pod, err := cc.Client.Pods(api.NamespaceDefault).Get(cc.Container.Name)
+func (cc *ConformanceContainer) Status() (*api.ContainerStatus, error) {
+	pod, err := cc.client.Pods(api.NamespaceDefault).Get(cc.pod.Name)
 	if err != nil {
-		return ConformanceContainer{}, err
+		return nil, err
 	}
 
-	containers := pod.Spec.Containers
-	if containers == nil || len(containers) != 1 {
-		return ConformanceContainer{}, errors.New("Failed to get container")
+	if len(pod.Spec.Containers) != 1 {
+		return nil, fmt.Errorf("unexpected containers %v", pod.Spec.Containers)
 	}
-	return ConformanceContainer{containers[0], cc.Client, pod.Status.Phase, cc.NodeName}, nil
+	if len(pod.Status.ContainerStatuses) != 1 || pod.Status.ContainerStatuses[0].Name != cc.container.Name {
+		return nil, fmt.Errorf("unexpected container statuses %v", pod.Status.ContainerStatuses)
+	}
+	return &pod.Status.ContainerStatuses[0], nil
+}
+
+func (cc *ConformanceContainer) Wait(timeout time.Duration, condition func(*api.ContainerStatus) bool) {
+	Eventually(cc.check(condition), timeout, pollInterval).Should(BeTrue())
+}
+
+func (cc *ConformanceContainer) Always(timeout time.Duration, condition func(*api.ContainerStatus) bool) {
+	Consistently(cc.check(condition), timeout, pollInterval).Should(BeTrue())
+}
+
+func (cc *ConformanceContainer) check(condition func(*api.ContainerStatus) bool) func() (bool, error) {
+	return func() (bool, error) {
+		status, err := cc.Status()
+		if err != nil {
+			return false, err
+		}
+		return condition(status), nil
+	}
+}
+
+// TODO(random-liu): Add UpdateImage, Log, Exec, Attach
+
+func isContainerSucceed(status *api.ContainerStatus) bool {
+	return status.State.Terminated != nil && status.State.Terminated.ExitCode == 0
 }
