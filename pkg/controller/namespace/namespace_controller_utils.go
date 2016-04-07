@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -459,11 +460,14 @@ func ServerPreferredNamespacedGroupVersionResources(discoveryClient discovery.Di
 	if err != nil {
 		return results, err
 	}
+
+	allErrs := []error{}
 	for _, apiGroup := range serverGroupList.Groups {
 		preferredVersion := apiGroup.PreferredVersion
 		apiResourceList, err := discoveryClient.ServerResourcesForGroupVersion(preferredVersion.GroupVersion)
 		if err != nil {
-			return results, err
+			allErrs = append(allErrs, err)
+			continue
 		}
 		groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
 		for _, apiResource := range apiResourceList.APIResources {
@@ -476,5 +480,5 @@ func ServerPreferredNamespacedGroupVersionResources(discoveryClient discovery.Di
 			results = append(results, groupVersion.WithResource(apiResource.Name))
 		}
 	}
-	return results, nil
+	return results, utilerrors.NewAggregate(allErrs)
 }

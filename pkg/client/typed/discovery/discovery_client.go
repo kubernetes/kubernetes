@@ -124,7 +124,9 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (resources *unversioned.APIResourceList, err error) {
 	url := url.URL{}
-	if groupVersion == "v1" {
+	if len(groupVersion) == 0 {
+		return nil, fmt.Errorf("groupVersion shouldn't be empty")
+	} else if groupVersion == "v1" {
 		url.Path = "/api/" + groupVersion
 	} else {
 		url.Path = "/apis/" + groupVersion
