@@ -1,3 +1,5 @@
+// +build !linux
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -22,8 +24,6 @@ import (
 )
 
 type containerManagerStub struct{}
-
-var _ ContainerManager = &containerManagerStub{}
 
 func (cm *containerManagerStub) Start(_ *api.Node) error {
 	glog.V(2).Infof("Starting stub container manager")
