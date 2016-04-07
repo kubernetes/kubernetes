@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -26,24 +27,22 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 const ProviderName = "vsphere"
 
 // VSphere is an implementation of Interface, LoadBalancer and Instances for vSphere.
 type VSphere struct {
-	provider   *govmomi.Client
-	region     string
-	datacenter string
-	// cfg      *VSphereConfig
-	// Add vSphere instance
+	cfg	*VSphereConfig
 }
 
 type VSphereConfig struct {
 	Global struct {
 		User          string `gcfg:"user"`
 		Password      string `gcfg:"password"`
-		VSphereServer string `gcfg:"server"`
+		VCenterIp     string `gcfg:"server"`
+		VCenterPort   string `gcfg:"port"`
 		InsecureFlag  bool   `gcfg:"insecure-flag"`
 		Datacenter    string `gcfg:"datacenter"`
 	}
@@ -71,37 +70,66 @@ func init() {
 }
 
 func newVSphere(cfg VSphereConfig) (*VSphere, error) {
-
-	u, err := url.Parse("https://" + cfg.Global.VSphereServer + "/sdk")
-	if err != nil {
-		return nil, fmt.Errorf("Error parse url: %s", err)
-	}
-
-	u.User = url.UserPassword(cfg.Global.User, cfg.Global.Password)
-
-	provider, err := govmomi.NewClient(context.TODO(), u, cfg.Global.InsecureFlag)
-	if err != nil {
-		return nil, err
-	}
-
 	vs := VSphere{
-		provider:   provider,
-		datacenter: cfg.Global.Datacenter,
-		// cfg              *VSphereConfig,
+		cfg:	&cfg,
 	}
 	return &vs, nil
 }
 
+func vsphereLogin(cfg	*VSphereConfig, ctx context.Context) (*govmomi.Client, error) {
+
+	// Parse URL from string
+	u, err := url.Parse(fmt.Sprintf("https://%s:%s/sdk", cfg.Global.VCenterIp, cfg.Global.VCenterPort))
+	if err != nil {
+		return nil, err
+	}
+	// set username and password for the URL
+	u.User = url.UserPassword(cfg.Global.User, cfg.Global.Password)
+
+	// Connect and log in to ESX or vCenter
+	c, err := govmomi.NewClient(ctx, u, cfg.Global.InsecureFlag)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
 type Instances struct {
+	cfg		*VSphereConfig
 }
 
 // Instances returns an implementation of Instances for vSphere.
 func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
-	return nil, true
+	return &Instances{vs.cfg}, true
 }
 
 func (i *Instances) List(nameFilter string) ([]string, error) {
 	return nil, nil
+}
+
+func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	return nil, nil
+}
+
+func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
+}
+
+func (i *Instances) CurrentNodeName(hostname string) (string, error) {
+	return hostname, nil
+}
+
+func (i *Instances) ExternalID(name string) (string, error) {
+	return "", nil
+}
+
+func (i *Instances) InstanceType(name string) (string, error) {
+	return "", nil
+}
+
+func (i *Instances) InstanceID(name string) (string, error) {
+	return "/" + " ", nil
 }
 
 func (vs *VSphere) Clusters() (cloudprovider.Clusters, bool) {
