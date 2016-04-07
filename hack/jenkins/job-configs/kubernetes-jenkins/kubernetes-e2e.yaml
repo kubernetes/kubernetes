@@ -15,6 +15,8 @@
     description: '{description} Test owner: {test-owner}.'
     logrotate:
         daysToKeep: 7
+    node: '{jenkins_node}'
+    jenkins_node: 'master'
     disabled: '{obj:disable_job}'
     builders:
         - shell: |
@@ -105,6 +107,8 @@
                 export KUBE_ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
         - 'gce-flaky':
             description: 'Run the flaky tests on GCE, sequentially.'
+            jenkins_node: 'e2e'
+            runner: '{dockerized-runner}'
             timeout: 180
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Flaky\] \
@@ -213,6 +217,8 @@
                 - client (kubectl): ci/latest.txt<br>
                 - cluster (k8s): ci/latest.txt<br>
                 - tests: ci/latest.txt
+            jenkins_node: 'e2e'
+            runner: '{dockerized-runner}'
             timeout: 300
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-ci-flaky"
