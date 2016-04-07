@@ -280,6 +280,7 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 			Time:            unversioned.NewTime(cstat.Timestamp),
 			UsageBytes:      &cstat.Memory.Usage,
 			WorkingSetBytes: &cstat.Memory.WorkingSet,
+			RSSBytes:        &cstat.Memory.RSS,
 			PageFaults:      &pageFaults,
 			MajorPageFaults: &majorPageFaults,
 		}

@@ -133,6 +133,9 @@ type MemoryStats struct {
 	// The amount of working set memory. This includes recently accessed memory,
 	// dirty memory, and kernel memory. UsageBytes is <= TotalBytes.
 	WorkingSetBytes *uint64 `json:"workingSetBytes,omitempty"`
+	// The amount of anonymous and swap cache memory (includes transparent
+	// hugepages).
+	RSSBytes *uint64 `json:"rssBytes,omitempty"`
 	// Cumulative number of minor page faults.
 	PageFaults *uint64 `json:"pageFaults,omitempty"`
 	// Cumulative number of major page faults.
