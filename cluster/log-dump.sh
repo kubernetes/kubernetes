@@ -83,7 +83,7 @@ readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"
 readonly common_logfiles="kern"
 readonly initd_logfiles="docker"
-readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr"
+readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr supervisor/docker-stdout supervisor/docker-stderr"
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.
