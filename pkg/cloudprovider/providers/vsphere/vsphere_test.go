@@ -117,3 +117,28 @@ func TestVSphereLogin(t *testing.T) {
 	}
 	defer c.Logout(ctx)
 }
+
+func TestZones(t *testing.T) {
+	cfg := VSphereConfig{}
+	cfg.Global.Datacenter = "myDatacenter"
+
+	// Create vSphere configuration object
+	vs, err := newVSphere(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	}
+
+	z, ok := vs.Zones()
+	if !ok {
+		t.Fatalf("Zones() returned false")
+	}
+
+	zone, err := z.GetZone()
+	if err != nil {
+		t.Fatalf("GetZone() returned error: %s", err)
+	}
+
+	if zone.Region != vs.cfg.Global.Datacenter {
+		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
+	}
+}

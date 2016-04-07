@@ -26,6 +26,7 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/gcfg.v1"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -148,7 +149,15 @@ func (vs *VSphere) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 
 // Zones returns an implementation of Zones for Google vSphere.
 func (vs *VSphere) Zones() (cloudprovider.Zones, bool) {
-	return nil, true
+	glog.V(1).Info("Claiming to support Zones")
+
+	return vs, true
+}
+
+func (vs *VSphere) GetZone() (cloudprovider.Zone, error) {
+	glog.V(1).Infof("Current zone is %v", vs.cfg.Global.Datacenter)
+
+	return cloudprovider.Zone{Region: vs.cfg.Global.Datacenter}, nil
 }
 
 // Routes returns an implementation of Routes for vSphere.
