@@ -614,8 +614,9 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Version:      rsrc.Versions[0].Name,
 	}
 	apiGroup := unversioned.APIGroup{
-		Name:     group,
-		Versions: []unversioned.GroupVersionForDiscovery{groupVersion},
+		Name:             group,
+		Versions:         []unversioned.GroupVersionForDiscovery{groupVersion},
+		PreferredVersion: groupVersion,
 	}
 	apiserver.AddGroupWebService(api.Codecs, m.HandlerContainer, path, apiGroup)
 	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST), apiGroup)
