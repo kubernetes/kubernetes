@@ -34,6 +34,7 @@ import (
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -79,7 +80,7 @@ var (
 	verifyHTTPGET = true
 
 	// On average it takes ~6 minutes for a single backend to come online.
-	// We *don't* expect this poll to consistently take 15 minutes for every
+	// We *don't* expect this framework.Poll to consistently take 15 minutes for every
 	// Ingress as GCE is creating/checking backends in parallel, but at the
 	// same time, we're not testing GCE startup latency. So give it enough
 	// time, and fail if the average is too high.
@@ -181,13 +182,13 @@ func createApp(c *client.Client, ns string, i int) {
 	name := fmt.Sprintf("%v%d", appPrefix, i)
 	l := map[string]string{}
 
-	Logf("Creating svc %v", name)
+	framework.Logf("Creating svc %v", name)
 	svc := svcByName(name, httpContainerPort)
 	svc.Spec.Type = api.ServiceTypeNodePort
 	_, err := c.Services(ns).Create(svc)
 	Expect(err).NotTo(HaveOccurred())
 
-	Logf("Creating rc %v", name)
+	framework.Logf("Creating rc %v", name)
 	rc := rcByNamePort(name, 1, testImage, httpContainerPort, api.ProtocolTCP, l)
 	rc.Spec.Template.Spec.Containers[0].Args = []string{
 		"--num=1",
@@ -215,19 +216,19 @@ func gcloudUnmarshal(resource, regex, project string, out interface{}) {
 		if exitErr, ok := err.(utilexec.ExitError); ok {
 			errCode = exitErr.ExitStatus()
 		}
-		Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d", strings.Join(command, " "), err, string(output), errCode)
+		framework.Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d", strings.Join(command, " "), err, string(output), errCode)
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
-		Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))
+		framework.Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))
 	}
 }
 
 func gcloudDelete(resource, name, project string) {
-	Logf("Deleting %v: %v", resource, name)
+	framework.Logf("Deleting %v: %v", resource, name)
 	output, err := exec.Command("gcloud", "compute", resource, "delete",
 		name, fmt.Sprintf("--project=%v", project), "-q").CombinedOutput()
 	if err != nil {
-		Logf("Error deleting %v, output: %v\nerror: %+v", resource, string(output), err)
+		framework.Logf("Error deleting %v, output: %v\nerror: %+v", resource, string(output), err)
 	}
 }
 
@@ -237,17 +238,17 @@ func kubectlLogLBController(c *client.Client, ns string) {
 	options := api.ListOptions{LabelSelector: selector}
 	podList, err := c.Pods(api.NamespaceAll).List(options)
 	if err != nil {
-		Logf("Cannot log L7 controller output, error listing pods %v", err)
+		framework.Logf("Cannot log L7 controller output, error listing pods %v", err)
 		return
 	}
 	if len(podList.Items) == 0 {
-		Logf("Loadbalancer controller pod not found")
+		framework.Logf("Loadbalancer controller pod not found")
 		return
 	}
 	for _, p := range podList.Items {
-		Logf("\nLast 100 log lines of %v\n", p.Name)
-		l, _ := runKubectl("logs", p.Name, fmt.Sprintf("--namespace=%v", ns), "-c", lbContainerName, "--tail=100")
-		Logf(l)
+		framework.Logf("\nLast 100 log lines of %v\n", p.Name)
+		l, _ := framework.RunKubectl("logs", p.Name, fmt.Sprintf("--namespace=%v", ns), "-c", lbContainerName, "--tail=100")
+		framework.Logf(l)
 	}
 }
 
@@ -270,7 +271,7 @@ func (cont *IngressController) create() {
 	// for issues like #16337. Currently, all names should fall within 63 chars.
 	testName := fmt.Sprintf("k8s-fw-foo-app-X-%v--%v", cont.ns, cont.UID)
 	if len(testName) > nameLenLimit {
-		Failf("Cannot reliably test the given namespace(%v)/uid(%v), too close to GCE limit of %v",
+		framework.Failf("Cannot reliably test the given namespace(%v)/uid(%v), too close to GCE limit of %v",
 			cont.ns, cont.UID, nameLenLimit)
 	}
 
@@ -289,7 +290,7 @@ func (cont *IngressController) create() {
 	existingRCs, err := cont.c.ReplicationControllers(api.NamespaceSystem).List(listOpts)
 	Expect(err).NotTo(HaveOccurred())
 	if len(existingRCs.Items) != 1 {
-		Failf("Unexpected number of lb cluster addons %v with label %v in kube-system namespace", len(existingRCs.Items), clusterAddonLBLabels)
+		framework.Failf("Unexpected number of lb cluster addons %v with label %v in kube-system namespace", len(existingRCs.Items), clusterAddonLBLabels)
 	}
 
 	// Merge the existing spec and new spec. The modifications should not
@@ -321,7 +322,7 @@ func (cont *IngressController) create() {
 	cont.rc = rc
 	_, err = cont.c.ReplicationControllers(cont.ns).Create(cont.rc)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(waitForRCPodsRunning(cont.c, cont.ns, cont.rc.Name)).NotTo(HaveOccurred())
+	Expect(framework.WaitForRCPodsRunning(cont.c, cont.ns, cont.rc.Name)).NotTo(HaveOccurred())
 }
 
 func (cont *IngressController) Cleanup(del bool) error {
@@ -336,11 +337,11 @@ func (cont *IngressController) Cleanup(del bool) error {
 			for _, f := range fwList {
 				msg += fmt.Sprintf("%v\n", f.Name)
 				if del {
-					Logf("Deleting forwarding-rule: %v", f.Name)
+					framework.Logf("Deleting forwarding-rule: %v", f.Name)
 					output, err := exec.Command("gcloud", "compute", "forwarding-rules", "delete",
 						f.Name, fmt.Sprintf("--project=%v", cont.Project), "-q", "--global").CombinedOutput()
 					if err != nil {
-						Logf("Error deleting forwarding rules, output: %v\nerror:%v", string(output), err)
+						framework.Logf("Error deleting forwarding rules, output: %v\nerror:%v", string(output), err)
 					}
 				}
 			}
@@ -440,7 +441,7 @@ func (cont *IngressController) Cleanup(del bool) error {
 // test requires at least 5.
 //
 // Slow by design (10 min)
-var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() {
+var _ = framework.KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var addonDir string
@@ -448,18 +449,18 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 	var responseTimes, creationTimes []time.Duration
 	var ingController *IngressController
 
-	framework := Framework{BaseName: "glbc"}
+	f := framework.Framework{BaseName: "glbc"}
 
 	BeforeEach(func() {
 		// This test requires a GCE/GKE only cluster-addon
-		SkipUnlessProviderIs("gce", "gke")
-		framework.beforeEach()
-		client = framework.Client
-		ns = framework.Namespace.Name
+		framework.SkipUnlessProviderIs("gce", "gke")
+		f.BeforeEach()
+		client = f.Client
+		ns = f.Namespace.Name
 		// Scaled down the existing Ingress controller so it doesn't interfere with the test.
-		Expect(scaleRCByLabels(client, api.NamespaceSystem, clusterAddonLBLabels, 0)).NotTo(HaveOccurred())
+		Expect(framework.ScaleRCByLabels(client, api.NamespaceSystem, clusterAddonLBLabels, 0)).NotTo(HaveOccurred())
 		addonDir = filepath.Join(
-			testContext.RepoRoot, "cluster", "addons", "cluster-loadbalancing", "glbc")
+			framework.TestContext.RepoRoot, "cluster", "addons", "cluster-loadbalancing", "glbc")
 
 		nsParts := strings.Split(ns, "-")
 		ingController = &IngressController{
@@ -467,13 +468,13 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 			// The UID in the namespace was generated by the master, so it's
 			// global to the cluster.
 			UID:            nsParts[len(nsParts)-1],
-			Project:        testContext.CloudConfig.ProjectID,
+			Project:        framework.TestContext.CloudConfig.ProjectID,
 			rcPath:         filepath.Join(addonDir, "glbc-controller.yaml"),
 			defaultSvcPath: filepath.Join(addonDir, "default-svc.yaml"),
 			c:              client,
 		}
 		ingController.create()
-		Logf("Finished creating ingress controller")
+		framework.Logf("Finished creating ingress controller")
 		// If we somehow get the same namespace uid as someone else in this
 		// gce project, just back off.
 		Expect(ingController.Cleanup(false)).NotTo(HaveOccurred())
@@ -482,47 +483,47 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 	})
 
 	AfterEach(func() {
-		Logf("Average creation time %+v, health check time %+v", creationTimes, responseTimes)
+		framework.Logf("Average creation time %+v, health check time %+v", creationTimes, responseTimes)
 		if CurrentGinkgoTestDescription().Failed {
 			kubectlLogLBController(client, ns)
-			Logf("\nOutput of kubectl describe ing:\n")
-			desc, _ := runKubectl("describe", "ing", fmt.Sprintf("--namespace=%v", ns))
-			Logf(desc)
+			framework.Logf("\nOutput of kubectl describe ing:\n")
+			desc, _ := framework.RunKubectl("describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+			framework.Logf(desc)
 		}
 		// Delete all Ingress, then wait for the controller to cleanup.
 		ings, err := client.Extensions().Ingress(ns).List(api.ListOptions{})
 		if err != nil {
-			Logf("WARNING: Failed to list ingress: %+v", err)
+			framework.Logf("WARNING: Failed to list ingress: %+v", err)
 		} else {
 			for _, ing := range ings.Items {
-				Logf("Deleting ingress %v/%v", ing.Namespace, ing.Name)
+				framework.Logf("Deleting ingress %v/%v", ing.Namespace, ing.Name)
 				if err := client.Extensions().Ingress(ns).Delete(ing.Name, nil); err != nil {
-					Logf("WARNING: Failed to delete ingress %v: %v", ing.Name, err)
+					framework.Logf("WARNING: Failed to delete ingress %v: %v", ing.Name, err)
 				}
 			}
 		}
 		pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
 			if err := ingController.Cleanup(false); err != nil {
-				Logf("Still waiting for glbc to cleanup: %v", err)
+				framework.Logf("Still waiting for glbc to cleanup: %v", err)
 				return false, nil
 			}
 			return true, nil
 		})
 		// TODO: Remove this once issue #17802 is fixed
-		Expect(scaleRCByLabels(client, ingController.rc.Namespace, ingController.rc.Labels, 0)).NotTo(HaveOccurred())
+		Expect(framework.ScaleRCByLabels(client, ingController.rc.Namespace, ingController.rc.Labels, 0)).NotTo(HaveOccurred())
 
 		// If the controller failed to cleanup the test will fail, but we want to cleanup
 		// resources before that.
 		if pollErr != nil {
 			if cleanupErr := ingController.Cleanup(true); cleanupErr != nil {
-				Logf("WARNING: Failed to cleanup resources %v", cleanupErr)
+				framework.Logf("WARNING: Failed to cleanup resources %v", cleanupErr)
 			}
-			Failf("Failed to cleanup GCE L7 resources.")
+			framework.Failf("Failed to cleanup GCE L7 resources.")
 		}
 		// Restore the cluster Addon.
-		Expect(scaleRCByLabels(client, api.NamespaceSystem, clusterAddonLBLabels, 1)).NotTo(HaveOccurred())
-		framework.afterEach()
-		Logf("Successfully verified GCE L7 loadbalancer via Ingress.")
+		Expect(framework.ScaleRCByLabels(client, api.NamespaceSystem, clusterAddonLBLabels, 1)).NotTo(HaveOccurred())
+		f.AfterEach()
+		framework.Logf("Successfully verified GCE L7 loadbalancer via Ingress.")
 	})
 
 	It("should create GCE L7 loadbalancers and verify Ingress", func() {
@@ -536,9 +537,9 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 		//	  foo0.bar.com: /foo0
 		//	  foo1.bar.com: /foo1
 		if numApps < numIng {
-			Failf("Need more apps than Ingress")
+			framework.Failf("Need more apps than Ingress")
 		}
-		Logf("Starting ingress test")
+		framework.Logf("Starting ingress test")
 		appsPerIngress := numApps / numIng
 		By(fmt.Sprintf("Creating %d rcs + svc, and %d apps per Ingress", numApps, appsPerIngress))
 
@@ -569,9 +570,9 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 		for _, ing := range ings.Items {
 			// Wait for the loadbalancer IP.
 			start := time.Now()
-			address, err := waitForIngressAddress(client, ing.Namespace, ing.Name, lbPollTimeout)
+			address, err := framework.WaitForIngressAddress(client, ing.Namespace, ing.Name, lbPollTimeout)
 			if err != nil {
-				Failf("Ingress failed to acquire an IP address within %v", lbPollTimeout)
+				framework.Failf("Ingress failed to acquire an IP address within %v", lbPollTimeout)
 			}
 			Expect(err).NotTo(HaveOccurred())
 			By(fmt.Sprintf("Found address %v for ingress %v, took %v to come online",
@@ -592,9 +593,9 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 
 				for _, p := range rules.IngressRuleValue.HTTP.Paths {
 					route := fmt.Sprintf("https://%v%v", address, p.Path)
-					Logf("Testing route %v host %v with simple GET", route, rules.Host)
+					framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
 					if err != nil {
-						Failf("Unable to create transport: %v", err)
+						framework.Failf("Unable to create transport: %v", err)
 					}
 					// Make sure the service node port is reachable
 					Expect(curlServiceNodePort(client, ns, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))).NotTo(HaveOccurred())
@@ -605,7 +606,7 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 						var err error
 						lastBody, err = simpleGET(timeoutClient, route, rules.Host)
 						if err != nil {
-							Logf("host %v path %v: %v", rules.Host, route, err)
+							framework.Logf("host %v path %v: %v", rules.Host, route, err)
 							return false, nil
 						}
 						return true, nil
@@ -618,7 +619,7 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 						if err := curlServiceNodePort(client, ns, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal)); err != nil {
 							msg += fmt.Sprintf("Also unable to curl service node port: %v", err)
 						}
-						Failf(msg)
+						framework.Failf(msg)
 					}
 					rt := time.Since(GETStart)
 					By(fmt.Sprintf("Route %v host %v took %v to respond", route, rules.Host, rt))
@@ -632,7 +633,7 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 		sort.Sort(timeSlice(creationTimes))
 		perc50 := creationTimes[len(creationTimes)/2]
 		if perc50 > expectedLBCreationTime {
-			Logf("WARNING: Average creation time is too high: %+v", creationTimes)
+			framework.Logf("WARNING: Average creation time is too high: %+v", creationTimes)
 		}
 		if !verifyHTTPGET {
 			return
@@ -640,14 +641,14 @@ var _ = KubeDescribe("GCE L7 LoadBalancer Controller [Feature:Ingress]", func() 
 		sort.Sort(timeSlice(responseTimes))
 		perc50 = responseTimes[len(responseTimes)/2]
 		if perc50 > expectedLBHealthCheckTime {
-			Logf("WARNING: Average startup time is too high: %+v", responseTimes)
+			framework.Logf("WARNING: Average startup time is too high: %+v", responseTimes)
 		}
 	})
 })
 
 func curlServiceNodePort(client *client.Client, ns, name string, port int) error {
 	// TODO: Curl all nodes?
-	u, err := getNodePortURL(client, ns, name, port)
+	u, err := framework.GetNodePortURL(client, ns, name, port)
 	if err != nil {
 		return err
 	}
@@ -656,7 +657,7 @@ func curlServiceNodePort(client *client.Client, ns, name string, port int) error
 	pollErr := wait.Poll(10*time.Second, timeout, func() (bool, error) {
 		svcCurlBody, err = simpleGET(timeoutClient, u, "")
 		if err != nil {
-			Logf("Failed to curl service node port, body: %v\nerror %v", svcCurlBody, err)
+			framework.Logf("Failed to curl service node port, body: %v\nerror %v", svcCurlBody, err)
 			return false, nil
 		}
 		return true, nil
@@ -664,6 +665,6 @@ func curlServiceNodePort(client *client.Client, ns, name string, port int) error
 	if pollErr != nil {
 		return fmt.Errorf("Failed to curl service node port in %v, body: %v\nerror %v", timeout, svcCurlBody, err)
 	}
-	Logf("Successfully curled service node port, body: %v", svcCurlBody)
+	framework.Logf("Successfully curled service node port, body: %v", svcCurlBody)
 	return nil
 }

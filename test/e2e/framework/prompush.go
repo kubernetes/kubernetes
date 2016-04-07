@@ -39,11 +39,11 @@ var prom_registered = false
 
 // Reusable function for pushing metrics to prometheus.  Handles initialization and so on.
 func promPushRunningPending(running, pending int) error {
-	if testContext.PrometheusPushGateway == "" {
+	if TestContext.PrometheusPushGateway == "" {
 		return nil
 	} else {
 		// Register metrics if necessary
-		if !prom_registered && testContext.PrometheusPushGateway != "" {
+		if !prom_registered && TestContext.PrometheusPushGateway != "" {
 			prometheus.Register(runningMetric)
 			prometheus.Register(pendingMetric)
 			prom_registered = true
@@ -57,7 +57,7 @@ func promPushRunningPending(running, pending int) error {
 		if err := prometheus.Push(
 			"e2e",
 			"none",
-			testContext.PrometheusPushGateway, //i.e. "127.0.0.1:9091"
+			TestContext.PrometheusPushGateway, //i.e. "127.0.0.1:9091"
 		); err != nil {
 			fmt.Println("failed at pushing to pushgateway ", err)
 			return err

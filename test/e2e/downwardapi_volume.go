@@ -22,21 +22,22 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = KubeDescribe("Downward API volume", func() {
+var _ = framework.KubeDescribe("Downward API volume", func() {
 	// How long to wait for a log pod to be displayed
 	const podLogTimeout = 45 * time.Second
 
-	f := NewDefaultFramework("downward-api")
+	f := framework.NewDefaultFramework("downward-api")
 	It("should provide podname only [Conformance]", func() {
 		podName := "downwardapi-volume-" + string(util.NewUUID())
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 
-		testContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
+		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
 		}, f.Namespace.Name)
 	})
@@ -50,7 +51,7 @@ var _ = KubeDescribe("Downward API volume", func() {
 			RunAsUser: &uid,
 			FSGroup:   &gid,
 		}
-		testContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
+		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
 		}, f.Namespace.Name)
 	})
@@ -71,15 +72,15 @@ var _ = KubeDescribe("Downward API volume", func() {
 		_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
-		expectNoError(waitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
 
 		pod, err = f.Client.Pods(f.Namespace.Name).Get(pod.Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() (string, error) {
-			return getPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
+			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, poll).Should(ContainSubstring("key1=\"value1\"\n"))
+			podLogTimeout, framework.Poll).Should(ContainSubstring("key1=\"value1\"\n"))
 
 		//modify labels
 		pod.Labels["key3"] = "value3"
@@ -88,9 +89,9 @@ var _ = KubeDescribe("Downward API volume", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() (string, error) {
-			return getPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
+			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, poll).Should(ContainSubstring("key3=\"value3\"\n"))
+			podLogTimeout, framework.Poll).Should(ContainSubstring("key3=\"value3\"\n"))
 
 	})
 
@@ -108,15 +109,15 @@ var _ = KubeDescribe("Downward API volume", func() {
 		By("Creating the pod")
 		_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
-		expectNoError(waitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
 
 		pod, err = f.Client.Pods(f.Namespace.Name).Get(pod.Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() (string, error) {
-			return getPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
+			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, poll).Should(ContainSubstring("builder=\"bar\"\n"))
+			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"bar\"\n"))
 
 		//modify annotations
 		pod.Annotations["builder"] = "foo"
@@ -125,9 +126,9 @@ var _ = KubeDescribe("Downward API volume", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() (string, error) {
-			return getPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
+			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, poll).Should(ContainSubstring("builder=\"foo\"\n"))
+			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"foo\"\n"))
 
 	})
 })

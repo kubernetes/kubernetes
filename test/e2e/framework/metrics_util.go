@@ -91,7 +91,7 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 
 func (m *MetricsForE2E) PrintJSON() string {
 	m.filterMetrics()
-	return prettyPrintJSON(*m)
+	return PrettyPrintJSON(*m)
 }
 
 var InterestingApiServerMetrics = []string{
@@ -287,7 +287,7 @@ func HighLatencyRequests(c *client.Client) (int, error) {
 		}
 	}
 
-	Logf("API calls latencies: %s", prettyPrintJSON(metrics))
+	Logf("API calls latencies: %s", PrettyPrintJSON(metrics))
 
 	return badMetrics, nil
 }
@@ -295,7 +295,7 @@ func HighLatencyRequests(c *client.Client) (int, error) {
 // Verifies whether 50, 90 and 99th percentiles of PodStartupLatency are
 // within the threshold.
 func VerifyPodStartupLatency(latency PodStartupLatency) error {
-	Logf("Pod startup latency: %s", prettyPrintJSON(latency))
+	Logf("Pod startup latency: %s", PrettyPrintJSON(latency))
 
 	if latency.Latency.Perc50 > podStartupThreshold {
 		return fmt.Errorf("too high pod startup latency 50th percentile: %v", latency.Latency.Perc50)
@@ -310,9 +310,9 @@ func VerifyPodStartupLatency(latency PodStartupLatency) error {
 }
 
 // Resets latency metrics in apiserver.
-func resetMetrics(c *client.Client) error {
+func ResetMetrics(c *client.Client) error {
 	Logf("Resetting latency metrics in apiserver...")
-	body, err := c.Get().AbsPath("/resetMetrics").DoRaw()
+	body, err := c.Get().AbsPath("/ResetMetrics").DoRaw()
 	if err != nil {
 		return err
 	}
@@ -337,7 +337,7 @@ func getSchedulingLatency(c *client.Client) (SchedulingLatency, error) {
 
 	// Check if master Node is registered
 	nodes, err := c.Nodes().List(api.ListOptions{})
-	expectNoError(err)
+	ExpectNoError(err)
 
 	var data string
 	var masterRegistered = false
@@ -351,16 +351,16 @@ func getSchedulingLatency(c *client.Client) (SchedulingLatency, error) {
 			Prefix("proxy").
 			Namespace(api.NamespaceSystem).
 			Resource("pods").
-			Name(fmt.Sprintf("kube-scheduler-%v:%v", testContext.CloudConfig.MasterName, ports.SchedulerPort)).
+			Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
 			Suffix("metrics").
 			Do().Raw()
 
-		expectNoError(err)
+		ExpectNoError(err)
 		data = string(rawData)
 	} else {
 		// If master is not registered fall back to old method of using SSH.
 		cmd := "curl http://localhost:10251/metrics"
-		sshResult, err := SSH(cmd, getMasterHost()+":22", testContext.Provider)
+		sshResult, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
 		if err != nil || sshResult.Code != 0 {
 			return result, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
 		}
@@ -401,13 +401,13 @@ func VerifySchedulerLatency(c *client.Client) error {
 	if err != nil {
 		return err
 	}
-	Logf("Scheduling latency: %s", prettyPrintJSON(latency))
+	Logf("Scheduling latency: %s", PrettyPrintJSON(latency))
 
 	// TODO: Add some reasonable checks once we know more about the values.
 	return nil
 }
 
-func prettyPrintJSON(metrics interface{}) string {
+func PrettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
 	if err := json.NewEncoder(output).Encode(metrics); err != nil {
 		Logf("Error building encoder: %v", err)
@@ -446,8 +446,8 @@ func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 	}
 }
 
-// podLatencyData encapsulates pod startup latency information.
-type podLatencyData struct {
+// PodLatencyData encapsulates pod startup latency information.
+type PodLatencyData struct {
 	// Name of the pod
 	Name string
 	// Node this pod was running on
@@ -456,13 +456,13 @@ type podLatencyData struct {
 	Latency time.Duration
 }
 
-type latencySlice []podLatencyData
+type LatencySlice []PodLatencyData
 
-func (a latencySlice) Len() int           { return len(a) }
-func (a latencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a latencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
+func (a LatencySlice) Len() int           { return len(a) }
+func (a LatencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a LatencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
 
-func extractLatencyMetrics(latencies []podLatencyData) LatencyMetric {
+func ExtractLatencyMetrics(latencies []PodLatencyData) LatencyMetric {
 	length := len(latencies)
 	perc50 := latencies[int(math.Ceil(float64(length*50)/100))-1].Latency
 	perc90 := latencies[int(math.Ceil(float64(length*90)/100))-1].Latency
@@ -470,9 +470,9 @@ func extractLatencyMetrics(latencies []podLatencyData) LatencyMetric {
 	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99}
 }
 
-// logSuspiciousLatency logs metrics/docker errors from all nodes that had slow startup times
+// LogSuspiciousLatency logs metrics/docker errors from all nodes that had slow startup times
 // If latencyDataLag is nil then it will be populated from latencyData
-func logSuspiciousLatency(latencyData []podLatencyData, latencyDataLag []podLatencyData, nodeCount int, c *client.Client) {
+func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLatencyData, nodeCount int, c *client.Client) {
 	if latencyDataLag == nil {
 		latencyDataLag = latencyData
 	}
@@ -489,15 +489,15 @@ func logSuspiciousLatency(latencyData []podLatencyData, latencyDataLag []podLate
 // the given time.Duration. Since the arrays are sorted we are looking at the last
 // element which will always be the highest. If the latency is higher than the max Failf
 // is called.
-func testMaximumLatencyValue(latencies []podLatencyData, max time.Duration, name string) {
+func testMaximumLatencyValue(latencies []PodLatencyData, max time.Duration, name string) {
 	highestLatency := latencies[len(latencies)-1]
 	if !(highestLatency.Latency <= max) {
 		Failf("%s were not all under %s: %#v", name, max.String(), latencies)
 	}
 }
 
-func printLatencies(latencies []podLatencyData, header string) {
-	metrics := extractLatencyMetrics(latencies)
+func PrintLatencies(latencies []PodLatencyData, header string) {
+	metrics := ExtractLatencyMetrics(latencies)
 	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
 	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
 }

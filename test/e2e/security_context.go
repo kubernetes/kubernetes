@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -57,15 +58,15 @@ func scTestPod(hostIPC bool, hostPID bool) *api.Pod {
 	return pod
 }
 
-var _ = KubeDescribe("Security Context [Feature:SecurityContext]", func() {
-	framework := NewDefaultFramework("security-context")
+var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", func() {
+	f := framework.NewDefaultFramework("security-context")
 
 	It("should support pod.Spec.SecurityContext.SupplementalGroups", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"id", "-G"}
 		pod.Spec.SecurityContext.SupplementalGroups = []int64{1234, 5678}
 		groups := []string{"1234", "5678"}
-		framework.TestContainerOutput("pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
+		f.TestContainerOutput("pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
 	})
 
 	It("should support pod.Spec.SecurityContext.RunAsUser", func() {
@@ -74,7 +75,7 @@ var _ = KubeDescribe("Security Context [Feature:SecurityContext]", func() {
 		pod.Spec.SecurityContext.RunAsUser = &uid
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
 
-		framework.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("%v", uid),
 		})
 	})
@@ -88,26 +89,26 @@ var _ = KubeDescribe("Security Context [Feature:SecurityContext]", func() {
 		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUid
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
 
-		framework.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("%v", overrideUid),
 		})
 	})
 
 	It("should support volume SELinux relabeling", func() {
-		testPodSELinuxLabeling(framework, false, false)
+		testPodSELinuxLabeling(f, false, false)
 	})
 
 	It("should support volume SELinux relabeling when using hostIPC", func() {
-		testPodSELinuxLabeling(framework, true, false)
+		testPodSELinuxLabeling(f, true, false)
 	})
 
 	It("should support volume SELinux relabeling when using hostPID", func() {
-		testPodSELinuxLabeling(framework, false, true)
+		testPodSELinuxLabeling(f, false, true)
 	})
 
 })
 
-func testPodSELinuxLabeling(framework *Framework, hostIPC bool, hostPID bool) {
+func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) {
 	// Write and read a file with an empty_dir volume
 	// with a pod with the MCS label s0:c0,c1
 	pod := scTestPod(hostIPC, hostPID)
@@ -134,28 +135,28 @@ func testPodSELinuxLabeling(framework *Framework, hostIPC bool, hostPID bool) {
 	}
 	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
 
-	client := framework.Client.Pods(framework.Namespace.Name)
+	client := f.Client.Pods(f.Namespace.Name)
 	_, err := client.Create(pod)
 
-	expectNoError(err, "Error creating pod %v", pod)
+	framework.ExpectNoError(err, "Error creating pod %v", pod)
 	defer client.Delete(pod.Name, nil)
-	expectNoError(waitForPodRunningInNamespace(framework.Client, pod.Name, framework.Namespace.Name))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
 
 	testContent := "hello"
 	testFilePath := mountPath + "/TEST"
-	err = framework.WriteFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath, testContent)
+	err = f.WriteFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath, testContent)
 	Expect(err).To(BeNil())
-	content, err := framework.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath)
+	content, err := f.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath)
 	Expect(err).To(BeNil())
 	Expect(content).To(ContainSubstring(testContent))
 
-	foundPod, err := framework.Client.Pods(framework.Namespace.Name).Get(pod.Name)
+	foundPod, err := f.Client.Pods(f.Namespace.Name).Get(pod.Name)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Confirm that the file can be accessed from a second
 	// pod using host_path with the same MCS label
-	volumeHostPath := fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~empty-dir/%s", testContext.KubeVolumeDir, foundPod.UID, volumeName)
-	By(fmt.Sprintf("confirming a container with the same label can read the file under --volume-dir=%s", testContext.KubeVolumeDir))
+	volumeHostPath := fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~empty-dir/%s", framework.TestContext.KubeVolumeDir, foundPod.UID, volumeName)
+	By(fmt.Sprintf("confirming a container with the same label can read the file under --volume-dir=%s", framework.TestContext.KubeVolumeDir))
 	pod = scTestPod(hostIPC, hostPID)
 	pod.Spec.NodeName = foundPod.Spec.NodeName
 	volumeMounts := []api.VolumeMount{
@@ -181,7 +182,7 @@ func testPodSELinuxLabeling(framework *Framework, hostIPC bool, hostPID bool) {
 		Level: "s0:c0,c1",
 	}
 
-	framework.TestContainerOutput("Pod with same MCS label reading test file", pod, 0, []string{testContent})
+	f.TestContainerOutput("Pod with same MCS label reading test file", pod, 0, []string{testContent})
 	// Confirm that the same pod with a different MCS
 	// label cannot access the volume
 	pod = scTestPod(hostIPC, hostPID)
@@ -192,12 +193,12 @@ func testPodSELinuxLabeling(framework *Framework, hostIPC bool, hostPID bool) {
 		Level: "s0:c2,c3",
 	}
 	_, err = client.Create(pod)
-	expectNoError(err, "Error creating pod %v", pod)
+	framework.ExpectNoError(err, "Error creating pod %v", pod)
 	defer client.Delete(pod.Name, nil)
 
-	err = framework.WaitForPodRunning(pod.Name)
-	expectNoError(err, "Error waiting for pod to run %v", pod)
+	err = f.WaitForPodRunning(pod.Name)
+	framework.ExpectNoError(err, "Error waiting for pod to run %v", pod)
 
-	content, err = framework.ReadFileViaContainer(pod.Name, "test-container", testFilePath)
+	content, err = f.ReadFileViaContainer(pod.Name, "test-container", testFilePath)
 	Expect(content).NotTo(ContainSubstring(testContent))
 }

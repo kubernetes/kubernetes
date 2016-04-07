@@ -24,30 +24,31 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = KubeDescribe("ReplicationController", func() {
-	framework := NewDefaultFramework("replication-controller")
+var _ = framework.KubeDescribe("ReplicationController", func() {
+	f := framework.NewDefaultFramework("replication-controller")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {
-		ServeImageOrFail(framework, "basic", "gcr.io/google_containers/serve_hostname:v1.4")
+		ServeImageOrFail(f, "basic", "gcr.io/google_containers/serve_hostname:v1.4")
 	})
 
 	It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
-		SkipUnlessProviderIs("gce", "gke")
+		framework.SkipUnlessProviderIs("gce", "gke")
 
-		ServeImageOrFail(framework, "private", "b.gcr.io/k8s_authenticated_test/serve_hostname:v1.4")
+		ServeImageOrFail(f, "private", "b.gcr.io/k8s_authenticated_test/serve_hostname:v1.4")
 	})
 })
 
 // A basic test to check the deployment of an image using
 // a replication controller. The image serves its hostname
 // which is checked for each replica.
-func ServeImageOrFail(f *Framework, test string, image string) {
+func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	name := "my-hostname-" + test + "-" + string(util.NewUUID())
 	replicas := 2
 
@@ -85,15 +86,15 @@ func ServeImageOrFail(f *Framework, test string, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := DeleteRC(f.Client, f.Namespace.Name, controller.Name); err != nil {
-			Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
+		if err := framework.DeleteRC(f.Client, f.Namespace.Name, controller.Name); err != nil {
+			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()
 
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 
-	pods, err := podsCreated(f.Client, f.Namespace.Name, name, replicas)
+	pods, err := framework.PodsCreated(f.Client, f.Namespace.Name, name, replicas)
 
 	By("Ensuring each pod is running")
 
@@ -111,8 +112,8 @@ func ServeImageOrFail(f *Framework, test string, image string) {
 	By("Trying to dial each unique pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
-	err = wait.Poll(retryInterval, retryTimeout, podProxyResponseChecker{f.Client, f.Namespace.Name, label, name, true, pods}.checkAllResponses)
+	err = wait.Poll(retryInterval, retryTimeout, framework.PodProxyResponseChecker(f.Client, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
 	if err != nil {
-		Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
+		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
 }
