@@ -24,6 +24,7 @@ import (
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
@@ -36,20 +37,25 @@ import (
 )
 
 const ProviderName = "vsphere"
+const ActivePowerState = "poweredOn"
 
-// VSphere is an implementation of Interface, LoadBalancer and Instances for vSphere.
+// VSphere is an implementation of cloud provider Interface for VSphere.
 type VSphere struct {
 	cfg *VSphereConfig
 }
 
 type VSphereConfig struct {
 	Global struct {
-		User         string `gcfg:"user"`
-		Password     string `gcfg:"password"`
-		VCenterIp    string `gcfg:"server"`
-		VCenterPort  string `gcfg:"port"`
-		InsecureFlag bool   `gcfg:"insecure-flag"`
-		Datacenter   string `gcfg:"datacenter"`
+		User          string `gcfg:"user"`
+		Password      string `gcfg:"password"`
+		VCenterIP     string `gcfg:"server"`
+		VCenterPort   string `gcfg:"port"`
+		InsecureFlag  bool   `gcfg:"insecure-flag"`
+		Datacenter    string `gcfg:"datacenter"`
+	}
+
+	Network struct {
+		PublicNetwork string `gcfg:"public-network"`
 	}
 }
 
@@ -84,7 +90,7 @@ func newVSphere(cfg VSphereConfig) (*VSphere, error) {
 func vsphereLogin(cfg *VSphereConfig, ctx context.Context) (*govmomi.Client, error) {
 
 	// Parse URL from string
-	u, err := url.Parse(fmt.Sprintf("https://%s:%s/sdk", cfg.Global.VCenterIp, cfg.Global.VCenterPort))
+	u, err := url.Parse(fmt.Sprintf("https://%s:%s/sdk", cfg.Global.VCenterIP, cfg.Global.VCenterPort))
 	if err != nil {
 		return nil, err
 	}
@@ -100,19 +106,49 @@ func vsphereLogin(cfg *VSphereConfig, ctx context.Context) (*govmomi.Client, err
 	return c, nil
 }
 
-type Instances struct {
-	cfg *VSphereConfig
+func getVirtualMachineByName(cfg *VSphereConfig, ctx context.Context, c *govmomi.Client, name string) (*object.VirtualMachine, error){
+	// Create a new finder
+	f := find.NewFinder(c.Client, true)
+
+	// Fetch and set data center
+	dc, err := f.Datacenter(ctx, cfg.Global.Datacenter)
+	if err != nil {
+		return nil, err
+	}
+	f.SetDatacenter(dc)
+
+	// Retrieve vm by name
+	//TODO: also look for vm inside subfolders
+	vm, err := f.VirtualMachine(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return vm, nil
 }
 
-// Instances returns an implementation of Instances for vSphere.
-func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
-    
-	return &Instances{vs.cfg}, true
+func getVirtualMachineManagedObjectReference(ctx context.Context, c *govmomi.Client, vm *object.VirtualMachine, field string, dst interface{}) error{
+	collector := property.DefaultCollector(c.Client)
+
+	// Retrieve required field from VM object
+	err := collector.RetrieveOne(ctx, vm.Reference(), []string{field}, dst);
+	if err !=nil {
+		return err
+	}
+	return nil
 }
 
-func getInstances(c *govmomi.Client, finder *find.Finder, ctx context.Context, nameFilter string) ([]string, error) {
+func getInstances(cfg *VSphereConfig, ctx context.Context, c *govmomi.Client, filter string) ([]string, error) {
+	f := find.NewFinder(c.Client, true)
+	dc, err := f.Datacenter(ctx, cfg.Global.Datacenter)
+	if err != nil {
+		return nil, err
+	}
+
+	f.SetDatacenter(dc)
+
 	//TODO: get all vms inside subfolders
-	vms, err := finder.VirtualMachineList(ctx, nameFilter)
+	vms, err := f.VirtualMachineList(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -132,45 +168,89 @@ func getInstances(c *govmomi.Client, finder *find.Finder, ctx context.Context, n
 
 	var vmList []string
 	for _, vm := range vmt {
-		vmPowerstate := vm.Summary.Runtime.PowerState
-		if vmPowerstate == "poweredOn" {
+		if vm.Summary.Runtime.PowerState == ActivePowerState {
 			vmList = append(vmList, vm.Name)
+		} else if vm.Summary.Config.Template == false {
+			glog.Warningf("VM %s, is not in %s state", vm.Name, ActivePowerState)
 		}
 	}
 	return vmList, nil
 }
 
-func (i *Instances) List(nameFilter string) ([]string, error) {
+type Instances struct {
+	cfg *VSphereConfig
+}
 
+// Instances returns an implementation of Instances for vSphere.
+func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
+	return &Instances{vs.cfg}, true
+}
+
+// List is an implementation of Instances.List.
+func (i *Instances) List(filter string) ([]string, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c, err := vsphereLogin(i.cfg, ctx)
 	if err != nil {
-		fmt.Errorf("Failed to create vSpere client: %s", err)
+		return nil, err
 	}
 	defer c.Logout(ctx)
 
-	fo := find.NewFinder(c.Client, true)
-	dc, err := fo.Datacenter(ctx, i.cfg.Global.Datacenter)
-	if err != nil {
-		glog.Warningf("Failed to find %v", err)
-		return nil, err
-	}
-
-	finderObj := fo.SetDatacenter(dc)
-	vmList, err := getInstances(c, finderObj, ctx, nameFilter)
+	vmList, err := getInstances(i.cfg, ctx, c, filter)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(3).Infof("Found %v instances matching %v: %v",
-		len(vmList), nameFilter, vmList)
+	glog.V(3).Infof("Found %s instances matching %s: %s",
+		len(vmList), filter, vmList)
 
 	return vmList, nil
 }
 
+// NodeAddresses is an implementation of Instances.NodeAddresses.
 func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	return nil, nil
+	addrs := []api.NodeAddress{}
+
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create vSphere client
+	c, err := vsphereLogin(i.cfg, ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer c.Logout(ctx)
+
+	vm, err := getVirtualMachineByName(i.cfg, ctx, c, name)
+	if err !=nil {
+		return nil, err
+	}
+
+	var mvm mo.VirtualMachine
+	err = getVirtualMachineManagedObjectReference(ctx, c, vm, "guest.net", &mvm)
+	if err !=nil {
+		return nil, err
+	}
+
+	// retrieve VM's ip(s)
+	for _, v := range mvm.Guest.Net {
+		var addressType api.NodeAddressType
+		if i.cfg.Network.PublicNetwork == v.Network {
+			addressType = api.NodeExternalIP
+		} else {
+			addressType = api.NodeInternalIP
+		}
+		for _, ip := range v.IpAddress {
+			api.AddToNodeAddresses(&addrs,
+				api.NodeAddress{
+					Type:    addressType,
+					Address: ip,
+				},
+			)
+		}
+	}
+	return addrs, nil
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -181,16 +261,79 @@ func (i *Instances) CurrentNodeName(hostname string) (string, error) {
 	return hostname, nil
 }
 
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (i *Instances) ExternalID(name string) (string, error) {
-	return "", nil
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create vSphere client
+	c, err := vsphereLogin(i.cfg, ctx)
+	if err != nil {
+		return "", err
+	}
+	defer c.Logout(ctx)
+
+	vm, err := getVirtualMachineByName(i.cfg, ctx, c, name)
+	if err != nil {
+		return "", err
+	}
+
+	var mvm mo.VirtualMachine
+	err = getVirtualMachineManagedObjectReference(ctx, c, vm, "summary", &mvm)
+	if err !=nil {
+		return "", err
+	}
+
+	if mvm.Summary.Runtime.PowerState == ActivePowerState {
+		return vm.InventoryPath, nil
+	} 
+    
+	if mvm.Summary.Config.Template == false {
+	    glog.Warningf("VM %s, is not in %s state", name, ActivePowerState)
+	} else {
+	    glog.Warningf("VM %s, is a template", name)
+	}
+
+	return "", cloudprovider.InstanceNotFound
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (i *Instances) InstanceID(name string) (string, error) {
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create vSphere client
+	c, err := vsphereLogin(i.cfg, ctx)
+	if err != nil {
+		return "", err
+	}
+	defer c.Logout(ctx)
+
+	vm, err := getVirtualMachineByName(i.cfg, ctx, c, name)
+
+	var mvm mo.VirtualMachine
+	err = getVirtualMachineManagedObjectReference(ctx, c, vm, "summary", &mvm)
+	if err !=nil {
+		return "", err
+	}
+
+	if mvm.Summary.Runtime.PowerState == ActivePowerState {
+		return "/" + vm.InventoryPath, nil
+	}
+    
+	if mvm.Summary.Config.Template == false {
+	    glog.Warning("VM %s, is not in %s state", name, ActivePowerState)
+	} else {
+	    glog.Warning("VM %s, is a template", name)
+	}
+
+	return "", cloudprovider.InstanceNotFound
 }
 
 func (i *Instances) InstanceType(name string) (string, error) {
 	return "", nil
-}
-
-func (i *Instances) InstanceID(name string) (string, error) {
-	return "/" + " ", nil
 }
 
 func (vs *VSphere) Clusters() (cloudprovider.Clusters, bool) {
