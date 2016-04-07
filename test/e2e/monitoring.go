@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"time"
 
 	influxdb "github.com/influxdb/influxdb/client"
@@ -234,12 +233,6 @@ func validatePodsAndNodes(c *client.Client, expectedPods, expectedNodes []string
 		return false
 	}
 	return true
-}
-
-func getMasterHost() string {
-	masterUrl, err := url.Parse(testContext.Host)
-	expectNoError(err)
-	return masterUrl.Host
 }
 
 func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {

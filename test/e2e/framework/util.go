@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package framework
 
 import (
 	"bytes"
@@ -50,7 +50,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -153,80 +152,29 @@ func getServicesProxyRequest(c *client.Client, request *restclient.Request) (*re
 	return request.Prefix("proxy").Resource("services"), nil
 }
 
-func GetServicesProxyRequest(c *client.Client, request *restclient.Request) (*restclient.Request, error) {
-	return getServicesProxyRequest(c, request)
-}
-
-type CloudConfig struct {
-	ProjectID         string
-	Zone              string
-	Cluster           string
-	MasterName        string
-	NodeInstanceGroup string
-	NumNodes          int
-	ClusterTag        string
-	ServiceAccount    string
-
-	Provider cloudprovider.Interface
-}
-
 // unique identifier of the e2e run
 var runId = util.NewUUID()
 
 type CreateTestingNSFn func(baseName string, c *client.Client, labels map[string]string) (*api.Namespace, error)
 
-type TestContextType struct {
-	KubeConfig            string
-	KubeContext           string
-	KubeVolumeDir         string
-	CertDir               string
-	Host                  string
-	RepoRoot              string
-	Provider              string
-	CloudConfig           CloudConfig
-	KubectlPath           string
-	OutputDir             string
-	ReportDir             string
-	ReportPrefix          string
-	prefix                string
-	MinStartupPods        int
-	UpgradeTarget         string
-	PrometheusPushGateway string
-	OSDistro              string
-	VerifyServiceAccount  bool
-	DeleteNamespace       bool
-	CleanStart            bool
-	// If set to true framework will start a goroutine monitoring resource usage of system add-ons.
-	// It will read the data every 30 seconds from all Nodes and print summary during afterEach.
-	GatherKubeSystemResourceUsageData bool
-	GatherLogsSizes                   bool
-	GatherMetricsAfterTest            bool
-	// Currently supported values are 'hr' for human-readable and 'json'. It's a comma separated list.
-	OutputPrintType string
-	// CreateTestingNS is responsible for creating namespace used for executing e2e tests.
-	// It accepts namespace base name, which will be prepended with e2e prefix, kube client
-	// and labels to be applied to a namespace.
-	CreateTestingNS CreateTestingNSFn
-}
-
-var testContext TestContextType
-
-func SetTestContext(t TestContextType) {
-	testContext = t
-}
-
 type ContainerFailures struct {
 	status   *api.ContainerStateTerminated
-	restarts int
+	Restarts int
+}
+
+func GetMasterHost() string {
+	masterUrl, err := url.Parse(TestContext.Host)
+	ExpectNoError(err)
+	return masterUrl.Host
 }
 
 // Convenient wrapper around cache.Store that returns list of api.Pod instead of interface{}.
-type podStore struct {
+type PodStore struct {
 	cache.Store
 	stopCh chan struct{}
 }
 
-func newPodStore(c *client.Client, namespace string, label labels.Selector, field fields.Selector) *podStore {
+func NewPodStore(c *client.Client, namespace string, label labels.Selector, field fields.Selector) *PodStore {
 	lw := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			options.LabelSelector = label

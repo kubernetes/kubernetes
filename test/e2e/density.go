@@ -41,39 +41,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// NodeStartupThreshold is a rough estimate of the time allocated for a pod to start on a node.
 const (
-	NodeStartupThreshold       = 4 * time.Second
 	MinSaturationThreshold     = 2 * time.Minute
 	MinPodsPerSecondThroughput = 8
 )
 
 // Maximum container failures this test tolerates before failing.
 var MaxContainerFailures = 0
-
-// podLatencyData encapsulates pod startup latency information.
-type podLatencyData struct {
-	// Name of the pod
-	Name string
-	// Node this pod was running on
-	Node string
-	// Latency information related to pod startuptime
-	Latency time.Duration
-}
-
-type latencySlice []podLatencyData
-
-func (a latencySlice) Len() int           { return len(a) }
-func (a latencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a latencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
-
-func extractLatencyMetrics(latencies []podLatencyData) LatencyMetric {
-	length := len(latencies)
-	perc50 := latencies[int(math.Ceil(float64(length*50)/100))-1].Latency
-	perc90 := latencies[int(math.Ceil(float64(length*90)/100))-1].Latency
-	perc99 := latencies[int(math.Ceil(float64(length*99)/100))-1].Latency
-	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99}
-}
 
 func density30AddonResourceVerifier() map[string]resourceConstraint {
 	constraints := make(map[string]resourceConstraint)
@@ -526,15 +500,7 @@ var _ = KubeDescribe("Density", func() {
 				podStartupLatency := PodStartupLatency{Latency: extractLatencyMetrics(e2eLag)}
 				expectNoError(VerifyPodStartupLatency(podStartupLatency))
 
-				// Log suspicious latency metrics/docker errors from all nodes that had slow startup times
-				for _, l := range startupLag {
-					if l.Latency > NodeStartupThreshold {
-						HighLatencyKubeletOperations(c, 1*time.Second, l.Node)
-					}
-				}
-
-				Logf("Approx throughput: %v pods/min",
-					float64(nodeCount)/(e2eLag[len(e2eLag)-1].Latency.Minutes()))
+				logSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
 			}
 
 			By("Deleting ReplicationController")
