@@ -23,11 +23,14 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"golang.org/x/net/context"
 )
 
 func configFromEnv() (cfg VSphereConfig, ok bool) {
 	fmt.Print("inside test")
-	cfg.Global.VSphereServer = os.Getenv("VSPHERE_SERVER")
+	cfg.Global.VCenterIp = os.Getenv("VSPHERE_VCENTER")
+	cfg.Global.VCenterPort = os.Getenv("VSPHERE_VCENTER_PORT")
 	cfg.Global.User = os.Getenv("VSPHERE_USER")
 	cfg.Global.Password = os.Getenv("VSPHERE_PASSWORD")
 	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
@@ -39,7 +42,9 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 
 	cfg.Global.InsecureFlag = InsecureFlag
 
-	ok = (cfg.Global.VSphereServer != "" &&
+
+
+	ok = (cfg.Global.VCenterIp != "" &&
 		cfg.Global.User != "")
 
 	return
@@ -54,6 +59,7 @@ func TestReadConfig(t *testing.T) {
 	cfg, err := readConfig(strings.NewReader(`
 [Global]
 server = 0.0.0.0
+port = 80
 user = user
 password = password
 insecure-flag = true
@@ -62,8 +68,13 @@ datacenter = us-west
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
 	}
-	if cfg.Global.VSphereServer != "0.0.0.0" {
-		t.Errorf("incorrect server: %s", cfg.Global.VSphereServer)
+
+	if cfg.Global.VCenterIp != "0.0.0.0" {
+		t.Errorf("incorrect vcenter ip: %s", cfg.Global.VCenterIp)
+	}
+
+	if cfg.Global.VCenterPort != "80" {
+		t.Errorf("incorrect vcenter port: %s", cfg.Global.VCenterPort)
 	}
 
 	if cfg.Global.Datacenter != "us-west" {
@@ -81,4 +92,28 @@ func TestNewVSphere(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
+}
+
+func TestVSphereLogin(t *testing.T) {
+	cfg, ok := configFromEnv()
+	if !ok {
+		t.Skipf("No config found in environment")
+	}
+
+	// Create vSphere configuration object
+	vs, err := newVSphere(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	}
+
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create vSphere client
+	c, err := vsphereLogin(vs.cfg, ctx)
+	if err != nil {
+		t.Errorf("Failed to create vSpere client: %s", err)
+	}
+	defer c.Logout(ctx)
 }
