@@ -22,6 +22,7 @@ import (
 	"time"
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -31,7 +32,7 @@ import (
 
 const (
 	// Interval to poll /stats/container on a node
-	containerStatsPollingPeriod = 3 * time.Second
+	containerStatsPollingPeriod = 10 * time.Second
 	// The monitoring time for one test.
 	monitoringTime = 20 * time.Minute
 	// The periodic reporting period.
@@ -210,27 +211,26 @@ var _ = Describe("Kubelet [Serial] [Slow]", func() {
 			{
 				podsPerNode: 0,
 				cpuLimits: containersCPUSummary{
-					"/kubelet":       {0.50: 0.06, 0.95: 0.08},
-					"/docker-daemon": {0.50: 0.05, 0.95: 0.06},
+					stats.SystemContainerKubelet: {0.50: 0.06, 0.95: 0.08},
+					stats.SystemContainerRuntime: {0.50: 0.05, 0.95: 0.06},
 				},
 				// We set the memory limits generously because the distribution
 				// of the addon pods affect the memory usage on each node.
 				memLimits: resourceUsagePerContainer{
-					"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
-					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 85 * 1024 * 1024},
+					stats.SystemContainerKubelet: &containerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
+					stats.SystemContainerRuntime: &containerResourceUsage{MemoryRSSInBytes: 85 * 1024 * 1024},
 				},
 			},
 			{
 				podsPerNode: 35,
 				cpuLimits: containersCPUSummary{
-					"/kubelet":       {0.50: 0.12, 0.95: 0.14},
-					"/docker-daemon": {0.50: 0.06, 0.95: 0.08},
+					stats.SystemContainerKubelet: {0.50: 0.12, 0.95: 0.14},
+					stats.SystemContainerRuntime: {0.50: 0.06, 0.95: 0.08},
 				},
 				// We set the memory limits generously because the distribution
 				// of the addon pods affect the memory usage on each node.
 				memLimits: resourceUsagePerContainer{
-					"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 75 * 1024 * 1024},
-					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					stats.SystemContainerRuntime: &containerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
 				},
 			},
 			{

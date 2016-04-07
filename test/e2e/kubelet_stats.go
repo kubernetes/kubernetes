@@ -34,8 +34,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	kubeletstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/master/ports"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -154,7 +155,9 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 
 // getContainerInfo contacts kubelet for the container information. The "Stats"
 // in the returned ContainerInfo is subject to the requirements in statsRequest.
-func getContainerInfo(c *client.Client, nodeName string, req *stats.StatsRequest) (map[string]cadvisorapi.ContainerInfo, error) {
+// TODO: This function uses the deprecated kubelet stats API; it should be
+// removed.
+func getContainerInfo(c *client.Client, nodeName string, req *kubeletstats.StatsRequest) (map[string]cadvisorapi.ContainerInfo, error) {
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -197,47 +200,6 @@ func getContainerInfo(c *client.Client, nodeName string, req *stats.StatsRequest
 	return containers, nil
 }
 
-const (
-	// cadvisor records stats about every second.
-	cadvisorStatsPollingIntervalInSeconds float64 = 1.0
-	// cadvisor caches up to 2 minutes of stats (configured by kubelet).
-	maxNumStatsToRequest int = 120
-)
-
-// A list of containers for which we want to collect resource usage.
-func targetContainers() []string {
-	if providerIs("gce", "gke") {
-		return []string{
-			"/",
-			"/docker-daemon",
-			"/kubelet",
-			"/system",
-		}
-	} else {
-		return []string{
-			"/",
-		}
-	}
-}
-
-type containerResourceUsage struct {
-	Name                    string
-	Timestamp               time.Time
-	CPUUsageInCores         float64
-	MemoryUsageInBytes      uint64
-	MemoryWorkingSetInBytes uint64
-	MemoryRSSInBytes        uint64
-	// The interval used to calculate CPUUsageInCores.
-	CPUInterval time.Duration
-}
-
-func (r *containerResourceUsage) isStrictlyGreaterThan(rhs *containerResourceUsage) bool {
-	return r.CPUUsageInCores > rhs.CPUUsageInCores && r.MemoryWorkingSetInBytes > rhs.MemoryWorkingSetInBytes
-}
-
-type resourceUsagePerContainer map[string]*containerResourceUsage
-type resourceUsagePerNode map[string]resourceUsagePerContainer
-
 // getOneTimeResourceUsageOnNode queries the node's /stats/container endpoint
 // and returns the resource usage of all containerNames for the past
 // cpuInterval.
@@ -258,6 +220,8 @@ type resourceUsagePerNode map[string]resourceUsagePerContainer
 // should fail if one of containers listed by containerNames is missing on any node
 // (useful e.g. when looking for system containers or daemons). If set to true function
 // is more forgiving and ignores missing containers.
+// TODO: This function relies on the deprecated kubelet stats API and should be
+// removed and/or rewritten.
 func getOneTimeResourceUsageOnNode(
 	c *client.Client,
 	nodeName string,
@@ -265,18 +229,37 @@ func getOneTimeResourceUsageOnNode(
 	containerNames func() []string,
 	expectMissingContainers bool,
 ) (resourceUsagePerContainer, error) {
+	const (
+		// cadvisor records stats about every second.
+		cadvisorStatsPollingIntervalInSeconds float64 = 1.0
+		// cadvisor caches up to 2 minutes of stats (configured by kubelet).
+		maxNumStatsToRequest int = 120
+	)
+
 	numStats := int(float64(cpuInterval.Seconds()) / cadvisorStatsPollingIntervalInSeconds)
 	if numStats < 2 || numStats > maxNumStatsToRequest {
 		return nil, fmt.Errorf("numStats needs to be > 1 and < %d", maxNumStatsToRequest)
 	}
 	// Get information of all containers on the node.
-	containerInfos, err := getContainerInfo(c, nodeName, &stats.StatsRequest{
+	containerInfos, err := getContainerInfo(c, nodeName, &kubeletstats.StatsRequest{
 		ContainerName: "/",
 		NumStats:      numStats,
 		Subcontainers: true,
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	f := func(name string, oldStats, newStats *cadvisorapi.ContainerStats) *containerResourceUsage {
+		return &containerResourceUsage{
+			Name:                    name,
+			Timestamp:               newStats.Timestamp,
+			CPUUsageInCores:         float64(newStats.Cpu.Usage.Total-oldStats.Cpu.Usage.Total) / float64(newStats.Timestamp.Sub(oldStats.Timestamp).Nanoseconds()),
+			MemoryUsageInBytes:      newStats.Memory.Usage,
+			MemoryWorkingSetInBytes: newStats.Memory.WorkingSet,
+			MemoryRSSInBytes:        newStats.Memory.RSS,
+			CPUInterval:             newStats.Timestamp.Sub(oldStats.Timestamp),
+		}
 	}
 	// Process container infos that are relevant to us.
 	containers := containerNames()
@@ -291,25 +274,95 @@ func getOneTimeResourceUsageOnNode(
 		}
 		first := info.Stats[0]
 		last := info.Stats[len(info.Stats)-1]
-		usageMap[name] = computeContainerResourceUsage(name, first, last)
+		usageMap[name] = f(name, first, last)
 	}
 	return usageMap, nil
 }
 
-// logOneTimeResourceUsageSummary collects container resource for the list of
-// nodes, formats and logs the stats.
-func logOneTimeResourceUsageSummary(c *client.Client, nodeNames []string, cpuInterval time.Duration) {
-	var summary []string
-	for _, nodeName := range nodeNames {
-		stats, err := getOneTimeResourceUsageOnNode(c, nodeName, cpuInterval, targetContainers, false)
-		if err != nil {
-			summary = append(summary, fmt.Sprintf("Error getting resource usage from node %q, err: %v", nodeName, err))
-		} else {
-			summary = append(summary, formatResourceUsageStats(nodeName, stats))
-		}
+func getNodeStatsSummary(c *client.Client, nodeName string) (*stats.Summary, error) {
+	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
+	if err != nil {
+		return nil, err
 	}
-	Logf("\n%s", strings.Join(summary, "\n"))
+
+	var data []byte
+	if subResourceProxyAvailable {
+		data, err = c.Get().
+			Resource("nodes").
+			SubResource("proxy").
+			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+			Suffix("stats/summary").
+			SetHeader("Content-Type", "application/json").
+			Do().Raw()
+
+	} else {
+		data, err = c.Get().
+			Prefix("proxy").
+			Resource("nodes").
+			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+			Suffix("stats/summary").
+			SetHeader("Content-Type", "application/json").
+			Do().Raw()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var summary *stats.Summary
+	err = json.Unmarshal(data, &summary)
+	if err != nil {
+		return nil, err
+	}
+	return summary, nil
 }
+
+func getSystemContainerStats(summary *stats.Summary) map[string]*stats.ContainerStats {
+	statsList := summary.Node.SystemContainers
+	statsMap := make(map[string]*stats.ContainerStats)
+	for i := range statsList {
+		statsMap[statsList[i].Name] = &statsList[i]
+	}
+
+	// Create a root container stats using information available in
+	// stats.NodeStats. This is necessary since it is a different type.
+	statsMap[rootContainerName] = &stats.ContainerStats{
+		CPU:    summary.Node.CPU,
+		Memory: summary.Node.Memory,
+	}
+	return statsMap
+}
+
+const (
+	rootContainerName = "/"
+)
+
+// A list of containers for which we want to collect resource usage.
+func targetContainers() []string {
+	return []string{
+		rootContainerName,
+		stats.SystemContainerRuntime,
+		stats.SystemContainerKubelet,
+		stats.SystemContainerMisc,
+	}
+}
+
+type containerResourceUsage struct {
+	Name                    string
+	Timestamp               time.Time
+	CPUUsageInCores         float64
+	MemoryUsageInBytes      uint64
+	MemoryWorkingSetInBytes uint64
+	MemoryRSSInBytes        uint64
+	// The interval used to calculate CPUUsageInCores.
+	CPUInterval time.Duration
+}
+
+func (r *containerResourceUsage) isStrictlyGreaterThan(rhs *containerResourceUsage) bool {
+	return r.CPUUsageInCores > rhs.CPUUsageInCores && r.MemoryWorkingSetInBytes > rhs.MemoryWorkingSetInBytes
+}
+
+type resourceUsagePerContainer map[string]*containerResourceUsage
+type resourceUsagePerNode map[string]resourceUsagePerContainer
 
 func formatResourceUsageStats(nodeName string, containerStats resourceUsagePerContainer) string {
 	// Example output:
@@ -459,15 +512,15 @@ func PrintAllKubeletPods(c *client.Client, nodeName string) {
 	}
 }
 
-func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapi.ContainerStats) *containerResourceUsage {
+func computeContainerResourceUsage(name string, oldStats, newStats *stats.ContainerStats) *containerResourceUsage {
 	return &containerResourceUsage{
 		Name:                    name,
-		Timestamp:               newStats.Timestamp,
-		CPUUsageInCores:         float64(newStats.Cpu.Usage.Total-oldStats.Cpu.Usage.Total) / float64(newStats.Timestamp.Sub(oldStats.Timestamp).Nanoseconds()),
-		MemoryUsageInBytes:      newStats.Memory.Usage,
-		MemoryWorkingSetInBytes: newStats.Memory.WorkingSet,
-		MemoryRSSInBytes:        newStats.Memory.RSS,
-		CPUInterval:             newStats.Timestamp.Sub(oldStats.Timestamp),
+		Timestamp:               newStats.CPU.Time.Time,
+		CPUUsageInCores:         float64(*newStats.CPU.UsageCoreNanoSeconds-*oldStats.CPU.UsageCoreNanoSeconds) / float64(newStats.CPU.Time.Time.Sub(oldStats.CPU.Time.Time).Nanoseconds()),
+		MemoryUsageInBytes:      *newStats.Memory.UsageBytes,
+		MemoryWorkingSetInBytes: *newStats.Memory.WorkingSetBytes,
+		MemoryRSSInBytes:        *newStats.Memory.RSSBytes,
+		CPUInterval:             newStats.CPU.Time.Time.Sub(oldStats.CPU.Time.Time),
 	}
 }
 
@@ -499,7 +552,7 @@ func newResourceCollector(c *client.Client, nodeName string, containerNames []st
 func (r *resourceCollector) Start() {
 	r.stopCh = make(chan struct{}, 1)
 	// Keep the last observed stats for comparison.
-	oldStats := make(map[string]*cadvisorapi.ContainerStats)
+	oldStats := make(map[string]*stats.ContainerStats)
 	go wait.Until(func() { r.collectStats(oldStats) }, r.pollingInterval, r.stopCh)
 }
 
@@ -508,35 +561,33 @@ func (r *resourceCollector) Stop() {
 	close(r.stopCh)
 }
 
-// collectStats gets the latest stats from kubelet's /stats/container, computes
+// collectStats gets the latest stats from kubelet stats summary API, computes
 // the resource usage, and pushes it to the buffer.
-func (r *resourceCollector) collectStats(oldStats map[string]*cadvisorapi.ContainerStats) {
-	infos, err := getContainerInfo(r.client, r.node, &stats.StatsRequest{
-		ContainerName: "/",
-		NumStats:      1,
-		Subcontainers: true,
-	})
+func (r *resourceCollector) collectStats(oldStatsMap map[string]*stats.ContainerStats) {
+	summary, err := getNodeStatsSummary(r.client, r.node)
+	cStatsMap := getSystemContainerStats(summary)
 	if err != nil {
-		Logf("Error getting container info on %q, err: %v", r.node, err)
+		Logf("Error getting node stats summary on %q, err: %v", r.node, err)
 		return
 	}
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	for _, name := range r.containers {
-		info, ok := infos[name]
-		if !ok || len(info.Stats) < 1 {
+		cStats, ok := cStatsMap[name]
+		if !ok {
 			Logf("Missing info/stats for container %q on node %q", name, r.node)
 			return
 		}
-		if oldInfo, ok := oldStats[name]; ok {
-			newInfo := info.Stats[0]
-			if oldInfo.Timestamp.Equal(newInfo.Timestamp) {
+
+		if oldStats, ok := oldStatsMap[name]; ok {
+			if oldStats.CPU.Time.Equal(cStats.CPU.Time) {
 				// No change -> skip this stat.
 				continue
 			}
-			r.buffers[name] = append(r.buffers[name], computeContainerResourceUsage(name, oldInfo, newInfo))
+			r.buffers[name] = append(r.buffers[name], computeContainerResourceUsage(name, oldStats, cStats))
 		}
-		oldStats[name] = info.Stats[0]
+		// Update the old stats.
+		oldStatsMap[name] = cStats
 	}
 }
 
@@ -677,9 +728,9 @@ func (r *resourceMonitor) FormatCPUSummary(summary nodesCPUSummary) string {
 	// CPU usage of containers on node "e2e-test-foo-minion-0vj7":
 	// container        5th%  50th% 90th% 95th%
 	// "/"              0.051 0.159 0.387 0.455
-	// "/docker-daemon" 0.000 0.000 0.146 0.166
+	// "/runtime        0.000 0.000 0.146 0.166
 	// "/kubelet"       0.036 0.053 0.091 0.154
-	// "/system"        0.001 0.001 0.001 0.002
+	// "/misc"          0.001 0.001 0.001 0.002
 	var summaryStrings []string
 	var header []string
 	header = append(header, "container")
