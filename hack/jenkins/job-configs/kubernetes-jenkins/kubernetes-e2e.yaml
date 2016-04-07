@@ -61,7 +61,7 @@
     suffix:
         - 'gce':
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel.'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 # This is the *only* job that should publish the last green version.
                 export E2E_PUBLISH_GREEN_VERSION="true"
@@ -177,7 +177,7 @@
     suffix:
         - 'gke':
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel (against GKE test endpoint)'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-ci"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
@@ -230,7 +230,7 @@
     suffix:
         - 'gce-release-1.2':
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel on the release-1.2 branch.'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
@@ -310,7 +310,7 @@
     suffix:
         - 'gke-release-1.2':
             description: 'Run E2E tests on GKE from the release-1.2 branch.'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-1-2"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
