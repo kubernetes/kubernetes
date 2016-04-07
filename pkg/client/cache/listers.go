@@ -41,7 +41,7 @@ import (
 // l := StoreToPodLister{s}
 // l.List()
 type StoreToPodLister struct {
-	Store
+	Indexer
 }
 
 // Please note that selector is filtering among the pods that have gotten into
@@ -54,7 +54,7 @@ func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err 
 	// s.Pods(api.NamespaceAll).List(selector), however then we'd have to
 	// remake the list.Items as a []*api.Pod. So leave this separate for
 	// now.
-	for _, m := range s.Store.List() {
+	for _, m := range s.Indexer.List() {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
 			pods = append(pods, pod)
@@ -65,11 +65,11 @@ func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err 
 
 // Pods is taking baby steps to be more like the api in pkg/client
 func (s *StoreToPodLister) Pods(namespace string) storePodsNamespacer {
-	return storePodsNamespacer{s.Store, namespace}
+	return storePodsNamespacer{s.Indexer, namespace}
 }
 
 type storePodsNamespacer struct {
-	store     Store
+	indexer   Indexer
 	namespace string
 }
 
@@ -78,12 +78,25 @@ type storePodsNamespacer struct {
 // that.
 func (s storePodsNamespacer) List(selector labels.Selector) (pods api.PodList, err error) {
 	list := api.PodList{}
-	for _, m := range s.store.List() {
-		pod := m.(*api.Pod)
-		if s.namespace == api.NamespaceAll || s.namespace == pod.Namespace {
+	if s.namespace == api.NamespaceAll {
+		for _, m := range s.indexer.List() {
+			pod := m.(*api.Pod)
 			if selector.Matches(labels.Set(pod.Labels)) {
 				list.Items = append(list.Items, *pod)
 			}
+		}
+		return list, nil
+	}
+
+	key := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
+	items, err := s.indexer.Index(NamespaceIndex, key)
+	if err != nil {
+		return api.PodList{}, err
+	}
+	for _, m := range items {
+		pod := m.(*api.Pod)
+		if selector.Matches(labels.Set(pod.Labels)) {
+			list.Items = append(list.Items, *pod)
 		}
 	}
 	return list, nil
@@ -91,7 +104,7 @@ func (s storePodsNamespacer) List(selector labels.Selector) (pods api.PodList, e
 
 // Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
 func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
-	_, exists, err := s.Store.Get(pod)
+	_, exists, err := s.Indexer.Get(pod)
 	if err != nil {
 		return false, err
 	}
@@ -143,12 +156,12 @@ func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
 
 // StoreToReplicationControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
 type StoreToReplicationControllerLister struct {
-	Store
+	Indexer
 }
 
 // Exists checks if the given rc exists in the store.
 func (s *StoreToReplicationControllerLister) Exists(controller *api.ReplicationController) (bool, error) {
-	_, exists, err := s.Store.Get(controller)
+	_, exists, err := s.Indexer.Get(controller)
 	if err != nil {
 		return false, err
 	}
@@ -158,28 +171,41 @@ func (s *StoreToReplicationControllerLister) Exists(controller *api.ReplicationC
 // StoreToReplicationControllerLister lists all controllers in the store.
 // TODO: converge on the interface in pkg/client
 func (s *StoreToReplicationControllerLister) List() (controllers []api.ReplicationController, err error) {
-	for _, c := range s.Store.List() {
+	for _, c := range s.Indexer.List() {
 		controllers = append(controllers, *(c.(*api.ReplicationController)))
 	}
 	return controllers, nil
 }
 
 func (s *StoreToReplicationControllerLister) ReplicationControllers(namespace string) storeReplicationControllersNamespacer {
-	return storeReplicationControllersNamespacer{s.Store, namespace}
+	return storeReplicationControllersNamespacer{s.Indexer, namespace}
 }
 
 type storeReplicationControllersNamespacer struct {
-	store     Store
+	indexer   Indexer
 	namespace string
 }
 
 func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (controllers []api.ReplicationController, err error) {
-	for _, c := range s.store.List() {
-		rc := *(c.(*api.ReplicationController))
-		if s.namespace == api.NamespaceAll || s.namespace == rc.Namespace {
+	if s.namespace == api.NamespaceAll {
+		for _, m := range s.indexer.List() {
+			rc := *(m.(*api.ReplicationController))
 			if selector.Matches(labels.Set(rc.Labels)) {
 				controllers = append(controllers, rc)
 			}
+		}
+		return
+	}
+
+	key := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
+	items, err := s.indexer.Index(NamespaceIndex, key)
+	if err != nil {
+		return
+	}
+	for _, m := range items {
+		rc := *(m.(*api.ReplicationController))
+		if selector.Matches(labels.Set(rc.Labels)) {
+			controllers = append(controllers, rc)
 		}
 	}
 	return
@@ -195,11 +221,14 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 		return
 	}
 
-	for _, m := range s.Store.List() {
+	key := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace}}
+	items, err := s.Indexer.Index(NamespaceIndex, key)
+	if err != nil {
+		return
+	}
+
+	for _, m := range items {
 		rc = *m.(*api.ReplicationController)
-		if rc.Namespace != pod.Namespace {
-			continue
-		}
 		labelSet := labels.Set(rc.Spec.Selector)
 		selector = labels.Set(rc.Spec.Selector).AsSelector()
 

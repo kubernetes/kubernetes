@@ -1139,7 +1139,7 @@ func TestCleanupOrphanedPods(t *testing.T) {
 	nc.nodeStore.Store.Add(newNode("bar"))
 	for _, pod := range pods {
 		p := pod
-		nc.podStore.Store.Add(&p)
+		nc.podStore.Indexer.Add(&p)
 	}
 
 	var deleteCalls int

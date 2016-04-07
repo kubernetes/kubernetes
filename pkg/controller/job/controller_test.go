@@ -221,13 +221,13 @@ func TestControllerSyncJob(t *testing.T) {
 		job := newJob(tc.parallelism, tc.completions)
 		manager.jobStore.Store.Add(job)
 		for _, pod := range newPodList(tc.activePods, api.PodRunning, job) {
-			manager.podStore.Store.Add(&pod)
+			manager.podStore.Indexer.Add(&pod)
 		}
 		for _, pod := range newPodList(tc.succeededPods, api.PodSucceeded, job) {
-			manager.podStore.Store.Add(&pod)
+			manager.podStore.Indexer.Add(&pod)
 		}
 		for _, pod := range newPodList(tc.failedPods, api.PodFailed, job) {
-			manager.podStore.Store.Add(&pod)
+			manager.podStore.Indexer.Add(&pod)
 		}
 
 		// run
@@ -319,13 +319,13 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		job.Status.StartTime = &start
 		manager.jobStore.Store.Add(job)
 		for _, pod := range newPodList(tc.activePods, api.PodRunning, job) {
-			manager.podStore.Store.Add(&pod)
+			manager.podStore.Indexer.Add(&pod)
 		}
 		for _, pod := range newPodList(tc.succeededPods, api.PodSucceeded, job) {
-			manager.podStore.Store.Add(&pod)
+			manager.podStore.Indexer.Add(&pod)
 		}
 		for _, pod := range newPodList(tc.failedPods, api.PodFailed, job) {
-			manager.podStore.Store.Add(&pod)
+			manager.podStore.Indexer.Add(&pod)
 		}
 
 		// run
@@ -571,14 +571,14 @@ func TestSyncJobExpectations(t *testing.T) {
 	job := newJob(2, 2)
 	manager.jobStore.Store.Add(job)
 	pods := newPodList(2, api.PodPending, job)
-	manager.podStore.Store.Add(&pods[0])
+	manager.podStore.Indexer.Add(&pods[0])
 
 	manager.expectations = FakeJobExpectations{
 		controller.NewControllerExpectations(), true, func() {
 			// If we check active pods before checking expectataions, the job
 			// will create a new replica because it doesn't see this pod, but
 			// has fulfilled its expectations.
-			manager.podStore.Store.Add(&pods[1])
+			manager.podStore.Indexer.Add(&pods[1])
 		},
 	}
 	manager.syncJob(getKey(job, t))

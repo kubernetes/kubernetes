@@ -173,7 +173,7 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 		},
 	)
 
-	rsc.podStore.Store, rsc.podController = framework.NewInformer(
+	rsc.podStore.Indexer, rsc.podController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rsc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
@@ -192,6 +192,7 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 			UpdateFunc: rsc.updatePod,
 			DeleteFunc: rsc.deletePod,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	rsc.syncHandler = rsc.syncReplicaSet
