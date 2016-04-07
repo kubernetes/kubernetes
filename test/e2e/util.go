@@ -112,7 +112,8 @@ const (
 
 	// How long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
-	singleCallTimeout = 30 * time.Second
+	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
+	singleCallTimeout = 5 * time.Minute
 
 	// How long nodes have to be "ready" when a test begins. They should already
 	// be "ready" before the test starts, so this is small.
