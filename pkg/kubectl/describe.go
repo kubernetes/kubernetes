@@ -169,7 +169,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string) (string, error) {
 func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.ResourceQuotaList, limitRangeList *api.LimitRangeList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", namespace.Name)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(namespace.Labels))
+		printLabelsMultiline(out, "Labels", namespace.Labels)
 		fmt.Fprintf(out, "Status:\t%s\n", string(namespace.Status.Phase))
 		if resourceQuotaList != nil {
 			fmt.Fprintf(out, "\n")
@@ -497,7 +497,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		if pod.Status.StartTime != nil {
 			fmt.Fprintf(out, "Start Time:\t%s\n", pod.Status.StartTime.Time.Format(time.RFC1123Z))
 		}
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(pod.Labels))
+		printLabelsMultiline(out, "Labels", pod.Labels)
 		if pod.DeletionTimestamp != nil {
 			fmt.Fprintf(out, "Status:\tTerminating (expires %s)\n", pod.DeletionTimestamp.Time.Format(time.RFC1123Z))
 			fmt.Fprintf(out, "Termination Grace Period:\t%ds\n", *pod.DeletionGracePeriodSeconds)
@@ -702,7 +702,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(pv.Labels))
+		printLabelsMultiline(out, "Labels", pv.Labels)
 		fmt.Fprintf(out, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
 			fmt.Fprintf(out, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
@@ -748,7 +748,6 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
-	labels := labels.FormatLabels(pvc.Labels)
 	storage := pvc.Spec.Resources.Requests[api.ResourceStorage]
 	capacity := ""
 	accessModes := ""
@@ -763,7 +762,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (strin
 		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
 		fmt.Fprintf(out, "Status:\t%v\n", pvc.Status.Phase)
 		fmt.Fprintf(out, "Volume:\t%s\n", pvc.Spec.VolumeName)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels)
+		printLabelsMultiline(out, "Labels", pvc.Labels)
 		fmt.Fprintf(out, "Capacity:\t%s\n", capacity)
 		fmt.Fprintf(out, "Access Modes:\t%s\n", accessModes)
 		return nil
@@ -998,7 +997,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 			fmt.Fprintf(out, "Image(s):\t%s\n", "<unset>")
 		}
 		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(controller.Spec.Selector))
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(controller.Labels))
+		printLabelsMultiline(out, "Labels", controller.Labels)
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		if controller.Spec.Template != nil {
@@ -1016,9 +1015,9 @@ func DescribePodTemplate(template *api.PodTemplateSpec, out io.Writer) {
 		fmt.Fprintf(out, "  <unset>")
 		return
 	}
-	fmt.Fprintf(out, "  Labels:\t%s\n", labels.FormatLabels(template.Labels))
+	printLabelsMultiline(out, "  Labels", template.Labels)
 	if len(template.Annotations) > 0 {
-		fmt.Fprintf(out, "  Annotations:\t%s\n", labels.FormatLabels(template.Annotations))
+		printLabelsMultiline(out, "  Annotations", template.Annotations)
 	}
 	if len(template.Spec.ServiceAccountName) > 0 {
 		fmt.Fprintf(out, "  Service Account:\t%s\n", template.Spec.ServiceAccountName)
@@ -1062,7 +1061,7 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		fmt.Fprintf(out, "Namespace:\t%s\n", rs.Namespace)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
 		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(rs.Spec.Selector))
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(rs.Labels))
+		printLabelsMultiline(out, "Labels", rs.Labels)
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		describeVolumes(rs.Spec.Template.Spec.Volumes, out, "")
@@ -1108,7 +1107,7 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		if job.Spec.ActiveDeadlineSeconds != nil {
 			fmt.Fprintf(out, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
 		}
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(job.Labels))
+		printLabelsMultiline(out, "Labels", job.Labels)
 		fmt.Fprintf(out, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
 		describeVolumes(job.Spec.Template.Spec.Volumes, out, "")
 		if events != nil {
@@ -1157,7 +1156,7 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 		}
 		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(daemon.Labels))
+		printLabelsMultiline(out, "Labels", daemon.Labels)
 		fmt.Fprintf(out, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
 		fmt.Fprintf(out, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
 		fmt.Fprintf(out, "Number of Nodes Misscheduled: %d\n", daemon.Status.NumberMisscheduled)
@@ -1189,8 +1188,8 @@ func describeSecret(secret *api.Secret) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", secret.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", secret.Namespace)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(secret.Labels))
-		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(secret.Annotations))
+		printLabelsMultiline(out, "Labels", secret.Labels)
+		printLabelsMultiline(out, "Annotations", secret.Annotations)
 
 		fmt.Fprintf(out, "\nType:\t%s\n", secret.Type)
 
@@ -1350,7 +1349,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", service.Namespace)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(service.Labels))
+		printLabelsMultiline(out, "Labels", service.Labels)
 		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "Type:\t%s\n", service.Spec.Type)
 		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.ClusterIP)
@@ -1401,7 +1400,7 @@ func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error)
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", ep.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", ep.Namespace)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(ep.Labels))
+		printLabelsMultiline(out, "Labels", ep.Labels)
 
 		fmt.Fprintf(out, "Subsets:\n")
 		for i := range ep.Subsets {
@@ -1484,7 +1483,7 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", serviceAccount.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", serviceAccount.Namespace)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(serviceAccount.Labels))
+		printLabelsMultiline(out, "Labels", serviceAccount.Labels)
 		fmt.Fprintln(out)
 
 		var (
@@ -1572,7 +1571,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events *api.EventList, canViewPods bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(node.Labels))
+		printLabelsMultiline(out, "Labels", node.Labels)
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		fmt.Fprintf(out, "Phase:\t%v\n", node.Status.Phase)
 		if len(node.Status.Conditions) > 0 {
@@ -1643,8 +1642,8 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", hpa.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", hpa.Namespace)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(hpa.Labels))
-		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(hpa.Annotations))
+		printLabelsMultiline(out, "Labels", hpa.Labels)
+		printLabelsMultiline(out, "Annotations", hpa.Annotations)
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
 		fmt.Fprintf(out, "Reference:\t%s/%s/%s\n",
 			hpa.Spec.ScaleRef.Kind,
@@ -1799,7 +1798,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 		fmt.Fprintf(out, "Name:\t%s\n", d.ObjectMeta.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", d.ObjectMeta.Namespace)
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(d.Labels))
+		printLabelsMultiline(out, "Labels", d.Labels)
 		fmt.Fprintf(out, "Selector:\t%s\n", selector)
 		fmt.Fprintf(out, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
 		fmt.Fprintf(out, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
@@ -1925,8 +1924,8 @@ func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", configMap.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", configMap.Namespace)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(configMap.Labels))
-		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(configMap.Annotations))
+		printLabelsMultiline(out, "Labels", configMap.Labels)
+		printLabelsMultiline(out, "Annotations", configMap.Annotations)
 
 		fmt.Fprintf(out, "\nData\n====\n")
 		for k, v := range configMap.Data {
@@ -2075,4 +2074,29 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 		err = out[1].Interface().(error)
 	}
 	return s, err
+}
+
+// printLabelsMultiline prints multiple labels with a proper alignment.
+func printLabelsMultiline(out io.Writer, title string, labels map[string]string) {
+	fmt.Fprintf(out, "%s:\t", title)
+
+	if labels == nil || len(labels) == 0 {
+		fmt.Fprintln(out, "<none>")
+		return
+	}
+
+	// to print labels in the sorted order
+	keys := make([]string, 0, len(labels))
+	for key := range labels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for i, key := range keys {
+		if i != 0 {
+			fmt.Fprint(out, "\t")
+		}
+		fmt.Fprintf(out, "%s=%s\n", key, labels[key])
+		i++
+	}
 }
