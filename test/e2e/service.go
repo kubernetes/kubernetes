@@ -399,7 +399,7 @@ var _ = KubeDescribe("Services", func() {
 		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
 		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 		if err != nil {
-			Failf("expected node port %d to be in use, stdout: %v", nodePort, stdout)
+			Failf("expected node port %d to be in use, stdout: %v. err: %v", nodePort, stdout, err)
 		}
 	})
 
