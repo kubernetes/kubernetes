@@ -25,6 +25,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -35,8 +36,8 @@ const (
 	resourceQuotaTimeout = 30 * time.Second
 )
 
-var _ = KubeDescribe("ResourceQuota", func() {
-	f := NewDefaultFramework("resourcequota")
+var _ = framework.KubeDescribe("ResourceQuota", func() {
+	f := framework.NewDefaultFramework("resourcequota")
 
 	It("should create a ResourceQuota and ensure its status is promptly calculated.", func() {
 		By("Creating a ResourceQuota")
@@ -712,7 +713,7 @@ func deleteResourceQuota(c *client.Client, namespace, name string) error {
 
 // wait for resource quota status to show the expected used resources value
 func waitForResourceQuota(c *client.Client, ns, quotaName string, used api.ResourceList) error {
-	return wait.Poll(poll, resourceQuotaTimeout, func() (bool, error) {
+	return wait.Poll(framework.Poll, resourceQuotaTimeout, func() (bool, error) {
 		resourceQuota, err := c.ResourceQuotas(ns).Get(quotaName)
 		if err != nil {
 			return false, err
@@ -724,7 +725,7 @@ func waitForResourceQuota(c *client.Client, ns, quotaName string, used api.Resou
 		// verify that the quota shows the expected used resource values
 		for k, v := range used {
 			if actualValue, found := resourceQuota.Status.Used[k]; !found || (actualValue.Cmp(v) != 0) {
-				Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
+				framework.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
 				return false, nil
 			}
 		}

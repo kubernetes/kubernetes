@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -49,36 +50,36 @@ const (
 // Maximum container failures this test tolerates before failing.
 var MaxContainerFailures = 0
 
-func density30AddonResourceVerifier() map[string]resourceConstraint {
-	constraints := make(map[string]resourceConstraint)
-	constraints["fluentd-elasticsearch"] = resourceConstraint{
-		cpuConstraint:    0.1,
-		memoryConstraint: 250 * (1024 * 1024),
+func density30AddonResourceVerifier() map[string]framework.ResourceConstraint {
+	constraints := make(map[string]framework.ResourceConstraint)
+	constraints["fluentd-elasticsearch"] = framework.ResourceConstraint{
+		CPUConstraint:    0.1,
+		MemoryConstraint: 250 * (1024 * 1024),
 	}
-	constraints["elasticsearch-logging"] = resourceConstraint{
-		cpuConstraint: 2,
+	constraints["elasticsearch-logging"] = framework.ResourceConstraint{
+		CPUConstraint: 2,
 		// TODO: bring it down to 750MB again, when we lower Kubelet verbosity level. I.e. revert #19164
-		memoryConstraint: 5000 * (1024 * 1024),
+		MemoryConstraint: 5000 * (1024 * 1024),
 	}
-	constraints["heapster"] = resourceConstraint{
-		cpuConstraint:    2,
-		memoryConstraint: 1800 * (1024 * 1024),
+	constraints["heapster"] = framework.ResourceConstraint{
+		CPUConstraint:    2,
+		MemoryConstraint: 1800 * (1024 * 1024),
 	}
-	constraints["kibana-logging"] = resourceConstraint{
-		cpuConstraint:    0.2,
-		memoryConstraint: 100 * (1024 * 1024),
+	constraints["kibana-logging"] = framework.ResourceConstraint{
+		CPUConstraint:    0.2,
+		MemoryConstraint: 100 * (1024 * 1024),
 	}
-	constraints["kube-proxy"] = resourceConstraint{
-		cpuConstraint:    0.05,
-		memoryConstraint: 20 * (1024 * 1024),
+	constraints["kube-proxy"] = framework.ResourceConstraint{
+		CPUConstraint:    0.05,
+		MemoryConstraint: 20 * (1024 * 1024),
 	}
-	constraints["l7-lb-controller"] = resourceConstraint{
-		cpuConstraint:    0.05,
-		memoryConstraint: 20 * (1024 * 1024),
+	constraints["l7-lb-controller"] = framework.ResourceConstraint{
+		CPUConstraint:    0.05,
+		MemoryConstraint: 20 * (1024 * 1024),
 	}
-	constraints["influxdb"] = resourceConstraint{
-		cpuConstraint:    2,
-		memoryConstraint: 500 * (1024 * 1024),
+	constraints["influxdb"] = framework.ResourceConstraint{
+		CPUConstraint:    2,
+		MemoryConstraint: 500 * (1024 * 1024),
 	}
 	return constraints
 }
@@ -90,7 +91,7 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 // IMPORTANT: This test is designed to work on large (>= 100 Nodes) clusters. For smaller ones
 // results will not be representative for control-plane performance as we'll start hitting
 // limits on Docker's concurrent container startup.
-var _ = KubeDescribe("Density", func() {
+var _ = framework.KubeDescribe("Density", func() {
 	var c *client.Client
 	var nodeCount int
 	var RCName string
@@ -109,35 +110,35 @@ var _ = KubeDescribe("Density", func() {
 			saturationThreshold = MinSaturationThreshold
 		}
 		Expect(e2eStartupTime).NotTo(BeNumerically(">", saturationThreshold))
-		saturationData := SaturationTime{
+		saturationData := framework.SaturationTime{
 			TimeToSaturate: e2eStartupTime,
 			NumberOfNodes:  nodeCount,
 			NumberOfPods:   totalPods,
 			Throughput:     float32(totalPods) / float32(e2eStartupTime/time.Second),
 		}
-		Logf("Cluster saturation time: %s", prettyPrintJSON(saturationData))
+		framework.Logf("Cluster saturation time: %s", framework.PrettyPrintJSON(saturationData))
 
 		// Verify latency metrics.
-		highLatencyRequests, err := HighLatencyRequests(c)
-		expectNoError(err)
+		highLatencyRequests, err := framework.HighLatencyRequests(c)
+		framework.ExpectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 
 		// Verify scheduler metrics.
 		// TODO: Reset metrics at the beginning of the test.
 		// We should do something similar to how we do it for APIserver.
-		expectNoError(VerifySchedulerLatency(c))
+		framework.ExpectNoError(framework.VerifySchedulerLatency(c))
 	})
 
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	framework := NewDefaultFramework("density")
-	framework.NamespaceDeletionTimeout = time.Hour
+	f := framework.NewDefaultFramework("density")
+	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		c = framework.Client
-		ns = framework.Namespace.Name
+		c = f.Client
+		ns = f.Namespace.Name
 
-		nodes := ListSchedulableNodesOrDie(c)
+		nodes := framework.ListSchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
@@ -147,15 +148,15 @@ var _ = KubeDescribe("Density", func() {
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err := checkTestingNSDeletedExcept(c, ns)
-		expectNoError(err)
+		err := framework.CheckTestingNSDeletedExcept(c, ns)
+		framework.ExpectNoError(err)
 
 		uuid = string(util.NewUUID())
 
-		expectNoError(resetMetrics(c))
-		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
+		framework.ExpectNoError(framework.ResetMetrics(c))
+		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(framework.TestContext.OutputDir+"/%s", uuid), 0777))
 
-		Logf("Listing nodes for easy debugging:\n")
+		framework.Logf("Listing nodes for easy debugging:\n")
 		for _, node := range nodes.Items {
 			var internalIP, externalIP string
 			for _, address := range node.Status.Addresses {
@@ -166,7 +167,7 @@ var _ = KubeDescribe("Density", func() {
 					externalIP = address.Address
 				}
 			}
-			Logf("Name: %v, clusterIP: %v, externalIP: %v", node.ObjectMeta.Name, internalIP, externalIP)
+			framework.Logf("Name: %v, clusterIP: %v, externalIP: %v", node.ObjectMeta.Name, internalIP, externalIP)
 		}
 	})
 
@@ -192,7 +193,7 @@ var _ = KubeDescribe("Density", func() {
 		switch testArg.podsPerNode {
 		case 30:
 			name = "[Feature:Performance] " + name
-			framework.addonResourceConstraints = density30AddonResourceVerifier()
+			f.AddonResourceConstraints = density30AddonResourceVerifier()
 		case 95:
 			name = "[Feature:HighDensityPerformance]" + name
 		default:
@@ -203,10 +204,10 @@ var _ = KubeDescribe("Density", func() {
 			podsPerNode := itArg.podsPerNode
 			totalPods = podsPerNode * nodeCount
 			RCName = "density" + strconv.Itoa(totalPods) + "-" + uuid
-			fileHndl, err := os.Create(fmt.Sprintf(testContext.OutputDir+"/%s/pod_states.csv", uuid))
-			expectNoError(err)
+			fileHndl, err := os.Create(fmt.Sprintf(framework.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
+			framework.ExpectNoError(err)
 			defer fileHndl.Close()
-			config := RCConfig{Client: c,
+			config := framework.RCConfig{Client: c,
 				Image:                "gcr.io/google_containers/pause:2.0",
 				Name:                 RCName,
 				Namespace:            ns,
@@ -274,10 +275,10 @@ var _ = KubeDescribe("Density", func() {
 
 			// Start the replication controller.
 			startTime := time.Now()
-			expectNoError(RunRC(config))
+			framework.ExpectNoError(framework.RunRC(config))
 			e2eStartupTime = time.Now().Sub(startTime)
-			Logf("E2E startup time for %d pods: %v", totalPods, e2eStartupTime)
-			Logf("Throughput (pods/s) during cluster saturation phase: %v", float32(totalPods)/float32(e2eStartupTime/time.Second))
+			framework.Logf("E2E startup time for %d pods: %v", totalPods, e2eStartupTime)
+			framework.Logf("Throughput (pods/s) during cluster saturation phase: %v", float32(totalPods)/float32(e2eStartupTime/time.Second))
 
 			By("Waiting for all events to be recorded")
 			last := -1
@@ -302,21 +303,21 @@ var _ = KubeDescribe("Density", func() {
 			close(stop)
 
 			if current != last {
-				Logf("Warning: Not all events were recorded after waiting %.2f minutes", timeout.Minutes())
+				framework.Logf("Warning: Not all events were recorded after waiting %.2f minutes", timeout.Minutes())
 			}
-			Logf("Found %d events", current)
+			framework.Logf("Found %d events", current)
 			if currentCount != lastCount {
-				Logf("Warning: Not all updates were recorded after waiting %.2f minutes", timeout.Minutes())
+				framework.Logf("Warning: Not all updates were recorded after waiting %.2f minutes", timeout.Minutes())
 			}
-			Logf("Found %d updates", currentCount)
+			framework.Logf("Found %d updates", currentCount)
 
 			// Tune the threshold for allowed failures.
-			badEvents := BadEvents(events)
+			badEvents := framework.BadEvents(events)
 			Expect(badEvents).NotTo(BeNumerically(">", int(math.Floor(0.01*float64(totalPods)))))
 			// Print some data about Pod to Node allocation
 			By("Printing Pod to Node allocation data")
 			podList, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-			expectNoError(err)
+			framework.ExpectNoError(err)
 			pausePodAllocation := make(map[string]int)
 			systemPodAllocation := make(map[string][]string)
 			for _, pod := range podList.Items {
@@ -332,7 +333,7 @@ var _ = KubeDescribe("Density", func() {
 			}
 			sort.Strings(nodeNames)
 			for _, node := range nodeNames {
-				Logf("%v: %v pause pods, system pods: %v", node, pausePodAllocation[node], systemPodAllocation[node])
+				framework.Logf("%v: %v pause pods, system pods: %v", node, pausePodAllocation[node], systemPodAllocation[node])
 			}
 
 			if itArg.runLatencyTest {
@@ -366,7 +367,7 @@ var _ = KubeDescribe("Density", func() {
 							if startTime != unversioned.NewTime(time.Time{}) {
 								runTimes[p.Name] = startTime
 							} else {
-								Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
+								framework.Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
 							}
 						}
 					}
@@ -428,7 +429,7 @@ var _ = KubeDescribe("Density", func() {
 				By("Waiting for all Pods begin observed by the watch...")
 				for start := time.Now(); len(watchTimes) < nodeCount; time.Sleep(10 * time.Second) {
 					if time.Since(start) < timeout {
-						Failf("Timeout reached waiting for all Pods being observed by the watch.")
+						framework.Failf("Timeout reached waiting for all Pods being observed by the watch.")
 					}
 				}
 				close(stopCh)
@@ -440,7 +441,7 @@ var _ = KubeDescribe("Density", func() {
 				}
 				for node, count := range nodeToLatencyPods {
 					if count > 1 {
-						Logf("%d latency pods scheduled on %s", count, node)
+						framework.Logf("%d latency pods scheduled on %s", count, node)
 					}
 				}
 
@@ -451,7 +452,7 @@ var _ = KubeDescribe("Density", func() {
 				}.AsSelector()
 				options := api.ListOptions{FieldSelector: selector}
 				schedEvents, err := c.Events(ns).List(options)
-				expectNoError(err)
+				framework.ExpectNoError(err)
 				for k := range createTimes {
 					for _, event := range schedEvents.Items {
 						if event.InvolvedObject.Name == k {
@@ -461,11 +462,11 @@ var _ = KubeDescribe("Density", func() {
 					}
 				}
 
-				scheduleLag := make([]podLatencyData, 0)
-				startupLag := make([]podLatencyData, 0)
-				watchLag := make([]podLatencyData, 0)
-				schedToWatchLag := make([]podLatencyData, 0)
-				e2eLag := make([]podLatencyData, 0)
+				scheduleLag := make([]framework.PodLatencyData, 0)
+				startupLag := make([]framework.PodLatencyData, 0)
+				watchLag := make([]framework.PodLatencyData, 0)
+				schedToWatchLag := make([]framework.PodLatencyData, 0)
+				e2eLag := make([]framework.PodLatencyData, 0)
 
 				for name, create := range createTimes {
 					sched, ok := scheduleTimes[name]
@@ -477,30 +478,30 @@ var _ = KubeDescribe("Density", func() {
 					node, ok := nodes[name]
 					Expect(ok).To(Equal(true))
 
-					scheduleLag = append(scheduleLag, podLatencyData{name, node, sched.Time.Sub(create.Time)})
-					startupLag = append(startupLag, podLatencyData{name, node, run.Time.Sub(sched.Time)})
-					watchLag = append(watchLag, podLatencyData{name, node, watch.Time.Sub(run.Time)})
-					schedToWatchLag = append(schedToWatchLag, podLatencyData{name, node, watch.Time.Sub(sched.Time)})
-					e2eLag = append(e2eLag, podLatencyData{name, node, watch.Time.Sub(create.Time)})
+					scheduleLag = append(scheduleLag, framework.PodLatencyData{name, node, sched.Time.Sub(create.Time)})
+					startupLag = append(startupLag, framework.PodLatencyData{name, node, run.Time.Sub(sched.Time)})
+					watchLag = append(watchLag, framework.PodLatencyData{name, node, watch.Time.Sub(run.Time)})
+					schedToWatchLag = append(schedToWatchLag, framework.PodLatencyData{name, node, watch.Time.Sub(sched.Time)})
+					e2eLag = append(e2eLag, framework.PodLatencyData{name, node, watch.Time.Sub(create.Time)})
 				}
 
-				sort.Sort(latencySlice(scheduleLag))
-				sort.Sort(latencySlice(startupLag))
-				sort.Sort(latencySlice(watchLag))
-				sort.Sort(latencySlice(schedToWatchLag))
-				sort.Sort(latencySlice(e2eLag))
+				sort.Sort(framework.LatencySlice(scheduleLag))
+				sort.Sort(framework.LatencySlice(startupLag))
+				sort.Sort(framework.LatencySlice(watchLag))
+				sort.Sort(framework.LatencySlice(schedToWatchLag))
+				sort.Sort(framework.LatencySlice(e2eLag))
 
-				printLatencies(scheduleLag, "worst schedule latencies")
-				printLatencies(startupLag, "worst run-after-schedule latencies")
-				printLatencies(watchLag, "worst watch latencies")
-				printLatencies(schedToWatchLag, "worst scheduled-to-end total latencies")
-				printLatencies(e2eLag, "worst e2e total latencies")
+				framework.PrintLatencies(scheduleLag, "worst schedule latencies")
+				framework.PrintLatencies(startupLag, "worst run-after-schedule latencies")
+				framework.PrintLatencies(watchLag, "worst watch latencies")
+				framework.PrintLatencies(schedToWatchLag, "worst scheduled-to-end total latencies")
+				framework.PrintLatencies(e2eLag, "worst e2e total latencies")
 
 				// Test whether e2e pod startup time is acceptable.
-				podStartupLatency := PodStartupLatency{Latency: extractLatencyMetrics(e2eLag)}
-				expectNoError(VerifyPodStartupLatency(podStartupLatency))
+				podStartupLatency := framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLag)}
+				framework.ExpectNoError(framework.VerifyPodStartupLatency(podStartupLatency))
 
-				logSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
+				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
 			}
 
 			By("Deleting ReplicationController")
@@ -508,8 +509,8 @@ var _ = KubeDescribe("Density", func() {
 			rc, err := c.ReplicationControllers(ns).Get(RCName)
 			if err == nil && rc.Spec.Replicas != 0 {
 				By("Cleaning up the replication controller")
-				err := DeleteRC(c, ns, RCName)
-				expectNoError(err)
+				err := framework.DeleteRC(c, ns, RCName)
+				framework.ExpectNoError(err)
 			}
 
 			By("Removing additional replication controllers if any")
@@ -559,7 +560,7 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c *client.Client, name, ns, imag
 		},
 	}
 	_, err := c.ReplicationControllers(ns).Create(rc)
-	expectNoError(err)
-	expectNoError(waitForRCPodsRunning(c, ns, name))
-	Logf("Found pod '%s' running", name)
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(framework.WaitForRCPodsRunning(c, ns, name))
+	framework.Logf("Found pod '%s' running", name)
 }

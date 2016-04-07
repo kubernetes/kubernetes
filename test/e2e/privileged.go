@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -43,17 +44,17 @@ const (
 
 type PrivilegedPodTestConfig struct {
 	privilegedPod *api.Pod
-	f             *Framework
+	f             *framework.Framework
 	hostExecPod   *api.Pod
 }
 
-var _ = KubeDescribe("PrivilegedPod", func() {
-	f := NewDefaultFramework("e2e-privilegedpod")
+var _ = framework.KubeDescribe("PrivilegedPod", func() {
+	f := framework.NewDefaultFramework("e2e-privilegedpod")
 	config := &PrivilegedPodTestConfig{
 		f: f,
 	}
 	It("should test privileged pod", func() {
-		config.hostExecPod = LaunchHostExecPod(config.f.Client, config.f.Namespace.Name, "hostexec")
+		config.hostExecPod = framework.LaunchHostExecPod(config.f.Client, config.f.Namespace.Name, "hostexec")
 
 		By("Creating a privileged pod")
 		config.createPrivilegedPod()
@@ -69,14 +70,14 @@ var _ = KubeDescribe("PrivilegedPod", func() {
 func (config *PrivilegedPodTestConfig) runPrivilegedCommandOnPrivilegedContainer() {
 	outputMap := config.dialFromContainer(config.privilegedPod.Status.PodIP, privilegedHttpPort)
 	if len(outputMap["error"]) > 0 {
-		Failf("Privileged command failed unexpectedly on privileged container, output:%v", outputMap)
+		framework.Failf("Privileged command failed unexpectedly on privileged container, output:%v", outputMap)
 	}
 }
 
 func (config *PrivilegedPodTestConfig) runPrivilegedCommandOnNonPrivilegedContainer() {
 	outputMap := config.dialFromContainer(config.privilegedPod.Status.PodIP, notPrivilegedHttpPort)
 	if len(outputMap["error"]) == 0 {
-		Failf("Privileged command should have failed on non-privileged container, output:%v", outputMap)
+		framework.Failf("Privileged command should have failed on non-privileged container, output:%v", outputMap)
 	}
 }
 
@@ -89,11 +90,11 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 		v.Encode())
 
 	By(fmt.Sprintf("Exec-ing into container over http. Running command:%s", cmd))
-	stdout := RunHostCmdOrDie(config.hostExecPod.Namespace, config.hostExecPod.Name, cmd)
+	stdout := framework.RunHostCmdOrDie(config.hostExecPod.Namespace, config.hostExecPod.Name, cmd)
 	var output map[string]string
 	err := json.Unmarshal([]byte(stdout), &output)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Could not unmarshal curl response: %s", stdout))
-	Logf("Deserialized output is %v", stdout)
+	framework.Logf("Deserialized output is %v", stdout)
 	return output
 }
 
@@ -147,12 +148,12 @@ func (config *PrivilegedPodTestConfig) createPrivilegedPod() {
 func (config *PrivilegedPodTestConfig) createPod(pod *api.Pod) *api.Pod {
 	createdPod, err := config.getPodClient().Create(pod)
 	if err != nil {
-		Failf("Failed to create %q pod: %v", pod.Name, err)
+		framework.Failf("Failed to create %q pod: %v", pod.Name, err)
 	}
-	expectNoError(config.f.WaitForPodRunning(pod.Name))
+	framework.ExpectNoError(config.f.WaitForPodRunning(pod.Name))
 	createdPod, err = config.getPodClient().Get(pod.Name)
 	if err != nil {
-		Failf("Failed to retrieve %q pod: %v", pod.Name, err)
+		framework.Failf("Failed to retrieve %q pod: %v", pod.Name, err)
 	}
 	return createdPod
 }

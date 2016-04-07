@@ -21,12 +21,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = KubeDescribe("Downward API", func() {
-	framework := NewDefaultFramework("downward-api")
+var _ = framework.KubeDescribe("Downward API", func() {
+	f := framework.NewDefaultFramework("downward-api")
 
 	It("should provide pod name and namespace as env vars [Conformance]", func() {
 		podName := "downward-api-" + string(util.NewUUID())
@@ -53,10 +54,10 @@ var _ = KubeDescribe("Downward API", func() {
 
 		expectations := []string{
 			fmt.Sprintf("POD_NAME=%v", podName),
-			fmt.Sprintf("POD_NAMESPACE=%v", framework.Namespace.Name),
+			fmt.Sprintf("POD_NAMESPACE=%v", f.Namespace.Name),
 		}
 
-		testDownwardAPI(framework, podName, env, expectations)
+		testDownwardAPI(f, podName, env, expectations)
 	})
 
 	It("should provide pod IP as an env var", func() {
@@ -77,11 +78,11 @@ var _ = KubeDescribe("Downward API", func() {
 			"POD_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
 		}
 
-		testDownwardAPI(framework, podName, env, expectations)
+		testDownwardAPI(f, podName, env, expectations)
 	})
 })
 
-func testDownwardAPI(framework *Framework, podName string, env []api.EnvVar, expectations []string) {
+func testDownwardAPI(f *framework.Framework, podName string, env []api.EnvVar, expectations []string) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   podName,
@@ -100,5 +101,5 @@ func testDownwardAPI(framework *Framework, podName string, env []api.EnvVar, exp
 		},
 	}
 
-	framework.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
+	f.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
 }

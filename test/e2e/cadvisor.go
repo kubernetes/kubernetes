@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -31,9 +32,9 @@ const (
 	sleepDuration = 10 * time.Second
 )
 
-var _ = KubeDescribe("Cadvisor", func() {
+var _ = framework.KubeDescribe("Cadvisor", func() {
 
-	f := NewDefaultFramework("cadvisor")
+	f := framework.NewDefaultFramework("cadvisor")
 
 	It("should be healthy on every node.", func() {
 		CheckCadvisorHealthOnAllNodes(f.Client, 5*time.Minute)
@@ -44,7 +45,7 @@ func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 	// It should be OK to list unschedulable Nodes here.
 	By("getting list of nodes")
 	nodeList, err := c.Nodes().List(api.ListOptions{})
-	expectNoError(err)
+	framework.ExpectNoError(err)
 	var errors []error
 	retries := maxRetries
 	for {
@@ -65,8 +66,8 @@ func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 		if retries--; retries <= 0 {
 			break
 		}
-		Logf("failed to retrieve kubelet stats -\n %v", errors)
+		framework.Logf("failed to retrieve kubelet stats -\n %v", errors)
 		time.Sleep(sleepDuration)
 	}
-	Failf("Failed after retrying %d times for cadvisor to be healthy on all nodes. Errors:\n%v", maxRetries, errors)
+	framework.Failf("Failed after retrying %d times for cadvisor to be healthy on all nodes. Errors:\n%v", maxRetries, errors)
 }

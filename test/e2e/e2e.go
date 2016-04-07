@@ -36,6 +36,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -99,19 +100,19 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Delete any namespaces except default and kube-system. This ensures no
 	// lingering resources are left over from a previous test run.
-	if testContext.CleanStart {
-		c, err := loadClient()
+	if framework.TestContext.CleanStart {
+		c, err := framework.LoadClient()
 		if err != nil {
 			glog.Fatal("Error loading client: ", err)
 		}
 
-		deleted, err := deleteNamespaces(c, nil /* deleteFilter */, []string{api.NamespaceSystem, api.NamespaceDefault})
+		deleted, err := framework.DeleteNamespaces(c, nil /* deleteFilter */, []string{api.NamespaceSystem, api.NamespaceDefault})
 		if err != nil {
-			Failf("Error deleting orphaned namespaces: %v", err)
+			framework.Failf("Error deleting orphaned namespaces: %v", err)
 		}
 		glog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
-		if err := waitForNamespacesDeleted(c, deleted, namespaceCleanupTimeout); err != nil {
-			Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
+		if err := framework.WaitForNamespacesDeleted(c, deleted, framework.NamespaceCleanupTimeout); err != nil {
+			framework.Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
 		}
 	}
 
@@ -119,15 +120,15 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
-	if err := waitForPodsRunningReady(api.NamespaceSystem, testContext.MinStartupPods, podStartupTimeout); err != nil {
-		if c, errClient := loadClient(); errClient != nil {
-			Logf("Unable to dump cluster information because: %v", errClient)
+	if err := framework.WaitForPodsRunningReady(api.NamespaceSystem, framework.TestContext.MinStartupPods, podStartupTimeout); err != nil {
+		if c, errClient := framework.LoadClient(); errClient != nil {
+			framework.Logf("Unable to dump cluster information because: %v", errClient)
 		} else {
-			dumpAllNamespaceInfo(c, api.NamespaceSystem)
+			framework.DumpAllNamespaceInfo(c, api.NamespaceSystem)
 		}
-		logFailedContainers(api.NamespaceSystem)
-		runKubernetesServiceTestContainer(testContext.RepoRoot, api.NamespaceDefault)
-		Failf("Error waiting for all pods to be running and ready: %v", err)
+		framework.LogFailedContainers(api.NamespaceSystem)
+		framework.RunKubernetesServiceTestContainer(framework.TestContext.RepoRoot, api.NamespaceDefault)
+		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
 	return nil
@@ -188,7 +189,7 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 }, func() {
 	// Run only Ginkgo on node 1
 	if framework.TestContext.ReportDir != "" {
-		CoreDump(framework.TestContext.ReportDir)
+		framework.CoreDump(framework.TestContext.ReportDir)
 	}
 })
 
@@ -225,6 +226,6 @@ func RunE2ETests(t *testing.T) {
 			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
 		}
 	}
-	glog.Infof("Starting e2e run %q on Ginkgo node %d", runId, config.GinkgoConfig.ParallelNode)
+	glog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunId, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }

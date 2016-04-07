@@ -101,7 +101,7 @@ func (s *LogsSizeDataSummary) PrintHumanReadable() string {
 }
 
 func (s *LogsSizeDataSummary) PrintJSON() string {
-	return prettyPrintJSON(*s)
+	return PrettyPrintJSON(*s)
 }
 
 type LogsSizeData struct {
@@ -144,8 +144,8 @@ func (d *LogsSizeData) AddNewData(ip, path string, timestamp time.Time, size int
 // NewLogsVerifier creates a new LogsSizeVerifier which will stop when stopChannel is closed
 func NewLogsVerifier(c *client.Client, stopChannel chan bool) *LogsSizeVerifier {
 	nodeAddresses, err := NodeSSHHosts(c)
-	expectNoError(err)
-	masterAddress := getMasterHost() + ":22"
+	ExpectNoError(err)
+	masterAddress := GetMasterHost() + ":22"
 
 	workChannel := make(chan WorkItem, len(nodeAddresses)+1)
 	workers := make([]*LogSizeGatherer, workersNo)
@@ -241,7 +241,7 @@ func (g *LogSizeGatherer) Work() bool {
 	sshResult, err := SSH(
 		fmt.Sprintf("ls -l %v | awk '{print $9, $5}' | tr '\n' ' '", strings.Join(workItem.paths, " ")),
 		workItem.ip,
-		testContext.Provider,
+		TestContext.Provider,
 	)
 	if err != nil {
 		Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)

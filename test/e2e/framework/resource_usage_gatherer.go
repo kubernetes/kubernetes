@@ -38,9 +38,9 @@ const (
 	probeDuration               = 15 * time.Second
 )
 
-type resourceConstraint struct {
-	cpuConstraint    float64
-	memoryConstraint uint64
+type ResourceConstraint struct {
+	CPUConstraint    float64
+	MemoryConstraint uint64
 }
 
 type SingleContainerSummary struct {
@@ -67,12 +67,12 @@ func (s *ResourceUsageSummary) PrintHumanReadable() string {
 }
 
 func (s *ResourceUsageSummary) PrintJSON() string {
-	return prettyPrintJSON(*s)
+	return PrettyPrintJSON(*s)
 }
 
-func computePercentiles(timeSeries []resourceUsagePerContainer, percentilesToCompute []int) map[int]resourceUsagePerContainer {
+func computePercentiles(timeSeries []ResourceUsagePerContainer, percentilesToCompute []int) map[int]ResourceUsagePerContainer {
 	if len(timeSeries) == 0 {
-		return make(map[int]resourceUsagePerContainer)
+		return make(map[int]ResourceUsagePerContainer)
 	}
 	dataMap := make(map[string]*usageDataPerContainer)
 	for i := range timeSeries {
@@ -95,12 +95,12 @@ func computePercentiles(timeSeries []resourceUsagePerContainer, percentilesToCom
 		sort.Sort(uint64arr(v.memWorkSetData))
 	}
 
-	result := make(map[int]resourceUsagePerContainer)
+	result := make(map[int]ResourceUsagePerContainer)
 	for _, perc := range percentilesToCompute {
-		data := make(resourceUsagePerContainer)
+		data := make(ResourceUsagePerContainer)
 		for k, v := range dataMap {
 			percentileIndex := int(math.Ceil(float64(len(v.cpuData)*perc)/100)) - 1
-			data[k] = &containerResourceUsage{
+			data[k] = &ContainerResourceUsage{
 				Name:                    k,
 				CPUUsageInCores:         v.cpuData[percentileIndex],
 				MemoryUsageInBytes:      v.memUseData[percentileIndex],
@@ -112,8 +112,8 @@ func computePercentiles(timeSeries []resourceUsagePerContainer, percentilesToCom
 	return result
 }
 
-func leftMergeData(left, right map[int]resourceUsagePerContainer) map[int]resourceUsagePerContainer {
-	result := make(map[int]resourceUsagePerContainer)
+func leftMergeData(left, right map[int]ResourceUsagePerContainer) map[int]ResourceUsagePerContainer {
+	result := make(map[int]ResourceUsagePerContainer)
 	for percentile, data := range left {
 		result[percentile] = data
 		if _, ok := right[percentile]; !ok {
@@ -133,12 +133,12 @@ type resourceGatherWorker struct {
 	containerIDToNameMap map[string]string
 	containerIDs         []string
 	stopCh               chan struct{}
-	dataSeries           []resourceUsagePerContainer
+	dataSeries           []ResourceUsagePerContainer
 	finished             bool
 }
 
 func (w *resourceGatherWorker) singleProbe() {
-	data := make(resourceUsagePerContainer)
+	data := make(ResourceUsagePerContainer)
 	nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, probeDuration, func() []string { return w.containerIDs }, true)
 	if err != nil {
 		Logf("Error while reading data from %v: %v", w.nodeName, err)
@@ -236,7 +236,7 @@ func (g *containerResourceGatherer) startGatheringData() {
 	g.getKubeSystemContainersResourceUsage(g.client)
 }
 
-func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constraints map[string]resourceConstraint) *ResourceUsageSummary {
+func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constraints map[string]ResourceConstraint) *ResourceUsageSummary {
 	close(g.stopCh)
 	Logf("Closed stop channel. Waiting for %v workers", len(g.workers))
 	finished := make(chan struct{})
@@ -261,7 +261,7 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 		Logf("Warning! Empty percentile list for stopAndPrintData.")
 		return &ResourceUsageSummary{}
 	}
-	data := make(map[int]resourceUsagePerContainer)
+	data := make(map[int]ResourceUsagePerContainer)
 	for i := range g.workers {
 		if g.workers[i].finished {
 			stats := computePercentiles(g.workers[i].dataSeries, percentiles)
@@ -290,23 +290,23 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 				// Name has a form: <pod_name>/<container_name>
 				containerName := strings.Split(name, "/")[1]
 				if constraint, ok := constraints[containerName]; ok {
-					if usage.CPUUsageInCores > constraint.cpuConstraint {
+					if usage.CPUUsageInCores > constraint.CPUConstraint {
 						violatedConstraints = append(
 							violatedConstraints,
 							fmt.Sprintf("Container %v is using %v/%v CPU",
 								name,
 								usage.CPUUsageInCores,
-								constraint.cpuConstraint,
+								constraint.CPUConstraint,
 							),
 						)
 					}
-					if usage.MemoryWorkingSetInBytes > constraint.memoryConstraint {
+					if usage.MemoryWorkingSetInBytes > constraint.MemoryConstraint {
 						violatedConstraints = append(
 							violatedConstraints,
 							fmt.Sprintf("Container %v is using %v/%v MB of memory",
 								name,
 								float64(usage.MemoryWorkingSetInBytes)/(1024*1024),
-								float64(constraint.memoryConstraint)/(1024*1024),
+								float64(constraint.MemoryConstraint)/(1024*1024),
 							),
 						)
 					}

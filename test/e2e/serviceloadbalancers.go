@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -95,14 +96,14 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	for i, c := range rc.Spec.Template.Spec.Containers {
 		rc.Spec.Template.Spec.Containers[i].Args = append(
 			c.Args, fmt.Sprintf("--namespace=%v", namespace))
-		Logf("Container args %+v", rc.Spec.Template.Spec.Containers[i].Args)
+		framework.Logf("Container args %+v", rc.Spec.Template.Spec.Containers[i].Args)
 	}
 
 	rc, err = h.client.ReplicationControllers(rc.Namespace).Create(rc)
 	if err != nil {
 		return
 	}
-	if err = waitForRCPodsRunning(h.client, namespace, rc.Name); err != nil {
+	if err = framework.WaitForRCPodsRunning(h.client, namespace, rc.Name); err != nil {
 		return
 	}
 	h.rcName = rc.Name
@@ -119,10 +120,10 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 
 	// Find the external addresses of the nodes the pods are running on.
 	for _, p := range pods.Items {
-		wait.Poll(pollInterval, serviceRespondingTimeout, func() (bool, error) {
-			address, err := getHostExternalAddress(h.client, &p)
+		wait.Poll(pollInterval, framework.ServiceRespondingTimeout, func() (bool, error) {
+			address, err := framework.GetHostExternalAddress(h.client, &p)
 			if err != nil {
-				Logf("%v", err)
+				framework.Logf("%v", err)
 				return false, nil
 			}
 			h.address = append(h.address, address)
@@ -169,7 +170,7 @@ func (s *ingManager) start(namespace string) (err error) {
 		if err != nil {
 			return
 		}
-		if err = waitForRCPodsRunning(s.client, rc.Namespace, rc.Name); err != nil {
+		if err = framework.WaitForRCPodsRunning(s.client, rc.Namespace, rc.Name); err != nil {
 			return
 		}
 	}
@@ -194,28 +195,28 @@ func (s *ingManager) start(namespace string) (err error) {
 func (s *ingManager) test(path string) error {
 	url := fmt.Sprintf("%v/hostName", path)
 	httpClient := &http.Client{}
-	return wait.Poll(pollInterval, serviceRespondingTimeout, func() (bool, error) {
+	return wait.Poll(pollInterval, framework.ServiceRespondingTimeout, func() (bool, error) {
 		body, err := simpleGET(httpClient, url, "")
 		if err != nil {
-			Logf("%v\n%v\n%v", url, body, err)
+			framework.Logf("%v\n%v\n%v", url, body, err)
 			return false, nil
 		}
 		return true, nil
 	})
 }
 
-var _ = KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
+var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var repoRoot string
 	var client *client.Client
 
-	framework := NewDefaultFramework("servicelb")
+	f := framework.NewDefaultFramework("servicelb")
 
 	BeforeEach(func() {
-		client = framework.Client
-		ns = framework.Namespace.Name
-		repoRoot = testContext.RepoRoot
+		client = f.Client
+		ns = f.Namespace.Name
+		repoRoot = framework.TestContext.RepoRoot
 	})
 
 	It("should support simple GET on Ingress ips", func() {
@@ -229,7 +230,7 @@ var _ = KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func()
 
 				for _, sName := range s.svcNames {
 					path := t.lookup(sName)
-					Logf("Testing path %v", path)
+					framework.Logf("Testing path %v", path)
 					Expect(s.test(path)).NotTo(HaveOccurred())
 				}
 			}
@@ -266,7 +267,7 @@ func simpleGET(c *http.Client, url, host string) (string, error) {
 // rcFromManifest reads a .json/yaml file and returns the rc in it.
 func rcFromManifest(fileName string) *api.ReplicationController {
 	var controller api.ReplicationController
-	Logf("Parsing rc from %v", fileName)
+	framework.Logf("Parsing rc from %v", fileName)
 	data, err := ioutil.ReadFile(fileName)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -280,7 +281,7 @@ func rcFromManifest(fileName string) *api.ReplicationController {
 // svcFromManifest reads a .json/yaml file and returns the rc in it.
 func svcFromManifest(fileName string) *api.Service {
 	var svc api.Service
-	Logf("Parsing service from %v", fileName)
+	framework.Logf("Parsing service from %v", fileName)
 	data, err := ioutil.ReadFile(fileName)
 	Expect(err).NotTo(HaveOccurred())
 

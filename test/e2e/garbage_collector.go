@@ -25,13 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
 //
 // Slow by design (7 min)
-var _ = KubeDescribe("Garbage collector [Feature:GarbageCollector] [Slow]", func() {
-	f := NewDefaultFramework("garbage-collector")
+var _ = framework.KubeDescribe("Garbage collector [Feature:GarbageCollector] [Slow]", func() {
+	f := framework.NewDefaultFramework("garbage-collector")
 	It("should handle the creation of 1000 pods", func() {
 		var count int
 		for count < 1000 {
@@ -40,16 +41,16 @@ var _ = KubeDescribe("Garbage collector [Feature:GarbageCollector] [Slow]", func
 			pod.Status.Phase = api.PodFailed
 			pod, err = f.Client.Pods(f.Namespace.Name).UpdateStatus(pod)
 			if err != nil {
-				Failf("err failing pod: %v", err)
+				framework.Failf("err failing pod: %v", err)
 			}
 
 			count++
 			if count%50 == 0 {
-				Logf("count: %v", count)
+				framework.Logf("count: %v", count)
 			}
 		}
 
-		Logf("created: %v", count)
+		framework.Logf("created: %v", count)
 
 		// The gc controller polls every 30s and fires off a goroutine per
 		// pod to terminate.
@@ -62,22 +63,22 @@ var _ = KubeDescribe("Garbage collector [Feature:GarbageCollector] [Slow]", func
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
 			pods, err = f.Client.Pods(f.Namespace.Name).List(api.ListOptions{})
 			if err != nil {
-				Logf("Failed to list pod %v", err)
+				framework.Logf("Failed to list pod %v", err)
 				return false, nil
 			}
 			if len(pods.Items) != gcThreshold {
-				Logf("Number of observed pods %v, waiting for %v", len(pods.Items), gcThreshold)
+				framework.Logf("Number of observed pods %v, waiting for %v", len(pods.Items), gcThreshold)
 				return false, nil
 			}
 			return true, nil
 		})
 		if pollErr != nil {
-			Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
+			framework.Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
 		}
 	})
 })
 
-func createTerminatingPod(f *Framework) (*api.Pod, error) {
+func createTerminatingPod(f *framework.Framework) (*api.Pod, error) {
 	uuid := util.NewUUID()
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{

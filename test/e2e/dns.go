@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const dnsTestPodHostName = "dns-querier-1"
@@ -150,9 +151,9 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, fileNameP
 func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *client.Client) {
 	var failed []string
 
-	expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+	framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 		failed = []string{}
-		subResourceProxyAvailable, err := serverVersionGTE(subResourcePodProxyVersion, client)
+		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, client)
 		if err != nil {
 			return false, err
 		}
@@ -175,20 +176,20 @@ func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *
 					Do().Raw()
 			}
 			if err != nil {
-				Logf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
+				framework.Logf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
 				failed = append(failed, fileName)
 			}
 		}
 		if len(failed) == 0 {
 			return true, nil
 		}
-		Logf("Lookups using %s failed for: %v\n", pod.Name, failed)
+		framework.Logf("Lookups using %s failed for: %v\n", pod.Name, failed)
 		return false, nil
 	}))
 	Expect(len(failed)).To(Equal(0))
 }
 
-func validateDNSResults(f *Framework, pod *api.Pod, fileNames []string) {
+func validateDNSResults(f *framework.Framework, pod *api.Pod, fileNames []string) {
 
 	By("submitting the pod to kubernetes")
 	podClient := f.Client.Pods(f.Namespace.Name)
@@ -198,15 +199,15 @@ func validateDNSResults(f *Framework, pod *api.Pod, fileNames []string) {
 		podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(pod); err != nil {
-		Failf("Failed to create %s pod: %v", pod.Name, err)
+		framework.Failf("Failed to create %s pod: %v", pod.Name, err)
 	}
 
-	expectNoError(f.WaitForPodRunning(pod.Name))
+	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 	By("retrieving the pod")
 	pod, err := podClient.Get(pod.Name)
 	if err != nil {
-		Failf("Failed to get pod %s: %v", pod.Name, err)
+		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
 	}
 	// Try to find results for each expected name.
 	By("looking for the results for each expected name from probiers")
@@ -214,21 +215,21 @@ func validateDNSResults(f *Framework, pod *api.Pod, fileNames []string) {
 
 	// TODO: probe from the host, too.
 
-	Logf("DNS probes using %s succeeded\n", pod.Name)
+	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
 }
 
-func verifyDNSPodIsRunning(f *Framework) {
+func verifyDNSPodIsRunning(f *framework.Framework) {
 	systemClient := f.Client.Pods(api.NamespaceSystem)
 	By("Waiting for DNS Service to be Running")
 	options := api.ListOptions{LabelSelector: dnsServiceLabelSelector}
 	dnsPods, err := systemClient.List(options)
 	if err != nil {
-		Failf("Failed to list all dns service pods")
+		framework.Failf("Failed to list all dns service pods")
 	}
 	if len(dnsPods.Items) != 1 {
-		Failf("Unexpected number of pods (%d) matches the label selector %v", len(dnsPods.Items), dnsServiceLabelSelector.String())
+		framework.Failf("Unexpected number of pods (%d) matches the label selector %v", len(dnsPods.Items), dnsServiceLabelSelector.String())
 	}
-	expectNoError(waitForPodRunningInNamespace(f.Client, dnsPods.Items[0].Name, api.NamespaceSystem))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, dnsPods.Items[0].Name, api.NamespaceSystem))
 }
 
 func createServiceSpec(serviceName string, isHeadless bool, selector map[string]string) *api.Service {
@@ -249,8 +250,8 @@ func createServiceSpec(serviceName string, isHeadless bool, selector map[string]
 	return headlessService
 }
 
-var _ = KubeDescribe("DNS", func() {
-	f := NewDefaultFramework("dns")
+var _ = framework.KubeDescribe("DNS", func() {
+	f := framework.NewDefaultFramework("dns")
 
 	It("should provide DNS for the cluster [Conformance]", func() {
 		verifyDNSPodIsRunning(f)
@@ -264,7 +265,7 @@ var _ = KubeDescribe("DNS", func() {
 			"google.com",
 		}
 		// Added due to #8512. This is critical for GCE and GKE deployments.
-		if providerIs("gce", "gke") {
+		if framework.ProviderIs("gce", "gke") {
 			namesToResolve = append(namesToResolve, "metadata")
 		}
 

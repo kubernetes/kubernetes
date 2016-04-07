@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/system"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -63,7 +64,7 @@ func getRequestedCPU(pod api.Pod) int64 {
 
 func verifyResult(c *client.Client, podName string, ns string) {
 	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-	expectNoError(err)
+	framework.ExpectNoError(err)
 	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
 
 	selector := fields.Set{
@@ -75,7 +76,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 	}.AsSelector()
 	options := api.ListOptions{FieldSelector: selector}
 	schedEvents, err := c.Events(ns).List(options)
-	expectNoError(err)
+	framework.ExpectNoError(err)
 	// If we failed to find event with a capitalized first letter of reason
 	// try looking for one starting with a small one for backward compatibility.
 	// If we don't do it we end up in #15806.
@@ -90,7 +91,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 		}.AsSelector()
 		options := api.ListOptions{FieldSelector: selector}
 		schedEvents, err = c.Events(ns).List(options)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 	}
 
 	printed := false
@@ -110,10 +111,10 @@ func verifyResult(c *client.Client, podName string, ns string) {
 func cleanupPods(c *client.Client, ns string) {
 	By("Removing all pods in namespace " + ns)
 	pods, err := c.Pods(ns).List(api.ListOptions{})
-	expectNoError(err)
+	framework.ExpectNoError(err)
 	opt := api.NewDeleteOptions(0)
 	for _, p := range pods.Items {
-		expectNoError(c.Pods(ns).Delete(p.ObjectMeta.Name, opt))
+		framework.ExpectNoError(c.Pods(ns).Delete(p.ObjectMeta.Name, opt))
 	}
 }
 
@@ -123,24 +124,24 @@ func waitForStableCluster(c *client.Client) int {
 	startTime := time.Now()
 
 	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-	expectNoError(err)
+	framework.ExpectNoError(err)
 	scheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
 	for len(currentlyNotScheduledPods) != 0 {
 		time.Sleep(2 * time.Second)
 
 		allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		scheduledPods, currentlyNotScheduledPods = getPodsScheduled(allPods)
 
 		if startTime.Add(timeout).Before(time.Now()) {
-			Failf("Timed out after %v waiting for stable cluster.", timeout)
+			framework.Failf("Timed out after %v waiting for stable cluster.", timeout)
 			break
 		}
 	}
 	return len(scheduledPods)
 }
 
-var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
+var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	var c *client.Client
 	var nodeList *api.NodeList
 	var systemPodsNo int
@@ -152,16 +153,16 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
 		if err == nil && rc.Spec.Replicas != 0 {
 			By("Cleaning up the replication controller")
-			err := DeleteRC(c, ns, RCName)
-			expectNoError(err)
+			err := framework.DeleteRC(c, ns, RCName)
+			framework.ExpectNoError(err)
 		}
 	})
 
-	framework := NewDefaultFramework("sched-pred")
+	f := framework.NewDefaultFramework("sched-pred")
 
 	BeforeEach(func() {
-		c = framework.Client
-		ns = framework.Namespace.Name
+		c = f.Client
+		ns = f.Namespace.Name
 		nodeList = &api.NodeList{}
 		nodes, err := c.Nodes().List(api.ListOptions{})
 		masterNodes = sets.NewString()
@@ -173,8 +174,8 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = checkTestingNSDeletedExcept(c, ns)
-		expectNoError(err)
+		err = framework.CheckTestingNSDeletedExcept(c, ns)
+		framework.ExpectNoError(err)
 
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
 		// cannot be run in parallel with any other test that touches Nodes or Pods.
@@ -188,12 +189,12 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = waitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, podReadyBeforeTimeout)
+		err = framework.WaitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
-			Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
-			PrintAllKubeletPods(c, node.Name)
+			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
+			framework.PrintAllKubeletPods(c, node.Name)
 		}
 
 	})
@@ -207,7 +208,7 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {
-			Logf("Node: %v", node)
+			framework.Logf("Node: %v", node)
 			podCapacity, found := node.Status.Capacity["pods"]
 			Expect(found).To(Equal(true))
 			totalPodCapacity += podCapacity.Value()
@@ -218,7 +219,7 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
 
-		startPods(c, podsNeededForSaturation, ns, "maxp", api.Pod{
+		framework.StartPods(c, podsNeededForSaturation, ns, "maxp", api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -254,10 +255,10 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		})
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		// Wait a bit to allow scheduler to do its thing
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
-		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
+		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns)
@@ -277,11 +278,11 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 		waitForStableCluster(c)
 
 		pods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase == api.PodRunning {
-				Logf("Pod %v requesting resource %v on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
+				framework.Logf("Pod %v requesting resource %v on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
 		}
@@ -289,13 +290,13 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 		var podsNeededForSaturation int
 		milliCpuPerPod := int64(500)
 		for name, leftCapacity := range nodeToCapacityMap {
-			Logf("Node: %v has capacity: %v", name, leftCapacity)
+			framework.Logf("Node: %v has capacity: %v", name, leftCapacity)
 			podsNeededForSaturation += (int)(leftCapacity / milliCpuPerPod)
 		}
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster CPU and trying to start another one", podsNeededForSaturation))
 
-		startPods(c, podsNeededForSaturation, ns, "overcommit", api.Pod{
+		framework.StartPods(c, podsNeededForSaturation, ns, "overcommit", api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -344,10 +345,10 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		})
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		// Wait a bit to allow scheduler to do its thing
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
-		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
+		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns)
@@ -382,10 +383,10 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		})
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		// Wait a bit to allow scheduler to do its thing
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
-		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
+		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns)
@@ -424,12 +425,12 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 		})
 
 		if err == nil || !errors.IsInvalid(err) {
-			Failf("Expect error of invalid, got : %v", err)
+			framework.Failf("Expect error of invalid, got : %v", err)
 		}
 
 		// Wait a bit to allow scheduler to do its thing if the pod is not rejected.
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
-		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
+		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
 		cleanupPods(c, ns)
@@ -458,24 +459,24 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		})
-		expectNoError(err)
-		expectNoError(waitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
 		pod, err := c.Pods(ns).Get(podName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
 		v := "42"
 		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
 		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		node, err := c.Nodes().Get(nodeName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
 
 		By("Trying to relaunch the pod, now with labels.")
@@ -500,7 +501,7 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		})
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
@@ -508,9 +509,9 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		expectNoError(waitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
 
@@ -560,10 +561,10 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		})
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		// Wait a bit to allow scheduler to do its thing
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
-		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
+		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns)
@@ -595,24 +596,24 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		})
-		expectNoError(err)
-		expectNoError(waitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
 		pod, err := c.Pods(ns).Get(podName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
 		v := "42"
 		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
 		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		node, err := c.Nodes().Get(nodeName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
 
 		By("Trying to relaunch the pod, now with labels.")
@@ -651,7 +652,7 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		})
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
@@ -659,9 +660,9 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		expectNoError(waitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
 
@@ -689,31 +690,31 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		})
-		expectNoError(err)
-		expectNoError(waitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
 		pod, err := c.Pods(ns).Get(podName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		By("Trying to apply a label with fake az info on the found node.")
 		k := "kubernetes.io/e2e-az-name"
 		v := "e2e-az1"
 		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
 		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		node, err := c.Nodes().Get(nodeName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		Expect(node.Labels[k]).To(Equal(v))
 
 		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-labels"
-		nodeSelectionRoot := filepath.Join(testContext.RepoRoot, "docs/user-guide/node-selection")
+		nodeSelectionRoot := filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/node-selection")
 		testPodPath := filepath.Join(nodeSelectionRoot, "pod-with-node-affinity.yaml")
-		runKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
+		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
 		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
@@ -721,9 +722,9 @@ var _ = KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		expectNoError(waitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
 })

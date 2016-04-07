@@ -56,15 +56,15 @@ type Framework struct {
 	// Constraints that passed to a check which is executed after data is gathered to
 	// see if 99% of results are within acceptable bounds. It as to be injected in the test,
 	// as expectations vary greatly. Constraints are groupped by the container names.
-	addonResourceConstraints map[string]resourceConstraint
+	AddonResourceConstraints map[string]ResourceConstraint
 
 	logsSizeWaitGroup    sync.WaitGroup
 	logsSizeCloseChannel chan bool
 	logsSizeVerifier     *LogsSizeVerifier
 
 	// To make sure that this framework cleans up after itself, no matter what,
-	// we install a cleanup action before each test and clear it after.  If we
-	// should abort, the AfterSuite hook should run all cleanup actions.
+	// we install a Cleanup action before each test and clear it after.  If we
+	// should abort, the AfterSuite hook should run all Cleanup actions.
 	cleanupHandle CleanupActionHandle
 
 	// configuration for framework's client
@@ -77,16 +77,16 @@ type TestDataSummary interface {
 }
 
 type FrameworkOptions struct {
-	clientQPS   float32
-	clientBurst int
+	ClientQPS   float32
+	ClientBurst int
 }
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
 	options := FrameworkOptions{
-		clientQPS:   20,
-		clientBurst: 50,
+		ClientQPS:   20,
+		ClientBurst: 50,
 	}
 	return NewFramework(baseName, options)
 }
@@ -94,27 +94,27 @@ func NewDefaultFramework(baseName string) *Framework {
 func NewFramework(baseName string, options FrameworkOptions) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
-		addonResourceConstraints: make(map[string]resourceConstraint),
+		AddonResourceConstraints: make(map[string]ResourceConstraint),
 		options:                  options,
 	}
 
-	BeforeEach(f.beforeEach)
-	AfterEach(f.afterEach)
+	BeforeEach(f.BeforeEach)
+	AfterEach(f.AfterEach)
 
 	return f
 }
 
-// beforeEach gets a client and makes a namespace.
-func (f *Framework) beforeEach() {
+// BeforeEach gets a client and makes a namespace.
+func (f *Framework) BeforeEach() {
 	// The fact that we need this feels like a bug in ginkgo.
 	// https://github.com/onsi/ginkgo/issues/222
-	f.cleanupHandle = AddCleanupAction(f.afterEach)
+	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 
 	By("Creating a kubernetes client")
-	config, err := loadConfig()
+	config, err := LoadConfig()
 	Expect(err).NotTo(HaveOccurred())
-	config.QPS = f.options.clientQPS
-	config.Burst = f.options.clientBurst
+	config.QPS = f.options.ClientQPS
+	config.Burst = f.options.ClientBurst
 	c, err := loadClientFromConfig(config)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -129,15 +129,15 @@ func (f *Framework) beforeEach() {
 
 	f.Namespace = namespace
 
-	if testContext.VerifyServiceAccount {
+	if TestContext.VerifyServiceAccount {
 		By("Waiting for a default service account to be provisioned in namespace")
-		err = waitForDefaultServiceAccountInNamespace(c, namespace.Name)
+		err = WaitForDefaultServiceAccountInNamespace(c, namespace.Name)
 		Expect(err).NotTo(HaveOccurred())
 	} else {
 		Logf("Skipping waiting for service account")
 	}
 
-	if testContext.GatherKubeSystemResourceUsageData {
+	if TestContext.GatherKubeSystemResourceUsageData {
 		f.gatherer, err = NewResourceUsageGatherer(c)
 		if err != nil {
 			Logf("Error while creating NewResourceUsageGatherer: %v", err)
@@ -146,7 +146,7 @@ func (f *Framework) beforeEach() {
 		}
 	}
 
-	if testContext.GatherLogsSizes {
+	if TestContext.GatherLogsSizes {
 		f.logsSizeWaitGroup = sync.WaitGroup{}
 		f.logsSizeWaitGroup.Add(1)
 		f.logsSizeCloseChannel = make(chan bool)
@@ -158,14 +158,14 @@ func (f *Framework) beforeEach() {
 	}
 }
 
-// afterEach deletes the namespace, after reading its events.
-func (f *Framework) afterEach() {
+// AfterEach deletes the namespace, after reading its events.
+func (f *Framework) AfterEach() {
 	RemoveCleanupAction(f.cleanupHandle)
 
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
 	defer func() {
-		if testContext.DeleteNamespace {
+		if TestContext.DeleteNamespace {
 			for _, ns := range f.namespacesToDelete {
 				By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
 
@@ -193,23 +193,23 @@ func (f *Framework) afterEach() {
 
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
-		dumpAllNamespaceInfo(f.Client, f.Namespace.Name)
+		DumpAllNamespaceInfo(f.Client, f.Namespace.Name)
 	}
 
 	summaries := make([]TestDataSummary, 0)
-	if testContext.GatherKubeSystemResourceUsageData && f.gatherer != nil {
+	if TestContext.GatherKubeSystemResourceUsageData && f.gatherer != nil {
 		By("Collecting resource usage data")
-		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99, 100}, f.addonResourceConstraints))
+		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints))
 	}
 
-	if testContext.GatherLogsSizes {
+	if TestContext.GatherLogsSizes {
 		By("Gathering log sizes data")
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
 		summaries = append(summaries, f.logsSizeVerifier.GetSummary())
 	}
 
-	if testContext.GatherMetricsAfterTest {
+	if TestContext.GatherMetricsAfterTest {
 		By("Gathering metrics")
 		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
 		grabber, err := metrics.NewMetricsGrabber(f.Client, true, false, false, true)
@@ -225,7 +225,7 @@ func (f *Framework) afterEach() {
 		}
 	}
 
-	outputTypes := strings.Split(testContext.OutputPrintType, ",")
+	outputTypes := strings.Split(TestContext.OutputPrintType, ",")
 	for _, printType := range outputTypes {
 		switch printType {
 		case "hr":
@@ -246,13 +246,13 @@ func (f *Framework) afterEach() {
 	// Check whether all nodes are ready after the test.
 	// This is explicitly done at the very end of the test, to avoid
 	// e.g. not removing namespace in case of this failure.
-	if err := allNodesReady(f.Client, time.Minute); err != nil {
+	if err := AllNodesReady(f.Client, time.Minute); err != nil {
 		Failf("All nodes should be ready after test, %v", err)
 	}
 }
 
 func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*api.Namespace, error) {
-	createTestingNS := testContext.CreateTestingNS
+	createTestingNS := TestContext.CreateTestingNS
 	if createTestingNS == nil {
 		createTestingNS = CreateTestingNS
 	}
@@ -270,12 +270,12 @@ func (f *Framework) WaitForPodTerminated(podName, reason string) error {
 
 // WaitForPodRunning waits for the pod to run in the namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
-	return waitForPodRunningInNamespace(f.Client, podName, f.Namespace.Name)
+	return WaitForPodRunningInNamespace(f.Client, podName, f.Namespace.Name)
 }
 
 // WaitForPodReady waits for the pod to flip to ready in the namespace.
 func (f *Framework) WaitForPodReady(podName string) error {
-	return waitTimeoutForPodReadyInNamespace(f.Client, podName, f.Namespace.Name, podStartTimeout)
+	return waitTimeoutForPodReadyInNamespace(f.Client, podName, f.Namespace.Name, PodStartTimeout)
 }
 
 // WaitForPodRunningSlow waits for the pod to run in the namespace.
@@ -287,12 +287,12 @@ func (f *Framework) WaitForPodRunningSlow(podName string) error {
 // WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
 // success or failure.
 func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
-	return waitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name)
+	return WaitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name)
 }
 
 // Runs the given pod and verifies that the output of exact container matches the desired output.
 func (f *Framework) TestContainerOutput(scenarioName string, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	testContainerOutput(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
+	TestContainerOutput(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
 }
 
 // Runs the given pod and verifies that the output of exact container matches the desired regexps.
@@ -406,7 +406,7 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 	}
 	cmdArgs = append(cmdArgs, args...)
 
-	cmd := kubectlCmd(cmdArgs...)
+	cmd := KubectlCmd(cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))

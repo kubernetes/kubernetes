@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -45,15 +46,15 @@ const (
 	rebootPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
-	var f *Framework
+var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
+	var f *framework.Framework
 
 	BeforeEach(func() {
 		// These tests requires SSH to nodes, so the provider check should be identical to there
-		// (the limiting factor is the implementation of util.go's getSigner(...)).
+		// (the limiting factor is the implementation of util.go's framework.GetSigner(...)).
 
 		// Cluster must support node reboot
-		SkipUnlessProviderIs(providersWithSSH...)
+		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 	})
 
 	AfterEach(func() {
@@ -66,23 +67,23 @@ var _ = KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
-				Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+				framework.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
 			}
 		}
 		// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
 		// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.  Most tests
 		// make use of some proxy feature to verify functionality. So, if a reboot test runs right before a test
 		// that tries to get logs, for example, we may get unlucky and try to use a closed tunnel to a node that
-		// was recently rebooted. There's no good way to poll for proxies being closed, so we sleep.
+		// was recently rebooted. There's no good way to framework.Poll for proxies being closed, so we sleep.
 		//
 		// TODO(cjcullen) reduce this sleep (#19314)
-		if providerIs("gke") {
+		if framework.ProviderIs("gke") {
 			By("waiting 5 minutes for all dead tunnels to be dropped")
 			time.Sleep(5 * time.Minute)
 		}
 	})
 
-	f = NewDefaultFramework("reboot")
+	f = framework.NewDefaultFramework("reboot")
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
@@ -127,7 +128,7 @@ var _ = KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 
 func testReboot(c *client.Client, rebootCmd string) {
 	// Get all nodes, and kick off the test on each.
-	nodelist := ListSchedulableNodesOrDie(c)
+	nodelist := framework.ListSchedulableNodesOrDie(c)
 	result := make([]bool, len(nodelist.Items))
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodelist.Items))
@@ -137,7 +138,7 @@ func testReboot(c *client.Client, rebootCmd string) {
 		go func(ix int) {
 			defer wg.Done()
 			n := nodelist.Items[ix]
-			result[ix] = rebootNode(c, testContext.Provider, n.ObjectMeta.Name, rebootCmd)
+			result[ix] = rebootNode(c, framework.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
 			if !result[ix] {
 				failed = true
 			}
@@ -151,10 +152,10 @@ func testReboot(c *client.Client, rebootCmd string) {
 		for ix := range nodelist.Items {
 			n := nodelist.Items[ix]
 			if !result[ix] {
-				Logf("Node %s failed reboot test.", n.ObjectMeta.Name)
+				framework.Logf("Node %s failed reboot test.", n.ObjectMeta.Name)
 			}
 		}
-		Failf("Test failed; at least one node failed to reboot in the time given.")
+		framework.Failf("Test failed; at least one node failed to reboot in the time given.")
 	}
 }
 
@@ -165,9 +166,9 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 			prefix = "Retrieving log for the last terminated container"
 		}
 		if err != nil {
-			Logf("%s %s, err: %v:\n%s\n", prefix, id, err, log)
+			framework.Logf("%s %s, err: %v:\n%s\n", prefix, id, err, log)
 		} else {
-			Logf("%s %s:\n%s\n", prefix, id, log)
+			framework.Logf("%s %s:\n%s\n", prefix, id, log)
 		}
 	}
 	podNameSet := sets.NewString(podNames...)
@@ -178,14 +179,14 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 		if !podNameSet.Has(p.Name) {
 			continue
 		}
-		if ok, _ := podRunningReady(p); ok {
+		if ok, _ := framework.PodRunningReady(p); ok {
 			continue
 		}
-		Logf("Status for not ready pod %s/%s: %+v", p.Namespace, p.Name, p.Status)
+		framework.Logf("Status for not ready pod %s/%s: %+v", p.Namespace, p.Name, p.Status)
 		// Print the log of the containers if pod is not running and ready.
 		for _, container := range p.Status.ContainerStatuses {
 			cIdentifer := fmt.Sprintf("%s/%s/%s", p.Namespace, p.Name, container.Name)
-			log, err := getPodLogs(c, p.Namespace, p.Name, container.Name)
+			log, err := framework.GetPodLogs(c, p.Namespace, p.Name, container.Name)
 			printFn(cIdentifer, log, err, false)
 			// Get log from the previous container.
 			if container.RestartCount > 0 {
@@ -208,19 +209,19 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := api.NamespaceSystem
-	ps := newPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	ps := framework.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
 	defer ps.Stop()
 
 	// Get the node initially.
-	Logf("Getting %s", name)
+	framework.Logf("Getting %s", name)
 	node, err := c.Nodes().Get(name)
 	if err != nil {
-		Logf("Couldn't get node %s", name)
+		framework.Logf("Couldn't get node %s", name)
 		return false
 	}
 
 	// Node sanity check: ensure it is "ready".
-	if !waitForNodeToBeReady(c, name, nodeReadyInitialTimeout) {
+	if !framework.WaitForNodeToBeReady(c, name, framework.NodeReadyInitialTimeout) {
 		return false
 	}
 
@@ -240,39 +241,39 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 			podNames = append(podNames, p.ObjectMeta.Name)
 		}
 	}
-	Logf("Node %s has %d pods: %v", name, len(podNames), podNames)
+	framework.Logf("Node %s has %d pods: %v", name, len(podNames), podNames)
 
 	// For each pod, we do a sanity check to ensure it's running / healthy
 	// now, as that's what we'll be checking later.
-	if !checkPodsRunningReady(c, ns, podNames, podReadyBeforeTimeout) {
+	if !framework.CheckPodsRunningReady(c, ns, podNames, framework.PodReadyBeforeTimeout) {
 		printStatusAndLogsForNotReadyPods(c, ns, podNames, pods)
 		return false
 	}
 
 	// Reboot the node.
-	if err = issueSSHCommand(rebootCmd, provider, node); err != nil {
-		Logf("Error while issuing ssh command: %v", err)
+	if err = framework.IssueSSHCommand(rebootCmd, provider, node); err != nil {
+		framework.Logf("Error while issuing ssh command: %v", err)
 		return false
 	}
 
 	// Wait for some kind of "not ready" status.
-	if !waitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
+	if !framework.WaitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
 		return false
 	}
 
 	// Wait for some kind of "ready" status.
-	if !waitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
+	if !framework.WaitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
 		return false
 	}
 
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy.
-	if !checkPodsRunningReady(c, ns, podNames, rebootPodReadyAgainTimeout) {
+	if !framework.CheckPodsRunningReady(c, ns, podNames, rebootPodReadyAgainTimeout) {
 		newPods := ps.List()
 		printStatusAndLogsForNotReadyPods(c, ns, podNames, newPods)
 		return false
 	}
 
-	Logf("Reboot successful on node %s", name)
+	framework.Logf("Reboot successful on node %s", name)
 	return true
 }

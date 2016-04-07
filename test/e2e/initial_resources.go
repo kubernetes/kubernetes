@@ -23,14 +23,15 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // [Feature:InitialResources]: Initial resources is an experimental feature, so
 // these tests are not run by default.
 //
 // Flaky issue #20272
-var _ = KubeDescribe("Initial Resources [Feature:InitialResources] [Flaky]", func() {
-	f := NewDefaultFramework("initial-resources")
+var _ = framework.KubeDescribe("Initial Resources [Feature:InitialResources] [Flaky]", func() {
+	f := framework.NewDefaultFramework("initial-resources")
 
 	It("should set initial resources based on historical data", func() {
 		// TODO(piosz): Add cleanup data in InfluxDB that left from previous tests.
@@ -50,7 +51,7 @@ var _ = KubeDescribe("Initial Resources [Feature:InitialResources] [Flaky]", fun
 	})
 })
 
-func runPod(f *Framework, name, image string) *api.Pod {
+func runPod(f *framework.Framework, name, image string) *api.Pod {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -65,7 +66,7 @@ func runPod(f *Framework, name, image string) *api.Pod {
 		},
 	}
 	createdPod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-	expectNoError(err)
-	expectNoError(waitForPodRunningInNamespace(f.Client, name, f.Namespace.Name))
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, name, f.Namespace.Name))
 	return createdPod
 }

@@ -156,7 +156,7 @@ func getContainerInfo(c *client.Client, nodeName string, req *kubeletstats.Stats
 	if err != nil {
 		return nil, err
 	}
-	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
+	subResourceProxyAvailable, err := ServerVersionGTE(subResourceServiceAndNodeProxyVersion, c)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func getContainerInfo(c *client.Client, nodeName string, req *kubeletstats.Stats
 // polls every second, we'd need to get N stats points for N-second interval.
 // Note that this is an approximation and may not be accurate, hence we also
 // write the actual interval used for calculation (based on the timestamps of
-// the stats points in containerResourceUsage.CPUInterval.
+// the stats points in ContainerResourceUsage.CPUInterval.
 //
 // containerNames is a function returning a collection of container names in which
 // user is interested in. ExpectMissingContainers is a flag which says if the test
@@ -222,7 +222,7 @@ func getOneTimeResourceUsageOnNode(
 	cpuInterval time.Duration,
 	containerNames func() []string,
 	expectMissingContainers bool,
-) (resourceUsagePerContainer, error) {
+) (ResourceUsagePerContainer, error) {
 	const (
 		// cadvisor records stats about every second.
 		cadvisorStatsPollingIntervalInSeconds float64 = 1.0
@@ -244,8 +244,8 @@ func getOneTimeResourceUsageOnNode(
 		return nil, err
 	}
 
-	f := func(name string, oldStats, newStats *cadvisorapi.ContainerStats) *containerResourceUsage {
-		return &containerResourceUsage{
+	f := func(name string, oldStats, newStats *cadvisorapi.ContainerStats) *ContainerResourceUsage {
+		return &ContainerResourceUsage{
 			Name:                    name,
 			Timestamp:               newStats.Timestamp,
 			CPUUsageInCores:         float64(newStats.Cpu.Usage.Total-oldStats.Cpu.Usage.Total) / float64(newStats.Timestamp.Sub(oldStats.Timestamp).Nanoseconds()),
@@ -257,7 +257,7 @@ func getOneTimeResourceUsageOnNode(
 	}
 	// Process container infos that are relevant to us.
 	containers := containerNames()
-	usageMap := make(resourceUsagePerContainer, len(containers))
+	usageMap := make(ResourceUsagePerContainer, len(containers))
 	for _, name := range containers {
 		info, ok := containerInfos[name]
 		if !ok {
@@ -274,7 +274,7 @@ func getOneTimeResourceUsageOnNode(
 }
 
 func getNodeStatsSummary(c *client.Client, nodeName string) (*stats.Summary, error) {
-	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)
+	subResourceProxyAvailable, err := ServerVersionGTE(subResourceServiceAndNodeProxyVersion, c)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ const (
 )
 
 // A list of containers for which we want to collect resource usage.
-func targetContainers() []string {
+func TargetContainers() []string {
 	return []string{
 		rootContainerName,
 		stats.SystemContainerRuntime,
@@ -340,7 +340,7 @@ func targetContainers() []string {
 	}
 }
 
-type containerResourceUsage struct {
+type ContainerResourceUsage struct {
 	Name                    string
 	Timestamp               time.Time
 	CPUUsageInCores         float64
@@ -351,14 +351,14 @@ type containerResourceUsage struct {
 	CPUInterval time.Duration
 }
 
-func (r *containerResourceUsage) isStrictlyGreaterThan(rhs *containerResourceUsage) bool {
+func (r *ContainerResourceUsage) isStrictlyGreaterThan(rhs *ContainerResourceUsage) bool {
 	return r.CPUUsageInCores > rhs.CPUUsageInCores && r.MemoryWorkingSetInBytes > rhs.MemoryWorkingSetInBytes
 }
 
-type resourceUsagePerContainer map[string]*containerResourceUsage
-type resourceUsagePerNode map[string]resourceUsagePerContainer
+type ResourceUsagePerContainer map[string]*ContainerResourceUsage
+type ResourceUsagePerNode map[string]ResourceUsagePerContainer
 
-func formatResourceUsageStats(nodeName string, containerStats resourceUsagePerContainer) string {
+func formatResourceUsageStats(nodeName string, containerStats ResourceUsagePerContainer) string {
 	// Example output:
 	//
 	// Resource usage for node "e2e-test-foo-minion-abcde":
@@ -417,7 +417,7 @@ func getKubeletMetricsThroughNode(nodeName string) (string, error) {
 	return string(body), nil
 }
 
-func getKubeletHeapStats(c *client.Client, nodeName string) (string, error) {
+func GetKubeletHeapStats(c *client.Client, nodeName string) (string, error) {
 	client, err := NodeProxyRequest(c, nodeName, "debug/pprof/heap")
 	if err != nil {
 		return "", err
@@ -448,8 +448,8 @@ func PrintAllKubeletPods(c *client.Client, nodeName string) {
 	}
 }
 
-func computeContainerResourceUsage(name string, oldStats, newStats *stats.ContainerStats) *containerResourceUsage {
-	return &containerResourceUsage{
+func computeContainerResourceUsage(name string, oldStats, newStats *stats.ContainerStats) *ContainerResourceUsage {
+	return &ContainerResourceUsage{
 		Name:                    name,
 		Timestamp:               newStats.CPU.Time.Time,
 		CPUUsageInCores:         float64(*newStats.CPU.UsageCoreNanoSeconds-*oldStats.CPU.UsageCoreNanoSeconds) / float64(newStats.CPU.Time.Time.Sub(oldStats.CPU.Time.Time).Nanoseconds()),
@@ -468,13 +468,13 @@ type resourceCollector struct {
 	node            string
 	containers      []string
 	client          *client.Client
-	buffers         map[string][]*containerResourceUsage
+	buffers         map[string][]*ContainerResourceUsage
 	pollingInterval time.Duration
 	stopCh          chan struct{}
 }
 
 func newResourceCollector(c *client.Client, nodeName string, containerNames []string, pollingInterval time.Duration) *resourceCollector {
-	buffers := make(map[string][]*containerResourceUsage)
+	buffers := make(map[string][]*ContainerResourceUsage)
 	return &resourceCollector{
 		node:            nodeName,
 		containers:      containerNames,
@@ -484,7 +484,7 @@ func newResourceCollector(c *client.Client, nodeName string, containerNames []st
 	}
 }
 
-// Start starts a goroutine to poll the node every pollingInterval.
+// Start starts a goroutine to Poll the node every pollingInterval.
 func (r *resourceCollector) Start() {
 	r.stopCh = make(chan struct{}, 1)
 	// Keep the last observed stats for comparison.
@@ -527,10 +527,10 @@ func (r *resourceCollector) collectStats(oldStatsMap map[string]*stats.Container
 	}
 }
 
-func (r *resourceCollector) GetLatest() (resourceUsagePerContainer, error) {
+func (r *resourceCollector) GetLatest() (ResourceUsagePerContainer, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
-	stats := make(resourceUsagePerContainer)
+	stats := make(ResourceUsagePerContainer)
 	for _, name := range r.containers {
 		contStats, ok := r.buffers[name]
 		if !ok || len(contStats) == 0 {
@@ -546,11 +546,11 @@ func (r *resourceCollector) Reset() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	for _, name := range r.containers {
-		r.buffers[name] = []*containerResourceUsage{}
+		r.buffers[name] = []*ContainerResourceUsage{}
 	}
 }
 
-type resourceUsageByCPU []*containerResourceUsage
+type resourceUsageByCPU []*ContainerResourceUsage
 
 func (r resourceUsageByCPU) Len() int           { return len(r) }
 func (r resourceUsageByCPU) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
@@ -579,27 +579,27 @@ func (r *resourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 	return result
 }
 
-// resourceMonitor manages a resourceCollector per node.
-type resourceMonitor struct {
+// ResourceMonitor manages a resourceCollector per node.
+type ResourceMonitor struct {
 	client          *client.Client
 	containers      []string
 	pollingInterval time.Duration
 	collectors      map[string]*resourceCollector
 }
 
-func newResourceMonitor(c *client.Client, containerNames []string, pollingInterval time.Duration) *resourceMonitor {
-	return &resourceMonitor{
+func NewResourceMonitor(c *client.Client, containerNames []string, pollingInterval time.Duration) *ResourceMonitor {
+	return &ResourceMonitor{
 		containers:      containerNames,
 		client:          c,
 		pollingInterval: pollingInterval,
 	}
 }
 
-func (r *resourceMonitor) Start() {
+func (r *ResourceMonitor) Start() {
 	// It should be OK to monitor unschedulable Nodes
 	nodes, err := r.client.Nodes().List(api.ListOptions{})
 	if err != nil {
-		Failf("resourceMonitor: unable to get list of nodes: %v", err)
+		Failf("ResourceMonitor: unable to get list of nodes: %v", err)
 	}
 	r.collectors = make(map[string]*resourceCollector, 0)
 	for _, node := range nodes.Items {
@@ -609,19 +609,19 @@ func (r *resourceMonitor) Start() {
 	}
 }
 
-func (r *resourceMonitor) Stop() {
+func (r *ResourceMonitor) Stop() {
 	for _, collector := range r.collectors {
 		collector.Stop()
 	}
 }
 
-func (r *resourceMonitor) Reset() {
+func (r *ResourceMonitor) Reset() {
 	for _, collector := range r.collectors {
 		collector.Reset()
 	}
 }
 
-func (r *resourceMonitor) LogLatest() {
+func (r *ResourceMonitor) LogLatest() {
 	summary, err := r.GetLatest()
 	if err != nil {
 		Logf("%v", err)
@@ -629,7 +629,7 @@ func (r *resourceMonitor) LogLatest() {
 	Logf("%s", r.FormatResourceUsage(summary))
 }
 
-func (r *resourceMonitor) FormatResourceUsage(s resourceUsagePerNode) string {
+func (r *ResourceMonitor) FormatResourceUsage(s ResourceUsagePerNode) string {
 	summary := []string{}
 	for node, usage := range s {
 		summary = append(summary, formatResourceUsageStats(node, usage))
@@ -637,8 +637,8 @@ func (r *resourceMonitor) FormatResourceUsage(s resourceUsagePerNode) string {
 	return strings.Join(summary, "\n")
 }
 
-func (r *resourceMonitor) GetLatest() (resourceUsagePerNode, error) {
-	result := make(resourceUsagePerNode)
+func (r *ResourceMonitor) GetLatest() (ResourceUsagePerNode, error) {
+	result := make(ResourceUsagePerNode)
 	errs := []error{}
 	for key, collector := range r.collectors {
 		s, err := collector.GetLatest()
@@ -651,15 +651,15 @@ func (r *resourceMonitor) GetLatest() (resourceUsagePerNode, error) {
 	return result, utilerrors.NewAggregate(errs)
 }
 
-// containersCPUSummary is indexed by the container name with each entry a
+// ContainersCPUSummary is indexed by the container name with each entry a
 // (percentile, value) map.
-type containersCPUSummary map[string]map[float64]float64
+type ContainersCPUSummary map[string]map[float64]float64
 
-// nodesCPUSummary is indexed by the node name with each entry a
-// containersCPUSummary map.
-type nodesCPUSummary map[string]containersCPUSummary
+// NodesCPUSummary is indexed by the node name with each entry a
+// ContainersCPUSummary map.
+type NodesCPUSummary map[string]ContainersCPUSummary
 
-func (r *resourceMonitor) FormatCPUSummary(summary nodesCPUSummary) string {
+func (r *ResourceMonitor) FormatCPUSummary(summary NodesCPUSummary) string {
 	// Example output for a node (the percentiles may differ):
 	// CPU usage of containers on node "e2e-test-foo-minion-0vj7":
 	// container        5th%  50th% 90th% 95th%
@@ -677,7 +677,7 @@ func (r *resourceMonitor) FormatCPUSummary(summary nodesCPUSummary) string {
 		buf := &bytes.Buffer{}
 		w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 		fmt.Fprintf(w, "%s\n", strings.Join(header, "\t"))
-		for _, containerName := range targetContainers() {
+		for _, containerName := range TargetContainers() {
 			var s []string
 			s = append(s, fmt.Sprintf("%q", containerName))
 			data, ok := containers[containerName]
@@ -696,16 +696,16 @@ func (r *resourceMonitor) FormatCPUSummary(summary nodesCPUSummary) string {
 	return strings.Join(summaryStrings, "\n")
 }
 
-func (r *resourceMonitor) LogCPUSummary() {
+func (r *ResourceMonitor) LogCPUSummary() {
 	summary := r.GetCPUSummary()
 	Logf("%s", r.FormatCPUSummary(summary))
 }
 
-func (r *resourceMonitor) GetCPUSummary() nodesCPUSummary {
-	result := make(nodesCPUSummary)
+func (r *ResourceMonitor) GetCPUSummary() NodesCPUSummary {
+	result := make(NodesCPUSummary)
 	for nodeName, collector := range r.collectors {
-		result[nodeName] = make(containersCPUSummary)
-		for _, containerName := range targetContainers() {
+		result[nodeName] = make(ContainersCPUSummary)
+		for _, containerName := range TargetContainers() {
 			data := collector.GetBasicCPUStats(containerName)
 			result[nodeName][containerName] = data
 		}
