@@ -76,7 +76,7 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 		},
 	)
 
-	e.podStore.Store, e.podController = framework.NewInformer(
+	e.podStore.Indexer, e.podController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return e.client.Core().Pods(api.NamespaceAll).List(options)
@@ -92,6 +92,7 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 			UpdateFunc: e.updatePod,
 			DeleteFunc: e.deletePod,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	return e
 }

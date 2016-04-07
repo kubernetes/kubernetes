@@ -60,7 +60,7 @@ var (
 )
 
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(podInformer framework.SharedInformer, client *clientset.Clientset) *EndpointController {
+func NewEndpointController(podInformer framework.SharedIndexInformer, client *clientset.Clientset) *EndpointController {
 	if client != nil && client.Core().GetRESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().GetRESTClient().GetRateLimiter())
 	}
@@ -95,7 +95,7 @@ func NewEndpointController(podInformer framework.SharedInformer, client *clients
 		UpdateFunc: e.updatePod,
 		DeleteFunc: e.deletePod,
 	})
-	e.podStore.Store = podInformer.GetStore()
+	e.podStore.Indexer = podInformer.GetIndexer()
 	e.podController = podInformer.GetController()
 	e.podStoreSynced = podInformer.HasSynced
 
@@ -104,7 +104,7 @@ func NewEndpointController(podInformer framework.SharedInformer, client *clients
 
 // NewEndpointControllerFromClient returns a new *EndpointController that runs its own informer.
 func NewEndpointControllerFromClient(client *clientset.Clientset, resyncPeriod controller.ResyncPeriodFunc) *EndpointController {
-	podInformer := informers.CreateSharedPodInformer(client, resyncPeriod())
+	podInformer := informers.CreateSharedIndexPodInformer(client, resyncPeriod(), cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	e := NewEndpointController(podInformer, client)
 	e.internalPodInformer = podInformer
 
@@ -123,7 +123,7 @@ type EndpointController struct {
 	// we have a personal informer, we must start it ourselves.   If you start
 	// the controller using NewEndpointController(passing SharedInformer), this
 	// will be null
-	internalPodInformer framework.SharedInformer
+	internalPodInformer framework.SharedIndexInformer
 
 	// Services that need to be updated. A channel is inappropriate here,
 	// because it allows services with lots of pods to be serviced much

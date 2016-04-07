@@ -124,7 +124,7 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 }
 
 func TestStoreToReplicationControllerLister(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
+	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
 	lister := StoreToReplicationControllerLister{store}
 	testCases := []struct {
 		inRCs      []*api.ReplicationController
@@ -645,7 +645,7 @@ func TestStoreToJobLister(t *testing.T) {
 }
 
 func TestStoreToPodLister(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
+	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
 	ids := []string{"foo", "bar", "baz"}
 	for _, id := range ids {
 		store.Add(&api.Pod{

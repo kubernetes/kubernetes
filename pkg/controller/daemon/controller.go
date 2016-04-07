@@ -108,7 +108,7 @@ type DaemonSetsController struct {
 	queue *workqueue.Type
 }
 
-func NewDaemonSetsController(podInformer framework.SharedInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, lookupCacheSize int) *DaemonSetsController {
+func NewDaemonSetsController(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, lookupCacheSize int) *DaemonSetsController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -183,7 +183,7 @@ func NewDaemonSetsController(podInformer framework.SharedInformer, kubeClient cl
 		UpdateFunc: dsc.updatePod,
 		DeleteFunc: dsc.deletePod,
 	})
-	dsc.podStore.Store = podInformer.GetStore()
+	dsc.podStore.Indexer = podInformer.GetIndexer()
 	dsc.podController = podInformer.GetController()
 	dsc.podStoreSynced = podInformer.HasSynced
 
@@ -210,7 +210,7 @@ func NewDaemonSetsController(podInformer framework.SharedInformer, kubeClient cl
 }
 
 func NewDaemonSetsControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, lookupCacheSize int) *DaemonSetsController {
-	podInformer := informers.CreateSharedPodInformer(kubeClient, resyncPeriod())
+	podInformer := informers.CreateSharedIndexPodInformer(kubeClient, resyncPeriod(), cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	dsc := NewDaemonSetsController(podInformer, kubeClient, resyncPeriod, lookupCacheSize)
 	dsc.internalPodInformer = podInformer
 
@@ -686,7 +686,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 	newPod.Spec.NodeName = node.Name
 	pods := []*api.Pod{newPod}
 
-	for _, m := range dsc.podStore.Store.List() {
+	for _, m := range dsc.podStore.Indexer.List() {
 		pod := m.(*api.Pod)
 		if pod.Spec.NodeName != node.Name {
 			continue

@@ -53,6 +53,10 @@ func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 	}
 }
 
+const (
+	NamespaceIndex string = "namespace"
+)
+
 // MetaNamespaceIndexFunc is a default index function that indexes based on an object's namespace
 func MetaNamespaceIndexFunc(obj interface{}) ([]string, error) {
 	meta, err := meta.Accessor(obj)

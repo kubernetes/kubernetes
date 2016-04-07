@@ -42,3 +42,19 @@ func CreateSharedPodInformer(client clientset.Interface, resyncPeriod time.Durat
 
 	return sharedInformer
 }
+
+// CreateSharedIndexPodInformer returns a SharedIndexInformer that lists and watches all pods
+func CreateSharedIndexPodInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) framework.SharedIndexInformer {
+	sharedIndexInformer := framework.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().Pods(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().Pods(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.Pod{}, resyncPeriod, indexers)
+
+	return sharedIndexInformer
+}
