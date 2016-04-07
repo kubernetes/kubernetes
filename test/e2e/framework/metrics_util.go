@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package framework
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,6 +38,9 @@ import (
 )
 
 const (
+	// NodeStartupThreshold is a rough estimate of the time allocated for a pod to start on a node.
+	NodeStartupThreshold = 4 * time.Second
+
 	podStartupThreshold           time.Duration = 5 * time.Second
 	listPodLatencySmallThreshold  time.Duration = 1 * time.Second
 	listPodLatencyMediumThreshold time.Duration = 1 * time.Second
@@ -440,6 +444,30 @@ func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 		}
 		samples = append(samples, v...)
 	}
+}
+
+// podLatencyData encapsulates pod startup latency information.
+type podLatencyData struct {
+	// Name of the pod
+	Name string
+	// Node this pod was running on
+	Node string
+	// Latency information related to pod startuptime
+	Latency time.Duration
+}
+
+type latencySlice []podLatencyData
+
+func (a latencySlice) Len() int           { return len(a) }
+func (a latencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a latencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
+
+func extractLatencyMetrics(latencies []podLatencyData) LatencyMetric {
+	length := len(latencies)
+	perc50 := latencies[int(math.Ceil(float64(length*50)/100))-1].Latency
+	perc90 := latencies[int(math.Ceil(float64(length*90)/100))-1].Latency
+	perc99 := latencies[int(math.Ceil(float64(length*99)/100))-1].Latency
+	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99}
 }
 
 // logSuspiciousLatency logs metrics/docker errors from all nodes that had slow startup times

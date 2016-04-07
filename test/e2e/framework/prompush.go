@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 //This is a utility for prometheus pushing functionality.
-package e2e
+package framework
 
 import (
 	"fmt"
