@@ -136,7 +136,6 @@
         fi
         echo "Exiting with code: ${{rc}}"
         exit ${{rc}}
-    branch: 'master'
     job-env: ''
     runner: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/dockerized-e2e-runner.sh")
     legacy-runner: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh")
