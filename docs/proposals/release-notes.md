@@ -121,7 +121,7 @@ will be collected from that cherry-pick PR.
 
 The only exception to this rule is when a PR is not a cherry-pick and is
 targeted directly to the non-master branch.  In this case, a `release-note-*`
-label is optional (and not enforced).
+label is required for that non-master PR.
 
 1. New labels added to github: `release-note-none`, maybe others for new release note categories - see Layout section below
 1. A [new munger](https://github.com/kubernetes/kubernetes/issues/23409) that will:

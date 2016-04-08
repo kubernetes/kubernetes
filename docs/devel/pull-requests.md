@@ -86,7 +86,7 @@ This section applies only to pull requests on the master branch.
 
 The only exception to these rules is when a PR is not a cherry-pick and is
 targeted directly to the non-master branch.  In this case, a `release-note-*`
-label is optional (and not enforced).
+label is required for that non-master PR.
 
 ### Reviewing pre-release notes
 
