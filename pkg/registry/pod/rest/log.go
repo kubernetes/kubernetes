@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/registry/pod"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -33,7 +33,7 @@ import (
 // LogREST implements the log endpoint for a Pod
 type LogREST struct {
 	KubeletConn client.ConnectionInfoGetter
-	Store       *etcdgeneric.Etcd
+	Store       *registry.Store
 }
 
 // LogREST implements GetterWithOptions

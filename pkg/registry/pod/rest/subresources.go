@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/registry/pod"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -34,7 +34,7 @@ import (
 
 // ProxyREST implements the proxy subresource for a Pod
 type ProxyREST struct {
-	Store          *etcdgeneric.Etcd
+	Store          *registry.Store
 	ProxyTransport http.RoundTripper
 }
 
@@ -78,7 +78,7 @@ var upgradeableMethods = []string{"GET", "POST"}
 
 // AttachREST implements the attach subresource for a Pod
 type AttachREST struct {
-	Store       *etcdgeneric.Etcd
+	Store       *registry.Store
 	KubeletConn client.ConnectionInfoGetter
 }
 
@@ -115,7 +115,7 @@ func (r *AttachREST) ConnectMethods() []string {
 
 // ExecREST implements the exec subresource for a Pod
 type ExecREST struct {
-	Store       *etcdgeneric.Etcd
+	Store       *registry.Store
 	KubeletConn client.ConnectionInfoGetter
 }
 
@@ -152,7 +152,7 @@ func (r *ExecREST) ConnectMethods() []string {
 
 // PortForwardREST implements the portforward subresource for a Pod
 type PortForwardREST struct {
-	Store       *etcdgeneric.Etcd
+	Store       *registry.Store
 	KubeletConn client.ConnectionInfoGetter
 }
 
