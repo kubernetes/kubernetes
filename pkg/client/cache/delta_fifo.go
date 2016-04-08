@@ -82,7 +82,7 @@ func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyL
 // different versions of the same object.
 //
 // A note on the KeyLister used by the DeltaFIFO: It's main purpose is
-// to list keys that are "known", for the puspose of figuring out which
+// to list keys that are "known", for the purpose of figuring out which
 // items have been deleted when Replace() or Delete() are called. The deleted
 // objet will be included in the DeleteFinalStateUnknown markers. These objects
 // could be stale.
