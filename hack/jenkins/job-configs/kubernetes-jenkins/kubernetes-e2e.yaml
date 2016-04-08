@@ -219,6 +219,17 @@
                 export PROJECT="k8s-jkns-e2e-gke-ci-flaky"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Flaky\] \
                                          --ginkgo.skip=\[Feature:.+\]"
+        - 'gke-multizone':
+            description: 'Run all non-flaky, non-slow, non-disruptive, non-feature tests on GKE, in parallel, and in a multi-zone (Ubernetes-lite) cluster.'
+            timeout: 150
+            emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com, arob@google.com, quinton@google.com'
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-multizone"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export NUM_NODES="1"
+                export ZONE="us-central1-f"
+                export ADDITIONAL_ZONES="us-central1-a,us-central1-b"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 

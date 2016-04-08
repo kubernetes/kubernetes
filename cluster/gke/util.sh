@@ -112,6 +112,7 @@ function verify-prereqs() {
 #   ZONE
 #   CLUSTER_API_VERSION (optional)
 #   NUM_NODES
+#   ADDITIONAL_ZONES
 #   NODE_SCOPES
 #   MACHINE_TYPE
 function kube-up() {
@@ -148,6 +149,10 @@ function kube-up() {
     "--cluster-version=${CLUSTER_API_VERSION}"
     "--machine-type=${MACHINE_TYPE}"
   )
+
+  if [[ ! -z "${ADDITIONAL_ZONES:-}" ]]; then
+    create_args+=("--additional-zones=${ADDITIONAL_ZONES}")
+  fi
 
   # Bring up the cluster.
   "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
