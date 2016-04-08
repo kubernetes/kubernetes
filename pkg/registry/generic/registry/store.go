@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package registry
 
 import (
 	"fmt"
@@ -40,7 +40,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// Etcd implements generic.Registry, backing it with etcd storage.
+// Store implements generic.Registry.
 // It's intended to be embeddable, so that you can implement any
 // non-generic functions if needed.
 // You must supply a value for every field below before use; these are
@@ -56,9 +56,7 @@ import (
 // logic specific to the API.
 //
 // TODO: make the default exposed methods exactly match a generic RESTStorage
-// TODO: because all aspects of etcd have been removed it should really
-//       just be called a registry implementation.
-type Etcd struct {
+type Store struct {
 	// Called to make a new object, should return e.g., &api.Pod{}
 	NewFunc func() runtime.Object
 
@@ -92,8 +90,8 @@ type Etcd struct {
 
 	// Called on all objects returned from the underlying store, after
 	// the exit hooks are invoked. Decorators are intended for integrations
-	// that are above etcd and should only be used for specific cases where
-	// storage of the value in etcd is not appropriate, since they cannot
+	// that are above storage and should only be used for specific cases where
+	// storage of the value is not appropriate, since they cannot
 	// be watched.
 	Decorator rest.ObjectFunc
 	// Allows extended behavior during creation, required
@@ -114,11 +112,11 @@ type Etcd struct {
 	// Allows extended behavior during export, optional
 	ExportStrategy rest.RESTExportStrategy
 
-	// Used for all etcd access functions
+	// Used for all storage access functions
 	Storage storage.Interface
 }
 
-// NamespaceKeyRootFunc is the default function for constructing etcd paths to resource directories enforcing namespace rules.
+// NamespaceKeyRootFunc is the default function for constructing storage paths to resource directories enforcing namespace rules.
 func NamespaceKeyRootFunc(ctx api.Context, prefix string) string {
 	key := prefix
 	ns, ok := api.NamespaceFrom(ctx)
@@ -128,7 +126,7 @@ func NamespaceKeyRootFunc(ctx api.Context, prefix string) string {
 	return key
 }
 
-// NamespaceKeyFunc is the default function for constructing etcd paths to a resource relative to prefix enforcing namespace rules.
+// NamespaceKeyFunc is the default function for constructing storage paths to a resource relative to prefix enforcing namespace rules.
 // If no namespace is on context, it errors.
 func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, error) {
 	key := NamespaceKeyRootFunc(ctx, prefix)
@@ -146,7 +144,7 @@ func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, erro
 	return key, nil
 }
 
-// NoNamespaceKeyFunc is the default function for constructing etcd paths to a resource relative to prefix without a namespace
+// NoNamespaceKeyFunc is the default function for constructing storage paths to a resource relative to prefix without a namespace
 func NoNamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, error) {
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
@@ -159,17 +157,17 @@ func NoNamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, er
 }
 
 // New implements RESTStorage
-func (e *Etcd) New() runtime.Object {
+func (e *Store) New() runtime.Object {
 	return e.NewFunc()
 }
 
 // NewList implements RESTLister
-func (e *Etcd) NewList() runtime.Object {
+func (e *Store) NewList() runtime.Object {
 	return e.NewListFunc()
 }
 
 // List returns a list of items matching labels and field
-func (e *Etcd) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+func (e *Store) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
@@ -182,7 +180,7 @@ func (e *Etcd) List(ctx api.Context, options *api.ListOptions) (runtime.Object, 
 }
 
 // ListPredicate returns a list of all the items matching m.
-func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *api.ListOptions) (runtime.Object, error) {
+func (e *Store) ListPredicate(ctx api.Context, m generic.Matcher, options *api.ListOptions) (runtime.Object, error) {
 	list := e.NewListFunc()
 	filterFunc := e.filterAndDecorateFunction(m)
 	if name, ok := m.MatchesSingle(); ok {
@@ -201,7 +199,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *api.Li
 }
 
 // Create inserts a new item according to the unique key from the object.
-func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -239,7 +237,7 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 // Update performs an atomic update and set of the object. Returns the result of the update
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
-func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+func (e *Store) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	name, err := e.ObjectNameFunc(obj)
 	if err != nil {
 		return nil, false, err
@@ -250,7 +248,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	}
 	// If AllowUnconditionalUpdate() is true and the object specified by the user does not have a resource version,
 	// then we populate it with the latest version.
-	// Else, we check that the version specified by the user matches the version of latest etcd object.
+	// Else, we check that the version specified by the user matches the version of latest storage object.
 	resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
 	if err != nil {
 		return nil, false, err
@@ -300,7 +298,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 
 		creating = false
 		if doUnconditionalUpdate {
-			// Update the object's resource version to match the latest etcd object's resource version.
+			// Update the object's resource version to match the latest storage object's resource version.
 			err = e.Storage.Versioner().UpdateObject(obj, res.ResourceVersion)
 			if err != nil {
 				return nil, nil, err
@@ -366,8 +364,8 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	return out, creating, nil
 }
 
-// Get retrieves the item from etcd.
-func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
+// Get retrieves the item from storage.
+func (e *Store) Get(ctx api.Context, name string) (runtime.Object, error) {
 	obj := e.NewFunc()
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
@@ -389,8 +387,8 @@ var (
 	errDeleteNow       = fmt.Errorf("delete now")
 )
 
-// Delete removes the item from etcd.
-func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
+// Delete removes the item from storage.
+func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
@@ -478,17 +476,17 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	return e.finalizeDelete(out, true)
 }
 
-// DeleteCollection remove all items returned by List with a given ListOptions from etcd.
+// DeleteCollection remove all items returned by List with a given ListOptions from storage.
 //
 // DeleteCollection is currently NOT atomic. It can happen that only subset of objects
-// will be deleted from etcd, and then an error will be returned.
+// will be deleted from storage, and then an error will be returned.
 // In case of success, the list of deleted objects will be returned.
 //
-// TODO: Currently, there is no easy way to remove 'directory' entry from etcd (if we
+// TODO: Currently, there is no easy way to remove 'directory' entry from storage (if we
 // are removing all objects of a given type) with the current API (it's technically
-// possibly with etcd API, but watch is not delivered correctly then).
+// possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
-func (e *Etcd) DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error) {
+func (e *Store) DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error) {
 	listObj, err := e.List(ctx, listOptions)
 	if err != nil {
 		return nil, err
@@ -497,7 +495,7 @@ func (e *Etcd) DeleteCollection(ctx api.Context, options *api.DeleteOptions, lis
 	if err != nil {
 		return nil, err
 	}
-	// Spawn a number of goroutines, so that we can issue requests to etcd
+	// Spawn a number of goroutines, so that we can issue requests to storage
 	// in parallel to speed up deletion.
 	// TODO: Make this proportional to the number of items to delete, up to
 	// DeleteCollectionWorkers (it doesn't make much sense to spawn 16
@@ -556,7 +554,7 @@ func (e *Etcd) DeleteCollection(ctx api.Context, options *api.DeleteOptions, lis
 	}
 }
 
-func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object, error) {
+func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object, error) {
 	if runHooks && e.AfterDelete != nil {
 		if err := e.AfterDelete(obj); err != nil {
 			return nil, err
@@ -577,7 +575,7 @@ func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
 // matcher that matches by key. generic.SelectionPredicate does this for you
 // automatically.
-func (e *Etcd) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
@@ -594,7 +592,7 @@ func (e *Etcd) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface
 }
 
 // WatchPredicate starts a watch for the items that m matches.
-func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
+func (e *Store) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
 	filterFunc := e.filterAndDecorateFunction(m)
 
 	if name, ok := m.MatchesSingle(); ok {
@@ -610,7 +608,7 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 	return e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, filterFunc)
 }
 
-func (e *Etcd) filterAndDecorateFunction(m generic.Matcher) func(runtime.Object) bool {
+func (e *Store) filterAndDecorateFunction(m generic.Matcher) func(runtime.Object) bool {
 	return func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		if err != nil {
@@ -630,7 +628,8 @@ func (e *Etcd) filterAndDecorateFunction(m generic.Matcher) func(runtime.Object)
 // calculateTTL is a helper for retrieving the updated TTL for an object or returning an error
 // if the TTL cannot be calculated. The defaultTTL is changed to 1 if less than zero. Zero means
 // no TTL, not expire immediately.
-func (e *Etcd) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) (ttl uint64, err error) {
+func (e *Store) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) (ttl uint64, err error) {
+	// TODO: validate this is assertion is still valid.
 	// etcd may return a negative TTL for a node if the expiration has not occurred due
 	// to server lag - we will ensure that the value is at least set.
 	if defaultTTL < 0 {
@@ -658,7 +657,7 @@ func exportObjectMeta(accessor meta.Object, exact bool) {
 }
 
 // Implements the rest.Exporter interface
-func (e *Etcd) Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error) {
+func (e *Store) Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error) {
 	obj, err := e.Get(ctx, name)
 	if err != nil {
 		return nil, err
