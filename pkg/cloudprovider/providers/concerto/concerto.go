@@ -19,7 +19,7 @@ package concerto_cloud
 import (
 	"io"
 
-	"github.com/scalingdata/gcfg"
+	"gopkg.in/gcfg.v1"
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
