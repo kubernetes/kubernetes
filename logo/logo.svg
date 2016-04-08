@@ -9,11 +9,11 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="744.09448819"
-   height="1052.3622047"
+   width="722.8457"
+   height="701.96637"
    id="svg2"
    version="1.1"
-   inkscape:version="0.48.3.1 r9886"
+   inkscape:version="0.48.4 r9939"
    sodipodi:docname="logo.svg"
    inkscape:export-filename="/home/thockin/src/kubernetes/new.png"
    inkscape:export-xdpi="460.95001"
@@ -28,17 +28,21 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="16.190509"
-     inkscape:cx="283.8946"
-     inkscape:cy="333.18837"
+     inkscape:cx="277.56851"
+     inkscape:cy="157.54494"
      inkscape:document-units="px"
      inkscape:current-layer="g3052"
      showgrid="false"
      inkscape:window-width="1519"
-     inkscape:window-height="848"
+     inkscape:window-height="822"
      inkscape:window-x="51"
-     inkscape:window-y="24"
+     inkscape:window-y="25"
      inkscape:window-maximized="0"
-     inkscape:snap-global="false" />
+     inkscape:snap-global="false"
+     fit-margin-top="10"
+     fit-margin-left="10"
+     fit-margin-right="10"
+     fit-margin-bottom="10" />
   <metadata
      id="metadata7">
     <rdf:RDF>
@@ -47,18 +51,19 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
   <g
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
-     id="layer1">
+     id="layer1"
+     transform="translate(-6.3260942,-174.7524)">
     <g
        id="g3052">
       <path
-         style="fill:#326ce5;fill-opacity:1;stroke:#ffffff;stroke-opacity:1;stroke-width:0;stroke-miterlimit:4;stroke-dasharray:none"
+         style="fill:#326ce5;fill-opacity:1;stroke:#ffffff;stroke-width:0;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
          d="m 365.3125,184.8125 a 46.724621,46.342246 0 0 0 -17.90625,4.53125 l -244.34375,116.75 a 46.724621,46.342246 0 0 0 -25.28125,31.4375 L 17.5,599.78125 A 46.724621,46.342246 0 0 0 23.84375,635.3125 46.724621,46.342246 0 0 0 26.5,639 l 169.125,210.28125 a 46.724621,46.342246 0 0 0 36.53125,17.4375 L 503.375,866.65625 A 46.724621,46.342246 0 0 0 539.90625,849.25 L 708.96875,638.9375 A 46.724621,46.342246 0 0 0 718,599.71875 l -60.375,-262.25 a 46.724621,46.342246 0 0 0 -25.28125,-31.4375 l -244.375,-116.6875 A 46.724621,46.342246 0 0 0 365.3125,184.8125 z"
          id="path3055"
          inkscape:connector-curvature="0"
