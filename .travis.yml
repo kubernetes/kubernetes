@@ -11,7 +11,7 @@ language: go
 
 matrix:
   include:
-    - go: 1.6.0
+    - go: 1.6
 
 install:
   - go get github.com/tools/godep
