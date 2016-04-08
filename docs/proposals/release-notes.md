@@ -137,7 +137,7 @@ With v1.2.0, the release notes were moved from their previous [github releases](
 location to [CHANGELOG.md](../../CHANGELOG.md).  Going forward this seems like a good plan.
 Other projects do similarly.
 
-The kuberntes.tar.gz download link is also displayed along with the release notes
+The kubernetes.tar.gz download link is also displayed along with the release notes
 in [CHANGELOG.md](../../CHANGELOG.md).
 
 Is there any reason to continue publishing anything to github releases if
