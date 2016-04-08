@@ -870,6 +870,7 @@
                 export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=Kubectl"
                 export GINKGO_PARALLEL="y"
+                export E2E_OPT="--check_version_skew=false"
         - 'gke-upgrade-master-1.1-1.2':
             description: 'Deploys a cluster at v1.1, upgrades its master to v1.2, and runs v1.1 tests against it.'
             timeout: 30
@@ -880,6 +881,7 @@
                 export E2E_UPGRADE_TEST="true"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
+                export E2E_OPT="--check_version_skew=false"
         - 'gke-upgrade-cluster-1.1-1.2':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.1 tests against it.'
             timeout: 30
@@ -890,6 +892,7 @@
                 export E2E_UPGRADE_TEST="true"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
+                export E2E_OPT="--check_version_skew=false"
         - 'gke-upgrade-cluster-new-1.1-1.2':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.2 tests against it.'
             timeout: 30
@@ -899,5 +902,6 @@
                 export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export E2E_UPGRADE_TEST="true"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
+                export E2E_OPT="--check_version_skew=false"
     jobs:
         - 'kubernetes-e2e-{suffix}'
