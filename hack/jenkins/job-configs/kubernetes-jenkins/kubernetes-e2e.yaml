@@ -645,6 +645,13 @@
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export PROJECT="e2e-gce-trusty-ci-master-slow"
+        - 'serial-master':
+            description: 'Run [Serial], [Disruptive], tests on GCE, with Trusty images.'
+            timeout: 300
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+                export PROJECT="e2e-gce-trusty-ci-serial"
     jobs:
         - 'kubernetes-e2e-gce-trusty-ci-{suffix}'
 
@@ -675,6 +682,13 @@
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export PROJECT="e2e-gce-trusty-ci-slow-1-2"
+        - 'serial-release-1.2':
+            description: 'Run [Serial], [Disruptive], tests on GCE, with Trusty images, on the release-1.2 branch.'
+            timeout: 300
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+                export PROJECT="e2e-gce-trusty-ci-serial-1-2"
     jobs:
         - 'kubernetes-e2e-gce-trusty-ci-{suffix}'
 
@@ -722,6 +736,13 @@
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export PROJECT="k8s-e2e-gce-trusty-dev-slow"
+        - 'serial':
+            description: 'Run [Serial], [Disruptive], tests on GCE, with Trusty dev images and the latest k8s 1.2 release.'
+            timeout: 300
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+                export PROJECT="e2e-gce-trusty-dev-serial"
     jobs:
         - 'kubernetes-e2e-gce-trusty-dev-{suffix}'
 
