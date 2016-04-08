@@ -71,7 +71,7 @@
                 export PROJECT="k8s-jkns-e2e-gce"
         - 'gce-slow':
             description: 'Runs slow tests on GCE, sequentially.'
-            timeout: 60
+            timeout: 150  #  See #24072
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
@@ -186,7 +186,7 @@
                 export GINKGO_PARALLEL="y"
         - 'gke-slow':
             description: 'Run slow E2E tests on GKE using the latest successful build.'
-            timeout: 60
+            timeout: 150  #  See #24072
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-slow"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
