@@ -23,8 +23,8 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/v1"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -34,11 +34,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
+const importPrefix = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io"
 
 var accessor = meta.NewAccessor()
 
-const groupName = "testgroup"
+const groupName = "testgroup.k8s.io"
 
 // availableVersions lists all known external versions for this group from most preferred to least preferred
 var availableVersions = []unversioned.GroupVersion{{Group: groupName, Version: "v1"}}
