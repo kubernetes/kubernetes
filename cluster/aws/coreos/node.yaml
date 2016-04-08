@@ -76,6 +76,7 @@ coreos:
         --container-runtime=${KUBERNETES_CONTAINER_RUNTIME}
         Restart=always
         RestartSec=10
+        KillMode=process
 
     - name: kube-proxy.service
       command: start

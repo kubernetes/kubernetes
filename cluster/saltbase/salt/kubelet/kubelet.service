@@ -6,6 +6,7 @@ Documentation=https://github.com/kubernetes/kubernetes
 EnvironmentFile=/etc/sysconfig/kubelet
 ExecStart=/usr/local/bin/kubelet "$DAEMON_ARGS"
 Restart=always
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target
