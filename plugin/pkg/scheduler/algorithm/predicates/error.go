@@ -21,7 +21,7 @@ import "fmt"
 const (
 	podCountResourceName  string = "PodCount"
 	cpuResourceName       string = "CPU"
-	memoryResoureceName   string = "Memory"
+	memoryResourceName    string = "Memory"
 	nvidiaGpuResourceName string = "NvidiaGpu"
 )
 
