@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // GetLoadBalancer implementation for Flexiant Concerto.
@@ -49,7 +50,7 @@ func toStatus(lb *ConcertoLoadBalancer) *api.LoadBalancerStatus {
 }
 
 // EnsureLoadBalancer implementation for Flexiant Concerto.
-func (c *ConcertoCloud) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+func (c *ConcertoCloud) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName, affinityType api.ServiceAffinity, annotations map[string]string) (*api.LoadBalancerStatus, error) {
 	// Concerto LB does not support session affinity
 	if affinityType != api.ServiceAffinityNone {
 		return nil, fmt.Errorf("Unsupported load balancer affinity: %v", affinityType)

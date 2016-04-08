@@ -90,6 +90,10 @@ func (concerto *ConcertoCloud) CurrentNodeName(hostname string) (string, error) 
 	return hostname, nil
 }
 
+func (concerto *ConcertoCloud) InstanceType(hostname string) (string, error) {
+	return "", nil
+}
+
 // NOT SUPPORTED in Concerto Cloud
 func (concerto *ConcertoCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return fmt.Errorf("Unsupported operation")

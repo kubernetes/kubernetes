@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestGetLoadBalancer(t *testing.T) {
@@ -72,7 +73,10 @@ func TestEnsureLoadBalancer_CreatesTheLBInConcerto(t *testing.T) {
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
-		api.ServiceAffinityNone)
+		types.NamespacedName{}, // namespaced name
+		api.ServiceAffinityNone,
+		nil, // annotations
+	)
 	if len(apiMock.balancers) != 1 {
 		t.Errorf("EnsureLoadBalancer: should have created the LB")
 	} else {
@@ -101,7 +105,10 @@ func TestEnsureLoadBalancerAddsTheNodes(t *testing.T) {
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
-		api.ServiceAffinityNone)
+		types.NamespacedName{}, // namespaced name
+		api.ServiceAffinityNone,
+		nil, // annotations
+	)
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer: should not have returned any errors")
 	}
@@ -121,7 +128,10 @@ func TestEnsureLoadBalancerWithUnsupportedAffinity(t *testing.T) {
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
-		api.ServiceAffinityClientIP)
+		types.NamespacedName{}, // namespaced name
+		api.ServiceAffinityClientIP,
+		nil, // annotations
+	)
 	if err == nil {
 		t.Errorf("EnsureLoadBalancer: should not support ServiceAffinity")
 	}
@@ -135,7 +145,10 @@ func TestEnsureLoadBalancerWithNoPort(t *testing.T) {
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
-		api.ServiceAffinityNone)
+		types.NamespacedName{}, // namespaced name
+		api.ServiceAffinityNone,
+		nil, // annotations
+	)
 	if err == nil {
 		t.Errorf("EnsureLoadBalancer: should return error if no port specified")
 	}
@@ -152,7 +165,10 @@ func TestEnsureLoadBalancerWithMultiplePorts(t *testing.T) {
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
-		api.ServiceAffinityNone)
+		types.NamespacedName{}, // namespaced name
+		api.ServiceAffinityNone,
+		nil, // annotations
+	)
 	if err == nil {
 		t.Errorf("EnsureLoadBalancer: should return error if no port specified")
 	}
@@ -168,7 +184,10 @@ func TestEnsureLoadBalancerWithExternalIP(t *testing.T) {
 		net.IP{}, // external ip
 		ports,    // ports
 		[]string{"host1", "host2"},
-		api.ServiceAffinityNone)
+		types.NamespacedName{}, // namespaced name
+		api.ServiceAffinityNone,
+		nil, // annotations
+	)
 	if err == nil {
 		t.Errorf("EnsureLoadBalancer: should not support ExternalIP specification")
 	}
@@ -197,7 +216,10 @@ func TestEnsureLoadBalancer_UpdatesTheLBInConcerto(t *testing.T) {
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host3"},
-		api.ServiceAffinityNone)
+		types.NamespacedName{}, // namespaced name
+		api.ServiceAffinityNone,
+		nil, // annotations
+	)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
