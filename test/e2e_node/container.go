@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -31,24 +32,30 @@ const (
 	pollInterval = time.Second * 5
 )
 
-//One pod one container
-type ConformanceContainer struct {
-	pod       *api.Pod
-	container *api.Container
-	client    *client.Client
+type ContainerConfig struct {
+	client *client.Client
+	node   string
+	server string
 }
 
-func NewConformanceContainer(c *client.Client, node string, container api.Container) *ConformanceContainer {
+//One pod one container
+type ConformanceContainer struct {
+	ContainerConfig
+	pod       *api.Pod
+	container *api.Container
+}
+
+func NewConformanceContainer(cfg ContainerConfig, container api.Container) *ConformanceContainer {
 	return &ConformanceContainer{
-		client:    c,
-		container: &container,
+		ContainerConfig: cfg,
+		container:       &container,
 		pod: &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      container.Name + "-" + string(util.NewUUID()),
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: api.PodSpec{
-				NodeName:      node,
+				NodeName:      cfg.node,
 				RestartPolicy: api.RestartPolicyNever,
 				Containers:    []api.Container{container},
 			},
@@ -78,6 +85,15 @@ func (cc *ConformanceContainer) Status() (*api.ContainerStatus, error) {
 		return nil, fmt.Errorf("unexpected container statuses %v", pod.Status.ContainerStatuses)
 	}
 	return &pod.Status.ContainerStatuses[0], nil
+}
+
+func (cc *ConformanceContainer) Run(cmd []string) (string, error) {
+	return cc.Exec(cmd, "", false)
+}
+
+func (cc *ConformanceContainer) Exec(cmd []string, input string, tty bool) (string, error) {
+	restConfig := &restclient.Config{Host: cc.server}
+	return execCommandInContainer(restConfig, cc.client, cc.pod.Namespace, cc.pod.Name, cc.container.Name, cmd, input, tty)
 }
 
 func (cc *ConformanceContainer) Wait(timeout time.Duration, condition func(*api.ContainerStatus) bool) {

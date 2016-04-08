@@ -37,10 +37,16 @@ func execute(method string, url *url.URL, config *restclient.Config, stdin io.Re
 	return exec.Stream(remotecommandserver.SupportedStreamingProtocols, stdin, stdout, stderr, tty)
 }
 
-func execCommandInContainer(config *restclient.Config, c *client.Client, ns, podName, containerName string, cmd []string) (string, error) {
+func runCommandInContainer(config *restclient.Config, c *client.Client, ns, podName, containerName string, cmd []string) (string, error) {
+	return execCommandInContainer(config, c, ns, podName, containerName, cmd, "", false)
+}
+
+func execCommandInContainer(config *restclient.Config, c *client.Client, ns, podName, containerName string, cmd []string, input string, tty bool) (string, error) {
 	var stdout, stderr bytes.Buffer
 	var stdin io.Reader
-	tty := false
+	if input != "" {
+		stdin = bytes.NewReader([]byte(input))
+	}
 	req := c.RESTClient.Post().
 		Resource("pods").
 		Name(podName).
@@ -50,7 +56,7 @@ func execCommandInContainer(config *restclient.Config, c *client.Client, ns, pod
 	req.VersionedParams(&api.PodExecOptions{
 		Container: containerName,
 		Command:   cmd,
-		Stdin:     false,
+		Stdin:     stdin != nil,
 		Stdout:    true,
 		Stderr:    true,
 		TTY:       tty,

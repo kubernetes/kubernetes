@@ -144,7 +144,7 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 		v.Encode())
 	By(fmt.Sprintf("Exec-ing into container over http. Running command: %s", cmd))
 
-	stdout, err := execCommandInContainer(config.config, config.client, config.hostExecPod.Namespace, config.hostExecPod.Name, config.hostExecPod.Spec.Containers[0].Name,
+	stdout, err := runCommandInContainer(config.config, config.client, config.hostExecPod.Namespace, config.hostExecPod.Name, config.hostExecPod.Spec.Containers[0].Name,
 		[]string{"/bin/sh", "-c", cmd})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error running command %q: %v", cmd, err))
 

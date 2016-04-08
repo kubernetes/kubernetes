@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -34,10 +35,16 @@ const (
 
 var _ = Describe("Container Conformance Test", func() {
 	var cl *client.Client
+	var cfg ContainerConfig
 
 	BeforeEach(func() {
 		// Setup the apiserver client
 		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
+		cfg = ContainerConfig{
+			client: cl,
+			node:   *nodeName,
+			server: *apiServerAddress,
+		}
 	})
 
 	Describe("container conformance blackbox test", func() {
@@ -98,11 +105,10 @@ var _ = Describe("Container Conformance Test", func() {
 		})
 		Context("when running a container that terminates", func() {
 			It("should be able to create, inspect and delete it [Conformance]", func() {
-				c := NewConformanceContainer(cl, *nodeName, api.Container{
-					Image:           "gcr.io/google_containers/busybox:1.24",
-					Name:            "terminate-container",
-					Command:         []string{"sh", "-c", "env"},
-					ImagePullPolicy: api.PullIfNotPresent,
+				c := NewConformanceContainer(cfg, api.Container{
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Name:    "terminate-container",
+					Command: []string{"sh", "-c", "env"},
 				})
 
 				By("create the container")
@@ -126,13 +132,12 @@ var _ = Describe("Container Conformance Test", func() {
 			It("should report termination message if TerminationMessagePath is set [Conformance]", func() {
 				terminationMessage := "DONE"
 				terminationMessagePath := "/dev/termination-log"
-				c := NewConformanceContainer(cl, *nodeName, api.Container{
+				c := NewConformanceContainer(cfg, api.Container{
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Name:    "termination-message-container",
 					Command: []string{"/bin/sh", "-c"},
 					Args:    []string{"/bin/echo -n " + terminationMessage + " > " + terminationMessagePath},
 					TerminationMessagePath: terminationMessagePath,
-					ImagePullPolicy:        api.PullIfNotPresent,
 				})
 
 				By("create the container")
@@ -154,9 +159,46 @@ var _ = Describe("Container Conformance Test", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
+		Context("when running an interactive container", func() {
+			It("should support exec [Conformance]", func() {
+				c := NewConformanceContainer(cfg, api.Container{
+					Image: "gcr.io/google_containers/nginx:1.7.9",
+					Name:  "exec-container",
+				})
+				text := "running in container"
+
+				By("create the container")
+				defer c.Delete()
+				err := c.Create()
+				Expect(err).NotTo(HaveOccurred())
+
+				By("wait up to 2m for the container to become running")
+				c.Wait(2*time.Minute, func(s *api.ContainerStatus) bool { return s.State.Running != nil })
+
+				By("executing a command in the container")
+				output, err := c.Run([]string{"echo", text})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).Should(Equal(text))
+
+				By("executing a command in the container with noninteractive stdin")
+				output, err = c.Exec([]string{"cat"}, text, false)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).Should(Equal(text))
+
+				By("executing a command in the container with pseudo-interactive stdin")
+				cmd := fmt.Sprintf("echo %s\nexit\n", text)
+				output, err = c.Exec([]string{"bash"}, cmd, false)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).Should(Equal(text))
+
+				By("delete the container")
+				err = c.Delete()
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
 		Context("when running a container with invalid image", func() {
 			It("it should not start successfully [Conformance]", func() {
-				c := NewConformanceContainer(cl, *nodeName, api.Container{
+				c := NewConformanceContainer(cfg, api.Container{
 					Image:           "foo.com/foo/foo",
 					Name:            "invalid-image-container",
 					Command:         []string{"foo", "'Should not work'"},
