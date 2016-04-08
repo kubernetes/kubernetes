@@ -238,13 +238,13 @@ function get-basename() {
     echo ${input_string%$suffix}
 }
 
-function stop-object() {
+function delete-object() {
     local -r obj_type=$1
     local -r namespace=$2
     local -r obj_name=$3
-    log INFO "Stopping ${obj_type} ${namespace}/${obj_name}"
+    log INFO "Deleting ${obj_type} ${namespace}/${obj_name}"
 
-    run-until-success "${KUBECTL} stop --namespace=${namespace} ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    run-until-success "${KUBECTL} delete --namespace=${namespace} ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
 }
 
 function create-object() {
@@ -271,21 +271,21 @@ function update-object() {
     local -r obj_name=$3
     local -r file_path=$4
     log INFO "updating the ${obj_type} ${namespace}/${obj_name} with the new definition ${file_path}"
-    stop-object ${obj_type} ${namespace} ${obj_name}
+    delete-object ${obj_type} ${namespace} ${obj_name}
     create-object ${obj_type} ${file_path}
 }
 
 # deletes the objects from the server
 # $1 object type
 # $2 a list of object nsnames
-function stop-objects() {
+function delete-objects() {
     local -r obj_type=$1
     local -r obj_nsnames=$2
     local namespace
     local obj_name
     for nsname in ${obj_nsnames}; do
         IFS='/' read namespace obj_name <<< "${nsname}"
-        stop-object ${obj_type} ${namespace} ${obj_name} &
+        delete-object ${obj_type} ${namespace} ${obj_name} &
     done
 }
 
@@ -442,7 +442,7 @@ function reconcile-objects() {
     log DBG "${obj_type}: nsnames_for_ignore=${nsnames_for_ignore}"
     log DBG "${obj_type}: new_files=${new_files}"
 
-    stop-objects "${obj_type}" "${nsnames_for_delete}"
+    delete-objects "${obj_type}" "${nsnames_for_delete}"
     # wait for jobs below is a protection against changing the basename
     # of a replication controllerm without changing the selector.
     # If we don't wait, the new rc may be created before the old one is deleted
@@ -451,7 +451,7 @@ function reconcile-objects() {
     # passing --cascade=false could solve the problem, but we want
     # all orphan pods to be deleted.
     wait-for-jobs
-    stopResult=$?
+    deleteResult=$?
 
     create-objects "${obj_type}" "${new_files}"
     update-objects "${obj_type}" "${for_update}"
@@ -464,7 +464,7 @@ function reconcile-objects() {
     wait-for-jobs
     createUpdateResult=$?
 
-    if [[ ${stopResult} -eq 0 ]] && [[ ${createUpdateResult} -eq 0 ]]; then
+    if [[ ${deleteResult} -eq 0 ]] && [[ ${createUpdateResult} -eq 0 ]]; then
         return 0
     else
         return 1
