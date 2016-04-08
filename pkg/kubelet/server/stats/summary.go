@@ -42,17 +42,17 @@ type SummaryProvider interface {
 }
 
 type summaryProviderImpl struct {
-	provider         StatsProvider
-	resourceAnalyzer ResourceAnalyzer
+	provider           StatsProvider
+	fsResourceAnalyzer fsResourceAnalyzerInterface
 }
 
 var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a new SummaryProvider
-func NewSummaryProvider(statsProvider StatsProvider, resourceAnalyzer ResourceAnalyzer) SummaryProvider {
+func NewSummaryProvider(statsProvider StatsProvider, fsResourceAnalyzer fsResourceAnalyzerInterface) SummaryProvider {
 	stackBuff := []byte{}
 	runtime.Stack(stackBuff, false)
-	return &summaryProviderImpl{statsProvider, resourceAnalyzer}
+	return &summaryProviderImpl{statsProvider, fsResourceAnalyzer}
 }
 
 // Get implements the SummaryProvider interface
@@ -83,18 +83,18 @@ func (sp *summaryProviderImpl) Get() (*stats.Summary, error) {
 		return nil, err
 	}
 
-	sb := &summaryBuilder{sp.resourceAnalyzer, node, nodeConfig, rootFsInfo, imageFsInfo, infos}
+	sb := &summaryBuilder{sp.fsResourceAnalyzer, node, nodeConfig, rootFsInfo, imageFsInfo, infos}
 	return sb.build()
 }
 
 // summaryBuilder aggregates the datastructures provided by cadvisor into a Summary result
 type summaryBuilder struct {
-	resourceAnalyzer ResourceAnalyzer
-	node             *api.Node
-	nodeConfig       cm.NodeConfig
-	rootFsInfo       cadvisorapiv2.FsInfo
-	imageFsInfo      cadvisorapiv2.FsInfo
-	infos            map[string]cadvisorapiv2.ContainerInfo
+	fsResourceAnalyzer fsResourceAnalyzerInterface
+	node               *api.Node
+	nodeConfig         cm.NodeConfig
+	rootFsInfo         cadvisorapiv2.FsInfo
+	imageFsInfo        cadvisorapiv2.FsInfo
+	infos              map[string]cadvisorapiv2.ContainerInfo
 }
 
 // build returns a Summary from aggregating the input data
@@ -221,7 +221,7 @@ func (sb *summaryBuilder) buildSummaryPods() []stats.PodStats {
 	for _, podStats := range podToStats {
 		// Lookup the volume stats for each pod
 		podUID := types.UID(podStats.PodRef.UID)
-		if vstats, found := sb.resourceAnalyzer.GetPodVolumeStats(podUID); found {
+		if vstats, found := sb.fsResourceAnalyzer.GetPodVolumeStats(podUID); found {
 			podStats.VolumeStats = vstats.Volumes
 		}
 		result = append(result, *podStats)
