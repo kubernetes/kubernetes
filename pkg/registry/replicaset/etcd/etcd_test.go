@@ -90,7 +90,7 @@ var validReplicaSet = *validNewReplicaSet()
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.ReplicaSet.Etcd)
+	test := registrytest.New(t, storage.ReplicaSet.Store)
 	rs := validNewReplicaSet()
 	rs.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -110,7 +110,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.ReplicaSet.Etcd)
+	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestUpdate(
 		// valid
 		validNewReplicaSet(),
@@ -137,7 +137,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.ReplicaSet.Etcd)
+	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestDelete(validNewReplicaSet())
 }
 
@@ -194,21 +194,21 @@ func TestGenerationNumber(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.ReplicaSet.Etcd)
+	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestGet(validNewReplicaSet())
 }
 
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.ReplicaSet.Etcd)
+	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestList(validNewReplicaSet())
 }
 
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.ReplicaSet.Etcd)
+	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestWatch(
 		validNewReplicaSet(),
 		// matching labels
