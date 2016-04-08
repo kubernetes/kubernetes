@@ -1,6 +1,8 @@
 - job:
     name: kubernetes-update-jenkins-jobs
     description: 'Update Jenkins jobs based on configs in https://github.com/kubernetes/kubernetes/tree/master/hack/jenkins/job-configs. Test owner: spxtr.'
+    logrotate:
+        daysToKeep: 7
     node: master
     triggers:
         - timed: 'H/15 * * * *'
