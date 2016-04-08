@@ -47,7 +47,10 @@ function gcloud-compute-list() {
   local attempt=1
   local result=""
   while true; do
-    if result=$(gcloud compute ${resource} list --project=${PROJECT} ${@:2} | grep "${GREP_REGEX}"); then
+    if result=$(gcloud compute ${resource} list --project=${PROJECT} ${@:2}); then
+      if [[ ! -z "${GREP_REGEX}" ]]; then
+        result=$(echo "${result}" | grep "${GREP_REGEX}")
+      fi
       echo "${result}"
       return
     fi
