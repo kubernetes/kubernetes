@@ -57,7 +57,7 @@ script
 	create_dirs
 	echo "Mount master PD"
 	mount_master_pd
-	echo "Creating kuberntes master auth file"
+	echo "Creating kubernetes master auth file"
 	create_master_auth
 	echo "Creating master instance kubelet auth file"
   create_master_kubelet_auth
