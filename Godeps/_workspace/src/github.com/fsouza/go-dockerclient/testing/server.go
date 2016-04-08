@@ -144,6 +144,7 @@ func (s *DockerServer) buildMuxer() {
 	s.mux.Path("/volumes/create").Methods("POST").HandlerFunc(s.handlerWrapper(s.createVolume))
 	s.mux.Path("/volumes/{name:.*}").Methods("GET").HandlerFunc(s.handlerWrapper(s.inspectVolume))
 	s.mux.Path("/volumes/{name:.*}").Methods("DELETE").HandlerFunc(s.handlerWrapper(s.removeVolume))
+	s.mux.Path("/info").Methods("GET").HandlerFunc(s.handlerWrapper(s.infoDocker))
 }
 
 // SetHook changes the hook function used by the server.
@@ -743,10 +744,9 @@ func (s *DockerServer) commitContainer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	var config *docker.Config
+	config := new(docker.Config)
 	runConfig := r.URL.Query().Get("run")
 	if runConfig != "" {
-		config = new(docker.Config)
 		err = json.Unmarshal([]byte(runConfig), config)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -828,7 +828,8 @@ func (s *DockerServer) pullImage(w http.ResponseWriter, r *http.Request) {
 	fromImageName := r.URL.Query().Get("fromImage")
 	tag := r.URL.Query().Get("tag")
 	image := docker.Image{
-		ID: s.generateID(),
+		ID:     s.generateID(),
+		Config: &docker.Config{},
 	}
 	s.iMut.Lock()
 	s.images = append(s.images, image)
@@ -1243,4 +1244,87 @@ func (s *DockerServer) removeVolume(w http.ResponseWriter, r *http.Request) {
 	}
 	s.volStore[vol.volume.Name] = nil
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *DockerServer) infoDocker(w http.ResponseWriter, r *http.Request) {
+	s.cMut.RLock()
+	defer s.cMut.RUnlock()
+	s.iMut.RLock()
+	defer s.iMut.RUnlock()
+	var running, stopped, paused int
+	for _, c := range s.containers {
+		if c.State.Running {
+			running++
+		} else {
+			stopped++
+		}
+		if c.State.Paused {
+			paused++
+		}
+	}
+	envs := map[string]interface{}{
+		"ID":                "AAAA:XXXX:0000:BBBB:AAAA:XXXX:0000:BBBB:AAAA:XXXX:0000:BBBB",
+		"Containers":        len(s.containers),
+		"ContainersRunning": running,
+		"ContainersPaused":  paused,
+		"ContainersStopped": stopped,
+		"Images":            len(s.images),
+		"Driver":            "aufs",
+		"DriverStatus":      [][]string{},
+		"SystemStatus":      nil,
+		"Plugins": map[string]interface{}{
+			"Volume": []string{
+				"local",
+			},
+			"Network": []string{
+				"bridge",
+				"null",
+				"host",
+			},
+			"Authorization": nil,
+		},
+		"MemoryLimit":        true,
+		"SwapLimit":          false,
+		"CpuCfsPeriod":       true,
+		"CpuCfsQuota":        true,
+		"CPUShares":          true,
+		"CPUSet":             true,
+		"IPv4Forwarding":     true,
+		"BridgeNfIptables":   true,
+		"BridgeNfIp6tables":  true,
+		"Debug":              false,
+		"NFd":                79,
+		"OomKillDisable":     true,
+		"NGoroutines":        101,
+		"SystemTime":         "2016-02-25T18:13:10.25870078Z",
+		"ExecutionDriver":    "native-0.2",
+		"LoggingDriver":      "json-file",
+		"NEventsListener":    0,
+		"KernelVersion":      "3.13.0-77-generic",
+		"OperatingSystem":    "Ubuntu 14.04.3 LTS",
+		"OSType":             "linux",
+		"Architecture":       "x86_64",
+		"IndexServerAddress": "https://index.docker.io/v1/",
+		"RegistryConfig": map[string]interface{}{
+			"InsecureRegistryCIDRs": []string{},
+			"IndexConfigs":          map[string]interface{}{},
+			"Mirrors":               nil,
+		},
+		"InitSha1":          "e2042dbb0fcf49bb9da199186d9a5063cda92a01",
+		"InitPath":          "/usr/lib/docker/dockerinit",
+		"NCPU":              1,
+		"MemTotal":          2099204096,
+		"DockerRootDir":     "/var/lib/docker",
+		"HttpProxy":         "",
+		"HttpsProxy":        "",
+		"NoProxy":           "",
+		"Name":              "vagrant-ubuntu-trusty-64",
+		"Labels":            nil,
+		"ExperimentalBuild": false,
+		"ServerVersion":     "1.10.1",
+		"ClusterStore":      "",
+		"ClusterAdvertise":  "",
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(envs)
 }
