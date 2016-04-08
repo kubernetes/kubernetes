@@ -403,7 +403,7 @@ var _ = KubeDescribe("Services", func() {
 		}
 	})
 
-	It("should be able to change the type and ports of a service", func() {
+	It("should be able to change the type and ports of a service [Slow]", func() {
 		// requires cloud load-balancer support
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
