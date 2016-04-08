@@ -282,7 +282,10 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 		if _, ok := value.(bool); !ok {
 			return append(allErrs, NewInvalidTypeError(reflect.Bool, reflect.TypeOf(value).Kind(), fieldName))
 		}
+	// API servers before release 1.3 produce swagger spec with `type: "any"` as the fallback type, while newer servers produce spec with `type: "object"`.
+	// We have both here so that kubectl can work with both old and new api servers.
 	case "any":
+	case "object":
 	default:
 		return append(allErrs, fmt.Errorf("unexpected type: %v", fieldType))
 	}
