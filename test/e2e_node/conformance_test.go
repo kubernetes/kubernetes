@@ -195,6 +195,63 @@ var _ = Describe("Container Conformance Test", func() {
 				err = c.Delete()
 				Expect(err).NotTo(HaveOccurred())
 			})
+			It("should support attach [Conformance]", func() {
+				closed := "stdin close"
+				input := "stdin input\n"
+				container := api.Container{
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Name:    "attach-container",
+					Command: []string{"/bin/sh", "-c"},
+					Args:    []string{"head -2 && echo " + closed},
+					Stdin:   true,
+				}
+
+				By("attach to a container with stdin once")
+				container.StdinOnce = true
+				c := NewConformanceContainer(cfg, container)
+				By("create the container")
+				defer c.Delete()
+				err := c.Create()
+				Expect(err).NotTo(HaveOccurred())
+				By("wait up to 2m for the container to become running")
+				c.Wait(2*time.Minute, func(s *api.ContainerStatus) bool { return s.State.Running != nil })
+				By("attach the container")
+				output, err := c.Attach(input, false)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).To(ContainSubstring(input))
+				Expect(output).To(ContainSubstring(closed))
+				By("wait up to 2m for the container to become terminated")
+				c.Wait(2*time.Minute, func(s *api.ContainerStatus) bool { return s.State.Terminated != nil })
+				By("delete the container")
+				err = c.Delete()
+				Expect(err).NotTo(HaveOccurred())
+
+				By("attach to a container with stdin")
+				container.StdinOnce = false
+				c = NewConformanceContainer(cfg, container)
+				By("create the container")
+				defer c.Delete()
+				err = c.Create()
+				Expect(err).NotTo(HaveOccurred())
+				By("wait up to 2m for the container to become running")
+				c.Wait(2*time.Minute, func(s *api.ContainerStatus) bool { return s.State.Running != nil })
+				By("attach the container")
+				output, err = c.Attach(input, false)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(ContainSubstring(closed))
+				By("wait for 10 seconds to make sure the container is still running")
+				c.Always(10*time.Second, func(s *api.ContainerStatus) bool { return s.State.Running != nil })
+				By("attach the container")
+				output, err = c.Attach(input, false)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(ContainSubstring(closed))
+				By("wait up to 2m for the container to become terminated")
+				c.Wait(2*time.Minute, func(s *api.ContainerStatus) bool { return s.State.Terminated != nil })
+				// TODO(random-liu): Check container log here, after we have container log support
+				By("delete the container")
+				err = c.Delete()
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 		Context("when running a container with invalid image", func() {
 			It("it should not start successfully [Conformance]", func() {

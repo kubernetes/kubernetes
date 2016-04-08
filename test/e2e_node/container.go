@@ -96,6 +96,11 @@ func (cc *ConformanceContainer) Exec(cmd []string, input string, tty bool) (stri
 	return execCommandInContainer(restConfig, cc.client, cc.pod.Namespace, cc.pod.Name, cc.container.Name, cmd, input, tty)
 }
 
+func (cc *ConformanceContainer) Attach(input string, tty bool) (string, error) {
+	restConfig := &restclient.Config{Host: cc.server}
+	return attachContainer(restConfig, cc.client, cc.pod.Namespace, cc.pod.Name, cc.container.Name, input, tty)
+}
+
 func (cc *ConformanceContainer) Wait(timeout time.Duration, condition func(*api.ContainerStatus) bool) {
 	Eventually(cc.check(condition), timeout, pollInterval).Should(BeTrue())
 }

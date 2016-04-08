@@ -29,7 +29,7 @@ import (
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
 
-func execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func stream(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
 	exec, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func execCommandInContainer(config *restclient.Config, c *client.Client, ns, pod
 	var stdout, stderr bytes.Buffer
 	var stdin io.Reader
 	if input != "" {
-		stdin = bytes.NewReader([]byte(input))
+		stdin = strings.NewReader(input)
 	}
 	req := c.RESTClient.Post().
 		Resource("pods").
@@ -62,7 +62,34 @@ func execCommandInContainer(config *restclient.Config, c *client.Client, ns, pod
 		TTY:       tty,
 	}, api.ParameterCodec)
 
-	err := execute("POST", req.URL(), config, stdin, &stdout, &stderr, tty)
+	err := stream("POST", req.URL(), config, stdin, &stdout, &stderr, tty)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(stdout.String()), nil
+}
+
+func attachContainer(config *restclient.Config, c *client.Client, ns, podName, containerName string, input string, tty bool) (string, error) {
+	var stdout, stderr bytes.Buffer
+	var stdin io.Reader
+	if input != "" {
+		stdin = strings.NewReader(input)
+	}
+
+	req := c.RESTClient.Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(ns).
+		SubResource("attach")
+	req.VersionedParams(&api.PodAttachOptions{
+		Container: containerName,
+		Stdin:     stdin != nil,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       tty,
+	}, api.ParameterCodec)
+
+	err := stream("POST", req.URL(), config, stdin, &stdout, &stderr, tty)
 	if err != nil {
 		return "", err
 	}
