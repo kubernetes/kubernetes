@@ -17,7 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
-	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
+	testgroup_k8s_io "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io"
 	api "k8s.io/kubernetes/pkg/api"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -30,13 +30,13 @@ type TestTypesGetter interface {
 
 // TestTypeInterface has methods to work with TestType resources.
 type TestTypeInterface interface {
-	Create(*testgroup.TestType) (*testgroup.TestType, error)
-	Update(*testgroup.TestType) (*testgroup.TestType, error)
-	UpdateStatus(*testgroup.TestType) (*testgroup.TestType, error)
+	Create(*testgroup_k8s_io.TestType) (*testgroup_k8s_io.TestType, error)
+	Update(*testgroup_k8s_io.TestType) (*testgroup_k8s_io.TestType, error)
+	UpdateStatus(*testgroup_k8s_io.TestType) (*testgroup_k8s_io.TestType, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*testgroup.TestType, error)
-	List(opts api.ListOptions) (*testgroup.TestTypeList, error)
+	Get(name string) (*testgroup_k8s_io.TestType, error)
+	List(opts api.ListOptions) (*testgroup_k8s_io.TestTypeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	TestTypeExpansion
 }
@@ -56,8 +56,8 @@ func newTestTypes(c *TestgroupClient, namespace string) *testTypes {
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Create(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
-	result = &testgroup.TestType{}
+func (c *testTypes) Create(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
+	result = &testgroup_k8s_io.TestType{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -68,8 +68,8 @@ func (c *testTypes) Create(testType *testgroup.TestType) (result *testgroup.Test
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
-	result = &testgroup.TestType{}
+func (c *testTypes) Update(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
+	result = &testgroup_k8s_io.TestType{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -80,8 +80,8 @@ func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.Test
 	return
 }
 
-func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
-	result = &testgroup.TestType{}
+func (c *testTypes) UpdateStatus(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
+	result = &testgroup_k8s_io.TestType{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -116,8 +116,8 @@ func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions api
 }
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *testTypes) Get(name string) (result *testgroup.TestType, err error) {
-	result = &testgroup.TestType{}
+func (c *testTypes) Get(name string) (result *testgroup_k8s_io.TestType, err error) {
+	result = &testgroup_k8s_io.TestType{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -128,8 +128,8 @@ func (c *testTypes) Get(name string) (result *testgroup.TestType, err error) {
 }
 
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *testTypes) List(opts api.ListOptions) (result *testgroup.TestTypeList, err error) {
-	result = &testgroup.TestTypeList{}
+func (c *testTypes) List(opts api.ListOptions) (result *testgroup_k8s_io.TestTypeList, err error) {
+	result = &testgroup_k8s_io.TestTypeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("testtypes").
