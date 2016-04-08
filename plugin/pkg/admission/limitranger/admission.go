@@ -249,6 +249,42 @@ func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.Resourc
 		}
 	}
 
+	for i := range pod.Spec.InitContainers {
+		container := &pod.Spec.InitContainers[i]
+		setRequests := []string{}
+		setLimits := []string{}
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = api.ResourceList{}
+		}
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = api.ResourceList{}
+		}
+		for k, v := range defaultRequirements.Limits {
+			_, found := container.Resources.Limits[k]
+			if !found {
+				container.Resources.Limits[k] = *v.Copy()
+				setLimits = append(setLimits, string(k))
+			}
+		}
+		for k, v := range defaultRequirements.Requests {
+			_, found := container.Resources.Requests[k]
+			if !found {
+				container.Resources.Requests[k] = *v.Copy()
+				setRequests = append(setRequests, string(k))
+			}
+		}
+		if len(setRequests) > 0 {
+			sort.Strings(setRequests)
+			a := strings.Join(setRequests, ", ") + " request for init container " + container.Name
+			annotations = append(annotations, a)
+		}
+		if len(setLimits) > 0 {
+			sort.Strings(setLimits)
+			a := strings.Join(setLimits, ", ") + " limit for init container " + container.Name
+			annotations = append(annotations, a)
+		}
+	}
+
 	if len(annotations) > 0 {
 		if pod.ObjectMeta.Annotations == nil {
 			pod.ObjectMeta.Annotations = make(map[string]string)
@@ -441,7 +477,7 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 			}
 		}
 
-		// enforce pod limits
+		// enforce pod limits on init containers
 		if limitType == api.LimitTypePod {
 			containerRequests, containerLimits := []api.ResourceList{}, []api.ResourceList{}
 			for j := range pod.Spec.Containers {
@@ -451,6 +487,28 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 			}
 			podRequests := sum(containerRequests)
 			podLimits := sum(containerLimits)
+			for j := range pod.Spec.InitContainers {
+				container := &pod.Spec.InitContainers[j]
+				// take max(sum_containers, any_init_container)
+				for k, v := range container.Resources.Requests {
+					if v2, ok := podRequests[k]; ok {
+						if v.Value() > v2.Value() {
+							podRequests[k] = v
+						}
+					} else {
+						podRequests[k] = v
+					}
+				}
+				for k, v := range container.Resources.Limits {
+					if v2, ok := podLimits[k]; ok {
+						if v.Value() > v2.Value() {
+							podLimits[k] = v
+						}
+					} else {
+						podLimits[k] = v
+					}
+				}
+			}
 			for k, v := range limit.Min {
 				if err := minConstraint(limitType, k, v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
