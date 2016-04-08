@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"regexp"
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
@@ -45,7 +46,8 @@ func (mock *ConcertoAPIServiceMock) GetInstanceList() ([]ConcertoInstance, error
 }
 
 func (mock *ConcertoAPIServiceMock) GetLoadBalancerByName(name string) (*ConcertoLoadBalancer, error) {
-	if name == "GiveMeAnError" {
+	matchError, _ := regexp.MatchString("Error", name)
+	if matchError {
 		return nil, fmt.Errorf("Take this!")
 	}
 	for _, lb := range mock.balancers {
