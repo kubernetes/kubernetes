@@ -19,26 +19,33 @@ package validation
 import (
 	"io/ioutil"
 	"math/rand"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/runtime"
+
+	"github.com/ghodss/yaml"
 )
 
-func readPod(filename string) (string, error) {
+func readPod(filename string) ([]byte, error) {
 	data, err := ioutil.ReadFile("testdata/" + testapi.Default.GroupVersion().Version + "/" + filename)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(data), nil
+	return data, nil
+}
+
+func readSwaggerFile() ([]byte, error) {
+	// TODO this path is broken
+	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
+	return ioutil.ReadFile(pathToSwaggerSpec)
 }
 
 func loadSchemaForTest() (Schema, error) {
-	// TODO this path is broken
-	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
-	data, err := ioutil.ReadFile(pathToSwaggerSpec)
+	data, err := readSwaggerFile()
 	if err != nil {
 		return nil, err
 	}
@@ -98,9 +105,9 @@ func TestInvalid(t *testing.T) {
 	for _, test := range tests {
 		pod, err := readPod(test)
 		if err != nil {
-			t.Errorf("could not read file: %s", pod)
+			t.Errorf("could not read file: %s, err: %v", test, err)
 		}
-		err = schema.ValidateBytes([]byte(pod))
+		err = schema.ValidateBytes(pod)
 		if err == nil {
 			t.Errorf("unexpected non-error, err: %s for pod: %s", err, pod)
 		}
@@ -118,9 +125,9 @@ func TestValid(t *testing.T) {
 	for _, test := range tests {
 		pod, err := readPod(test)
 		if err != nil {
-			t.Errorf("could not read file: %s", test)
+			t.Errorf("could not read file: %s, err: %v", test, err)
 		}
-		err = schema.ValidateBytes([]byte(pod))
+		err = schema.ValidateBytes(pod)
 		if err != nil {
 			t.Errorf("unexpected error %s, for pod %s", err, pod)
 		}
@@ -151,6 +158,42 @@ func TestVersionRegex(t *testing.T) {
 		}
 		if !versionRegexp.MatchString(test.typeName) && test.match {
 			t.Errorf("unexpected error: expect %s to match the regular expression", test.typeName)
+		}
+	}
+}
+
+// Tests that validation works fine when spec contains "type": "object" instead of "type": "any"
+func TestTypeObject(t *testing.T) {
+	data, err := readSwaggerFile()
+	if err != nil {
+		t.Errorf("failed to read swagger file: %v", err)
+	}
+	// Replace type: "any" in the spec by type: "object" and verify that the validation still passes.
+	newData := strings.Replace(string(data), `"type": "any"`, `"type": "object"`, -1)
+	schema, err := NewSwaggerSchemaFromBytes([]byte(newData))
+	if err != nil {
+		t.Errorf("Failed to load: %v", err)
+	}
+	tests := []string{
+		"validPod.yaml",
+	}
+	for _, test := range tests {
+		podBytes, err := readPod(test)
+		if err != nil {
+			t.Errorf("could not read file: %s, err: %v", test, err)
+		}
+		// Verify that pod has at least one label (labels are type "any")
+		var pod api.Pod
+		err = yaml.Unmarshal(podBytes, &pod)
+		if err != nil {
+			t.Errorf("error in unmarshalling pod: %v", err)
+		}
+		if len(pod.Labels) == 0 {
+			t.Errorf("invalid test input: the pod should have at least one label")
+		}
+		err = schema.ValidateBytes(podBytes)
+		if err != nil {
+			t.Errorf("unexpected error %s, for pod %s", err, string(podBytes))
 		}
 	}
 }
