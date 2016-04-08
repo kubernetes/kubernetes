@@ -290,7 +290,7 @@ if [[ -n "${JENKINS_PUBLISHED_TEST_VERSION:-}" ]]; then
     fetch_published_version_tars "${JENKINS_PUBLISHED_TEST_VERSION}"
     cd kubernetes
     # Upgrade the cluster before running other tests
-    if [[ "${E2E_UPGRADE_TEST,,}" == "true" ]]; then
+    if [[ "${E2E_UPGRADE_TEST:-}" == "true" ]]; then
 	# Add a report prefix for the e2e tests so that the tests don't get overwritten when we run
 	# the rest of the e2es.
         E2E_REPORT_PREFIX='upgrade' e2e_test "${GINKGO_UPGRADE_TEST_ARGS:-}"
