@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/node"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -40,14 +40,14 @@ type NodeStorage struct {
 }
 
 type REST struct {
-	*etcdgeneric.Etcd
+	*registry.Store
 	connection     client.ConnectionInfoGetter
 	proxyTransport http.RoundTripper
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
 type StatusREST struct {
-	store *etcdgeneric.Etcd
+	store *registry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {
@@ -67,14 +67,14 @@ func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter
 	storageInterface := opts.Decorator(
 		opts.Storage, cachesize.GetWatchCacheSizeByResource(cachesize.Nodes), &api.Node{}, prefix, node.Strategy, newListFunc)
 
-	store := &etcdgeneric.Etcd{
+	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
 		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
+			return registry.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil

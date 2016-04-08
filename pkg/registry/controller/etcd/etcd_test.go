@@ -87,7 +87,7 @@ var validController = validNewController()
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Controller.Etcd)
+	test := registrytest.New(t, storage.Controller.Store)
 	controller := validNewController()
 	controller.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -107,7 +107,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Controller.Etcd)
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestUpdate(
 		// valid
 		validNewController(),
@@ -134,7 +134,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Controller.Etcd)
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestDelete(validNewController())
 }
 
@@ -191,21 +191,21 @@ func TestGenerationNumber(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Controller.Etcd)
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestGet(validNewController())
 }
 
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Controller.Etcd)
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestList(validNewController())
 }
 
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Controller.Etcd)
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestWatch(
 		validController,
 		// matching labels

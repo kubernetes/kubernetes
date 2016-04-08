@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package registry
 
 import (
 	"fmt"
@@ -87,13 +87,13 @@ func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
 	}
 }
 
-func NewTestGenericEtcdRegistry(t *testing.T) (*etcdtesting.EtcdTestServer, *Etcd) {
+func NewTestGenericStoreRegistry(t *testing.T) (*etcdtesting.EtcdTestServer, *Store) {
 	podPrefix := "/pods"
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	s := etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 
-	return server, &Etcd{
+	return server, &Store{
 		NewFunc:           func() runtime.Object { return &api.Pod{} },
 		NewListFunc:       func() runtime.Object { return &api.PodList{} },
 		QualifiedResource: api.Resource("pods"),
@@ -160,7 +160,7 @@ func (everythingMatcher) MatchesSingle() (string, bool) {
 	return "", false
 }
 
-func TestEtcdList(t *testing.T) {
+func TestStoreList(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "bar"},
 		Spec:       api.PodSpec{NodeName: "machine"},
@@ -212,7 +212,7 @@ func TestEtcdList(t *testing.T) {
 		if item.context != nil {
 			ctx = item.context
 		}
-		server, registry := NewTestGenericEtcdRegistry(t)
+		server, registry := NewTestGenericStoreRegistry(t)
 
 		if item.in != nil {
 			if err := storagetesting.CreateList("/pods", registry.Storage, item.in); err != nil {
@@ -234,7 +234,7 @@ func TestEtcdList(t *testing.T) {
 	}
 }
 
-func TestEtcdCreate(t *testing.T) {
+func TestStoreCreate(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine"},
@@ -245,7 +245,7 @@ func TestEtcdCreate(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericEtcdRegistry(t)
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	// create the object
@@ -272,7 +272,7 @@ func TestEtcdCreate(t *testing.T) {
 	}
 }
 
-func updateAndVerify(t *testing.T, ctx api.Context, registry *Etcd, pod *api.Pod) bool {
+func updateAndVerify(t *testing.T, ctx api.Context, registry *Store, pod *api.Pod) bool {
 	obj, _, err := registry.Update(ctx, pod)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -290,7 +290,7 @@ func updateAndVerify(t *testing.T, ctx api.Context, registry *Etcd, pod *api.Pod
 	return true
 }
 
-func TestEtcdUpdate(t *testing.T) {
+func TestStoreUpdate(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine"},
@@ -305,7 +305,7 @@ func TestEtcdUpdate(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericEtcdRegistry(t)
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	// Test1 try to update a non-existing node
@@ -343,7 +343,7 @@ func TestEtcdUpdate(t *testing.T) {
 }
 
 func TestNoOpUpdates(t *testing.T) {
-	server, registry := NewTestGenericEtcdRegistry(t)
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	newPod := func() *api.Pod {
@@ -414,7 +414,7 @@ func (t testPodExport) Export(obj runtime.Object, exact bool) error {
 	return nil
 }
 
-func TestEtcdCustomExport(t *testing.T) {
+func TestStoreCustomExport(t *testing.T) {
 	podA := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: "test",
@@ -424,7 +424,7 @@ func TestEtcdCustomExport(t *testing.T) {
 		Spec: api.PodSpec{NodeName: "machine"},
 	}
 
-	server, registry := NewTestGenericEtcdRegistry(t)
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	registry.ExportStrategy = testPodExport{}
@@ -455,7 +455,7 @@ func TestEtcdCustomExport(t *testing.T) {
 	}
 }
 
-func TestEtcdBasicExport(t *testing.T) {
+func TestStoreBasicExport(t *testing.T) {
 	podA := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: "test",
@@ -466,7 +466,7 @@ func TestEtcdBasicExport(t *testing.T) {
 		Status: api.PodStatus{HostIP: "1.2.3.4"},
 	}
 
-	server, registry := NewTestGenericEtcdRegistry(t)
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
@@ -490,14 +490,14 @@ func TestEtcdBasicExport(t *testing.T) {
 	}
 }
 
-func TestEtcdGet(t *testing.T) {
+func TestStoreGet(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "foo"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericEtcdRegistry(t)
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	_, err := registry.Get(testContext, podA.Name)
@@ -511,14 +511,14 @@ func TestEtcdGet(t *testing.T) {
 	}
 }
 
-func TestEtcdDelete(t *testing.T) {
+func TestStoreDelete(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericEtcdRegistry(t)
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	// test failure condition
@@ -546,12 +546,12 @@ func TestEtcdDelete(t *testing.T) {
 	}
 }
 
-func TestEtcdDeleteCollection(t *testing.T) {
+func TestStoreDeleteCollection(t *testing.T) {
 	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podB := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericEtcdRegistry(t)
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	if _, err := registry.Create(testContext, podA); err != nil {
@@ -579,8 +579,8 @@ func TestEtcdDeleteCollection(t *testing.T) {
 	}
 }
 
-func TestEtcdDeleteCollectionNotFound(t *testing.T) {
-	server, registry := NewTestGenericEtcdRegistry(t)
+func TestStoreDeleteCollectionNotFound(t *testing.T) {
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
@@ -622,11 +622,11 @@ func TestEtcdDeleteCollectionNotFound(t *testing.T) {
 
 // Test whether objects deleted with DeleteCollection are correctly delivered
 // to watchers.
-func TestEtcdDeleteCollectionWithWatch(t *testing.T) {
+func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, registry := NewTestGenericEtcdRegistry(t)
+	server, registry := NewTestGenericStoreRegistry(t)
 	defer server.Terminate(t)
 
 	objCreated, err := registry.Create(testContext, podA)
@@ -660,7 +660,7 @@ func TestEtcdDeleteCollectionWithWatch(t *testing.T) {
 	}
 }
 
-func TestEtcdWatch(t *testing.T) {
+func TestStoreWatch(t *testing.T) {
 	testContext := api.WithNamespace(api.NewContext(), "test")
 	noNamespaceContext := api.NewContext()
 
@@ -693,7 +693,7 @@ func TestEtcdWatch(t *testing.T) {
 			Spec: api.PodSpec{NodeName: "machine"},
 		}
 
-		server, registry := NewTestGenericEtcdRegistry(t)
+		server, registry := NewTestGenericStoreRegistry(t)
 		wi, err := registry.WatchPredicate(ctx, m, "0")
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", name, err)
