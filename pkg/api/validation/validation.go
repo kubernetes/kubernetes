@@ -1576,11 +1576,11 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 
 	// validate updated spec.activeDeadlineSeconds.  two types of updates are allowed:
 	// 1.  from nil to a positive value
-	// 2.  from a positive value to a lesser, non-negative value
+	// 2.  from a positive value to a lesser, positive value
 	if newPod.Spec.ActiveDeadlineSeconds != nil {
 		newActiveDeadlineSeconds := *newPod.Spec.ActiveDeadlineSeconds
-		if newActiveDeadlineSeconds < 0 {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, isNegativeErrorMsg))
+		if newActiveDeadlineSeconds <= 0 {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, isNotPositiveErrorMsg))
 			return allErrs
 		}
 		if oldPod.Spec.ActiveDeadlineSeconds != nil {
