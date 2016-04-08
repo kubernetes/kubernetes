@@ -199,11 +199,11 @@ const (
 )
 
 // A list of containers for which we want to collect resource usage.
+// TODO: Re-enable docker-daemon tests.
 func targetContainers() []string {
 	if providerIs("gce", "gke") {
 		return []string{
 			"/",
-			"/docker-daemon",
 			"/kubelet",
 			"/system",
 		}
