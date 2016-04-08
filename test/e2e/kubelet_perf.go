@@ -197,6 +197,7 @@ var _ = KubeDescribe("Kubelet [Serial] [Slow]", func() {
 	AfterEach(func() {
 		rm.Stop()
 	})
+	// TODO: Re-enable tests for docker-daemon.
 	KubeDescribe("regular resource usage tracking", func() {
 		// We assume that the scheduler will make reasonable scheduling choices
 		// and assign ~N pods on the node.
@@ -210,27 +211,23 @@ var _ = KubeDescribe("Kubelet [Serial] [Slow]", func() {
 			{
 				podsPerNode: 0,
 				cpuLimits: containersCPUSummary{
-					"/kubelet":       {0.50: 0.06, 0.95: 0.08},
-					"/docker-daemon": {0.50: 0.05, 0.95: 0.06},
+					"/kubelet": {0.50: 0.06, 0.95: 0.08},
 				},
 				// We set the memory limits generously because the distribution
 				// of the addon pods affect the memory usage on each node.
 				memLimits: resourceUsagePerContainer{
-					"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
-					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 85 * 1024 * 1024},
+					"/kubelet": &containerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
 				},
 			},
 			{
 				podsPerNode: 35,
 				cpuLimits: containersCPUSummary{
-					"/kubelet":       {0.50: 0.12, 0.95: 0.14},
-					"/docker-daemon": {0.50: 0.06, 0.95: 0.08},
+					"/kubelet": {0.50: 0.12, 0.95: 0.14},
 				},
 				// We set the memory limits generously because the distribution
 				// of the addon pods affect the memory usage on each node.
 				memLimits: resourceUsagePerContainer{
-					"/kubelet":       &containerResourceUsage{MemoryRSSInBytes: 75 * 1024 * 1024},
-					"/docker-daemon": &containerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					"/kubelet": &containerResourceUsage{MemoryRSSInBytes: 75 * 1024 * 1024},
 				},
 			},
 			{
