@@ -27,13 +27,9 @@
         - email-ext:
             recipients: '{owner}'
     scm:
-        - git:
+        - git-2-4-4:
             url: 'https://github.com/{repoName}'
-            browser: githubweb
-            browser-url: 'https://github.com/{repoName}'
-            branches:
-                - 'master'
-            skip-tag: true
+            branch: 'master'
             basedir: 'go/src/{gitbasedir}'
     triggers:
         - pollscm:
@@ -77,13 +73,9 @@
         - email-ext:
             recipients: '{owner}'
     scm:
-        - git:
+        - git-2-4-4:
             url: 'https://github.com/{repoName}'
-            browser: githubweb
-            browser-url: 'https://github.com/{repoName}'
-            branches:
-                - 'master'
-            skip-tag: true
+            branch: 'master'
             basedir: 'go/src/{gitbasedir}'
     triggers:
         - pollscm:
