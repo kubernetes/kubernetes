@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -53,7 +54,7 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 						OptionalName: "fake_" + strings.ToLower(c.Namers["private"].Name(t)),
 					},
 					outputPackage: outputPackagePath,
-					group:         gv.Group,
+					group:         normalization.BeforeFirstDot(gv.Group),
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
 				})
@@ -65,7 +66,7 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 				},
 				outputPackage:  outputPackagePath,
 				realClientPath: realClientPath,
-				group:          gv.Group,
+				group:          normalization.BeforeFirstDot(gv.Group),
 				types:          typeList,
 				imports:        generator.NewImportTracker(),
 			})
