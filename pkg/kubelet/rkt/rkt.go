@@ -807,7 +807,7 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 	// Run 'rkt prepare' to get the rkt UUID.
 	cmds := []string{"prepare", "--quiet", "--pod-manifest", manifestFile.Name()}
 	if r.config.Stage1Image != "" {
-		cmds = append(cmds, "--stage1-image", r.config.Stage1Image)
+		cmds = append(cmds, "--stage1-path", r.config.Stage1Image)
 	}
 	output, err := r.runCommand(cmds...)
 	if err != nil {
