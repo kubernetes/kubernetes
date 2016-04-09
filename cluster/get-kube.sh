@@ -39,6 +39,7 @@
 #
 #  Set KUBERNETES_SKIP_DOWNLOAD to non-empty to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
+#  Set KUBERNETES_RELEASE to the release you want to use (e.g. 'v1.2.0'). See https://github.com/kubernetes/kubernetes/releases for release options
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -74,7 +75,7 @@ function get_latest_version_number {
   fi
 }
 
-release=$(get_latest_version_number)
+release=${KUBERNETES_RELEASE:-$(get_latest_version_number)}
 release_url=https://storage.googleapis.com/kubernetes-release/release/${release}/kubernetes.tar.gz
 
 uname=$(uname)
