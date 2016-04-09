@@ -656,7 +656,7 @@ func (dm *DockerManager) runContainer(
 
 	// Set network configuration for infra-container
 	if container.Name == PodInfraContainerName {
-		setInfraContainerNetworkConfig(pod, netMode, opts, dockerOpts)
+		setInfraContainerNetworkConfig(pod, netMode, opts, &dockerOpts)
 	}
 
 	setEntrypointAndCommand(container, opts, dockerOpts)
@@ -688,7 +688,7 @@ func (dm *DockerManager) runContainer(
 
 // setInfraContainerNetworkConfig sets the network configuration for the infra-container. We only set network configuration for infra-container, all
 // the user containers will share the same network namespace with infra-container.
-func setInfraContainerNetworkConfig(pod *api.Pod, netMode string, opts *kubecontainer.RunContainerOptions, dockerOpts dockertypes.ContainerCreateConfig) {
+func setInfraContainerNetworkConfig(pod *api.Pod, netMode string, opts *kubecontainer.RunContainerOptions, dockerOpts *dockertypes.ContainerCreateConfig) {
 	exposedPorts, portBindings := makePortsAndBindings(opts.PortMappings)
 	dockerOpts.Config.ExposedPorts = exposedPorts
 	dockerOpts.HostConfig.PortBindings = dockernat.PortMap(portBindings)
