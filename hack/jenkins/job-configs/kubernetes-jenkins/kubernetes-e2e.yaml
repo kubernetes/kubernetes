@@ -868,46 +868,50 @@
     emails: 'ihmccreery@google.com'
     provider-env: '{gke-provider-env}'
     suffix:
-        - 'gke-kubectl-skew-1.1-1.2':
+        - 'gke-1.1-1.2-kubectl-skew':
             description: 'Deploys a cluster at v1.1 and runs the v1.2 Kubectl tests.'
             timeout: 30
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-ctl-skew-1-1-1-2"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
+                export E2E_NAME="gke-1-1-1-2-ctl-skew"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=Kubectl"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_PARALLEL="y"
                 export E2E_OPT="--check_version_skew=false"
-        - 'gke-upgrade-master-1.1-1.2':
+        - 'gke-1.1-1.2-upgrade-master':
             description: 'Deploys a cluster at v1.1, upgrades its master to v1.2, and runs v1.1 tests against it.'
             timeout: 30
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-upg-mas-1-1-1-2"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
+                export E2E_NAME="gke-1-1-1-2-upg-mas"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
                 export E2E_UPGRADE_TEST="true"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
                 export E2E_OPT="--check_version_skew=false"
-        - 'gke-upgrade-cluster-1.1-1.2':
+        - 'gke-1.1-1.2-upgrade-cluster':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.1 tests against it.'
             timeout: 30
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-upg-clu-1-1-1-2"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
+                export E2E_NAME="gke-1-1-1-2-upg-clu"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
                 export E2E_UPGRADE_TEST="true"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
                 export E2E_OPT="--check_version_skew=false"
-        - 'gke-upgrade-cluster-new-1.1-1.2':
+        - 'gke-1.1-1.2-upgrade-cluster-new':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.2 tests against it.'
             timeout: 30
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-upg-clu-new-1-1-1-2"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
+                export E2E_NAME="gke-1-1-1-2-upg-clu-new"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
                 export E2E_UPGRADE_TEST="true"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export E2E_OPT="--check_version_skew=false"
     jobs:
