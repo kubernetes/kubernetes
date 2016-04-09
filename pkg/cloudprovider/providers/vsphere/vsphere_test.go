@@ -17,7 +17,6 @@ limitations under the License.
 package vsphere
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -28,7 +27,6 @@ import (
 )
 
 func configFromEnv() (cfg VSphereConfig, ok bool) {
-	fmt.Print("inside test")
 	cfg.Global.VCenterIp = os.Getenv("VSPHERE_VCENTER")
 	cfg.Global.VCenterPort = os.Getenv("VSPHERE_VCENTER_PORT")
 	cfg.Global.User = os.Getenv("VSPHERE_USER")
@@ -41,8 +39,6 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	}
 
 	cfg.Global.InsecureFlag = InsecureFlag
-
-
 
 	ok = (cfg.Global.VCenterIp != "" &&
 		cfg.Global.User != "")
@@ -59,7 +55,7 @@ func TestReadConfig(t *testing.T) {
 	cfg, err := readConfig(strings.NewReader(`
 [Global]
 server = 0.0.0.0
-port = 80
+port = 443
 user = user
 password = password
 insecure-flag = true
@@ -73,7 +69,7 @@ datacenter = us-west
 		t.Errorf("incorrect vcenter ip: %s", cfg.Global.VCenterIp)
 	}
 
-	if cfg.Global.VCenterPort != "80" {
+	if cfg.Global.VCenterPort != "443" {
 		t.Errorf("incorrect vcenter port: %s", cfg.Global.VCenterPort)
 	}
 
@@ -141,4 +137,32 @@ func TestZones(t *testing.T) {
 	if zone.Region != vs.cfg.Global.Datacenter {
 		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
 	}
+}
+
+func TestInstances(t *testing.T) {
+	cfg, ok := configFromEnv()
+	if !ok {
+		t.Skipf("No config found in environment")
+	}
+
+	vs, err := newVSphere(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	}
+
+	i, ok := vs.Instances()
+	if !ok {
+		t.Fatalf("Instances() returned false")
+	}
+
+	srvs, err := i.List("*")
+	if err != nil {
+		t.Fatalf("Instances.List() failed: %s", err)
+	}
+
+	if len(srvs) == 0 {
+		t.Fatalf("Instances.List() returned zero servers")
+	}
+	t.Logf("Found servers (%d): %s\n", len(srvs), srvs)
+
 }
