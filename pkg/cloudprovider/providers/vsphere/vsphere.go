@@ -23,29 +23,33 @@ import (
 	"net/url"
 
 	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 const ProviderName = "vsphere"
 
 // VSphere is an implementation of Interface, LoadBalancer and Instances for vSphere.
 type VSphere struct {
-	cfg	*VSphereConfig
+	cfg *VSphereConfig
 }
 
 type VSphereConfig struct {
 	Global struct {
-		User          string `gcfg:"user"`
-		Password      string `gcfg:"password"`
-		VCenterIp     string `gcfg:"server"`
-		VCenterPort   string `gcfg:"port"`
-		InsecureFlag  bool   `gcfg:"insecure-flag"`
-		Datacenter    string `gcfg:"datacenter"`
+		User         string `gcfg:"user"`
+		Password     string `gcfg:"password"`
+		VCenterIp    string `gcfg:"server"`
+		VCenterPort  string `gcfg:"port"`
+		InsecureFlag bool   `gcfg:"insecure-flag"`
+		Datacenter   string `gcfg:"datacenter"`
 	}
 }
 
@@ -72,12 +76,12 @@ func init() {
 
 func newVSphere(cfg VSphereConfig) (*VSphere, error) {
 	vs := VSphere{
-		cfg:	&cfg,
+		cfg: &cfg,
 	}
 	return &vs, nil
 }
 
-func vsphereLogin(cfg	*VSphereConfig, ctx context.Context) (*govmomi.Client, error) {
+func vsphereLogin(cfg *VSphereConfig, ctx context.Context) (*govmomi.Client, error) {
 
 	// Parse URL from string
 	u, err := url.Parse(fmt.Sprintf("https://%s:%s/sdk", cfg.Global.VCenterIp, cfg.Global.VCenterPort))
@@ -97,16 +101,72 @@ func vsphereLogin(cfg	*VSphereConfig, ctx context.Context) (*govmomi.Client, err
 }
 
 type Instances struct {
-	cfg		*VSphereConfig
+	cfg *VSphereConfig
 }
 
 // Instances returns an implementation of Instances for vSphere.
 func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
+    
 	return &Instances{vs.cfg}, true
 }
 
+func getInstances(c *govmomi.Client, finder *find.Finder, ctx context.Context, nameFilter string) ([]string, error) {
+	//TODO: get all vms inside subfolders
+	vms, err := finder.VirtualMachineList(ctx, nameFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	var vmRef []types.ManagedObjectReference
+	for _, vm := range vms {
+		vmRef = append(vmRef, vm.Reference())
+	}
+
+	pc := property.DefaultCollector(c.Client)
+
+	var vmt []mo.VirtualMachine
+	err = pc.Retrieve(ctx, vmRef, []string{"name", "summary"}, &vmt)
+	if err != nil {
+		return nil, err
+	}
+
+	var vmList []string
+	for _, vm := range vmt {
+		vmPowerstate := vm.Summary.Runtime.PowerState
+		if vmPowerstate == "poweredOn" {
+			vmList = append(vmList, vm.Name)
+		}
+	}
+	return vmList, nil
+}
+
 func (i *Instances) List(nameFilter string) ([]string, error) {
-	return nil, nil
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c, err := vsphereLogin(i.cfg, ctx)
+	if err != nil {
+		fmt.Errorf("Failed to create vSpere client: %s", err)
+	}
+	defer c.Logout(ctx)
+
+	fo := find.NewFinder(c.Client, true)
+	dc, err := fo.Datacenter(ctx, i.cfg.Global.Datacenter)
+	if err != nil {
+		glog.Warningf("Failed to find %v", err)
+		return nil, err
+	}
+
+	finderObj := fo.SetDatacenter(dc)
+	vmList, err := getInstances(c, finderObj, ctx, nameFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.V(3).Infof("Found %v instances matching %v: %v",
+		len(vmList), nameFilter, vmList)
+
+	return vmList, nil
 }
 
 func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
