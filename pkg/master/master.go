@@ -524,15 +524,19 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 
 // HasThirdPartyResource returns true if a particular third party resource currently installed.
 func (m *Master) HasThirdPartyResource(rsrc *extensions.ThirdPartyResource) (bool, error) {
-	_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
 	if err != nil {
 		return false, err
 	}
 	path := makeThirdPartyPath(group)
 	services := m.HandlerContainer.RegisteredWebServices()
-	for ix := range services {
-		if services[ix].RootPath() == path {
-			return true, nil
+	// Using Master object as a cache to check if the group and kind have already been installed
+	for _, service := range services {
+		if service.RootPath() == path {
+			_, ok := m.thirdPartyResources[path+"/"+strings.ToLower(kind)+"s"]
+			if ok {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
@@ -617,11 +621,10 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 	if err != nil {
 		return err
 	}
-	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name)
-	if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
-		glog.Fatalf("Unable to setup thirdparty api: %v", err)
-	}
+
 	path := makeThirdPartyPath(group)
+	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name)
+
 	groupVersion := unversioned.GroupVersionForDiscovery{
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
 		Version:      rsrc.Versions[0].Name,
@@ -630,9 +633,19 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Name:     group,
 		Versions: []unversioned.GroupVersionForDiscovery{groupVersion},
 	}
-	apiserver.AddGroupWebService(api.Codecs, m.HandlerContainer, path, apiGroup)
-	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST), apiGroup)
-	apiserver.InstallServiceErrorHandler(api.Codecs, m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
+
+	if thirdparty.GetREST(m.HandlerContainer) != nil {
+		// A webservice for the thirdparty group already exists
+		thirdparty.UpdateREST(m.HandlerContainer)
+	} else {
+		if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
+			glog.Fatalf("Unable to setup thirdparty api: %v", err)
+		}
+		apiserver.AddGroupWebService(api.Codecs, m.HandlerContainer, path, apiGroup)
+		apiserver.InstallServiceErrorHandler(api.Codecs, m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
+
+	}
+	m.addThirdPartyResourceStorage(path+"/"+strings.ToLower(kind)+"s", thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	return nil
 }
 
@@ -642,10 +655,21 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 
 	apiRoot := makeThirdPartyPath("")
 
+	thirdPartyAPIPath := makeThirdPartyPath(group)
+
 	storage := map[string]rest.Storage{
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
+	// We can have more than one thirdpartyresourcekind for an APIGroup (thirdpartyapi)
+	// /apis/domain.com/rest1 and /apis/domain.com/rest2
+	// In this case we have to add all the storages to this APIGroupVersion
+	for k := range m.thirdPartyResources {
+		if strings.HasPrefix(k, thirdPartyAPIPath) {
+			kind := strings.ToLower(m.thirdPartyResources[k].storage.Kind())
+			storage[kind + "s"] = m.thirdPartyResources[k].storage
+		}
+	}
 	optionsExternalVersion := registered.GroupOrDie(api.GroupName).GroupVersion
 	internalVersion := unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
 	externalVersion := unversioned.GroupVersion{Group: group, Version: version}

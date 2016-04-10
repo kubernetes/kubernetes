@@ -137,21 +137,30 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 // this method will return an error.
 func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 	installer := g.newInstaller()
-	var ws *restful.WebService = nil
-
-	for i, s := range container.RegisteredWebServices() {
-		if s.RootPath() == installer.prefix {
-			ws = container.RegisteredWebServices()[i]
-			break
-		}
-	}
-
+	ws := g.GetREST(container)
 	if ws == nil {
 		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
 	}
 	apiResources, registrationErrors := installer.Install(ws)
+	// TODO: This panics when the route is the last one in the webservice.
+	// Best effort due to this panic: https://github.com/emicklei/go-restful/issues/276
+	ws.RemoveRoute(ws.RootPath() + "/", "GET")
 	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, apiResources)
 	return utilerrors.NewAggregate(registrationErrors)
+}
+
+// GetREST returns the REST handlers for this APIGroupVersion from an existing web service
+// in the restful Container.  It will use the prefix (root/version) to find the existing
+// web service.  If a web service does not exist within the container to support the prefix
+// this method will return nil.
+func (g *APIGroupVersion) GetREST(container *restful.Container) *restful.WebService {
+	installer := g.newInstaller()
+	for i, s := range container.RegisteredWebServices() {
+		if s.RootPath() == installer.prefix {
+			return container.RegisteredWebServices()[i]
+		}
+	}
+	return nil
 }
 
 // newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
@@ -341,6 +350,7 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 		ss = StripVersionNegotiatedSerializer{s}
 	}
 	resourceHandler := SupportedResourcesHandler(ss, groupVersion, apiResources)
+	ws.SetDynamicRoutes(true)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").
 		Operation("getAPIResources").
