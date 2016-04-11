@@ -26,9 +26,12 @@ GPU is important to lots of workloads, such as machine learning, video stream de
 
 ## Implementation
 Related discussion:
+
 https://github.com/kubernetes/kubernetes/issues/19049
 
-Related implementation: All the codes below could found at below branch, and the codes has been verified, it could scheduler the GPU resources and assign GPU to container, the app inside container runs success.
+Related implementation: 
+
+All the codes below could found at below branch, and the codes has been verified, it could scheduler the GPU resources and assign GPU to container, the app inside container runs success.
 https://github.com/Hui-Zhi/kubernetes/tree/try_nvidia_docker_merge_devices_support
 
 The GPU should be known by both Scheduler and Kubelet, but for Scheduler, only need to know the attributes which could be a condition when scheduling/tracking, for Kubelet, need to report the GPU to scheduler and have the ability to assign these GPUs to containers, which means Kubelet need to know more than it give to Scheduler. 
@@ -40,6 +43,7 @@ Kubelet should responsible for the GPU information collection/update/allocation/
 Need to has the ability to send the GPU status to Scheduler for scheduling/tracking. The GPU need to be added as the volume or network,like: func ProbeXXXPlugins(pluginDir string) []XXX.XXXPlugin. All the scheduling/tracking information should be provided in this plugin. The information of GPU for container allocation/release also should be provided in this plugin. (like GPU device path "/dev/nvidia0")
 
 The responsibility of the GPU plugin in Kubelet:
+
 	1). Implement different subplugin for each of vendor. But all the GPU resources should be in 1 plugin. Like:
 		func ProbeGPUPlugins() []gpuTypes.GPUPlugin {
           glog.Infof("GPUPlugin: ProbeGPUPlugins")
@@ -98,7 +102,7 @@ Should include number to describe how many GPUs on a machine.
 
 
 ### yaml file example:
-.. code-block:: yaml
+
 apiVersion: v1
 kind: Pod
 metadata:
