@@ -17,15 +17,13 @@ limitations under the License.
 package clc
 
 import (
-	"errors"
 	"fmt"
 	"io"
-	"net"
 
 	"encoding/base64"
 
 	"github.com/golang/glog"
-	"github.com/scalingdata/gcfg"
+	"gopkg.in/gcfg.v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
@@ -36,7 +34,7 @@ const (
 	ProviderName = "clc"
 )
 
-// CLCCloud is an implementation of Interface, LoadBalancer and Instances for CenturyLinkCloud.
+// CLCCloud is an implementation of Interface, LoadBalancer and Zones for CenturyLinkCloud.
 type CLCCloud struct {
 	clcClient CenturyLinkClient
 	clcLB     *clcProviderLB // cloudprovider's LoadBalancer interface is implemented here
@@ -153,72 +151,53 @@ func (clc *CLCCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 	return nil, nil
 }
 
-// ListClusters lists the names of the available clusters.
-func (clc *CLCCloud) ListClusters() ([]string, error) {
-	return nil, errors.New("unsupported method")
+// GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
+func (clc *CLCCloud) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	zone, err := clc.GetZone()
+	if err != nil {
+		return nil, false, err
+	}
+	return clc.clcLB.GetLoadBalancer(loadBalancerName, zone.Region)
 }
 
-// Master gets back the address (either DNS name or IP address) of the master node for the cluster.
-func (clc *CLCCloud) Master(clusterName string) (string, error) {
-	return "", errors.New("unsupported method")
+// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
+func (clc *CLCCloud) EnsureLoadBalancer(service *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerIP := service.Spec.LoadBalancerIP
+	ports := service.Spec.Ports
+
+	zone, err := clc.GetZone()
+	if err != nil {
+		return nil, err
+	}
+	affinityType := service.Spec.SessionAffinity
+
+	serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+
+	return clc.clcLB.EnsureLoadBalancer(loadBalancerName, zone.Region, loadBalancerIP, ports, hosts, serviceName, affinityType, annotations)
 }
 
-// NodeAddresses returns the addresses of the specified instance.
-func (clc *CLCCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	return nil, errors.New("unsupported method")
+// UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
+func (clc *CLCCloud) UpdateLoadBalancer(service *api.Service, hostNames []string) error {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	zone, err := clc.GetZone()
+	if err != nil {
+		return err
+	}
+	return clc.clcLB.UpdateLoadBalancer(loadBalancerName, zone.Region, hostNames)
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (clc *CLCCloud) ExternalID(name string) (string, error) {
-	return "", errors.New("unsupported method")
+// EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
+func (clc *CLCCloud) EnsureLoadBalancerDeleted(service *api.Service) error {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	zone, err := clc.GetZone()
+	if err != nil {
+		return err
+	}
+	glog.V(2).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v)", service.Namespace, service.Name, loadBalancerName, zone.Region)
+	return clc.clcLB.EnsureLoadBalancerDeleted(loadBalancerName, zone.Region)
 }
-
-// InstanceID returns the cloud provider ID of the specified instance.
-func (clc *CLCCloud) InstanceID(name string) (string, error) {
-	return "", errors.New("unsupported method")
-}
-
-// InstanceType returns the type of the specified instance.
-func (clc *CLCCloud) InstanceType(name string) (string, error) {
-	return "", errors.New("unsupported method")
-}
-
-// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
-func (clc *CLCCloud) List(filter string) ([]string, error) {
-	return nil, errors.New("unsupported method")
-}
-
-// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
-func (clc *CLCCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("unsupported method")
-}
-
-// CurrentNodeName returns the name of the node we are currently running on
-func (clc *CLCCloud) CurrentNodeName(hostname string) (string, error) {
-	return "", errors.New("unsupported method")
-}
-
-//////////////// Kubernetes LoadBalancer interface: Get, Ensure, Update, EnsureDeleted
-func (clc *CLCCloud) GetLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error) {
-	return clc.clcLB.GetLoadBalancer(name, region)
-}
-
-func (clc *CLCCloud) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP,
-	ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName,
-	affinityType api.ServiceAffinity, annotations cloudprovider.ServiceAnnotation) (*api.LoadBalancerStatus, error) {
-
-	return clc.clcLB.EnsureLoadBalancer(name, region, loadBalancerIP, ports, hosts, serviceName, affinityType, annotations)
-}
-
-func (clc *CLCCloud) UpdateLoadBalancer(name, region string, hosts []string) error {
-	return clc.clcLB.UpdateLoadBalancer(name, region, hosts)
-}
-
-func (clc *CLCCloud) EnsureLoadBalancerDeleted(name, region string) error {
-	return clc.clcLB.EnsureLoadBalancerDeleted(name, region)
-}
-
-//////////////// Kubernetes Zones interface is just this one method
 
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 func (clc *CLCCloud) GetZone() (cloudprovider.Zone, error) {
@@ -226,22 +205,4 @@ func (clc *CLCCloud) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: clc.clcConfig.Global.Datacenter,
 		Region:        clc.clcConfig.Global.Datacenter,
 	}, nil
-}
-
-////////////////
-
-// ListRoutes lists all managed routes that belong to the specified clusterName
-func (clc *CLCCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
-	return nil, errors.New("unsupported method")
-}
-
-// CreateRoute creates the described managed route
-func (clc *CLCCloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
-	return errors.New("unsupported method")
-}
-
-// DeleteRoute deletes the specified managed route
-// Route should be as returned by ListRoutes
-func (clc *CLCCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
-	return errors.New("unsupported method")
 }

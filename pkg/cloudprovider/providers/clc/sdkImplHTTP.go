@@ -140,7 +140,7 @@ func invokeHTTP(method, server, uri string, creds Credentials, body io.Reader, r
 	}
 
 	// this should be the normal code
-	resp,err := http.DefaultClient.Do(req)	// execute the call
+	resp, err := http.DefaultClient.Do(req) // execute the call
 
 	// instead, we have this which tolerates bad certs [fixme both here and in CredsLogin]
 	// tlscfg := &tls.Config{InsecureSkipVerify: true} // true means to skip the verification

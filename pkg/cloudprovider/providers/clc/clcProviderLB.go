@@ -2,14 +2,11 @@ package clc
 
 import (
 	"fmt"
-	"net"
 
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
-
 	// activating stack-dump code requires this
 	// "runtime/debug"
 )
@@ -94,10 +91,10 @@ func (clc *clcProviderLB) GetLoadBalancer(name, region string) (status *api.Load
 //	create a pool for every entry in ports, using serviceAffinity.  Equates api.ServicePort.Port to PoolDetails.IncomingPort
 //	for every one of those pools, add a node list from the hosts array
 func (clc *clcProviderLB) EnsureLoadBalancer(name, region string,
-	loadBalancerIP net.IP, // ignore this.  AWS actually returns error if it's non-nil
-	ports []*api.ServicePort, hosts []string, serviceName types.NamespacedName,
+	loadBalancerIP string, // ignore this.  AWS actually returns error if it's non-nil
+	ports []api.ServicePort, hosts []string, serviceName types.NamespacedName,
 	affinityType api.ServiceAffinity,
-	annotations cloudprovider.ServiceAnnotation) (*api.LoadBalancerStatus, error) {
+	annotations map[string]string) (*api.LoadBalancerStatus, error) {
 
 	glog.Info("CLC: inside EnsureLoadBalancer")
 
@@ -154,7 +151,7 @@ func (clc *clcProviderLB) EnsureLoadBalancer(name, region string,
 		bMatched := false
 		for _, pool := range lb.Pools {
 			if port.Port == pool.IncomingPort { // use ServicePort.Port==PoolDetails.IncomingPort to match
-				fromPorts = append(fromPorts, *port)
+				fromPorts = append(fromPorts, port)
 				toPools = append(toPools, pool) // insert fromPorts/toPool as a pair only
 				bMatched = true
 				break
@@ -162,7 +159,7 @@ func (clc *clcProviderLB) EnsureLoadBalancer(name, region string,
 		}
 
 		if !bMatched {
-			addPorts = append(addPorts, *port)
+			addPorts = append(addPorts, port)
 		}
 	}
 
@@ -201,7 +198,7 @@ func (clc *clcProviderLB) EnsureLoadBalancer(name, region string,
 		glog.Info(fmt.Sprintf("CLC.EnsureLoadBalancer: deleted pool, dc=%s, LBID=%s, PoolID=%s", lb.DataCenter, lb.LBID, deletionPool.PoolID))
 	}
 
-	for idx, _ := range fromPorts {
+	for idx := range fromPorts {
 		desiredPort := &fromPorts[idx] // ServicePort, what K wants
 		existingPool := &toPools[idx]  // PoolDetails, what CL has now
 
@@ -231,7 +228,7 @@ func makePoolDetailsFromServicePort(lbid string, srcPort *api.ServicePort, hosts
 		Persistence:  persist,
 		TimeoutMS:    99999, // and what should the default be?
 		Mode:         "tcp",
-		Health:       &HealthCheck { UnhealthyThreshold:2, HealthyThreshold:2, IntervalSeconds:5, TargetPort:srcPort.NodePort , Mode:"TCP" },
+		Health:       &HealthCheck{UnhealthyThreshold: 2, HealthyThreshold: 2, IntervalSeconds: 5, TargetPort: srcPort.NodePort, Mode: "TCP"},
 		Nodes:        makeNodeListFromHosts(hosts, srcPort.NodePort),
 	}
 }
@@ -250,7 +247,7 @@ func conformPoolDetails(clcClient CenturyLinkClient, dc string, desiredPool, exi
 	} else if len(desiredPool.Nodes) != len(existingPool.Nodes) {
 		bMatch = false
 	} else {
-		for idx, _ := range desiredPool.Nodes {
+		for idx := range desiredPool.Nodes {
 			if desiredPool.Nodes[idx].TargetIP != existingPool.Nodes[idx].TargetIP {
 				bMatch = false
 			} else if desiredPool.Nodes[idx].TargetPort != existingPool.Nodes[idx].TargetPort {
