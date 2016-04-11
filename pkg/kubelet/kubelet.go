@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/atomic"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -363,7 +364,7 @@ func NewMainKubelet(
 	}
 
 	procFs := procfs.NewProcFS()
-	imageBackOff := util.NewBackOff(backOffPeriod, MaxContainerBackOff)
+	imageBackOff := flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
 	klet.livenessManager = proberesults.NewManager()
 
@@ -475,7 +476,7 @@ func NewMainKubelet(
 	klet.workQueue = queue.NewBasicWorkQueue()
 	klet.podWorkers = newPodWorkers(klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
-	klet.backOff = util.NewBackOff(backOffPeriod, MaxContainerBackOff)
+	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 	klet.sourcesSeen = sets.NewString()
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
@@ -691,7 +692,7 @@ type Kubelet struct {
 	syncLoopMonitor atomic.Value
 
 	// Container restart Backoff
-	backOff *util.Backoff
+	backOff *flowcontrol.Backoff
 
 	// Channel for sending pods to kill.
 	podKillingCh chan *kubecontainer.PodPair

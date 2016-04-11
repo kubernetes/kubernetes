@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -770,7 +771,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	clock := util.FakeClock{}
 	request.backoffMgr = &URLBackoff{
 		// Use a fake backoff here to avoid flakes and speed the test up.
-		Backoff: util.NewFakeBackOff(
+		Backoff: flowcontrol.NewFakeBackOff(
 			time.Duration(1)*time.Second,
 			time.Duration(200)*time.Second,
 			&clock,
