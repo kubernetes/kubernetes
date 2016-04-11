@@ -30,11 +30,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
@@ -75,8 +78,27 @@ func TestRunOnce(t *testing.T) {
 		reasonCache:         NewReasonCache(),
 		clock:               util.RealClock{},
 		kubeClient:          &fake.Clientset{},
+		hostname:            testKubeletHostname,
+		nodeName:            testKubeletHostname,
 	}
 	kb.containerManager = cm.NewStubContainerManager()
+
+	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
+	// TODO: we should have a mock resource analyzer and a mock stability manager
+	volumeStatsAggPeriod := time.Second * 10
+	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod)
+	thresholds := []eviction.Threshold{}
+	nodeRef := &api.ObjectReference{
+		Kind:      "Node",
+		Name:      kb.nodeName,
+		UID:       types.UID(kb.nodeName),
+		Namespace: "",
+	}
+	evictionManager, err := eviction.NewManager(kb, kb.resourceAnalyzer, eviction.NewDefaultStrategy(), thresholds, kb.recorder, nodeRef)
+	if err != nil {
+		t.Fatalf("can't initialize eviction manager: %v", err)
+	}
+	kb.evictionManager = evictionManager
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
 	if err := kb.setupDataDirs(); err != nil {

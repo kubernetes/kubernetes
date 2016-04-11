@@ -82,6 +82,11 @@ EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-} --insecure-registry 10.0.0.0/8"
 # Flag to tell the kubelet to enable CFS quota support
 ENABLE_CPU_CFS_QUOTA="${KUBE_ENABLE_CPU_CFS_QUOTA:-true}"
 
+# Flags to tell the kubelet how to handle evictions
+EVICTION_HARD=""
+EVICTION_SOFT=""
+EVICTION_SOFT_GRACE_PERIOD=""
+
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.247.0.10"

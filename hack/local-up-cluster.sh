@@ -348,6 +348,8 @@ function start_kubelet {
         ${dns_args} \
         ${net_plugin_args} \
         ${kubenet_plugin_args} \
+        --eviction-soft="memory.available<7Gi" \
+        --eviction-soft-grace-period="memory.available=30s" \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else

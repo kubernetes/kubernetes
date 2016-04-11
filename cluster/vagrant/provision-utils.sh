@@ -75,6 +75,9 @@ grains:
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
   master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
   keep_host_etcd: true
+  eviction_hard: '$(echo "$EVICTION_HARD" | sed -e "s/'/''/g")'
+  eviction_soft: '$(echo "$EVICTION_SOFT" | sed -e "s/'/''/g")'
+  eviction_soft_grace_period: '$(echo "$EVICTION_SOFT_GRACE_PERIOD" | sed -e "s/'/''/g")'
 EOF
 }
 

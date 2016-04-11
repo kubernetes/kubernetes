@@ -18,11 +18,15 @@ package eviction
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
+	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -161,4 +165,230 @@ func parseGracePeriods(expr string) (map[Signal]time.Duration, error) {
 		results[signal] = gracePeriod
 	}
 	return results, nil
+}
+
+// refersTo returns true if the pod reference refers to the specified pod.
+func refersTo(podRef statsapi.PodReference, pod *api.Pod) bool {
+	return pod.Name == podRef.Name && pod.Namespace == podRef.Namespace && string(pod.UID) == podRef.UID
+}
+
+// podsByPhase filters pods by their phase
+func podsByPhase(pods []*api.Pod, phase api.PodPhase) []*api.Pod {
+	results := []*api.Pod{}
+	for _, pod := range pods {
+		if phase == pod.Status.Phase {
+			results = append(results, pod)
+		}
+	}
+	return results
+}
+
+// podUsage aggregates usage of compute resources.
+// it supports the following memory and disk.
+func podUsage(podStats statsapi.PodStats) (api.ResourceList, error) {
+	disk := resource.Quantity{Format: resource.BinarySI}
+	memory := resource.Quantity{Format: resource.BinarySI}
+	for _, container := range podStats.Containers {
+		// disk usage (if known)
+		if container.Rootfs != nil && container.Rootfs.AvailableBytes != nil {
+			usage := int64(*container.Rootfs.AvailableBytes)
+			quantity := resource.NewQuantity(usage, resource.BinarySI)
+			if err := disk.Add(*quantity); err != nil {
+				return nil, err
+			}
+		}
+		// memory usage (if known)
+		if container.Memory != nil && container.Memory.WorkingSetBytes != nil {
+			usage := int64(*container.Memory.WorkingSetBytes)
+			quantity := resource.NewQuantity(usage, resource.BinarySI)
+			if err := memory.Add(*quantity); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return api.ResourceList{
+		api.ResourceMemory:  memory,
+		api.ResourceStorage: disk,
+	}, nil
+}
+
+// formatThreshold formats a threshold for logging.
+func formatThreshold(threshold Threshold) string {
+	return fmt.Sprintf("threshold(signal=%v, operator=%v, value=%v, gracePeriod=%v)", threshold.Signal, threshold.Value.String(), threshold.Operator, threshold.GracePeriod)
+}
+
+// cachedStatsFunc returns a statsFunc based on the provided pod stats.
+func cachedStatsFunc(podStats []statsapi.PodStats) statsFunc {
+	uid2PodStats := map[string]statsapi.PodStats{}
+	for i := range podStats {
+		uid2PodStats[podStats[i].PodRef.UID] = podStats[i]
+	}
+	return func(pod *api.Pod) (statsapi.PodStats, bool) {
+		stats, found := uid2PodStats[string(pod.UID)]
+		return stats, found
+	}
+}
+
+// Cmp compares p1 and p2 and returns:
+//
+//   -1 if p1 <  p2
+//    0 if p1 == p2
+//   +1 if p1 >  p2
+//
+type cmpFunc func(p1, p2 *api.Pod) int
+
+// multiSorter implements the Sort interface, sorting changes within.
+type multiSorter struct {
+	pods []*api.Pod
+	cmp  []cmpFunc
+}
+
+// Sort sorts the argument slice according to the less functions passed to OrderedBy.
+func (ms *multiSorter) Sort(pods []*api.Pod) {
+	ms.pods = pods
+	sort.Sort(ms)
+}
+
+// OrderedBy returns a Sorter that sorts using the cmp functions, in order.
+// Call its Sort method to sort the data.
+func orderedBy(cmp ...cmpFunc) *multiSorter {
+	return &multiSorter{
+		cmp: cmp,
+	}
+}
+
+// Len is part of sort.Interface.
+func (ms *multiSorter) Len() int {
+	return len(ms.pods)
+}
+
+// Swap is part of sort.Interface.
+func (ms *multiSorter) Swap(i, j int) {
+	ms.pods[i], ms.pods[j] = ms.pods[j], ms.pods[i]
+}
+
+// Less is part of sort.Interface.
+func (ms *multiSorter) Less(i, j int) bool {
+	p1, p2 := ms.pods[i], ms.pods[j]
+	var k int
+	for k = 0; k < len(ms.cmp)-1; k++ {
+		cmpResult := ms.cmp[k](p1, p2)
+		// p1 is less than p2
+		if cmpResult < 0 {
+			return true
+		}
+		// p1 is greater than p2
+		if cmpResult > 0 {
+			return false
+		}
+		// we don't know yet
+	}
+	// the last cmp func is the final decider
+	return ms.cmp[k](p1, p2) < 0
+}
+
+// qos compares pods by QoS (BestEffort < Burstable < Guaranteed)
+func qos(p1, p2 *api.Pod) int {
+	qosP1 := qosutil.GetPodQos(p1)
+	qosP2 := qosutil.GetPodQos(p2)
+	// its a tie
+	if qosP1 == qosP2 {
+		return 0
+	}
+	// if p1 is best effort, we know p2 is burstable or guaranteed
+	if qosP1 == qosutil.BestEffort {
+		return -1
+	}
+	// we know p1 and p2 are not besteffort, so if p1 is burstable, p2 must be guaranteed
+	if qosP1 == qosutil.Burstable {
+		if qosP2 == qosutil.Guaranteed {
+			return -1
+		}
+		return 1
+	}
+	// ok, p1 must be guaranteed.
+	return 1
+}
+
+// memory compares pods by largest consumer of memory relative to request.
+func memory(stats statsFunc) cmpFunc {
+	return func(p1, p2 *api.Pod) int {
+		p1Stats, found := stats(p1)
+		// if we have no usage stats for p1, we want p2 first
+		if !found {
+			return -1
+		}
+		// if we have no usage stats for p2, but p1 has usage, we want p1 first.
+		p2Stats, found := stats(p2)
+		if !found {
+			return 1
+		}
+		// if we cant get usage for p1 measured, we want p2 first
+		p1Usage, err := podUsage(p1Stats)
+		if err != nil {
+			return -1
+		}
+		// if we cant get usage for p2 measured, we want p1 first
+		p2Usage, err := podUsage(p2Stats)
+		if err != nil {
+			return 1
+		}
+
+		// adjust p1, p2 usage relative to the request (if any)
+		p1Memory := p1Usage[api.ResourceMemory]
+		p1Spec := core.PodUsageFunc(p1)
+		p1Request := p1Spec[api.ResourceRequestsMemory]
+		p1Memory.Sub(p1Request)
+
+		p2Memory := p2Usage[api.ResourceMemory]
+		p2Spec := core.PodUsageFunc(p2)
+		p2Request := p2Spec[api.ResourceRequestsMemory]
+		p2Memory.Sub(p2Request)
+
+		// if p2 is using more than p1, we want p2 first
+		return p2Memory.Cmp(p1Memory)
+	}
+}
+
+// disk compares pods by largest consumer of disk relative to request.
+func disk(stats statsFunc) cmpFunc {
+	return func(p1, p2 *api.Pod) int {
+		p1Stats, found := stats(p1)
+		// if we have no usage stats for p1, we want p2 first
+		if !found {
+			return -1
+		}
+		// if we have no usage stats for p2, but p1 has usage, we want p1 first.
+		p2Stats, found := stats(p2)
+		if !found {
+			return 1
+		}
+		// if we cant get usage for p1 measured, we want p2 first
+		p1Usage, err := podUsage(p1Stats)
+		if err != nil {
+			return -1
+		}
+		// if we cant get usage for p2 measured, we want p1 first
+		p2Usage, err := podUsage(p2Stats)
+		if err != nil {
+			return 1
+		}
+
+		// disk is best effort, so we don't measure relative to a request.
+		// TODO: add disk as a guaranteed resource
+		p1Disk := p1Usage[api.ResourceStorage]
+		p2Disk := p2Usage[api.ResourceStorage]
+		// if p2 is using more than p1, we want p2 first
+		return p2Disk.Cmp(p1Disk)
+	}
+}
+
+// rankMemoryPressure orders the input pods for eviction in response to memory pressure.
+func rankMemoryPressure(pods []*api.Pod, stats statsFunc) {
+	orderedBy(qos, memory(stats)).Sort(pods)
+}
+
+// rankDiskPressure orders the input pods for eviction in response to disk pressure.
+func rankDiskPressure(pods []*api.Pod, stats statsFunc) {
+	orderedBy(qos, disk(stats)).Sort(pods)
 }

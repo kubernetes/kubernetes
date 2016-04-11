@@ -467,6 +467,13 @@ func NewMainKubelet(
 	klet.runner = klet.containerRuntime
 	klet.statusManager = status.NewManager(kubeClient, klet.podManager)
 
+	// setup eviction manager
+	evictionManager, err := eviction.NewManager(klet, klet.resourceAnalyzer, thresholds, klet.killPodNow, recorder, nodeRef, klet.clock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize eviction manager: %v", err)
+	}
+	klet.evictionManager = evictionManager
+
 	klet.probeManager = prober.NewManager(
 		klet.statusManager,
 		klet.livenessManager,
@@ -562,6 +569,9 @@ type Kubelet struct {
 	// podManager is a facade that abstracts away the various sources of pods
 	// this Kubelet services.
 	podManager kubepod.Manager
+
+	// Needed to observe and respond to situations that could impact node stability
+	evictionManager eviction.Manager
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
@@ -954,9 +964,18 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	kl.statusManager.Start()
 	kl.probeManager.Start()
 
+	kl.evictionManager.Start(kl.getActivePods)
+
 	// Start the pod lifecycle event generator.
 	kl.pleg.Start()
 	kl.syncLoop(updates, kl)
+}
+
+// getActivePods returns non-terminal pods
+func (kl *Kubelet) getActivePods() []*api.Pod {
+	allPods := kl.podManager.GetPods()
+	activePods := kl.filterOutTerminatedPods(allPods)
+	return activePods
 }
 
 // initialNodeStatus determines the initial node status, incorporating node
@@ -1737,14 +1756,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Generate final API pod status with pod and status manager status
-	// by default, we use the internal status generation func, but we defer to
-	// the override function if specified.  this is used for eviction scenarios
-	// that interacted directly with pod workers to update pod status.
-	generateAPIPodStatus := kl.generateAPIPodStatus
-	if o.podStatusFunc != nil {
-		generateAPIPodStatus = o.podStatusFunc
-	}
-	apiPodStatus := generateAPIPodStatus(pod, podStatus)
+	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
 
 	// Record the time it takes for the pod to become running.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
@@ -3132,6 +3144,64 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 	}
 }
 
+// setNodeMemoryPressureCondition for the node.
+// TODO: this needs to move somewhere centralized...
+func (kl *Kubelet) setNodeMemoryPressureCondition(node *api.Node) {
+	currentTime := unversioned.NewTime(kl.clock.Now())
+	var condition *api.NodeCondition
+
+	// Check if NodeMemoryPressure condition already exists and if it does, just pick it up for update.
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == api.NodeMemoryPressure {
+			condition = &node.Status.Conditions[i]
+		}
+	}
+
+	newCondition := false
+	// If the NodeMemoryPressure condition doesn't exist, create one
+	if condition == nil {
+		condition = &api.NodeCondition{
+			Type:   api.NodeMemoryPressure,
+			Status: api.ConditionUnknown,
+		}
+		// cannot be appended to node.Status.Conditions here because it gets
+		// copied to the slice. So if we append to the slice here none of the
+		// updates we make below are reflected in the slice.
+		newCondition = true
+	}
+
+	// Update the heartbeat time
+	condition.LastHeartbeatTime = currentTime
+
+	// Note: The conditions below take care of the case when a new NodeMemoryPressure condition is
+	// created and as well as the case when the condition already exists. When a new condition
+	// is created its status is set to api.ConditionUnknown which matches either
+	// condition.Status != api.ConditionTrue or
+	// condition.Status != api.ConditionFalse in the conditions below depending on whether
+	// the kubelet is under memory pressure or not.
+	if kl.evictionManager.IsUnderMemoryPressure() {
+		if condition.Status != api.ConditionTrue {
+			condition.Status = api.ConditionTrue
+			condition.Reason = "KubeletHasInsufficientMemoryAvailable"
+			condition.Message = "Kubelet is evicting pods to reclaim memory."
+			condition.LastTransitionTime = currentTime
+			kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeHasInsufficientMemoryAvailable")
+		}
+	} else {
+		if condition.Status != api.ConditionFalse {
+			condition.Status = api.ConditionFalse
+			condition.Reason = "KubeletHasSufficientMemoryAvailable"
+			condition.Message = "Kubelet has sufficient memory available"
+			condition.LastTransitionTime = currentTime
+			kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeHasSufficientMemoryAvailable")
+		}
+	}
+
+	if newCondition {
+		node.Status.Conditions = append(node.Status.Conditions, *condition)
+	}
+}
+
 // Set OODcondition for the node.
 func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
 	currentTime := unversioned.NewTime(kl.clock.Now())
@@ -3239,6 +3309,8 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*api.Node) error {
 		withoutError(kl.setNodeOODCondition),
 		withoutError(kl.setNodeReadyCondition),
 		withoutError(kl.recordNodeSchedulableEvent),
+		withoutError(kl.recordNodeSchdulableEvent),
+		withoutError(kl.setNodeMemoryPressureCondition),
 	}
 }
 
@@ -3778,37 +3850,4 @@ func (kl *Kubelet) killPodNow(pod *api.Pod, status api.PodStatus, gracePeriodOve
 		// pause
 		time.Sleep(time.Millisecond * 100)
 	}
-}
-
-// killPodNow kills a pod.
-// The pod status is updated, and then it is killed with the specified grace period.
-// This function must block until either the pod is killed or an error is encountered.
-// Arguments:
-// pod - the pod to kill
-// status - the desired status to associate with the pod (i.e. why its killed)
-// gracePeriodOverride - the grace period override to use instead of what is on the pod spec
-func (kl *Kubelet) killPodNow(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error {
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var result error
-	go func() {
-		defer utilruntime.HandleCrash(func(panicReason interface{}) {
-			result = fmt.Errorf("KilLPodNow goroutine panicked: %v", panicReason)
-		})
-		onCompleteFunc := func(err error) {
-			defer wg.Done()
-			result = err
-		}
-		kl.podWorkers.UpdatePod(&UpdatePodOptions{
-			Pod:            pod,
-			UpdateType:     kubetypes.SyncPodSync,
-			OnCompleteFunc: onCompleteFunc,
-			PodStatusFunc: func(p *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
-				return status
-			},
-			PodTerminationGracePeriodSecondsOverride: gracePeriodOverride,
-		})
-	}()
-	wg.Wait()
-	return result
 }

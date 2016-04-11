@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
@@ -54,6 +55,7 @@ import (
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
@@ -201,6 +203,23 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, util.RealClock{})
 	kubelet.clock = fakeClock
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
+
+	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
+	volumeStatsAggPeriod := time.Second * 10
+	kubelet.resourceAnalyzer = stats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod)
+	thresholds := []eviction.Threshold{}
+	nodeRef := &api.ObjectReference{
+		Kind:      "Node",
+		Name:      kubelet.nodeName,
+		UID:       types.UID(kubelet.nodeName),
+		Namespace: "",
+	}
+	evictionManager, err := eviction.NewManager(kubelet, kubelet.resourceAnalyzer, eviction.NewDefaultStrategy(), thresholds, fakeRecorder, nodeRef)
+	if err != nil {
+		t.Fatalf("can't initialize eviction manager: %v", err)
+	}
+	kubelet.evictionManager = evictionManager
+
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil}
 }
 
