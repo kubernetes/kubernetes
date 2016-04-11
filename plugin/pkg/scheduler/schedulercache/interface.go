@@ -86,4 +86,10 @@ type Cache interface {
 
 	// List lists all cached pods (including assumed ones).
 	List(labels.Selector) ([]*api.Pod, error)
+
+	// Methods for handling create/update/delete operation on grouping objects
+	// that schedulercache in maintaining a reversed index for.
+	AddGroupingObject(ref *api.ObjectReference, selector labels.Selector) error
+	UpdateGroupingObject(ref *api.ObjectReference, oldSelector, newSelector labels.Selector) error
+	DeleteGroupingObject(ref *api.ObjectReference) error
 }

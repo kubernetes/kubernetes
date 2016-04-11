@@ -39,6 +39,10 @@ type NodeInfo struct {
 	requestedResource *Resource
 	pods              []*api.Pod
 	nonzeroRequest    *Resource
+
+	// Mapping from a grouping object to number of pods on that node being
+	// groupped by this object.
+	references map[api.ObjectReference]int
 }
 
 // Resource is a collection of compute resource.
@@ -150,6 +154,20 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 		}
 	}
 	return fmt.Errorf("no corresponding pod in pods")
+}
+
+func (n *NodeInfo) AddReference(ref *api.ObjectReference) {
+	if n.references == nil {
+		n.references = make(map[api.ObjectReference]int)
+	}
+	n.references[*ref]++
+}
+
+func (n *NodeInfo) RemoveReference(ref *api.ObjectReference) {
+	n.references[*ref]--
+	if n.references[*ref] == 0 {
+		delete(n.references, *ref)
+	}
 }
 
 func calculateResource(pod *api.Pod) (cpu int64, mem int64, non0_cpu int64, non0_mem int64) {

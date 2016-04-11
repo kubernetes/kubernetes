@@ -205,7 +205,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 
 	stop := make(chan struct{})
 	defer close(stop)
-	cache := schedulercache.New(1*time.Second, stop)
+	cache := schedulercache.New(1*time.Second, schedulertesting.FakeGroupingObjects, stop)
 	// Create the scheduler config
 	algo := NewGenericScheduler(
 		cache,

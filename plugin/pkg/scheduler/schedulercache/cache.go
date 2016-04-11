@@ -18,12 +18,14 @@ package schedulercache
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -31,12 +33,14 @@ var (
 	cleanAssumedPeriod = 1 * time.Second
 )
 
+type GroupingObjectsFunc func(*api.Pod) ([]*api.ObjectReference, error)
+
 // New returns a Cache implementation.
 // It automatically starts a go routine that manages expiration of assumed pods.
 // "ttl" is how long the assumed pod will get expired.
 // "stop" is the channel that would close the background goroutine.
-func New(ttl time.Duration, stop chan struct{}) Cache {
-	cache := newSchedulerCache(ttl, cleanAssumedPeriod, stop)
+func New(ttl time.Duration, groupingObjects GroupingObjectsFunc, stop chan struct{}) Cache {
+	cache := newSchedulerCache(ttl, cleanAssumedPeriod, groupingObjects, stop)
 	cache.run()
 	return cache
 }
@@ -54,6 +58,11 @@ type schedulerCache struct {
 	// a map from pod key to podState.
 	podStates map[string]*podState
 	nodes     map[string]*NodeInfo
+
+	// Listers for creating grouping objects.
+	groupingObjects GroupingObjectsFunc
+	// Mapping from a grouping object, to set of pods it is grouping.
+	grouping map[api.ObjectReference]sets.String
 }
 
 type podState struct {
@@ -62,7 +71,7 @@ type podState struct {
 	deadline *time.Time
 }
 
-func newSchedulerCache(ttl, period time.Duration, stop chan struct{}) *schedulerCache {
+func newSchedulerCache(ttl, period time.Duration, groupingObjects GroupingObjectsFunc, stop chan struct{}) *schedulerCache {
 	return &schedulerCache{
 		ttl:    ttl,
 		period: period,
@@ -71,6 +80,9 @@ func newSchedulerCache(ttl, period time.Duration, stop chan struct{}) *scheduler
 		nodes:       make(map[string]*NodeInfo),
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
+
+		groupingObjects: groupingObjects,
+		grouping:        make(map[api.ObjectReference]sets.String),
 	}
 }
 
@@ -87,11 +99,17 @@ func (cache *schedulerCache) GetNodeNameToInfoMap() (map[string]*NodeInfo, error
 func (cache *schedulerCache) List(selector labels.Selector) ([]*api.Pod, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
+	return cache.list(selector, api.NamespaceAll)
+}
+
+func (cache *schedulerCache) list(selector labels.Selector, ns string) ([]*api.Pod, error) {
 	var pods []*api.Pod
 	for _, info := range cache.nodes {
 		for _, pod := range info.pods {
-			if selector.Matches(labels.Set(pod.Labels)) {
-				pods = append(pods, pod)
+			if ns == api.NamespaceAll || ns == pod.Namespace {
+				if selector.Matches(labels.Set(pod.Labels)) {
+					pods = append(pods, pod)
+				}
 			}
 		}
 	}
@@ -115,7 +133,7 @@ func (cache *schedulerCache) assumePod(pod *api.Pod, now time.Time) error {
 		return fmt.Errorf("pod state wasn't initial but get assumed. Pod key: %v", key)
 	}
 
-	cache.addPod(pod)
+	cache.addPod(pod, true)
 	dl := now.Add(cache.ttl)
 	ps := &podState{
 		pod:      pod,
@@ -142,7 +160,7 @@ func (cache *schedulerCache) AddPod(pod *api.Pod) error {
 		cache.podStates[key].deadline = nil
 	case !ok:
 		// Pod was expired. We should add it back.
-		cache.addPod(pod)
+		cache.addPod(pod, true)
 		ps := &podState{
 			pod: pod,
 		}
@@ -178,27 +196,58 @@ func (cache *schedulerCache) UpdatePod(oldPod, newPod *api.Pod) error {
 
 func (cache *schedulerCache) updatePod(oldPod, newPod *api.Pod) error {
 	if err := cache.removePod(oldPod); err != nil {
+=======
+	updateRefs := false
+	if !reflect.DeepEqual(oldPod.Labels, newPod.Labels) || oldPod.Spec.NodeName != newPod.Spec.NodeName {
+		updateRefs = true
+	}
+
+	if err := cache.deletePod(oldPod, updateRefs); err != nil {
+>>>>>>> fea9631... Support for reverse index in scheduler
 		return err
 	}
-	cache.addPod(newPod)
+	cache.addPod(newPod, updateRefs)
 	return nil
 }
 
-func (cache *schedulerCache) addPod(pod *api.Pod) {
+func (cache *schedulerCache) addPod(pod *api.Pod, addRef bool) {
 	n, ok := cache.nodes[pod.Spec.NodeName]
 	if !ok {
 		n = NewNodeInfo()
 		cache.nodes[pod.Spec.NodeName] = n
 	}
 	n.addPod(pod)
+
+	if addRef {
+		refs, err := cache.groupingObjects(pod)
+		if err != nil {
+			glog.Errorf("couldn't get grouping objects for %s/%s: %v", pod.Namespace, pod.Name, err)
+			return
+		}
+		for _, ref := range refs {
+			cache.addReference(ref, pod)
+		}
+	}
 }
 
-func (cache *schedulerCache) removePod(pod *api.Pod) error {
+func (cache *schedulerCache) removePod(pod *api.Pod, deleteRef bool) error {
 	n := cache.nodes[pod.Spec.NodeName]
 	if err := n.removePod(pod); err != nil {
 		return err
 	}
-	if len(n.pods) == 0 && n.node == nil {
+
+	if deleteRef {
+		refs, err := cache.groupingObjects(pod)
+		if err != nil {
+			glog.Errorf("couldn't get grouping objects for %s/%s: %v", pod.Namespace, pod.Name, err)
+			return err
+		}
+		for _, ref := range refs {
+			cache.deleteReference(ref, pod)
+		}
+	}
+
+	if len(n.pods) == 0 && n.node == nil  && len(n.references) == 0 {
 		delete(cache.nodes, pod.Spec.NodeName)
 	}
 	return nil
@@ -218,7 +267,7 @@ func (cache *schedulerCache) RemovePod(pod *api.Pod) error {
 	// An assumed pod won't have Delete/Remove event. It needs to have Add event
 	// before Remove event, in which case the state would change from Assumed to Added.
 	case ok && !cache.assumedPods[key]:
-		err := cache.removePod(pod)
+		err := cache.removePod(pod, true)
 		if err != nil {
 			return err
 		}
@@ -292,17 +341,97 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 		}
 		if now.After(*ps.deadline) {
 			if err := cache.expirePod(key, ps); err != nil {
-				glog.Errorf(" expirePod failed for %s: %v", key, err)
+				glog.Errorf("expirePod failed for %s: %v", key, err)
 			}
 		}
 	}
 }
 
 func (cache *schedulerCache) expirePod(key string, ps *podState) error {
-	if err := cache.removePod(ps.pod); err != nil {
+	if err := cache.removePod(ps.pod, true); err != nil {
 		return err
 	}
 	delete(cache.assumedPods, key)
 	delete(cache.podStates, key)
 	return nil
+}
+
+func (cache *schedulerCache) AddGroupingObject(ref *api.ObjectReference, selector labels.Selector) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	pods, err := cache.list(selector, ref.Namespace)
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods {
+		cache.addReference(ref, pod)
+	}
+	return nil
+}
+
+func (cache *schedulerCache) addReference(ref *api.ObjectReference, pod *api.Pod) {
+	name, err := getPodKey(pod)
+	if err != nil {
+		glog.Errorf("couldn't get name of a pod: %v", pod)
+		return
+	}
+	if _, ok := cache.grouping[*ref]; !ok {
+		cache.grouping[*ref] = sets.NewString()
+	}
+	if !cache.grouping[*ref].Has(name) {
+		cache.grouping[*ref].Insert(name)
+
+		n, ok := cache.nodes[pod.Spec.NodeName]
+		if !ok {
+			n = NewNodeInfo()
+			cache.nodes[pod.Spec.NodeName] = n
+		}
+		n.AddReference(ref)
+	}
+}
+
+func (cache *schedulerCache) UpdateGroupingObject(ref *api.ObjectReference, oldSelector, newSelector labels.Selector) error {
+	// Here we explicitly assume that the selector has changed.
+	if err := cache.DeleteGroupingObject(ref); err != nil {
+		return err
+	}
+	return cache.AddGroupingObject(ref, newSelector)
+}
+
+func (cache *schedulerCache) DeleteGroupingObject(ref *api.ObjectReference) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	podNames, ok := cache.grouping[*ref]
+	if !ok {
+		return nil
+	}
+	for podName := range podNames {
+		podState, ok := cache.podStates[podName]
+		if !ok {
+			glog.Errorf("removing pod from grouping object that don't exist.")
+			continue
+		}
+		cache.deleteReference(ref, podState.pod)
+	}
+	delete(cache.grouping, *ref)
+	return nil
+}
+
+func (cache *schedulerCache) deleteReference(ref *api.ObjectReference, pod *api.Pod) {
+	name, err := getPodKey(pod)
+	if err != nil {
+		glog.Errorf("couldn't get name of a pod: %v", pod)
+		return
+	}
+
+	n, ok := cache.nodes[pod.Spec.NodeName]
+	if !ok {
+		glog.Errorf("removing reference that doesn't exist")
+		return
+	}
+
+	cache.grouping[*ref].Delete(name)
+	n.RemoveReference(ref)
 }

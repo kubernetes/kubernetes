@@ -22,6 +22,10 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
+func FakeGroupingObjects(pod *api.Pod) ([]*api.ObjectReference, error) {
+	return []*api.ObjectReference{}, nil
+}
+
 // FakeCache is used for testing
 type FakeCache struct {
 	AssumeFunc func(*api.Pod)
@@ -49,3 +53,13 @@ func (f *FakeCache) GetNodeNameToInfoMap() (map[string]*schedulercache.NodeInfo,
 }
 
 func (f *FakeCache) List(s labels.Selector) ([]*api.Pod, error) { return nil, nil }
+
+func (f *FakeCache) AddGroupingObject(ref *api.ObjectReference, selector labels.Selector) error {
+	return nil
+}
+
+func (f *FakeCache) UpdateGroupingObject(ref *api.ObjectReference, oldSelector, newSelector labels.Selector) error {
+	return nil
+}
+
+func (f *FakeCache) DeleteGroupingObject(ref *api.ObjectReference) error { return nil }

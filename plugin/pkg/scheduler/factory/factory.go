@@ -21,16 +21,19 @@ package factory
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -76,6 +79,9 @@ type ConfigFactory struct {
 
 	scheduledPodPopulator *framework.Controller
 	nodePopulator         *framework.Controller
+	servicePopulator      *framework.Controller
+	controllerPopulator   *framework.Controller
+	replicaSetPopulator   *framework.Controller
 
 	schedulerCache schedulercache.Cache
 
@@ -88,7 +94,6 @@ type ConfigFactory struct {
 // Initializes the factory.
 func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactory {
 	stopEverything := make(chan struct{})
-	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
 
 	c := &ConfigFactory{
 		Client:             client,
@@ -98,15 +103,12 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 		NodeLister:       &cache.StoreToNodeLister{},
 		PVLister:         &cache.StoreToPVFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		PVCLister:        &cache.StoreToPVCFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		ServiceLister:    &cache.StoreToServiceLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		ControllerLister: &cache.StoreToReplicationControllerLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		ReplicaSetLister: &cache.StoreToReplicaSetLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		schedulerCache:   schedulerCache,
+		ServiceLister:    &cache.StoreToServiceLister{},
+		ControllerLister: &cache.StoreToReplicationControllerLister{},
+		ReplicaSetLister: &cache.StoreToReplicaSetLister{},
 		StopEverything:   stopEverything,
 		SchedulerName:    schedulerName,
 	}
-
-	c.PodLister = schedulerCache
 
 	// On add/delete to the scheduled pods, remove from the assumed pods.
 	// We construct this here instead of in CreateFromKeys because
@@ -131,10 +133,69 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 			AddFunc:    c.addNodeToCache,
 			UpdateFunc: c.updateNodeInCache,
 			DeleteFunc: c.deleteNodeFromCache,
+
+	c.ServiceLister.Store, c.servicePopulator = framework.NewInformer(
+		c.createServiceLW(),
+		&api.Service{},
+		0,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc:    c.addGroupingObject,
+			UpdateFunc: c.updateGroupingObject,
+			DeleteFunc: c.deleteGroupingObject,
 		},
 	)
 
+	c.ControllerLister.Store, c.controllerPopulator = framework.NewInformer(
+		c.createControllerLW(),
+		&api.ReplicationController{},
+		0,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc:    c.addGroupingObject,
+			UpdateFunc: c.updateGroupingObject,
+			DeleteFunc: c.deleteGroupingObject,
+		},
+	)
+
+	c.ReplicaSetLister.Store, c.replicaSetPopulator = framework.NewInformer(
+		c.createReplicaSetLW(),
+		&extensions.ReplicaSet{},
+		0,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc:    c.addGroupingObject,
+			UpdateFunc: c.updateGroupingObject,
+			DeleteFunc: c.deleteGroupingObject,
+		},
+	)
+
+	c.schedulerCache = schedulercache.New(30*time.Second, c.groupingObjects(), stopEverything)
+	c.PodLister = c.schedulerCache
+
 	return c
+}
+
+func (c *ConfigFactory) groupingObjects() schedulercache.GroupingObjectsFunc {
+	return func(pod *api.Pod) ([]*api.ObjectReference, error) {
+		result := []*api.ObjectReference{}
+		if services, err := c.ServiceLister.GetPodServices(pod); err == nil {
+			for _, s := range services {
+				ref := &api.ObjectReference{Kind: "Service", Namespace: s.Namespace, Name: s.Name}
+				result = append(result, ref)
+			}
+		}
+		if controllers, err := c.ControllerLister.GetPodControllers(pod); err == nil {
+			for _, c := range controllers {
+				ref := &api.ObjectReference{Kind: "ReplicationController", Namespace: c.Namespace, Name: c.Name}
+				result = append(result, ref)
+			}
+		}
+		if replicasets, err := c.ReplicaSetLister.GetPodReplicaSets(pod); err == nil {
+			for _, r := range replicasets {
+				ref := &api.ObjectReference{Kind: "ReplicaSet", Namespace: r.Namespace, Name: r.Name}
+				result = append(result, ref)
+			}
+		}
+		return result, nil
+	}
 }
 
 func (c *ConfigFactory) addPodToCache(obj interface{}) {
@@ -233,6 +294,134 @@ func (c *ConfigFactory) deleteNodeFromCache(obj interface{}) {
 	}
 }
 
+func serviceReference(s *api.Service) *api.ObjectReference {
+	return &api.ObjectReference{Kind: "Service", Namespace: s.Namespace, Name: s.Name}
+}
+
+func replicationControllerReference(rc *api.ReplicationController) *api.ObjectReference {
+	return &api.ObjectReference{Kind: "ReplicationController", Namespace: rc.Namespace, Name: rc.Name}
+}
+
+func replicaSetReference(rs *extensions.ReplicaSet) *api.ObjectReference {
+	return &api.ObjectReference{Kind: "ReplicaSet", Namespace: rs.Namespace, Name: rs.Name}
+}
+
+func (c *ConfigFactory) addGroupingObject(obj interface{}) {
+	var ref *api.ObjectReference
+	var selector labels.Selector
+	switch t := obj.(type) {
+	case *api.Service:
+		ref = serviceReference(t)
+		selector = labels.Set(t.Spec.Selector).AsSelector()
+	case *api.ReplicationController:
+		ref = replicationControllerReference(t)
+		selector = labels.Set(t.Spec.Selector).AsSelector()
+	case *extensions.ReplicaSet:
+		ref = replicaSetReference(t)
+		var err error
+		selector, err = unversioned.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			glog.Errorf("invalid selector in %#v", t)
+		}
+	default:
+		glog.Errorf("unsupported object type: %v", t)
+		return
+	}
+	if err := c.schedulerCache.AddGroupingObject(ref, selector); err != nil {
+		glog.Errorf("scheduler cache AddGroupingObject failed: %v", err)
+	}
+}
+
+func (c *ConfigFactory) updateGroupingObject(oldObj, newObj interface{}) {
+	var ref *api.ObjectReference
+	var oldSelector labels.Selector
+	var newSelector labels.Selector
+	switch t := newObj.(type) {
+	case *api.Service:
+		switch t2 := oldObj.(type) {
+		case *api.Service:
+			if reflect.DeepEqual(t.Spec.Selector, t2.Spec.Selector) {
+				return
+			}
+			ref = serviceReference(t)
+			oldSelector = labels.Set(t2.Spec.Selector).AsSelector()
+			newSelector = labels.Set(t.Spec.Selector).AsSelector()
+		default:
+			glog.Errorf("objects have different types: %v vs %v", t, t2)
+			return
+		}
+	case *api.ReplicationController:
+		switch t2 := oldObj.(type) {
+		case *api.ReplicationController:
+			if reflect.DeepEqual(t.Spec.Selector, t2.Spec.Selector) {
+				return
+			}
+			ref = replicationControllerReference(t)
+			oldSelector = labels.Set(t2.Spec.Selector).AsSelector()
+			newSelector = labels.Set(t.Spec.Selector).AsSelector()
+		default:
+			glog.Errorf("objects have different types: %v vs %v", t, t2)
+			return
+		}
+	case *extensions.ReplicaSet:
+		switch t2 := oldObj.(type) {
+		case *extensions.ReplicaSet:
+			if reflect.DeepEqual(t.Spec.Selector, t2.Spec.Selector) {
+				return
+			}
+			ref = replicaSetReference(t)
+			var err error
+			oldSelector, err = unversioned.LabelSelectorAsSelector(t2.Spec.Selector)
+			if err != nil {
+				glog.Errorf("invalid selector in %#v", t2)
+			}
+			newSelector, err = unversioned.LabelSelectorAsSelector(t.Spec.Selector)
+			if err != nil {
+				glog.Errorf("invalid selector in %#v", t2)
+			}
+		default:
+			glog.Errorf("objects have different types: %v vs %v", t, t2)
+			return
+		}
+	default:
+		glog.Errorf("unsupported object type: %v", t)
+		return
+	}
+	if err := c.schedulerCache.UpdateGroupingObject(ref, oldSelector, newSelector); err != nil {
+		glog.Errorf("scheduler cache UpdateGroupingObject failed: %v", err)
+	}
+}
+
+func (c *ConfigFactory) deleteGroupingObject(obj interface{}) {
+	var ref *api.ObjectReference
+	switch t := obj.(type) {
+	case *api.Service:
+		ref = serviceReference(t)
+	case *api.ReplicationController:
+		ref = replicationControllerReference(t)
+	case *extensions.ReplicaSet:
+		ref = replicaSetReference(t)
+	case cache.DeletedFinalStateUnknown:
+		switch t2 := t.Obj.(type) {
+		case *api.Service:
+			ref = serviceReference(t2)
+		case *api.ReplicationController:
+			ref = replicationControllerReference(t2)
+		case *extensions.ReplicaSet:
+			ref = replicaSetReference(t2)
+		default:
+			glog.Errorf("unsupported object type: %v", t2)
+			return
+		}
+	default:
+		glog.Errorf("unsupported object type: %v", t)
+		return
+	}
+	if err := c.schedulerCache.DeleteGroupingObject(ref); err != nil {
+		glog.Errorf("scheduler cache DeleteGroupingObject failed: %v", err)
+	}
+}
+
 // Create creates a scheduler with the default algorithm provider.
 func (f *ConfigFactory) Create() (*scheduler.Config, error) {
 	return f.CreateFromProvider(DefaultProvider)
@@ -322,20 +511,14 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	cache.NewReflector(f.createPersistentVolumeLW(), &api.PersistentVolume{}, f.PVLister.Store, 0).RunUntil(f.StopEverything)
 	cache.NewReflector(f.createPersistentVolumeClaimLW(), &api.PersistentVolumeClaim{}, f.PVCLister.Store, 0).RunUntil(f.StopEverything)
 
-	// Watch and cache all service objects. Scheduler needs to find all pods
-	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
-	// Cache this locally.
-	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).RunUntil(f.StopEverything)
+	// Watch services to enable spreading pods coming from the same one.
+	go f.servicePopulator.Run(f.StopEverything)
 
-	// Watch and cache all ReplicationController objects. Scheduler needs to find all pods
-	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
-	// Cache this locally.
-	cache.NewReflector(f.createControllerLW(), &api.ReplicationController{}, f.ControllerLister.Store, 0).RunUntil(f.StopEverything)
+	// Watch ReplicationController objects to enable spreading pods coming from the same ones.
+	go f.controllerPopulator.Run(f.StopEverything)
 
-	// Watch and cache all ReplicaSet objects. Scheduler needs to find all pods
-	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
-	// Cache this locally.
-	cache.NewReflector(f.createReplicaSetLW(), &extensions.ReplicaSet{}, f.ReplicaSetLister.Store, 0).RunUntil(f.StopEverything)
+	// Watch ReplicaSet objects to enable spreading pods coming from the same ones.
+	go f.replicaSetPopulator.Run(f.StopEverything)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 

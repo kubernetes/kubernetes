@@ -28,6 +28,10 @@ import (
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 )
 
+func fakeGrouper(pod *api.Pod) ([]*api.ObjectReference, error) {
+	return []*api.ObjectReference{}, nil
+}
+
 // TestAssumePodScheduled tests that after a pod is assumed, its information is aggregated
 // on node level.
 func TestAssumePodScheduled(t *testing.T) {
@@ -85,7 +89,7 @@ func TestAssumePodScheduled(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
-		cache := newSchedulerCache(time.Second, time.Second, nil)
+		cache := newSchedulerCache(time.Second, time.Second, fakeGrouper, nil)
 		for _, pod := range tt.pods {
 			if err := cache.AssumePod(pod); err != nil {
 				t.Fatalf("AssumePod failed: %v", err)
@@ -144,7 +148,7 @@ func TestExpirePod(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
-		cache := newSchedulerCache(ttl, time.Second, nil)
+		cache := newSchedulerCache(ttl, time.Second, fakeGrouper, nil)
 
 		for _, pod := range tt.pods {
 			if err := cache.assumePod(pod.pod, pod.assumedTime); err != nil {
@@ -193,7 +197,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
-		cache := newSchedulerCache(ttl, time.Second, nil)
+		cache := newSchedulerCache(ttl, time.Second, fakeGrouper, nil)
 		for _, podToAssume := range tt.podsToAssume {
 			if err := cache.assumePod(podToAssume, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
@@ -239,7 +243,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 
 	now := time.Now()
 	for i, tt := range tests {
-		cache := newSchedulerCache(ttl, time.Second, nil)
+		cache := newSchedulerCache(ttl, time.Second, fakeGrouper, nil)
 		if err := cache.assumePod(tt.pod, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
@@ -301,7 +305,7 @@ func TestUpdatePod(t *testing.T) {
 	}}
 
 	for _, tt := range tests {
-		cache := newSchedulerCache(ttl, time.Second, nil)
+		cache := newSchedulerCache(ttl, time.Second, fakeGrouper, nil)
 		for _, podToAdd := range tt.podsToAdd {
 			if err := cache.AddPod(podToAdd); err != nil {
 				t.Fatalf("AddPod failed: %v", err)
@@ -367,7 +371,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 
 	now := time.Now()
 	for _, tt := range tests {
-		cache := newSchedulerCache(ttl, time.Second, nil)
+		cache := newSchedulerCache(ttl, time.Second, fakeGrouper, nil)
 		for _, podToAssume := range tt.podsToAssume {
 			if err := cache.assumePod(podToAssume, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
@@ -421,7 +425,7 @@ func TestRemovePod(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
-		cache := newSchedulerCache(time.Second, time.Second, nil)
+		cache := newSchedulerCache(time.Second, time.Second, fakeGrouper, nil)
 		if err := cache.AddPod(tt.pod); err != nil {
 			t.Fatalf("AddPod failed: %v", err)
 		}
@@ -505,7 +509,7 @@ func makeBasePod(nodeName, objName, cpu, mem string, ports []api.ContainerPort) 
 }
 
 func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
-	cache := newSchedulerCache(time.Second, time.Second, nil)
+	cache := newSchedulerCache(time.Second, time.Second, fakeGrouper, nil)
 	for i := 0; i < 1000; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
 		for j := 0; j < 30; j++ {
@@ -521,7 +525,7 @@ func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
 }
 
 func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) *schedulerCache {
-	cache := newSchedulerCache(time.Second, time.Second, nil)
+	cache := newSchedulerCache(time.Second, time.Second, fakeGrouper, nil)
 	for i := 0; i < podNum; i++ {
 		nodeName := fmt.Sprintf("node-%d", i/10)
 		objName := fmt.Sprintf("%s-pod-%d", nodeName, i%10)
