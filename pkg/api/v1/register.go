@@ -135,3 +135,4 @@ func (obj *RangeAllocation) GetObjectKind() unversioned.ObjectKind           { r
 func (obj *ExportOptions) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
 func (obj *ConfigMap) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
 func (obj *ConfigMapList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind           { return obj }
