@@ -46,10 +46,10 @@ var _ = Describe("Container Conformance Test", func() {
 		Context("when testing images that exist", func() {
 			var conformImages []ConformanceImage
 			conformImageTags := []string{
-				"gcr.io/google_containers/busybox:1.24",
-				"gcr.io/google_containers/mounttest:0.2",
-				"gcr.io/google_containers/nettest:1.7",
-				"gcr.io/google_containers/nginx:1.7.9",
+				"gcr.io/google_containers/node-conformance:v1",
+				"gcr.io/google_containers/node-conformance:v2",
+				"gcr.io/google_containers/node-conformance:v3",
+				"gcr.io/google_containers/node-conformance:v4",
 			}
 			It("it should pull successfully [Conformance]", func() {
 				for _, imageTag := range conformImageTags {
