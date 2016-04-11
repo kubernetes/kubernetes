@@ -202,8 +202,6 @@ script
 	. /etc/kube-env
 	export HOME="/root"
 	export KUBECTL_BIN="/usr/bin/kubectl"
-	export TOKEN_DIR="/etc/srv/kubernetes"
-	export kubelet_kubeconfig_file="/var/lib/kubelet/kubeconfig"
 	export TRUSTY_MASTER="true"
 	if [ -n "${TEST_ADDON_CHECK_INTERVAL_SEC:-}" ]; then
 		export TEST_ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC}
