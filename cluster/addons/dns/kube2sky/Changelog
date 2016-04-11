@@ -1,3 +1,10 @@
+## Version 1.15 (Apr 7 2016 Lucas Käldström <lucas.kaldstrom@hotmail.co.uk>)
+ - No code changes since 1.14
+ - Built in a dockerized env instead of using go on host to make it more reliable. `1.15` was built with `go1.6`
+ - Made it possible to compile this image for multiple architectures, so the main naming of this image is 
+   now `gcr.io/google_containers/kube2sky-arch:tag`. `arch` may be one of `amd64`, `arm`, `arm64` or `ppc64le`.
+   `gcr.io/google_containers/kube2sky:tag` is still pushed for backward compability
+
 ## Version 1.14 (Mar 4 2016 Abhishek Shah <abshah@google.com>)
 - If Endpoint has hostnames-map annotation (endpoints.net.beta.kubernetes.io/hostnames-map),
   the hostnames supplied via the annotation will be used to generate A Records for Headless Service.
