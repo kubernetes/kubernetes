@@ -97,8 +97,8 @@ Resource quantities
 Should include number to describe how many GPUs on a machine.
 
 
-yaml file example:
-
+### yaml file example:
+.. code-block:: yaml
 apiVersion: v1
 kind: Pod
 metadata:
