@@ -127,6 +127,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControll
 	if err := DeepCopy_componentconfig_VolumeConfiguration(in.VolumeConfiguration, &out.VolumeConfiguration, c); err != nil {
 		return err
 	}
+	out.EnableExperimentalFeatures = in.EnableExperimentalFeatures
 	return nil
 }
 

@@ -55,6 +55,10 @@
   {% set log_level = pillar['controller_manager_test_log_level'] -%}
 {% endif -%}
 
+{% if pillar['enable_experimental_features'] is defined -%}
+  {% set enable_experimental_features = "--enable-experimental-features=" + pillar['enable_experimental_features'] -%}
+{% endif -%}
+
 {% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
 
 
