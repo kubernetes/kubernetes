@@ -102,7 +102,7 @@ Should include number to describe how many GPUs on a machine.
 
 
 ### yaml file example:
----
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -117,7 +117,7 @@ spec:
         cpu: 100m
         memory: 100Mi
         nvidiagpu: 1
----
+```
 
 
 
