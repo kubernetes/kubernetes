@@ -25,24 +25,6 @@ function running_in_docker() {
     grep -q docker /proc/self/cgroup
 }
 
-function check_dirty_workspace() {
-    if [[ "${JENKINS_TOLERATE_DIRTY_WORKSPACE:-}" =~ ^[yY]$ ]]; then
-        echo "Tolerating dirty workspace (because JENKINS_TOLERATE_DIRTY_WORKSPACE)."
-    else
-        echo "Checking dirty workspace."
-        # .config and its children are created by the gcloud call that we use to
-        # get the GCE service account.
-        #
-        # console-log.txt is created by Jenkins, but is usually not flushed out
-        # this early in this script.
-        if [[ $(find . -not -path "./.config*" -not -name "console-log.txt" | wc -l) != 1 ]]; then
-            echo "${PWD} not empty, bailing!"
-            find .
-            exit 1
-        fi
-    fi
-}
-
 function fetch_output_tars() {
     clean_binaries
     echo "Using binaries from _output."
@@ -225,12 +207,10 @@ elif [[ "${KUBE_RUN_FROM_OUTPUT:-}" =~ ^[yY]$ ]]; then
 elif [[ "${JENKINS_USE_SERVER_VERSION:-}" =~ ^[yY]$ ]]; then
     # This is for test, staging, and prod jobs on GKE, where we want to
     # test what's running in GKE by default rather than some CI build.
-    check_dirty_workspace
     fetch_server_version_tars
 else
     # use JENKINS_PUBLISHED_VERSION, default to 'ci/latest', since that's
     # usually what we're testing.
-    check_dirty_workspace
     fetch_published_version_tars "${JENKINS_PUBLISHED_VERSION:-ci/latest}"
 fi
 
