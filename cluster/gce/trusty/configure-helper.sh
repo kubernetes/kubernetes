@@ -342,7 +342,7 @@ create_master_kubelet_auth() {
 # $5: pod name, which should be either etcd or etcd-events
 prepare_etcd_manifest() {
   etcd_temp_file="/tmp/$5"
-  cp /run/kube-manifests/kubernetes/trusty/etcd.manifest "${etcd_temp_file}"
+  cp /home/kubernetes/kube-manifests/kubernetes/trusty/etcd.manifest "${etcd_temp_file}"
   sed -i -e "s@{{ *suffix *}}@$1@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *port *}}@$2@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *server_port *}}@$3@g" "${etcd_temp_file}"
@@ -415,7 +415,7 @@ start_kube_apiserver() {
   prepare_log_file /var/log/kube-apiserver.log
   # Load the docker image from file.
   echo "Try to load docker image file kube-apiserver.tar"
-  timeout 30 docker load -i /run/kube-docker-files/kube-apiserver.tar
+  timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-apiserver.tar
 
   # Calculate variables and assemble the command line.
   params="--cloud-provider=gce --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001 --tls-cert-file=/etc/srv/kubernetes/server.cert --tls-private-key-file=/etc/srv/kubernetes/server.key --secure-port=443 --client-ca-file=/etc/srv/kubernetes/ca.crt --token-auth-file=/etc/srv/kubernetes/known_tokens.csv --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv --allow-privileged=true"
@@ -445,9 +445,9 @@ start_kube_apiserver() {
     readonly vm_external_ip=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     params="${params} --cloud-config=/etc/gce.conf --advertise-address=${vm_external_ip} --ssh-user=${PROXY_SSH_USER} --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
   fi
-  readonly kube_apiserver_docker_tag=$(cat /run/kube-docker-files/kube-apiserver.docker_tag)
+  readonly kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
 
-  src_file="/run/kube-manifests/kubernetes/trusty/kube-apiserver.manifest"
+  src_file="/home/kubernetes/kube-manifests/kubernetes/trusty/kube-apiserver.manifest"
   remove_salt_config_comments "${src_file}"
   # Evaluate variables
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
@@ -477,7 +477,7 @@ start_kube_controller_manager() {
   prepare_log_file /var/log/kube-controller-manager.log
   # Load the docker image from file.
   echo "Try to load docker image file kube-controller-manager.tar"
-  timeout 30 docker load -i /run/kube-docker-files/kube-controller-manager.tar
+  timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-controller-manager.tar
 
   # Calculate variables and assemble the command line.
   params="--master=127.0.0.1:8080 --cloud-provider=gce --root-ca-file=/etc/srv/kubernetes/ca.crt --service-account-private-key-file=/etc/srv/kubernetes/server.key"
@@ -504,9 +504,9 @@ start_kube_controller_manager() {
   if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
     params="${params} ${CONTROLLER_MANAGER_TEST_ARGS}"
   fi
-  readonly kube_rc_docker_tag=$(cat /run/kube-docker-files/kube-controller-manager.docker_tag)
+  readonly kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
 
-  src_file="/run/kube-manifests/kubernetes/trusty/kube-controller-manager.manifest"
+  src_file="/home/kubernetes/kube-manifests/kubernetes/trusty/kube-controller-manager.manifest"
   remove_salt_config_comments "${src_file}"
   # Evaluate variables
   sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
@@ -528,9 +528,10 @@ start_kube_controller_manager() {
 #   DOCKER_REGISTRY
 start_kube_scheduler() {
   prepare_log_file /var/log/kube-scheduler.log
+  kube_home="home/kubernetes"
   # Load the docker image from file.
   echo "Try to load docker image file kube-scheduler.tar"
-  timeout 30 docker load -i /run/kube-docker-files/kube-scheduler.tar
+  timeout 30 docker load -i "${kube_home}/kube-docker-files/kube-scheduler.tar"
 
   # Calculate variables and set them in the manifest.
   params=""
@@ -542,10 +543,10 @@ start_kube_scheduler() {
   if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
     params="${params} ${SCHEDULER_TEST_ARGS}"
   fi
-  readonly kube_scheduler_docker_tag=$(cat /run/kube-docker-files/kube-scheduler.docker_tag)
+  readonly kube_scheduler_docker_tag=$(cat "${kube_home}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values
-  src_file="/run/kube-manifests/kubernetes/trusty/kube-scheduler.manifest"
+  src_file="${kube_home}/kube-manifests/kubernetes/trusty/kube-scheduler.manifest"
   remove_salt_config_comments "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
@@ -557,9 +558,9 @@ start_kube_scheduler() {
 start_fluentd() {
   if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
     if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
-      cp /run/kube-manifests/kubernetes/fluentd-gcp.yaml /etc/kubernetes/manifests/
+      cp /home/kubernetes/kube-manifests/kubernetes/fluentd-gcp.yaml /etc/kubernetes/manifests/
     elif [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ]; then
-      cp /run/kube-manifests/kubernetes/fluentd-es.yaml /etc/kubernetes/manifests/
+      cp /home/kubernetes/kube-manifests/kubernetes/fluentd-es.yaml /etc/kubernetes/manifests/
     fi
   fi
 }
@@ -569,7 +570,7 @@ start_fluentd() {
 # $1: addon category under /etc/kubernetes
 # $2: manifest source dir
 setup_addon_manifests() {
-  src_dir="/run/kube-manifests/kubernetes/trusty/$2"
+  src_dir="/home/kubernetes/kube-manifests/kubernetes/trusty/$2"
   dst_dir="/etc/kubernetes/$1/$2"
   if [ ! -d "${dst_dir}" ]; then
     mkdir -p "${dst_dir}"
@@ -593,7 +594,7 @@ setup_addon_manifests() {
 
 # Prepares the manifests of k8s addons static pods.
 prepare_kube_addons() {
-  addon_src_dir="/run/kube-manifests/kubernetes/trusty"
+  addon_src_dir="/home/kubernetes/kube-manifests/kubernetes/trusty"
   addon_dst_dir="/etc/kubernetes/addons"
   # Set up manifests of other addons.
   if [ "${ENABLE_CLUSTER_MONITORING:-}" = "influxdb" ] || \
