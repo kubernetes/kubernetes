@@ -21,6 +21,10 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+function running_in_docker() {
+    grep -q docker /proc/self/cgroup
+}
+
 function check_dirty_workspace() {
     if [[ "${JENKINS_TOLERATE_DIRTY_WORKSPACE:-}" =~ ^[yY]$ ]]; then
         echo "Tolerating dirty workspace (because JENKINS_TOLERATE_DIRTY_WORKSPACE)."
@@ -143,6 +147,43 @@ function get_latest_trusty_image() {
     rm -rf .gsutil &> /dev/null
 }
 
+function install_google_cloud_sdk_tarball() {
+    local -r tarball=$1
+    local -r install_dir=$2
+    mkdir -p "${install_dir}"
+    tar xzf "${tarball}" -C "${install_dir}"
+
+    export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+    "${install_dir}/google-cloud-sdk/install.sh" --disable-installation-options --bash-completion=false --path-update=false --usage-reporting=false
+    export PATH=${install_dir}/google-cloud-sdk/bin:${PATH}
+}
+
+### Pre Set Up ###
+if running_in_docker; then
+    curl -fsSL --retry 3 -o "${WORKSPACE}/google-cloud-sdk.tar.gz" 'https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.tar.gz'
+    install_google_cloud_sdk_tarball "${WORKSPACE}/google-cloud-sdk.tar.gz" /
+fi
+
+# Install gcloud from a custom path if provided. Used to test GKE with gcloud
+# at HEAD, release candidate.
+# TODO: figure out how to avoid installing the cloud sdk twice if run inside Docker.
+if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
+    # Retry the download a few times to mitigate transient server errors and
+    # race conditions where the bucket contents change under us as we download.
+    for n in $(seq 3); do
+        gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~ && break || sleep 1
+        # Delete any temporary files from the download so that we start from
+        # scratch when we retry.
+        rm -rf ~/.gsutil
+    done
+    rm -rf ~/repo ~/cloudsdk
+    mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
+    export CLOUDSDK_COMPONENT_MANAGER_SNAPSHOT_URL=file://${HOME}/repo/components-2.json
+    install_google_cloud_sdk_tarball ~/repo/google-cloud-sdk.tar.gz ~/cloudsdk
+    # TODO: is this necessary? this won't work inside Docker currently.
+    export CLOUDSDK_CONFIG=/var/lib/jenkins/.config/gcloud
+fi
+
 # We get the image project and name for Trusty dynamically.
 if [[ "${JENKINS_USE_TRUSTY_IMAGES:-}" =~ ^[yY]$ ]]; then
   trusty_image_project="$(get_trusty_image_project)"
@@ -212,13 +253,23 @@ fi
 # # Move the permissions for the keys to Jenkins.
 # $ sudo chown -R jenkins /var/lib/jenkins/gce_keys/
 # $ sudo chgrp -R jenkins /var/lib/jenkins/gce_keys/
-if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-    echo "Skipping SSH key copying for AWS"
-else
-    mkdir -p ${WORKSPACE}/.ssh/
-    cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
-    cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
-fi
+case "${KUBERNETES_PROVIDER}" in
+    gce|gke|kubemark)
+        if ! running_in_docker; then
+            mkdir -p ${WORKSPACE}/.ssh/
+            cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
+            cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
+        fi
+        if [[ ! -f ${WORKSPACE}/.ssh/google_compute_engine ]]; then
+            echo "google_compute_engine ssh key missing!"
+            exit 1
+        fi
+        ;;
+
+    default)
+        echo "Not copying ssh keys for ${KUBERNETES_PROVIDER}"
+        ;;
+esac
 
 cd kubernetes
 
@@ -231,6 +282,9 @@ fi
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
 ARTIFACTS=${WORKSPACE}/_artifacts
 mkdir -p ${ARTIFACTS}
+# When run inside Docker, we need to make sure all files are world-readable
+# (since they will be owned by root on the host).
+trap "chmod -R o+r '${ARTIFACTS}'" EXIT SIGINT SIGTERM
 export E2E_REPORT_DIR=${ARTIFACTS}
 declare -r gcp_list_resources_script="./cluster/gce/list-resources.sh"
 declare -r gcp_resources_before="${ARTIFACTS}/gcp-resources-before.txt"
@@ -242,29 +296,6 @@ if [[ ( ${KUBERNETES_PROVIDER} == "gce" || ${KUBERNETES_PROVIDER} == "gke" ) && 
   gcp_list_resources="true"
 else
   gcp_list_resources="false"
-fi
-
-### Pre Set Up ###
-# Install gcloud from a custom path if provided. Used to test GKE with gcloud
-# at HEAD, release candidate.
-if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
-    # Retry the download a few times to mitigate transient server errors and
-    # race conditions where the bucket contents change under us as we download.
-    for n in $(seq 3); do
-        gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~ && break || sleep 1
-        # Delete any temporary files from the download so that we start from
-        # scratch when we retry.
-        rm -rf ~/.gsutil
-    done
-    rm -rf ~/repo ~/cloudsdk
-    mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
-    mkdir ~/cloudsdk
-    tar zxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
-    export CLOUDSDK_CORE_DISABLE_PROMPTS=1
-    export CLOUDSDK_COMPONENT_MANAGER_SNAPSHOT_URL=file://${HOME}/repo/components-2.json
-    ~/cloudsdk/google-cloud-sdk/install.sh --disable-installation-options --bash-completion=false --path-update=false --usage-reporting=false
-    export PATH=${HOME}/cloudsdk/google-cloud-sdk/bin:${PATH}
-    export CLOUDSDK_CONFIG=/var/lib/jenkins/.config/gcloud
 fi
 
 ### Set up ###
