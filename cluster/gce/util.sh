@@ -228,8 +228,7 @@ function upload-server-tars() {
       echo "Creating ${staging_bucket}"
       # The `-o ...` bit is a temporary workaround for
       # https://github.com/GoogleCloudPlatform/gsutil/issues/348
-      # It can safely be removed once that issue is resolved and it's likely
-      # users have updated thir gsutil installations.
+      # It can safely be removed once that issue is resolved.
       gsutil -o "GSUtil:prefer_api=xml" mb -l "${region}" "${staging_bucket}"
     fi
 
