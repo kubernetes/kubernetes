@@ -248,7 +248,14 @@ fi
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
 # at HEAD, release candidate.
 if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
-    gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~
+    # Retry the download a few times to mitigate transient server errors and
+    # race conditions where the bucket contents change under us as we download.
+    for n in $(seq 3); do
+        gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~ && break || sleep 1
+        # Delete any temporary files from the download so that we start from
+        # scratch when we retry.
+        rm -rf ~/.gsutil
+    done
     rm -rf ~/repo ~/cloudsdk
     mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
     mkdir ~/cloudsdk
@@ -290,7 +297,7 @@ if [[ -n "${JENKINS_PUBLISHED_TEST_VERSION:-}" ]]; then
     fetch_published_version_tars "${JENKINS_PUBLISHED_TEST_VERSION}"
     cd kubernetes
     # Upgrade the cluster before running other tests
-    if [[ "${E2E_UPGRADE_TEST,,}" == "true" ]]; then
+    if [[ "${E2E_UPGRADE_TEST:-}" == "true" ]]; then
 	# Add a report prefix for the e2e tests so that the tests don't get overwritten when we run
 	# the rest of the e2es.
         E2E_REPORT_PREFIX='upgrade' e2e_test "${GINKGO_UPGRADE_TEST_ARGS:-}"

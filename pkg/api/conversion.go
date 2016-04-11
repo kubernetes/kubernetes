@@ -41,20 +41,20 @@ func init() {
 		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
 		Convert_unversioned_Time_To_unversioned_Time,
-		Convert_string_slice_To_unversioned_Time,
+		Convert_Slice_string_To_unversioned_Time,
 		Convert_string_To_labels_Selector,
 		Convert_string_To_fields_Selector,
-		Convert_bool_ref_To_bool,
-		Convert_bool_To_bool_ref,
-		Convert_string_ref_To_string,
-		Convert_string_To_string_ref,
+		Convert_Pointer_bool_To_bool,
+		Convert_bool_To_Pointer_bool,
+		Convert_Pointer_string_To_string,
+		Convert_string_To_Pointer_string,
 		Convert_labels_Selector_To_string,
 		Convert_fields_Selector_To_string,
 		Convert_resource_Quantity_To_resource_Quantity,
 	)
 }
 
-func Convert_string_ref_To_string(in **string, out *string, s conversion.Scope) error {
+func Convert_Pointer_string_To_string(in **string, out *string, s conversion.Scope) error {
 	if *in == nil {
 		*out = ""
 		return nil
@@ -63,7 +63,7 @@ func Convert_string_ref_To_string(in **string, out *string, s conversion.Scope) 
 	return nil
 }
 
-func Convert_string_To_string_ref(in *string, out **string, s conversion.Scope) error {
+func Convert_string_To_Pointer_string(in *string, out **string, s conversion.Scope) error {
 	if in == nil {
 		stringVar := ""
 		*out = &stringVar
@@ -73,7 +73,7 @@ func Convert_string_To_string_ref(in *string, out **string, s conversion.Scope) 
 	return nil
 }
 
-func Convert_bool_ref_To_bool(in **bool, out *bool, s conversion.Scope) error {
+func Convert_Pointer_bool_To_bool(in **bool, out *bool, s conversion.Scope) error {
 	if *in == nil {
 		*out = false
 		return nil
@@ -82,7 +82,7 @@ func Convert_bool_ref_To_bool(in **bool, out *bool, s conversion.Scope) error {
 	return nil
 }
 
-func Convert_bool_To_bool_ref(in *bool, out **bool, s conversion.Scope) error {
+func Convert_bool_To_Pointer_bool(in *bool, out **bool, s conversion.Scope) error {
 	if in == nil {
 		boolVar := false
 		*out = &boolVar
@@ -118,8 +118,8 @@ func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unv
 	return nil
 }
 
-// Convert_string_slice_To_unversioned_Time allows converting a URL query parameter value
-func Convert_string_slice_To_unversioned_Time(input *[]string, out *unversioned.Time, s conversion.Scope) error {
+// Convert_Slice_string_To_unversioned_Time allows converting a URL query parameter value
+func Convert_Slice_string_To_unversioned_Time(input *[]string, out *unversioned.Time, s conversion.Scope) error {
 	str := ""
 	if len(*input) > 0 {
 		str = (*input)[0]

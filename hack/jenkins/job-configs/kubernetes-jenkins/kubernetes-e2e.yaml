@@ -61,7 +61,7 @@
     suffix:
         - 'gce':
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel.'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 # This is the *only* job that should publish the last green version.
                 export E2E_PUBLISH_GREEN_VERSION="true"
@@ -71,7 +71,7 @@
                 export PROJECT="k8s-jkns-e2e-gce"
         - 'gce-slow':
             description: 'Runs slow tests on GCE, sequentially.'
-            timeout: 60
+            timeout: 150  #  See #24072
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
@@ -92,6 +92,8 @@
                 export PROJECT="k8s-jkns-e2e-gce-ci-reboot"
         - 'gce-autoscaling':
             description: 'Run autoscaling E2E tests on GCE.'
+            # Issue: #23716
+            disable_job: true
             timeout: 210
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterSizeAutoscaling\]|\[Feature:InitialResources\] \
@@ -171,20 +173,19 @@
 - project:
     name: kubernetes-e2e-gke-master
     trigger-job: 'kubernetes-build'
-    test-owner: 'GKE on-call'
-    emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
+    test-owner: 'Build Cop'
     provider-env: '{gke-provider-env}'
     suffix:
         - 'gke':
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel (against GKE test endpoint)'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-ci"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
         - 'gke-slow':
             description: 'Run slow E2E tests on GKE using the latest successful build.'
-            timeout: 60
+            timeout: 150  #  See #24072
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-slow"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
@@ -230,7 +231,7 @@
     suffix:
         - 'gce-release-1.2':
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel on the release-1.2 branch.'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
@@ -303,14 +304,14 @@
 - project:
     name: kubernetes-e2e-gke-1-2
     trigger-job: 'kubernetes-build-1.2'
-    test-owner: 'GKE on-call'
+    test-owner: 'Build Cop'
     provider-env: |
         {gke-provider-env}
         export JENKINS_PUBLISHED_VERSION="ci/latest-1.2"
     suffix:
         - 'gke-release-1.2':
             description: 'Run E2E tests on GKE from the release-1.2 branch.'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-1-2"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
@@ -351,6 +352,13 @@
     provider-env: |
         {gke-provider-env}
     suffix:
+        - 'gke-pre-release':
+            description: 'Run E2E tests on GKE test endpoint against the latest prerelease (alpha/beta).'
+            timeout: 480
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-prerel"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
+                export JENKINS_PUBLISHED_VERSION="release/latest"
         - 'gke-test':
             description: 'Run E2E tests on GKE test endpoint.'
             timeout: 480
@@ -412,11 +420,10 @@
 - project:
     name: kubernetes-e2e-gke-1.1
     trigger-job: 'kubernetes-build-1.1'
-    test-owner: 'GKE on-call'
+    test-owner: 'Build Cop'
     branch: 'release-1.1'
     runner: '{old-runner-1-1}'
     post-env: ''
-    emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
     suffix:
         - 'gke-1.1':
             timeout: 150
@@ -870,6 +877,7 @@
                 export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=Kubectl"
                 export GINKGO_PARALLEL="y"
+                export E2E_OPT="--check_version_skew=false"
         - 'gke-upgrade-master-1.1-1.2':
             description: 'Deploys a cluster at v1.1, upgrades its master to v1.2, and runs v1.1 tests against it.'
             timeout: 30
@@ -880,6 +888,7 @@
                 export E2E_UPGRADE_TEST="true"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
+                export E2E_OPT="--check_version_skew=false"
         - 'gke-upgrade-cluster-1.1-1.2':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.1 tests against it.'
             timeout: 30
@@ -890,6 +899,7 @@
                 export E2E_UPGRADE_TEST="true"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
+                export E2E_OPT="--check_version_skew=false"
         - 'gke-upgrade-cluster-new-1.1-1.2':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.2 tests against it.'
             timeout: 30
@@ -899,5 +909,6 @@
                 export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export E2E_UPGRADE_TEST="true"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
+                export E2E_OPT="--check_version_skew=false"
     jobs:
         - 'kubernetes-e2e-{suffix}'

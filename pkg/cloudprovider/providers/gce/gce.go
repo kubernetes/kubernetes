@@ -924,6 +924,11 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 		TargetTags:   hostTags,
 		Allowed: []*compute.FirewallAllowed{
 			{
+				// TODO: Make this more generic. Currently this method is only
+				// used to create firewall rules for loadbalancers, which have
+				// exactly one protocol, so we can never end up with a list of
+				// mixed TCP and UDP ports. It should be possible to use a
+				// single firewall rule for both a TCP and UDP lb.
 				IPProtocol: strings.ToLower(string(ports[0].Protocol)),
 				Ports:      allowedPorts,
 			},
@@ -1237,8 +1242,13 @@ func (gce *GCECloud) CreateFirewall(name, desc string, sourceRanges netsets.IPNe
 	// TODO: This completely breaks modularity in the cloudprovider but the methods
 	// shared with the TCPLoadBalancer take api.ServicePorts.
 	svcPorts := []api.ServicePort{}
+	// TODO: Currently the only consumer of this method is the GCE L7
+	// loadbalancer controller, which never needs a protocol other than TCP.
+	// We should pipe through a mapping of port:protocol and default to TCP
+	// if UDP ports are required. This means the method signature will change
+	// forcing downstream clients to refactor interfaces.
 	for _, p := range ports {
-		svcPorts = append(svcPorts, api.ServicePort{Port: int(p)})
+		svcPorts = append(svcPorts, api.ServicePort{Port: int(p), Protocol: api.ProtocolTCP})
 	}
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {
@@ -1266,8 +1276,13 @@ func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges netsets.IPNe
 	// TODO: This completely breaks modularity in the cloudprovider but the methods
 	// shared with the TCPLoadBalancer take api.ServicePorts.
 	svcPorts := []api.ServicePort{}
+	// TODO: Currently the only consumer of this method is the GCE L7
+	// loadbalancer controller, which never needs a protocol other than TCP.
+	// We should pipe through a mapping of port:protocol and default to TCP
+	// if UDP ports are required. This means the method signature will change,
+	// forcing downstream clients to refactor interfaces.
 	for _, p := range ports {
-		svcPorts = append(svcPorts, api.ServicePort{Port: int(p)})
+		svcPorts = append(svcPorts, api.ServicePort{Port: int(p), Protocol: api.ProtocolTCP})
 	}
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {

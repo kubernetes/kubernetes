@@ -399,11 +399,11 @@ var _ = KubeDescribe("Services", func() {
 		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
 		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 		if err != nil {
-			Failf("expected node port %d to be in use, stdout: %v", nodePort, stdout)
+			Failf("expected node port %d to be in use, stdout: %v. err: %v", nodePort, stdout, err)
 		}
 	})
 
-	It("should be able to change the type and ports of a service", func() {
+	It("should be able to change the type and ports of a service [Slow]", func() {
 		// requires cloud load-balancer support
 		SkipUnlessProviderIs("gce", "gke", "aws")
 

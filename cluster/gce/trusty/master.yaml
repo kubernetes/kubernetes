@@ -57,7 +57,7 @@ script
 	create_dirs
 	echo "Mount master PD"
 	mount_master_pd
-	echo "Creating kuberntes master auth file"
+	echo "Creating kubernetes master auth file"
 	create_master_auth
 	echo "Creating master instance kubelet auth file"
   create_master_kubelet_auth
@@ -138,7 +138,6 @@ script
 		--configure-cbr0=${ALLOCATE_NODE_CIDRS} \
 		--cgroup-root=/ \
 		--system-cgroups=/system \
-		--runtime-cgroups=/docker-daemon \
 		--kubelet-cgroups=/kubelet \
 		--babysit-daemons=true \
 		${KUBELET_CMD_FLAGS} 1>>/var/log/kubelet.log 2>&1
