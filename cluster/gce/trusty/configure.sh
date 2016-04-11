@@ -81,7 +81,7 @@ download_or_bust() {
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
-# and places them into suitable directories.
+# and places them into suitable directories. Files are placed in /home/kubernetes. 
 install_kube_binary_config() {
   # Upstart does not support shell array well. Put urls in a temp file with one
   # url at a line, and we will use 'read' command to get them one-by-one.
@@ -90,7 +90,9 @@ install_kube_binary_config() {
   tmp_manifests_urls=$(mktemp /tmp/kube-temp.XXXXXX)
   echo "${KUBE_MANIFESTS_TAR_URL}" | tr "," "\n" > "${tmp_manifests_urls}"
 
-  cd /tmp
+  kube_home="/home/kubernetes"
+  mkdir -p "${kube_home}"
+  cd "${kube_home}"
   read -r server_binary_tar_url < "${tmp_binary_urls}"
   readonly server_binary_tar="${server_binary_tar_url##*/}"
   if [ -n "${SERVER_BINARY_TAR_HASH:-}" ]; then
@@ -102,37 +104,40 @@ install_kube_binary_config() {
   fi
   echo "Downloading binary release tar"
   download_or_bust "${server_binary_tar_hash}" "${tmp_binary_urls}"
-  tar xzf "/tmp/${server_binary_tar}" -C /tmp/ --overwrite
-  # Copy docker_tag and image files to /run/kube-docker-files.
-  mkdir -p /run/kube-docker-files
-  cp /tmp/kubernetes/server/bin/*.docker_tag /run/kube-docker-files/
+  tar xzf "${kube_home}/${server_binary_tar}" -C "${kube_home}" --overwrite
+  # Copy docker_tag and image files to /home/kubernetes/kube-docker-files.
+  src_dir="${kube_home}/kubernetes/server/bin"
+  dst_dir="${kube_home}/kube-docker-files"
+  mkdir -p "${dst_dir}"
+  cp "${src_dir}/"*.docker_tag "${dst_dir}"
   if [ "${KUBERNETES_MASTER:-}" = "false" ]; then
-    cp /tmp/kubernetes/server/bin/kube-proxy.tar /run/kube-docker-files/
+    cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
   else
-    cp /tmp/kubernetes/server/bin/kube-apiserver.tar /run/kube-docker-files/
-    cp /tmp/kubernetes/server/bin/kube-controller-manager.tar /run/kube-docker-files/
-    cp /tmp/kubernetes/server/bin/kube-scheduler.tar /run/kube-docker-files/
-    cp -r /tmp/kubernetes/addons /run/kube-docker-files/
+    cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
+    cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
+    cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"
+    cp -r "${kube_home}/kubernetes/addons" "${dst_dir}"
   fi
   # Use the binary from the release tarball if they are not preinstalled, or if this is
   # a test cluster.
   readonly BIN_PATH="/usr/bin"
   if ! which kubelet > /dev/null || ! which kubectl > /dev/null; then
-    cp /tmp/kubernetes/server/bin/kubelet "${BIN_PATH}"
-    cp /tmp/kubernetes/server/bin/kubectl "${BIN_PATH}"
+    cp "${src_dir}/kubelet" "${BIN_PATH}"
+    cp "${src_dir}/kubectl" "${BIN_PATH}"
   elif [ "${TEST_CLUSTER:-}" = "true" ]; then
-    mkdir -p /home/kubernetes/bin
-    cp /tmp/kubernetes/server/bin/kubelet /home/kubernetes/bin
-    cp /tmp/kubernetes/server/bin/kubectl /home/kubernetes/bin
-    mount --bind /home/kubernetes/bin/kubelet "${BIN_PATH}/kubelet"
+    kube_bin="${kube_home}/bin"
+    mkdir -p "${kube_bin}"
+    cp "${src_dir}/kubelet" "${kube_bin}"
+    cp "${src_dir}/kubectl" "${kube_bin}"
+    mount --bind "${kube_bin}/kubelet" "${BIN_PATH}/kubelet"
     mount --bind -o remount,ro,^noexec "${BIN_PATH}/kubelet" "${BIN_PATH}/kubelet"
-    mount --bind /home/kubernetes/bin/kubectl "${BIN_PATH}/kubectl"
+    mount --bind "${kube_bin}/kubectl" "${BIN_PATH}/kubectl"
     mount --bind -o remount,ro,^noexec "${BIN_PATH}/kubectl" "${BIN_PATH}/kubectl"
   fi
 
-  # Put kube-system pods manifests in /etc/kube-manifests/.
-  mkdir -p /run/kube-manifests
-  cd /run/kube-manifests
+  # Put kube-system pods manifests in /home/kubernetes/kube-manifests/.
+  dst_dir="${kube_home}/kube-manifests"
+  mkdir -p "${dst_dir}"
   read -r manifests_tar_url < "${tmp_manifests_urls}"
   readonly manifests_tar="${manifests_tar_url##*/}"
   if [ -n "${KUBE_MANIFESTS_TAR_HASH:-}" ]; then
@@ -144,22 +149,22 @@ install_kube_binary_config() {
   fi
   echo "Downloading k8s manifests tar"
   download_or_bust "${manifests_tar_hash}" "${tmp_manifests_urls}"
-  tar xzf "/run/kube-manifests/${manifests_tar}" -C /run/kube-manifests/ --overwrite
+  tar xzf "${kube_home}/${manifests_tar}" -C "${dst_dir}" --overwrite
   readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
   if [ "${kube_addon_registry}" != "gcr.io/google_containers" ]; then
-    find /run/kube-manifests -name \*.yaml -or -name \*.yaml.in | \
+    find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
       xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
-    find /run/kube-manifests -name \*.manifest -or -name \*.json | \
+    find "${dst_dir}" -name \*.manifest -or -name \*.json | \
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
-  cp /run/kube-manifests/kubernetes/trusty/configure-helper.sh /etc/kube-configure-helper.sh
+  cp "${dst_dir}/kubernetes/trusty/configure-helper.sh" /etc/kube-configure-helper.sh
 
   # Clean up.
-  rm -rf /tmp/kubernetes
-  rm -f "/tmp/${server_binary_tar}"
-  rm -f "/tmp/${server_binary_tar}.sha1"
-  rm -f "/run/kube-manifests/${manifests_tar}"
-  rm -f "/run/kube-manifests/${manifests_tar}.sha1"
+  rm -rf "${kube_home}/kubernetes"
+  rm -f "${kube_home}/${server_binary_tar}"
+  rm -f "${kube_home}/${server_binary_tar}.sha1"
+  rm -f "${kube_home}/${manifests_tar}"
+  rm -f "${kube_home}/${manifests_tar}.sha1"
   rm -f "${tmp_binary_urls}"
   rm -f "${tmp_manifests_urls}"
 }
