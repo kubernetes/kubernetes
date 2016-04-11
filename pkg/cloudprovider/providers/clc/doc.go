@@ -14,6 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package clc is an implementation of Interface, LoadBalancer
-// and Zones for CenturyLinkCloud
+// Package clc is an implementation of cloudprovider.LoadBalancer and cloudprovider.Zones for CenturyLinkCloud
 package clc

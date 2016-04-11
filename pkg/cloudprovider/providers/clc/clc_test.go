@@ -40,12 +40,12 @@ func TestLoadbalancer(t *testing.T) {
 	checkLoadbalancer(clc)
 }
 
-func checkInstances(provider cloudprovider.Instances) {
+func checkZones(provider cloudprovider.Zones) {
 }
 
-func TestInstances(t *testing.T) {
+func TestZones(t *testing.T) {
 	clc := &CLCCloud{}
-	checkInstances(clc)
+	checkZones(clc)
 }
 
 func TestReadConfig(t *testing.T) {

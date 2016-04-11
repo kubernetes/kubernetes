@@ -18,7 +18,6 @@ package clc
 
 import (
 	"bytes"
-	// tls "crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -181,7 +180,7 @@ func (creds *implCreds) CredsLogin(username string, password string) error {
 	req.Header.Add("Connection", "close")
 
 	// this should be the normal code
-	resp,err := http.DefaultClient.Do(req)	// execute the call
+	resp, err := http.DefaultClient.Do(req) // execute the call
 
 	// instead, we have this which tolerates bad certs [fixme both here and in invokeHTTP]
 	// tlscfg := &tls.Config{InsecureSkipVerify: true} // true means to skip the verification

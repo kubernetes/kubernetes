@@ -160,7 +160,7 @@ func (clc clcImpl) createLB(dc string, lbname string, desc string) (*LoadBalance
 	}
 
 	deadline := time.Now().Add(2 * time.Minute)
-	for {	// infinite loop.  Wait until the newly created LB actually appears in the list.
+	for { // infinite loop.  Wait until the newly created LB actually appears in the list.
 		time.Sleep(2 * time.Second)
 
 		list, listErr := clc.listAllLB()
@@ -168,9 +168,9 @@ func (clc clcImpl) createLB(dc string, lbname string, desc string) (*LoadBalance
 			continue
 		}
 
-		for _,entry := range list {
+		for _, entry := range list {
 			if (entry.DataCenter == dc) && (entry.LBID == LB.LBID) { // success
-				glog.Info(fmt.Sprintf("createLB complete, duration=%d seconds", (time.Now().Sub(timeStarted)/time.Second)))
+				glog.Info(fmt.Sprintf("createLB complete, duration=%d seconds", (time.Now().Sub(timeStarted) / time.Second)))
 				return LB, nil
 			}
 		}
@@ -191,14 +191,14 @@ type NodeJSON struct {
 type ApiNodes []NodeJSON
 
 type PoolJSON struct {
-	PoolID       string   `json:"id"`
-	IncomingPort int      `json:"port"`
-	Method       string   `json:"loadBalancingMethod"`
-	Persistence  string   `json:"persistence"`
-	TimeoutMS    int64    `json:"idleTimeout"`
-	Mode         string   `json:"loadBalancingMode"`
-	Health       *HealthCheckJSON   `json:"healthCheck,omitempty"`
-	Nodes        ApiNodes `json:"nodes"`
+	PoolID       string           `json:"id"`
+	IncomingPort int              `json:"port"`
+	Method       string           `json:"loadBalancingMethod"`
+	Persistence  string           `json:"persistence"`
+	TimeoutMS    int64            `json:"idleTimeout"`
+	Mode         string           `json:"loadBalancingMode"`
+	Health       *HealthCheckJSON `json:"healthCheck,omitempty"`
+	Nodes        ApiNodes         `json:"nodes"`
 }
 
 type ApiPools []PoolJSON
@@ -246,13 +246,13 @@ func (clc clcImpl) inspectLB(dc, lbid string) (*LoadBalancerDetails, error) {
 
 			var pool_health *HealthCheck = nil
 			if srcpool.Health != nil {
-				pool_health = &HealthCheck {
+				pool_health = &HealthCheck{
 					UnhealthyThreshold: srcpool.Health.UnhealthyThreshold,
-					HealthyThreshold: srcpool.Health.HealthyThreshold,
-					IntervalSeconds: srcpool.Health.IntervalSeconds,
-					TargetPort: srcpool.Health.TargetPort,
-					Mode: srcpool.Health.Mode,
-				} 
+					HealthyThreshold:   srcpool.Health.HealthyThreshold,
+					IntervalSeconds:    srcpool.Health.IntervalSeconds,
+					TargetPort:         srcpool.Health.TargetPort,
+					Mode:               srcpool.Health.Mode,
+				}
 			}
 
 			json_pools[idx] = PoolDetails{
@@ -328,12 +328,11 @@ type NodeEntityJSON struct {
 	TargetPort int    `json:"privatePort"`
 }
 
-
 type HealthCheckJSON struct {
-	UnhealthyThreshold int `json:"unhealthyThreshold"`
-	HealthyThreshold   int `json:"healthyThreshold"`
-	IntervalSeconds    int `json:"intervalSeconds"`
-	TargetPort         int `json:"targetPort"`
+	UnhealthyThreshold int    `json:"unhealthyThreshold"`
+	HealthyThreshold   int    `json:"healthyThreshold"`
+	IntervalSeconds    int    `json:"intervalSeconds"`
+	TargetPort         int    `json:"targetPort"`
 	Mode               string `json:"mode,omitempty"`
 }
 
@@ -341,7 +340,7 @@ type PoolEntityJSON struct {
 	PoolID       string           `json:"id,omitempty"` // createPool doesn't want to send an id
 	IncomingPort int              `json:"port"`
 	Method       string           `json:"loadBalancingMethod"`
-	Health       *HealthCheckJSON  `json:"healthCheck,omitEmpty"`
+	Health       *HealthCheckJSON `json:"healthCheck,omitEmpty"`
 	Persistence  string           `json:"persistence"`
 	TimeoutMS    int64            `json:"idleTimeout"`
 	Mode         string           `json:"loadBalancingMode"`
@@ -350,15 +349,15 @@ type PoolEntityJSON struct {
 
 func health_to_json(src *HealthCheck) *HealthCheckJSON {
 	if src == nil {
-		return nil;
+		return nil
 	}
 
-	return &HealthCheckJSON {
+	return &HealthCheckJSON{
 		UnhealthyThreshold: src.UnhealthyThreshold,
-		HealthyThreshold: src.HealthyThreshold,
-		IntervalSeconds: src.IntervalSeconds,
-		TargetPort: src.TargetPort,
-		Mode: src.Mode,
+		HealthyThreshold:   src.HealthyThreshold,
+		IntervalSeconds:    src.IntervalSeconds,
+		TargetPort:         src.TargetPort,
+		Mode:               src.Mode,
 	}
 }
 
