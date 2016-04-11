@@ -36,10 +36,11 @@ The GPU should be known by both Scheduler and Kubelet, but for Scheduler, only n
 ### Extend the Kubelet
 Kubelet should responsible for the GPU information collection/update/allocation/release.
 
-#### 1. Provide GPU information, need to has the ability to send the GPU status to Scheduler for scheduling/tracking. The GPU need to be added as the volume or network,like: func ProbeXXXPlugins(pluginDir string) []XXX.XXXPlugin. All the scheduling/tracking information should be provided in this plugin. The information of GPU for container allocation/release also should be provided in this plugin. (like GPU device path "/dev/nvidia0")
+#### 1. Provide GPU information.
+Need to has the ability to send the GPU status to Scheduler for scheduling/tracking. The GPU need to be added as the volume or network,like: func ProbeXXXPlugins(pluginDir string) []XXX.XXXPlugin. All the scheduling/tracking information should be provided in this plugin. The information of GPU for container allocation/release also should be provided in this plugin. (like GPU device path "/dev/nvidia0")
 
 The responsibility of the GPU plugin in Kubelet:
-	##### 1). Implement different subplugin for each of vendor. But all the GPU resources should be in 1 plugin. Like:
+	1). Implement different subplugin for each of vendor. But all the GPU resources should be in 1 plugin. Like:
 		func ProbeGPUPlugins() []gpuTypes.GPUPlugin {
           glog.Infof("GPUPlugin: ProbeGPUPlugins")
           allPlugins := []gpuTypes.GPUPlugin{}
@@ -51,9 +52,9 @@ The responsibility of the GPU plugin in Kubelet:
           xxxxPlugin := xxxx.ProbeGPUPlugin()
         }
 		
-	##### 2). Discover the GPU information on host. (The host need to have CUDA installed) The way we discover GPU and its information by nvidia-smi, the same way used in NVIDIA-Docker.
+	2). Discover the GPU information on host. (The host need to have CUDA installed) The way we discover GPU and its information by nvidia-smi, the same way used in NVIDIA-Docker.
 	
-	##### 3). Collect/Update the GPU status to Scheduler, like:
+	3). Collect/Update the GPU status to Scheduler, like:
 	    func IsGPUAvailable(pods []*api.Pod, gpuCapacity int) bool {
           glog.Infof("GPUPlugin: IsGPUAvaiable()")
           totalGPU := gpuCapacity
@@ -67,7 +68,7 @@ The responsibility of the GPU plugin in Kubelet:
           return totalGPURequest == 0 || (totalGPU-totalGPURequest) >= 0
         }
 
-	##### 4). Allocate/Release GPU to/from container. The Plugin should could mount the GPU relative libraries to the container, like build the list of devices to be exposed in the container (e.g. /dev/nvidia0, /dev/nvidiactl, /dev/nvidia-uvm). Do it as NVIDIA-Docker. 
+	4). Allocate/Release GPU to/from container. The Plugin should could mount the GPU relative libraries to the container, like build the list of devices to be exposed in the container (e.g. /dev/nvidia0, /dev/nvidiactl, /dev/nvidia-uvm). Do it as NVIDIA-Docker. 
 
 #### 2. Container with GPU requirement.
 	1). "--device" ability to add GPU to container. The dockertools need to be extended to support the "--device", then we can assign GPU to container, also other hardware could benifit from it if we want to add more hardware such as GPU.
