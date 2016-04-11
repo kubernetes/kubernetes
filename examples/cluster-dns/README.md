@@ -40,11 +40,6 @@ This is a toy example demonstrating how to use kubernetes DNS.
 
 This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/). Make sure DNS is enabled in your setup, see [DNS doc](../../cluster/addons/dns/).
 
-```sh
-$ cd kubernetes
-$ hack/dev-build-and-up.sh
-```
-
 ### Step One: Create two namespaces
 
 We'll see how cluster DNS works across multiple [namespaces](../../docs/user-guide/namespaces.md), first we need to create two namespaces:
