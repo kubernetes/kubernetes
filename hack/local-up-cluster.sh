@@ -38,7 +38,7 @@ KUBECTL=${KUBECTL:-cluster/kubectl.sh}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-10}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
 HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
-
+KUBELET_SYNC_FREQUENCY=${KUBELET_SYNC_FREQUENCY:-"1m0s"}
 cd "${KUBE_ROOT}"
 
 if [ "$(id -u)" != "0" ]; then
@@ -340,6 +340,7 @@ function start_kubelet {
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
+        --sync-frequency=${KUBELET_SYNC_FREQUENCY} \
         ${dns_args} \
         ${net_plugin_args} \
         ${kubenet_plugin_args} \
@@ -362,7 +363,7 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=3 --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" &> $KUBELET_LOG &
+        /kubelet --v=3 --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" --sync-frequency=${KUBELET_SYNC_FREQUENCY} &> $KUBELET_LOG &
     fi
 }
 

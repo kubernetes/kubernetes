@@ -169,6 +169,9 @@ func volumeTestCleanup(client *client.Client, config VolumeTestConfig) {
 		expectNoError(err, "Failed to delete client pod: %v", err)
 	}
 
+	By("sleeping a bit so client can stop and unmount")
+	time.Sleep(20 * time.Second)
+
 	if config.serverImage != "" {
 		err = podClient.Delete(config.prefix+"-server", nil)
 		if err != nil {
