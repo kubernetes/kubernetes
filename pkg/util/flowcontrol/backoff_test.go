@@ -14,16 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package flowcontrol
 
 import (
+	"k8s.io/kubernetes/pkg/util"
 	"testing"
 	"time"
 )
 
 func TestSlowBackoff(t *testing.T) {
 	id := "_idSlow"
-	tc := NewFakeClock(time.Now())
+	tc := util.NewFakeClock(time.Now())
 	step := time.Second
 	maxDuration := 50 * step
 
@@ -49,7 +50,7 @@ func TestSlowBackoff(t *testing.T) {
 
 func TestBackoffReset(t *testing.T) {
 	id := "_idReset"
-	tc := NewFakeClock(time.Now())
+	tc := util.NewFakeClock(time.Now())
 	step := time.Second
 	maxDuration := step * 5
 	b := NewFakeBackOff(step, maxDuration, tc)
@@ -75,7 +76,7 @@ func TestBackoffReset(t *testing.T) {
 
 func TestBackoffHightWaterMark(t *testing.T) {
 	id := "_idHiWaterMark"
-	tc := NewFakeClock(time.Now())
+	tc := util.NewFakeClock(time.Now())
 	step := time.Second
 	maxDuration := 5 * step
 	b := NewFakeBackOff(step, maxDuration, tc)
@@ -97,7 +98,7 @@ func TestBackoffHightWaterMark(t *testing.T) {
 
 func TestBackoffGC(t *testing.T) {
 	id := "_idGC"
-	tc := NewFakeClock(time.Now())
+	tc := util.NewFakeClock(time.Now())
 	step := time.Second
 	maxDuration := 5 * step
 
@@ -125,7 +126,7 @@ func TestBackoffGC(t *testing.T) {
 
 func TestIsInBackOffSinceUpdate(t *testing.T) {
 	id := "_idIsInBackOffSinceUpdate"
-	tc := NewFakeClock(time.Now())
+	tc := util.NewFakeClock(time.Now())
 	step := time.Second
 	maxDuration := 10 * step
 	b := NewFakeBackOff(step, maxDuration, tc)

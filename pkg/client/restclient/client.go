@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
@@ -105,7 +104,7 @@ func readExpBackoffConfig() BackoffManager {
 		return &NoBackoff{}
 	}
 	return &URLBackoff{
-		Backoff: util.NewBackOff(
+		Backoff: flowcontrol.NewBackOff(
 			time.Duration(backoffBaseInt)*time.Second,
 			time.Duration(backoffDurationInt)*time.Second)}
 }

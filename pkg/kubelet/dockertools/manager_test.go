@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -106,7 +107,7 @@ func newTestDockerManagerWithHTTPClientWithVersion(fakeHTTPClient *fakeHTTP, ver
 		networkPlugin,
 		&fakeRuntimeHelper{},
 		fakeHTTPClient,
-		util.NewBackOff(time.Second, 300*time.Second))
+		flowcontrol.NewBackOff(time.Second, 300*time.Second))
 
 	return dockerManager, fakeDocker
 }
@@ -586,14 +587,14 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 
 // runSyncPod is a helper function to retrieve the running pods from the fake
 // docker client and runs SyncPod for the given pod.
-func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *util.Backoff, expectErr bool) kubecontainer.PodSyncResult {
+func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *flowcontrol.Backoff, expectErr bool) kubecontainer.PodSyncResult {
 	podStatus, err := dm.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	fakeDocker.ClearCalls()
 	if backOff == nil {
-		backOff = util.NewBackOff(time.Second, time.Minute)
+		backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	}
 	// api.PodStatus is not used in SyncPod now, pass in an empty one.
 	result := dm.SyncPod(pod, api.PodStatus{}, podStatus, []api.Secret{}, backOff)
@@ -1089,7 +1090,7 @@ func TestSyncPodBackoff(t *testing.T) {
 		{130, 1, 0, startCalls, false},
 	}
 
-	backOff := util.NewBackOff(time.Second, time.Minute)
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
 	backOff.Clock = fakeClock
 	for _, c := range tests {
 		fakeDocker.SetFakeContainers(dockerContainers)

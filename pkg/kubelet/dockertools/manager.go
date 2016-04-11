@@ -50,7 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -194,7 +194,7 @@ func NewDockerManager(
 	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFSInterface,
 	cpuCFSQuota bool,
-	imageBackOff *util.Backoff,
+	imageBackOff *flowcontrol.Backoff,
 	serializeImagePulls bool,
 	enableCustomMetrics bool,
 	hairpinMode bool,
@@ -1732,7 +1732,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 }
 
 // Sync the running pod to match the specified desired pod.
-func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) (result kubecontainer.PodSyncResult) {
+func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("SyncPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1982,7 +1982,7 @@ func getUidFromUser(id string) string {
 // If all instances of a container are garbage collected, doBackOff will also return false, which means the container may be restarted before the
 // backoff deadline. However, because that won't cause error and the chance is really slim, we can just ignore it for now.
 // If a container is still in backoff, the function will return a brief backoff error and a detailed error message.
-func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podStatus *kubecontainer.PodStatus, backOff *util.Backoff) (bool, error, string) {
+func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) (bool, error, string) {
 	var cStatus *kubecontainer.ContainerStatus
 	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
 	// TODO(random-liu): Better define backoff start point; add unit and e2e test after we finalize this. (See github issue #22240)
