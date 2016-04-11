@@ -131,7 +131,11 @@ func assignGoTypeToProtoPackage(p *protobufPackage, t *types.Type, local, global
 			continue
 		}
 		field := &protoField{}
-		if err := protobufTagToField(reflect.StructTag(m.Tags).Get("protobuf"), field, m, t, p.ProtoTypeName()); err == nil && field.Type != nil {
+		tag := reflect.StructTag(m.Tags).Get("protobuf")
+		if tag == "-" {
+			continue
+		}
+		if err := protobufTagToField(tag, field, m, t, p.ProtoTypeName()); err == nil && field.Type != nil {
 			assignGoTypeToProtoPackage(p, field.Type, local, global)
 			continue
 		}
