@@ -11,7 +11,14 @@ body {
     padding: 10px;
 }
 
-#header span{
+a.suite-link {
+    font-weight: bold;
+    font-size: large;
+    display: block;
+    text-decoration: none;
+}
+
+span.total {
     display: inline-block;
     width: 60px;
     padding-left: 30px;
@@ -91,19 +98,24 @@ li.suite span {
     font-weight: bold;
 }
 
-li.suite span.time {
+li.test span.time {
     width: 50px;
     font-weight: normal;
 }
 
-li.suite span.okay {
+li.test span.okay {
     color: green;
 }
 
-li.suite span.unstable {
+li.test span.unstable {
     color: orange;
 }
 
-li.suite span.failed {
+li.test span.failed {
     color: red;
+}
+
+li.test>span {
+    display: inline-block;
+    text-align: right;
 }
