@@ -25,7 +25,6 @@ import (
 
 	"github.com/golang/groupcache/lru"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util"
@@ -173,7 +172,7 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, error) 
 
 	// create a new aggregate event
 	eventCopy := &v1.Event{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", newEvent.InvolvedObject.Name, now.UnixNano()),
 			Namespace: newEvent.Namespace,
 		},
@@ -237,7 +236,7 @@ func (e *eventLogger) eventObserve(newEvent *v1.Event) (*v1.Event, []byte, error
 		event.Name = lastObservation.name
 		event.ResourceVersion = lastObservation.resourceVersion
 		event.FirstTimestamp = lastObservation.firstTimestamp
-		event.Count = lastObservation.count + 1
+		event.Count = int32(lastObservation.count + 1)
 
 		eventCopy2 := *event
 		eventCopy2.Count = 0
@@ -252,7 +251,7 @@ func (e *eventLogger) eventObserve(newEvent *v1.Event) (*v1.Event, []byte, error
 	e.cache.Add(
 		key,
 		eventLog{
-			count:           event.Count,
+			count:           int(event.Count),
 			firstTimestamp:  event.FirstTimestamp,
 			name:            event.Name,
 			resourceVersion: event.ResourceVersion,
@@ -270,7 +269,7 @@ func (e *eventLogger) updateState(event *v1.Event) {
 	e.cache.Add(
 		key,
 		eventLog{
-			count:           event.Count,
+			count:           int(event.Count),
 			firstTimestamp:  event.FirstTimestamp,
 			name:            event.Name,
 			resourceVersion: event.ResourceVersion,
