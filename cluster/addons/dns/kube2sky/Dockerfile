@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM busybox
+FROM BASEIMAGE
 MAINTAINER Tim Hockin <thockin@google.com>
-ADD kube2sky kube2sky
-ADD kube2sky.go kube2sky.go
+ADD kube2sky /
+ADD kube2sky.go /
 ENTRYPOINT ["/kube2sky"]

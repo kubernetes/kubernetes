@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM busybox
+FROM BASEIMAGE
 MAINTAINER Tim Hockin <thockin@google.com>
-ADD skydns skydns
+ADD skydns /
 ENTRYPOINT ["/skydns"]
