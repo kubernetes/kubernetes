@@ -3,6 +3,7 @@
     description: '{description} Test owner: gmarek'
     logrotate:
         daysToKeep: 7
+    node: 'e2e'
     builders:
         - shell: |
             {provider-env}

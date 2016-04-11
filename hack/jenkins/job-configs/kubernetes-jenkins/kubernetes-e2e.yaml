@@ -15,8 +15,7 @@
     description: '{description} Test owner: {test-owner}.'
     logrotate:
         daysToKeep: 7
-    node: '{jenkins_node}'
-    jenkins_node: 'master'
+    jenkins_node: 'e2e'
     disabled: '{obj:disable_job}'
     builders:
         - shell: |
@@ -46,6 +45,7 @@
 - job-template:
     name: 'kubernetes-e2e-{suffix}'
     <<: *e2e_job_defaults
+    node: '{jenkins_node}'
     triggers:
         - reverse:
             jobs: '{trigger-job}'
@@ -107,8 +107,6 @@
                 export KUBE_ADMISSION_CONTROL="NamespaceLifecycle,InitialResources,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
         - 'gce-flaky':
             description: 'Run the flaky tests on GCE, sequentially.'
-            jenkins_node: 'e2e'
-            runner: '{dockerized-runner}'
             timeout: 180
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Flaky\] \
@@ -217,8 +215,6 @@
                 - client (kubectl): ci/latest.txt<br>
                 - cluster (k8s): ci/latest.txt<br>
                 - tests: ci/latest.txt
-            jenkins_node: 'e2e'
-            runner: '{dockerized-runner}'
             timeout: 300
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-ci-flaky"
@@ -428,6 +424,7 @@
     trigger-job: 'kubernetes-build-1.1'
     test-owner: 'Build Cop'
     branch: 'release-1.1'
+    jenkins_node: 'master'
     runner: '{old-runner-1-1}'
     post-env: ''
     suffix:
@@ -444,6 +441,7 @@
     trigger-job: 'kubernetes-build-1.1'
     test-owner: 'Build Cop'
     branch: 'release-1.1'
+    jenkins_node: 'master'
     runner: '{old-runner-1-1}'
     post-env: ''
     cron-string: 'H */6 * * *'
@@ -462,6 +460,7 @@
     trigger-job: 'kubernetes-build-1.0'
     test-owner: 'Build Cop'
     branch: 'release-1.0'
+    jenkins_node: 'master'
     runner: '{old-runner-1-0}'
     post-env: ''
     cron-string: 'H */12 * * *'
@@ -533,6 +532,8 @@
     cron-string: '@daily'
     trigger-job: ''
     timeout: 240
+    jenkins_node: 'master'
+    runner: '{legacy-runner}'
     provider-env: |
         {aws-provider-env}
         export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
@@ -613,6 +614,7 @@
 - job-template:
     name: 'kubernetes-e2e-gce-trusty-ci-{suffix}'
     <<: *e2e_job_defaults
+    node: '{jenkins_node}'
     triggers:
         - reverse:
             jobs: '{trigger-job}'
@@ -694,6 +696,7 @@
 - job-template:
     name: 'kubernetes-e2e-gce-trusty-dev-{suffix}'
     <<: *e2e_job_defaults
+    node: '{jenkins_node}'
     triggers:
         - timed: 'H H/8 * * *'
     publishers:
@@ -741,6 +744,7 @@
 - job-template:
     name: 'kubernetes-e2e-gce-trusty-{suffix}'
     <<: *e2e_job_defaults
+    node: '{jenkins_node}'
     triggers:
         # Trusty beta and stable images are built once per day.
         - timed: '@daily'
@@ -762,6 +766,7 @@
     test-owner: 'wonderfly@google.com'
     branch: 'release-1.1'
     emails: 'wonderfly@google.com,qzheng@google.com'
+    jenkins_node: 'master'
     runner: '{old-runner-1-1}'
     post-env: ''
     suffix:
