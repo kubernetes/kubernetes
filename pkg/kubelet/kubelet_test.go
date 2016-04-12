@@ -2366,7 +2366,14 @@ func TestHandlePortConflicts(t *testing.T) {
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	spec := api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
+	kl.nodeLister = testNodeLister{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: kl.nodeName}},
+	}}
+	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: kl.nodeName}},
+	}}
+
+	spec := api.PodSpec{NodeName: kl.nodeName, Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
 	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -2389,16 +2396,89 @@ func TestHandlePortConflicts(t *testing.T) {
 	pods[1].CreationTimestamp = unversioned.NewTime(time.Now())
 	pods[0].CreationTimestamp = unversioned.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
-	conflictedPod := pods[0]
+	notfittingPod := pods[0]
+	fittingPod := pods[1]
 
 	kl.HandlePodAdditions(pods)
 	// Check pod status stored in the status map.
-	status, found := kl.statusManager.GetPodStatus(conflictedPod.UID)
+	// notfittingPod should be Failed
+	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
 	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", conflictedPod.UID)
+		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+	}
+	// fittingPod should be Pending
+	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
+	if !found {
+		t.Fatalf("status of pod %q is not found in the status map", fittingPod.UID)
+	}
+	if status.Phase != api.PodPending {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
+	}
+}
+
+// Tests that we handle host name conflicts correctly by setting the failed status in status map.
+func TestHandleHostNameConflicts(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kl := testKubelet.kubelet
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
+	kl.nodeLister = testNodeLister{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"}},
+	}}
+	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"}},
+	}}
+
+	pods := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "123456789",
+				Name:      "notfittingpod",
+				Namespace: "foo",
+			},
+			Spec: api.PodSpec{
+				// default NodeName in test is 127.0.0.1
+				NodeName: "127.0.0.2",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "987654321",
+				Name:      "fittingpod",
+				Namespace: "foo",
+			},
+			Spec: api.PodSpec{
+				// default NodeName in test is 127.0.0.1
+				NodeName: "127.0.0.1",
+			},
+		},
+	}
+
+	notfittingPod := pods[0]
+	fittingPod := pods[1]
+
+	kl.HandlePodAdditions(pods)
+	// Check pod status stored in the status map.
+	// notfittingPod should be Failed
+	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
+	if !found {
+		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
+	}
+	if status.Phase != api.PodFailed {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+	}
+	// fittingPod should be Pending
+	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
+	if !found {
+		t.Fatalf("status of pod %q is not found in the status map", fittingPod.UID)
+	}
+	if status.Phase != api.PodPending {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
 	}
 }
 
@@ -2435,9 +2515,11 @@ func TestHandleNodeSelector(t *testing.T) {
 	}
 	// The first pod should be rejected.
 	notfittingPod := pods[0]
+	fittingPod := pods[1]
 
 	kl.HandlePodAdditions(pods)
 	// Check pod status stored in the status map.
+	// notfittingPod should be Failed
 	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
 	if !found {
 		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
@@ -2445,21 +2527,46 @@ func TestHandleNodeSelector(t *testing.T) {
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
 	}
+	// fittingPod should be Pending
+	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
+	if !found {
+		t.Fatalf("status of pod %q is not found in the status map", fittingPod.UID)
+	}
+	if status.Phase != api.PodPending {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
+	}
 }
 
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
 func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kl := testKubelet.kubelet
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{MemoryCapacity: 100}, nil)
+	kl.nodeLister = testNodeLister{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+			Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+				api.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+			}}},
+	}}
+	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+			Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+				api.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+			}}},
+	}}
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	spec := api.PodSpec{Containers: []api.Container{{Resources: api.ResourceRequirements{
-		Requests: api.ResourceList{
-			"memory": resource.MustParse("90"),
-		},
-	}}}}
+	spec := api.PodSpec{NodeName: kl.nodeName,
+		Containers: []api.Container{{Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				"memory": resource.MustParse("90"),
+			},
+		}}}}
 	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -2483,15 +2590,25 @@ func TestHandleMemExceeded(t *testing.T) {
 	pods[0].CreationTimestamp = unversioned.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
 	notfittingPod := pods[0]
+	fittingPod := pods[1]
 
 	kl.HandlePodAdditions(pods)
 	// Check pod status stored in the status map.
+	// notfittingPod should be Failed
 	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
 	if !found {
 		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+	}
+	// fittingPod should be Pending
+	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
+	if !found {
+		t.Fatalf("status of pod %q is not found in the status map", fittingPod.UID)
+	}
+	if status.Phase != api.PodPending {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
 	}
 }
 
@@ -2501,6 +2618,12 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	versionInfo := &cadvisorapi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	testKubelet.fakeCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
 	kl := testKubelet.kubelet
 	pods := []*api.Pod{
