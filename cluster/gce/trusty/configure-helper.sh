@@ -62,12 +62,12 @@ kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: "${KUBELET_CERT}"
-    client-key-data: "${KUBELET_KEY}"
+    client-certificate-data: ${KUBELET_CERT}
+    client-key-data: ${KUBELET_KEY}
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: "${KUBELET_CA_CERT}"
+    certificate-authority-data: ${KUBELET_CA_CERT}
 contexts:
 - context:
     cluster: local
@@ -85,11 +85,11 @@ kind: Config
 users:
 - name: kube-proxy
   user:
-    token: "${KUBE_PROXY_TOKEN}"
+    token: ${KUBE_PROXY_TOKEN}
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: "${CA_CERT}"
+    certificate-authority-data: ${CA_CERT}
 contexts:
 - context:
     cluster: local
@@ -137,7 +137,7 @@ install_additional_packages() {
 # Assembles kubelet command line flags.
 # It should be called by master and nodes before running kubelet process. The caller
 # needs to source the config file /etc/kube-env. This function sets the following
-# variable that will be used in kubelet command line.
+# variable that will be used as the kubelet command line flags
 #   KUBELET_CMD_FLAGS
 assemble_kubelet_flags() {
   KUBELET_CMD_FLAGS="--v=2"
@@ -150,23 +150,25 @@ assemble_kubelet_flags() {
   if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} ${KUBELET_TEST_ARGS}"
   fi
-  if [ "${KUBERNETES_MASTER:-}" = "true" ] && \
-     [ ! -z "${KUBELET_APISERVER:-}" ] && \
-     [ ! -z "${KUBELET_CERT:-}" ] && \
-     [ ! -z "${KUBELET_KEY:-}" ]; then
-    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --api-servers=https://${KUBELET_APISERVER}"
-    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --register-schedulable=false --reconcile-cidr=false"
-    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --pod-cidr=10.123.45.0/30"
+  if [ "${KUBERNETES_MASTER:-}" = "true" ]; then
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --enable-debugging-handlers=false --hairpin-mode=none"
+    if [ ! -z "${KUBELET_APISERVER:-}" ] && \
+       [ ! -z "${KUBELET_CERT:-}" ] && \
+       [ ! -z "${KUBELET_KEY:-}" ]; then
+      KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --api-servers=https://${KUBELET_APISERVER} --register-schedulable=false --reconcile-cidr=false --pod-cidr=10.123.45.0/30"
+    else
+      KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --pod-cidr=${MASTER_IP_RANGE}"
+    fi
+  else # For nodes
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --enable-debugging-handlers=true --api-servers=https://${KUBERNETES_MASTER_NAME}"
+    if [ "${HAIRPIN_MODE:-}" = "promiscuous-bridge" ] || \
+       [ "${HAIRPIN_MODE:-}" = "hairpin-veth" ] || \
+       [ "${HAIRPIN_MODE:-}" = "none" ]; then
+      KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --hairpin-mode=${HAIRPIN_MODE}"
+    fi
   fi
   if [ "${ENABLE_MANIFEST_URL:-}" = "true" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --manifest-url=${MANIFEST_URL} --manifest-url-header=${MANIFEST_URL_HEADER}"
-  fi
-  if [ "${KUBERNETES_MASTER:-}" = "true" ]; then
-    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --hairpin-mode=none"
-  elif [ "${HAIRPIN_MODE:-}" = "promiscuous-bridge" ] || \
-       [ "${HAIRPIN_MODE:-}" = "hairpin-veth" ] || \
-       [ "${HAIRPIN_MODE:-}" = "none" ]; then
-    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --hairpin-mode=${HAIRPIN_MODE}"
   fi
   if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --enable-custom-metrics=${ENABLE_CUSTOM_METRICS}"
@@ -174,6 +176,11 @@ assemble_kubelet_flags() {
   if [ -n "${NODE_LABELS:-}" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --node-labels=${NODE_LABELS}"
   fi
+  if [ "${ALLOCATE_NODE_CIDRS:-}" = "true" ]; then
+     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --configure-cbr0=${ALLOCATE_NODE_CIDRS}"
+  fi
+  # Add the unconditional flags
+  KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --cloud-provider=gce --allow-privileged=true --cgroup-root=/ --system-cgroups=/system --kubelet-cgroups=/kubelet --babysit-daemons=true --config=/etc/kubernetes/manifests --cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
 }
 
 restart_docker_daemon() {
@@ -315,10 +322,15 @@ create_master_auth() {
   if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
     cat <<EOF >/etc/gce.conf
 [global]
-token-url = "${TOKEN_URL}"
-token-body = "${TOKEN_BODY}"
-project-id = "${PROJECT_ID}"
-network-name = "${NODE_NETWORK}"
+token-url = ${TOKEN_URL}
+token-body = ${TOKEN_BODY}
+project-id = ${PROJECT_ID}
+network-name = ${NODE_NETWORK}
+EOF
+  fi
+  if [ -n "${MULTIZONE:-}" ]; then
+    cat <<EOF >>/etc/gce.conf
+multizone = ${MULTIZONE}
 EOF
   fi
 }
