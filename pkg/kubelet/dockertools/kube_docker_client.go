@@ -24,7 +24,8 @@ import (
 	"io/ioutil"
 	"strconv"
 
-	"github.com/docker/docker/pkg/stdcopy"
+	dockermessage "github.com/docker/docker/pkg/jsonmessage"
+	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -228,8 +229,21 @@ func (d *kubeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 	}
 	defer resp.Close()
 	// TODO(random-liu): Use the image pulling progress information.
-	_, err = io.Copy(ioutil.Discard, resp)
-	return err
+	decoder := json.NewDecoder(resp)
+	for {
+		var msg dockermessage.JSONMessage
+		err := decoder.Decode(&msg)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if msg.Error != nil {
+			return msg.Error
+		}
+	}
+	return nil
 }
 
 func (d *kubeDockerClient) RemoveImage(image string) error {
@@ -353,7 +367,7 @@ func (d *kubeDockerClient) redirectResponseToOutputStream(tty bool, outputStream
 	if tty {
 		_, err = io.Copy(outputStream, resp)
 	} else {
-		_, err = stdcopy.StdCopy(outputStream, errorStream, resp)
+		_, err = dockerstdcopy.StdCopy(outputStream, errorStream, resp)
 	}
 	return err
 }
