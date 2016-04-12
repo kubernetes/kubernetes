@@ -17,11 +17,11 @@ limitations under the License.
 package strategicpatch
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
 
+	"k8s.io/kubernetes/pkg/util/json"
 	forkedjson "k8s.io/kubernetes/third_party/forked/json"
 
 	"github.com/davecgh/go-spew/spew"
