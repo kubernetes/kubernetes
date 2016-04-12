@@ -7,7 +7,6 @@ package restful
 import (
 	"errors"
 	"net/http"
-	"strings"
 )
 
 // DEPRECATED, use DefaultResponseContentType(mime)
@@ -68,38 +67,39 @@ func (r *Response) SetRequestAccepts(mime string) {
 // can write according to what the request wants (Accept) and what the Route can produce or what the restful defaults say.
 // If called before WriteEntity and WriteHeader then a false return value can be used to write a 406: Not Acceptable.
 func (r *Response) EntityWriter() (EntityReaderWriter, bool) {
-	for _, qualifiedMime := range strings.Split(r.requestAccept, ",") {
-		mime := strings.Trim(strings.Split(qualifiedMime, ";")[0], " ")
-		if 0 == len(mime) || mime == "*/*" {
-			for _, each := range r.routeProduces {
-				if MIME_JSON == each {
-					return entityAccessRegistry.AccessorAt(MIME_JSON)
-				}
-				if MIME_XML == each {
-					return entityAccessRegistry.AccessorAt(MIME_XML)
+	sorted := sortedMimes(r.requestAccept)
+	for _, eachAccept := range sorted {
+		for _, eachProduce := range r.routeProduces {
+			if eachProduce == eachAccept.media {
+				if w, ok := entityAccessRegistry.accessorAt(eachAccept.media); ok {
+					return w, true
 				}
 			}
-		} else { // mime is not blank; see if we have a match in Produces
+		}
+		if eachAccept.media == "*/*" {
 			for _, each := range r.routeProduces {
-				if mime == each {
-					if MIME_JSON == each {
-						return entityAccessRegistry.AccessorAt(MIME_JSON)
-					}
-					if MIME_XML == each {
-						return entityAccessRegistry.AccessorAt(MIME_XML)
-					}
+				if w, ok := entityAccessRegistry.accessorAt(each); ok {
+					return w, true
 				}
 			}
 		}
 	}
-	writer, ok := entityAccessRegistry.AccessorAt(r.requestAccept)
+	// if requestAccept is empty
+	writer, ok := entityAccessRegistry.accessorAt(r.requestAccept)
 	if !ok {
 		// if not registered then fallback to the defaults (if set)
 		if DefaultResponseMimeType == MIME_JSON {
-			return entityAccessRegistry.AccessorAt(MIME_JSON)
+			return entityAccessRegistry.accessorAt(MIME_JSON)
 		}
 		if DefaultResponseMimeType == MIME_XML {
-			return entityAccessRegistry.AccessorAt(MIME_XML)
+			return entityAccessRegistry.accessorAt(MIME_XML)
+		}
+		// Fallback to whatever the route says it can produce.
+		// https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
+		for _, each := range r.routeProduces {
+			if w, ok := entityAccessRegistry.accessorAt(each); ok {
+				return w, true
+			}
 		}
 		if trace {
 			traceLogger.Printf("no registered EntityReaderWriter found for %s", r.requestAccept)
@@ -182,6 +182,15 @@ func (r *Response) WriteErrorString(httpStatus int, errorReason string) error {
 		return err
 	}
 	return nil
+}
+
+// Flush implements http.Flusher interface, which sends any buffered data to the client.
+func (r *Response) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	} else if trace {
+		traceLogger.Printf("ResponseWriter %v doesn't support Flush", r)
+	}
 }
 
 // WriteHeader is overridden to remember the Status Code that has been written.
