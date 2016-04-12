@@ -31,7 +31,7 @@ generated_files=($(
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
-        -o -wholename '*/Godeps/*' \
+        -o -wholename '*/vendor/*' \
       \) -prune \
     \) -name '*.generated.go'))
 
@@ -83,7 +83,7 @@ done
 index=(${result})
 
 CODECGEN="${_tmpdir}/codecgen_binary"
-godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
+go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
 # Generate files in the dependency order.
 for current in ${index[@]}; do

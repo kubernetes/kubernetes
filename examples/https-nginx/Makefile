@@ -25,7 +25,7 @@ keys:
 	openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout $(KEY) -out $(CERT) -subj "/CN=nginxsvc/O=nginxsvc"
 
 secret:
-	godep go run make_secret.go -crt $(CERT) -key $(KEY) > $(SECRET)
+	go run make_secret.go -crt $(CERT) -key $(KEY) > $(SECRET)
 
 container:
 	docker build -t $(PREFIX):$(TAG) .

@@ -30,7 +30,7 @@ Documentation for other releases can be found at
 # Testing guide
 
 This assumes you already read the [development guide](development.md) to
-install go, godeps, and configure your git client.
+install go and configure your git client.
 
 Before sending pull requests you should at least make sure your changes have
 passed both unit and integration tests.
@@ -65,10 +65,10 @@ hack/test-go.sh  # Run all unit tests.
 cd kubernetes
 
 # Run all tests under pkg (requires client to be in $GOPATH/src/k8s.io)
-godep go test ./pkg/...
+go test ./pkg/...
 
 # Run all tests in the pkg/api (but not subpackages)
-godep go test ./pkg/api
+go test ./pkg/api
 ```
 
 ### Stress running unit tests
@@ -116,7 +116,7 @@ To run benchmark tests, you'll typically use something like:
 
 ```sh
 cd kubernetes
-godep go test ./pkg/apiserver -benchmem -run=XXX -bench=BenchmarkWatch
+go test ./pkg/apiserver -benchmem -run=XXX -bench=BenchmarkWatch
 ```
 
 This will do the following:

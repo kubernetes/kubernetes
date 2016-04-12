@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package main defines the protoc-gen-gogo binary we use to generate our proto go files,
-// as well as takes dependencies on the correct gogo/protobuf packages for godeps.
+// as well as takes dependencies on the correct gogo/protobuf packages.
 package main
 
 import (

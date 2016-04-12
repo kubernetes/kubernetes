@@ -82,12 +82,12 @@ See [setup_host.sh](../../test/e2e_node/environment/setup_host.sh)
   * **Requires password-less ssh and sudo access**
     * Make sure this works - e.g. `ssh <hostname> -- sudo echo "ok"`
     * If ssh flags are required (e.g. `-i`), they can be used and passed to the tests with `--ssh-options`
-  * `godep go run test/e2e_node/runner/run_e2e.go --logtostderr --hosts <comma separated hosts>`
+  * `go run test/e2e_node/runner/run_e2e.go --logtostderr --hosts <comma separated hosts>`
     * **Must be run from kubernetes root**
     * requires (go get): `github.com/tools/godep`, `github.com/onsi/gomega`, `github.com/onsi/ginkgo/ginkgo`
 
 3. Alternatively, manually build and copy `e2e_node_test.tar.gz` to a remote host
-  * Build the tar.gz `godep go run test/e2e_node/runner/run_e2e.go --logtostderr --build-only`
+  * Build the tar.gz `go run test/e2e_node/runner/run_e2e.go --logtostderr --build-only`
     * requires (go get): `github.com/tools/godep`, `github.com/onsi/gomega`, `github.com/onsi/ginkgo/ginkgo`
   * Copy `e2e_node_test.tar.gz` to the remote host
   * Extract the archive on the remote host `tar -xzvf e2e_node_test.tar.gz`

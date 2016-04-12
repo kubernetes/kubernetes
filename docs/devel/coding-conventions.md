@@ -78,7 +78,7 @@ Directory and file conventions
     - Examples should also illustrate
       [best practices for configuration and using the system](../user-guide/config-best-practices.md)
   - Third-party code
-    - Go code for normal third-party dependencies is managed using [Godeps](https://github.com/tools/godep)
+    - Go code for normal third-party dependencies is managed using [glide](https://github.com/Masterminds/glide)
     - Other third-party code belongs in `/third_party`
       - forked third party Go code goes in `/third_party/forked`
       - forked _golang stdlib_ code goes in `/third_party/golang`

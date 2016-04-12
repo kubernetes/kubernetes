@@ -43,5 +43,5 @@ gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 PATH="${KUBE_ROOT}/_output/local/go/bin:${PATH}" \
   "${gotoprotobuf}" \
   --conditional="proto" \
-  --proto-import="${KUBE_ROOT}/Godeps/_workspace/src" \
+  --proto-import="${KUBE_ROOT}/vendor" \
   --proto-import="${KUBE_ROOT}/third_party/protobuf"

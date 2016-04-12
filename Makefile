@@ -21,7 +21,6 @@
 #   clean: Clean up.
 
 OUT_DIR = _output
-GODEPS_PKG_DIR = Godeps/_workspace/pkg
 
 KUBE_GOFLAGS = $(GOFLAGS)
 export KUBE_GOFLAGS
@@ -49,7 +48,7 @@ all:
 # Runs all the presubmission verifications.
 #
 # Args:
-#   BRANCH: Branch to be passed to hack/verify-godeps.sh script.
+#   BRANCH: Branch to be passed to hack/verify-vendored-deps.sh script.
 #
 # Example:
 #   make verify
@@ -111,7 +110,7 @@ test_e2e_node:
 clean:
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
-	rm -rf $(GODEPS_PKG_DIR)
+	rm -rf Godeps # old stuff, delete this sometime after v1.3
 .PHONY: clean
 
 # Run 'go vet'.

@@ -45,8 +45,8 @@ endif
 all: container
 
 kube2sky: kube2sky.go
-	# Only build kube2sky. This requires go and godep in PATH
-	CGO_ENABLED=0 GOARCH=$(ARCH) GOARM=$(GOARM) godep go build -a -installsuffix cgo --ldflags '-w' ./kube2sky.go
+	# Only build kube2sky. This requires go in PATH
+	CGO_ENABLED=0 GOARCH=$(ARCH) GOARM=$(GOARM) go build -a -installsuffix cgo --ldflags '-w' ./kube2sky.go
 
 container:
 	# Copy the content in this dir to the temp dir
@@ -58,8 +58,7 @@ container:
 		-v $(KUBE_ROOT):/go/src/k8s.io/kubernetes \
 		-v $(TEMP_DIR):/go/src/k8s.io/kubernetes/cluster/addons/dns/kube2sky \
 		golang:$(GOLANG_VERSION) /bin/bash -c \
-		"go get github.com/tools/godep \
-		&& make -C /go/src/k8s.io/kubernetes/cluster/addons/dns/kube2sky kube2sky ARCH=$(ARCH)"
+		"make -C /go/src/k8s.io/kubernetes/cluster/addons/dns/kube2sky kube2sky ARCH=$(ARCH)"
 
 	# Replace BASEIMAGE with the real base image
 	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
@@ -80,7 +79,7 @@ clean:
 	rm -f kube2sky
 
 test: clean
-	godep go test -v --vmodule=*=4
+	go test -v --vmodule=*=4
 
 
 .PHONY: all kube2sky container push clean test

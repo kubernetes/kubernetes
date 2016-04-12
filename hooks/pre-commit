@@ -16,11 +16,11 @@ else
 fi
 echo "${reset}"
 
-# Check if changes to Godeps are reproducible...
-files=($(git diff --cached --name-only --diff-filter ACM | grep "Godeps"))
+# Check if changes to vendored deps are reproducible...
+files=($(git diff --cached --name-only --diff-filter ACM glide.*))
 if [[ "${#files[@]}" -ne 0 ]]; then
-  echo -ne "Check if changes to Godeps are reproducible (this is pretty slow)..."
-  if ! OUT=$("hack/verify-godeps.sh" 2>&1); then
+  echo -ne "Check if changes to vendored deps are reproducible (this is pretty slow)..."
+  if ! OUT=$("hack/verify-vendored-deps.sh" 2>&1); then
     echo
     echo "${red}${OUT}"
     exit_code=1
@@ -29,7 +29,7 @@ if [[ "${#files[@]}" -ne 0 ]]; then
   fi
   echo "${reset}"
 
-  echo -ne "Check if Godep licesnses are up to date..."
+  echo -ne "Check if Godep licenses are up to date..."
   if ! OUT=$("hack/verify-godep-licenses.sh" 2>&1); then
     echo
     echo "${red}${OUT}"
@@ -42,7 +42,7 @@ fi
 
 echo -ne "Checking for files that need gofmt... "
 files_need_gofmt=()
-files=($(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "third_party" -e "Godeps"))
+files=($(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "^third_party" -e "^vendor"))
 for file in "${files[@]}"; do
   # Check for files that fail gofmt.
   diff="$(git show ":${file}" | gofmt -s -d 2>&1)"
