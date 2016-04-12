@@ -65,6 +65,9 @@ func paramNames() []GeneratorParam {
 		{"load-balancer-ip", false},
 		{"type", false},
 		{"protocol", false},
+		// protocols will be used to keep port-protocol mapping derived from
+		// exposed object
+		{"protocols", false},
 		{"container-port", false}, // alias of target-port
 		{"target-port", false},
 		{"port-name", false},
@@ -112,6 +115,15 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		// Leave the port unnamed.
 		servicePortName = ""
 	}
+
+	protocolsString, found := params["protocols"]
+	var portProtocolMap map[string]string
+	if found && len(protocolsString) > 0 {
+		portProtocolMap, err = ParseProtocols(protocolsString)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// ports takes precedence over port since it will be
 	// specified only when the user hasn't specified a port
 	// via --port and the exposed object has multiple ports.
@@ -122,6 +134,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 			return nil, fmt.Errorf("'port' is a required parameter.")
 		}
 	}
+
 	portStringSlice := strings.Split(portString, ",")
 	for i, stillPortString := range portStringSlice {
 		port, err := strconv.Atoi(stillPortString)
@@ -134,10 +147,14 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		if len(portStringSlice) > 1 {
 			name = fmt.Sprintf("port-%d", i+1)
 		}
+		protocol := params["protocol"]
+		if exposeProtocol, found := portProtocolMap[stillPortString]; found {
+			protocol = exposeProtocol
+		}
 		ports = append(ports, api.ServicePort{
 			Name:     name,
 			Port:     port,
-			Protocol: api.Protocol(params["protocol"]),
+			Protocol: api.Protocol(protocol),
 		})
 	}
 

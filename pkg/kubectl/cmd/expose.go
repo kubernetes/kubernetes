@@ -182,6 +182,19 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			params["ports"] = strings.Join(ports, ",")
 		}
 	}
+
+	// Always try to derive protocols from the exposed object, as
+	// user may specify UDP protocol
+	if _, found := params["protocol"]; found {
+		protocolsMap, err := f.ProtocolsForObject(inputObject)
+		if err != nil {
+			return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find protocol via introspection: %s", err))
+		}
+		if protocols := kubectl.MakeProtocols(protocolsMap); !kubectl.IsZero(protocols) {
+			params["protocols"] = protocols
+		}
+	}
+
 	if kubectl.IsZero(params["labels"]) {
 		labels, err := f.LabelsForObject(inputObject)
 		if err != nil {
