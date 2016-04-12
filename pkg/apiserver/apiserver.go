@@ -139,9 +139,7 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
 	}
 	apiResources, registrationErrors := installer.Install(ws)
-	// TODO: This panics when the route is the last one in the webservice.
-	// Best effort due to this panic: https://github.com/emicklei/go-restful/issues/276
-	ws.RemoveRoute(ws.RootPath() + "/", "GET")
+	ws.RemoveRoute(ws.RootPath()+"/", "GET")
 	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, apiResources)
 	return utilerrors.NewAggregate(registrationErrors)
 }
@@ -355,6 +353,8 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 		ss = StripVersionNegotiatedSerializer{s}
 	}
 	resourceHandler := SupportedResourcesHandler(ss, groupVersion, apiResources)
+	// Setting Dynamic Routes to true so that we can add, modify and delete new resources to the same webservice
+	// For example, a webservice with group example.com can be modified to add foos and bars and also delete foosdummy.
 	ws.SetDynamicRoutes(true)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").

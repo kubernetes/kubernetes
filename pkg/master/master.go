@@ -95,7 +95,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
-	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
@@ -109,6 +109,7 @@ import (
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
 
+	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
@@ -149,7 +150,7 @@ type Master struct {
 
 	// storage for third party objects
 	thirdPartyStorage storage.Interface
-	// map from api path to a tuple of (storage for the objects, APIGroup)
+	// map from api path to a tuple of (storage for the objects, API Path for the Thirdparty resource)
 	thirdPartyResources map[string]thirdPartyEntry
 	// protects the map
 	thirdPartyResourcesLock sync.RWMutex
@@ -666,7 +667,7 @@ func (m *Master) HasThirdPartyResource(rsrc *extensions.ThirdPartyResource) (boo
 	// Using Master object as a cache to check if the group and kind have already been installed
 	for _, service := range services {
 		if service.RootPath() == path {
-			_, ok := m.thirdPartyResources[path+"/"+strings.ToLower(kind)+"s"]
+			_, ok := m.thirdPartyResources[path+"/"+getResourceNameFromKind(kind)]
 			if ok {
 				return true, nil
 			}
@@ -684,22 +685,42 @@ func (m *Master) removeThirdPartyStorage(path string) error {
 			return err
 		}
 		delete(m.thirdPartyResources, path)
-		m.RemoveAPIGroupForDiscovery(getThirdPartyGroupName(path))
 	}
 	return nil
 }
 
-// RemoveThirdPartyResource removes all resources matching `path`.  Also deletes any stored data
+// RemoveThirdPartyResource unregisters the route webservice corresponding to the APIGroup.
+// If it is the only resource for that webservice, it also deletes the webservice from the container.
 func (m *Master) RemoveThirdPartyResource(path string) error {
+	group, kind := getThirdPartyGroupResourceName(path)
+	thirdPartyResourcePath := makeThirdPartyPath(group)
 	if err := m.removeThirdPartyStorage(path); err != nil {
 		return err
 	}
-
 	services := m.HandlerContainer.RegisteredWebServices()
 	for ix := range services {
-		root := services[ix].RootPath()
-		if root == path || strings.HasPrefix(root, path+"/") {
-			m.HandlerContainer.Remove(services[ix])
+		// Determine the webservice service corresponds to the thirdpartyresource being deleted
+		if strings.HasPrefix(services[ix].RootPath(), thirdPartyResourcePath) {
+			//  Delete the route corresponding to the resource from the webservice
+			m.removeAllThirdPartyResourceRoutes(services[ix], kind)
+		}
+	}
+
+	len := 0
+	for k := range m.thirdPartyResources {
+		if strings.HasPrefix(k, thirdPartyResourcePath) {
+			len = len + 1
+		}
+	}
+
+	// Remove the APIGroup if there are no more thirdparty resources registered under the Group
+	if len == 0 {
+		m.RemoveAPIGroupForDiscovery(group)
+		webservices := m.HandlerContainer.RegisteredWebServices()
+		for _, ws := range webservices {
+			if strings.HasPrefix(ws.RootPath(), thirdPartyResourcePath) {
+				m.HandlerContainer.Remove(ws)
+			}
 		}
 	}
 	return nil
@@ -722,6 +743,17 @@ func (m *Master) removeAllThirdPartyResources(registry *thirdpartyresourcedataet
 		}
 	}
 	return nil
+}
+
+// removeAllThirdPartyResourceRoutes gets all routes registered to the webservice and unregisters the route
+// corresponding to the "kind" resource
+func (m *Master) removeAllThirdPartyResourceRoutes(ws *restful.WebService, kind string) {
+	routes := ws.Routes()
+	for _, route := range routes {
+		if strings.Contains(route.Path, getResourceNameFromKind(kind)) {
+			ws.RemoveRoute(route.Path, route.Method)
+		}
+	}
 }
 
 // ListThirdPartyResources lists all currently installed third party resources
@@ -781,10 +813,8 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 			glog.Fatalf("Unable to setup thirdparty api: %v", err)
 		}
 		apiserver.AddGroupWebService(api.Codecs, m.HandlerContainer, path, apiGroup)
-		apiserver.InstallServiceErrorHandler(api.Codecs, m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
-
 	}
-	m.addThirdPartyResourceStorage(path, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
+	m.addThirdPartyResourceStorage(path+"/"+getResourceNameFromKind(kind), thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	apiserver.InstallServiceErrorHandler(api.Codecs, m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
 	return nil
 }
@@ -813,8 +843,8 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 	// In this case we have to add all the storages to this APIGroupVersion
 	for k := range m.thirdPartyResources {
 		if strings.HasPrefix(k, thirdPartyAPIPath) {
-			kind := strings.ToLower(m.thirdPartyResources[k].storage.Kind())
-			storage[kind + "s"] = m.thirdPartyResources[k].storage
+			resourceName := getResourceNameFromKind(strings.ToLower(m.thirdPartyResources[k].storage.Kind()))
+			storage[resourceName] = m.thirdPartyResources[k].storage
 		}
 	}
 	optionsExternalVersion := registered.GroupOrDie(api.GroupName).GroupVersion
