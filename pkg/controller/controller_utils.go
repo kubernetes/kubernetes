@@ -26,11 +26,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset_release_1_2 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
-	"k8s.io/kubernetes/pkg/client/record"
+	record "k8s.io/kubernetes/pkg/client/record/v1"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -348,9 +349,9 @@ func NewUIDTrackingControllerExpectations(ce ControllerExpectationsInterface) *U
 // created as an interface to allow testing.
 type PodControlInterface interface {
 	// CreatePods creates new pods according to the spec.
-	CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error
+	CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error
 	// CreatePodsOnNode creates a new pod accorting to the spec on the specified node.
-	CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error
+	CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(namespace string, podID string, object runtime.Object) error
 }
@@ -363,7 +364,7 @@ type RealPodControl struct {
 
 var _ PodControlInterface = &RealPodControl{}
 
-func getPodsLabelSet(template *api.PodTemplateSpec) labels.Set {
+func getPodsLabelSet(template *v1.PodTemplateSpec) labels.Set {
 	desiredLabels := make(labels.Set)
 	for k, v := range template.Labels {
 		desiredLabels[k] = v
@@ -371,12 +372,12 @@ func getPodsLabelSet(template *api.PodTemplateSpec) labels.Set {
 	return desiredLabels
 }
 
-func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) (labels.Set, error) {
+func getPodsAnnotationSet(template *v1.PodTemplateSpec, object runtime.Object) (labels.Set, error) {
 	desiredAnnotations := make(labels.Set)
 	for k, v := range template.Annotations {
 		desiredAnnotations[k] = v
 	}
-	createdByRef, err := api.GetReference(object)
+	createdByRef, err := v1.GetReference(object)
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
 	}
@@ -386,7 +387,7 @@ func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) 
 	//   We need to consistently handle this case of annotation versioning.
 	codec := api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"})
 
-	createdByRefJson, err := runtime.Encode(codec, &api.SerializedReference{
+	createdByRefJson, err := runtime.Encode(codec, &v1.SerializedReference{
 		Reference: *createdByRef,
 	})
 	if err != nil {
@@ -405,15 +406,15 @@ func getPodsPrefix(controllerName string) string {
 	return prefix
 }
 
-func (r RealPodControl) CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+func (r RealPodControl) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
 	return r.createPods("", namespace, template, object)
 }
 
-func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
 	return r.createPods(nodeName, namespace, template, object)
 }
 
-func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
 	desiredLabels := getPodsLabelSet(template)
 	desiredAnnotations, err := getPodsAnnotationSet(template, object)
 	if err != nil {
@@ -425,8 +426,8 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 	}
 	prefix := getPodsPrefix(accessor.GetName())
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Labels:       desiredLabels,
 			Annotations:  desiredAnnotations,
 			GenerateName: prefix,
@@ -442,11 +443,11 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 		return fmt.Errorf("unable to create pods, no labels")
 	}
 	if newPod, err := r.KubeClient.Core().Pods(namespace).Create(pod); err != nil {
-		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
+		r.Recorder.Eventf(object, v1.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create pods: %v", err)
 	} else {
 		glog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
-		r.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulCreate", "Created pod: %v", newPod.Name)
+		r.Recorder.Eventf(object, v1.EventTypeNormal, "SuccessfulCreate", "Created pod: %v", newPod.Name)
 	}
 	return nil
 }
@@ -457,25 +458,25 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
 	if err := r.KubeClient.Core().Pods(namespace).Delete(podID, nil); err != nil {
-		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedDelete", "Error deleting: %v", err)
+		r.Recorder.Eventf(object, v1.EventTypeWarning, "FailedDelete", "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
 	} else {
 		glog.V(4).Infof("Controller %v deleted pod %v", accessor.GetName(), podID)
-		r.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulDelete", "Deleted pod: %v", podID)
+		r.Recorder.Eventf(object, v1.EventTypeNormal, "SuccessfulDelete", "Deleted pod: %v", podID)
 	}
 	return nil
 }
 
 type FakePodControl struct {
 	sync.Mutex
-	Templates     []api.PodTemplateSpec
+	Templates     []v1.PodTemplateSpec
 	DeletePodName []string
 	Err           error
 }
 
 var _ PodControlInterface = &FakePodControl{}
 
-func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
+func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
 	if f.Err != nil {
@@ -485,7 +486,7 @@ func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec,
 	return nil
 }
 
-func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
 	if f.Err != nil {
@@ -509,7 +510,7 @@ func (f *FakePodControl) Clear() {
 	f.Lock()
 	defer f.Unlock()
 	f.DeletePodName = []string{}
-	f.Templates = []api.PodTemplateSpec{}
+	f.Templates = []v1.PodTemplateSpec{}
 }
 
 // ActivePods type allows custom sorting of pods so a controller can pick the best ones to delete.
