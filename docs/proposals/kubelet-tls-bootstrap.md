@@ -72,55 +72,80 @@ provisioning script.
 We introduce a new API object to represent PKCS#10 certificate signing
 requests. It will be accessible under:
 
-`/api/vX/certificaterequests/mycsr`
+`/apis/certificates/v1beta1/signingrequests/mycsr`
 
 It will have the following structure:
 
 ```go
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
-        api.TypeMeta         `json:",inline"`
-        api.ObjectMeta       `json:"metadata,omitempty"`
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata,omitempty"`
 
-        // Specifies the behavior of the CSR
-        Spec CertificateSigningRequestSpec
+	// The certificate request itself and any additonal information.
+	Spec CertificateSigningRequestSpec `json:"spec,omitempty"`
 
-        // Most recently observed status of the CSR
-        Status CertificateSigningRequestStatus
+	// Derived information about the request.
+	Status CertificateSigningRequestStatus `json:"status,omitempty"`
+
+	// The current approval state of the request.
+	Approve CertificateSigningRequestApproval `json:"approve,omitempty"`
 }
 
+// This information is immutable after the request is created.
 type CertificateSigningRequestSpec struct {
-        // Raw PKCS#10 CSR data
-        CertificateRequest []byte
+	// Raw PKCS#10 CSR data
+	CertificateRequest string `json:"request"`
 
-        // Fingerprint of the public key that signed the CSR
-        Fingerprint string
-
-        // Subject fields from the CSR
-        Subject pkix.Name
-
-        // DNS SANs from the CSR
-        Hostnames []string
-
-        // IP SANs from the CSR
-        IPAddresses []string
-
-        // Extra information the node wishes to send with the request
-        ExtraInfo []string
+	// Any extra information the node wishes to send with the request.
+	ExtraInfo []string `json:"extra,omitempty"`
 }
 
+// This information is derived from the request by Kubernetes and cannot be
+// modified by users. All information is optional since it might not be
+// available in the underlying request. This is intented to aid approval
+// decisions.
 type CertificateSigningRequestStatus struct {
-        // Indicates whether CSR has a response yet. Default is Unknown. Status
-        // is True for approval and False for rejections.
-        Status api.ConditionStatus
+	// Information about the requesting user (if relevant)
+	// See user.Info interface for details
+	Username string   `json:"username,omitempty"`
+	UID      string   `json:"uid,omitempty"`
+	Groups   []string `json:"groups,omitempty"`
 
-        // If CSR was rejected, these contain the reason why (if any was supplied).
-        Reason string
-        Message string
+	// Fingerprint of the public key in request
+	Fingerprint string `json:"fingerprint,omitempty"`
 
-        // If CSR was approved, this contains the issued certificate.
-        Certificate []byte
+	// Subject fields from the request
+	Subject pkix.Name `json:"subject,omitempty"`
+
+	// DNS SANs from the request
+	Hostnames []string `json:"dns,omitempty"`
+
+	// IP SANs from the request
+	IPAddresses []string `json:"ip,omitempty"`
 }
+
+type CertificateSigningRequestApproval struct {
+	// CSR approval state, one of Submitted, Approved, or Denied
+	State CertificateRequestState `json:"state"`
+
+	// brief reason for the request state
+	Reason string `json:"reason,omitempty"`
+	// human readable message with details about the request state
+	Message string `json:"message,omitempty"`
+
+	// If request was approved, the controller will place the issued certificate here.
+	Certificate []byte `json:"certificate,omitempty"`
+}
+
+type CertificateRequestState string
+
+// These are the possible states for a certificate request.
+const (
+	RequestSubmitted CertificateRequestState = "Submitted"
+	RequestApproved  CertificateRequestState = "Approved"
+	RequestDenied    CertificateRequestState = "Denied"
+)
 ```
 
 We also introduce CertificateSigningRequestList to allow listing all the CSRs in the cluster:
@@ -141,7 +166,7 @@ type CertificateSigningRequestList struct {
 When the kubelet executes it checks a location on disk for TLS assets
 (currently `/var/run/kubernetes/kubelet.{key,crt}` by default). If it finds
 them, it proceeds. If there are no TLS assets, the kubelet generates a keypair
-and self-signed certificate. We propose the following optional fallback behavior:
+and self-signed certificate. We propose the following optional behavior:
 
 1. Generate a keypair
 2. Generate a CSR for that keypair with CN set to the hostname (or
@@ -152,49 +177,60 @@ and self-signed certificate. We propose the following optional fallback behavior
 
 ### Controller response
 
-The apiserver must first validate the signature on the raw CSR data and reject
-requests featuring invalid CSRs. It then persists the
-CertificateSigningRequests and exposes the List of all CSRs for an
-administrator to approve or reject. The apiserver should watch for updates the
-Status field of any CertificateSigningRequest. When a CSR is approved
-(signified by Status changing from Unknown to True) the apiserver should
-generate and sign the certificate, then update the
-CertificateSigningRequestStatus with the new data.
+The apiserver persists the CertificateSigningRequests and exposes the List of
+all CSRs for an administrator to approve or reject.
+
+A new certificate controller watches for certificate requests. It must first
+validate the signature on each CSR and set `CertificateRequestState=Denied` on
+any requests with invalid signatures. For valid requests, it will set
+`CertificateRequestState=Submitted`. The controller will derive the information
+in `CertificateSigningRequestStatus` and update that object. The controller
+should watch for updates the approval state of any CertificateSigningRequest.
+When a request is approved (signified by CertificateRequestState changing from
+Submitted to Approved) the controller should generate and sign a certificate
+based on that CSR, then update the approval subresource with the certificate
+data.
 
 ### Manual CSR approval
 
 An administrator using `kubectl` or another API client can query the
-CertificateSigningRequestList and update the status of
-CertificateSigningRequests. The default Status is Unknown, indicating that
-there has been no decision so far. A Status of True indicates that the admin
-has approved the request and the apiserver should issue the certificate. A
-Status of False indicates that the admin has denied the request. An admin may
-also supply Reason and Message fields to explain the rejection.
+CertificateSigningRequestList and update the approval state of
+CertificateSigningRequests. The default state is empty, indicating that there
+has been no decision so far. Once a request has passed basic validation it will
+be "Submitted". A state of "Approved" indicates that the admin has approved the
+request and the certificate controller should issue the certificate. A state of
+"Denied" indicates that the admin has denied the request. An admin may also
+supply Reason and Message fields to explain the rejection.
 
-## kube-apiserver support (CA assets)
+## kube-apiserver support
 
-So that the apiserver can handle certificate issuance on its own, it will need
-access to CA signing assets. This could be as simple as a private key and a
-config file or as complex as a PKCS#11 client and supplementary policy system.
-For now, we will add flags for a signing key, a certificate, and a basic config
-file.
+The apiserver will present the new endpoints mentioned above and support the
+relevant object types.
+
+## kube-controller-manager support
+
+To handle certificate issuance, the controller-manager will need access to CA
+signing assets. This could be as simple as a private key and a config file or
+as complex as a PKCS#11 client and supplementary policy system. For now, we
+will add flags for a signing key, a certificate, and a basic policy file.
 
 ## kubectl support
 
 To support manual CSR inspection and approval, we will add support for listing,
-inspecting, and approving/rejecting CertificateSigningRequests to kubectl. The
-interface will be similar to
+inspecting, and approving or denying CertificateSigningRequests to kubectl. The
+interaction will be similar to
 [salt-key](https://docs.saltstack.com/en/latest/ref/cli/salt-key.html).
 
 Specifically, the admin will have the ability to retrieve the full list of
-active CSRs, inspect their contents, and set their statuses to one of:
+pending CSRs, inspect their contents, and set their states to one of:
 
-1. **approved** if the apiserver should issue the cert
-2. **rejected** if the apiserver should not issue the cert
+1. **Approved** if the controller should issue the cert
+2. **Denied** if the controller should not issue the cert
 
-The suggested commands are `kubectl get certificates`, `kubectl approve <csr>`
-and `kubectl reject <csr>`. For the reject subcommand, the admin will also be
-able to supply Reason and Message fields via additional flags.
+The suggested command for listing is `kubectl get csrs`. The approve/deny
+interactions can be accomplished with normal updates, but would be more
+conveniently accessed by direct subresource updates. We leave this for future
+updates to kubectl.
 
 ## Security Considerations
 
@@ -210,8 +246,9 @@ access to the CSR endpoint.
 The node is responsible for monitoring its own certificate expiration date.
 When the certificate is close to expiration, the kubelet should begin repeating
 this flow until it successfully obtains a new certificate. If the expiring
-certificate has not been revoked then it may do so using the same keypair
-unless the cluster policy (see "Future Work") requires fresh keys.
+certificate has not been revoked and the previous certificate request is still
+approved, then it may do so using the same keypair unless the cluster policy
+(see "Future Work") requires fresh keys.
 
 Revocation is for the most part an unhandled problem in Go, requiring each
 application to produce its own logic around a variety of parsing functions. For
