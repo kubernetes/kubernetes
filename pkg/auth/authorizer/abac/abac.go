@@ -75,8 +75,15 @@ func New(path string) (*ABACPolicy, error) {
 	}
 
 	if eof {
+
+		info, err := os.Stat(path)
+		if err != nil {
+			return nil, err
+		}
+		modTime := info.ModTime()
+		lastModifiedTime := modTime
+
 		go wait.Forever(func() {
-			var lastModifiedTime *time.Time
 			for {
 				time.Sleep(filePollPeriod)
 
@@ -87,8 +94,7 @@ func New(path string) (*ABACPolicy, error) {
 						done <- err
 					} else {
 						modTime := info.ModTime()
-						if lastModifiedTime == nil || *lastModifiedTime == modTime {
-							lastModifiedTime = &modTime
+						if lastModifiedTime == modTime {
 							close(done)
 						} else {
 							tmpPlist, err, eof := newFromFile(path)
@@ -100,7 +106,7 @@ func New(path string) (*ABACPolicy, error) {
 								} else {
 									abacPolicy.Auth.Store(tmpPlist)
 									glog.Infof("ABAC policy is successfully reloaded")
-									lastModifiedTime = &modTime
+									lastModifiedTime = modTime
 									close(done)
 								}
 							}
