@@ -61,8 +61,9 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 		typedClientPath := filepath.Join(g.typedClientPath, group, version)
 		group = normalization.BeforeFirstDot(group)
 		imports = append(imports, fmt.Sprintf("%s%s \"%s\"", version, group, typedClientPath))
-		imports = append(imports, "github.com/golang/glog")
 	}
+	imports = append(imports, "github.com/golang/glog")
+	imports = append(imports, "k8s.io/kubernetes/pkg/util/flowcontrol")
 	return
 }
 
@@ -143,14 +144,18 @@ func (c *Clientset) Discovery() $.DiscoveryInterface|raw$ {
 var newClientsetForConfigTemplate = `
 // NewForConfig creates a new Clientset for the given config.
 func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
+	configShallowCopy := *c
+	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
+		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
+	}
 	var clientset Clientset
 	var err error
-$range .allGroups$    clientset.$.Group$Client, err =$.PackageName$.NewForConfig(c)
+$range .allGroups$    clientset.$.Group$Client, err =$.PackageName$.NewForConfig(&configShallowCopy)
 	if err!=nil {
 		return &clientset, err
 	}
 $end$
-	clientset.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(c)
+	clientset.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(&configShallowCopy)
 	if err!=nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 	}
