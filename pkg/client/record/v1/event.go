@@ -19,6 +19,7 @@ package v1
 import (
 	"fmt"
 	"math/rand"
+	"runtime/debug"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -256,6 +257,7 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unv
 	ref, err := v1.GetReference(object)
 	if err != nil {
 		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", object, err, eventtype, reason, message)
+		debug.PrintStack()
 		return
 	}
 

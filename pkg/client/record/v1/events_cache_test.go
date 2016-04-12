@@ -22,14 +22,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
-func makeObjectReference(kind, name, namespace string) api.ObjectReference {
-	return api.ObjectReference{
+func makeObjectReference(kind, name, namespace string) v1.ObjectReference {
+	return v1.ObjectReference{
 		Kind:       kind,
 		Name:       name,
 		Namespace:  namespace,
@@ -38,7 +38,7 @@ func makeObjectReference(kind, name, namespace string) api.ObjectReference {
 	}
 }
 
-func makeEvent(reason, message string, involvedObject api.ObjectReference) v1.Event {
+func makeEvent(reason, message string, involvedObject v1.ObjectReference) v1.Event {
 	eventTime := unversioned.Now()
 	event := v1.Event{
 		Reason:         reason,
@@ -86,7 +86,7 @@ func makeSimilarEvents(num int, template v1.Event, messagePrefix string) []v1.Ev
 	return events
 }
 
-func setCount(event v1.Event, count int) v1.Event {
+func setCount(event v1.Event, count int32) v1.Event {
 	event.Count = count
 	return event
 }
