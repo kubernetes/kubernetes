@@ -116,6 +116,53 @@ drop behavior (this occurs whether or not network-isolation has been enabled on 
 NetworkPolicy objects select the same set of pods, as there can be no conflicting rules.
 - All pods will always be accessible from the host that they are running on.  This is required to allow for kubelet health checks.
 
+### Go Representation
+
+```go
+type NetworkPolicy struct {
+  TypeMeta
+  ObjectMeta
+
+  Spec NetworkPolicySpec 
+}
+
+type NetworkPolicySpec struct {
+  // Selects the pods which this NetworkPolicy object
+  // applies to.
+  PodSelector map[string]string `json:"podSelector,omitempty"`
+
+  // List of ingress rules to be applied to the 
+  // selected pods.
+  Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty"`
+}
+
+type NetworkPolicyIngressRule struct {
+  // List of allowed ports. 
+  Ports []NetworkPolicyPort `json:"ports,omitempty"`
+
+  // List of allowed sources.
+  From []NetworkPolicySource `json:"from,omitempty"`
+}
+
+type NetworkPolicyPort struct {
+  // If specified, the port on the given protocol.
+  Port int32 `json:"port,omitempty"`
+
+  // The protocol - TCP or UDP.
+  Protocol string `json:"protocol"`
+}
+
+type NetworkPolicySource struct {
+  // Label selector - selects pods in this namespace.
+  // If 'Namespaces' is defined, this must not be.
+  Pods map[string]string `json:"pods,omitempty"`
+
+  // Label selector - selects namespaces.
+  // If 'Pods' is defined, this must not be.
+  Namespaces map[string]string `json:"namespaces,omitempty"`
+}
+```
+
 
 ## References
 
