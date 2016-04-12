@@ -200,6 +200,12 @@ function run-heat-script() {
       -P dns_nameserver=${DNS_SERVER} \
       -P kubernetes_salt_url=${swift_repo_url}/kubernetes-salt.tar.gz \
       -P kubernetes_server_url=${swift_repo_url}/kubernetes-server.tar.gz \
+      -P enable_proxy=${ENABLE_PROXY} \
+      -P ftp_proxy="${FTP_PROXY}" \
+      -P http_proxy="${HTTP_PROXY}" \
+      -P https_proxy="${HTTPS_PROXY}" \
+      -P socks_proxy="${SOCKS_PROXY}" \
+      -P no_proxy="${NO_PROXY}" \
       --template-file kubecluster.yaml \
       ${STACK_NAME}
     )
