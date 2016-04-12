@@ -416,7 +416,7 @@ func (rsc *ReplicaSetController) worker() {
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *v1beta1.ReplicaSet) {
-	diff := len(filteredPods) - int(rs.Spec.Replicas)
+	diff := len(filteredPods) - int(*rs.Spec.Replicas)
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
 		glog.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err)
@@ -454,11 +454,11 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *v1be
 		}
 		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rs.Namespace, rs.Name, rs.Spec.Replicas, diff)
 		// No need to sort pods if we are about to delete all of them
-		if int(rs.Spec.Replicas) != 0 {
+		if int(*rs.Spec.Replicas) != 0 {
 			// Sort the pods in the order such that not-ready < ready, unscheduled
 			// < scheduled, and pending < running. This ensures that we delete pods
 			// in the earlier stages whenever possible.
-			sort.Sort(controller.ActivePods(filteredPods))
+			sort.Sort(controller.V1ActivePods(filteredPods))
 		}
 		// Snapshot the UIDs (ns/name) of the pods we're expecting to see
 		// deleted, so we know to record their expectations exactly once either
@@ -468,7 +468,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *v1be
 		// expired even if other pods are deleted.
 		deletedPodKeys := []string{}
 		for i := 0; i < diff; i++ {
-			deletedPodKeys = append(deletedPodKeys, controller.PodKey(filteredPods[i]))
+			deletedPodKeys = append(deletedPodKeys, controller.V1PodKey(filteredPods[i]))
 		}
 		rsc.expectations.ExpectDeletions(rsKey, deletedPodKeys)
 		wait := sync.WaitGroup{}
@@ -478,7 +478,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *v1be
 				defer wait.Done()
 				if err := rsc.podControl.DeletePod(rs.Namespace, filteredPods[ix].Name, rs); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
-					podKey := controller.PodKey(filteredPods[ix])
+					podKey := controller.V1PodKey(filteredPods[ix])
 					glog.V(2).Infof("Failed to delete %v, decrementing expectations for controller %q/%q", podKey, rs.Namespace, rs.Name)
 					rsc.expectations.DeletionObserved(rsKey, podKey)
 					utilruntime.HandleError(err)
@@ -534,7 +534,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		glog.Errorf("Error converting pod selector to selector: %v", err)
 		return err
 	}
-	podList, err := rsc.podStore.Pods(rs.Namespace).List(selector)
+	podList, err := rsc.podStore.Pods(rs.Namespace).V1List(selector)
 	if err != nil {
 		glog.Errorf("Error getting pods for ReplicaSet %q: %v", key, err)
 		rsc.queue.Add(key)
@@ -542,7 +542,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 
 	// TODO: Do this in a single pass, or use an index.
-	filteredPods := controller.FilterActivePods(podList.Items)
+	filteredPods := controller.V1FilterActivePods(podList.Items)
 	if rsNeedsSync {
 		rsc.manageReplicas(filteredPods, &rs)
 	}

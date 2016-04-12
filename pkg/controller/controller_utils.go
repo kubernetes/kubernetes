@@ -553,6 +553,46 @@ func (s ActivePods) Less(i, j int) bool {
 	return false
 }
 
+// V1ActivePods is a versioned duplication.
+type V1ActivePods []*v1.Pod
+
+func (s V1ActivePods) Len() int      { return len(s) }
+func (s V1ActivePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+func (s V1ActivePods) Less(i, j int) bool {
+	// 1. Unassigned < assigned
+	// If only one of the pods is unassigned, the unassigned one is smaller
+	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {
+		return len(s[i].Spec.NodeName) == 0
+	}
+	// 2. PodPending < PodUnknown < PodRunning
+	m := map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
+	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
+		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
+	}
+	// 3. Not ready < ready
+	// If only one of the pods is not ready, the not ready one is smaller
+	if v1.IsPodReady(s[i]) != v1.IsPodReady(s[j]) {
+		return !v1.IsPodReady(s[i])
+	}
+	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
+	//       see https://github.com/kubernetes/kubernetes/issues/22065
+	// 4. Been ready for empty time < less time < more time
+	// If both pods are ready, the latest ready one is smaller
+	if v1.IsPodReady(s[i]) && v1.IsPodReady(s[j]) && !v1podReadyTime(s[i]).Equal(v1podReadyTime(s[j])) {
+		return afterOrZero(v1podReadyTime(s[i]), v1podReadyTime(s[j]))
+	}
+	// 5. Pods with containers with higher restart counts < lower restart counts
+	if v1maxContainerRestarts(s[i]) != v1maxContainerRestarts(s[j]) {
+		return v1maxContainerRestarts(s[i]) > v1maxContainerRestarts(s[j])
+	}
+	// 6. Empty creation time pods < newer pods < older pods
+	if !s[i].CreationTimestamp.Equal(s[j].CreationTimestamp) {
+		return afterOrZero(s[i].CreationTimestamp, s[j].CreationTimestamp)
+	}
+	return false
+}
+
 // afterOrZero checks if time t1 is after time t2; if one of them
 // is zero, the zero time is seen as after non-zero time.
 func afterOrZero(t1, t2 unversioned.Time) bool {
@@ -574,10 +614,32 @@ func podReadyTime(pod *api.Pod) unversioned.Time {
 	return unversioned.Time{}
 }
 
+// Yet another versioned duplication.
+func v1podReadyTime(pod *v1.Pod) unversioned.Time {
+	if v1.IsPodReady(pod) {
+		for _, c := range pod.Status.Conditions {
+			// we only care about pod ready conditions
+			if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+				return c.LastTransitionTime
+			}
+		}
+	}
+	return unversioned.Time{}
+}
+
 func maxContainerRestarts(pod *api.Pod) int {
 	maxRestarts := 0
 	for _, c := range pod.Status.ContainerStatuses {
 		maxRestarts = integer.IntMax(maxRestarts, c.RestartCount)
+	}
+	return maxRestarts
+}
+
+// Yet another versioned duplication.
+func v1maxContainerRestarts(pod *v1.Pod) int {
+	maxRestarts := 0
+	for _, c := range pod.Status.ContainerStatuses {
+		maxRestarts = integer.IntMax(maxRestarts, int(c.RestartCount))
 	}
 	return maxRestarts
 }
@@ -597,9 +659,31 @@ func FilterActivePods(pods []api.Pod) []*api.Pod {
 	return result
 }
 
+// Yet another versioned duplication.
+func V1FilterActivePods(pods []v1.Pod) []*v1.Pod {
+	var result []*v1.Pod
+	for i := range pods {
+		p := pods[i]
+		if V1IsPodActive(p) {
+			result = append(result, &p)
+		} else {
+			glog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
+				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
+		}
+	}
+	return result
+}
+
 func IsPodActive(p api.Pod) bool {
 	return api.PodSucceeded != p.Status.Phase &&
 		api.PodFailed != p.Status.Phase &&
+		p.DeletionTimestamp == nil
+}
+
+// Yet another versioned duplication.
+func V1IsPodActive(p v1.Pod) bool {
+	return v1.PodSucceeded != p.Status.Phase &&
+		v1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
 }
 

@@ -89,6 +89,20 @@ func (s storePodsNamespacer) List(selector labels.Selector) (pods api.PodList, e
 	return list, nil
 }
 
+// A verioned duplication.
+func (s storePodsNamespacer) V1List(selector labels.Selector) (pods v1.PodList, err error) {
+	list := v1.PodList{}
+	for _, m := range s.store.List() {
+		pod := m.(*v1.Pod)
+		if s.namespace == v1.NamespaceAll || s.namespace == pod.Namespace {
+			if selector.Matches(labels.Set(pod.Labels)) {
+				list.Items = append(list.Items, *pod)
+			}
+		}
+	}
+	return list, nil
+}
+
 // Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
 func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
 	_, exists, err := s.Store.Get(pod)

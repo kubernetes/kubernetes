@@ -23,16 +23,16 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2/typed/extensions/v1beta1"
 )
 
 // updateReplicaCount attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
-func updateReplicaCount(rsClient client.ReplicaSetInterface, rs v1beta1.ReplicaSet, numReplicas, numFullyLabeledReplicas int) (updateErr error) {
+func updateReplicaCount(rsClient v1beta1extensions.ReplicaSetInterface, rs v1beta1.ReplicaSet, numReplicas, numFullyLabeledReplicas int) (updateErr error) {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
-	if rs.Status.Replicas == numReplicas &&
-		rs.Status.FullyLabeledReplicas == numFullyLabeledReplicas &&
+	if int(rs.Status.Replicas) == numReplicas &&
+		int(rs.Status.FullyLabeledReplicas) == numFullyLabeledReplicas &&
 		rs.Generation == rs.Status.ObservedGeneration {
 		return nil
 	}
@@ -49,7 +49,7 @@ func updateReplicaCount(rsClient client.ReplicaSetInterface, rs v1beta1.ReplicaS
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rs.Status.FullyLabeledReplicas, numFullyLabeledReplicas) +
 			fmt.Sprintf("sequence No: %v->%v", rs.Status.ObservedGeneration, generation))
 
-		rs.Status = v1beta1.ReplicaSetStatus{Replicas: numReplicas, FullyLabeledReplicas: numFullyLabeledReplicas, ObservedGeneration: generation}
+		rs.Status = v1beta1.ReplicaSetStatus{Replicas: int32(numReplicas), FullyLabeledReplicas: int32(numFullyLabeledReplicas), ObservedGeneration: generation}
 		_, updateErr = rsClient.UpdateStatus(rs)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr
