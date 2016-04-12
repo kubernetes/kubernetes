@@ -26,14 +26,12 @@ function running_in_docker() {
 }
 
 function fetch_output_tars() {
-    clean_binaries
     echo "Using binaries from _output."
     cp _output/release-tars/kubernetes*.tar.gz .
     unpack_binaries
 }
 
 function fetch_server_version_tars() {
-    clean_binaries
     local -r msg=$(gcloud ${CMD_GROUP:-} container get-server-config --project=${PROJECT} --zone=${ZONE} | grep defaultClusterVersion)
     # msg will look like "defaultClusterVersion: 1.0.1". Strip
     # everything up to, including ": "
@@ -45,7 +43,6 @@ function fetch_server_version_tars() {
 # Use a published version like "ci/latest" (default), "release/latest",
 # "release/latest-1", or "release/stable"
 function fetch_published_version_tars() {
-    clean_binaries
     local -r published_version="${1}"
     IFS='/' read -a varr <<< "${published_version}"
     bucket="${varr[0]}"
@@ -203,14 +200,17 @@ elif [[ "${KUBE_RUN_FROM_OUTPUT:-}" =~ ^[yY]$ ]]; then
     # TODO(spxtr) This should probably be JENKINS_USE_BINARIES_FROM_OUTPUT or
     # something, rather than being prepended with KUBE, since it's sort of a
     # meta-thing.
+    clean_binaries
     fetch_output_tars
 elif [[ "${JENKINS_USE_SERVER_VERSION:-}" =~ ^[yY]$ ]]; then
     # This is for test, staging, and prod jobs on GKE, where we want to
     # test what's running in GKE by default rather than some CI build.
+    clean_binaries
     fetch_server_version_tars
 else
     # use JENKINS_PUBLISHED_VERSION, default to 'ci/latest', since that's
     # usually what we're testing.
+    clean_binaries
     fetch_published_version_tars "${JENKINS_PUBLISHED_VERSION:-ci/latest}"
 fi
 
