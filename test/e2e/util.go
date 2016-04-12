@@ -309,23 +309,23 @@ func nowStamp() string {
 	return time.Now().Format(time.StampMilli)
 }
 
-func logf(level string, format string, args ...interface{}) {
+func log(level string, format string, args ...interface{}) {
 	fmt.Fprintf(GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
 func Logf(format string, args ...interface{}) {
-	logf("INFO", format, args...)
+	log("INFO", format, args...)
 }
 
 func Failf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	logf("FAIL", msg)
+	log("INFO", msg)
 	Fail(nowStamp()+": "+msg, 1)
 }
 
 func Skipf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	logf("SKIP", msg)
+	log("INFO", msg)
 	Skip(nowStamp() + ": " + msg)
 }
 

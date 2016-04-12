@@ -333,7 +333,7 @@ func (tc *testCase) runTest(t *testing.T) {
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 
 	broadcaster := record.NewBroadcasterForTests(0)
-	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{testClient.Core().Events("")})
+	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: testClient.Core().Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	hpaController := &HorizontalController{

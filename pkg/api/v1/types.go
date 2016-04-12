@@ -2048,8 +2048,14 @@ type NodeSpec struct {
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
 type DaemonEndpoint struct {
+	/*
+		The port tag was not properly in quotes in earlier releases, so it must be
+		uppercased for backwards compat (since it was falling back to var name of
+		'Port').
+	*/
+
 	// Port number of the given endpoint.
-	Port int32 `json:port`
+	Port int32 `json:"Port"`
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.
@@ -2102,7 +2108,7 @@ type NodeStatus struct {
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 	// List of container images on this node
-	Images []ContainerImage `json:"images",omitempty`
+	Images []ContainerImage `json:"images,omitempty"`
 }
 
 // Describe a container image

@@ -55,7 +55,7 @@ type (
 	watcher struct {
 		updates  <-chan *PodEvent
 		rw       sync.RWMutex
-		handlers map[string]watchHandler
+		handlers map[string]*watchHandler
 		filters  []watchFilter
 		runOnce  chan struct{}
 	}
@@ -64,7 +64,7 @@ type (
 func newWatcher(updates <-chan *PodEvent) *watcher {
 	return &watcher{
 		updates:  updates,
-		handlers: make(map[string]watchHandler),
+		handlers: make(map[string]*watchHandler),
 		runOnce:  make(chan struct{}),
 	}
 }
@@ -86,7 +86,7 @@ updateLoop:
 			}
 		}
 		log.V(1).Info("handling " + u.FormatShort())
-		h, ok := func() (h watchHandler, ok bool) {
+		h, ok := func() (h *watchHandler, ok bool) {
 			pw.rw.RLock()
 			defer pw.rw.RUnlock()
 			h, ok = pw.handlers[u.taskID]
@@ -125,7 +125,7 @@ func (pw *watcher) addFilter(f watchFilter) {
 }
 
 // forTask associates a handler `h` with the given taskID.
-func (pw *watcher) forTask(taskID string, h watchHandler) {
+func (pw *watcher) forTask(taskID string, h *watchHandler) {
 	pw.rw.Lock()
 	pw.handlers[taskID] = h
 	pw.rw.Unlock()

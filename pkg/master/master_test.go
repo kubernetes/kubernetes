@@ -56,10 +56,10 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 
-	master := Master{
+	master := &Master{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
 	config := Config{

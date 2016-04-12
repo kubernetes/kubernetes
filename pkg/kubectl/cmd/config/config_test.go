@@ -44,7 +44,7 @@ func newRedFederalCowHammerConfig() clientcmdapi.Config {
 	}
 }
 
-func ExampleView() {
+func Example_view() {
 	expectedConfig := newRedFederalCowHammerConfig()
 	test := configCommandTest{
 		args:           []string{"view"},

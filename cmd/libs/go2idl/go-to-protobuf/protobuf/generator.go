@@ -154,7 +154,6 @@ func (g *genProtoIDL) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	default:
 		return b.unknown(sw)
 	}
-	return sw.Error()
 }
 
 // ProtobufFromGoNamer finds the protobuf name of a type (and its package, and
@@ -446,7 +445,7 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 		field.Nullable = true
 	case types.Alias:
 		if err := memberTypeToProtobufField(locator, field, t.Underlying); err != nil {
-			log.Printf("failed to alias: %s %s: err", t.Name, t.Underlying.Name, err)
+			log.Printf("failed to alias: %s %s: err %v", t.Name, t.Underlying.Name, err)
 			return err
 		}
 		if field.Extras == nil {
@@ -616,7 +615,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 		tag := field.Tag
 		if tag != -1 {
 			if existing, ok := byTag[tag]; ok {
-				return nil, fmt.Errorf("field %q and %q in %q both have tag %d", field.Name, existing.Name, tag)
+				return nil, fmt.Errorf("field %q and %q both have tag %d", field.Name, existing.Name, tag)
 			}
 			byTag[tag] = field
 		}

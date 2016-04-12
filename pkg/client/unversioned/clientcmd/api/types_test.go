@@ -22,7 +22,7 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-func ExampleEmptyConfig() {
+func Example_emptyConfig() {
 	defaultConfig := NewConfig()
 
 	output, err := yaml.Marshal(defaultConfig)
@@ -39,7 +39,7 @@ func ExampleEmptyConfig() {
 	// users: {}
 }
 
-func ExampleOfOptionsConfig() {
+func Example_ofOptionsConfig() {
 	defaultConfig := NewConfig()
 	defaultConfig.Preferences.Colors = true
 	defaultConfig.Clusters["alfa"] = &Cluster{

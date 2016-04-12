@@ -52,7 +52,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 	}
 	// Checking the Preconditions here to fail early. They'll be enforced later on when we actually do the deletion, too.
 	if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != objectMeta.UID {
-		return false, false, errors.NewConflict(unversioned.GroupResource{gvk.Group, gvk.Kind}, objectMeta.Name, fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *options.Preconditions.UID, objectMeta.UID))
+		return false, false, errors.NewConflict(unversioned.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, objectMeta.Name, fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *options.Preconditions.UID, objectMeta.UID))
 	}
 	gracefulStrategy, ok := strategy.(RESTGracefulDeleteStrategy)
 	if !ok {

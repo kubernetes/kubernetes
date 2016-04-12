@@ -206,7 +206,7 @@ func TestFlattenSuccess(t *testing.T) {
 
 }
 
-func ExampleMinifyAndShorten() {
+func Example_minifyAndShorten() {
 	certFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(certFile.Name())
 	keyFile, _ := ioutil.TempFile("", "")

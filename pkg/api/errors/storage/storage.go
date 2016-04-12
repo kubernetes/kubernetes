@@ -101,7 +101,7 @@ func InterpretWatchError(err error, resource unversioned.GroupResource, name str
 	switch {
 	case storage.IsInvalidError(err):
 		invalidError, _ := err.(storage.InvalidError)
-		return errors.NewInvalid(unversioned.GroupKind{resource.Group, resource.Resource}, name, invalidError.Errs)
+		return errors.NewInvalid(unversioned.GroupKind{Group: resource.Group, Kind: resource.Resource}, name, invalidError.Errs)
 	default:
 		return err
 	}
