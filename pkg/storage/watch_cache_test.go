@@ -122,7 +122,7 @@ func TestWatchCacheBasic(t *testing.T) {
 func TestEvents(t *testing.T) {
 	store := newTestWatchCache(5)
 
-	store.Add(makeTestPod("pod", 2))
+	store.Add(makeTestPod("pod", 3))
 
 	// Test for Added event.
 	{
@@ -145,7 +145,7 @@ func TestEvents(t *testing.T) {
 		if result[0].Type != watch.Added {
 			t.Errorf("unexpected event type: %v", result[0].Type)
 		}
-		pod := makeTestPod("pod", uint64(2))
+		pod := makeTestPod("pod", uint64(3))
 		if !api.Semantic.DeepEqual(pod, result[0].Object) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
 		}
@@ -154,8 +154,8 @@ func TestEvents(t *testing.T) {
 		}
 	}
 
-	store.Update(makeTestPod("pod", 3))
 	store.Update(makeTestPod("pod", 4))
+	store.Update(makeTestPod("pod", 5))
 
 	// Test with not full cache.
 	{
@@ -176,22 +176,22 @@ func TestEvents(t *testing.T) {
 			if result[i].Type != watch.Modified {
 				t.Errorf("unexpected event type: %v", result[i].Type)
 			}
-			pod := makeTestPod("pod", uint64(i+3))
+			pod := makeTestPod("pod", uint64(i+4))
 			if !api.Semantic.DeepEqual(pod, result[i].Object) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
-			prevPod := makeTestPod("pod", uint64(i+2))
+			prevPod := makeTestPod("pod", uint64(i+3))
 			if !api.Semantic.DeepEqual(prevPod, result[i].PrevObject) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].PrevObject, prevPod)
 			}
 		}
 	}
 
-	for i := 5; i < 9; i++ {
+	for i := 6; i < 10; i++ {
 		store.Update(makeTestPod("pod", uint64(i)))
 	}
 
-	// Test with full cache - there should be elements from 4 to 8.
+	// Test with full cache - there should be elements from 5 to 9.
 	{
 		_, err := store.GetAllEventsSince(3)
 		if err == nil {
@@ -207,7 +207,7 @@ func TestEvents(t *testing.T) {
 			t.Fatalf("unexpected events: %v", result)
 		}
 		for i := 0; i < 5; i++ {
-			pod := makeTestPod("pod", uint64(i+4))
+			pod := makeTestPod("pod", uint64(i+5))
 			if !api.Semantic.DeepEqual(pod, result[i].Object) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
@@ -215,7 +215,7 @@ func TestEvents(t *testing.T) {
 	}
 
 	// Test for delete event.
-	store.Delete(makeTestPod("pod", uint64(9)))
+	store.Delete(makeTestPod("pod", uint64(10)))
 
 	{
 		result, err := store.GetAllEventsSince(9)
@@ -228,11 +228,11 @@ func TestEvents(t *testing.T) {
 		if result[0].Type != watch.Deleted {
 			t.Errorf("unexpected event type: %v", result[0].Type)
 		}
-		pod := makeTestPod("pod", uint64(9))
+		pod := makeTestPod("pod", uint64(10))
 		if !api.Semantic.DeepEqual(pod, result[0].Object) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
 		}
-		prevPod := makeTestPod("pod", uint64(8))
+		prevPod := makeTestPod("pod", uint64(9))
 		if !api.Semantic.DeepEqual(prevPod, result[0].PrevObject) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].PrevObject, prevPod)
 		}
