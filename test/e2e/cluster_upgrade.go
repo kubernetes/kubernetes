@@ -110,18 +110,50 @@ func nodeUpgradeGCE(rawV string) error {
 	// TODO(ihmccreery) This code path should be identical to how a user
 	// would trigger a node update; right now it's very different.
 	v := "v" + rawV
+
+	Logf("Getting the node template before the upgrade")
+	tmplBefore, err := migTemplate()
+	if err != nil {
+		return fmt.Errorf("error getting the node template before the upgrade: %v", err)
+	}
+
 	Logf("Preparing node upgrade by creating new instance template for %q", v)
 	stdout, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-P", v)
 	if err != nil {
-		return err
+		cleanupNodeUpgradeGCE(tmplBefore)
+		return fmt.Errorf("error preparing node upgrade: %v", err)
 	}
 	tmpl := strings.TrimSpace(stdout)
 
 	Logf("Performing a node upgrade to %q; waiting at most %v per node", tmpl, restartPerNodeTimeout)
 	if err := migRollingUpdate(tmpl, restartPerNodeTimeout); err != nil {
+		cleanupNodeUpgradeGCE(tmplBefore)
 		return fmt.Errorf("error doing node upgrade via a migRollingUpdate to %s: %v", tmpl, err)
 	}
 	return nil
+}
+
+func cleanupNodeUpgradeGCE(tmplBefore string) {
+	Logf("Cleaning up any unused node templates")
+	tmplAfter, err := migTemplate()
+	if err != nil {
+		Logf("Could not get node template post-upgrade; may have leaked template %s", tmplBefore)
+		return
+	}
+	if tmplBefore == tmplAfter {
+		// The node upgrade failed so there's no need to delete
+		// anything.
+		Logf("Node template %s is still in use; not cleaning up", tmplBefore)
+		return
+	}
+	Logf("Deleting node template %s", tmplBefore)
+	if _, _, err := retryCmd("gcloud", "compute", "instance-templates",
+		fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
+		"delete",
+		tmplBefore); err != nil {
+		Logf("gcloud compute instance-templates delete %s call failed with err: %v", tmplBefore, err)
+		Logf("May have leaked instance template %q", tmplBefore)
+	}
 }
 
 func nodeUpgradeGKE(v string) error {
@@ -204,42 +236,6 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 	})
 
 	Describe("node upgrade", func() {
-		var tmplBefore, tmplAfter string
-		BeforeEach(func() {
-			if providerIs("gce") {
-				By("Getting the node template before the upgrade")
-				var err error
-				tmplBefore, err = migTemplate()
-				expectNoError(err)
-			}
-		})
-
-		AfterEach(func() {
-			if providerIs("gce") {
-				By("Cleaning up any unused node templates")
-				var err error
-				tmplAfter, err = migTemplate()
-				if err != nil {
-					Logf("Could not get node template post-upgrade; may have leaked template %s", tmplBefore)
-					return
-				}
-				if tmplBefore == tmplAfter {
-					// The node upgrade failed so there's no need to delete
-					// anything.
-					Logf("Node template %s is still in use; not cleaning up", tmplBefore)
-					return
-				}
-				Logf("Deleting node template %s", tmplBefore)
-				if _, _, err := retryCmd("gcloud", "compute", "instance-templates",
-					fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
-					"delete",
-					tmplBefore); err != nil {
-					Logf("gcloud compute instance-templates delete %s call failed with err: %v", tmplBefore, err)
-					Logf("May have leaked instance template %q", tmplBefore)
-				}
-			}
-		})
-
 		It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
 			By("Validating cluster before node upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
@@ -255,6 +251,53 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 		})
 
 		It("should maintain responsive services [Feature:ExperimentalNodeUpgrade]", func() {
+			By("Validating cluster before node upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+			By("Performing a node upgrade")
+			testUpgrade(ip, v, func(v string) error {
+				return nodeUpgrade(f, replicas, v)
+			})
+			By("Checking node versions")
+			expectNoError(checkNodesVersions(f.Client, v))
+			By("Validating cluster after node upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+		})
+	})
+
+	Describe("cluster upgrade", func() {
+		It("should maintain responsive services [Feature:ClusterUpgrade]", func() {
+			By("Validating cluster before master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+			By("Performing a master upgrade")
+			testUpgrade(ip, v, masterUpgrade)
+			By("Checking master version")
+			expectNoError(checkMasterVersion(f.Client, v))
+			By("Validating cluster after master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+
+			By("Validating cluster before node upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+			By("Performing a node upgrade")
+			// Circumnavigate testUpgrade, since services don't necessarily stay up.
+			Logf("Starting upgrade")
+			expectNoError(nodeUpgrade(f, replicas, v))
+			Logf("Upgrade complete")
+			By("Checking node versions")
+			expectNoError(checkNodesVersions(f.Client, v))
+			By("Validating cluster after node upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+		})
+
+		It("should maintain responsive services [Feature:ExperimentalClusterUpgrade]", func() {
+			By("Validating cluster before master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+			By("Performing a master upgrade")
+			testUpgrade(ip, v, masterUpgrade)
+			By("Checking master version")
+			expectNoError(checkMasterVersion(f.Client, v))
+			By("Validating cluster after master upgrade")
+			expectNoError(validate(f, svcName, rcName, ingress, replicas))
+
 			By("Validating cluster before node upgrade")
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			By("Performing a node upgrade")
@@ -437,7 +480,7 @@ func migRollingUpdate(tmpl string, nt time.Duration) error {
 	return nil
 }
 
-// migTemplate (GCE/GKE-only) returns the name of the MIG template that the
+// migTemplate (GCE-only) returns the name of the MIG template that the
 // nodes of the cluster use.
 func migTemplate() (string, error) {
 	var errLast error
