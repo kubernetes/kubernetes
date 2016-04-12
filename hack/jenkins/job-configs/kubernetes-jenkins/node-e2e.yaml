@@ -14,7 +14,6 @@
     node: 'node'
     logrotate:
         numToKeep: 200
-    node: node
     builders:
          - docker-build-publish:
              repoName: '{repoName}'
@@ -64,7 +63,6 @@
     node: 'node'
     logrotate:
         numToKeep: 200
-    node: node
     builders:
          - shell: |
               #!/bin/bash
