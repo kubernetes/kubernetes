@@ -2686,13 +2686,13 @@ const (
 	// ResourceServicesLoadBalancers, number
 	ResourceServicesLoadBalancers ResourceName = "services.loadbalancers"
 	// CPU request, in cores. (500m = .5 cores)
-	ResourceCPURequest ResourceName = "cpu.request"
-	// CPU limit, in cores. (500m = .5 cores)
-	ResourceCPULimit ResourceName = "cpu.limit"
+	ResourceRequestsCPU ResourceName = "requests.cpu"
 	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceMemoryRequest ResourceName = "memory.request"
+	ResourceRequestsMemory ResourceName = "requests.memory"
+	// CPU limit, in cores. (500m = .5 cores)
+	ResourceLimitsCPU ResourceName = "limits.cpu"
 	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceMemoryLimit ResourceName = "memory.limit"
+	ResourceLimitsMemory ResourceName = "limits.memory"
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota
