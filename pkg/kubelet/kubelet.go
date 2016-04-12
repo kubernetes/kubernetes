@@ -89,6 +89,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/third_party/golang/expansion"
 )
 
@@ -2324,32 +2325,63 @@ func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
 		Message: "Pod " + message})
 }
 
+// getNodeAnyWay() must return a *api.Node which is required by RunGeneralPredicates().
+// The *api.Node is obtained as follows:
+// Return kubelet's nodeInfo for this node, except on error or if in standalone mode,
+// in which case return a manufactured nodeInfo representing a node with no pods,
+// zero capacity, and the default labels.
+func (kl *Kubelet) getNodeAnyWay() (*api.Node, error) {
+	if !kl.standaloneMode {
+		if n, err := kl.nodeInfo.GetNodeInfo(kl.nodeName); err == nil {
+			return n, nil
+		}
+	}
+	return kl.initialNodeStatus()
+}
+
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
 // cannot. "pod" is new pod, while "pods" include all admitted pods plus the
 // new pod. The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
-//
-// This needs to be kept in sync with the scheduler's and daemonset's fit predicates,
-// otherwise there will inevitably be pod delete create loops. This will be fixed
-// once we can extract these predicates into a common library. (#12744)
 func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, string) {
-	if hasHostPortConflicts(pods) {
-		return false, "HostPortConflict", "cannot start the pod due to host port conflict."
+	node, err := kl.getNodeAnyWay()
+	if err != nil {
+		glog.Errorf("Cannot get Node info: %v", err)
+		return false, "InvalidNodeInfo", "Kubelet cannot get node info."
 	}
-	if !kl.matchesNodeSelector(pod) {
-		return false, "NodeSelectorMismatching", "cannot be started due to node selector mismatch"
+	otherPods := []*api.Pod{}
+	for _, p := range pods {
+		if p != pod {
+			otherPods = append(otherPods, p)
+		}
 	}
-	cpu, memory := kl.hasInsufficientfFreeResources(pods)
-	if cpu {
-		return false, "InsufficientFreeCPU", "cannot start the pod due to insufficient free CPU."
-	} else if memory {
-		return false, "InsufficientFreeMemory", "cannot be started due to insufficient free memory"
+	nodeInfo := schedulercache.CreateNodeNameToInfoMap(otherPods)[kl.nodeName]
+	fit, err := predicates.RunGeneralPredicates(pod, kl.nodeName, nodeInfo, node)
+	if !fit {
+		if re, ok := err.(*predicates.PredicateFailureError); ok {
+			reason := re.PredicateName
+			message := re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+			return fit, reason, message
+		}
+		if re, ok := err.(*predicates.InsufficientResourceError); ok {
+			reason := fmt.Sprintf("OutOf%s", re.ResourceName)
+			message := re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+			return fit, reason, message
+		}
+		reason := "UnexpectedPredicateFailureType"
+		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
+		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		return fit, reason, message
 	}
+	// TODO: When disk space scheduling is implemented (#11976), remove the out-of-disk check here and
+	// add the disk space predicate to predicates.GeneralPredicates.
 	if kl.isOutOfDisk() {
+		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), "predicate fails due to isOutOfDisk")
 		return false, "OutOfDisk", "cannot be started due to lack of disk space."
 	}
-
 	return true, "", ""
 }
 
