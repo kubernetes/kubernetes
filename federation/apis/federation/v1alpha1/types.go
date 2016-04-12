@@ -21,17 +21,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// Address of a cluster
-type ClusterAddress struct {
-	// URL to access the cluster
-	Url string `json:"url"`
-}
-
 // ClusterSpec describes the attributes on a Cluster.
 type ClusterSpec struct {
 	// a map of client CIDR to server address
 	ServerAddressByClientCIDRs []unversioned.ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs"`
-	// The credential used to access cluster. It’s used for system routines (not behalf of users)
+	// the type (e.g. bearer token, client certificate etc) and data of the credential used to access cluster.
+	// It’s used for system routines (not behalf of users)
 	Credential string `json:"credential",omitempty`
 }
 
@@ -66,7 +61,7 @@ type ClusterStatus struct {
 	ClusterMeta `json:",inline"`
 }
 
-// Cluster information in Ubernetes
+// Information about a cluster in a federated clusters setup
 type Cluster struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.

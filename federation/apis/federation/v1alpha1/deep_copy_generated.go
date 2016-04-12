@@ -31,7 +31,6 @@ import (
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_v1alpha1_Cluster,
-		DeepCopy_v1alpha1_ClusterAddress,
 		DeepCopy_v1alpha1_ClusterList,
 		DeepCopy_v1alpha1_ClusterMeta,
 		DeepCopy_v1alpha1_ClusterSpec,
@@ -55,11 +54,6 @@ func DeepCopy_v1alpha1_Cluster(in Cluster, out *Cluster, c *conversion.Cloner) e
 	if err := DeepCopy_v1alpha1_ClusterStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
-	return nil
-}
-
-func DeepCopy_v1alpha1_ClusterAddress(in ClusterAddress, out *ClusterAddress, c *conversion.Cloner) error {
-	out.Url = in.Url
 	return nil
 }
 

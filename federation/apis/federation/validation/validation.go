@@ -26,11 +26,11 @@ func ValidateClusterName(name string, prefix bool) (bool, string) {
 	return validation.NameIsDNSSubdomain(name, prefix)
 }
 
-func ValidateClusterSpec(spec *federation.ClusterSpec, fldPath *field.Path) field.ErrorList {
+func ValidateClusterSpec(spec *federation.ClusterSpec, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// address is required.
 	if len(spec.ServerAddressByClientCIDRs) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("serverAddressByClientCIDRs"), ""))
+		allErrs = append(allErrs, field.Required(fieldPath.Child("serverAddressByClientCIDRs"), ""))
 	}
 	return allErrs
 }

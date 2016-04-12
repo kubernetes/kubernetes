@@ -30,7 +30,6 @@ import (
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_federation_Cluster,
-		DeepCopy_federation_ClusterAddress,
 		DeepCopy_federation_ClusterList,
 		DeepCopy_federation_ClusterMeta,
 		DeepCopy_federation_ClusterSpec,
@@ -54,11 +53,6 @@ func DeepCopy_federation_Cluster(in Cluster, out *Cluster, c *conversion.Cloner)
 	if err := DeepCopy_federation_ClusterStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
-	return nil
-}
-
-func DeepCopy_federation_ClusterAddress(in ClusterAddress, out *ClusterAddress, c *conversion.Cloner) error {
-	out.Url = in.Url
 	return nil
 }
 
