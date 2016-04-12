@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -303,7 +302,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 		return result, nil
 	}
 	if resourceVersion < oldest {
-		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest))
+		return nil, NewGoneError(resourceVersion, oldest)
 	}
 
 	// Binary search the smallest index at which resourceVersion is not smaller than

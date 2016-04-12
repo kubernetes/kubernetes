@@ -19,10 +19,11 @@ package testing
 import (
 	"path"
 
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+
+	"golang.org/x/net/context"
 )
 
 // CreateObj will create a single object using the storage interface

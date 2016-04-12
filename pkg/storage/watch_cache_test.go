@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -130,8 +129,8 @@ func TestEvents(t *testing.T) {
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
-		if _, ok := err.(*errors.StatusError); !ok {
-			t.Errorf("expected error to be of type StatusError")
+		if !IsGoneError(err) {
+			t.Errorf("expected error to be of type GoneError")
 		}
 	}
 	{
