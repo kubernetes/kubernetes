@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset_release_1_2 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -357,7 +357,7 @@ type PodControlInterface interface {
 
 // RealPodControl is the default implementation of PodControlInterface.
 type RealPodControl struct {
-	KubeClient clientset.Interface
+	KubeClient clientset_release_1_2.Interface
 	Recorder   record.EventRecorder
 }
 
