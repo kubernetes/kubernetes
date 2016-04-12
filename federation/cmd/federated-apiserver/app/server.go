@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -229,34 +228,16 @@ func Run(s *options.APIServer) error {
 
 	n := s.ServiceClusterIPRange
 
-	// Default to the private server key for service account token signing
-	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
-		if authenticator.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
-			s.ServiceAccountKeyFile = s.TLSPrivateKeyFile
-		} else {
-			glog.Warning("No RSA key provided, service account token authentication disabled")
-		}
-	}
-
-	var serviceAccountGetter serviceaccount.ServiceAccountTokenGetter
-	if s.ServiceAccountLookup {
-		// TODO: Maybe do not expose this option in genericapiserver, if most servers do not need it?
-		glog.Fatalf("Invalid ServerRunOptions: ServiceAccountLookup should be false for ubernetes server")
-	}
-
 	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
-		BasicAuthFile:             s.BasicAuthFile,
-		ClientCAFile:              s.ClientCAFile,
-		TokenAuthFile:             s.TokenAuthFile,
-		OIDCIssuerURL:             s.OIDCIssuerURL,
-		OIDCClientID:              s.OIDCClientID,
-		OIDCCAFile:                s.OIDCCAFile,
-		OIDCUsernameClaim:         s.OIDCUsernameClaim,
-		OIDCGroupsClaim:           s.OIDCGroupsClaim,
-		ServiceAccountKeyFile:     s.ServiceAccountKeyFile,
-		ServiceAccountLookup:      s.ServiceAccountLookup,
-		ServiceAccountTokenGetter: serviceAccountGetter,
-		KeystoneURL:               s.KeystoneURL,
+		BasicAuthFile:     s.BasicAuthFile,
+		ClientCAFile:      s.ClientCAFile,
+		TokenAuthFile:     s.TokenAuthFile,
+		OIDCIssuerURL:     s.OIDCIssuerURL,
+		OIDCClientID:      s.OIDCClientID,
+		OIDCCAFile:        s.OIDCCAFile,
+		OIDCUsernameClaim: s.OIDCUsernameClaim,
+		OIDCGroupsClaim:   s.OIDCGroupsClaim,
+		KeystoneURL:       s.KeystoneURL,
 	})
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
