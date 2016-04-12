@@ -260,8 +260,6 @@ var _ = framework.KubeDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
 
 	It("should provide DNS for the cluster [Conformance]", func() {
-		verifyDNSPodIsRunning(f)
-
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		namesToResolve := []string{
@@ -288,8 +286,6 @@ var _ = framework.KubeDescribe("DNS", func() {
 	})
 
 	It("should provide DNS for services [Conformance]", func() {
-		verifyDNSPodIsRunning(f)
-
 		// Create a test headless service.
 		By("Creating a test headless service")
 		testServiceSelector := map[string]string{
@@ -338,8 +334,6 @@ var _ = framework.KubeDescribe("DNS", func() {
 	})
 
 	It("should provide DNS for pods for Hostname and Subdomain Annotation", func() {
-		verifyDNSPodIsRunning(f)
-
 		// Create a test headless service.
 		By("Creating a test headless service")
 		testServiceSelector := map[string]string{
