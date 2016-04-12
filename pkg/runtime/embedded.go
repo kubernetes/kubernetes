@@ -24,9 +24,9 @@ import (
 )
 
 type encodable struct {
-	e        Encoder `json:"-"`
+	E        Encoder `json:"-"`
 	obj      Object
-	versions []unversioned.GroupVersion `json:"-"`
+	versions []unversioned.GroupVersion
 }
 
 func (e encodable) GetObjectKind() unversioned.ObjectKind { return e.obj.GetObjectKind() }
@@ -47,7 +47,7 @@ func (re encodable) UnmarshalJSON(in []byte) error {
 // Marshal may get called on pointers or values, so implement MarshalJSON on value.
 // http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
 func (re encodable) MarshalJSON() ([]byte, error) {
-	return Encode(re.e, re.obj)
+	return Encode(re.E, re.obj)
 }
 
 // NewEncodableList creates an object that will be encoded with the provided codec on demand.

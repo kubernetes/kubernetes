@@ -42,7 +42,7 @@ type FooList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
-	items []Foo `json:"items"`
+	Items []Foo `json:"items"`
 }
 
 func TestCodec(t *testing.T) {

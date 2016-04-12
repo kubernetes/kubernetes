@@ -2048,7 +2048,7 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("VolumeStatsAggPeriod"))
+				r.EncodeString(codecSelferC_UTF81234, string("volumeStatsAggPeriod"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				yy149 := &x.VolumeStatsAggPeriod
 				yym150 := z.EncBinary()
@@ -3190,7 +3190,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			} else {
 				x.LowDiskSpaceThresholdMB = int(r.DecodeInt(codecSelferBitsize1234))
 			}
-		case "VolumeStatsAggPeriod":
+		case "volumeStatsAggPeriod":
 			if r.TryDecodeAsNil() {
 				x.VolumeStatsAggPeriod = pkg1_unversioned.Duration{}
 			} else {

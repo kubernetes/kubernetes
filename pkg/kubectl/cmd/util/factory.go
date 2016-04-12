@@ -415,14 +415,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 				// operator, DoubleEquals operator and In operator with only one element in the set.
 				if len(t.Spec.Selector.MatchExpressions) > 0 {
-					return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format")
+					return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 				}
 				return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
 			case *extensions.ReplicaSet:
 				// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 				// operator, DoubleEquals operator and In operator with only one element in the set.
 				if len(t.Spec.Selector.MatchExpressions) > 0 {
-					return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format")
+					return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 				}
 				return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
 			default:

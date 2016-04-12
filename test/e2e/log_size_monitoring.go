@@ -67,7 +67,7 @@ type LogsSizeVerifier struct {
 	client      *client.Client
 	stopChannel chan bool
 	// data stores LogSizeData groupped per IP and log_path
-	data          LogsSizeData
+	data          *LogsSizeData
 	masterAddress string
 	nodeAddresses []string
 	wg            sync.WaitGroup
@@ -117,13 +117,13 @@ type WorkItem struct {
 	backoffMultiplier int
 }
 
-func prepareData(masterAddress string, nodeAddresses []string) LogsSizeData {
+func prepareData(masterAddress string, nodeAddresses []string) *LogsSizeData {
 	data := make(LogSizeDataTimeseries)
 	ips := append(nodeAddresses, masterAddress)
 	for _, ip := range ips {
 		data[ip] = make(map[string][]TimestampedSize)
 	}
-	return LogsSizeData{
+	return &LogsSizeData{
 		data: data,
 		lock: sync.Mutex{},
 	}
@@ -164,7 +164,7 @@ func NewLogsVerifier(c *client.Client, stopChannel chan bool) *LogsSizeVerifier 
 	for i := 0; i < workersNo; i++ {
 		workers[i] = &LogSizeGatherer{
 			stopChannel: stopChannel,
-			data:        &verifier.data,
+			data:        verifier.data,
 			wg:          &verifier.wg,
 			workChannel: workChannel,
 		}
