@@ -423,17 +423,17 @@ function kube::release::parse_and_validate_release_version() {
 #   version
 # Returns:
 #   If version is a valid ci version
-# Sets:                    (e.g. for '1.2.3-alpha.4.56+abcd789-dirty')
+# Sets:                    (e.g. for '1.2.3-alpha.4.56+abcdef12345678')
 #   VERSION_MAJOR          (e.g. '1')
 #   VERSION_MINOR          (e.g. '2')
 #   VERSION_PATCH          (e.g. '3')
 #   VERSION_PRERELEASE     (e.g. 'alpha')
 #   VERSION_PRERELEASE_REV (e.g. '4')
-#   VERSION_BUILD_INFO     (e.g. '.56+abcd789-dirty')
+#   VERSION_BUILD_INFO     (e.g. '.56+abcdef12345678')
 #   VERSION_COMMITS        (e.g. '56')
 function kube::release::parse_and_validate_ci_version() {
-  # Accept things like "v1.2.3-alpha.4.56+abcd789-dirty" or "v1.2.3-beta.4.56"
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+  # Accept things like "v1.2.3-alpha.4.56+abcdef12345678" or "v1.2.3-beta.4"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[0-9a-f]{7,40})?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
     kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
