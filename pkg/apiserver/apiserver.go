@@ -144,7 +144,8 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 	apiResources, registrationErrors := installer.Install(ws)
 	// TODO: This panics when the route is the last one in the webservice.
 	// Best effort due to this panic: https://github.com/emicklei/go-restful/issues/276
-	ws.RemoveRoute(ws.RootPath() + "/", "GET")
+	// Remove the supported resources route and add it back to reflect new resource adds and deletes
+	ws.RemoveRoute(ws.RootPath()+"/", "GET")
 	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, apiResources)
 	return utilerrors.NewAggregate(registrationErrors)
 }

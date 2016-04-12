@@ -85,6 +85,7 @@ import (
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
 
+	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
@@ -125,10 +126,11 @@ type Master struct {
 
 	// storage for third party objects
 	thirdPartyStorage storage.Interface
-	// map from api path to a tuple of (storage for the objects, APIGroup)
+	// map from api path to a tuple of (storage for the objects, API Path for the Thirdparty resource)
 	thirdPartyResources map[string]thirdPartyEntry
 	// protects the map
 	thirdPartyResourcesLock sync.RWMutex
+	thirdPartyGroupsLock    sync.RWMutex
 	// Useful for reliable testing.  Shouldn't be used otherwise.
 	disableThirdPartyControllerForTesting bool
 
@@ -551,22 +553,36 @@ func (m *Master) removeThirdPartyStorage(path string) error {
 			return err
 		}
 		delete(m.thirdPartyResources, path)
-		m.RemoveAPIGroupForDiscovery(getThirdPartyGroupName(path))
 	}
 	return nil
 }
 
 // RemoveThirdPartyResource removes all resources matching `path`.  Also deletes any stored data
 func (m *Master) RemoveThirdPartyResource(path string) error {
+	group, kind := getThirdPartyGroupKind(path)
 	if err := m.removeThirdPartyStorage(path); err != nil {
 		return err
 	}
-
 	services := m.HandlerContainer.RegisteredWebServices()
 	for ix := range services {
-		root := services[ix].RootPath()
-		if root == path || strings.HasPrefix(root, path+"/") {
-			m.HandlerContainer.Remove(services[ix])
+		if strings.HasPrefix(services[ix].RootPath(), makeThirdPartyPath(group)) {
+			m.removeAllThirdPartyResourceRoutes(services[ix], kind)
+		}
+	}
+
+	len := 0
+	for k := range m.thirdPartyResources {
+		if strings.HasPrefix(k, makeThirdPartyPath(group)) {
+			len = len + 1
+		}
+	}
+	if len == 0 {
+		m.RemoveAPIGroupForDiscovery(group)
+		webservices := m.HandlerContainer.RegisteredWebServices()
+		for _, ws := range webservices {
+			if strings.HasPrefix(ws.RootPath(), makeThirdPartyPath(group)) {
+				m.HandlerContainer.Remove(ws)
+			}
 		}
 	}
 	return nil
@@ -589,6 +605,15 @@ func (m *Master) removeAllThirdPartyResources(registry *thirdpartyresourcedataet
 		}
 	}
 	return nil
+}
+
+func (m *Master) removeAllThirdPartyResourceRoutes(ws *restful.WebService, kind string) {
+	routes := ws.Routes()
+	for _, route := range routes {
+		if strings.Contains(route.Path, strings.ToLower(kind)+"s") {
+			ws.RemoveRoute(route.Path, route.Method)
+		}
+	}
 }
 
 // ListThirdPartyResources lists all currently installed third party resources
@@ -667,7 +692,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	for k := range m.thirdPartyResources {
 		if strings.HasPrefix(k, thirdPartyAPIPath) {
 			kind := strings.ToLower(m.thirdPartyResources[k].storage.Kind())
-			storage[kind + "s"] = m.thirdPartyResources[k].storage
+			storage[kind+"s"] = m.thirdPartyResources[k].storage
 		}
 	}
 	optionsExternalVersion := registered.GroupOrDie(api.GroupName).GroupVersion

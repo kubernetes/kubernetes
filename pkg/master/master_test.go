@@ -947,7 +947,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 	}
 
 	path := makeThirdPartyPath("company.com")
-	master.RemoveThirdPartyResource(path)
+	master.RemoveThirdPartyResource(path + "/foos")
 
 	resp, err = http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {
