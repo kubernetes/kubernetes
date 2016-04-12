@@ -41,6 +41,36 @@ parameters:
     type: string
     description: Token used by kube-proxy
 
+  enable_proxy:
+    type: string
+    description: Whether or not to enable proxy settings
+    default: false
+
+  ftp_proxy:
+    type: string
+    description: FTP Proxy URL
+    default: localhost
+
+  http_proxy:
+    type: string
+    description: HTTP Proxy URL
+    default: localhost
+
+  https_proxy:
+    type: string
+    description: HTTPS Proxy URL
+    default: localhost
+
+  socks_proxy:
+    type: string
+    description: SOCKS Proxy URL
+    default: localhost
+
+  no_proxy:
+    type: string
+    description: Comma seperated list of domains/addresses that bypass proxying.
+    default: localhost
+
   # The following are all generated in the parent template.
   kube_master_ip:
     type: string
@@ -95,6 +125,21 @@ resources:
             "$KUBERNETES_SALT_URL": {get_param: kubernetes_salt_url}
             "$MASTER_IP": {get_param: kube_master_ip}
 
+  proxy_config:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config:
+        str_replace:
+          template: {get_file: fragments/configure-proxy.sh}
+          params:
+            "$ENABLE_PROXY": {get_param: enable_proxy }
+            "$FTP_PROXY": {get_param: ftp_proxy }
+            "$HTTP_PROXY": {get_param: http_proxy }
+            "$HTTPS_PROXY": {get_param: https_proxy }
+            "$SOCKS_PROXY": {get_param: socks_proxy }
+            "$NO_PROXY": {get_param: no_proxy }
+
   kube_user:
     type: OS::Heat::SoftwareConfig
     properties:
@@ -144,6 +189,7 @@ resources:
     properties:
       parts:
         - config: {get_resource: write_heat_params}
+        - config: {get_resource: proxy_config}
         - config: {get_resource: kube_user}
         - config: {get_resource: provision_network_node}
         - config: {get_resource: deploy_kube_auth_files_node}

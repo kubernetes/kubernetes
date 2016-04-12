@@ -20,6 +20,11 @@ set -o pipefail
 
 . /etc/sysconfig/heat-params
 
+#Reads in profile, need to relax restrictions for some OSes.
+set +o nounset
+. /etc/profile
+set -o nounset
+
 rm -rf /kube-install
 mkdir -p /kube-install
 cd /kube-install
