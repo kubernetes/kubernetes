@@ -31,7 +31,7 @@ generated_files=($(
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
-        -o -wholename '*/Godeps/*' \
+        -o -wholename '*/vendor/*' \
         -o -wholename '*/codecgen-*-1234.generated.go' \
       \) -prune \
     \) -name '*.generated.go'))
@@ -100,7 +100,7 @@ if [[ -z ${haveindex} ]]; then
 fi
 
 CODECGEN="${PWD}/codecgen_binary"
-godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
+go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
 # Running codecgen fails if some of the files doesn't compile.
 # Thus (since all the files are completely auto-generated and

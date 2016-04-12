@@ -151,106 +151,96 @@ reviews much easier.
 
 See [Faster Reviews](faster_reviews.md) for more details.
 
-## godep and dependency management
+## Dependency management
 
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. It is not strictly required for building Kubernetes but it is required when managing dependencies under the Godeps/ tree, and is required by a number of the build and test scripts. Please make sure that ``godep`` is installed and in your ``$PATH``.
+Kubernetes uses [glide](https://github.com/Masterminds/glide) to manage
+dependencies. It is not required for building Kubernetes but it is required
+when managing dependencies under the `vendor` directory, and is required by a
+number of the build and test scripts. Please make sure that `glide` is
+installed and in your `$PATH`.
 
-### Installing godep
+### Installing glide
 
-There are many ways to build and host Go binaries. Here is an easy way to get utilities like `godep` installed:
+There are many ways to build and host go binaries. Here is an easy way to get utilities like `glide` installed:
 
-1) Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
-source control system). Use `apt-get install mercurial` or `yum install mercurial` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
-directly from mercurial.
-
-2) Create a new GOPATH for your tools and install godep:
+1) Decide on a `GOPATH` for tools.  You can use your existing `GOPATH` or create a new one.
 
 ```sh
 export GOPATH=$HOME/go-tools
 mkdir -p $GOPATH
-go get github.com/tools/godep
+go get github.com/Masterminds/glide
 ```
 
-3) Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
+2) Add `$GOPATH/bin` to your path. Typically you'd add this to your `~/.profile`:
 
 ```sh
 export GOPATH=$HOME/go-tools
 export PATH=$PATH:$GOPATH/bin
 ```
 
-Note:
-At this time, godep update in the Kubernetes project only works properly if your version of godep is < 54.
+### How vendored dependencies work in Kubernetes
 
-To check your version of godep:
+Depending on which version of Go you are using, dependencies will be used in
+one of a number of ways.  The vendored code is stored in the top-level `vendor`
+directory, which is the "new" way to do vendored dependencies in Go, but you
+can still use older Go versions.
 
-```sh
-$ godep version
-godep v53 (linux/amd64/go1.5.3)
-```
+If you use go-1.4 or go-1.5 with `GO15VENDOREXPERIMENT` unset, you have two
+choices.  You can load all of the project's dependencies into your `GOPATH` or
+you can use our build scripts which will synthesize an extra `GOPATH` entry for
+you.
 
-### Using godep
-
-Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/\_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
-
-1) Devote a directory to this endeavor:
-
-_Devoting a separate directory is not required, but it is helpful to separate dependency updates from other changes._
+Option 1) You can copy deps into your `GOPATH` using `glide`.  From within the
+Kubernetes source directory, run:
 
 ```sh
-export KPATH=$HOME/code/kubernetes
-mkdir -p $KPATH/src/k8s.io/kubernetes
-cd $KPATH/src/k8s.io/kubernetes
-git clone https://path/to/your/fork .
-# Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
+glide update --update-vendored --strip-vendor --strip-vcs --cache-gopath
 ```
 
-2) Set up your GOPATH.
+This will consult our manifest of vendored dependencies, fetch them all from
+version-control, and save them in your GOPATH.  Unfortunately, the way `glide`
+works is that this will try to update your local repo.  There should be no
+changes (or something is very wrong), but the `glide.lock` file may be updated
+with a new timestamp.  it is safe to revert this change `git co -- glide.lock`.
+We need the `--strip-vendor` flag so that projects which have their own
+vendored deps will instead use the revisions we have chosen (for more
+consistent builds).  We ned the `--strip-vcs` flag because `glide` demands it
+when using `--strip-vendor`.
+
+Option 2) You can use our build tools.  If you simply run `make` or
+`hack/build-go.sh` or `make test` or `hack/test-go.sh` or (any of the related
+make rules or build scripts) we will create a temporary dir and symlink it to
+look like a `GOPATH` dir, add that to your `GOPATH` before running any `go`
+commands.  This way is simpler, but somewhat slower.
+
+If you use go-1.6 (or late)r or go-1.5 with `GO15VENDOREXPERIMENT=1` set, the
+`go` commands should find the vendored code automatically.
+
+### Using glide to manage dependencies
+
+Here's a quick walkthrough of how to use glide to add or update a Kubernetes dependency.
 
 ```sh
-# Option A: this will let your builds see packages that exist elsewhere on your system.
-export GOPATH=$KPATH:$GOPATH
-# Option B: This will *not* let your local builds see packages that exist elsewhere on your system.
-export GOPATH=$KPATH
-# Option B is recommended if you're going to mess with the dependencies.
+glide get --update-vendored --strip-vendor --strip-vcs example.com/new-dep
 ```
 
-3) Populate your new GOPATH.
+This will pull the `example.com/new-dep` repo into the `vendor` directory along
+with any dependencies it has (vendored or just imported) and then analyze the
+codebase for any changes in the dependency graph.  It can take a while.
 
-```sh
-cd $KPATH/src/k8s.io/kubernetes
-godep restore
-```
+At the end of this you should have the new dependency and its recursive
+dependencies in your `vendor` directory, as well as updated `glide.yaml` and
+glide.lock` files.
 
-4) Next, you can either add a new dependency or update an existing one.
+Before sending a PR, it's a good idea to sanity check that your change is ok by
+running `hack/verify-vendored-deps.sh`
 
-```sh
-# To add a new dependency, do:
-cd $KPATH/src/k8s.io/kubernetes
-go get path/to/dependency
-# Change code in Kubernetes to use the dependency.
-godep save ./...
+Please send dependency updates in separate commits within your PR, for easier
+reviewing.
 
-# To update an existing dependency, do:
-cd $KPATH/src/k8s.io/kubernetes
-go get -u path/to/dependency
-# Change code in Kubernetes accordingly if necessary.
-godep update path/to/dependency/...
-```
-
-_If `go get -u path/to/dependency` fails with compilation errors, instead try `go get -d -u path/to/dependency`
-to fetch the dependencies without compiling them. This can happen when updating the cadvisor dependency._
-
-
-5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by running `hack/verify-godeps.sh`
-
-_If hack/verify-godeps.sh fails after a `godep update`, it is possible that a transitive dependency was added or removed but not
-updated by godeps. It then may be necessary to perform a `godep save ./...` to pick up the transitive dependency changes._
-
-It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
-
-Please send dependency updates in separate commits within your PR, for easier reviewing.
-
+FIXME: need to handle licenses with glide.
 6) If you updated the Godeps, please also update `Godeps/LICENSES` by running `hack/update-godep-licenses.sh`.
+FIXME: need to doc removing a dep
 
 ## Testing
 
