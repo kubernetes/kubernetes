@@ -27,7 +27,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -234,7 +233,7 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *v1.Pod) *v1beta1.ReplicaS
 	}
 
 	// if not cached or cached value is invalid, search all the rs to find the matching one, and update cache
-	rss, err := rsc.rsStore.GetPodReplicaSets(pod)
+	rss, err := rsc.rsStore.VersionedGetPodReplicaSets(pod)
 	if err != nil {
 		glog.V(4).Infof("No ReplicaSets found for pod %v, ReplicaSet controller will avoid syncing", pod.Name)
 		return nil
@@ -274,7 +273,7 @@ func isReplicaSetMatch(pod *v1.Pod, rs *v1beta1.ReplicaSet) bool {
 	if rs.Namespace != pod.Namespace {
 		return false
 	}
-	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := v1beta1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		err = fmt.Errorf("invalid selector: %v", err)
 		return false
@@ -375,7 +374,7 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 			glog.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err)
 			return
 		}
-		rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
+		rsc.expectations.DeletionObserved(rsKey, controller.V1PodKey(pod))
 		rsc.enqueueReplicaSet(rs)
 	}
 }
@@ -417,7 +416,7 @@ func (rsc *ReplicaSetController) worker() {
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *v1beta1.ReplicaSet) {
-	diff := len(filteredPods) - rs.Spec.Replicas
+	diff := len(filteredPods) - int(rs.Spec.Replicas)
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
 		glog.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err)
@@ -455,7 +454,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *v1be
 		}
 		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rs.Namespace, rs.Name, rs.Spec.Replicas, diff)
 		// No need to sort pods if we are about to delete all of them
-		if rs.Spec.Replicas != 0 {
+		if int(rs.Spec.Replicas) != 0 {
 			// Sort the pods in the order such that not-ready < ready, unscheduled
 			// < scheduled, and pending < running. This ensures that we delete pods
 			// in the earlier stages whenever possible.
@@ -530,7 +529,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return err
 	}
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(rsKey)
-	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := v1beta1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		glog.Errorf("Error converting pod selector to selector: %v", err)
 		return err

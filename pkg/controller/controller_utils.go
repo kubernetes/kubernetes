@@ -622,6 +622,11 @@ func PodKey(pod *api.Pod) string {
 	return fmt.Sprintf("%v/%v", pod.Namespace, pod.Name)
 }
 
+// V1PodKey is a duplication of PodKey but operates on versioned pod.
+func V1PodKey(pod *v1.Pod) string {
+	return fmt.Sprintf("%v/%v", pod.Namespace, pod.Name)
+}
+
 // ControllersByCreationTimestamp sorts a list of ReplicationControllers by creation timestamp, using their names as a tie breaker.
 type ControllersByCreationTimestamp []*api.ReplicationController
 

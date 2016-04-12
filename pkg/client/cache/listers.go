@@ -22,7 +22,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -328,6 +330,40 @@ func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensi
 			continue
 		}
 		selector, err = unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		if err != nil {
+			err = fmt.Errorf("invalid selector: %v", err)
+			return
+		}
+
+		// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		rss = append(rss, rs)
+	}
+	if len(rss) == 0 {
+		err = fmt.Errorf("could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
+// VersionedGetPodReplicaSets has the same logic as the GetPodReplicaSets but operates on versioned pod and replicaset.
+// This is a temporary arrangement. GetPodReplicaSets will be removed when all controllers are migrated to use the versioned clients.
+func (s *StoreToReplicaSetLister) VersionedGetPodReplicaSets(pod *v1.Pod) (rss []v1beta1.ReplicaSet, err error) {
+	var selector labels.Selector
+	var rs v1beta1.ReplicaSet
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		rs = *m.(*v1beta1.ReplicaSet)
+		if rs.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = v1beta1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			err = fmt.Errorf("invalid selector: %v", err)
 			return
