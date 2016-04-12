@@ -38,7 +38,7 @@ func construct(t *testing.T, files map[string]string, testNamer namer.Namer) (*p
 	if err != nil {
 		t.Fatal(err)
 	}
-	orderer := namer.Orderer{testNamer}
+	orderer := namer.Orderer{Namer: testNamer}
 	o := orderer.OrderUniverse(u)
 	return b, u, o
 }

@@ -347,7 +347,7 @@ func TestJobScaleFailsPreconditions(t *testing.T) {
 			Parallelism: &ten,
 		},
 	})
-	scaler := JobScaler{&testclient.FakeExperimental{fake}}
+	scaler := JobScaler{&testclient.FakeExperimental{Fake: fake}}
 	preconditions := ScalePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"
@@ -586,7 +586,7 @@ func TestDeploymentScaleFailsPreconditions(t *testing.T) {
 			Replicas: 10,
 		},
 	})
-	scaler := DeploymentScaler{&testclient.FakeExperimental{fake}}
+	scaler := DeploymentScaler{&testclient.FakeExperimental{Fake: fake}}
 	preconditions := ScalePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"

@@ -184,7 +184,7 @@ func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrder
 	for name, systemNamer := range nameSystems {
 		c.Namers[name] = systemNamer
 		if name == canonicalOrderName {
-			orderer := namer.Orderer{systemNamer}
+			orderer := namer.Orderer{Namer: systemNamer}
 			c.Order = orderer.OrderUniverse(u)
 		}
 	}

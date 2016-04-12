@@ -704,7 +704,7 @@ func TestSimpleStop(t *testing.T) {
 		}
 		actions := fake.Actions()
 		if len(test.actions) != len(actions) {
-			t.Errorf("unexpected actions: %v; expected %v (%s)", fake.Actions, test.actions, test.test)
+			t.Errorf("unexpected actions: %v; expected %v (%s)", actions, test.actions, test.test)
 		}
 		for i, action := range actions {
 			testAction := test.actions[i]

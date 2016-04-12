@@ -114,7 +114,7 @@ func TestHandshake(t *testing.T) {
 
 		if len(test.expectedProtocol) == 0 {
 			if len(w.Header()[HeaderProtocolVersion]) > 0 {
-				t.Errorf("%s: unexpected protocol version response header: %s", w.Header()[HeaderProtocolVersion])
+				t.Errorf("%s: unexpected protocol version response header: %s", name, w.Header()[HeaderProtocolVersion])
 			}
 			continue
 		}
