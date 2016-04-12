@@ -496,7 +496,7 @@ func Run(s *options.APIServer) error {
 		return err
 	}
 
-	addControlplaneAPIGroup(storageDestinations, s)
+	addFederationAPIGroup(storageDestinations, s)
 	installFederationAPI(m, storageDestinations)
 
 	m.Run(s.ServerRunOptions)

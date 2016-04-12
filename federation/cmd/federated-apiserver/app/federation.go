@@ -33,7 +33,7 @@ import (
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
 )
 
-func addControlplaneAPIGroup(d genericapiserver.StorageDestinations, s *options.APIServer) {
+func addFederationAPIGroup(d genericapiserver.StorageDestinations, s *options.APIServer) {
 	glog.Infof("Configuring federation/v1alpha1 storage destination")
 	storageVersions := s.StorageGroupsToGroupVersions()
 	controlplaneGroup, err := registered.Group(federation.GroupName)
