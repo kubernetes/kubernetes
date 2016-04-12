@@ -24,13 +24,16 @@ const (
 	maxTestCacheSize int = shardsCount * 2
 )
 
-func ExpectEntry(t *testing.T, cache Cache, index uint64, expectedValue interface{}) {
+func ExpectEntry(t *testing.T, cache Cache, index uint64, expectedValue interface{}) bool {
 	elem, found := cache.Get(index)
 	if !found {
-		t.Error("Expected to find entry with key 1")
+		t.Errorf("Expected to find entry with key %d", index)
+		return false
 	} else if elem != expectedValue {
 		t.Errorf("Expected to find %v, got %v", expectedValue, elem)
+		return false
 	}
+	return true
 }
 
 func TestBasic(t *testing.T) {
@@ -62,4 +65,26 @@ func TestOverwrite(t *testing.T) {
 	ExpectEntry(t, cache, 1, "xxx")
 	cache.Add(1, "yyy")
 	ExpectEntry(t, cache, 1, "yyy")
+}
+
+// TestEvict this test will fail sporatically depending on what add()
+// selects for the randomKey to be evicted.  Ensure that randomKey
+// is never the key we most recently added.  Since the chance of failure
+// on each evict is 50%, if we do it 7 times, it should catch the problem
+// if it exists >99% of the time.
+func TestEvict(t *testing.T) {
+	cache := NewCache(shardsCount)
+	var found bool
+	for retry := 0; retry < 7; retry++ {
+		cache.Add(uint64(shardsCount), "xxx")
+		found = ExpectEntry(t, cache, uint64(shardsCount), "xxx")
+		if !found {
+			break
+		}
+		cache.Add(0, "xxx")
+		found = ExpectEntry(t, cache, 0, "xxx")
+		if !found {
+			break
+		}
+	}
 }

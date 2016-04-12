@@ -27,6 +27,9 @@ const (
 type Cache []*cacheShard
 
 func NewCache(maxSize int) Cache {
+	if maxSize < shardsCount {
+		maxSize = shardsCount
+	}
 	cache := make(Cache, shardsCount)
 	for i := 0; i < shardsCount; i++ {
 		cache[i] = &cacheShard{
@@ -61,14 +64,14 @@ func (s *cacheShard) add(index uint64, obj interface{}) bool {
 	s.Lock()
 	defer s.Unlock()
 	_, isOverwrite := s.items[index]
-	s.items[index] = obj
-	if len(s.items) > s.maxSize {
+	if !isOverwrite && len(s.items) >= s.maxSize {
 		var randomKey uint64
 		for randomKey = range s.items {
 			break
 		}
 		delete(s.items, randomKey)
 	}
+	s.items[index] = obj
 	return isOverwrite
 }
 
