@@ -86,7 +86,7 @@ func (p *Pod) GetUID() string {
 
 // implements Deadlined
 func (dp *Pod) Deadline() (time.Time, bool) {
-	if dp.Deadline != nil {
+	if dp.deadline != nil {
 		return *(dp.deadline), true
 	}
 	return time.Time{}, false

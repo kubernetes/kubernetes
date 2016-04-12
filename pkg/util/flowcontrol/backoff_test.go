@@ -70,7 +70,7 @@ func TestBackoffReset(t *testing.T) {
 	lastUpdate := tc.Now()
 	tc.Step(2*maxDuration + step) // time += 11s, 11 > 2*maxDuration
 	if b.IsInBackOffSince(id, lastUpdate) {
-		t.Errorf("now=%s lastUpdate=%s (%s) expected Backoff reset got %s b.lastUpdate=%s", tc.Now(), startTime, tc.Now().Sub(lastUpdate), b.Get(id))
+		t.Errorf("expected to not be in Backoff after reset (start=%s, now=%s, lastUpdate=%s), got %s", startTime, tc.Now(), lastUpdate, b.Get(id))
 	}
 }
 
