@@ -27,7 +27,7 @@ import (
 )
 
 // updateReplicaCount attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
-func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.ReplicaSet, numReplicas, numFullyLabeledReplicas int) (updateErr error) {
+func updateReplicaCount(rsClient client.ReplicaSetInterface, rs v1beta1.ReplicaSet, numReplicas, numFullyLabeledReplicas int) (updateErr error) {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
@@ -49,7 +49,7 @@ func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.Repli
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rs.Status.FullyLabeledReplicas, numFullyLabeledReplicas) +
 			fmt.Sprintf("sequence No: %v->%v", rs.Status.ObservedGeneration, generation))
 
-		rs.Status = extensions.ReplicaSetStatus{Replicas: numReplicas, FullyLabeledReplicas: numFullyLabeledReplicas, ObservedGeneration: generation}
+		rs.Status = v1beta1.ReplicaSetStatus{Replicas: numReplicas, FullyLabeledReplicas: numFullyLabeledReplicas, ObservedGeneration: generation}
 		_, updateErr = rsClient.UpdateStatus(rs)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr
@@ -64,7 +64,7 @@ func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.Repli
 }
 
 // overlappingReplicaSets sorts a list of ReplicaSets by creation timestamp, using their names as a tie breaker.
-type overlappingReplicaSets []extensions.ReplicaSet
+type overlappingReplicaSets []v1beta1.ReplicaSet
 
 func (o overlappingReplicaSets) Len() int      { return len(o) }
 func (o overlappingReplicaSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

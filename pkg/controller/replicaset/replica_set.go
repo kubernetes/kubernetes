@@ -121,14 +121,14 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 				return rsc.kubeClient.Extensions().ReplicaSets(api.NamespaceAll).Watch(options)
 			},
 		},
-		&extensions.ReplicaSet{},
+		&v1beta1.ReplicaSet{},
 		// TODO: Can we have much longer period here?
 		FullControllerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rsc.enqueueReplicaSet,
 			UpdateFunc: func(old, cur interface{}) {
-				oldRS := old.(*extensions.ReplicaSet)
-				curRS := cur.(*extensions.ReplicaSet)
+				oldRS := old.(*v1beta1.ReplicaSet)
+				curRS := cur.(*v1beta1.ReplicaSet)
 
 				// We should invalidate the whole lookup cache if a RS's selector has been updated.
 				//
@@ -178,7 +178,7 @@ func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod contro
 				return rsc.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
-		&api.Pod{},
+		&v1.Pod{},
 		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rsc.addPod,
@@ -219,10 +219,10 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodReplicaSet returns the replica set managing the given pod.
 // TODO: Surface that we are ignoring multiple replica sets for a single pod.
-func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) *extensions.ReplicaSet {
+func (rsc *ReplicaSetController) getPodReplicaSet(pod *v1.Pod) *v1beta1.ReplicaSet {
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rsc.lookupCache.GetMatchingObject(pod); cached {
-		rs, ok := obj.(*extensions.ReplicaSet)
+		rs, ok := obj.(*v1beta1.ReplicaSet)
 		if !ok {
 			// This should not happen
 			glog.Errorf("lookup cache does not retuen a ReplicaSet object")
@@ -259,7 +259,7 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) *extensions.Repl
 }
 
 // isCacheValid check if the cache is valid
-func (rsc *ReplicaSetController) isCacheValid(pod *api.Pod, cachedRS *extensions.ReplicaSet) bool {
+func (rsc *ReplicaSetController) isCacheValid(pod *v1.Pod, cachedRS *v1beta1.ReplicaSet) bool {
 	_, exists, err := rsc.rsStore.Get(cachedRS)
 	// rs has been deleted or updated, cache is invalid
 	if err != nil || !exists || !isReplicaSetMatch(pod, cachedRS) {
@@ -270,7 +270,7 @@ func (rsc *ReplicaSetController) isCacheValid(pod *api.Pod, cachedRS *extensions
 
 // isReplicaSetMatch take a Pod and ReplicaSet, return whether the Pod and ReplicaSet are matching
 // TODO(mqliang): This logic is a copy from GetPodReplicaSets(), remove the duplication
-func isReplicaSetMatch(pod *api.Pod, rs *extensions.ReplicaSet) bool {
+func isReplicaSetMatch(pod *v1.Pod, rs *v1beta1.ReplicaSet) bool {
 	if rs.Namespace != pod.Namespace {
 		return false
 	}
@@ -289,7 +289,7 @@ func isReplicaSetMatch(pod *api.Pod, rs *extensions.ReplicaSet) bool {
 
 // When a pod is created, enqueue the replica set that manages it and update it's expectations.
 func (rsc *ReplicaSetController) addPod(obj interface{}) {
-	pod := obj.(*api.Pod)
+	pod := obj.(*v1.Pod)
 	glog.V(4).Infof("Pod %s created: %+v.", pod.Name, pod)
 
 	rs := rsc.getPodReplicaSet(pod)
@@ -313,14 +313,14 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 
 // When a pod is updated, figure out what replica set/s manage it and wake them
 // up. If the labels of the pod have changed we need to awaken both the old
-// and new replica set. old and cur must be *api.Pod types.
+// and new replica set. old and cur must be *v1.Pod types.
 func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 	if api.Semantic.DeepEqual(old, cur) {
 		// A periodic relist will send update events for all known pods.
 		return
 	}
-	curPod := cur.(*api.Pod)
-	oldPod := old.(*api.Pod)
+	curPod := cur.(*v1.Pod)
+	oldPod := old.(*v1.Pod)
 	glog.V(4).Infof("Pod %s updated %+v -> %+v.", curPod.Name, oldPod, curPod)
 	rs := rsc.getPodReplicaSet(curPod)
 	if rs == nil {
@@ -348,9 +348,9 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 }
 
 // When a pod is deleted, enqueue the replica set that manages the pod and update its expectations.
-// obj could be an *api.Pod, or a DeletionFinalStateUnknown marker item.
+// obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
 func (rsc *ReplicaSetController) deletePod(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
+	pod, ok := obj.(*v1.Pod)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
@@ -362,7 +362,7 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 			glog.Errorf("Couldn't get object from tombstone %+v", obj)
 			return
 		}
-		pod, ok = tombstone.Obj.(*api.Pod)
+		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
 			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
 			return
@@ -380,7 +380,7 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 	}
 }
 
-// obj could be an *extensions.ReplicaSet, or a DeletionFinalStateUnknown marker item.
+// obj could be an *v1beta1.ReplicaSet, or a DeletionFinalStateUnknown marker item.
 func (rsc *ReplicaSetController) enqueueReplicaSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
@@ -416,7 +416,7 @@ func (rsc *ReplicaSetController) worker() {
 }
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
-func (rsc *ReplicaSetController) manageReplicas(filteredPods []*api.Pod, rs *extensions.ReplicaSet) {
+func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *v1beta1.ReplicaSet) {
 	diff := len(filteredPods) - rs.Spec.Replicas
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
@@ -518,7 +518,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		rsc.queue.Add(key)
 		return err
 	}
-	rs := *obj.(*extensions.ReplicaSet)
+	rs := *obj.(*v1beta1.ReplicaSet)
 
 	// Check the expectations of the ReplicaSet before counting active pods, otherwise a new pod can sneak
 	// in and update the expectations after we've retrieved active pods from the store. If a new pod enters
