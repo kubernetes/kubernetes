@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-#These values are meant to be swapped in by heat
+# The contents of these variables swapped in by heat via environments presented to kube-up.sh
 
 export ETC_ENVIRONMENT='FTP_PROXY=$FTP_PROXY
 HTTP_PROXY=$HTTP_PROXY
@@ -56,8 +56,10 @@ export DOCKER_PROXY='[Service]
       Environment="no_proxy=$NO_PROXY"
 '
 
+# This again is set by heat
 ENABLE_PROXY='$ENABLE_PROXY'
 
+# Heat itself doesn't have conditionals, so this is how we set up our proxy without breaking non-proxy setups.
 if [[ "${ENABLE_PROXY}" == "true" ]]; then
   mkdir -p /etc/systemd/system/docker.service.d/
 

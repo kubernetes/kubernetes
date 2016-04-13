@@ -53,4 +53,5 @@ CLIENT_PUBLIC_KEY_PATH=${CLIENT_PUBLIC_KEY_PATH:-~/.ssh/id_rsa.pub}
 # Max time period for stack provisioning. Time in minutes.
 STACK_CREATE_TIMEOUT=${STACK_CREATE_TIMEOUT:-60}
 
+# Enable Proxy, if true kube-up will apply your current proxy settings(defined by *_PROXY environment variables) to the deployment.
 ENABLE_PROXY=${ENABLE_PROXY:-false}

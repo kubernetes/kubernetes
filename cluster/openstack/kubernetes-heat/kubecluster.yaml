@@ -354,6 +354,12 @@ resources:
           cluster_name: {get_param: "OS::stack_name"}
           secgroup_base: {get_resource: secgroup_base}
           secgroup_node: {get_resource: secgroup_node}
+          enable_proxy: {get_param: enable_proxy }
+          ftp_proxy: {get_param: ftp_proxy }
+          http_proxy: {get_param: http_proxy }
+          https_proxy: {get_param: https_proxy }
+          socks_proxy: {get_param: socks_proxy }
+          no_proxy: {get_param: no_proxy }
       min_size: {get_param: number_of_minions}
       desired_capacity: {get_param: number_of_minions}
       max_size: {get_param: max_number_of_minions}
