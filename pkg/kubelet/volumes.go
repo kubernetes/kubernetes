@@ -34,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-var errUnsupportedVolumeType = fmt.Errorf("unsupported volume type")
-
 // This just exports required functions from kubelet proper, for use by volume
 // plugins.
 type volumeHost struct {
@@ -58,6 +56,9 @@ func (vh *volumeHost) GetKubeClient() clientset.Interface {
 	return vh.kubelet.kubeClient
 }
 
+// NewWrapperMounter attempts to create a volume mounter
+// from a volume Spec, pod and volume options.
+// Returns a new volume Mounter or an error.
 func (vh *volumeHost) NewWrapperMounter(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
@@ -65,13 +66,12 @@ func (vh *volumeHost) NewWrapperMounter(volName string, spec volume.Spec, pod *a
 		spec.Volume.Name = wrapperVolumeName
 	}
 
-	b, err := vh.kubelet.newVolumeMounterFromPlugins(&spec, pod, opts)
-	if err == nil && b == nil {
-		return nil, errUnsupportedVolumeType
-	}
-	return b, nil
+	return vh.kubelet.newVolumeMounterFromPlugins(&spec, pod, opts)
 }
 
+// NewWrapperUnmounter attempts to create a volume unmounter
+// from a volume name and pod uid.
+// Returns a new volume Unmounter or an error.
 func (vh *volumeHost) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
@@ -83,15 +83,8 @@ func (vh *volumeHost) NewWrapperUnmounter(volName string, spec volume.Spec, podU
 	if err != nil {
 		return nil, err
 	}
-	if plugin == nil {
-		// Not found but not an error
-		return nil, nil
-	}
-	c, err := plugin.NewUnmounter(spec.Name(), podUID)
-	if err == nil && c == nil {
-		return nil, errUnsupportedVolumeType
-	}
-	return c, nil
+
+	return plugin.NewUnmounter(spec.Name(), podUID)
 }
 
 func (vh *volumeHost) GetCloudProvider() cloudprovider.Interface {
@@ -140,9 +133,6 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		if err != nil {
 			glog.Errorf("Could not create volume mounter for pod %s: %v", pod.UID, err)
 			return nil, err
-		}
-		if mounter == nil {
-			return nil, errUnsupportedVolumeType
 		}
 
 		// some volumes require attachment before mounter's setup.
@@ -254,10 +244,6 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleanerTuple {
 				glog.Errorf("Could not create volume unmounter for %s: %v", volume.Name, err)
 				continue
 			}
-			if unmounter == nil {
-				glog.Errorf("Could not create volume unmounter for %s: %v", volume.Name, errUnsupportedVolumeType)
-				continue
-			}
 
 			tuple := cleanerTuple{Unmounter: unmounter}
 			detacher, err := kl.newVolumeDetacherFromPlugins(volume.Kind, volume.Name, podUID)
@@ -275,23 +261,29 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleanerTuple {
 	return currentVolumes
 }
 
+// newVolumeMounterFromPlugins attempts to find a plugin by volume spec, pod
+// and volume options and then creates a Mounter.
+// Returns a valid Unmounter or an error.
 func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name(), err)
 	}
-	if plugin == nil {
-		// Not found but not an error
-		return nil, nil
-	}
 	physicalMounter, err := plugin.NewMounter(spec, pod, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate volume physicalMounter for %s: %v", spec.Name(), err)
+		return nil, fmt.Errorf("failed to instantiate mounter for volume: %s using plugin: %s with a root cause: %v", spec.Name(), plugin.Name(), err)
 	}
 	glog.V(10).Infof("Used volume plugin %q to mount %s", plugin.Name(), spec.Name())
 	return physicalMounter, nil
 }
 
+// newVolumeAttacherFromPlugins attempts to find a plugin from a volume spec
+// and then create an Attacher.
+// Returns:
+//  - an attacher if one exists
+//  - an error if no plugin was found for the volume
+//    or the attacher failed to instantiate
+//  - nil if there is no appropriate attacher for this volume
 func (kl *Kubelet) newVolumeAttacherFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Attacher, error) {
 	plugin, err := kl.volumePluginMgr.FindAttachablePluginBySpec(spec)
 	if err != nil {
@@ -310,6 +302,9 @@ func (kl *Kubelet) newVolumeAttacherFromPlugins(spec *volume.Spec, pod *api.Pod,
 	return attacher, nil
 }
 
+// newVolumeUnmounterFromPlugins attempts to find a plugin by name and then
+// create an Unmounter.
+// Returns a valid Unmounter or an error.
 func (kl *Kubelet) newVolumeUnmounterFromPlugins(kind string, name string, podUID types.UID) (volume.Unmounter, error) {
 	plugName := strings.UnescapeQualifiedNameForDisk(kind)
 	plugin, err := kl.volumePluginMgr.FindPluginByName(plugName)
@@ -317,10 +312,7 @@ func (kl *Kubelet) newVolumeUnmounterFromPlugins(kind string, name string, podUI
 		// TODO: Maybe we should launch a cleanup of this dir?
 		return nil, fmt.Errorf("can't use volume plugins for %s/%s: %v", podUID, kind, err)
 	}
-	if plugin == nil {
-		// Not found but not an error.
-		return nil, nil
-	}
+
 	unmounter, err := plugin.NewUnmounter(name, podUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume plugin for %s/%s: %v", podUID, kind, err)
@@ -329,6 +321,13 @@ func (kl *Kubelet) newVolumeUnmounterFromPlugins(kind string, name string, podUI
 	return unmounter, nil
 }
 
+// newVolumeDetacherFromPlugins attempts to find a plugin by a name and then
+// create a Detacher.
+// Returns:
+//  - a detacher if one exists
+//  - an error if no plugin was found for the volume
+//    or the detacher failed to instantiate
+//  - nil if there is no appropriate detacher for this volume
 func (kl *Kubelet) newVolumeDetacherFromPlugins(kind string, name string, podUID types.UID) (volume.Detacher, error) {
 	plugName := strings.UnescapeQualifiedNameForDisk(kind)
 	plugin, err := kl.volumePluginMgr.FindAttachablePluginByName(plugName)
