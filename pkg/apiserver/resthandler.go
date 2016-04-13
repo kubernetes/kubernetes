@@ -70,8 +70,11 @@ type ScopeNamer interface {
 type RequestScope struct {
 	Namer ScopeNamer
 	ContextFunc
-	Serializer runtime.NegotiatedSerializer
+
+	Serializer       runtime.NegotiatedSerializer
+	StreamSerializer runtime.NegotiatedSerializer
 	runtime.ParameterCodec
+
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
 

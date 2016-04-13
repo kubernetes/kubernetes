@@ -17,12 +17,15 @@ limitations under the License.
 package api_test
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	proto "github.com/golang/protobuf/proto"
 	flag "github.com/spf13/pflag"
 	"github.com/ugorji/go/codec"
 
@@ -58,6 +61,15 @@ func fuzzInternalObject(t *testing.T, forVersion unversioned.GroupVersion, item 
 	return item
 }
 
+func dataAsString(data []byte) string {
+	dataString := string(data)
+	if !strings.HasPrefix(dataString, "{") {
+		dataString = "\n" + hex.Dump(data)
+		proto.NewBuffer(make([]byte, 0, 1024)).DebugPrint("decoded object", data)
+	}
+	return dataString
+}
+
 func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	printer := spew.ConfigState{DisableMethods: true}
 
@@ -70,11 +82,12 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 
 	obj2, err := runtime.Decode(codec, data)
 	if err != nil {
-		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, string(data), printer.Sprintf("%#v", item))
+		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), printer.Sprintf("%#v", item))
+		panic("failed")
 		return
 	}
 	if !api.Semantic.DeepEqual(item, obj2) {
-		t.Errorf("\n1: %v: diff: %v\nCodec: %v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectGoPrintDiff(item, obj2), codec, printer.Sprintf("%#v", item), string(data), printer.Sprintf("%#v", obj2))
+		t.Errorf("\n1: %v: diff: %v\nCodec: %v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectGoPrintDiff(item, obj2), codec, printer.Sprintf("%#v", item), dataAsString(data), printer.Sprintf("%#v", obj2))
 		return
 	}
 
@@ -135,7 +148,14 @@ func TestList(t *testing.T) {
 	roundTripSame(t, testapi.Default, item)
 }
 
-var nonRoundTrippableTypes = sets.NewString("ExportOptions")
+var nonRoundTrippableTypes = sets.NewString(
+	"ExportOptions",
+	// WatchEvent does not include kind and version and can only be deserialized
+	// implicitly (if the caller expects the specific object). The watch call defines
+	// the schema by content type, rather than via kind/version included in each
+	// object.
+	"WatchEvent",
+)
 
 var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions", "ExportOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}
