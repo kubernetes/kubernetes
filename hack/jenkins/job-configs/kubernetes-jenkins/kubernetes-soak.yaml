@@ -3,14 +3,13 @@
     description: '{deploy-description} Test owner: {test-owner}'
     logrotate:
         daysToKeep: 14
-    node: 'master'
     builders:
         - shell: |
             {provider-env}
             {soak-deploy}
             {job-env}
             {post-env}
-            timeout -k {kill-timeout}m 90m {legacy-runner} && rc=$? || rc=$?
+            timeout -k {kill-timeout}m 90m {runner} && rc=$? || rc=$?
             {report-rc}
     properties:
         - build-blocker:
@@ -37,14 +36,13 @@
     workspace: '/var/lib/jenkins/jobs/kubernetes-soak-weekly-deploy-{suffix}/workspace'
     logrotate:
         daysToKeep: 7
-    node: 'master'
     builders:
         - shell: |
             {provider-env}
             {soak-continuous}
             {job-env}
             {post-env}
-            timeout -k {kill-timeout}m 360m {legacy-runner} && rc=$? || rc=$?
+            timeout -k {kill-timeout}m 360m {runner} && rc=$? || rc=$?
             {report-rc}
     properties:
         - build-blocker:
