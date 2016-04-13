@@ -20,11 +20,11 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/config-common.sh"
 
 GCLOUD=gcloud
-ZONE=${KUBE_GCE_ZONE:-us-central1-b}
+ZONE=${KUBE_GCE_ZONE:-europe-west1-b}
 RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
 REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
-NODE_SIZE=${NODE_SIZE:-n1-standard-2}
-NUM_NODES=${NUM_NODES:-3}
+NODE_SIZE=${NODE_SIZE:-n1-standard-8}
+NUM_NODES=${NUM_NODES:-11}
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
