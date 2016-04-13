@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -60,6 +61,9 @@ var (
 
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer framework.SharedInformer, client *clientset.Clientset) *EndpointController {
+	if client != nil && client.Core().GetRESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().GetRESTClient().GetRateLimiter())
+	}
 	e := &EndpointController{
 		client: client,
 		queue:  workqueue.New(),

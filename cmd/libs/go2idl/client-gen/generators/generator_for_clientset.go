@@ -131,6 +131,9 @@ type Clientset struct {
 var clientsetInterfaceImplTemplate = `
 // $.Group$ retrieves the $.Group$Client
 func (c *Clientset) $.Group$() $.PackageName$.$.Group$Interface {
+	if c == nil {
+		return nil
+	}
 	return c.$.Group$Client
 }
 `

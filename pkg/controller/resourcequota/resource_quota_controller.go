@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -81,7 +82,9 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 		registry:                 options.Registry,
 		replenishmentControllers: []framework.ControllerInterface{},
 	}
-
+	if options.KubeClient != nil && options.KubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", options.KubeClient.Core().GetRESTClient().GetRateLimiter())
+	}
 	// set the synchronization handler
 	rq.syncHandler = rq.syncResourceQuotaFromKey
 

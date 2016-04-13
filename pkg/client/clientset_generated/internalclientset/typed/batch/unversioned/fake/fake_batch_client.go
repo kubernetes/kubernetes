@@ -18,6 +18,7 @@ package fake
 
 import (
 	unversioned "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -27,4 +28,10 @@ type FakeBatch struct {
 
 func (c *FakeBatch) Jobs(namespace string) unversioned.JobInterface {
 	return &FakeJobs{c, namespace}
+}
+
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *FakeBatch) GetRESTClient() *restclient.RESTClient {
+	return nil
 }
