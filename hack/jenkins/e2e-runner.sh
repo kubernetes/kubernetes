@@ -21,6 +21,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+: ${KUBE_GCS_RELEASE_BUCKET:="kubernetes-release"}
+
 function running_in_docker() {
     grep -q docker /proc/self/cgroup
 }
@@ -46,7 +48,7 @@ function fetch_published_version_tars() {
     local -r published_version="${1}"
     IFS='/' read -a varr <<< "${published_version}"
     bucket="${varr[0]}"
-    build_version=$(gsutil cat gs://kubernetes-release/${published_version}.txt)
+    build_version=$(gsutil cat gs://${KUBE_GCS_RELEASE_BUCKET}/${published_version}.txt)
     echo "Using published version $bucket/$build_version (from ${published_version})"
     fetch_tars_from_gcs "${bucket}" "${build_version}"
     unpack_binaries
@@ -66,8 +68,8 @@ function fetch_tars_from_gcs() {
     local -r build_version="${2}"
     echo "Pulling binaries from GCS; using server version ${bucket}/${build_version}."
     gsutil -mq cp \
-        "gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz" \
-        "gs://kubernetes-release/${bucket}/${build_version}/kubernetes-test.tar.gz" \
+        "gs://${KUBE_GCS_RELEASE_BUCKET}/${bucket}/${build_version}/kubernetes.tar.gz" \
+        "gs://${KUBE_GCS_RELEASE_BUCKET}/${bucket}/${build_version}/kubernetes-test.tar.gz" \
         .
 }
 

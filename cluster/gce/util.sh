@@ -738,8 +738,8 @@ function create-nodes() {
         --template "$template_name" || true;
     gcloud compute instance-groups managed wait-until-stable \
         "${NODE_INSTANCE_PREFIX}-group-$i" \
-	      --zone "${ZONE}" \
-	      --project "${PROJECT}" || true;
+        --zone "${ZONE}" \
+        --project "${PROJECT}" || true;
   done
 
   # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
