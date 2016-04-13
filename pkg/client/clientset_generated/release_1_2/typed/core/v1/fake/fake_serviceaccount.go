@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -32,9 +33,11 @@ type FakeServiceAccounts struct {
 	ns   string
 }
 
+var serviceaccountsResource = unversioned.GroupVersionResource{Group: "core", Version: "v1", Resource: "serviceaccounts"}
+
 func (c *FakeServiceAccounts) Create(serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("serviceaccounts", c.ns, serviceAccount), &v1.ServiceAccount{})
+		Invokes(core.NewCreateAction(serviceaccountsResource, c.ns, serviceAccount), &v1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +47,7 @@ func (c *FakeServiceAccounts) Create(serviceAccount *v1.ServiceAccount) (result 
 
 func (c *FakeServiceAccounts) Update(serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("serviceaccounts", c.ns, serviceAccount), &v1.ServiceAccount{})
+		Invokes(core.NewUpdateAction(serviceaccountsResource, c.ns, serviceAccount), &v1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err
@@ -54,13 +57,13 @@ func (c *FakeServiceAccounts) Update(serviceAccount *v1.ServiceAccount) (result 
 
 func (c *FakeServiceAccounts) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("serviceaccounts", c.ns, name), &v1.ServiceAccount{})
+		Invokes(core.NewDeleteAction(serviceaccountsResource, c.ns, name), &v1.ServiceAccount{})
 
 	return err
 }
 
 func (c *FakeServiceAccounts) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("serviceaccounts", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(serviceaccountsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ServiceAccountList{})
 	return err
@@ -68,7 +71,7 @@ func (c *FakeServiceAccounts) DeleteCollection(options *api.DeleteOptions, listO
 
 func (c *FakeServiceAccounts) Get(name string) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("serviceaccounts", c.ns, name), &v1.ServiceAccount{})
+		Invokes(core.NewGetAction(serviceaccountsResource, c.ns, name), &v1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err
@@ -78,7 +81,7 @@ func (c *FakeServiceAccounts) Get(name string) (result *v1.ServiceAccount, err e
 
 func (c *FakeServiceAccounts) List(opts api.ListOptions) (result *v1.ServiceAccountList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("serviceaccounts", c.ns, opts), &v1.ServiceAccountList{})
+		Invokes(core.NewListAction(serviceaccountsResource, c.ns, opts), &v1.ServiceAccountList{})
 
 	if obj == nil {
 		return nil, err
@@ -100,6 +103,6 @@ func (c *FakeServiceAccounts) List(opts api.ListOptions) (result *v1.ServiceAcco
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
 func (c *FakeServiceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("serviceaccounts", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(serviceaccountsResource, c.ns, opts))
 
 }

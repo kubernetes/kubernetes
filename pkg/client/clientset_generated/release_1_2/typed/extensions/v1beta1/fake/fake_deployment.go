@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -32,9 +33,11 @@ type FakeDeployments struct {
 	ns   string
 }
 
+var deploymentsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}
+
 func (c *FakeDeployments) Create(deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("deployments", c.ns, deployment), &v1beta1.Deployment{})
+		Invokes(core.NewCreateAction(deploymentsResource, c.ns, deployment), &v1beta1.Deployment{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +47,7 @@ func (c *FakeDeployments) Create(deployment *v1beta1.Deployment) (result *v1beta
 
 func (c *FakeDeployments) Update(deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("deployments", c.ns, deployment), &v1beta1.Deployment{})
+		Invokes(core.NewUpdateAction(deploymentsResource, c.ns, deployment), &v1beta1.Deployment{})
 
 	if obj == nil {
 		return nil, err
@@ -54,7 +57,7 @@ func (c *FakeDeployments) Update(deployment *v1beta1.Deployment) (result *v1beta
 
 func (c *FakeDeployments) UpdateStatus(deployment *v1beta1.Deployment) (*v1beta1.Deployment, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("deployments", "status", c.ns, deployment), &v1beta1.Deployment{})
+		Invokes(core.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), &v1beta1.Deployment{})
 
 	if obj == nil {
 		return nil, err
@@ -64,13 +67,13 @@ func (c *FakeDeployments) UpdateStatus(deployment *v1beta1.Deployment) (*v1beta1
 
 func (c *FakeDeployments) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("deployments", c.ns, name), &v1beta1.Deployment{})
+		Invokes(core.NewDeleteAction(deploymentsResource, c.ns, name), &v1beta1.Deployment{})
 
 	return err
 }
 
 func (c *FakeDeployments) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("deployments", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(deploymentsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.DeploymentList{})
 	return err
@@ -78,7 +81,7 @@ func (c *FakeDeployments) DeleteCollection(options *api.DeleteOptions, listOptio
 
 func (c *FakeDeployments) Get(name string) (result *v1beta1.Deployment, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("deployments", c.ns, name), &v1beta1.Deployment{})
+		Invokes(core.NewGetAction(deploymentsResource, c.ns, name), &v1beta1.Deployment{})
 
 	if obj == nil {
 		return nil, err
@@ -88,7 +91,7 @@ func (c *FakeDeployments) Get(name string) (result *v1beta1.Deployment, err erro
 
 func (c *FakeDeployments) List(opts api.ListOptions) (result *v1beta1.DeploymentList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("deployments", c.ns, opts), &v1beta1.DeploymentList{})
+		Invokes(core.NewListAction(deploymentsResource, c.ns, opts), &v1beta1.DeploymentList{})
 
 	if obj == nil {
 		return nil, err
@@ -110,6 +113,6 @@ func (c *FakeDeployments) List(opts api.ListOptions) (result *v1beta1.Deployment
 // Watch returns a watch.Interface that watches the requested deployments.
 func (c *FakeDeployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("deployments", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(deploymentsResource, c.ns, opts))
 
 }

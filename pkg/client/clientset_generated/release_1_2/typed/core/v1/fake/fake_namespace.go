@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -31,9 +32,11 @@ type FakeNamespaces struct {
 	Fake *FakeCore
 }
 
+var namespacesResource = unversioned.GroupVersionResource{Group: "core", Version: "v1", Resource: "namespaces"}
+
 func (c *FakeNamespaces) Create(namespace *v1.Namespace) (result *v1.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction("namespaces", namespace), &v1.Namespace{})
+		Invokes(core.NewRootCreateAction(namespacesResource, namespace), &v1.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
@@ -42,7 +45,7 @@ func (c *FakeNamespaces) Create(namespace *v1.Namespace) (result *v1.Namespace, 
 
 func (c *FakeNamespaces) Update(namespace *v1.Namespace) (result *v1.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction("namespaces", namespace), &v1.Namespace{})
+		Invokes(core.NewRootUpdateAction(namespacesResource, namespace), &v1.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
@@ -51,7 +54,7 @@ func (c *FakeNamespaces) Update(namespace *v1.Namespace) (result *v1.Namespace, 
 
 func (c *FakeNamespaces) UpdateStatus(namespace *v1.Namespace) (*v1.Namespace, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction("namespaces", "status", namespace), &v1.Namespace{})
+		Invokes(core.NewRootUpdateSubresourceAction(namespacesResource, "status", namespace), &v1.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
@@ -60,12 +63,12 @@ func (c *FakeNamespaces) UpdateStatus(namespace *v1.Namespace) (*v1.Namespace, e
 
 func (c *FakeNamespaces) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction("namespaces", name), &v1.Namespace{})
+		Invokes(core.NewRootDeleteAction(namespacesResource, name), &v1.Namespace{})
 	return err
 }
 
 func (c *FakeNamespaces) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction("namespaces", listOptions)
+	action := core.NewRootDeleteCollectionAction(namespacesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.NamespaceList{})
 	return err
@@ -73,7 +76,7 @@ func (c *FakeNamespaces) DeleteCollection(options *api.DeleteOptions, listOption
 
 func (c *FakeNamespaces) Get(name string) (result *v1.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction("namespaces", name), &v1.Namespace{})
+		Invokes(core.NewRootGetAction(namespacesResource, name), &v1.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
@@ -82,7 +85,7 @@ func (c *FakeNamespaces) Get(name string) (result *v1.Namespace, err error) {
 
 func (c *FakeNamespaces) List(opts api.ListOptions) (result *v1.NamespaceList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction("namespaces", opts), &v1.NamespaceList{})
+		Invokes(core.NewRootListAction(namespacesResource, opts), &v1.NamespaceList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -103,5 +106,5 @@ func (c *FakeNamespaces) List(opts api.ListOptions) (result *v1.NamespaceList, e
 // Watch returns a watch.Interface that watches the requested namespaces.
 func (c *FakeNamespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction("namespaces", opts))
+		InvokesWatch(core.NewRootWatchAction(namespacesResource, opts))
 }

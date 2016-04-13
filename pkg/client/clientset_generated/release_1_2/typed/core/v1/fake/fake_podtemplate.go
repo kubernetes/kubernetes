@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -32,9 +33,11 @@ type FakePodTemplates struct {
 	ns   string
 }
 
+var podtemplatesResource = unversioned.GroupVersionResource{Group: "core", Version: "v1", Resource: "podtemplates"}
+
 func (c *FakePodTemplates) Create(podTemplate *v1.PodTemplate) (result *v1.PodTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("podtemplates", c.ns, podTemplate), &v1.PodTemplate{})
+		Invokes(core.NewCreateAction(podtemplatesResource, c.ns, podTemplate), &v1.PodTemplate{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +47,7 @@ func (c *FakePodTemplates) Create(podTemplate *v1.PodTemplate) (result *v1.PodTe
 
 func (c *FakePodTemplates) Update(podTemplate *v1.PodTemplate) (result *v1.PodTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("podtemplates", c.ns, podTemplate), &v1.PodTemplate{})
+		Invokes(core.NewUpdateAction(podtemplatesResource, c.ns, podTemplate), &v1.PodTemplate{})
 
 	if obj == nil {
 		return nil, err
@@ -54,13 +57,13 @@ func (c *FakePodTemplates) Update(podTemplate *v1.PodTemplate) (result *v1.PodTe
 
 func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("podtemplates", c.ns, name), &v1.PodTemplate{})
+		Invokes(core.NewDeleteAction(podtemplatesResource, c.ns, name), &v1.PodTemplate{})
 
 	return err
 }
 
 func (c *FakePodTemplates) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("podtemplates", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(podtemplatesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.PodTemplateList{})
 	return err
@@ -68,7 +71,7 @@ func (c *FakePodTemplates) DeleteCollection(options *api.DeleteOptions, listOpti
 
 func (c *FakePodTemplates) Get(name string) (result *v1.PodTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("podtemplates", c.ns, name), &v1.PodTemplate{})
+		Invokes(core.NewGetAction(podtemplatesResource, c.ns, name), &v1.PodTemplate{})
 
 	if obj == nil {
 		return nil, err
@@ -78,7 +81,7 @@ func (c *FakePodTemplates) Get(name string) (result *v1.PodTemplate, err error) 
 
 func (c *FakePodTemplates) List(opts api.ListOptions) (result *v1.PodTemplateList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("podtemplates", c.ns, opts), &v1.PodTemplateList{})
+		Invokes(core.NewListAction(podtemplatesResource, c.ns, opts), &v1.PodTemplateList{})
 
 	if obj == nil {
 		return nil, err
@@ -100,6 +103,6 @@ func (c *FakePodTemplates) List(opts api.ListOptions) (result *v1.PodTemplateLis
 // Watch returns a watch.Interface that watches the requested podTemplates.
 func (c *FakePodTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("podtemplates", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(podtemplatesResource, c.ns, opts))
 
 }

@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -32,9 +33,11 @@ type FakeSecrets struct {
 	ns   string
 }
 
+var secretsResource = unversioned.GroupVersionResource{Group: "core", Version: "v1", Resource: "secrets"}
+
 func (c *FakeSecrets) Create(secret *v1.Secret) (result *v1.Secret, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("secrets", c.ns, secret), &v1.Secret{})
+		Invokes(core.NewCreateAction(secretsResource, c.ns, secret), &v1.Secret{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +47,7 @@ func (c *FakeSecrets) Create(secret *v1.Secret) (result *v1.Secret, err error) {
 
 func (c *FakeSecrets) Update(secret *v1.Secret) (result *v1.Secret, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("secrets", c.ns, secret), &v1.Secret{})
+		Invokes(core.NewUpdateAction(secretsResource, c.ns, secret), &v1.Secret{})
 
 	if obj == nil {
 		return nil, err
@@ -54,13 +57,13 @@ func (c *FakeSecrets) Update(secret *v1.Secret) (result *v1.Secret, err error) {
 
 func (c *FakeSecrets) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("secrets", c.ns, name), &v1.Secret{})
+		Invokes(core.NewDeleteAction(secretsResource, c.ns, name), &v1.Secret{})
 
 	return err
 }
 
 func (c *FakeSecrets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("secrets", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(secretsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.SecretList{})
 	return err
@@ -68,7 +71,7 @@ func (c *FakeSecrets) DeleteCollection(options *api.DeleteOptions, listOptions a
 
 func (c *FakeSecrets) Get(name string) (result *v1.Secret, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("secrets", c.ns, name), &v1.Secret{})
+		Invokes(core.NewGetAction(secretsResource, c.ns, name), &v1.Secret{})
 
 	if obj == nil {
 		return nil, err
@@ -78,7 +81,7 @@ func (c *FakeSecrets) Get(name string) (result *v1.Secret, err error) {
 
 func (c *FakeSecrets) List(opts api.ListOptions) (result *v1.SecretList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("secrets", c.ns, opts), &v1.SecretList{})
+		Invokes(core.NewListAction(secretsResource, c.ns, opts), &v1.SecretList{})
 
 	if obj == nil {
 		return nil, err
@@ -100,6 +103,6 @@ func (c *FakeSecrets) List(opts api.ListOptions) (result *v1.SecretList, err err
 // Watch returns a watch.Interface that watches the requested secrets.
 func (c *FakeSecrets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("secrets", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(secretsResource, c.ns, opts))
 
 }

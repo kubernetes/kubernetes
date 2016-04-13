@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -32,9 +33,11 @@ type FakePods struct {
 	ns   string
 }
 
+var podsResource = unversioned.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}
+
 func (c *FakePods) Create(pod *v1.Pod) (result *v1.Pod, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("pods", c.ns, pod), &v1.Pod{})
+		Invokes(core.NewCreateAction(podsResource, c.ns, pod), &v1.Pod{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +47,7 @@ func (c *FakePods) Create(pod *v1.Pod) (result *v1.Pod, err error) {
 
 func (c *FakePods) Update(pod *v1.Pod) (result *v1.Pod, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("pods", c.ns, pod), &v1.Pod{})
+		Invokes(core.NewUpdateAction(podsResource, c.ns, pod), &v1.Pod{})
 
 	if obj == nil {
 		return nil, err
@@ -54,7 +57,7 @@ func (c *FakePods) Update(pod *v1.Pod) (result *v1.Pod, err error) {
 
 func (c *FakePods) UpdateStatus(pod *v1.Pod) (*v1.Pod, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("pods", "status", c.ns, pod), &v1.Pod{})
+		Invokes(core.NewUpdateSubresourceAction(podsResource, "status", c.ns, pod), &v1.Pod{})
 
 	if obj == nil {
 		return nil, err
@@ -64,13 +67,13 @@ func (c *FakePods) UpdateStatus(pod *v1.Pod) (*v1.Pod, error) {
 
 func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("pods", c.ns, name), &v1.Pod{})
+		Invokes(core.NewDeleteAction(podsResource, c.ns, name), &v1.Pod{})
 
 	return err
 }
 
 func (c *FakePods) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("pods", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(podsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.PodList{})
 	return err
@@ -78,7 +81,7 @@ func (c *FakePods) DeleteCollection(options *api.DeleteOptions, listOptions api.
 
 func (c *FakePods) Get(name string) (result *v1.Pod, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("pods", c.ns, name), &v1.Pod{})
+		Invokes(core.NewGetAction(podsResource, c.ns, name), &v1.Pod{})
 
 	if obj == nil {
 		return nil, err
@@ -88,7 +91,7 @@ func (c *FakePods) Get(name string) (result *v1.Pod, err error) {
 
 func (c *FakePods) List(opts api.ListOptions) (result *v1.PodList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("pods", c.ns, opts), &v1.PodList{})
+		Invokes(core.NewListAction(podsResource, c.ns, opts), &v1.PodList{})
 
 	if obj == nil {
 		return nil, err
@@ -110,6 +113,6 @@ func (c *FakePods) List(opts api.ListOptions) (result *v1.PodList, err error) {
 // Watch returns a watch.Interface that watches the requested pods.
 func (c *FakePods) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("pods", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(podsResource, c.ns, opts))
 
 }

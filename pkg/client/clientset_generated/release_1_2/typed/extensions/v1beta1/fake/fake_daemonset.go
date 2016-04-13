@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -32,9 +33,11 @@ type FakeDaemonSets struct {
 	ns   string
 }
 
+var daemonsetsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "daemonsets"}
+
 func (c *FakeDaemonSets) Create(daemonSet *v1beta1.DaemonSet) (result *v1beta1.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("daemonsets", c.ns, daemonSet), &v1beta1.DaemonSet{})
+		Invokes(core.NewCreateAction(daemonsetsResource, c.ns, daemonSet), &v1beta1.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +47,7 @@ func (c *FakeDaemonSets) Create(daemonSet *v1beta1.DaemonSet) (result *v1beta1.D
 
 func (c *FakeDaemonSets) Update(daemonSet *v1beta1.DaemonSet) (result *v1beta1.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("daemonsets", c.ns, daemonSet), &v1beta1.DaemonSet{})
+		Invokes(core.NewUpdateAction(daemonsetsResource, c.ns, daemonSet), &v1beta1.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -54,7 +57,7 @@ func (c *FakeDaemonSets) Update(daemonSet *v1beta1.DaemonSet) (result *v1beta1.D
 
 func (c *FakeDaemonSets) UpdateStatus(daemonSet *v1beta1.DaemonSet) (*v1beta1.DaemonSet, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("daemonsets", "status", c.ns, daemonSet), &v1beta1.DaemonSet{})
+		Invokes(core.NewUpdateSubresourceAction(daemonsetsResource, "status", c.ns, daemonSet), &v1beta1.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -64,13 +67,13 @@ func (c *FakeDaemonSets) UpdateStatus(daemonSet *v1beta1.DaemonSet) (*v1beta1.Da
 
 func (c *FakeDaemonSets) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("daemonsets", c.ns, name), &v1beta1.DaemonSet{})
+		Invokes(core.NewDeleteAction(daemonsetsResource, c.ns, name), &v1beta1.DaemonSet{})
 
 	return err
 }
 
 func (c *FakeDaemonSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("daemonsets", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(daemonsetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.DaemonSetList{})
 	return err
@@ -78,7 +81,7 @@ func (c *FakeDaemonSets) DeleteCollection(options *api.DeleteOptions, listOption
 
 func (c *FakeDaemonSets) Get(name string) (result *v1beta1.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("daemonsets", c.ns, name), &v1beta1.DaemonSet{})
+		Invokes(core.NewGetAction(daemonsetsResource, c.ns, name), &v1beta1.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -88,7 +91,7 @@ func (c *FakeDaemonSets) Get(name string) (result *v1beta1.DaemonSet, err error)
 
 func (c *FakeDaemonSets) List(opts api.ListOptions) (result *v1beta1.DaemonSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("daemonsets", c.ns, opts), &v1beta1.DaemonSetList{})
+		Invokes(core.NewListAction(daemonsetsResource, c.ns, opts), &v1beta1.DaemonSetList{})
 
 	if obj == nil {
 		return nil, err
@@ -110,6 +113,6 @@ func (c *FakeDaemonSets) List(opts api.ListOptions) (result *v1beta1.DaemonSetLi
 // Watch returns a watch.Interface that watches the requested daemonSets.
 func (c *FakeDaemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("daemonsets", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(daemonsetsResource, c.ns, opts))
 
 }
