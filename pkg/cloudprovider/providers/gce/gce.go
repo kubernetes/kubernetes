@@ -68,6 +68,15 @@ const (
 	// are iterated through to prevent infinite loops if the API
 	// were to continuously return a nextPageToken.
 	maxPages = 25
+
+	// volume types for CreateDisk()
+	DiskTypeSSD      = "pd-ssd"
+	DiskTypeStandard = "pd-standard"
+	// Use SSD by default
+	DefaultDiskType = DiskTypeSSD
+
+	// Template of GCE Disk type URL
+	diskTypeTemplate = "https://www.googleapis.com/compute/v1/projects/%s/zones/%s/diskTypes/%s"
 )
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
@@ -2085,16 +2094,22 @@ func (gce *GCECloud) encodeDiskTags(tags map[string]string) (string, error) {
 // CreateDisk creates a new Persistent Disk, with the specified name & size, in
 // the specified zone. It stores specified tags endoced in JSON in Description
 // field.
-func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error {
+func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, diskType string, tags map[string]string) error {
 	tagsStr, err := gce.encodeDiskTags(tags)
 	if err != nil {
 		return err
 	}
 
+	if diskType == "" {
+		diskType = DefaultDiskType
+	}
+	diskTypeUrl := fmt.Sprintf(diskTypeTemplate, gce.projectID, zone, diskType)
+
 	diskToCreate := &compute.Disk{
 		Name:        name,
 		SizeGb:      sizeGb,
 		Description: tagsStr,
+		Type:        diskTypeUrl,
 	}
 
 	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()
@@ -2103,6 +2118,15 @@ func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, tags map
 	}
 
 	return gce.waitForZoneOp(createOp, zone)
+}
+
+// This function should be used only for testing of CreateDisk()
+func (gce *GCECloud) GetDiskProperties(name string, zone string) (sizeGb int64, diskType string, err error) {
+	disk, err := gce.getDiskByName(name, zone)
+	if err != nil {
+		return 0, "", err
+	}
+	return disk.Size, disk.Type, nil
 }
 
 func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
@@ -2208,6 +2232,15 @@ func (gce *GCECloud) findDiskByName(diskName string, zone string) (*gceDisk, err
 			Zone: lastComponent(disk.Zone),
 			Name: disk.Name,
 			Kind: disk.Kind,
+			Size: disk.SizeGb,
+		}
+
+		// Trim the URL from disk type (see diskTypeTemplate for expected format)
+		lastSlash := strings.LastIndex(disk.Type, "/")
+		if lastSlash > 0 {
+			d.Type = disk.Type[lastSlash+1:]
+		} else {
+			d.Type = disk.Type
 		}
 		return d, nil
 	}
@@ -2323,6 +2356,8 @@ type gceDisk struct {
 	Zone string
 	Name string
 	Kind string
+	Type string
+	Size int64
 }
 
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any instance is not found

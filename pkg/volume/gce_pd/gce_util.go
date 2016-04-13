@@ -147,7 +147,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		return "", 0, nil, err
 	}
 
-	err = cloud.CreateDisk(name, zone.FailureDomain, int64(requestGB), *c.options.CloudTags)
+	err = cloud.CreateDisk(name, zone.FailureDomain, int64(requestGB), c.provisioningOptions.VolumeType, *c.options.CloudTags)
 	if err != nil {
 		glog.V(2).Infof("Error creating GCE PD volume: %v", err)
 		return "", 0, nil, err
