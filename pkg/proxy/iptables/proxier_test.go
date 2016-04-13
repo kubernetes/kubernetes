@@ -19,7 +19,14 @@ package iptables
 import (
 	"testing"
 
+	"fmt"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	"net"
+	"strings"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -154,6 +161,217 @@ func TestGetChainLinesMultipleTables(t *testing.T) {
 		utiliptables.Chain("KUBE-SVC-6666666666666666"): ":KUBE-SVC-6666666666666666 - [0:0]",
 	}
 	checkAllLines(t, utiliptables.TableNAT, []byte(iptables_save), expected)
+}
+
+func TestGetRemovedEndpoints(t *testing.T) {
+	testCases := []struct {
+		currentEndpoints []string
+		newEndpoints     []string
+		removedEndpoints []string
+	}{
+		{
+			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
+			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			removedEndpoints: []string{},
+		},
+		{
+			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80", "10.0.2.3:80"},
+			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			removedEndpoints: []string{"10.0.2.3:80"},
+		},
+		{
+			currentEndpoints: []string{},
+			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			removedEndpoints: []string{},
+		},
+		{
+			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
+			newEndpoints:     []string{},
+			removedEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
+		},
+		{
+			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80", "10.0.2.2:443"},
+			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			removedEndpoints: []string{"10.0.2.2:443"},
+		},
+	}
+
+	for i := range testCases {
+		res := getRemovedEndpoints(testCases[i].currentEndpoints, testCases[i].newEndpoints)
+		if !slicesEquiv(res, testCases[i].removedEndpoints) {
+			t.Errorf("Expected: %v, but getRemovedEndpoints returned: %v", testCases[i].removedEndpoints, res)
+		}
+	}
+}
+
+func TestExecConntrackTool(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, error) {
+				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted.")
+			},
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+	}
+
+	fakeProxier := Proxier{exec: &fexec}
+
+	testCases := [][]string{
+		{"-L", "-p", "udp"},
+		{"-D", "-p", "udp", "-d", "10.0.240.1"},
+		{"-D", "-p", "udp", "--orig-dst", "10.240.0.2", "--dst-nat", "10.0.10.2"},
+	}
+
+	expectErr := []bool{false, false, true}
+
+	for i := range testCases {
+		err := fakeProxier.execConntrackTool(testCases[i]...)
+
+		if expectErr[i] {
+			if err == nil {
+				t.Errorf("expected err, got %v", err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("expected success, got %v", err)
+			}
+		}
+
+		execCmd := strings.Join(fcmd.CombinedOutputLog[i], " ")
+		expectCmd := fmt.Sprintf("%s %s", "conntrack", strings.Join(testCases[i], " "))
+
+		if execCmd != expectCmd {
+			t.Errorf("expect execute command: %s, but got: %s", expectCmd, execCmd)
+		}
+	}
+}
+
+func newFakeServiceInfo(service proxy.ServicePortName, ip net.IP, protocol api.Protocol) *serviceInfo {
+	return &serviceInfo{
+		sessionAffinityType: api.ServiceAffinityNone, // default
+		stickyMaxAgeSeconds: 180,                     // TODO: paramaterize this in the API.
+		clusterIP:           ip,
+		protocol:            protocol,
+	}
+}
+
+func TestDeleteEndpointConnections(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, error) {
+				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted.")
+			},
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+	}
+
+	serviceMap := make(map[proxy.ServicePortName]*serviceInfo)
+	svc1 := proxy.ServicePortName{types.NamespacedName{Namespace: "ns1", Name: "svc1"}, ""}
+	svc2 := proxy.ServicePortName{types.NamespacedName{Namespace: "ns1", Name: "svc2"}, ""}
+	serviceMap[svc1] = newFakeServiceInfo(svc1, net.IPv4(10, 20, 30, 40), api.ProtocolUDP)
+	serviceMap[svc2] = newFakeServiceInfo(svc1, net.IPv4(10, 20, 30, 41), api.ProtocolTCP)
+
+	fakeProxier := Proxier{exec: &fexec, serviceMap: serviceMap}
+
+	testCases := []endpointServicePair{
+		{
+			endpoint:        "10.240.0.3:80",
+			servicePortName: svc1,
+		},
+		{
+			endpoint:        "10.240.0.4:80",
+			servicePortName: svc1,
+		},
+		{
+			endpoint:        "10.240.0.5:80",
+			servicePortName: svc2,
+		},
+	}
+
+	expectCommandExecCount := 0
+	for i := range testCases {
+		input := map[endpointServicePair]bool{testCases[i]: true}
+		fakeProxier.deleteEndpointConnections(input)
+		svcInfo := fakeProxier.serviceMap[testCases[i].servicePortName]
+		if svcInfo.protocol == api.ProtocolUDP {
+			svcIp := svcInfo.clusterIP.String()
+			endpointIp := strings.Split(testCases[i].endpoint, ":")[0]
+			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", svcIp, endpointIp)
+			execCommand := strings.Join(fcmd.CombinedOutputLog[expectCommandExecCount], " ")
+			if expectCommand != execCommand {
+				t.Errorf("Exepect comand: %s, but executed %s", expectCommand, execCommand)
+			}
+			expectCommandExecCount += 1
+		}
+
+		if expectCommandExecCount != fexec.CommandCalls {
+			t.Errorf("Exepect comand executed %d times, but got %d", expectCommandExecCount, fexec.CommandCalls)
+		}
+	}
+}
+
+func TestDeleteServiceConnections(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, error) {
+				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted.")
+			},
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+	}
+
+	fakeProxier := Proxier{exec: &fexec}
+
+	testCases := [][]string{
+		{
+			"10.240.0.3",
+			"10.240.0.5",
+		},
+		{
+			"10.240.0.4",
+		},
+	}
+
+	svcCount := 0
+	for i := range testCases {
+		fakeProxier.deleteServiceConnections(testCases[i])
+		for _, ip := range testCases[i] {
+			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p udp", ip)
+			execCommand := strings.Join(fcmd.CombinedOutputLog[svcCount], " ")
+			if expectCommand != execCommand {
+				t.Errorf("Exepect comand: %s, but executed %s", expectCommand, execCommand)
+			}
+			svcCount += 1
+		}
+		if svcCount != fexec.CommandCalls {
+			t.Errorf("Exepect comand executed %d times, but got %d", svcCount, fexec.CommandCalls)
+		}
+	}
 }
 
 // TODO(thockin): add a test for syncProxyRules() or break it down further and test the pieces.
