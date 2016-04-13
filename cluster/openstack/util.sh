@@ -91,7 +91,7 @@ function create-stack() {
   echo "[INFO] Execute commands to create Kubernetes cluster"
   # It is required for some cloud provider like CityCloud where swift client has different credentials
   source "${ROOT}/openrc-swift.sh"
-  if [[ -z "${OS_PROJECT_ID}" ]]; then
+  if [[ -z ${OS_PROJECT_ID+x} ]]; then
     SWIFT_PROJECT_ID="${OS_TENANT_ID}"
   else
     SWIFT_PROJECT_ID="${OS_PROJECT_ID}"

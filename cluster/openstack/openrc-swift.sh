@@ -15,12 +15,12 @@
 # limitations under the License.
 
 ## Enviroment variables for the OpenStack Swift command-line client. This is required for CityCloud
-## provider where Swift has different credentials. When Swift is part of your OpenStack use the same
-## settings as in openrc-default.sh
+## provider where Swift has different credentials. When Swift is part of your OpenStack do not
+## modify these settings.
 
-export OS_IDENTITY_API_VERSION=2.0
-export OS_USERNAME=admin
-export OS_PASSWORD=secretsecret
-export OS_AUTH_URL=http://192.168.123.100:5000/v2.0
-export OS_TENANT_NAME=admin
-export OS_TENANT_ID=ed51b98b40944d89a449592eb67431eb
+export OS_IDENTITY_API_VERSION=${OS_IDENTITY_API_VERSION:-2.0}
+export OS_USERNAME=${OS_USERNAME:-admin}
+export OS_PASSWORD=${OS_PASSWORD:-secretsecret}
+export OS_AUTH_URL=${OS_AUTH_URL:-http://192.168.123.100:5000/v2.0}
+export OS_TENANT_NAME=${OS_TENANT_NAME:-admin}
+export OS_TENANT_ID=${OS_TENANT_ID:-ed51b98b40944d89a449592eb67431eb}
