@@ -2216,7 +2216,7 @@ func (kl *Kubelet) isOutOfDisk() bool {
 }
 
 func (kl *Kubelet) hasInsufficientGPU(pods []*api.Pod) bool {
-	glog.Infof("Hans: hasInsufficientGPU()")
+	glog.Infof("kubelet: hasInsufficientGPU()")
 	totalGPUNum := int(0)
 	for _, gpuPlugin := range kl.gpuPlugins {
 		gpuDevices, err := gpuPlugin.Detect()
@@ -2224,7 +2224,7 @@ func (kl *Kubelet) hasInsufficientGPU(pods []*api.Pod) bool {
 			totalGPUNum += len(gpuDevices.Devices)
 		}
 	}
-	glog.Infof("Hans: hasInsufficientGPU() totalGPUNum: %d", totalGPUNum)
+	glog.Infof("kubelet: hasInsufficientGPU() totalGPUNum: %d", totalGPUNum)
 	return !gpu.IsGPUAvailable(pods, totalGPUNum)
 }
 
@@ -2770,12 +2770,12 @@ func (kl *Kubelet) setNodeStatusGPUInfo(node *api.Node) {
 	}
 
 	if node.Status.Capacity != nil && node.Status.Allocatable != nil {
-		node.Status.Capacity[api.ResourceNvidiaGPU] = *resource.NewMilliQuantity(int64(totalGpuNum*1000), resource.DecimalSI)
-		//node.Status.Allocatable[api.ResourceDevices] = *resource.NewMilliQuantity(int64(availableGpuNum*1000), resource.DecimalSI)
-		node.Status.Allocatable[api.ResourceNvidiaGPU] = *resource.NewMilliQuantity(int64(totalGpuNum*1000), resource.DecimalSI)
+		node.Status.Capacity[api.ResourceNvidiaGPU] = *resource.NewQuantity(int64(totalGpuNum), resource.Digit)
+		//node.Status.Allocatable[api.ResourceDevices] = *resource.NewQuantity(int64(availableGpuNum), resource.Digit)
+		node.Status.Allocatable[api.ResourceNvidiaGPU] = *resource.NewQuantity(int64(totalGpuNum), resource.Digit)
 	}
 
-	glog.Errorf("Hans:setNodeStatusGPUInfo(): Available GPU num: %d", availableGpuNum)
+	glog.Errorf("kubelet:setNodeStatusGPUInfo(): Available GPU num: %d", availableGpuNum)
 
 }
 

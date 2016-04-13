@@ -43,7 +43,7 @@ func getGPUResourceRequest(pod *api.Pod) int {
 	gpuReqNum := 0
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests
-		gpuReqNum += int(requests.Gpu().MilliValue())
+		gpuReqNum += int(requests.Gpu().Value())
 	}
 	glog.Infof("Hans: getGPUResourceRequest() gpuReqNum:%d", gpuReqNum)
 	return gpuReqNum
