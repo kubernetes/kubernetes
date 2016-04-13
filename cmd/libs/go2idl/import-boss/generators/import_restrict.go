@@ -132,10 +132,12 @@ type importRuleFile struct{}
 
 func (importRuleFile) AssembleFile(f *generator.File, path string) error {
 	return nil
+}
 
+// TODO: make a flag to enable this, or expose this information in some other way.
+func (importRuleFile) listEntireImportTree(f *generator.File, path string) error {
 	// If the file exists, populate its current imports. This is mostly to help
 	// humans figure out what they need to fix.
-	// TODO: add a command line flag to enable this? Or require that it always stay up-to-date?
 	if _, err := os.Stat(path); err != nil {
 		// Ignore packages which haven't opted in by adding an .import-restrictions file.
 		return nil

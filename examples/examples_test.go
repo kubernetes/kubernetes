@@ -128,7 +128,8 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 		}
 		errors = expvalidation.ValidateDaemonSet(t)
 	default:
-		return field.ErrorList{field.InternalError(field.NewPath(""), fmt.Errorf("no validation defined for %#v", obj))}
+		errors = field.ErrorList{}
+		errors = append(errors, field.InternalError(field.NewPath(""), fmt.Errorf("no validation defined for %#v", obj)))
 	}
 	return errors
 }

@@ -84,7 +84,6 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	if err != nil {
 		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), printer.Sprintf("%#v", item))
 		panic("failed")
-		return
 	}
 	if !api.Semantic.DeepEqual(item, obj2) {
 		t.Errorf("\n1: %v: diff: %v\nCodec: %v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectGoPrintDiff(item, obj2), codec, printer.Sprintf("%#v", item), dataAsString(data), printer.Sprintf("%#v", obj2))

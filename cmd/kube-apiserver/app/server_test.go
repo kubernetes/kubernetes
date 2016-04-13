@@ -220,7 +220,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 
 		expectedConfig := test.expectedAPIConfig()
 		if err == nil && !reflect.DeepEqual(actualDisablers, expectedConfig) {
-			t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %q\n expected: %q", test.runtimeConfig, actualDisablers, expectedConfig)
+			t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %v\n expected: %v", test.runtimeConfig, actualDisablers, expectedConfig)
 		}
 	}
 
