@@ -24,6 +24,10 @@ options:
   default_value: horizontalpodautoscaler/v1beta1
   usage: |
     The name of the API generator to use. Currently there is only 1 generator.
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: max
   default_value: "-1"
   usage: |
@@ -48,6 +52,10 @@ options:
 - name: record
   default_value: "false"
   usage: Record current kubectl command in the resource annotation.
+- name: recursive
+  shorthand: R
+  default_value: "false"
+  usage: If true, process directory recursively.
 - name: save-config
   default_value: "false"
   usage: |

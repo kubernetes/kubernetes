@@ -14,7 +14,7 @@ description: |-
   Possible resource types include (case insensitive): pods (po), services (svc), deployments,
   replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
   persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
-  serviceaccounts, ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
+  serviceaccounts (sa), ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
   componentstatuses (cs), endpoints (ep), and secrets.
 options:
 - name: filename
@@ -22,6 +22,14 @@ options:
   default_value: '[]'
   usage: |
     Filename, directory, or URL to a file containing the resource to describe
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
+- name: recursive
+  shorthand: R
+  default_value: "false"
+  usage: If true, process directory recursively.
 - name: selector
   shorthand: l
   usage: Selector (label query) to filter on

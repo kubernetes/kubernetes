@@ -8,6 +8,10 @@ options:
   default_value: '[]'
   usage: |
     Filename, directory, or URL to file that contains the configuration to apply
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: output
   shorthand: o
   usage: |
@@ -15,6 +19,10 @@ options:
 - name: record
   default_value: "false"
   usage: Record current kubectl command in the resource annotation.
+- name: recursive
+  shorthand: R
+  default_value: "false"
+  usage: If true, process directory recursively.
 - name: schema-cache-dir
   default_value: ~/.kube/schema
   usage: |
