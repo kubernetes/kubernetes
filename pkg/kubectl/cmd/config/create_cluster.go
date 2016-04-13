@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -70,6 +71,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess ConfigAccess) *cobra.Com
 			err := options.run()
 			if err != nil {
 				fmt.Fprintf(out, "%v\n", err)
+				os.Exit(1)
 			} else {
 				fmt.Fprintf(out, "cluster %q set.\n", options.name)
 			}

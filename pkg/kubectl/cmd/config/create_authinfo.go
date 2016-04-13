@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -85,6 +86,7 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Co
 			err := options.run()
 			if err != nil {
 				fmt.Fprintf(out, "%v\n", err)
+				os.Exit(1)
 			} else {
 				fmt.Fprintf(out, "user %q set.\n", options.name)
 			}

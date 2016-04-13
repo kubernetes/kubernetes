@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -59,6 +60,7 @@ func NewCmdConfigSetContext(out io.Writer, configAccess ConfigAccess) *cobra.Com
 			err := options.run()
 			if err != nil {
 				fmt.Fprintf(out, "%v\n", err)
+				os.Exit(1)
 			} else {
 				fmt.Fprintf(out, "context %q set.\n", options.name)
 			}
