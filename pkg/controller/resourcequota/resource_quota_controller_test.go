@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -132,14 +132,14 @@ func TestSyncResourceQuota(t *testing.T) {
 	)
 	actionSet := sets.NewString()
 	for _, action := range kubeClient.Actions() {
-		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
 	}
 	if !actionSet.HasAll(expectedActionSet.List()...) {
 		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
 	}
 
 	lastActionIndex := len(kubeClient.Actions()) - 1
-	usage := kubeClient.Actions()[lastActionIndex].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*api.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {
@@ -219,14 +219,14 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	)
 	actionSet := sets.NewString()
 	for _, action := range kubeClient.Actions() {
-		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
 	}
 	if !actionSet.HasAll(expectedActionSet.List()...) {
 		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
 	}
 
 	lastActionIndex := len(kubeClient.Actions()) - 1
-	usage := kubeClient.Actions()[lastActionIndex].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*api.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {
@@ -294,7 +294,7 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 	)
 	actionSet := sets.NewString()
 	for _, action := range kubeClient.Actions() {
-		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
 	}
 	if !actionSet.HasAll(expectedActionSet.List()...) {
 		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))

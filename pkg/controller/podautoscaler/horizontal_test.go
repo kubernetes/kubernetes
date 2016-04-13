@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -295,8 +294,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.Lock()
 		defer tc.Unlock()
 
-		obj := action.(testclient.UpdateAction).GetObject().(*extensions.Scale)
-		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
+		obj := action.(core.UpdateAction).GetObject().(*extensions.Scale)
+		replicas := action.(core.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
 		assert.Equal(t, tc.desiredReplicas, replicas)
 		tc.scaleUpdated = true
 		return true, obj, nil
@@ -306,8 +305,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.Lock()
 		defer tc.Unlock()
 
-		obj := action.(testclient.UpdateAction).GetObject().(*extensions.Scale)
-		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
+		obj := action.(core.UpdateAction).GetObject().(*extensions.Scale)
+		replicas := action.(core.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
 		assert.Equal(t, tc.desiredReplicas, replicas)
 		tc.scaleUpdated = true
 		return true, obj, nil
@@ -317,8 +316,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.Lock()
 		defer tc.Unlock()
 
-		obj := action.(testclient.UpdateAction).GetObject().(*extensions.Scale)
-		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
+		obj := action.(core.UpdateAction).GetObject().(*extensions.Scale)
+		replicas := action.(core.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
 		assert.Equal(t, tc.desiredReplicas, replicas)
 		tc.scaleUpdated = true
 		return true, obj, nil
@@ -328,7 +327,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.Lock()
 		defer tc.Unlock()
 
-		obj := action.(testclient.UpdateAction).GetObject().(*extensions.HorizontalPodAutoscaler)
+		obj := action.(core.UpdateAction).GetObject().(*extensions.HorizontalPodAutoscaler)
 		assert.Equal(t, namespace, obj.Namespace)
 		assert.Equal(t, hpaName, obj.Name)
 		assert.Equal(t, tc.desiredReplicas, obj.Status.DesiredReplicas)
@@ -346,7 +345,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.Lock()
 		defer tc.Unlock()
 
-		obj := action.(testclient.CreateAction).GetObject().(*api.Event)
+		obj := action.(core.CreateAction).GetObject().(*api.Event)
 		if tc.verifyEvents {
 			assert.Equal(t, "SuccessfulRescale", obj.Reason)
 			assert.Equal(t, fmt.Sprintf("New size: %d; reason: CPU utilization above target", tc.desiredReplicas), obj.Message)
