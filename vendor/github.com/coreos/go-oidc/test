@@ -1,0 +1,58 @@
+#!/bin/bash -e
+#
+# Run all tests (not including functional)
+#   ./test
+#   ./test -v
+#
+# Run tests for one package
+#   PKG=./unit ./test
+#   PKG=ssh ./test
+#
+
+# Invoke ./cover for HTML output
+COVER=${COVER:-"-cover"}
+
+RACE=${RACE:-"-race"}
+
+source ./build
+
+TESTABLE="http jose key oauth2 oidc"
+FORMATTABLE="$TESTABLE"
+
+# user has not provided PKG override
+if [ -z "$PKG" ]; then
+	TEST=$TESTABLE
+	FMT=$FORMATTABLE
+
+# user has provided PKG override
+else
+	# strip out slashes and dots from PKG=./foo/
+	TEST=${PKG//\//}
+	TEST=${TEST//./}
+
+	# only run gofmt on packages provided by user
+	FMT="$TEST"
+fi
+
+# split TEST into an array and prepend repo path to each local package
+split=(${TEST// / })
+TEST=${split[@]/#/github.com/coreos/go-oidc/}
+
+echo "Running tests..."
+go test $RACE ${COVER} $@ ${TEST}
+
+echo "Checking gofmt..."
+fmtRes=$(gofmt -l $FMT)
+if [ -n "${fmtRes}" ]; then
+	echo -e "gofmt checking failed:\n${fmtRes}"
+	exit 255
+fi
+
+echo "Checking govet..."
+vetRes=$(go vet $TEST)
+if [ -n "${vetRes}" ]; then
+	echo -e "govet checking failed:\n${vetRes}"
+	exit 255
+fi
+
+echo "Success"

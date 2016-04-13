@@ -1,0 +1,4 @@
+#!/bin/bash
+
+mount -t tmpfs none /tmp
+exec "$@"

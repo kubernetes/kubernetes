@@ -1,0 +1,862 @@
+{
+  "version": "2.0",
+  "service": "<p>Simple Systems Manager (SSM) enables you to remotely manage the configuration of your Amazon EC2 instance. Using SSM, you can run scripts or commands using either EC2 Run Command or SSM Config. (SSM Config is currently available only for Windows instances.) </p> <p/> <b>Run Command</b> <p>Run Command provides an on-demand experience for executing commands. You can use pre-defined Amazon SSM documents to perform the actions listed later in this section, or you can create your own documents. With these documents, you can remotely configure your instances by sending commands using the <b>Commands</b> page in the <a href=\"http://console.aws.amazon.com/ec2/\">Amazon EC2 console</a>, <a href=\"http://docs.aws.amazon.com/powershell/latest/reference/items/Amazon_Simple_Systems_Management_cmdlets.html\">AWS Tools for Windows PowerShell</a>, or the <a href=\"http://docs.aws.amazon.com/cli/latest/reference/ssm/index.html\">AWS CLI</a>.</p> <p>Run Command reports the status of the command execution for each instance targeted by a command. You can also audit the command execution to understand who executed commands, when, and what changes were made. By switching between different SSM documents, you can quickly configure your instances with different types of commands. To get started with Run Command, verify that your environment meets the prerequisites for remotely running commands on EC2 instances (<a href=\"http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/remote-commands-prereq.html\">Linux</a> or <a href=\"http://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/remote-commands-prereq.html\">Windows</a>). </p> <p/> <b>SSM Config</b> <p>SSM Config is a lightweight instance configuration solution. SSM Config is currently only available for Windows instances. With SSM Config, you can specify a setup configuration for your instances. SSM Config is similar to EC2 User Data, which is another way of running one-time scripts or applying settings during instance launch. SSM Config is an extension of this capability. Using SSM documents, you can specify which actions the system should perform on your instances, including which applications to install, which AWS Directory Service directory to join, which Microsoft PowerShell modules to install, etc. If an instance is missing one or more of these configurations, the system makes those changes. By default, the system checks every five minutes to see if there is a new configuration to apply as defined in a new SSM document. If so, the system updates the instances accordingly. In this way, you can remotely maintain a consistent configuration baseline on your instances. SSM Config is available using the AWS CLI or the AWS Tools for Windows PowerShell. For more information, see <a href=\"http://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/ec2-configuration-manage.html\">Managing Windows Instance Configuration</a>.</p> <para>SSM Config and Run Command include the following pre-defined documents.</para> <table> <title>Amazon Pre-defined SSM Documents</title> <tgroup cols=\"3\"> <colspec colname=\"col1\" colnum=\"1\" colwidth=\"1*\"/> <colspec colname=\"col2\" colnum=\"2\" colwidth=\"1*\"/> <colspec colname=\"col3\" colnum=\"3\" colwidth=\"1*\"/> <thead> <row> <entry>Name</entry> <entry>Description</entry> <entry>Platform</entry> </row> </thead> <tbody> <row> <entry> <para>AWS-RunShellScript</para> </entry> <entry> <para>Run shell scripts</para> </entry> <entry> <para>Linux</para> </entry> </row> <row> <entry> <para>AWS-UpdateSSMAgent</para> </entry> <entry> <para>Update the Amazon SSM agent</para> </entry> <entry> <para>Linux</para> </entry> </row> <row> <entry> <para>AWS-JoinDirectoryServiceDomain </para> </entry> <entry> <para>Join an AWS Directory </para> </entry> <entry> <para>Windows</para> </entry> </row> <row> <entry> <para>AWS-RunPowerShellScript</para> </entry> <entry> <para>Run PowerShell commands or scripts</para> </entry> <entry> <para>Windows</para> </entry> </row> <row> <entry> <para>AWS-UpdateEC2Config</para> </entry> <entry> <para>Update the EC2Config service </para> </entry> <entry> <para>Windows</para> </entry> </row> <row> <entry> <para>AWS-ConfigureWindowsUpdate</para> </entry> <entry> <para>Configure Windows Update settings</para> </entry> <entry> <para>Windows</para> </entry> </row> <row> <entry> <para>AWS-InstallApplication</para> </entry> <entry> <para>Install, repair, or uninstall software using an MSI package</para> </entry> <entry> <para>Windows</para> </entry> </row> <row> <entry> <para>AWS-InstallPowerShellModule</para> </entry> <entry> <para>Install PowerShell modules </para> </entry> <entry> <para>Windows</para> </entry> </row> <row> <entry> <para>AWS-ConfigureCloudWatch</para> </entry> <entry> <para>Configure Amazon CloudWatch Logs to monitor applications and systems</para> </entry> <entry> <para>Windows</para> </entry> </row> </tbody> </tgroup> </table> <important> <simpara>The commands or scripts specified in SSM documents run with administrative privilege on your instances because the Amazon SSM agent runs as root on Linux and the EC2Config service runs in the Local System account on Windows. If a user has permission to execute any of the pre-defined SSM documents (any document that begins with AWS-*) then that user also has administrator access to the instance. Delegate access to SSM and Run Command judiciously. This becomes extremely important if you create your own SSM documents. Amazon Web Services does not provide guidance about how to create secure SSM documents. You create SSM documents and delegate access to Run Command at your own risk. As a security best practice, we recommend that you assign access to \"AWS-*\" documents, especially the AWS-RunShellScript document on Linux and the AWS-RunPowerShellScript document on Windows, to trusted administrators only. You can create SSM documents for specific tasks and delegate access to non-administrators.</simpara> </important>",
+  "operations": {
+    "CancelCommand": "<p>Attempts to cancel the command specified by the Command ID. There is no guarantee that the command will be terminated and the underlying process stopped.</p>",
+    "CreateAssociation": "<p>Associates the specified SSM document with the specified instance.</p> <p>When you associate an SSM document with an instance, the configuration agent on the instance processes the document and configures the instance as specified.</p> <p>If you associate a document with an instance that already has an associated document, the system throws the AssociationAlreadyExists exception.</p>",
+    "CreateAssociationBatch": "<p>Associates the specified SSM document with the specified instances.</p> <p>When you associate an SSM document with an instance, the configuration agent on the instance processes the document and configures the instance as specified.</p> <p>If you associate a document with an instance that already has an associated document, the system throws the AssociationAlreadyExists exception.</p>",
+    "CreateDocument": "<p>Creates an SSM document.</p> <p>After you create an SSM document, you can use <a>CreateAssociation</a> to associate it with one or more running instances.</p>",
+    "DeleteAssociation": "<p>Disassociates the specified SSM document from the specified instance.</p> <p>When you disassociate an SSM document from an instance, it does not change the configuration of the instance. To change the configuration state of an instance after you disassociate a document, you must create a new document with the desired configuration and associate it with the instance.</p>",
+    "DeleteDocument": "<p>Deletes the SSM document and all instance associations to the document.</p> <p>Before you delete the SSM document, we recommend that you use DeleteAssociation to disassociate all instances that are associated with the document.</p>",
+    "DescribeAssociation": "<p>Describes the associations for the specified SSM document or instance.</p>",
+    "DescribeDocument": "<p>Describes the specified SSM document.</p>",
+    "DescribeInstanceInformation": "Describes one or more of your instances. You can use this to get information about instances like the operating system platform, the SSM agent version, status etc. If you specify one or more instance IDs, it returns information for those instances. If you do not specify instance IDs, it returns information for all your instances. If you specify an instance ID that is not valid or an instance that you do not own, you receive an error.",
+    "GetDocument": "<p>Gets the contents of the specified SSM document.</p>",
+    "ListAssociations": "<p>Lists the associations for the specified SSM document or instance.</p>",
+    "ListCommandInvocations": "An invocation is copy of a command sent to a specific instance. A command can apply to one or more instances. A command invocation applies to one instance. For example, if a user executes SendCommand against three instances, then a command invocation is created for each requested instance ID. ListCommandInvocations provide status about command execution.",
+    "ListCommands": "<p>Lists the commands requested by users of the AWS account.</p>",
+    "ListDocuments": "<p>Describes one or more of your SSM documents.</p>",
+    "SendCommand": "Executes commands on one or more remote instances.",
+    "UpdateAssociationStatus": "<p>Updates the status of the SSM document associated with the specified instance.</p>"
+  },
+  "shapes": {
+    "AssociatedInstances": {
+      "base": "<p>You must disassociate an SSM document from all instances before you can delete it.</p>",
+      "refs": {
+      }
+    },
+    "Association": {
+      "base": "<p>Describes an association of an SSM document and an instance.</p>",
+      "refs": {
+        "AssociationList$member": null
+      }
+    },
+    "AssociationAlreadyExists": {
+      "base": "<p>The specified association already exists.</p>",
+      "refs": {
+      }
+    },
+    "AssociationDescription": {
+      "base": "<p>Describes the parameters for a document.</p>",
+      "refs": {
+        "AssociationDescriptionList$member": null,
+        "CreateAssociationResult$AssociationDescription": "<p>Information about the association.</p>",
+        "DescribeAssociationResult$AssociationDescription": "<p>Information about the association.</p>",
+        "UpdateAssociationStatusResult$AssociationDescription": "<p>Information about the association.</p>"
+      }
+    },
+    "AssociationDescriptionList": {
+      "base": null,
+      "refs": {
+        "CreateAssociationBatchResult$Successful": "<p>Information about the associations that succeeded.</p>"
+      }
+    },
+    "AssociationDoesNotExist": {
+      "base": "<p>The specified association does not exist.</p>",
+      "refs": {
+      }
+    },
+    "AssociationFilter": {
+      "base": "<p>Describes a filter.</p>",
+      "refs": {
+        "AssociationFilterList$member": null
+      }
+    },
+    "AssociationFilterKey": {
+      "base": null,
+      "refs": {
+        "AssociationFilter$key": "<p>The name of the filter.</p>"
+      }
+    },
+    "AssociationFilterList": {
+      "base": null,
+      "refs": {
+        "ListAssociationsRequest$AssociationFilterList": "<p>One or more filters. Use a filter to return a more specific list of results.</p>"
+      }
+    },
+    "AssociationFilterValue": {
+      "base": null,
+      "refs": {
+        "AssociationFilter$value": "<p>The filter value.</p>"
+      }
+    },
+    "AssociationLimitExceeded": {
+      "base": "<p>You can have at most 2,000 active associations.</p>",
+      "refs": {
+      }
+    },
+    "AssociationList": {
+      "base": null,
+      "refs": {
+        "ListAssociationsResult$Associations": "<p>The associations.</p>"
+      }
+    },
+    "AssociationStatus": {
+      "base": "<p>Describes an association status.</p>",
+      "refs": {
+        "AssociationDescription$Status": "<p>The association status.</p>",
+        "UpdateAssociationStatusRequest$AssociationStatus": "<p>The association status.</p>"
+      }
+    },
+    "AssociationStatusName": {
+      "base": null,
+      "refs": {
+        "AssociationStatus$Name": "<p>The status.</p>"
+      }
+    },
+    "BatchErrorMessage": {
+      "base": null,
+      "refs": {
+        "FailedCreateAssociation$Message": "<p>A description of the failure.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "InstanceInformation$IsLatestVersion": "Indicates whether latest version of the SSM agent is running on your instance.",
+        "ListCommandInvocationsRequest$Details": "(Optional) If set this returns the response of the command executions. By default this is set to False."
+      }
+    },
+    "CancelCommandRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelCommandResult": {
+      "base": "<p>Whether or not the command was successfully canceled. There is no guarantee that a request can be canceled.</p>",
+      "refs": {
+      }
+    },
+    "Command": {
+      "base": "Describes a command request.",
+      "refs": {
+        "CommandList$member": null,
+        "SendCommandResult$Command": "The request as it was received by SSM. Also provides the command ID which can be used future references to this request."
+      }
+    },
+    "CommandFilter": {
+      "base": "Describes a command filter.",
+      "refs": {
+        "CommandFilterList$member": null
+      }
+    },
+    "CommandFilterKey": {
+      "base": null,
+      "refs": {
+        "CommandFilter$key": "The name of the filter. For example, requested date and time."
+      }
+    },
+    "CommandFilterList": {
+      "base": null,
+      "refs": {
+        "ListCommandInvocationsRequest$Filters": "(Optional) One or more filters. Use a filter to return a more specific list of results.",
+        "ListCommandsRequest$Filters": "(Optional) One or more filters. Use a filter to return a more specific list of results."
+      }
+    },
+    "CommandFilterValue": {
+      "base": null,
+      "refs": {
+        "CommandFilter$value": "The filter value. For example: June 30, 2015."
+      }
+    },
+    "CommandId": {
+      "base": null,
+      "refs": {
+        "CancelCommandRequest$CommandId": "The ID of the command you want to cancel.",
+        "Command$CommandId": "A unique identifier for this command.",
+        "CommandInvocation$CommandId": "The command against which this invocation was requested.",
+        "ListCommandInvocationsRequest$CommandId": "(Optional) The invocations for a specific command ID.",
+        "ListCommandsRequest$CommandId": "(Optional) If provided, lists only the specified command."
+      }
+    },
+    "CommandInvocation": {
+      "base": "An invocation is copy of a command sent to a specific instance. A command can apply to one or more instances. A command invocation applies to one instance. For example, if a user executes SendCommand against three instances, then a command invocation is created for each requested instance ID. A command invocation returns status and detail information about a command you executed.",
+      "refs": {
+        "CommandInvocationList$member": null
+      }
+    },
+    "CommandInvocationList": {
+      "base": null,
+      "refs": {
+        "ListCommandInvocationsResult$CommandInvocations": "(Optional) A list of all invocations."
+      }
+    },
+    "CommandInvocationStatus": {
+      "base": null,
+      "refs": {
+        "CommandInvocation$Status": "Whether or not the invocation succeeded, failed, or is pending."
+      }
+    },
+    "CommandList": {
+      "base": null,
+      "refs": {
+        "ListCommandsResult$Commands": "(Optional) The list of commands requested by the user."
+      }
+    },
+    "CommandMaxResults": {
+      "base": null,
+      "refs": {
+        "ListCommandInvocationsRequest$MaxResults": "(Optional) The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results.",
+        "ListCommandsRequest$MaxResults": "(Optional) The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results."
+      }
+    },
+    "CommandPlugin": {
+      "base": "Describes plugin details.",
+      "refs": {
+        "CommandPluginList$member": null
+      }
+    },
+    "CommandPluginList": {
+      "base": null,
+      "refs": {
+        "CommandInvocation$CommandPlugins": null
+      }
+    },
+    "CommandPluginName": {
+      "base": null,
+      "refs": {
+        "CommandPlugin$Name": "The name of the plugin. Must be one of the following: aws:updateAgent, aws:domainjoin, aws:applications, aws:runPowerShellScript, aws:psmodule, aws:cloudWatch, aws:runShellScript, or aws:updateSSMAgent."
+      }
+    },
+    "CommandPluginOutput": {
+      "base": null,
+      "refs": {
+        "CommandPlugin$Output": "Output of the plugin execution."
+      }
+    },
+    "CommandPluginStatus": {
+      "base": null,
+      "refs": {
+        "CommandPlugin$Status": "The status of this plugin. You can execute a document with multiple plugins."
+      }
+    },
+    "CommandStatus": {
+      "base": null,
+      "refs": {
+        "Command$Status": "The status of the command."
+      }
+    },
+    "Comment": {
+      "base": null,
+      "refs": {
+        "Command$Comment": "User-specified information about the command, such as a brief description of what the command should do.",
+        "CommandInvocation$Comment": "User-specified information about the command, such as a brief description of what the command should do.",
+        "SendCommandRequest$Comment": "User-specified information about the command, such as a brief description of what the command should do."
+      }
+    },
+    "CreateAssociationBatchRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAssociationBatchRequestEntries": {
+      "base": null,
+      "refs": {
+        "CreateAssociationBatchRequest$Entries": "<p>One or more associations.</p>"
+      }
+    },
+    "CreateAssociationBatchRequestEntry": {
+      "base": "Describes the association of an SSM document and an instance.",
+      "refs": {
+        "CreateAssociationBatchRequestEntries$member": null,
+        "FailedCreateAssociation$Entry": "<p>The association.</p>"
+      }
+    },
+    "CreateAssociationBatchResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAssociationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateAssociationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDocumentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDocumentResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DateTime": {
+      "base": null,
+      "refs": {
+        "AssociationDescription$Date": "<p>The date when the association was made.</p>",
+        "AssociationStatus$Date": "<p>The date when the status changed.</p>",
+        "Command$ExpiresAfter": "If this time is reached and the command has not already started executing, it will not execute. Calculated based on the ExpiresAfter user input provided as part of the SendCommand API.",
+        "Command$RequestedDateTime": "The date and time the command was requested.",
+        "CommandInvocation$RequestedDateTime": "The time and date the request was sent to this instance.",
+        "CommandPlugin$ResponseStartDateTime": "The time the plugin started executing.",
+        "CommandPlugin$ResponseFinishDateTime": "The time the plugin stopped executing. Could stop prematurely if, for example, a cancel command was sent.",
+        "DocumentDescription$CreatedDate": "The date when the SSM document was created.",
+        "InstanceInformation$LastPingDateTime": "The date and time when agent last pinged SSM service."
+      }
+    },
+    "DeleteAssociationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteAssociationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDocumentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDocumentResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAssociationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAssociationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDocumentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDocumentResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeInstanceInformationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeInstanceInformationResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescriptionInDocument": {
+      "base": null,
+      "refs": {
+        "DocumentDescription$Description": "A description of the document."
+      }
+    },
+    "DocumentAlreadyExists": {
+      "base": "<p>The specified SSM document already exists.</p>",
+      "refs": {
+      }
+    },
+    "DocumentContent": {
+      "base": null,
+      "refs": {
+        "CreateDocumentRequest$Content": "<p>A valid JSON string. For more information about the contents of this string, see <a href=\"http://docs.aws.amazon.com/ssm/latest/APIReference/aws-ssm-document.html\">SSM Document</a>.</p>",
+        "GetDocumentResult$Content": "<p>The contents of the SSM document.</p>"
+      }
+    },
+    "DocumentDescription": {
+      "base": "Describes an SSM document.",
+      "refs": {
+        "CreateDocumentResult$DocumentDescription": "<p>Information about the SSM document.</p>",
+        "DescribeDocumentResult$Document": "<p>Information about the SSM document.</p>"
+      }
+    },
+    "DocumentFilter": {
+      "base": "<p>Describes a filter.</p>",
+      "refs": {
+        "DocumentFilterList$member": null
+      }
+    },
+    "DocumentFilterKey": {
+      "base": null,
+      "refs": {
+        "DocumentFilter$key": "<p>The name of the filter.</p>"
+      }
+    },
+    "DocumentFilterList": {
+      "base": null,
+      "refs": {
+        "ListDocumentsRequest$DocumentFilterList": "<p>One or more filters. Use a filter to return a more specific list of results.</p>"
+      }
+    },
+    "DocumentFilterValue": {
+      "base": null,
+      "refs": {
+        "DocumentFilter$value": "<p>The value of the filter.</p>"
+      }
+    },
+    "DocumentIdentifier": {
+      "base": "<p>Describes the name of an SSM document.</p>",
+      "refs": {
+        "DocumentIdentifierList$member": null
+      }
+    },
+    "DocumentIdentifierList": {
+      "base": null,
+      "refs": {
+        "ListDocumentsResult$DocumentIdentifiers": "<p>The names of the SSM documents.</p>"
+      }
+    },
+    "DocumentLimitExceeded": {
+      "base": "<p>You can have at most 100 active SSM documents.</p>",
+      "refs": {
+      }
+    },
+    "DocumentName": {
+      "base": null,
+      "refs": {
+        "Association$Name": "<p>The name of the SSM document.</p>",
+        "AssociationDescription$Name": "<p>The name of the SSM document.</p>",
+        "Command$DocumentName": "The name of the SSM document requested for execution.",
+        "CommandInvocation$DocumentName": "The document name that was requested for execution.",
+        "CreateAssociationBatchRequestEntry$Name": "The name of the configuration document.",
+        "CreateAssociationRequest$Name": "<p>The name of the SSM document.</p>",
+        "CreateDocumentRequest$Name": "<p>A name for the SSM document.</p>",
+        "DeleteAssociationRequest$Name": "<p>The name of the SSM document.</p>",
+        "DeleteDocumentRequest$Name": "<p>The name of the SSM document.</p>",
+        "DescribeAssociationRequest$Name": "<p>The name of the SSM document.</p>",
+        "DescribeDocumentRequest$Name": "<p>The name of the SSM document.</p>",
+        "DocumentDescription$Name": "<p>The name of the SSM document.</p>",
+        "DocumentIdentifier$Name": "<p>The name of the SSM document.</p>",
+        "GetDocumentRequest$Name": "<p>The name of the SSM document.</p>",
+        "GetDocumentResult$Name": "<p>The name of the SSM document.</p>",
+        "SendCommandRequest$DocumentName": "Required. The name of the SSM document to execute. This can be an SSM public document or a custom document.",
+        "UpdateAssociationStatusRequest$Name": "<p>The name of the SSM document.</p>"
+      }
+    },
+    "DocumentParameter": {
+      "base": null,
+      "refs": {
+        "DocumentParameterList$member": null
+      }
+    },
+    "DocumentParameterDefaultValue": {
+      "base": null,
+      "refs": {
+        "DocumentParameter$DefaultValue": "<p>If specified, the default values for the parameters. Parameters without a default value are required. Parameters with a default value are optional.</p>"
+      }
+    },
+    "DocumentParameterDescrption": {
+      "base": null,
+      "refs": {
+        "DocumentParameter$Description": "<p>A description of what the parameter does, how to use it, the default value, and whether or not the parameter is optional.</p>"
+      }
+    },
+    "DocumentParameterList": {
+      "base": null,
+      "refs": {
+        "DocumentDescription$Parameters": "<p>A description of the parameters for a document.</p>"
+      }
+    },
+    "DocumentParameterName": {
+      "base": null,
+      "refs": {
+        "DocumentParameter$Name": "<p>The name of the parameter.</p>"
+      }
+    },
+    "DocumentParameterType": {
+      "base": null,
+      "refs": {
+        "DocumentParameter$Type": "<p>The type of parameter. The type can be either “String” or “StringList”.</p>"
+      }
+    },
+    "DocumentSha1": {
+      "base": null,
+      "refs": {
+        "DocumentDescription$Sha1": "<p>The SHA1 hash of the document, which you can use for verification purposes.</p>"
+      }
+    },
+    "DocumentStatus": {
+      "base": null,
+      "refs": {
+        "DocumentDescription$Status": "<p>The status of the SSM document.</p>"
+      }
+    },
+    "DuplicateInstanceId": {
+      "base": "<p>You cannot specify an instance ID in more than one association.</p>",
+      "refs": {
+      }
+    },
+    "FailedCreateAssociation": {
+      "base": "<p>Describes a failed association.</p>",
+      "refs": {
+        "FailedCreateAssociationList$member": null
+      }
+    },
+    "FailedCreateAssociationList": {
+      "base": null,
+      "refs": {
+        "CreateAssociationBatchResult$Failed": "<p>Information about the associations that failed.</p>"
+      }
+    },
+    "Fault": {
+      "base": null,
+      "refs": {
+        "FailedCreateAssociation$Fault": "<p>The source of the failure.</p>"
+      }
+    },
+    "GetDocumentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDocumentResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InstanceId": {
+      "base": null,
+      "refs": {
+        "Association$InstanceId": "<p>The ID of the instance.</p>",
+        "AssociationDescription$InstanceId": "<p>The ID of the instance.</p>",
+        "CommandInvocation$InstanceId": "The instance ID in which this invocation was requested.",
+        "CreateAssociationBatchRequestEntry$InstanceId": "The ID of the instance.",
+        "CreateAssociationRequest$InstanceId": "<p>The Windows Server instance ID.</p>",
+        "DeleteAssociationRequest$InstanceId": "<p>The ID of the instance.</p>",
+        "DescribeAssociationRequest$InstanceId": "<p>The Windows Server instance ID.</p>",
+        "InstanceIdList$member": null,
+        "InstanceInformation$InstanceId": "The instance ID.",
+        "ListCommandInvocationsRequest$InstanceId": "(Optional) The command execution details for a specific instance ID.",
+        "ListCommandsRequest$InstanceId": "(Optional) Lists commands issued against this instance ID.",
+        "UpdateAssociationStatusRequest$InstanceId": "<p>The ID of the instance.</p>"
+      }
+    },
+    "InstanceIdList": {
+      "base": null,
+      "refs": {
+        "CancelCommandRequest$InstanceIds": "<p>(Optional) A list of instance IDs on which you want to cancel the command. If not provided, the command is canceled on every instance on which it was requested.</p>",
+        "Command$InstanceIds": "The instance IDs against which this command was requested.",
+        "SendCommandRequest$InstanceIds": "Required. The instance IDs where the command should execute."
+      }
+    },
+    "InstanceInformation": {
+      "base": "Describes a filter for a specific list of instances.",
+      "refs": {
+        "InstanceInformationList$member": null
+      }
+    },
+    "InstanceInformationFilter": {
+      "base": "Describes a filter for a specific list of instances.",
+      "refs": {
+        "InstanceInformationFilterList$member": null
+      }
+    },
+    "InstanceInformationFilterKey": {
+      "base": null,
+      "refs": {
+        "InstanceInformationFilter$key": "The name of the filter."
+      }
+    },
+    "InstanceInformationFilterList": {
+      "base": null,
+      "refs": {
+        "DescribeInstanceInformationRequest$InstanceInformationFilterList": "One or more filters. Use a filter to return a more specific list of instances."
+      }
+    },
+    "InstanceInformationFilterValue": {
+      "base": null,
+      "refs": {
+        "InstanceInformationFilterValueSet$member": null
+      }
+    },
+    "InstanceInformationFilterValueSet": {
+      "base": null,
+      "refs": {
+        "InstanceInformationFilter$valueSet": "The filter values."
+      }
+    },
+    "InstanceInformationList": {
+      "base": null,
+      "refs": {
+        "DescribeInstanceInformationResult$InstanceInformationList": "The instance information list."
+      }
+    },
+    "InternalServerError": {
+      "base": "<p>An error occurred on the server side.</p>",
+      "refs": {
+      }
+    },
+    "InvalidCommandId": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InvalidDocument": {
+      "base": "<p>The specified document does not exist.</p>",
+      "refs": {
+      }
+    },
+    "InvalidDocumentContent": {
+      "base": "<p>The content for the SSM document is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidFilterKey": {
+      "base": "The specified key is not valid.",
+      "refs": {
+      }
+    },
+    "InvalidInstanceId": {
+      "base": "<p>The instance is not in valid state. Valid states are: Running, Pending, Stopped, Stopping. Invalid states are: Shutting-down and Terminated. </p>",
+      "refs": {
+      }
+    },
+    "InvalidInstanceInformationFilterValue": {
+      "base": "The specified filter value is not valid.",
+      "refs": {
+      }
+    },
+    "InvalidNextToken": {
+      "base": "<p>The specified token is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidOutputFolder": {
+      "base": "The S3 bucket does not exist.",
+      "refs": {
+      }
+    },
+    "InvalidParameters": {
+      "base": "You must specify values for all required parameters in the SSM document. You can only supply values to parameters defined in the SSM document.",
+      "refs": {
+      }
+    },
+    "InvocationTraceOutput": {
+      "base": null,
+      "refs": {
+        "CommandInvocation$TraceOutput": "Gets the trace output sent by the agent."
+      }
+    },
+    "ListAssociationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAssociationsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCommandInvocationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCommandInvocationsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCommandsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCommandsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDocumentsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListDocumentsResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxDocumentSizeExceeded": {
+      "base": "<p>The size limit of an SSM document is 64 KB.</p>",
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListAssociationsRequest$MaxResults": "<p>The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results.</p>",
+        "ListDocumentsRequest$MaxResults": "<p>The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results.</p>"
+      }
+    },
+    "MaxResultsEC2Compatible": {
+      "base": null,
+      "refs": {
+        "DescribeInstanceInformationRequest$MaxResults": "The maximum number of items to return for this call. The call also returns a token that you can specify in a subsequent call to get the next set of results."
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "DescribeInstanceInformationRequest$NextToken": "The token for the next set of items to return. (You received this token from a previous call.)",
+        "DescribeInstanceInformationResult$NextToken": "The token to use when requesting the next set of items. If there are no additional items to return, the string is empty.",
+        "ListAssociationsRequest$NextToken": "<p>The token for the next set of items to return. (You received this token from a previous call.)</p>",
+        "ListAssociationsResult$NextToken": "<p>The token to use when requesting the next set of items. If there are no additional items to return, the string is empty.</p>",
+        "ListCommandInvocationsRequest$NextToken": "(Optional) The token for the next set of items to return. (You received this token from a previous call.)",
+        "ListCommandInvocationsResult$NextToken": "(Optional) The token for the next set of items to return. (You received this token from a previous call.)",
+        "ListCommandsRequest$NextToken": "(Optional) The token for the next set of items to return. (You received this token from a previous call.)",
+        "ListCommandsResult$NextToken": "(Optional) The token for the next set of items to return. (You received this token from a previous call.)",
+        "ListDocumentsRequest$NextToken": "<p>The token for the next set of items to return. (You received this token from a previous call.)</p>",
+        "ListDocumentsResult$NextToken": "<p>The token to use when requesting the next set of items. If there are no additional items to return, the string is empty.</p>"
+      }
+    },
+    "ParameterName": {
+      "base": null,
+      "refs": {
+        "Parameters$key": null
+      }
+    },
+    "ParameterValue": {
+      "base": null,
+      "refs": {
+        "ParameterValueList$member": null
+      }
+    },
+    "ParameterValueList": {
+      "base": null,
+      "refs": {
+        "Parameters$value": null
+      }
+    },
+    "Parameters": {
+      "base": null,
+      "refs": {
+        "AssociationDescription$Parameters": "A description of the parameters for a document.",
+        "Command$Parameters": "The parameter values to be inserted in the SSM document when executing the command.",
+        "CreateAssociationBatchRequestEntry$Parameters": "A description of the parameters for a document.",
+        "CreateAssociationRequest$Parameters": "The parameters for the documents runtime configuration.",
+        "SendCommandRequest$Parameters": "The required and optional parameters specified in the SSM document being executed."
+      }
+    },
+    "PingStatus": {
+      "base": null,
+      "refs": {
+        "InstanceInformation$PingStatus": "Connection status of the SSM agent."
+      }
+    },
+    "PlatformType": {
+      "base": null,
+      "refs": {
+        "InstanceInformation$PlatformType": "The operating system platform type.",
+        "PlatformTypeList$member": null
+      }
+    },
+    "PlatformTypeList": {
+      "base": null,
+      "refs": {
+        "DocumentDescription$PlatformTypes": "The list of OS platforms compatible with this SSM document.",
+        "DocumentIdentifier$PlatformTypes": "The operating system platform."
+      }
+    },
+    "ResponseCode": {
+      "base": null,
+      "refs": {
+        "CommandPlugin$ResponseCode": "A numeric response code generated after executing the plugin."
+      }
+    },
+    "S3BucketName": {
+      "base": null,
+      "refs": {
+        "Command$OutputS3BucketName": "The S3 bucket where the responses to the command executions should be stored. This was requested when issuing the command.",
+        "CommandPlugin$OutputS3BucketName": "The S3 bucket where the responses to the command executions should be stored. This was requested when issuing the command.",
+        "SendCommandRequest$OutputS3BucketName": "The name of the S3 bucket where command execution responses should be stored."
+      }
+    },
+    "S3KeyPrefix": {
+      "base": null,
+      "refs": {
+        "Command$OutputS3KeyPrefix": "The S3 directory path inside the bucket where the responses to the command executions should be stored. This was requested when issuing the command.",
+        "CommandPlugin$OutputS3KeyPrefix": "The S3 directory path inside the bucket where the responses to the command executions should be stored. This was requested when issuing the command.",
+        "SendCommandRequest$OutputS3KeyPrefix": "The directory structure within the S3 bucket where the responses should be stored."
+      }
+    },
+    "SendCommandRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SendCommandResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StatusAdditionalInfo": {
+      "base": null,
+      "refs": {
+        "AssociationStatus$AdditionalInfo": "<p>A user-defined string.</p>"
+      }
+    },
+    "StatusMessage": {
+      "base": null,
+      "refs": {
+        "AssociationStatus$Message": "<p>The reason for the status.</p>"
+      }
+    },
+    "StatusUnchanged": {
+      "base": "<p>The updated status is the same as the current status.</p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "InstanceInformation$PlatformName": "The name of the operating system platform running on your instance.",
+        "InstanceInformation$PlatformVersion": "The version of the OS platform running on your instance.",
+        "InternalServerError$message": "An error occurred on the server side.",
+        "InvalidDocument$message": "<p>The SSM document does not exist or the document is not available to the user. This exception can be issued by CreateAssociation, CreateAssociationBatch, DeleteAssociation, DeleteDocument, DescribeAssociation, DescribeDocument, GetDocument, SendCommand, or UpdateAssociationStatus. </p>",
+        "InvalidDocumentContent$message": "<p>A description of the validation error.</p>",
+        "InvalidInstanceInformationFilterValue$message": null,
+        "InvalidParameters$message": "<p>The parameter values entered by the user do not work in the SSM document. For example, incorrect type. This exception can be issued by CreateAssociation, CreateAssociationBatch, or SendCommand. </p>",
+        "UnsupportedPlatformType$message": null
+      }
+    },
+    "TimeoutSeconds": {
+      "base": null,
+      "refs": {
+        "SendCommandRequest$TimeoutSeconds": "If this time is reached and the command has not already started executing, it will not execute."
+      }
+    },
+    "TooManyUpdates": {
+      "base": "<p>There are concurrent updates for a resource that supports one update at a time.</p>",
+      "refs": {
+      }
+    },
+    "UnsupportedPlatformType": {
+      "base": "The document does not support the platform type of the given instance ID(s).",
+      "refs": {
+      }
+    },
+    "UpdateAssociationStatusRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAssociationStatusResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Version": {
+      "base": null,
+      "refs": {
+        "InstanceInformation$AgentVersion": "The version of the SSM agent running on your instance."
+      }
+    }
+  }
+}

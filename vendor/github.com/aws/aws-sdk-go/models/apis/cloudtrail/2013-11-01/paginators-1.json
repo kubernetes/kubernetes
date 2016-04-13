@@ -1,0 +1,7 @@
+{
+  "pagination": {
+    "DescribeTrails": {
+      "result_key": "trailList"
+    }
+  }
+}

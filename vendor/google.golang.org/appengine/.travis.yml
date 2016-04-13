@@ -1,0 +1,18 @@
+language: go
+sudo: false
+
+go:
+  - 1.4
+
+install:
+  - go get -v -t -d google.golang.org/appengine/...
+  - mkdir sdk
+  - curl -o sdk.zip "https://storage.googleapis.com/appengine-sdks/featured/go_appengine_sdk_linux_amd64-1.9.24.zip"
+  - unzip sdk.zip -d sdk
+  - export APPENGINE_DEV_APPSERVER=$(pwd)/sdk/go_appengine/dev_appserver.py
+
+script:
+  - go version
+  - go test -v google.golang.org/appengine/...
+  - go test -v -race google.golang.org/appengine/...
+  - sdk/go_appengine/goapp test -v google.golang.org/appengine/...

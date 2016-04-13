@@ -1,0 +1,32 @@
+#!/bin/bash
+set -e
+
+source "${MAKEDIR}/.validate"
+
+IFS=$'\n'
+files=( $(validate_diff --diff-filter=ACMR --name-only -- 'pkg/*.go' || true) )
+unset IFS
+
+badFiles=()
+for f in "${files[@]}"; do
+	IFS=$'\n'
+	badImports=( $(go list -e -f '{{ join .Deps "\n" }}' "$f" | sort -u | grep -vE '^github.com/docker/docker/pkg/' | grep -E '^github.com/docker/docker' || true) )
+	unset IFS
+
+	for import in "${badImports[@]}"; do
+		badFiles+=( "$f imports $import" )
+	done
+done
+
+if [ ${#badFiles[@]} -eq 0 ]; then
+	echo 'Congratulations! "./pkg/..." is safely isolated from internal code.'
+else
+	{
+		echo 'These files import internal code: (either directly or indirectly)'
+		for f in "${badFiles[@]}"; do
+			echo " - $f"
+		done
+		echo
+	} >&2
+	false
+fi

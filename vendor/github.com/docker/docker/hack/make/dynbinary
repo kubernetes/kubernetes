@@ -1,0 +1,20 @@
+#!/bin/bash
+set -e
+
+if [ -z "$DOCKER_CLIENTONLY" ]; then
+	source "${MAKEDIR}/.dockerinit"
+
+	hash_files "$DEST/dockerinit-$VERSION"
+else
+	# DOCKER_CLIENTONLY must be truthy, so we don't need to bother with dockerinit :)
+	export DOCKER_INITSHA1=""
+fi
+# DOCKER_INITSHA1 is exported so that other bundlescripts can easily access it later without recalculating it
+
+(
+	export IAMSTATIC="false"
+	export LDFLAGS_STATIC_DOCKER=''
+	export BUILDFLAGS=( "${BUILDFLAGS[@]/netgo /}" ) # disable netgo, since we don't need it for a dynamic binary
+	export BUILDFLAGS=( "${BUILDFLAGS[@]/static_build /}" ) # we're not building a "static" binary here
+	source "${MAKEDIR}/binary"
+)

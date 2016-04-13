@@ -1,0 +1,59 @@
+{
+  "pagination": {
+    "ListArtifacts": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "artifacts"
+    },
+    "ListDevicePools": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "devicePools"
+    },
+    "ListDevices": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "devices"
+    },
+    "ListJobs": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "jobs"
+    },
+    "ListProjects": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "projects"
+    },
+    "ListRuns": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "runs"
+    },
+    "ListSamples": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "samples"
+    },
+    "ListSuites": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "suites"
+    },
+    "ListTests": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "tests"
+    },
+    "ListUniqueProblems": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "uniqueProblems"
+    },
+    "ListUploads": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "uploads"
+    }
+  }
+}

@@ -1,0 +1,490 @@
+package: k8s.io/kubernetes
+import:
+- package: bitbucket.org/bertimus9/systemstat
+  version: 1468fd0db20598383c9393cccaa547de6ad99e5e
+- package: bitbucket.org/ww/goautoneg
+  version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
+- package: github.com/ClusterHQ/flocker-go
+  version: 1c0a791b33bdc01d062b376612aa04e27eed7eb3
+- package: github.com/Microsoft/go-winio
+  version: 8f9387ea7efabb228a981b9c381142be7667967f
+- package: github.com/Sirupsen/logrus
+  version: 51fe59aca108dc5680109e7b2051cbdcfa5a253c
+- package: github.com/abbot/go-http-auth
+  version: c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35
+- package: github.com/appc/cni
+  version: 2a58bd9379ca33579f0cf631945b717aa4fa373d
+  subpackages:
+  - libcni
+  - pkg/invoke
+  - pkg/types
+- package: github.com/appc/spec
+  version: 5d54e27f1764a0309eafe12c9df7bac03f241646
+  subpackages:
+  - schema
+  - schema/types
+- package: github.com/armon/go-metrics
+  version: 345426c77237ece5dab0e1605c3e4b35c3f54757
+- package: github.com/aws/aws-sdk-go
+  version: bf2f8fe7f45e68017086d069498638893feddf64
+  subpackages:
+  - aws
+  - private/endpoints
+  - private/protocol/ec2query
+  - private/protocol/json/jsonutil
+  - private/protocol/jsonrpc
+  - private/protocol/query
+  - private/protocol/rest
+  - private/protocol/xml/xmlutil
+  - private/signer/v4
+  - private/waiter
+  - service/autoscaling
+  - service/ec2
+  - service/ecr
+  - service/elb
+  - aws/awserr
+  - aws/credentials
+  - aws/credentials/ec2rolecreds
+  - aws/ec2metadata
+  - aws/request
+  - aws/session
+- package: github.com/beorn7/perks
+  version: b965b613227fddccbfffe13eae360ed3fa822f8d
+  subpackages:
+  - quantile
+- package: github.com/blang/semver
+  version: 31b736133b98f26d5e078ec9eb591666edfd091f
+- package: github.com/boltdb/bolt
+  version: ee4a0888a9abe7eefe5a0992ca4cb06864839873
+- package: github.com/camlistore/go4
+  version: 3b6feb5cf32f573fb124905de36a54c24ee14ac1
+  subpackages:
+  - errorutil
+- package: github.com/codegangsta/negroni
+  version: 8d75e11374a1928608c906fe745b538483e7aeb2
+- package: github.com/coreos/etcd
+  version: 5e6eb7e19d6385adfabb1f1caea03e732f9348ad
+  subpackages:
+  - auth
+  - client
+  - clientv3
+  - compactor
+  - discovery
+  - error
+  - etcdserver
+  - integration
+  - lease
+  - pkg/adt
+  - pkg/contention
+  - pkg/crc
+  - pkg/fileutil
+  - pkg/httputil
+  - pkg/idutil
+  - pkg/ioutil
+  - pkg/logutil
+  - pkg/netutil
+  - pkg/pathutil
+  - pkg/pbutil
+  - pkg/runtime
+  - pkg/schedule
+  - pkg/testutil
+  - pkg/transport
+  - pkg/types
+  - pkg/wait
+  - raft
+  - rafthttp
+  - snap
+  - storage
+  - store
+  - version
+  - wal
+  - etcdserver/etcdhttp
+- package: github.com/coreos/go-etcd
+  version: 003851be7bb0694fe3cc457a49529a19388ee7cf
+  subpackages:
+  - etcd
+- package: github.com/coreos/go-oidc
+  version: d7cb66526fffc811d602b6770581064f4b66b507
+  subpackages:
+  - http
+  - jose
+  - key
+  - oauth2
+  - oidc
+- package: github.com/coreos/go-semver
+  version: d043ae190b3202550d026daf009359bb5d761672
+  subpackages:
+  - semver
+- package: github.com/coreos/go-systemd
+  version: b4a58d95188dd092ae20072bac14cece0e67c388
+  subpackages:
+  - daemon
+  - dbus
+  - journal
+  - unit
+  - util
+- package: github.com/coreos/pkg
+  version: fa94270d4bac0d8ae5dc6b71894e251aada93f74
+  subpackages:
+  - capnslog
+  - health
+  - httputil
+  - timeutil
+- package: github.com/coreos/rkt
+  version: e56895779706097a5fdfc7099003d105cc325638
+  subpackages:
+  - api/v1alpha
+- package: github.com/cpuguy83/go-md2man
+  version: 71acacd42f85e5e82f70a55327789582a5200a90
+  subpackages:
+  - md2man
+- package: github.com/davecgh/go-spew
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  subpackages:
+  - spew
+- package: github.com/daviddengcn/go-colortext
+  version: b5c0891944c2f150ccc9d02aecf51b76c14c2948
+- package: github.com/dgrijalva/jwt-go
+  version: 5ca80149b9d3f8b863af0e2bb6742e608603bd99
+- package: github.com/docker/docker
+  version: 0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d
+  subpackages:
+  - pkg/jsonmessage
+  - pkg/mount
+  - pkg/parsers
+  - pkg/stdcopy
+  - pkg/symlink
+  - pkg/term
+  - pkg/timeutils
+  - pkg/units
+- package: github.com/docker/engine-api
+  version: 26cdffeca716ae4df98070051a852b3198d7d153
+  subpackages:
+  - client
+  - types
+  - types/container
+  - types/filters
+- package: github.com/docker/go-connections
+  version: f549a9393d05688dff0992ef3efd8bbe6c628aeb
+  subpackages:
+  - nat
+  - sockets
+  - tlsconfig
+- package: github.com/docker/go-units
+  version: 0bbddae09c5a5419a8c6dcdd7ff90da3d450393b
+- package: github.com/docker/spdystream
+  version: 449fdfce4d962303d702fec724ef0ad181c92528
+- package: github.com/elazarl/go-bindata-assetfs
+  version: 3dcc96556217539f50599357fb481ac0dc7439b9
+- package: github.com/elazarl/goproxy
+  version: 07b16b6e30fcac0ad8c0435548e743bcf2ca7e92
+- package: github.com/emicklei/go-restful
+  version: 777bb3f19bcafe2575ffb2a3e46af92509ae9594
+  subpackages:
+  - swagger
+- package: github.com/evanphx/json-patch
+  version: 7dd4489c2eb6073e5a9d7746c3274c5b5f0387df
+- package: github.com/fsouza/go-dockerclient
+  version: 0099401a7342ad77e71ca9f9a57c5e72fb80f6b2
+- package: github.com/garyburd/redigo
+  version: 535138d7bcd717d6531c701ef5933d98b1866257
+  subpackages:
+  - internal
+  - redis
+- package: github.com/ghodss/yaml
+  version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
+- package: github.com/go-ini/ini
+  version: 2e44421e256d82ebbf3d4d4fcabe8930b905eff3
+- package: github.com/godbus/dbus
+  version: c7fdd8b5cd55e87b4e1f4e372cdb1db61dd6c66f
+- package: github.com/gogo/protobuf
+  version: 82d16f734d6d871204a3feb1a73cb220cc92574c
+  subpackages:
+  - gogoproto
+  - plugin/defaultcheck
+  - plugin/description
+  - plugin/embedcheck
+  - plugin/enumstringer
+  - plugin/equal
+  - plugin/face
+  - plugin/gostring
+  - plugin/grpc
+  - plugin/marshalto
+  - plugin/oneofcheck
+  - plugin/populate
+  - plugin/size
+  - plugin/stringer
+  - plugin/testgen
+  - plugin/union
+  - plugin/unmarshal
+  - proto
+  - protoc-gen-gogo/descriptor
+  - protoc-gen-gogo/generator
+  - protoc-gen-gogo/plugin
+  - sortkeys
+  - vanity
+  - vanity/command
+- package: github.com/golang/glog
+  version: 44145f04b68cf362d9c4df2182967c2275eaefed
+- package: github.com/golang/groupcache
+  version: 604ed5785183e59ae2789449d89e73f3a2a77987
+  subpackages:
+  - lru
+- package: github.com/golang/protobuf
+  version: b982704f8bb716bb608144408cff30e15fbde841
+  subpackages:
+  - proto
+- package: github.com/google/btree
+  version: cc6329d4279e3f025a53a83c397d2339b5705c45
+- package: github.com/google/cadvisor
+  version: 546a3771589bdb356777c646c6eca24914fdd48b
+  subpackages:
+  - api
+  - cache/memory
+  - collector
+  - container
+  - events
+  - fs
+  - healthz
+  - http
+  - info/v1
+  - info/v2
+  - manager
+  - metrics
+  - pages
+  - storage
+  - summary
+  - utils
+  - validate
+  - version
+  - utils/sysfs
+- package: github.com/google/gofuzz
+  version: bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5
+- package: github.com/gorilla/context
+  version: 215affda49addc4c8ef7e2534915df2c8c35c6cd
+- package: github.com/gorilla/mux
+  version: 8096f47503459bcc74d1f4c487b7e6e42e5746b5
+- package: github.com/hashicorp/go-msgpack
+  version: fa3f63826f7c23912c15263591e65d54d080b458
+  subpackages:
+  - codec
+- package: github.com/hashicorp/golang-lru
+  version: a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4
+- package: github.com/hashicorp/raft
+  version: 057b893fd996696719e98b6c44649ea14968c811
+- package: github.com/hashicorp/raft-boltdb
+  version: d1e82c1ec3f15ee991f7cc7ffd5b67ff6f5bbaee
+- package: github.com/hawkular/hawkular-client-go
+  version: 1d46ce7e1eca635f372357a8ccbf1fa7cc28b7d2
+  subpackages:
+  - metrics
+- package: github.com/imdario/mergo
+  version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
+- package: github.com/inconshreveable/mousetrap
+  version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
+- package: github.com/influxdb/influxdb
+  version: b237c68bab4756507baf6840023be103853e77db
+  subpackages:
+  - client
+  - influxql
+  - meta
+  - snapshot
+  - toml
+  - tsdb
+- package: github.com/jmespath/go-jmespath
+  version: 3433f3ea46d9f8019119e7dd41274e112a2359a9
+- package: github.com/jonboulle/clockwork
+  version: 3f831b65b61282ba6bece21b91beea2edc4c887a
+- package: github.com/juju/ratelimit
+  version: 77ed1c8a01217656d2080ad51981f6e99adaa177
+- package: github.com/kardianos/osext
+  version: 8fef92e41e22a70e700a96b29f066cda30ea24ef
+- package: github.com/kr/pty
+  version: f7ee69f31298ecbe5d2b349c711e2547a617d398
+- package: github.com/matttproud/golang_protobuf_extensions
+  version: fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a
+  subpackages:
+  - pbutil
+- package: github.com/mesos/mesos-go
+  version: 45c8b08e9af666add36a6f93ff8c1c75812367b0
+  subpackages:
+  - auth
+  - detector
+  - executor
+  - mesosproto
+  - mesosutil
+  - messenger
+  - scheduler
+  - upid
+  - auth/sasl
+  - auth/sasl/mech
+  - detector/zoo
+- package: github.com/miekg/dns
+  version: 3f504e8dabd5d562e997d19ce0200aa41973e1b2
+- package: github.com/mistifyio/go-zfs
+  version: 1b4ae6fb4e77b095934d4430860ff202060169f8
+- package: github.com/mitchellh/mapstructure
+  version: 740c764bc6149d3f1806231418adb9f52c11bcbf
+- package: github.com/mvdan/xurls
+  version: 1b768d7c393abd8e8dda1458385a57becd4b2d4e
+- package: github.com/mxk/go-flowrate
+  version: cca7078d478f8520f85629ad7c68962d31ed7682
+  subpackages:
+  - flowrate
+- package: github.com/onsi/ginkgo
+  version: 07d85e6b10c4289c7d612f9b13f45ba36f66d55b
+  subpackages:
+  - config
+  - reporters
+- package: github.com/onsi/gomega
+  version: 8adf9e1730c55cdc590de7d49766cb2acc88d8f2
+  subpackages:
+  - format
+  - types
+- package: github.com/opencontainers/runc
+  version: 7ca2aa4873aea7cb4265b1726acb24b90d8726c6
+  subpackages:
+  - libcontainer
+  - libcontainer/cgroups
+  - libcontainer/cgroups/fs
+  - libcontainer/configs
+  - libcontainer/selinux
+- package: github.com/pborman/uuid
+  version: ca53cad383cad2479bbba7f7a1a05797ec1386e4
+- package: github.com/pmezard/go-difflib
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  subpackages:
+  - difflib
+- package: github.com/prometheus/client_golang
+  version: 3b78d7a77f51ccbc364d4bc170920153022cfd08
+  subpackages:
+  - prometheus
+- package: github.com/prometheus/client_model
+  version: fa8ad6fec33561be4280a8f0514318c79d7f6cb6
+  subpackages:
+  - go
+- package: github.com/prometheus/common
+  version: ef7a9a5fb138aa5d3a19988537606226869a0390
+  subpackages:
+  - expfmt
+  - model
+- package: github.com/prometheus/procfs
+  version: 490cc6eb5fa45bf8a8b7b73c8bc82a8160e8531d
+- package: github.com/rackspace/gophercloud
+  version: 8992d7483a06748dea706e4716d042a4a9e73918
+  subpackages:
+  - openstack
+  - openstack/blockstorage/v1/volumes
+  - openstack/compute/v2/extensions/volumeattach
+  - openstack/compute/v2/flavors
+  - openstack/compute/v2/servers
+  - openstack/networking/v2/extensions/layer3/floatingips
+  - openstack/networking/v2/extensions/lbaas/members
+  - openstack/networking/v2/extensions/lbaas/monitors
+  - openstack/networking/v2/extensions/lbaas/pools
+  - openstack/networking/v2/extensions/lbaas/vips
+  - pagination
+  - rackspace
+  - rackspace/compute/v2/servers
+- package: github.com/russross/blackfriday
+  version: 77efab57b2f74dd3f9051c79752b2e8995c8b789
+- package: github.com/samuel/go-zookeeper
+  version: 177002e16a0061912f02377e2dd8951a8b3551bc
+  subpackages:
+  - zk
+- package: github.com/seccomp/libseccomp-golang
+  version: 1b506fc7c24eec5a3693cdcbed40d9c226cfc6a1
+- package: github.com/shurcooL/sanitized_anchor_name
+  version: 9a8b7d4e8f347bfa230879db9d7d4e4d9e19f962
+- package: github.com/skynetservices/skydns
+  version: 1be70b5b8aa07acccd972146d84011b670af88b4
+  subpackages:
+  - msg
+- package: github.com/spf13/cobra
+  version: 1c44ec8d3f1552cac48999f9306da23c4d8a288b
+- package: github.com/spf13/pflag
+  version: 08b1a584251b5b62f458943640fc8ebd4d50aaa5
+- package: github.com/stretchr/objx
+  version: d40df0cc104c06eae2dfe03d7dddb83802d52f9a
+- package: github.com/stretchr/testify
+  version: e3a8ff8ce36581f87a15341206f205b1da467059
+  subpackages:
+  - assert
+  - mock
+  - require
+- package: github.com/syndtr/gocapability
+  version: 2c00daeb6c3b45114c80ac44119e7b8801fdd852
+  subpackages:
+  - capability
+- package: github.com/ugorji/go
+  version: f4485b318aadd133842532f841dc205a8e339d74
+  subpackages:
+  - codec
+- package: github.com/vishvananda/netlink
+  version: 1e2e08e8a2dcdacaae3f14ac44c5cfa31361f270
+- package: github.com/xiang90/probing
+  version: 6a0cc1ae81b4cc11db5e491e030e4b98fba79c19
+- package: github.com/xyproto/simpleredis
+  version: 5292687f5379e01054407da44d7c4590a61fd3de
+- package: golang.org/x/crypto
+  version: c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3
+  subpackages:
+  - bcrypt
+  - blowfish
+  - ssh
+- package: golang.org/x/exp
+  version: d00e13ec443927751b2bd49e97dea7bf3b6a6487
+  subpackages:
+  - inotify
+- package: golang.org/x/net
+  version: c2528b2dd8352441850638a8bb678c2ad056fd3e
+  subpackages:
+  - context
+  - html
+  - http2
+  - internal/timeseries
+  - proxy
+  - trace
+  - websocket
+  - html/atom
+- package: golang.org/x/oauth2
+  version: b5adcc2dcdf009d0391547edc6ecbaff889f5bb9
+  subpackages:
+  - google
+  - jwt
+- package: golang.org/x/sys
+  version: 833a04a10549a95dc34458c195cbad61bbb6cb4d
+  subpackages:
+  - unix
+- package: golang.org/x/tools
+  version: 4f50f44d7a3206e9e28b984e023efce2a4a75369
+  subpackages:
+  - go/ast/astutil
+  - imports
+- package: google.golang.org/api
+  version: 77e7d383beb96054547729f49c372b3d01e196ff
+  subpackages:
+  - cloudmonitoring/v2beta2
+  - compute/v1
+  - container/v1
+  - gensupport
+  - googleapi
+- package: google.golang.org/cloud
+  version: eb47ba841d53d93506cfbfbc03927daf9cc48f88
+  subpackages:
+  - compute/metadata
+  - internal
+- package: google.golang.org/grpc
+  version: 933601d8cd6418a8a891bd9075a7161b0a67badb
+- package: gopkg.in/gcfg.v1
+  version: 083575c3955c85df16fe9590cceab64d03f5eb6e
+- package: gopkg.in/natefinch/lumberjack.v2
+  version: 20b71e5b60d756d3d2f80def009790325acc2b23
+- package: gopkg.in/yaml.v2
+  version: d466437aa4adc35830964cffc5b5f262c63ddcb4
+- package: k8s.io/heapster
+  version: 0991ac528ea24aae194e45d6dcf01896cb42cbea
+  subpackages:
+  - api/v1/types
+- package: speter.net/go/exp/math/dec/inf
+  version: 42ca6cd68aa922bc3f32f1e056e61b65945d9ad7

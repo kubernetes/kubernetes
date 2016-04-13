@@ -1,0 +1,10 @@
+2015-09-20: v0.0.2
+  Fixed a bunch of race conditions and most test flakes (#185, #189)
+  Updated Protobufs to Mesos 0.24.0 (#192)
+  Fixed path to executor in example-scheduler (#186)
+  Fixed executor shutdown hang bug (#183)
+  Fixed nil dereference bug (#181)
+
+2015-09-15: v0.0.1
+  First tagged release ever!
+  Mesos 0.24.0 and 0.23.0 compatibility.

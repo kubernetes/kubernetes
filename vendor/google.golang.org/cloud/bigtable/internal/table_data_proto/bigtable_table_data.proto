@@ -1,0 +1,123 @@
+// Copyright (c) 2015, Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package google.bigtable.admin.table.v1;
+
+import "google.golang.org/cloud/bigtable/internal/duration_proto/duration.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "BigtableTableDataProto";
+option java_package = "com.google.bigtable.admin.table.v1";
+
+
+// A collection of user data indexed by row, column, and timestamp.
+// Each table is served using the resources of its parent cluster.
+message Table {
+  enum TimestampGranularity {
+    MILLIS = 0;
+  }
+
+  // A unique identifier of the form
+  // <cluster_name>/tables/[_a-zA-Z0-9][-_.a-zA-Z0-9]*
+  string name = 1;
+
+  // If this Table is in the process of being created, the Operation used to
+  // track its progress. As long as this operation is present, the Table will
+  // not accept any Table Admin or Read/Write requests.
+
+  // The column families configured for this table, mapped by column family id.
+  map<string, ColumnFamily> column_families = 3;
+
+  // The granularity (e.g. MILLIS, MICROS) at which timestamps are stored in
+  // this table. Timestamps not matching the granularity will be rejected.
+  // Cannot be changed once the table is created.
+  TimestampGranularity granularity = 4;
+}
+
+// A set of columns within a table which share a common configuration.
+message ColumnFamily {
+  // A unique identifier of the form <table_name>/columnFamilies/[-_.a-zA-Z0-9]+
+  // The last segment is the same as the "name" field in
+  // google.bigtable.v1.Family.
+  string name = 1;
+
+  // Garbage collection expression specified by the following grammar:
+  //   GC = EXPR
+  //      | "" ;
+  //   EXPR = EXPR, "||", EXPR              (* lowest precedence *)
+  //        | EXPR, "&&", EXPR
+  //        | "(", EXPR, ")"                (* highest precedence *)
+  //        | PROP ;
+  //   PROP = "version() >", NUM32
+  //        | "age() >", NUM64, [ UNIT ] ;
+  //   NUM32 = non-zero-digit { digit } ;    (* # NUM32 <= 2^32 - 1 *)
+  //   NUM64 = non-zero-digit { digit } ;    (* # NUM64 <= 2^63 - 1 *)
+  //   UNIT =  "d" | "h" | "m"  (* d=days, h=hours, m=minutes, else micros *)
+  // GC expressions can be up to 500 characters in length
+  //
+  // The different types of PROP are defined as follows:
+  //   version() - cell index, counting from most recent and starting at 1
+  //   age() - age of the cell (current time minus cell timestamp)
+  //
+  // Example: "version() > 3 || (age() > 3d && version() > 1)"
+  //   drop cells beyond the most recent three, and drop cells older than three
+  //   days unless they're the most recent cell in the row/column
+  //
+  // Garbage collection executes opportunistically in the background, and so
+  // it's possible for reads to return a cell even if it matches the active GC
+  // expression for its family.
+  string gc_expression = 2;
+
+  // Garbage collection rule specified as a protobuf.
+  // Supersedes `gc_expression`.
+  // Must serialize to at most 500 bytes.
+  //
+  // NOTE: Garbage collection executes opportunistically in the background, and
+  // so it's possible for reads to return a cell even if it matches the active
+  // GC expression for its family.
+  GcRule gc_rule = 3;
+}
+
+// Rule for determining which cells to delete during garbage collection.
+message GcRule {
+  // A GcRule which deletes cells matching all of the given rules.
+  message Intersection {
+    // Only delete cells which would be deleted by every element of `rules`.
+    repeated GcRule rules = 1;
+  }
+
+  // A GcRule which deletes cells matching any of the given rules.
+  message Union {
+    // Delete cells which would be deleted by any element of `rules`.
+    repeated GcRule rules = 1;
+  }
+
+  oneof rule {
+    // Delete all cells in a column except the most recent N.
+    int32 max_num_versions = 1;
+
+    // Delete cells in a column older than the given age.
+    // Values must be at least one millisecond, and will be truncated to
+    // microsecond granularity.
+    google.protobuf.Duration max_age = 2;
+
+    // Delete cells that would be deleted by every nested rule.
+    Intersection intersection = 3;
+
+    // Delete cells that would be deleted by any nested rule.
+    Union union = 4;
+  }
+}

@@ -1,0 +1,16 @@
+# If you modify this, please also make sure to edit init.sh
+
+[Unit]
+Description=InfluxDB is an open-source, distributed, time series database
+After=network.target
+
+[Service]
+User=influxdb
+Group=influxdb
+LimitNOFILE=65536
+EnvironmentFile=-/etc/default/influxdb
+ExecStart=/opt/influxdb/influxd -config /etc/opt/influxdb/influxdb.conf $INFLUXD_OPTS
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

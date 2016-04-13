@@ -1,0 +1,217 @@
+// Package wrapnewlines provides access to the Example API.
+//
+// Usage example:
+//
+//   import "google.golang.org/api/wrapnewlines/v1"
+//   ...
+//   wrapnewlinesService, err := wrapnewlines.New(oauthHttpClient)
+package wrapnewlines // import "google.golang.org/api/wrapnewlines/v1"
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	context "golang.org/x/net/context"
+	ctxhttp "golang.org/x/net/context/ctxhttp"
+	gensupport "google.golang.org/api/gensupport"
+	googleapi "google.golang.org/api/googleapi"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+)
+
+// Always reference these packages, just in case the auto-generated code
+// below doesn't.
+var _ = bytes.NewBuffer
+var _ = strconv.Itoa
+var _ = fmt.Sprintf
+var _ = json.NewDecoder
+var _ = io.Copy
+var _ = url.Parse
+var _ = gensupport.MarshalJSON
+var _ = googleapi.Version
+var _ = errors.New
+var _ = strings.Replace
+var _ = context.Canceled
+var _ = ctxhttp.Do
+
+const apiId = "wrapnewlines:v1"
+const apiName = "wrapnewlines"
+const apiVersion = "v1"
+const basePath = "https://www.googleapis.com/discovery/v1/apis"
+
+func New(client *http.Client) (*Service, error) {
+	if client == nil {
+		return nil, errors.New("client is nil")
+	}
+	s := &Service{client: client, BasePath: basePath}
+	return s, nil
+}
+
+type Service struct {
+	client    *http.Client
+	BasePath  string // API endpoint base URL
+	UserAgent string // optional additional User-Agent fragment
+}
+
+func (s *Service) userAgent() string {
+	if s.UserAgent == "" {
+		return googleapi.UserAgent
+	}
+	return googleapi.UserAgent + " " + s.UserAgent
+}
+
+// Thing: don't care
+type Thing struct {
+	// BoolEmptyDefaultA:
+	// Nonempty default: no
+	// Unfortunate default: no
+	BoolEmptyDefaultA bool `json:"bool_empty_default_a,omitempty"`
+
+	// BoolEmptyDefaultB:
+	// Nonempty default: no
+	// Unfortunate default: no
+	BoolEmptyDefaultB bool `json:"bool_empty_default_b,omitempty"`
+
+	// BoolNonemptyDefault:
+	// Nonempty default: yes
+	// Unfortunate default: yes
+	//
+	// Default: true
+	BoolNonemptyDefault *bool `json:"bool_nonempty_default,omitempty"`
+
+	// NumericEmptyDefaultA:
+	// Nonempty default: no
+	// Unfortunate default: no
+	NumericEmptyDefaultA int64 `json:"numeric_empty_default_a,omitempty,string"`
+
+	// NumericEmptyDefaultB:
+	// Nonempty default: no
+	// Unfortunate default: no
+	NumericEmptyDefaultB int64 `json:"numeric_empty_default_b,omitempty,string"`
+
+	// NumericEmptyDefaultC:
+	// Nonempty default: no
+	// Unfortunate default: no
+	NumericEmptyDefaultC int64 `json:"numeric_empty_default_c,omitempty,string"`
+
+	// NumericEmptyDefaultD:
+	// Nonempty default: no
+	// Unfortunate default: no
+	NumericEmptyDefaultD float64 `json:"numeric_empty_default_d,omitempty"`
+
+	// NumericEmptyDefaultE:
+	// Nonempty default: no
+	// Unfortunate default: no
+	NumericEmptyDefaultE float64 `json:"numeric_empty_default_e,omitempty"`
+
+	// NumericNonemptyDefaultA:
+	// Nonempty default: yes
+	// Unfortunate default: yes
+	// string encoded, so will not be represented as pointer.
+	//
+	// Default: 1
+	NumericNonemptyDefaultA *int64 `json:"numeric_nonempty_default_a,omitempty,string"`
+
+	// NumericNonemptyDefaultB:
+	// Nonempty default: yes
+	// Unfortunate default: yes
+	//
+	// Default: 0.001
+	NumericNonemptyDefaultB *float64 `json:"numeric_nonempty_default_b,omitempty"`
+
+	// StringEmptyDefaultDoesntAcceptEmpty:
+	// Nonempty default: no
+	// Accepts empty value: no
+	// Unfortunate default: no
+	StringEmptyDefaultDoesntAcceptEmpty string `json:"string_empty_default_doesnt_accept_empty,omitempty"`
+
+	// StringEmptyDefaultEnumAcceptsEmpty:
+	// Nonempty default: no
+	// Accepts empty value: yes (enum)
+	// Unfortunate default: no
+	//
+	// Possible values:
+	//   "" (default)
+	//   "value"
+	StringEmptyDefaultEnumAcceptsEmpty string `json:"string_empty_default_enum_accepts_empty,omitempty"`
+
+	// StringEmptyDefaultEnumDoesntAcceptEmpty:
+	// Nonempty default: no
+	// Accepts empty value: no (enum)
+	// Unfortunate default: no
+	//
+	// Possible values:
+	//   "value"
+	StringEmptyDefaultEnumDoesntAcceptEmpty string `json:"string_empty_default_enum_doesnt_accept_empty,omitempty"`
+
+	// StringEmptyDefaultPatternAcceptsEmpty:
+	// Nonempty default: no
+	// Accepts empty value: yes (pattern)
+	// Unfortunate default: no
+	StringEmptyDefaultPatternAcceptsEmpty string `json:"string_empty_default_pattern_accepts_empty,omitempty"`
+
+	// StringEmptyDefaultPatternDoesntAcceptEmpty:
+	// Nonempty default: no
+	// Accepts empty value: no (pattern)
+	// Unfortunate default: no
+	StringEmptyDefaultPatternDoesntAcceptEmpty string `json:"string_empty_default_pattern_doesnt_accept_empty,omitempty"`
+
+	// StringNonemptyDefaultDoesntAcceptEmpty:
+	// Nonempty default: yes
+	// Accepts empty value: no
+	// Unfortunate default: no
+	StringNonemptyDefaultDoesntAcceptEmpty string `json:"string_nonempty_default_doesnt_accept_empty,omitempty"`
+
+	// StringNonemptyDefaultEnumAcceptsEmpty:
+	// Nonempty default: yes
+	// Accepts empty value: yes (enum)
+	// Unfortunate default: yes
+	//
+	// Possible values:
+	//   ""
+	//   "nonempty" (default)
+	//   "aaa"
+	StringNonemptyDefaultEnumAcceptsEmpty *string `json:"string_nonempty_default_enum_accepts_empty,omitempty"`
+
+	// StringNonemptyDefaultEnumDoesntAcceptEmpty:
+	// Nonempty default: yes
+	// Accepts empty value: no (enum)
+	// Unfortunate default: no
+	//
+	// Possible values:
+	//   "nonempty" (default)
+	//   "aaa"
+	StringNonemptyDefaultEnumDoesntAcceptEmpty string `json:"string_nonempty_default_enum_doesnt_accept_empty,omitempty"`
+
+	// StringNonemptyDefaultPatternAcceptsEmpty:
+	// Nonempty default: yes
+	// Accepts empty value: yes (pattern)
+	// Unfortunate default: yes
+	//
+	// Default: nonempty
+	StringNonemptyDefaultPatternAcceptsEmpty *string `json:"string_nonempty_default_pattern_accepts_empty,omitempty"`
+
+	// StringNonemptyDefaultPatternDoesntAcceptEmpty:
+	// Nonempty default: yes
+	// Accepts empty value: no (pattern)
+	// Unfortunate default: no
+	StringNonemptyDefaultPatternDoesntAcceptEmpty string `json:"string_nonempty_default_pattern_doesnt_accept_empty,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "BoolEmptyDefaultA")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *Thing) MarshalJSON() ([]byte, error) {
+	type noMethod Thing
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
+}

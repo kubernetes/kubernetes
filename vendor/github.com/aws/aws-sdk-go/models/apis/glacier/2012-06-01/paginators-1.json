@@ -1,0 +1,28 @@
+{
+  "pagination": {
+    "ListJobs": {
+      "input_token": "marker",
+      "output_token": "Marker",
+      "limit_key": "limit",
+      "result_key": "JobList"
+    },
+    "ListMultipartUploads": {
+      "input_token": "marker",
+      "output_token": "Marker",
+      "limit_key": "limit",
+      "result_key": "UploadsList"
+    },
+    "ListParts": {
+      "input_token": "marker",
+      "output_token": "Marker",
+      "limit_key": "limit",
+      "result_key": "Parts"
+    },
+    "ListVaults": {
+      "input_token": "marker",
+      "output_token": "Marker",
+      "limit_key": "limit",
+      "result_key": "VaultList"
+    }
+  }
+}

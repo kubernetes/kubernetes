@@ -1,0 +1,10 @@
+---
+  language: go
+  sudo: false
+  notifications:
+    email: false
+  go:
+    - 1.6
+    - tip
+  install: make deps
+  script: make validate && make test

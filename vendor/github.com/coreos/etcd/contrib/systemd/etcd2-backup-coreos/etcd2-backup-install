@@ -1,0 +1,33 @@
+#!/bin/bash -e
+
+if [ ! -f /etc/os-release ];then
+    echo "Could not find /etc/os-release. This is not CoreOS Linux"
+    exit 1
+fi
+. /etc/os-release
+if [ ! "$ID" == "coreos" ];then
+    echo "os-release error: Detected ID=$ID: this is not CoreOS Linux"
+    exit 1
+fi
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "${SCRIPT_DIR}"
+
+sudo cp ./rclone.conf /etc/
+
+sudo mkdir -p /opt/bin
+
+sudo mv etcd2-join bin/etcd2-restore /opt/bin
+sudo mv *.{service,timer} /etc/systemd/system
+
+sudo systemctl daemon-reload
+
+for jobtype in restore backup join;do
+     sudo mkdir -p /var/run/systemd/system/etcd2-${jobtype}.service.d
+     sudo cp 30-etcd2-backup-restore.conf /var/run/systemd/system/etcd2-${jobtype}.service.d/
+     sudo ln -sf /var/run/systemd/system/etcd2{,-${jobtype}}.service.d/20-cloudinit.conf
+done
+
+sudo systemctl daemon-reload
+
+echo "etcd2-backup install complete!"

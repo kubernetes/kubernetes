@@ -1,0 +1,1064 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/67X4oa_z2X9akk2jDtoTiNGUkaE\"",
+ "discoveryVersion": "v1",
+ "id": "replicapool:v1beta2",
+ "name": "replicapool",
+ "version": "v1beta2",
+ "revision": "20150708",
+ "title": "Google Compute Engine Instance Group Manager API",
+ "description": "The Google Compute Engine Instance Group Manager API provides groups of homogenous Compute Engine Instances.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/compute/docs/instance-groups/manager/v1beta2",
+ "labels": [
+  "limited_availability"
+ ],
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/replicapool/v1beta2/projects/",
+ "basePath": "/replicapool/v1beta2/projects/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "replicapool/v1beta2/projects/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/cloud-platform": {
+     "description": "View and manage your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/cloud-platform.read-only": {
+     "description": "View your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/compute": {
+     "description": "View and manage your Google Compute Engine resources"
+    },
+    "https://www.googleapis.com/auth/compute.readonly": {
+     "description": "View your Google Compute Engine resources"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "InstanceGroupManager": {
+   "id": "InstanceGroupManager",
+   "type": "object",
+   "description": "An Instance Group Manager resource.",
+   "properties": {
+    "autoHealingPolicies": {
+     "type": "array",
+     "description": "The autohealing policy for this managed instance group. You can specify only one value.",
+     "items": {
+      "$ref": "ReplicaPoolAutoHealingPolicy"
+     }
+    },
+    "baseInstanceName": {
+     "type": "string",
+     "description": "The base instance name to use for instances in this group. The value must be a valid RFC1035 name. Supported characters are lowercase letters, numbers, and hyphens (-). Instances are named by appending a hyphen and a random four-character string to the base instance name."
+    },
+    "creationTimestamp": {
+     "type": "string",
+     "description": "[Output only] The time the instance group manager was created, in RFC3339 text format."
+    },
+    "currentSize": {
+     "type": "integer",
+     "description": "[Output only] The number of instances that currently exist and are a part of this group. This includes instances that are starting but are not yet RUNNING, and instances that are in the process of being deleted or abandoned.",
+     "format": "int32"
+    },
+    "description": {
+     "type": "string",
+     "description": "An optional textual description of the instance group manager."
+    },
+    "fingerprint": {
+     "type": "string",
+     "description": "[Output only] Fingerprint of the instance group manager. This field is used for optimistic locking. An up-to-date fingerprint must be provided in order to modify the Instance Group Manager resource.",
+     "format": "byte"
+    },
+    "group": {
+     "type": "string",
+     "description": "[Output only] The full URL of the instance group created by the manager. This group contains all of the instances being managed, and cannot contain non-managed instances."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output only] A server-assigned unique identifier for the resource.",
+     "format": "uint64"
+    },
+    "instanceTemplate": {
+     "type": "string",
+     "description": "The full URL to an instance template from which all new instances will be created."
+    },
+    "kind": {
+     "type": "string",
+     "description": "[Output only] The resource type. Always replicapool#instanceGroupManager.",
+     "default": "replicapool#instanceGroupManager"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the instance group manager. Must be 1-63 characters long and comply with RFC1035. Supported characters include lowercase letters, numbers, and hyphens."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output only] The fully qualified URL for this resource."
+    },
+    "targetPools": {
+     "type": "array",
+     "description": "The full URL of all target pools to which new instances in the group are added. Updating the target pool values does not affect existing instances.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "targetSize": {
+     "type": "integer",
+     "description": "[Output only] The number of instances that the manager is attempting to maintain. Deleting or abandoning instances affects this number, as does resizing the group.",
+     "format": "int32"
+    }
+   }
+  },
+  "InstanceGroupManagerList": {
+   "id": "InstanceGroupManagerList",
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Unique identifier for the resource; defined by the server (output only)."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of instance resources.",
+     "items": {
+      "$ref": "InstanceGroupManager"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Type of resource.",
+     "default": "replicapool#instanceGroupManagerList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token used to continue a truncated list request (output only)."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Server defined URL for this resource (output only)."
+    }
+   }
+  },
+  "InstanceGroupManagersAbandonInstancesRequest": {
+   "id": "InstanceGroupManagersAbandonInstancesRequest",
+   "type": "object",
+   "properties": {
+    "instances": {
+     "type": "array",
+     "description": "The names of one or more instances to abandon. For example:\n{ 'instances': [ 'instance-c3po', 'instance-r2d2' ] }",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "InstanceGroupManagersDeleteInstancesRequest": {
+   "id": "InstanceGroupManagersDeleteInstancesRequest",
+   "type": "object",
+   "properties": {
+    "instances": {
+     "type": "array",
+     "description": "Names of instances to delete.\n\nExample: 'instance-foo', 'instance-bar'",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "InstanceGroupManagersRecreateInstancesRequest": {
+   "id": "InstanceGroupManagersRecreateInstancesRequest",
+   "type": "object",
+   "properties": {
+    "instances": {
+     "type": "array",
+     "description": "The names of one or more instances to recreate. For example:\n{ 'instances': [ 'instance-c3po', 'instance-r2d2' ] }",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "InstanceGroupManagersSetInstanceTemplateRequest": {
+   "id": "InstanceGroupManagersSetInstanceTemplateRequest",
+   "type": "object",
+   "properties": {
+    "instanceTemplate": {
+     "type": "string",
+     "description": "The full URL to an Instance Template from which all new instances will be created."
+    }
+   }
+  },
+  "InstanceGroupManagersSetTargetPoolsRequest": {
+   "id": "InstanceGroupManagersSetTargetPoolsRequest",
+   "type": "object",
+   "properties": {
+    "fingerprint": {
+     "type": "string",
+     "description": "The current fingerprint of the Instance Group Manager resource. If this does not match the server-side fingerprint of the resource, then the request will be rejected.",
+     "format": "byte"
+    },
+    "targetPools": {
+     "type": "array",
+     "description": "A list of fully-qualified URLs to existing Target Pool resources. New instances in the Instance Group Manager will be added to the specified target pools; existing instances are not affected.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "Operation": {
+   "id": "Operation",
+   "type": "object",
+   "description": "An operation resource, used to manage asynchronous API requests.",
+   "properties": {
+    "clientOperationId": {
+     "type": "string",
+     "description": "[Output only] An optional identifier specified by the client when the mutation was initiated. Must be unique for all operation resources in the project."
+    },
+    "creationTimestamp": {
+     "type": "string",
+     "description": "[Output Only] The time that this operation was requested, in RFC3339 text format."
+    },
+    "endTime": {
+     "type": "string",
+     "description": "[Output Only] The time that this operation was completed, in RFC3339 text format."
+    },
+    "error": {
+     "type": "object",
+     "description": "[Output Only] If errors occurred during processing of this operation, this field will be populated.",
+     "properties": {
+      "errors": {
+       "type": "array",
+       "description": "[Output Only] The array of errors encountered while processing this operation.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "code": {
+          "type": "string",
+          "description": "[Output Only] The error type identifier for this error."
+         },
+         "location": {
+          "type": "string",
+          "description": "[Output Only] Indicates the field in the request which caused the error. This property is optional."
+         },
+         "message": {
+          "type": "string",
+          "description": "[Output Only] An optional, human-readable error message."
+         }
+        }
+       }
+      }
+     }
+    },
+    "httpErrorMessage": {
+     "type": "string",
+     "description": "[Output only] If operation fails, the HTTP error message returned."
+    },
+    "httpErrorStatusCode": {
+     "type": "integer",
+     "description": "[Output only] If operation fails, the HTTP error status code returned.",
+     "format": "int32"
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output Only] Unique identifier for the resource, generated by the server.",
+     "format": "uint64"
+    },
+    "insertTime": {
+     "type": "string",
+     "description": "[Output Only] The time that this operation was requested, in RFC3339 text format."
+    },
+    "kind": {
+     "type": "string",
+     "description": "[Output only] Type of the resource.",
+     "default": "replicapool#operation"
+    },
+    "name": {
+     "type": "string",
+     "description": "[Output Only] Name of the resource."
+    },
+    "operationType": {
+     "type": "string",
+     "description": "[Output only] Type of the operation. Operations include insert, update, and delete."
+    },
+    "progress": {
+     "type": "integer",
+     "description": "[Output only] An optional progress indicator that ranges from 0 to 100. There is no requirement that this be linear or support any granularity of operations. This should not be used to guess at when the operation will be complete. This number should be monotonically increasing as the operation progresses.",
+     "format": "int32"
+    },
+    "region": {
+     "type": "string",
+     "description": "[Output Only] URL of the region where the operation resides. Only available when performing regional operations."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output Only] Server-defined fully-qualified URL for this resource."
+    },
+    "startTime": {
+     "type": "string",
+     "description": "[Output Only] The time that this operation was started by the server, in RFC3339 text format."
+    },
+    "status": {
+     "type": "string",
+     "description": "[Output Only] Status of the operation.",
+     "enum": [
+      "DONE",
+      "PENDING",
+      "RUNNING"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      ""
+     ]
+    },
+    "statusMessage": {
+     "type": "string",
+     "description": "[Output Only] An optional textual description of the current status of the operation."
+    },
+    "targetId": {
+     "type": "string",
+     "description": "[Output Only] Unique target ID which identifies a particular incarnation of the target.",
+     "format": "uint64"
+    },
+    "targetLink": {
+     "type": "string",
+     "description": "[Output only] URL of the resource the operation is mutating."
+    },
+    "user": {
+     "type": "string",
+     "description": "[Output Only] User who requested the operation, for example: user@example.com."
+    },
+    "warnings": {
+     "type": "array",
+     "description": "[Output Only] If there are issues with this operation, a warning is returned.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "[Output only] The warning type identifier for this warning.",
+        "enum": [
+         "DEPRECATED_RESOURCE_USED",
+         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+         "INJECTED_KERNELS_DEPRECATED",
+         "NEXT_HOP_ADDRESS_NOT_ASSIGNED",
+         "NEXT_HOP_CANNOT_IP_FORWARD",
+         "NEXT_HOP_INSTANCE_NOT_FOUND",
+         "NEXT_HOP_INSTANCE_NOT_ON_NETWORK",
+         "NEXT_HOP_NOT_RUNNING",
+         "NO_RESULTS_ON_PAGE",
+         "REQUIRED_TOS_AGREEMENT",
+         "RESOURCE_NOT_DELETED",
+         "SINGLE_INSTANCE_PROPERTY_TEMPLATE",
+         "UNREACHABLE"
+        ],
+        "enumDescriptions": [
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         ""
+        ]
+       },
+       "data": {
+        "type": "array",
+        "description": "[Output only] Metadata for this warning in key:value format.",
+        "items": {
+         "type": "object",
+         "properties": {
+          "key": {
+           "type": "string",
+           "description": "[Output Only] Metadata key for this warning."
+          },
+          "value": {
+           "type": "string",
+           "description": "[Output Only] Metadata value for this warning."
+          }
+         }
+        }
+       },
+       "message": {
+        "type": "string",
+        "description": "[Output only] Optional human-readable details for this warning."
+       }
+      }
+     }
+    },
+    "zone": {
+     "type": "string",
+     "description": "[Output Only] URL of the zone where the operation resides. Only available when performing per-zone operations."
+    }
+   }
+  },
+  "OperationList": {
+   "id": "OperationList",
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Unique identifier for the resource; defined by the server (output only)."
+    },
+    "items": {
+     "type": "array",
+     "description": "The operation resources.",
+     "items": {
+      "$ref": "Operation"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Type of resource.",
+     "default": "replicapool#operationList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token used to continue a truncated list request (output only)."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Server defined URL for this resource (output only)."
+    }
+   }
+  },
+  "ReplicaPoolAutoHealingPolicy": {
+   "id": "ReplicaPoolAutoHealingPolicy",
+   "type": "object",
+   "properties": {
+    "actionType": {
+     "type": "string",
+     "description": "The action to perform when an instance becomes unhealthy. Possible values are RECREATE or REBOOT. RECREATE replaces an unhealthy instance with a new instance that is based on the instance template for this managed instance group. REBOOT performs a soft reboot on an instance. If the instance cannot reboot, the instance performs a hard restart.",
+     "enum": [
+      "REBOOT",
+      "RECREATE"
+     ],
+     "enumDescriptions": [
+      "",
+      ""
+     ]
+    },
+    "healthCheck": {
+     "type": "string",
+     "description": "The URL for the HealthCheck that signals autohealing."
+    }
+   }
+  }
+ },
+ "resources": {
+  "instanceGroupManagers": {
+   "methods": {
+    "abandonInstances": {
+     "id": "replicapool.instanceGroupManagers.abandonInstances",
+     "path": "{project}/zones/{zone}/instanceGroupManagers/{instanceGroupManager}/abandonInstances",
+     "httpMethod": "POST",
+     "description": "Removes the specified instances from the managed instance group, and from any target pools of which they were members, without deleting the instances.",
+     "parameters": {
+      "instanceGroupManager": {
+       "type": "string",
+       "description": "The name of the instance group manager.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "instanceGroupManager"
+     ],
+     "request": {
+      "$ref": "InstanceGroupManagersAbandonInstancesRequest"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "delete": {
+     "id": "replicapool.instanceGroupManagers.delete",
+     "path": "{project}/zones/{zone}/instanceGroupManagers/{instanceGroupManager}",
+     "httpMethod": "DELETE",
+     "description": "Deletes the instance group manager and all instances contained within. If you'd like to delete the manager without deleting the instances, you must first abandon the instances to remove them from the group.",
+     "parameters": {
+      "instanceGroupManager": {
+       "type": "string",
+       "description": "Name of the Instance Group Manager resource to delete.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "instanceGroupManager"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "deleteInstances": {
+     "id": "replicapool.instanceGroupManagers.deleteInstances",
+     "path": "{project}/zones/{zone}/instanceGroupManagers/{instanceGroupManager}/deleteInstances",
+     "httpMethod": "POST",
+     "description": "Deletes the specified instances. The instances are deleted, then removed from the instance group and any target pools of which they were a member. The targetSize of the instance group manager is reduced by the number of instances deleted.",
+     "parameters": {
+      "instanceGroupManager": {
+       "type": "string",
+       "description": "The name of the instance group manager.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "instanceGroupManager"
+     ],
+     "request": {
+      "$ref": "InstanceGroupManagersDeleteInstancesRequest"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "get": {
+     "id": "replicapool.instanceGroupManagers.get",
+     "path": "{project}/zones/{zone}/instanceGroupManagers/{instanceGroupManager}",
+     "httpMethod": "GET",
+     "description": "Returns the specified Instance Group Manager resource.",
+     "parameters": {
+      "instanceGroupManager": {
+       "type": "string",
+       "description": "Name of the instance resource to return.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "instanceGroupManager"
+     ],
+     "response": {
+      "$ref": "InstanceGroupManager"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly"
+     ]
+    },
+    "insert": {
+     "id": "replicapool.instanceGroupManagers.insert",
+     "path": "{project}/zones/{zone}/instanceGroupManagers",
+     "httpMethod": "POST",
+     "description": "Creates an instance group manager, as well as the instance group and the specified number of instances.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "size": {
+       "type": "integer",
+       "description": "Number of instances that should exist.",
+       "required": true,
+       "format": "int32",
+       "minimum": "0",
+       "location": "query"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "size"
+     ],
+     "request": {
+      "$ref": "InstanceGroupManager"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "list": {
+     "id": "replicapool.instanceGroupManagers.list",
+     "path": "{project}/zones/{zone}/instanceGroupManagers",
+     "httpMethod": "GET",
+     "description": "Retrieves the list of Instance Group Manager resources contained within the specified zone.",
+     "parameters": {
+      "filter": {
+       "type": "string",
+       "description": "Optional. Filter expression for filtering listed resources.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Optional. Maximum count of results to be returned. Maximum value is 500 and default value is 500.",
+       "default": "500",
+       "format": "uint32",
+       "minimum": "0",
+       "maximum": "500",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Optional. Tag returned by a previous list request truncated by maxResults. Used to continue a previous list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone"
+     ],
+     "response": {
+      "$ref": "InstanceGroupManagerList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly"
+     ]
+    },
+    "recreateInstances": {
+     "id": "replicapool.instanceGroupManagers.recreateInstances",
+     "path": "{project}/zones/{zone}/instanceGroupManagers/{instanceGroupManager}/recreateInstances",
+     "httpMethod": "POST",
+     "description": "Recreates the specified instances. The instances are deleted, then recreated using the instance group manager's current instance template.",
+     "parameters": {
+      "instanceGroupManager": {
+       "type": "string",
+       "description": "The name of the instance group manager.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "instanceGroupManager"
+     ],
+     "request": {
+      "$ref": "InstanceGroupManagersRecreateInstancesRequest"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "resize": {
+     "id": "replicapool.instanceGroupManagers.resize",
+     "path": "{project}/zones/{zone}/instanceGroupManagers/{instanceGroupManager}/resize",
+     "httpMethod": "POST",
+     "description": "Resizes the managed instance group up or down. If resized up, new instances are created using the current instance template. If resized down, instances are removed in the order outlined in Resizing a managed instance group.",
+     "parameters": {
+      "instanceGroupManager": {
+       "type": "string",
+       "description": "The name of the instance group manager.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "size": {
+       "type": "integer",
+       "description": "Number of instances that should exist in this Instance Group Manager.",
+       "required": true,
+       "format": "int32",
+       "minimum": "0",
+       "location": "query"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "instanceGroupManager",
+      "size"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "setInstanceTemplate": {
+     "id": "replicapool.instanceGroupManagers.setInstanceTemplate",
+     "path": "{project}/zones/{zone}/instanceGroupManagers/{instanceGroupManager}/setInstanceTemplate",
+     "httpMethod": "POST",
+     "description": "Sets the instance template to use when creating new instances in this group. Existing instances are not affected.",
+     "parameters": {
+      "instanceGroupManager": {
+       "type": "string",
+       "description": "The name of the instance group manager.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "instanceGroupManager"
+     ],
+     "request": {
+      "$ref": "InstanceGroupManagersSetInstanceTemplateRequest"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "setTargetPools": {
+     "id": "replicapool.instanceGroupManagers.setTargetPools",
+     "path": "{project}/zones/{zone}/instanceGroupManagers/{instanceGroupManager}/setTargetPools",
+     "httpMethod": "POST",
+     "description": "Modifies the target pools to which all new instances in this group are assigned. Existing instances in the group are not affected.",
+     "parameters": {
+      "instanceGroupManager": {
+       "type": "string",
+       "description": "The name of the instance group manager.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "The Google Developers Console project name.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone in which the instance group manager resides.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "instanceGroupManager"
+     ],
+     "request": {
+      "$ref": "InstanceGroupManagersSetTargetPoolsRequest"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    }
+   }
+  },
+  "zoneOperations": {
+   "methods": {
+    "get": {
+     "id": "replicapool.zoneOperations.get",
+     "path": "{project}/zones/{zone}/operations/{operation}",
+     "httpMethod": "GET",
+     "description": "Retrieves the specified zone-specific operation resource.",
+     "parameters": {
+      "operation": {
+       "type": "string",
+       "description": "Name of the operation resource to return.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "Name of the zone scoping this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "operation"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "list": {
+     "id": "replicapool.zoneOperations.list",
+     "path": "{project}/zones/{zone}/operations",
+     "httpMethod": "GET",
+     "description": "Retrieves the list of operation resources contained within the specified zone.",
+     "parameters": {
+      "filter": {
+       "type": "string",
+       "description": "Optional. Filter expression for filtering listed resources.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Optional. Maximum count of results to be returned. Maximum value is 500 and default value is 500.",
+       "default": "500",
+       "format": "uint32",
+       "minimum": "0",
+       "maximum": "500",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Optional. Tag returned by a previous list request truncated by maxResults. Used to continue a previous list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "Name of the zone scoping this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone"
+     ],
+     "response": {
+      "$ref": "OperationList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    }
+   }
+  }
+ }
+}

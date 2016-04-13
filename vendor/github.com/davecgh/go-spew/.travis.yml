@@ -1,0 +1,11 @@
+language: go
+go: 1.2
+install:
+    - go get -v code.google.com/p/go.tools/cmd/cover
+script:
+    - go test -v -tags=disableunsafe ./spew
+    - go test -v -tags=testcgo ./spew -covermode=count -coverprofile=profile.cov
+after_success:
+    - go get -v github.com/mattn/goveralls
+    - export PATH=$PATH:$HOME/gopath/bin
+    - goveralls -coverprofile=profile.cov -service=travis-ci

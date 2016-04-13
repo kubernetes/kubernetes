@@ -1,0 +1,6 @@
+# Use goreman to run `go get github.com/mattn/goreman`
+# One of the four etcd members falls back to a proxy
+etcd1: ../../bin/etcd -name infra1 -listen-client-urls http://127.0.0.1:4001 -advertise-client-urls http://127.0.0.1:4001 -listen-peer-urls http://127.0.0.1:7001 -initial-advertise-peer-urls http://127.0.0.1:7001
+etcd2: ../../bin/etcd -name infra2 -listen-client-urls http://127.0.0.1:4002 -advertise-client-urls http://127.0.0.1:4002 -listen-peer-urls http://127.0.0.1:7002 -initial-advertise-peer-urls http://127.0.0.1:7002
+etcd3: ../../bin/etcd -name infra3 -listen-client-urls http://127.0.0.1:4003 -advertise-client-urls http://127.0.0.1:4003 -listen-peer-urls http://127.0.0.1:7003 -initial-advertise-peer-urls http://127.0.0.1:7003
+etcd4: ../../bin/etcd -name infra4 -listen-client-urls http://127.0.0.1:4004 -advertise-client-urls http://127.0.0.1:4004 -listen-peer-urls http://127.0.0.1:7004 -initial-advertise-peer-urls http://127.0.0.1:7004

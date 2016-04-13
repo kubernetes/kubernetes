@@ -1,0 +1,67 @@
+*~
+src/
+
+config.json
+/bin/
+
+/pkg/
+
+TAGS
+
+# vim temp files
+*.swp
+
+*.test
+/query/a.out*
+.DS_Store
+
+# ignore generated files.
+cmd/influxd/version.go
+
+# executables
+
+influxd
+**/influxd
+!**/influxd/
+
+influx
+**/influx
+!**/influx/
+
+influxdb
+**/influxdb
+!**/influxdb/
+
+/benchmark-tool
+/main
+/benchmark-storage
+godef
+gosym
+gocode
+inspect-raft
+
+# dependencies
+out_rpm/
+packages/
+
+# autconf
+autom4te.cache/
+config.log
+config.status
+Makefile
+
+# log file
+influxdb.log
+benchmark.log
+
+# config file
+config.toml
+
+# test data files
+integration/migration_data/
+
+# goide project files
+.idea
+
+# goconvey config files
+*.goconvey

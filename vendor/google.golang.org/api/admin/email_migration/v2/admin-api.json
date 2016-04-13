@@ -1,0 +1,173 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/_VRzIG5q4_x1FzCCxocLHIuiUhw\"",
+ "discoveryVersion": "v1",
+ "id": "admin:email_migration_v2",
+ "name": "admin",
+ "version": "email_migration_v2",
+ "revision": "20150303",
+ "title": "Email Migration API v2",
+ "description": "Email Migration API lets you migrate emails of users to Google backends.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "https://www.google.com/images/icons/product/googlemail-16.png",
+  "x32": "https://www.google.com/images/icons/product/googlemail-32.png"
+ },
+ "documentationLink": "https://developers.google.com/admin-sdk/email-migration/v2/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/email/v2/users/",
+ "basePath": "/email/v2/users/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "email/v2/users/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/email.migration": {
+     "description": "Manage email messages of users on your domain"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "MailItem": {
+   "id": "MailItem",
+   "type": "object",
+   "description": "JSON template for MailItem object in Email Migration API.",
+   "properties": {
+    "isDeleted": {
+     "type": "boolean",
+     "description": "Boolean indicating if the mail is deleted (used in Vault)"
+    },
+    "isDraft": {
+     "type": "boolean",
+     "description": "Boolean indicating if the mail is draft"
+    },
+    "isInbox": {
+     "type": "boolean",
+     "description": "Boolean indicating if the mail is in inbox"
+    },
+    "isSent": {
+     "type": "boolean",
+     "description": "Boolean indicating if the mail is in 'sent mails'"
+    },
+    "isStarred": {
+     "type": "boolean",
+     "description": "Boolean indicating if the mail is starred"
+    },
+    "isTrash": {
+     "type": "boolean",
+     "description": "Boolean indicating if the mail is in trash"
+    },
+    "isUnread": {
+     "type": "boolean",
+     "description": "Boolean indicating if the mail is unread"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "mailItem"
+    },
+    "labels": {
+     "type": "array",
+     "description": "List of labels (strings)",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "mail": {
+   "methods": {
+    "insert": {
+     "id": "emailMigration.mail.insert",
+     "path": "{userKey}/mail",
+     "httpMethod": "POST",
+     "description": "Insert Mail into Google's Gmail backends",
+     "parameters": {
+      "userKey": {
+       "type": "string",
+       "description": "The email or immutable id of the user",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey"
+     ],
+     "request": {
+      "$ref": "MailItem"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/email.migration"
+     ],
+     "supportsMediaUpload": true,
+     "mediaUpload": {
+      "accept": [
+       "message/rfc822"
+      ],
+      "maxSize": "35MB",
+      "protocols": {
+       "simple": {
+        "multipart": true,
+        "path": "/upload/email/v2/users/{userKey}/mail"
+       },
+       "resumable": {
+        "multipart": true,
+        "path": "/resumable/upload/email/v2/users/{userKey}/mail"
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package issue34;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.unmarshaler_all) = true;
+
+message Foo {
+  optional bytes bar = 1;
+}
+
+message FooWithRepeated {
+  repeated bytes bar = 1;
+}

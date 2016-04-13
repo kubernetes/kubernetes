@@ -1,0 +1,143 @@
+{
+  "version": 2,
+  "waiters": {
+    "CacheClusterAvailable": {
+      "delay": 15,
+      "operation": "DescribeCacheClusters",
+      "maxAttempts": 40,
+      "description": "Wait until ElastiCache cluster is available.",
+      "acceptors": [
+        {
+          "expected": "available",
+          "matcher": "pathAll",
+          "state": "success",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "deleted",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "deleting",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "incompatible-network",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "restore-failed",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        }
+      ]
+    },
+    "CacheClusterDeleted": {
+      "delay": 15,
+      "operation": "DescribeCacheClusters",
+      "maxAttempts": 40,
+      "description": "Wait until ElastiCache cluster is deleted.",
+      "acceptors": [
+        {
+          "expected": "deleted",
+          "matcher": "pathAll",
+          "state": "success",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "CacheClusterNotFound",
+          "matcher": "error",
+          "state": "success"
+        },
+        {
+          "expected": "available",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "creating",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "incompatible-network",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "modifying",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "restore-failed",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        },
+        {
+          "expected": "snapshotting",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "CacheClusters[].CacheClusterStatus"
+        }
+      ]
+    },
+    "ReplicationGroupAvailable": {
+      "delay": 15,
+      "operation": "DescribeReplicationGroups",
+      "maxAttempts": 40,
+      "description": "Wait until ElastiCache replication group is available.",
+      "acceptors": [
+        {
+          "expected": "available",
+          "matcher": "pathAll",
+          "state": "success",
+          "argument": "ReplicationGroups[].Status"
+        },
+        {
+          "expected": "deleted",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "ReplicationGroups[].Status"
+        }
+      ]
+    },
+    "ReplicationGroupDeleted": {
+      "delay": 15,
+      "operation": "DescribeReplicationGroups",
+      "maxAttempts": 40,
+      "description": "Wait until ElastiCache replication group is deleted.",
+      "acceptors": [
+        {
+          "expected": "deleted",
+          "matcher": "pathAll",
+          "state": "success",
+          "argument": "ReplicationGroups[].Status"
+        },
+        {
+          "expected": "available",
+          "matcher": "pathAny",
+          "state": "failure",
+          "argument": "ReplicationGroups[].Status"
+        },
+        {
+          "expected": "ReplicationGroupNotFoundFault",
+          "matcher": "error",
+          "state": "success"
+        }
+      ]
+    }
+  }
+}

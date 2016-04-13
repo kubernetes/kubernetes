@@ -1,0 +1,343 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/vc2WYrePuDcqazgNVjmdzE5Mns4\"",
+ "discoveryVersion": "v1",
+ "id": "cloudbilling:v1",
+ "name": "cloudbilling",
+ "version": "v1",
+ "revision": "20150903",
+ "title": "Google Cloud Billing API",
+ "description": "Retrieves Google Developers Console billing accounts and associates them with projects.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://cloud.google.com/billing/",
+ "protocol": "rest",
+ "baseUrl": "https://cloudbilling.googleapis.com/",
+ "basePath": "/",
+ "rootUrl": "https://cloudbilling.googleapis.com/",
+ "servicePath": "",
+ "batchPath": "batch",
+ "parameters": {
+  "access_token": {
+   "type": "string",
+   "description": "OAuth access token.",
+   "location": "query"
+  },
+  "alt": {
+   "type": "string",
+   "description": "Data format for response.",
+   "default": "json",
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json",
+    "Media download with context-dependent Content-Type",
+    "Responses with Content-Type of application/x-protobuf"
+   ],
+   "location": "query"
+  },
+  "bearer_token": {
+   "type": "string",
+   "description": "OAuth bearer token.",
+   "location": "query"
+  },
+  "callback": {
+   "type": "string",
+   "description": "JSONP",
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "pp": {
+   "type": "boolean",
+   "description": "Pretty-print response.",
+   "default": "true",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+   "location": "query"
+  },
+  "upload_protocol": {
+   "type": "string",
+   "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+   "location": "query"
+  },
+  "uploadType": {
+   "type": "string",
+   "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+   "location": "query"
+  },
+  "$.xgafv": {
+   "type": "string",
+   "description": "V1 error format.",
+   "enumDescriptions": [
+    "v1 error format",
+    "v2 error format"
+   ],
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/cloud-platform": {
+     "description": "View and manage your data across Google Cloud Platform services"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "BillingAccount": {
+   "id": "BillingAccount",
+   "type": "object",
+   "description": "A billing account in [Google Developers Console](https://console.developers.google.com/). You can assign a billing account to one or more projects.",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "The resource name of the billing account. The resource name has the form `billingAccounts/{billing_account_id}`. For example, `billingAccounts/012345-567890-ABCDEF` would be the resource name for billing account `012345-567890-ABCDEF`."
+    },
+    "open": {
+     "type": "boolean",
+     "description": "True if the billing account is open, and will therefore be charged for any usage on associated projects. False if the billing account is closed, and therefore projects associated with it will be unable to use paid services."
+    },
+    "displayName": {
+     "type": "string",
+     "description": "The display name given to the billing account, such as `My Billing Account`. This name is displayed in the Google Developers Console."
+    }
+   }
+  },
+  "ListBillingAccountsResponse": {
+   "id": "ListBillingAccountsResponse",
+   "type": "object",
+   "description": "Response message for `ListBillingAccounts`.",
+   "properties": {
+    "billingAccounts": {
+     "type": "array",
+     "description": "A list of billing accounts.",
+     "items": {
+      "$ref": "BillingAccount"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token to retrieve the next page of results. To retrieve the next page, call `ListBillingAccounts` again with the `page_token` field set to this value. This field is empty if there are no more results to retrieve."
+    }
+   }
+  },
+  "ListProjectBillingInfoResponse": {
+   "id": "ListProjectBillingInfoResponse",
+   "type": "object",
+   "description": "Request message for `ListProjectBillingInfoResponse`.",
+   "properties": {
+    "projectBillingInfo": {
+     "type": "array",
+     "description": "A list of `ProjectBillingInfo` resources representing the projects associated with the billing account.",
+     "items": {
+      "$ref": "ProjectBillingInfo"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token to retrieve the next page of results. To retrieve the next page, call `ListProjectBillingInfo` again with the `page_token` field set to this value. This field is empty if there are no more results to retrieve."
+    }
+   }
+  },
+  "ProjectBillingInfo": {
+   "id": "ProjectBillingInfo",
+   "type": "object",
+   "description": "Encapsulation of billing information for a Developers Console project. A project has at most one associated billing account at a time (but a billing account can be assigned to multiple projects).",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "The resource name for the `ProjectBillingInfo`; has the form `projects/{project_id}/billingInfo`. For example, the resource name for the billing information for project `tokyo-rain-123` would be `projects/tokyo-rain-123/billingInfo`. This field is read-only."
+    },
+    "projectId": {
+     "type": "string",
+     "description": "The ID of the project that this `ProjectBillingInfo` represents, such as `tokyo-rain-123`. This is a convenience field so that you don't need to parse the `name` field to obtain a project ID. This field is read-only."
+    },
+    "billingAccountName": {
+     "type": "string",
+     "description": "The resource name of the billing account associated with the project, if any. For example, `billingAccounts/012345-567890-ABCDEF`."
+    },
+    "billingEnabled": {
+     "type": "boolean",
+     "description": "True if the project is associated with an open billing account, to which usage on the project is charged. False if the project is associated with a closed billing account, or no billing account at all, and therefore cannot use paid services. This field is read-only."
+    }
+   }
+  }
+ },
+ "resources": {
+  "billingAccounts": {
+   "methods": {
+    "get": {
+     "id": "cloudbilling.billingAccounts.get",
+     "path": "v1/{+name}",
+     "httpMethod": "GET",
+     "description": "Gets information about a billing account. The current authenticated user must be an [owner of the billing account](https://support.google.com/cloud/answer/4430947).",
+     "parameters": {
+      "name": {
+       "type": "string",
+       "description": "The resource name of the billing account to retrieve. For example, `billingAccounts/012345-567890-ABCDEF`.",
+       "required": true,
+       "pattern": "^billingAccounts/[^/]*$",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "name"
+     ],
+     "response": {
+      "$ref": "BillingAccount"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "list": {
+     "id": "cloudbilling.billingAccounts.list",
+     "path": "v1/billingAccounts",
+     "httpMethod": "GET",
+     "description": "Lists the billing accounts that the current authenticated user [owns](https://support.google.com/cloud/answer/4430947).",
+     "parameters": {
+      "pageSize": {
+       "type": "integer",
+       "description": "Requested page size. The maximum page size is 100; this is also the default.",
+       "format": "int32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "A token identifying a page of results to return. This should be a `next_page_token` value returned from a previous `ListBillingAccounts` call. If unspecified, the first page of results is returned.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "ListBillingAccountsResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    }
+   },
+   "resources": {
+    "projects": {
+     "methods": {
+      "list": {
+       "id": "cloudbilling.billingAccounts.projects.list",
+       "path": "v1/{+name}/projects",
+       "httpMethod": "GET",
+       "description": "Lists the projects associated with a billing account. The current authenticated user must be an [owner of the billing account](https://support.google.com/cloud/answer/4430947).",
+       "parameters": {
+        "name": {
+         "type": "string",
+         "description": "The resource name of the billing account associated with the projects that you want to list. For example, `billingAccounts/012345-567890-ABCDEF`.",
+         "required": true,
+         "pattern": "^billingAccounts/[^/]*$",
+         "location": "path"
+        },
+        "pageSize": {
+         "type": "integer",
+         "description": "Requested page size. The maximum page size is 100; this is also the default.",
+         "format": "int32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "A token identifying a page of results to be returned. This should be a `next_page_token` value returned from a previous `ListProjectBillingInfo` call. If unspecified, the first page of results is returned.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "name"
+       ],
+       "response": {
+        "$ref": "ListProjectBillingInfoResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/cloud-platform"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "projects": {
+   "methods": {
+    "getBillingInfo": {
+     "id": "cloudbilling.projects.getBillingInfo",
+     "path": "v1/{+name}/billingInfo",
+     "httpMethod": "GET",
+     "description": "Gets the billing information for a project. The current authenticated user must have [permission to view the project](https://cloud.google.com/docs/permissions-overview#h.bgs0oxofvnoo ).",
+     "parameters": {
+      "name": {
+       "type": "string",
+       "description": "The resource name of the project for which billing information is retrieved. For example, `projects/tokyo-rain-123`.",
+       "required": true,
+       "pattern": "^projects/[^/]*$",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "name"
+     ],
+     "response": {
+      "$ref": "ProjectBillingInfo"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "updateBillingInfo": {
+     "id": "cloudbilling.projects.updateBillingInfo",
+     "path": "v1/{+name}/billingInfo",
+     "httpMethod": "PUT",
+     "description": "Sets or updates the billing account associated with a project. You specify the new billing account by setting the `billing_account_name` in the `ProjectBillingInfo` resource to the resource name of a billing account. Associating a project with an open billing account enables billing on the project and allows charges for resource usage. If the project already had a billing account, this method changes the billing account used for resource usage charges. *Note:* Incurred charges that have not yet been reported in the transaction history of the Google Developers Console may be billed to the new billing account, even if the charge occurred before the new billing account was assigned to the project. The current authenticated user must have ownership privileges for both the [project](https://cloud.google.com/docs/permissions-overview#h.bgs0oxofvnoo ) and the [billing account](https://support.google.com/cloud/answer/4430947). You can disable billing on the project by setting the `billing_account_name` field to empty. This action disassociates the current billing account from the project. Any billable activity of your in-use services will stop, and your application could stop functioning as expected. Any unbilled charges to date will be billed to the previously associated account. The current authenticated user must be either an owner of the project or an owner of the billing account for the project. Note that associating a project with a *closed* billing account will have much the same effect as disabling billing on the project: any paid resources used by the project will be shut down. Thus, unless you wish to disable billing, you should always call this method with the name of an *open* billing account.",
+     "parameters": {
+      "name": {
+       "type": "string",
+       "description": "The resource name of the project associated with the billing information that you want to update. For example, `projects/tokyo-rain-123`.",
+       "required": true,
+       "pattern": "^projects/[^/]*$",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "name"
+     ],
+     "request": {
+      "$ref": "ProjectBillingInfo"
+     },
+     "response": {
+      "$ref": "ProjectBillingInfo"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    }
+   }
+  }
+ }
+}

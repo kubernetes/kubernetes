@@ -20,7 +20,7 @@ set -x
 ARCH=$1
 
 # Build the binary.
-CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} godep go build -a -installsuffix cgo -ldflags '-w' ./pause.go
+CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -a -installsuffix cgo -ldflags '-w' ./pause.go
 
 # Run goupx to shrink binary size.
 go get github.com/pwaller/goupx

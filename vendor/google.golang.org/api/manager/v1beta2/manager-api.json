@@ -1,0 +1,1171 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/E9BDi4qTzFW-I9oO8ahZRyv1jkM\"",
+ "discoveryVersion": "v1",
+ "id": "manager:v1beta2",
+ "name": "manager",
+ "version": "v1beta2",
+ "revision": "20140915",
+ "title": "Deployment Manager API",
+ "description": "The Deployment Manager API allows users to declaratively configure, deploy and run complex solutions on the Google Cloud Platform.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/deployment-manager/",
+ "labels": [
+  "limited_availability"
+ ],
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/manager/v1beta2/projects/",
+ "basePath": "/manager/v1beta2/projects/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "manager/v1beta2/projects/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/appengine.admin": {
+     "description": "View and manage your applications deployed on Google App Engine"
+    },
+    "https://www.googleapis.com/auth/cloud-platform": {
+     "description": "View and manage your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/cloud-platform.read-only": {
+     "description": "View your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/compute": {
+     "description": "View and manage your Google Compute Engine resources"
+    },
+    "https://www.googleapis.com/auth/devstorage.read_write": {
+     "description": "Manage your data in Google Cloud Storage"
+    },
+    "https://www.googleapis.com/auth/ndev.cloudman": {
+     "description": "View and manage your Google Cloud Platform management resources and deployment status information"
+    },
+    "https://www.googleapis.com/auth/ndev.cloudman.readonly": {
+     "description": "View your Google Cloud Platform management resources and deployment status information"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "AccessConfig": {
+   "id": "AccessConfig",
+   "type": "object",
+   "description": "A Compute Engine network accessConfig. Identical to the accessConfig on corresponding Compute Engine resource.",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "Name of this access configuration."
+    },
+    "natIp": {
+     "type": "string",
+     "description": "An external IP address associated with this instance."
+    },
+    "type": {
+     "type": "string",
+     "description": "Type of this access configuration file. (Currently only ONE_TO_ONE_NAT is legal.)"
+    }
+   }
+  },
+  "Action": {
+   "id": "Action",
+   "type": "object",
+   "description": "An Action encapsulates a set of commands as a single runnable module with additional information needed during run-time.",
+   "properties": {
+    "commands": {
+     "type": "array",
+     "description": "A list of commands to run sequentially for this action.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "timeoutMs": {
+     "type": "integer",
+     "description": "The timeout in milliseconds for this action to run.",
+     "format": "int32"
+    }
+   }
+  },
+  "AllowedRule": {
+   "id": "AllowedRule",
+   "type": "object",
+   "description": "An allowed port resource.",
+   "properties": {
+    "IPProtocol": {
+     "type": "string",
+     "description": "?tcp?, ?udp? or ?icmp?"
+    },
+    "ports": {
+     "type": "array",
+     "description": "List of ports or port ranges (Example inputs include: [\"22\"], [?33?, \"12345-12349\"].",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "AutoscalingModule": {
+   "id": "AutoscalingModule",
+   "type": "object",
+   "properties": {
+    "coolDownPeriodSec": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "description": {
+     "type": "string"
+    },
+    "maxNumReplicas": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "minNumReplicas": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "signalType": {
+     "type": "string"
+    },
+    "targetModule": {
+     "type": "string"
+    },
+    "targetUtilization": {
+     "type": "number",
+     "description": "target_utilization should be in range [0,1].",
+     "format": "double"
+    }
+   }
+  },
+  "AutoscalingModuleStatus": {
+   "id": "AutoscalingModuleStatus",
+   "type": "object",
+   "properties": {
+    "autoscalingConfigUrl": {
+     "type": "string",
+     "description": "[Output Only] The URL of the corresponding Autoscaling configuration."
+    }
+   }
+  },
+  "DeployState": {
+   "id": "DeployState",
+   "type": "object",
+   "description": "[Output Only] The current state of a replica or module.",
+   "properties": {
+    "details": {
+     "type": "string",
+     "description": "[Output Only] Human readable details about the current state."
+    },
+    "status": {
+     "type": "string",
+     "description": "[Output Only] The status of the deployment. Possible values include: \n- UNKNOWN\n- DEPLOYING\n- DEPLOYED\n- DEPLOYMENT_FAILED\n- DELETING\n- DELETED\n- DELETE_FAILED"
+    }
+   }
+  },
+  "Deployment": {
+   "id": "Deployment",
+   "type": "object",
+   "description": "A deployment represents a physical instantiation of a Template.",
+   "properties": {
+    "creationDate": {
+     "type": "string",
+     "description": "[Output Only] The time when this deployment was created."
+    },
+    "description": {
+     "type": "string",
+     "description": "A user-supplied description of this Deployment."
+    },
+    "modules": {
+     "type": "object",
+     "description": "[Output Only] List of status for the modules in this deployment.",
+     "additionalProperties": {
+      "$ref": "ModuleStatus",
+      "description": "Name of the module."
+     }
+    },
+    "name": {
+     "type": "string",
+     "description": "Name of this deployment. The name must conform to the following regular expression: [a-zA-Z0-9-_]{1,64}"
+    },
+    "overrides": {
+     "type": "array",
+     "description": "The set of parameter overrides to apply to the corresponding Template before deploying.",
+     "items": {
+      "$ref": "ParamOverride"
+     }
+    },
+    "state": {
+     "$ref": "DeployState",
+     "description": "[Output Only] Current status of this deployment."
+    },
+    "templateName": {
+     "type": "string",
+     "description": "The name of the Template on which this deployment is based."
+    }
+   }
+  },
+  "DeploymentsListResponse": {
+   "id": "DeploymentsListResponse",
+   "type": "object",
+   "properties": {
+    "nextPageToken": {
+     "type": "string"
+    },
+    "resources": {
+     "type": "array",
+     "items": {
+      "$ref": "Deployment"
+     }
+    }
+   }
+  },
+  "DiskAttachment": {
+   "id": "DiskAttachment",
+   "type": "object",
+   "description": "How to attach a disk to a Replica.",
+   "properties": {
+    "deviceName": {
+     "type": "string",
+     "description": "The device name of this disk."
+    },
+    "index": {
+     "type": "integer",
+     "description": "A zero-based index to assign to this disk, where 0 is reserved for the boot disk. If not specified, this is assigned by the server.",
+     "format": "uint32"
+    }
+   }
+  },
+  "EnvVariable": {
+   "id": "EnvVariable",
+   "type": "object",
+   "description": "An environment variable.",
+   "properties": {
+    "hidden": {
+     "type": "boolean",
+     "description": "Whether this variable is hidden or visible."
+    },
+    "value": {
+     "type": "string",
+     "description": "Value of the environment variable."
+    }
+   }
+  },
+  "ExistingDisk": {
+   "id": "ExistingDisk",
+   "type": "object",
+   "description": "A pre-existing persistent disk that will be attached to every Replica in the Pool.",
+   "properties": {
+    "attachment": {
+     "$ref": "DiskAttachment",
+     "description": "Optional. How the disk will be attached to the Replica."
+    },
+    "source": {
+     "type": "string",
+     "description": "The fully-qualified URL of the Persistent Disk resource. It must be in the same zone as the Pool."
+    }
+   }
+  },
+  "FirewallModule": {
+   "id": "FirewallModule",
+   "type": "object",
+   "description": "A Firewall resource",
+   "properties": {
+    "allowed": {
+     "type": "array",
+     "description": "The allowed ports or port ranges.",
+     "items": {
+      "$ref": "AllowedRule"
+     }
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of the firewall (optional)"
+    },
+    "network": {
+     "type": "string",
+     "description": "The NetworkModule to which this firewall should apply. If not specified, or if specified as 'default', this firewall will be applied to the 'default' network."
+    },
+    "sourceRanges": {
+     "type": "array",
+     "description": "Source IP ranges to apply this firewall to, see the GCE Spec for details on syntax",
+     "items": {
+      "type": "string"
+     }
+    },
+    "sourceTags": {
+     "type": "array",
+     "description": "Source Tags to apply this firewall to, see the GCE Spec for details on syntax",
+     "items": {
+      "type": "string"
+     }
+    },
+    "targetTags": {
+     "type": "array",
+     "description": "Target Tags to apply this firewall to, see the GCE Spec for details on syntax",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "FirewallModuleStatus": {
+   "id": "FirewallModuleStatus",
+   "type": "object",
+   "properties": {
+    "firewallUrl": {
+     "type": "string",
+     "description": "[Output Only] The URL of the corresponding Firewall resource."
+    }
+   }
+  },
+  "HealthCheckModule": {
+   "id": "HealthCheckModule",
+   "type": "object",
+   "properties": {
+    "checkIntervalSec": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "description": {
+     "type": "string"
+    },
+    "healthyThreshold": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "host": {
+     "type": "string"
+    },
+    "path": {
+     "type": "string"
+    },
+    "port": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "timeoutSec": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "unhealthyThreshold": {
+     "type": "integer",
+     "format": "int32"
+    }
+   }
+  },
+  "HealthCheckModuleStatus": {
+   "id": "HealthCheckModuleStatus",
+   "type": "object",
+   "properties": {
+    "healthCheckUrl": {
+     "type": "string",
+     "description": "[Output Only] The HealthCheck URL."
+    }
+   }
+  },
+  "LbModule": {
+   "id": "LbModule",
+   "type": "object",
+   "properties": {
+    "description": {
+     "type": "string"
+    },
+    "healthChecks": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "ipAddress": {
+     "type": "string"
+    },
+    "ipProtocol": {
+     "type": "string"
+    },
+    "portRange": {
+     "type": "string"
+    },
+    "sessionAffinity": {
+     "type": "string"
+    },
+    "targetModules": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "LbModuleStatus": {
+   "id": "LbModuleStatus",
+   "type": "object",
+   "properties": {
+    "forwardingRuleUrl": {
+     "type": "string",
+     "description": "[Output Only] The URL of the corresponding ForwardingRule in GCE."
+    },
+    "targetPoolUrl": {
+     "type": "string",
+     "description": "[Output Only] The URL of the corresponding TargetPool resource in GCE."
+    }
+   }
+  },
+  "Metadata": {
+   "id": "Metadata",
+   "type": "object",
+   "description": "A Compute Engine metadata entry. Identical to the metadata on the corresponding Compute Engine resource.",
+   "properties": {
+    "fingerPrint": {
+     "type": "string",
+     "description": "The fingerprint of the metadata."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of metadata items.",
+     "items": {
+      "$ref": "MetadataItem"
+     }
+    }
+   }
+  },
+  "MetadataItem": {
+   "id": "MetadataItem",
+   "type": "object",
+   "description": "A Compute Engine metadata item, defined as a key:value pair. Identical to the metadata on the corresponding Compute Engine resource.",
+   "properties": {
+    "key": {
+     "type": "string",
+     "description": "A metadata key."
+    },
+    "value": {
+     "type": "string",
+     "description": "A metadata value."
+    }
+   }
+  },
+  "Module": {
+   "id": "Module",
+   "type": "object",
+   "description": "A module in a configuration. A module represents a single homogeneous, possibly replicated task.",
+   "properties": {
+    "autoscalingModule": {
+     "$ref": "AutoscalingModule"
+    },
+    "firewallModule": {
+     "$ref": "FirewallModule"
+    },
+    "healthCheckModule": {
+     "$ref": "HealthCheckModule"
+    },
+    "lbModule": {
+     "$ref": "LbModule"
+    },
+    "networkModule": {
+     "$ref": "NetworkModule"
+    },
+    "replicaPoolModule": {
+     "$ref": "ReplicaPoolModule"
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of this module. Valid values (\"AUTOSCALING\", \"FIREWALL\", \"HEALTH_CHECK\", \"LOAD_BALANCING\", \"NETWORK\", \"REPLICA_POOL\")"
+    }
+   }
+  },
+  "ModuleStatus": {
+   "id": "ModuleStatus",
+   "type": "object",
+   "description": "[Output Only] Aggregate status for a module.",
+   "properties": {
+    "autoscalingModuleStatus": {
+     "$ref": "AutoscalingModuleStatus",
+     "description": "[Output Only] The status of the AutoscalingModule, set for type AUTOSCALING."
+    },
+    "firewallModuleStatus": {
+     "$ref": "FirewallModuleStatus",
+     "description": "[Output Only] The status of the FirewallModule, set for type FIREWALL."
+    },
+    "healthCheckModuleStatus": {
+     "$ref": "HealthCheckModuleStatus",
+     "description": "[Output Only] The status of the HealthCheckModule, set for type HEALTH_CHECK."
+    },
+    "lbModuleStatus": {
+     "$ref": "LbModuleStatus",
+     "description": "[Output Only] The status of the LbModule, set for type LOAD_BALANCING."
+    },
+    "networkModuleStatus": {
+     "$ref": "NetworkModuleStatus",
+     "description": "[Output Only] The status of the NetworkModule, set for type NETWORK."
+    },
+    "replicaPoolModuleStatus": {
+     "$ref": "ReplicaPoolModuleStatus",
+     "description": "[Output Only] The status of the ReplicaPoolModule, set for type VM."
+    },
+    "state": {
+     "$ref": "DeployState",
+     "description": "[Output Only] The current state of the module."
+    },
+    "type": {
+     "type": "string",
+     "description": "[Output Only] The type of the module."
+    }
+   }
+  },
+  "NetworkInterface": {
+   "id": "NetworkInterface",
+   "type": "object",
+   "description": "A Compute Engine NetworkInterface resource. Identical to the NetworkInterface on the corresponding Compute Engine resource.",
+   "properties": {
+    "accessConfigs": {
+     "type": "array",
+     "description": "An array of configurations for this interface. This specifies how this interface is configured to interact with other network services",
+     "items": {
+      "$ref": "AccessConfig"
+     }
+    },
+    "name": {
+     "type": "string",
+     "description": "Name of the interface."
+    },
+    "network": {
+     "type": "string",
+     "description": "The name of the NetworkModule to which this interface applies. If not specified, or specified as 'default', this will use the 'default' network."
+    },
+    "networkIp": {
+     "type": "string",
+     "description": "An optional IPV4 internal network address to assign to the instance for this network interface."
+    }
+   }
+  },
+  "NetworkModule": {
+   "id": "NetworkModule",
+   "type": "object",
+   "properties": {
+    "IPv4Range": {
+     "type": "string",
+     "description": "Required; The range of internal addresses that are legal on this network. This range is a CIDR specification, for example: 192.168.0.0/16."
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of the network."
+    },
+    "gatewayIPv4": {
+     "type": "string",
+     "description": "An optional address that is used for default routing to other networks. This must be within the range specified by IPv4Range, and is typicall the first usable address in that range. If not specified, the default value is the first usable address in IPv4Range."
+    }
+   }
+  },
+  "NetworkModuleStatus": {
+   "id": "NetworkModuleStatus",
+   "type": "object",
+   "properties": {
+    "networkUrl": {
+     "type": "string",
+     "description": "[Output Only] The URL of the corresponding Network resource."
+    }
+   }
+  },
+  "NewDisk": {
+   "id": "NewDisk",
+   "type": "object",
+   "description": "A Persistent Disk resource that will be created and attached to each Replica in the Pool. Each Replica will have a unique persistent disk that is created and attached to that Replica.",
+   "properties": {
+    "attachment": {
+     "$ref": "DiskAttachment",
+     "description": "How the disk will be attached to the Replica."
+    },
+    "autoDelete": {
+     "type": "boolean",
+     "description": "If true, then this disk will be deleted when the instance is deleted."
+    },
+    "boot": {
+     "type": "boolean",
+     "description": "If true, indicates that this is the root persistent disk."
+    },
+    "initializeParams": {
+     "$ref": "NewDiskInitializeParams",
+     "description": "Create the new disk using these parameters. The name of the disk will be \u003cinstance_name\u003e-\u003cfive_random_charactersgt;."
+    }
+   }
+  },
+  "NewDiskInitializeParams": {
+   "id": "NewDiskInitializeParams",
+   "type": "object",
+   "description": "Initialization parameters for creating a new disk.",
+   "properties": {
+    "diskSizeGb": {
+     "type": "string",
+     "description": "The size of the created disk in gigabytes.",
+     "format": "int64"
+    },
+    "diskType": {
+     "type": "string",
+     "description": "Name of the disk type resource describing which disk type to use to create the disk. For example 'pd-ssd' or 'pd-standard'. Default is 'pd-standard'"
+    },
+    "sourceImage": {
+     "type": "string",
+     "description": "The fully-qualified URL of a source image to use to create this disk."
+    }
+   }
+  },
+  "ParamOverride": {
+   "id": "ParamOverride",
+   "type": "object",
+   "description": "A specification for overriding parameters in a Template that corresponds to the Deployment.",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "A JSON Path expression that specifies which parameter should be overridden."
+    },
+    "value": {
+     "type": "string",
+     "description": "The new value to assign to the overridden parameter."
+    }
+   }
+  },
+  "ReplicaPoolModule": {
+   "id": "ReplicaPoolModule",
+   "type": "object",
+   "properties": {
+    "envVariables": {
+     "type": "object",
+     "description": "A list of environment variables.",
+     "additionalProperties": {
+      "$ref": "EnvVariable",
+      "description": "Name of the environment variable. The name must conform to the following regular expression: [a-zA-Z_]+[a-zA-Z0-9_]+."
+     }
+    },
+    "healthChecks": {
+     "type": "array",
+     "description": "The Health Checks to configure for the ReplicaPoolModule",
+     "items": {
+      "type": "string"
+     }
+    },
+    "numReplicas": {
+     "type": "integer",
+     "description": "Number of replicas in this module.",
+     "format": "int32"
+    },
+    "replicaPoolParams": {
+     "$ref": "ReplicaPoolParams",
+     "description": "Information for a ReplicaPoolModule."
+    },
+    "resourceView": {
+     "type": "string",
+     "description": "[Output Only] The name of the Resource View associated with a ReplicaPoolModule. This field will be generated by the service."
+    }
+   }
+  },
+  "ReplicaPoolModuleStatus": {
+   "id": "ReplicaPoolModuleStatus",
+   "type": "object",
+   "properties": {
+    "replicaPoolUrl": {
+     "type": "string",
+     "description": "[Output Only] The URL of the associated ReplicaPool resource."
+    },
+    "resourceViewUrl": {
+     "type": "string",
+     "description": "[Output Only] The URL of the Resource Group associated with this ReplicaPool."
+    }
+   }
+  },
+  "ReplicaPoolParams": {
+   "id": "ReplicaPoolParams",
+   "type": "object",
+   "description": "Configuration information for a ReplicaPools resource. Specifying an item within will determine the ReplicaPools API version used for a ReplicaPoolModule. Only one may be specified.",
+   "properties": {
+    "v1beta1": {
+     "$ref": "ReplicaPoolParamsV1Beta1",
+     "description": "ReplicaPoolParams specifications for use with ReplicaPools v1beta1."
+    }
+   }
+  },
+  "ReplicaPoolParamsV1Beta1": {
+   "id": "ReplicaPoolParamsV1Beta1",
+   "type": "object",
+   "description": "Configuration information for a ReplicaPools v1beta1 API resource. Directly maps to ReplicaPool InitTemplate.",
+   "properties": {
+    "autoRestart": {
+     "type": "boolean",
+     "description": "Whether these replicas should be restarted if they experience a failure. The default value is true."
+    },
+    "baseInstanceName": {
+     "type": "string",
+     "description": "The base name for instances within this ReplicaPool."
+    },
+    "canIpForward": {
+     "type": "boolean",
+     "description": "Enables IP Forwarding"
+    },
+    "description": {
+     "type": "string",
+     "description": "An optional textual description of the resource."
+    },
+    "disksToAttach": {
+     "type": "array",
+     "description": "A list of existing Persistent Disk resources to attach to each replica in the pool. Each disk will be attached in read-only mode to every replica.",
+     "items": {
+      "$ref": "ExistingDisk"
+     }
+    },
+    "disksToCreate": {
+     "type": "array",
+     "description": "A list of Disk resources to create and attach to each Replica in the Pool. Currently, you can only define one disk and it must be a root persistent disk. Note that Replica Pool will create a root persistent disk for each replica.",
+     "items": {
+      "$ref": "NewDisk"
+     }
+    },
+    "initAction": {
+     "type": "string",
+     "description": "Name of the Action to be run during initialization of a ReplicaPoolModule."
+    },
+    "machineType": {
+     "type": "string",
+     "description": "The machine type for this instance. Either a complete URL, or the resource name (e.g. n1-standard-1)."
+    },
+    "metadata": {
+     "$ref": "Metadata",
+     "description": "The metadata key/value pairs assigned to this instance."
+    },
+    "networkInterfaces": {
+     "type": "array",
+     "description": "A list of network interfaces for the instance. Currently only one interface is supported by Google Compute Engine.",
+     "items": {
+      "$ref": "NetworkInterface"
+     }
+    },
+    "onHostMaintenance": {
+     "type": "string"
+    },
+    "serviceAccounts": {
+     "type": "array",
+     "description": "A list of Service Accounts to enable for this instance.",
+     "items": {
+      "$ref": "ServiceAccount"
+     }
+    },
+    "tags": {
+     "$ref": "Tag",
+     "description": "A list of tags to apply to the Google Compute Engine instance to identify resources."
+    },
+    "zone": {
+     "type": "string",
+     "description": "The zone for this ReplicaPool."
+    }
+   }
+  },
+  "ServiceAccount": {
+   "id": "ServiceAccount",
+   "type": "object",
+   "description": "A Compute Engine service account, identical to the Compute Engine resource.",
+   "properties": {
+    "email": {
+     "type": "string",
+     "description": "Service account email address."
+    },
+    "scopes": {
+     "type": "array",
+     "description": "List of OAuth2 scopes to obtain for the service account.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "Tag": {
+   "id": "Tag",
+   "type": "object",
+   "description": "A Compute Engine Instance tag, identical to the tags on the corresponding Compute Engine Instance resource.",
+   "properties": {
+    "fingerPrint": {
+     "type": "string",
+     "description": "The fingerprint of the tag."
+    },
+    "items": {
+     "type": "array",
+     "description": "Items contained in this tag.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "Template": {
+   "id": "Template",
+   "type": "object",
+   "description": "A Template represents a complete configuration for a Deployment.",
+   "properties": {
+    "actions": {
+     "type": "object",
+     "description": "Action definitions for use in Module intents in this Template.",
+     "additionalProperties": {
+      "$ref": "Action",
+      "description": "The name of this action, used when specifying Actions in Module definitions."
+     }
+    },
+    "description": {
+     "type": "string",
+     "description": "A user-supplied description of this Template."
+    },
+    "modules": {
+     "type": "object",
+     "description": "A list of modules for this Template.",
+     "additionalProperties": {
+      "$ref": "Module",
+      "description": "Name of the module. The name must conform to the following regular expression: [a-zA-Z0-9-_]{1,64}"
+     }
+    },
+    "name": {
+     "type": "string",
+     "description": "Name of this Template. The name must conform to the expression: [a-zA-Z0-9-_]{1,64}"
+    }
+   }
+  },
+  "TemplatesListResponse": {
+   "id": "TemplatesListResponse",
+   "type": "object",
+   "properties": {
+    "nextPageToken": {
+     "type": "string"
+    },
+    "resources": {
+     "type": "array",
+     "items": {
+      "$ref": "Template"
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "deployments": {
+   "methods": {
+    "delete": {
+     "id": "manager.deployments.delete",
+     "path": "{projectId}/regions/{region}/deployments/{deploymentName}",
+     "httpMethod": "DELETE",
+     "description": "",
+     "parameters": {
+      "deploymentName": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "region": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "region",
+      "deploymentName"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "get": {
+     "id": "manager.deployments.get",
+     "path": "{projectId}/regions/{region}/deployments/{deploymentName}",
+     "httpMethod": "GET",
+     "description": "",
+     "parameters": {
+      "deploymentName": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "region": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "region",
+      "deploymentName"
+     ],
+     "response": {
+      "$ref": "Deployment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "insert": {
+     "id": "manager.deployments.insert",
+     "path": "{projectId}/regions/{region}/deployments",
+     "httpMethod": "POST",
+     "description": "",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "region": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "region"
+     ],
+     "request": {
+      "$ref": "Deployment"
+     },
+     "response": {
+      "$ref": "Deployment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/appengine.admin",
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/devstorage.read_write",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "list": {
+     "id": "manager.deployments.list",
+     "path": "{projectId}/regions/{region}/deployments",
+     "httpMethod": "GET",
+     "description": "",
+     "parameters": {
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum count of results to be returned. Acceptable values are 0 to 100, inclusive. (Default: 50)",
+       "default": "50",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Specifies a nextPageToken returned by a previous list request. This token can be used to request the next page of results from a previous list request.",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "region": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "region"
+     ],
+     "response": {
+      "$ref": "DeploymentsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    }
+   }
+  },
+  "templates": {
+   "methods": {
+    "delete": {
+     "id": "manager.templates.delete",
+     "path": "{projectId}/templates/{templateName}",
+     "httpMethod": "DELETE",
+     "description": "",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "templateName": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "templateName"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "get": {
+     "id": "manager.templates.get",
+     "path": "{projectId}/templates/{templateName}",
+     "httpMethod": "GET",
+     "description": "",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "templateName": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "templateName"
+     ],
+     "response": {
+      "$ref": "Template"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "insert": {
+     "id": "manager.templates.insert",
+     "path": "{projectId}/templates",
+     "httpMethod": "POST",
+     "description": "",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "request": {
+      "$ref": "Template"
+     },
+     "response": {
+      "$ref": "Template"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "list": {
+     "id": "manager.templates.list",
+     "path": "{projectId}/templates",
+     "httpMethod": "GET",
+     "description": "",
+     "parameters": {
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum count of results to be returned. Acceptable values are 0 to 100, inclusive. (Default: 50)",
+       "default": "50",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Specifies a nextPageToken returned by a previous list request. This token can be used to request the next page of results from a previous list request.",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "response": {
+      "$ref": "TemplatesListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    }
+   }
+  }
+ }
+}

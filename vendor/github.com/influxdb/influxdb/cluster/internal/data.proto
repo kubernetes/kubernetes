@@ -1,0 +1,36 @@
+package internal;
+
+message WriteShardRequest {
+    required uint64 ShardID = 1;
+    repeated Point Points = 2;
+}
+
+message Field {
+    required string Name = 1;
+    oneof Value {
+        int32 Int32 = 2;
+        int64 Int64 = 3;
+        double Float64 = 4;
+        bool Bool = 5;
+        string String = 6;
+        bytes Bytes = 7;
+    }
+}
+
+message Tag {
+    required string Key = 1;
+    required string Value = 2;
+}
+
+message Point {
+    required string Name = 1;
+    required int64 Time = 2;
+    repeated Field Fields = 3;
+    repeated Tag Tags = 4;
+}
+
+message WriteShardResponse {
+    required int32 Code = 1;
+    optional string Message = 2;
+}
+

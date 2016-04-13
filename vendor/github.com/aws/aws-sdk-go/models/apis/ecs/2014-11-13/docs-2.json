@@ -1,0 +1,995 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon EC2 Container Service (Amazon ECS) is a highly scalable, fast, container management service that makes it easy to run, stop, and manage Docker containers on a cluster of EC2 instances. Amazon ECS lets you launch and stop container-enabled applications with simple API calls, allows you to get the state of your cluster from a centralized service, and gives you access to many familiar Amazon EC2 features like security groups, Amazon EBS volumes, and IAM roles.</p> <p>You can use Amazon ECS to schedule the placement of containers across your cluster based on your resource needs, isolation policies, and availability requirements. Amazon EC2 Container Service eliminates the need for you to operate your own cluster management and configuration management systems or worry about scaling your management infrastructure.</p>",
+  "operations": {
+    "CreateCluster": "<p>Creates a new Amazon ECS cluster. By default, your account receives a <code>default</code> cluster when you launch your first container instance. However, you can create your own cluster with a unique name with the <code>CreateCluster</code> action.</p>",
+    "CreateService": "<p>Runs and maintains a desired number of tasks from a specified task definition. If the number of tasks running in a service drops below <code>desiredCount</code>, Amazon ECS spawns another instantiation of the task in the specified cluster. To update an existing service, see <a>UpdateService</a>.</p> <p>You can optionally specify a deployment configuration for your service. During a deployment (which is triggered by changing the task definition of a service with an <a>UpdateService</a> operation), the service scheduler uses the <code>minimumHealthyPercent</code> and <code>maximumPercent</code> parameters to determine the deployment strategy.</p> <p>If the <code>minimumHealthyPercent</code> is below 100%, the scheduler can ignore the <code>desiredCount</code> temporarily during a deployment. For example, if your service has a <code>desiredCount</code> of four tasks, a <code>minimumHealthyPercent</code> of 50% allows the scheduler to stop two existing tasks before starting two new tasks. Tasks for services that <i>do not</i> use a load balancer are considered healthy if they are in the <code>RUNNING</code> state; tasks for services that <i>do</i> use a load balancer are considered healthy if they are in the <code>RUNNING</code> state and the container instance it is hosted on is reported as healthy by the load balancer. The default value for <code>minimumHealthyPercent</code> is 50% in the console and 100% for the AWS CLI, the AWS SDKs, and the APIs.</p> <p>The <code>maximumPercent</code> parameter represents an upper limit on the number of running tasks during a deployment, which enables you to define the deployment batch size. For example, if your service has a <code>desiredCount</code> of four tasks, a <code>maximumPercent</code> value of 200% starts four new tasks before stopping the four older tasks (provided that the cluster resources required to do this are available). The default value for <code>maximumPercent</code> is 200%.</p> <p>When the service scheduler launches new tasks, it attempts to balance them across the Availability Zones in your cluster with the following logic:</p> <ul> <li> <p>Determine which of the container instances in your cluster can support your service's task definition (for example, they have the required CPU, memory, ports, and container instance attributes).</p> </li> <li> <p>Sort the valid container instances by the fewest number of running tasks for this service in the same Availability Zone as the instance. For example, if zone A has one running service task and zones B and C each have zero, valid container instances in either zone B or C are considered optimal for placement.</p> </li> <li> <p>Place the new service task on a valid container instance in an optimal Availability Zone (based on the previous steps), favoring container instances with the fewest number of running tasks for this service.</p> </li> </ul>",
+    "DeleteCluster": "<p>Deletes the specified cluster. You must deregister all container instances from this cluster before you may delete it. You can list the container instances in a cluster with <a>ListContainerInstances</a> and deregister them with <a>DeregisterContainerInstance</a>.</p>",
+    "DeleteService": "<p>Deletes a specified service within a cluster. You can delete a service if you have no running tasks in it and the desired task count is zero. If the service is actively maintaining tasks, you cannot delete it, and you must update the service to a desired task count of zero. For more information, see <a>UpdateService</a>.</p> <note> <p>When you delete a service, if there are still running tasks that require cleanup, the service status moves from <code>ACTIVE</code> to <code>DRAINING</code>, and the service is no longer visible in the console or in <a>ListServices</a> API operations. After the tasks have stopped, then the service status moves from <code>DRAINING</code> to <code>INACTIVE</code>. Services in the <code>DRAINING</code> or <code>INACTIVE</code> status can still be viewed with <a>DescribeServices</a> API operations; however, in the future, <code>INACTIVE</code> services may be cleaned up and purged from Amazon ECS record keeping, and <a>DescribeServices</a> API operations on those services will return a <code>ServiceNotFoundException</code> error.</p> </note>",
+    "DeregisterContainerInstance": "<p>Deregisters an Amazon ECS container instance from the specified cluster. This instance is no longer available to run tasks.</p> <p>If you intend to use the container instance for some other purpose after deregistration, you should stop all of the tasks running on the container instance before deregistration to avoid any orphaned tasks from consuming resources.</p> <p>Deregistering a container instance removes the instance from a cluster, but it does not terminate the EC2 instance; if you are finished using the instance, be sure to terminate it in the Amazon EC2 console to stop billing.</p> <note><p>When you terminate a container instance, it is automatically deregistered from your cluster.</p></note>",
+    "DeregisterTaskDefinition": "<p>Deregisters the specified task definition by family and revision. Upon deregistration, the task definition is marked as <code>INACTIVE</code>. Existing tasks and services that reference an <code>INACTIVE</code> task definition continue to run without disruption. Existing services that reference an <code>INACTIVE</code> task definition can still scale up or down by modifying the service's desired count.</p> <p>You cannot use an <code>INACTIVE</code> task definition to run new tasks or create new services, and you cannot update an existing service to reference an <code>INACTIVE</code> task definition (although there may be up to a 10 minute window following deregistration where these restrictions have not yet taken effect).</p>",
+    "DescribeClusters": "<p>Describes one or more of your clusters.</p>",
+    "DescribeContainerInstances": "<p>Describes Amazon EC2 Container Service container instances. Returns metadata about registered and remaining resources on each container instance requested.</p>",
+    "DescribeServices": "<p>Describes the specified services running in your cluster.</p>",
+    "DescribeTaskDefinition": "<p>Describes a task definition. You can specify a <code>family</code> and <code>revision</code> to find information about a specific task definition, or you can simply specify the family to find the latest <code>ACTIVE</code> revision in that family.</p> <note> <p>You can only describe <code>INACTIVE</code> task definitions while an active task or service references them.</p> </note>",
+    "DescribeTasks": "<p>Describes a specified task or tasks.</p>",
+    "DiscoverPollEndpoint": "<note><p>This action is only used by the Amazon EC2 Container Service agent, and it is not intended for use outside of the agent.</p></note> <p>Returns an endpoint for the Amazon EC2 Container Service agent to poll for updates.</p>",
+    "ListClusters": "<p>Returns a list of existing clusters.</p>",
+    "ListContainerInstances": "<p>Returns a list of container instances in a specified cluster.</p>",
+    "ListServices": "<p>Lists the services that are running in a specified cluster.</p>",
+    "ListTaskDefinitionFamilies": "<p>Returns a list of task definition families that are registered to your account (which may include task definition families that no longer have any <code>ACTIVE</code> task definitions). You can filter the results with the <code>familyPrefix</code> parameter.</p>",
+    "ListTaskDefinitions": "<p>Returns a list of task definitions that are registered to your account. You can filter the results by family name with the <code>familyPrefix</code> parameter or by status with the <code>status</code> parameter.</p>",
+    "ListTasks": "<p>Returns a list of tasks for a specified cluster. You can filter the results by family name, by a particular container instance, or by the desired status of the task with the <code>family</code>, <code>containerInstance</code>, and <code>desiredStatus</code> parameters.</p>",
+    "RegisterContainerInstance": "<note><p>This action is only used by the Amazon EC2 Container Service agent, and it is not intended for use outside of the agent.</p></note> <p>Registers an EC2 instance into the specified cluster. This instance becomes available to place containers on.</p>",
+    "RegisterTaskDefinition": "<p>Registers a new task definition from the supplied <code>family</code> and <code>containerDefinitions</code>. Optionally, you can add data volumes to your containers with the <code>volumes</code> parameter. For more information about task definition parameters and defaults, see <a href=\"http://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_defintions.html\">Amazon ECS Task Definitions</a> in the <i>Amazon EC2 Container Service Developer Guide</i>.</p>",
+    "RunTask": "<p>Start a task using random placement and the default Amazon ECS scheduler. To use your own scheduler or place a task on a specific container instance, use <code>StartTask</code> instead.</p> <important> <p>The <code>count</code> parameter is limited to 10 tasks per call.</p> </important>",
+    "StartTask": "<p>Starts a new task from the specified task definition on the specified container instance or instances. To use the default Amazon ECS scheduler to place your task, use <code>RunTask</code> instead.</p> <important> <p>The list of container instances to start tasks on is limited to 10.</p> </important>",
+    "StopTask": "<p>Stops a running task.</p> <p>When <a>StopTask</a> is called on a task, the equivalent of <code>docker stop</code> is issued to the containers running in the task. This results in a <code>SIGTERM</code> and a 30-second timeout, after which <code>SIGKILL</code> is sent and the containers are forcibly stopped. If the container handles the <code>SIGTERM</code> gracefully and exits within 30 seconds from receiving it, no <code>SIGKILL</code> is sent.</p>",
+    "SubmitContainerStateChange": "<note><p>This action is only used by the Amazon EC2 Container Service agent, and it is not intended for use outside of the agent.</p></note> <p>Sent to acknowledge that a container changed states.</p>",
+    "SubmitTaskStateChange": "<note><p>This action is only used by the Amazon EC2 Container Service agent, and it is not intended for use outside of the agent.</p></note> <p>Sent to acknowledge that a task changed states.</p>",
+    "UpdateContainerAgent": "<p>Updates the Amazon ECS container agent on a specified container instance. Updating the Amazon ECS container agent does not interrupt running tasks or services on the container instance. The process for updating the agent differs depending on whether your container instance was launched with the Amazon ECS-optimized AMI or another operating system.</p> <p><code>UpdateContainerAgent</code> requires the Amazon ECS-optimized AMI or Amazon Linux with the <code>ecs-init</code> service installed and running. For help updating the Amazon ECS container agent on other operating systems, see <a href=\"http://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-agent-update.html#manually_update_agent\">Manually Updating the Amazon ECS Container Agent</a> in the <i>Amazon EC2 Container Service Developer Guide</i>.</p>",
+    "UpdateService": "<p>Modifies the desired count, deployment configuration, or task definition used in a service.</p> <p>You can add to or subtract from the number of instantiations of a task definition in a service by specifying the cluster that the service is running in and a new <code>desiredCount</code> parameter.</p> <p>You can use <a>UpdateService</a> to modify your task definition and deploy a new version of your service.</p> <p>You can also update the deployment configuration of a service. When a deployment is triggered by updating the task definition of a service, the service scheduler uses the deployment configuration parameters, <code>minimumHealthyPercent</code> and <code>maximumPercent</code>, to determine the deployment strategy.</p> <p>If the <code>minimumHealthyPercent</code> is below 100%, the scheduler can ignore the <code>desiredCount</code> temporarily during a deployment. For example, if your service has a <code>desiredCount</code> of four tasks, a <code>minimumHealthyPercent</code> of 50% allows the scheduler to stop two existing tasks before starting two new tasks. Tasks for services that <i>do not</i> use a load balancer are considered healthy if they are in the <code>RUNNING</code> state; tasks for services that <i>do</i> use a load balancer are considered healthy if they are in the <code>RUNNING</code> state and the container instance it is hosted on is reported as healthy by the load balancer.</p> <p>The <code>maximumPercent</code> parameter represents an upper limit on the number of running tasks during a deployment, which enables you to define the deployment batch size. For example, if your service has a <code>desiredCount</code> of four tasks, a <code>maximumPercent</code> value of 200% starts four new tasks before stopping the four older tasks (provided that the cluster resources required to do this are available).</p> <p>When <a>UpdateService</a> stops a task during a deployment, the equivalent of <code>docker stop</code> is issued to the containers running in the task. This results in a <code>SIGTERM</code> and a 30-second timeout, after which <code>SIGKILL</code> is sent and the containers are forcibly stopped. If the container handles the <code>SIGTERM</code> gracefully and exits within 30 seconds from receiving it, no <code>SIGKILL</code> is sent.</p> <p>When the service scheduler launches new tasks, it attempts to balance them across the Availability Zones in your cluster with the following logic:</p> <ul> <li> <p>Determine which of the container instances in your cluster can support your service's task definition (for example, they have the required CPU, memory, ports, and container instance attributes).</p> </li> <li> <p>Sort the valid container instances by the fewest number of running tasks for this service in the same Availability Zone as the instance. For example, if zone A has one running service task and zones B and C each have zero, valid container instances in either zone B or C are considered optimal for placement.</p> </li> <li> <p>Place the new service task on a valid container instance in an optimal Availability Zone (based on the previous steps), favoring container instances with the fewest number of running tasks for this service.</p> </li> </ul>"
+  },
+  "shapes": {
+    "AgentUpdateStatus": {
+      "base": null,
+      "refs": {
+        "ContainerInstance$agentUpdateStatus": "<p>The status of the most recent agent update. If an update has never been requested, this value is <code>NULL</code>.</p>"
+      }
+    },
+    "Attribute": {
+      "base": "<p>The attributes applicable to a container instance when it is registered.</p>",
+      "refs": {
+        "Attributes$member": null,
+        "RequiresAttributes$member": null
+      }
+    },
+    "Attributes": {
+      "base": null,
+      "refs": {
+        "ContainerInstance$attributes": "<p>The attributes set for the container instance by the Amazon ECS container agent at instance registration.</p>",
+        "RegisterContainerInstanceRequest$attributes": "<p>The container instance attributes that this container instance supports.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "ContainerInstance$agentConnected": "<p>This parameter returns <code>true</code> if the agent is actually connected to Amazon ECS. Registered instances with an agent that may be unhealthy or stopped return <code>false</code>, and instances without a connected agent cannot accept placement requests.</p>"
+      }
+    },
+    "BoxedBoolean": {
+      "base": null,
+      "refs": {
+        "ContainerDefinition$essential": "<p>If the <code>essential</code> parameter of a container is marked as <code>true</code>, the failure of that container stops the task. If the <code>essential</code> parameter of a container is marked as <code>false</code>, then its failure does not affect the rest of the containers in a task. If this parameter is omitted, a container is assumed to be essential.</p> <note> <p>All tasks must have at least one essential container.</p> </note>",
+        "ContainerDefinition$disableNetworking": "<p>When this parameter is true, networking is disabled within the container. This parameter maps to <code>NetworkDisabled</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a>.</p>",
+        "ContainerDefinition$privileged": "<p>When this parameter is true, the container is given elevated privileges on the host container instance (similar to the <code>root</code> user). This parameter maps to <code>Privileged</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--privileged</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>",
+        "ContainerDefinition$readonlyRootFilesystem": "<p>When this parameter is true, the container is given read-only access to its root file system. This parameter maps to <code>ReadonlyRootfs</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--read-only</code> option to <code>docker run</code>.</p>",
+        "DeregisterContainerInstanceRequest$force": "<p>Forces the deregistration of the container instance. If you have tasks running on the container instance when you deregister it with the <code>force</code> option, these tasks remain running and they continue to pass Elastic Load Balancing load balancer health checks until you terminate the instance or the tasks stop through some other means, but they are orphaned (no longer monitored or accounted for by Amazon ECS). If an orphaned task on your container instance is part of an Amazon ECS service, then the service scheduler starts another copy of that task, on a different container instance if possible.</p>",
+        "MountPoint$readOnly": "<p>If this value is <code>true</code>, the container has read-only access to the volume. If this value is <code>false</code>, then the container can write to the volume. The default value is <code>false</code>.</p>",
+        "VolumeFrom$readOnly": "<p>If this value is <code>true</code>, the container has read-only access to the volume. If this value is <code>false</code>, then the container can write to the volume. The default value is <code>false</code>.</p>"
+      }
+    },
+    "BoxedInteger": {
+      "base": null,
+      "refs": {
+        "Container$exitCode": "<p>The exit code returned from the container.</p>",
+        "CreateServiceRequest$desiredCount": "<p>The number of instantiations of the specified task definition to place and keep running on your cluster.</p>",
+        "DeploymentConfiguration$maximumPercent": "<p>The upper limit (as a percentage of the service's <code>desiredCount</code>) of the number of running tasks that can be running in a service during a deployment. The maximum number of tasks during a deployment is the <code>desiredCount</code> multiplied by the <code>maximumPercent</code>/100, rounded down to the nearest integer value.</p>",
+        "DeploymentConfiguration$minimumHealthyPercent": "<p>The lower limit (as a percentage of the service's <code>desiredCount</code>) of the number of running tasks that must remain running and healthy in a service during a deployment. The minimum healthy tasks during a deployment is the <code>desiredCount</code> multiplied by the <code>minimumHealthyPercent</code>/100, rounded up to the nearest integer value.</p>",
+        "ListClustersRequest$maxResults": "<p>The maximum number of cluster results returned by <code>ListClusters</code> in paginated output. When this parameter is used, <code>ListClusters</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListClusters</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListClusters</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>",
+        "ListContainerInstancesRequest$maxResults": "<p>The maximum number of container instance results returned by <code>ListContainerInstances</code> in paginated output. When this parameter is used, <code>ListContainerInstances</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListContainerInstances</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListContainerInstances</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>",
+        "ListServicesRequest$maxResults": "<p>The maximum number of container instance results returned by <code>ListServices</code> in paginated output. When this parameter is used, <code>ListServices</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListServices</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 10. If this parameter is not used, then <code>ListServices</code> returns up to 10 results and a <code>nextToken</code> value if applicable.</p>",
+        "ListTaskDefinitionFamiliesRequest$maxResults": "<p>The maximum number of task definition family results returned by <code>ListTaskDefinitionFamilies</code> in paginated output. When this parameter is used, <code>ListTaskDefinitions</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListTaskDefinitionFamilies</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListTaskDefinitionFamilies</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>",
+        "ListTaskDefinitionsRequest$maxResults": "<p>The maximum number of task definition results returned by <code>ListTaskDefinitions</code> in paginated output. When this parameter is used, <code>ListTaskDefinitions</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListTaskDefinitions</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListTaskDefinitions</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>",
+        "ListTasksRequest$maxResults": "<p>The maximum number of task results returned by <code>ListTasks</code> in paginated output. When this parameter is used, <code>ListTasks</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListTasks</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListTasks</code> returns up to 100 results and a <code>nextToken</code> value if applicable.</p>",
+        "LoadBalancer$containerPort": "<p>The port on the container to associate with the load balancer. This port must correspond to a <code>containerPort</code> in the service's task definition. Your container instances must allow ingress traffic on the <code>hostPort</code> of the port mapping.</p>",
+        "NetworkBinding$containerPort": "<p>The port number on the container that is be used with the network binding.</p>",
+        "NetworkBinding$hostPort": "<p>The port number on the host that is used with the network binding.</p>",
+        "RunTaskRequest$count": "<p>The number of instantiations of the specified task to place on your cluster.</p> <important> <p>The <code>count</code> parameter is limited to 10 tasks per call.</p> </important>",
+        "SubmitContainerStateChangeRequest$exitCode": "<p>The exit code returned for the state change request.</p>",
+        "UpdateServiceRequest$desiredCount": "<p>The number of instantiations of the task to place and keep running in your service.</p>"
+      }
+    },
+    "ClientException": {
+      "base": "<p>These errors are usually caused by a client action, such as using an action or resource on behalf of a user that doesn't have permission to use the action or resource, or specifying an identifier that is not valid.</p>",
+      "refs": {
+      }
+    },
+    "Cluster": {
+      "base": "<p>A regional grouping of one or more container instances on which you can run task requests. Each account receives a default cluster the first time you use the Amazon ECS service, but you may also create other clusters. Clusters may contain more than one instance type simultaneously.</p>",
+      "refs": {
+        "Clusters$member": null,
+        "CreateClusterResponse$cluster": "<p>The full description of your new cluster.</p>",
+        "DeleteClusterResponse$cluster": "<p>The full description of the deleted cluster.</p>"
+      }
+    },
+    "ClusterContainsContainerInstancesException": {
+      "base": "<p>You cannot delete a cluster that has registered container instances. You must first deregister the container instances before you can delete the cluster. For more information, see <a>DeregisterContainerInstance</a>.</p>",
+      "refs": {
+      }
+    },
+    "ClusterContainsServicesException": {
+      "base": "<p>You cannot delete a cluster that contains services. You must first update the service to reduce its desired task count to 0 and then delete the service. For more information, see <a>UpdateService</a> and <a>DeleteService</a>.</p>",
+      "refs": {
+      }
+    },
+    "ClusterNotFoundException": {
+      "base": "<p>The specified cluster could not be found. You can view your available clusters with <a>ListClusters</a>. Amazon ECS clusters are region-specific.</p>",
+      "refs": {
+      }
+    },
+    "Clusters": {
+      "base": null,
+      "refs": {
+        "DescribeClustersResponse$clusters": "<p>The list of clusters.</p>"
+      }
+    },
+    "Container": {
+      "base": "<p>A Docker container that is part of a task.</p>",
+      "refs": {
+        "Containers$member": null
+      }
+    },
+    "ContainerDefinition": {
+      "base": "<p>Container definitions are used in task definitions to describe the different containers that are launched as part of a task.</p>",
+      "refs": {
+        "ContainerDefinitions$member": null
+      }
+    },
+    "ContainerDefinitions": {
+      "base": null,
+      "refs": {
+        "RegisterTaskDefinitionRequest$containerDefinitions": "<p>A list of container definitions in JSON format that describe the different containers that make up your task.</p>",
+        "TaskDefinition$containerDefinitions": "<p>A list of container definitions in JSON format that describe the different containers that make up your task. For more information about container definition parameters and defaults, see <a href=\"http://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_defintions.html\">Amazon ECS Task Definitions</a> in the <i>Amazon EC2 Container Service Developer Guide</i>.</p>"
+      }
+    },
+    "ContainerInstance": {
+      "base": "<p>An EC2 instance that is running the Amazon ECS agent and has been registered with a cluster.</p>",
+      "refs": {
+        "ContainerInstances$member": null,
+        "DeregisterContainerInstanceResponse$containerInstance": null,
+        "RegisterContainerInstanceResponse$containerInstance": null,
+        "UpdateContainerAgentResponse$containerInstance": null
+      }
+    },
+    "ContainerInstances": {
+      "base": null,
+      "refs": {
+        "DescribeContainerInstancesResponse$containerInstances": "<p>The list of container instances.</p>"
+      }
+    },
+    "ContainerOverride": {
+      "base": "<p>The overrides that should be sent to a container.</p>",
+      "refs": {
+        "ContainerOverrides$member": null
+      }
+    },
+    "ContainerOverrides": {
+      "base": null,
+      "refs": {
+        "TaskOverride$containerOverrides": "<p>One or more container overrides sent to a task.</p>"
+      }
+    },
+    "Containers": {
+      "base": null,
+      "refs": {
+        "Task$containers": "<p>The containers associated with the task.</p>"
+      }
+    },
+    "CreateClusterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateClusterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateServiceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateServiceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteClusterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteClusterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteServiceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteServiceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Deployment": {
+      "base": "<p>The details of an Amazon ECS service deployment.</p>",
+      "refs": {
+        "Deployments$member": null
+      }
+    },
+    "DeploymentConfiguration": {
+      "base": "<p>Optional deployment parameters that control how many tasks run during the deployment and the ordering of stopping and starting tasks.</p>",
+      "refs": {
+        "CreateServiceRequest$deploymentConfiguration": "<p>Optional deployment parameters that control how many tasks run during the deployment and the ordering of stopping and starting tasks. </p>",
+        "Service$deploymentConfiguration": "<p>Optional deployment parameters that control how many tasks run during the deployment and the ordering of stopping and starting tasks.</p>",
+        "UpdateServiceRequest$deploymentConfiguration": "<p>Optional deployment parameters that control how many tasks run during the deployment and the ordering of stopping and starting tasks. </p>"
+      }
+    },
+    "Deployments": {
+      "base": null,
+      "refs": {
+        "Service$deployments": "<p>The current state of deployments for the service.</p>"
+      }
+    },
+    "DeregisterContainerInstanceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterContainerInstanceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterTaskDefinitionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeregisterTaskDefinitionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeClustersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeClustersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeContainerInstancesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeContainerInstancesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeServicesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeServicesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTaskDefinitionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTaskDefinitionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTasksRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTasksResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DesiredStatus": {
+      "base": null,
+      "refs": {
+        "ListTasksRequest$desiredStatus": "<p>The task status with which to filter the <code>ListTasks</code> results. Specifying a <code>desiredStatus</code> of <code>STOPPED</code> limits the results to tasks that are in the <code>STOPPED</code> status, which can be useful for debugging tasks that are not starting properly or have died or finished. The default status filter is <code>RUNNING</code>.</p>"
+      }
+    },
+    "DiscoverPollEndpointRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DiscoverPollEndpointResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DockerLabelsMap": {
+      "base": null,
+      "refs": {
+        "ContainerDefinition$dockerLabels": "<p>A key/value map of labels to add to the container. This parameter maps to <code>Labels</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--label</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>. This parameter requires version 1.18 of the Docker Remote API or greater on your container instance. To check the Docker Remote API version on your container instance, log into your container instance and run the following command: <code>sudo docker version | grep \"Server API version\"</code> </p>"
+      }
+    },
+    "Double": {
+      "base": null,
+      "refs": {
+        "Resource$doubleValue": "<p>When the <code>doubleValue</code> type is set, the value of the resource must be a double precision floating-point type.</p>"
+      }
+    },
+    "EnvironmentVariables": {
+      "base": null,
+      "refs": {
+        "ContainerDefinition$environment": "<p>The environment variables to pass to a container. This parameter maps to <code>Env</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--env</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p> <important> <p>We do not recommend using plain text environment variables for sensitive information, such as credential data.</p> </important>",
+        "ContainerOverride$environment": "<p>The environment variables to send to the container. You can add new environment variables, which are added to the container at launch, or you can override the existing environment variables from the Docker image or the task definition.</p>"
+      }
+    },
+    "Failure": {
+      "base": "<p>A failed resource.</p>",
+      "refs": {
+        "Failures$member": null
+      }
+    },
+    "Failures": {
+      "base": null,
+      "refs": {
+        "DescribeClustersResponse$failures": "<p>Any failures associated with the call.</p>",
+        "DescribeContainerInstancesResponse$failures": "<p>Any failures associated with the call.</p>",
+        "DescribeServicesResponse$failures": "<p>Any failures associated with the call.</p>",
+        "DescribeTasksResponse$failures": "<p>Any failures associated with the call.</p>",
+        "RunTaskResponse$failures": "<p>Any failures associated with the call.</p>",
+        "StartTaskResponse$failures": "<p>Any failures associated with the call.</p>"
+      }
+    },
+    "HostEntry": {
+      "base": "<p>Hostnames and IP address entries that are added to the <code>/etc/hosts</code> file of a container via the <code>extraHosts</code> parameter of its <a>ContainerDefinition</a>. </p>",
+      "refs": {
+        "HostEntryList$member": null
+      }
+    },
+    "HostEntryList": {
+      "base": null,
+      "refs": {
+        "ContainerDefinition$extraHosts": "<p>A list of hostnames and IP address mappings to append to the <code>/etc/hosts</code> file on the container. This parameter maps to <code>ExtraHosts</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--add-host</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>"
+      }
+    },
+    "HostVolumeProperties": {
+      "base": "<p>Details on a container instance host volume.</p>",
+      "refs": {
+        "Volume$host": "<p>The contents of the <code>host</code> parameter determine whether your data volume persists on the host container instance and where it is stored. If the host parameter is empty, then the Docker daemon assigns a host path for your data volume, but the data is not guaranteed to persist after the containers associated with it stop running.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "Cluster$registeredContainerInstancesCount": "<p>The number of container instances registered into the cluster.</p>",
+        "Cluster$runningTasksCount": "<p>The number of tasks in the cluster that are in the <code>RUNNING</code> state.</p>",
+        "Cluster$pendingTasksCount": "<p>The number of tasks in the cluster that are in the <code>PENDING</code> state.</p>",
+        "Cluster$activeServicesCount": "<p>The number of services that are running on the cluster in an <code>ACTIVE</code> state. You can view these services with <a>ListServices</a>.</p>",
+        "ContainerDefinition$cpu": "<p>The number of <code>cpu</code> units reserved for the container. A container instance has 1,024 <code>cpu</code> units for every CPU core. This parameter specifies the minimum amount of CPU to reserve for a container, and containers share unallocated CPU units with other containers on the instance with the same ratio as their allocated amount. This parameter maps to <code>CpuShares</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--cpu-shares</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p> <note> <p>You can determine the number of CPU units that are available per EC2 instance type by multiplying the vCPUs listed for that instance type on the <a href=\"http://aws.amazon.com/ec2/instance-types/\">Amazon EC2 Instances</a> detail page by 1,024.</p> </note> <p>For example, if you run a single-container task on a single-core instance type with 512 CPU units specified for that container, and that is the only task running on the container instance, that container could use the full 1,024 CPU unit share at any given time. However, if you launched another copy of the same task on that container instance, each task would be guaranteed a minimum of 512 CPU units when needed, and each container could float to higher CPU usage if the other container was not using it, but if both tasks were 100% active all of the time, they would be limited to 512 CPU units.</p> <p>The Docker daemon on the container instance uses the CPU value to calculate the relative CPU share ratios for running containers. For more information, see <a href=\"https://docs.docker.com/reference/run/#cpu-share-constraint\">CPU share constraint</a> in the Docker documentation. The minimum valid CPU share value that the Linux kernel allows is 2; however, the CPU parameter is not required, and you can use CPU values below 2 in your container definitions. For CPU values below 2 (including null), the behavior varies based on your Amazon ECS container agent version:</p> <ul> <li><b>Agent versions less than or equal to 1.1.0:</b> Null and zero CPU values are passed to Docker as 0, which Docker then converts to 1,024 CPU shares. CPU values of 1 are passed to Docker as 1, which the Linux kernel converts to 2 CPU shares.</li> <li><b>Agent versions greater than or equal to 1.2.0:</b> Null, zero, and CPU values of 1 are passed to Docker as 2.</li></ul>",
+        "ContainerDefinition$memory": "<p>The number of MiB of memory to reserve for the container. You must specify a non-zero integer for this parameter; the Docker daemon reserves a minimum of 4 MiB of memory for a container, so you should not specify fewer than 4 MiB of memory for your containers. If your container attempts to exceed the memory allocated here, the container is killed. This parameter maps to <code>Memory</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--memory</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>",
+        "ContainerInstance$runningTasksCount": "<p>The number of tasks on the container instance that are in the <code>RUNNING</code> status.</p>",
+        "ContainerInstance$pendingTasksCount": "<p>The number of tasks on the container instance that are in the <code>PENDING</code> status.</p>",
+        "Deployment$desiredCount": "<p>The most recent desired count of tasks that was specified for the service to deploy or maintain.</p>",
+        "Deployment$pendingCount": "<p>The number of tasks in the deployment that are in the <code>PENDING</code> status.</p>",
+        "Deployment$runningCount": "<p>The number of tasks in the deployment that are in the <code>RUNNING</code> status.</p>",
+        "PortMapping$containerPort": "<p>The port number on the container that is bound to the user-specified or automatically assigned host port. If you specify a container port and not a host port, your container automatically receives a host port in the ephemeral port range (for more information, see <code>hostPort</code>).</p>",
+        "PortMapping$hostPort": "<p>The port number on the container instance to reserve for your container. You can specify a non-reserved host port for your container port mapping, or you can omit the <code>hostPort</code> (or set it to <code>0</code>) while specifying a <code>containerPort</code> and your container automatically receives a port in the ephemeral port range for your container instance operating system and Docker version.</p> <p>The default ephemeral port range is 49153 to 65535, and this range is used for Docker versions prior to 1.6.0. For Docker version 1.6.0 and later, the Docker daemon tries to read the ephemeral port range from <code>/proc/sys/net/ipv4/ip_local_port_range</code>; if this kernel parameter is unavailable, the default ephemeral port range is used. You should not attempt to specify a host port in the ephemeral port range, because these are reserved for automatic assignment. In general, ports below 32768 are outside of the ephemeral port range.</p> <p>The default reserved ports are 22 for SSH, the Docker ports 2375 and 2376, and the Amazon ECS container agent port 51678. Any host port that was previously specified in a running task is also reserved while the task is running (after a task stops, the host port is released).The current reserved ports are displayed in the <code>remainingResources</code> of <a>DescribeContainerInstances</a> output, and a container instance may have up to 50 reserved ports at a time, including the default reserved ports (automatically assigned ports do not count toward this limit).</p>",
+        "Resource$integerValue": "<p>When the <code>integerValue</code> type is set, the value of the resource must be an integer.</p>",
+        "Service$desiredCount": "<p>The desired number of instantiations of the task definition to keep running on the service. This value is specified when the service is created with <a>CreateService</a>, and it can be modified with <a>UpdateService</a>.</p>",
+        "Service$runningCount": "<p>The number of tasks in the cluster that are in the <code>RUNNING</code> state.</p>",
+        "Service$pendingCount": "<p>The number of tasks in the cluster that are in the <code>PENDING</code> state.</p>",
+        "TaskDefinition$revision": "<p>The revision of the task in a particular family. The revision is a version number of a task definition in a family. When you register a task definition for the first time, the revision is <code>1</code>; each time you register a new revision of a task definition in the same family, the revision value always increases by one (even if you have deregistered previous revisions in this family).</p>",
+        "Ulimit$softLimit": "<p>The soft limit for the ulimit type.</p>",
+        "Ulimit$hardLimit": "<p>The hard limit for the ulimit type.</p>"
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>The specified parameter is invalid. Review the available parameters for the API request.</p>",
+      "refs": {
+      }
+    },
+    "KeyValuePair": {
+      "base": "<p>A key and value pair object.</p>",
+      "refs": {
+        "EnvironmentVariables$member": null
+      }
+    },
+    "ListClustersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListClustersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListContainerInstancesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListContainerInstancesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServicesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListServicesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTaskDefinitionFamiliesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTaskDefinitionFamiliesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTaskDefinitionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTaskDefinitionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTasksRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTasksResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LoadBalancer": {
+      "base": "<p>Details on a load balancer that is used with a service.</p>",
+      "refs": {
+        "LoadBalancers$member": null
+      }
+    },
+    "LoadBalancers": {
+      "base": null,
+      "refs": {
+        "CreateServiceRequest$loadBalancers": "<p>A list of load balancer objects, containing the load balancer name, the container name (as it appears in a container definition), and the container port to access from the load balancer.</p>",
+        "Service$loadBalancers": "<p>A list of load balancer objects, containing the load balancer name, the container name (as it appears in a container definition), and the container port to access from the load balancer.</p>"
+      }
+    },
+    "LogConfiguration": {
+      "base": "<p>Log configuration options to send to a custom log driver for the container.</p>",
+      "refs": {
+        "ContainerDefinition$logConfiguration": "<p>The log configuration specification for the container. This parameter maps to <code>LogConfig</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--log-driver</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>. Valid log drivers are displayed in the <a>LogConfiguration</a> data type. This parameter requires version 1.18 of the Docker Remote API or greater on your container instance. To check the Docker Remote API version on your container instance, log into your container instance and run the following command: <code>sudo docker version | grep \"Server API version\"</code></p> <note> <p>The Amazon ECS container agent running on a container instance must register the logging drivers available on that instance with the <code>ECS_AVAILABLE_LOGGING_DRIVERS</code> environment variable before containers placed on that instance can use these log configuration options. For more information, see <a href=\"http://docs.aws.amazon.com/AmazonECS/latest/developerguide/developerguide/ecs-agent-config.html\">Amazon ECS Container Agent Configuration</a> in the <i>Amazon EC2 Container Service Developer Guide</i>.</p> </note>"
+      }
+    },
+    "LogConfigurationOptionsMap": {
+      "base": null,
+      "refs": {
+        "LogConfiguration$options": "<p>The configuration options to send to the log driver. This parameter requires version 1.19 of the Docker Remote API or greater on your container instance. To check the Docker Remote API version on your container instance, log into your container instance and run the following command: <code>sudo docker version | grep \"Server API version\"</code></p>"
+      }
+    },
+    "LogDriver": {
+      "base": null,
+      "refs": {
+        "LogConfiguration$logDriver": "<p>The log driver to use for the container. This parameter requires version 1.18 of the Docker Remote API or greater on your container instance. To check the Docker Remote API version on your container instance, log into your container instance and run the following command: <code>sudo docker version | grep \"Server API version\"</code></p>"
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "Resource$longValue": "<p>When the <code>longValue</code> type is set, the value of the resource must be an extended precision floating-point type.</p>"
+      }
+    },
+    "MissingVersionException": {
+      "base": "<p>Amazon ECS is unable to determine the current version of the Amazon ECS container agent on the container instance and does not have enough information to proceed with an update. This could be because the agent running on the container instance is an older or custom version that does not use our version information.</p>",
+      "refs": {
+      }
+    },
+    "MountPoint": {
+      "base": "<p>Details on a volume mount point that is used in a container definition.</p>",
+      "refs": {
+        "MountPointList$member": null
+      }
+    },
+    "MountPointList": {
+      "base": null,
+      "refs": {
+        "ContainerDefinition$mountPoints": "<p>The mount points for data volumes in your container. This parameter maps to <code>Volumes</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--volume</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>"
+      }
+    },
+    "NetworkBinding": {
+      "base": "<p>Details on the network bindings between a container and its host container instance. After a task reaches the <code>RUNNING</code> status, manual and automatic host and container port assignments are visible in the <code>networkBindings</code> section of <a>DescribeTasks</a> API responses.</p>",
+      "refs": {
+        "NetworkBindings$member": null
+      }
+    },
+    "NetworkBindings": {
+      "base": null,
+      "refs": {
+        "Container$networkBindings": "<p>The network bindings associated with the container.</p>",
+        "SubmitContainerStateChangeRequest$networkBindings": "<p>The network bindings of the container.</p>"
+      }
+    },
+    "NoUpdateAvailableException": {
+      "base": "<p>There is no update available for this Amazon ECS container agent. This could be because the agent is already running the latest version, or it is so old that there is no update path to the current version.</p>",
+      "refs": {
+      }
+    },
+    "PortMapping": {
+      "base": "<p>Port mappings allow containers to access ports on the host container instance to send or receive traffic. Port mappings are specified as part of the container definition. After a task reaches the <code>RUNNING</code> status, manual and automatic host and container port assignments are visible in the <code>networkBindings</code> section of <a>DescribeTasks</a> API responses.</p>",
+      "refs": {
+        "PortMappingList$member": null
+      }
+    },
+    "PortMappingList": {
+      "base": null,
+      "refs": {
+        "ContainerDefinition$portMappings": "<p>The list of port mappings for the container. Port mappings allow containers to access ports on the host container instance to send or receive traffic. This parameter maps to <code>PortBindings</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--publish</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p> <note> <p>After a task reaches the <code>RUNNING</code> status, manual and automatic host and container port assignments are visible in the <b>Network Bindings</b> section of a container description of a selected task in the Amazon ECS console, or the <code>networkBindings</code> section <a>DescribeTasks</a> responses.</p> </note>"
+      }
+    },
+    "RegisterContainerInstanceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterContainerInstanceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterTaskDefinitionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RegisterTaskDefinitionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RequiresAttributes": {
+      "base": null,
+      "refs": {
+        "TaskDefinition$requiresAttributes": "<p>The container instance attributes required by your task.</p>"
+      }
+    },
+    "Resource": {
+      "base": "<p>Describes the resources available for a container instance.</p>",
+      "refs": {
+        "Resources$member": null
+      }
+    },
+    "Resources": {
+      "base": null,
+      "refs": {
+        "ContainerInstance$remainingResources": "<p>The remaining resources of the container instance that are available for new tasks.</p>",
+        "ContainerInstance$registeredResources": "<p>The registered resources on the container instance that are in use by current tasks.</p>",
+        "RegisterContainerInstanceRequest$totalResources": "<p>The resources available on the instance.</p>"
+      }
+    },
+    "RunTaskRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RunTaskResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ServerException": {
+      "base": "<p>These errors are usually caused by a server issue.</p>",
+      "refs": {
+      }
+    },
+    "Service": {
+      "base": "<p>Details on a service within a cluster</p>",
+      "refs": {
+        "CreateServiceResponse$service": "<p>The full description of your service following the create call.</p>",
+        "DeleteServiceResponse$service": "<p>The full description of the deleted service.</p>",
+        "Services$member": null,
+        "UpdateServiceResponse$service": "<p>The full description of your service following the update call.</p>"
+      }
+    },
+    "ServiceEvent": {
+      "base": "<p>Details on an event associated with a service.</p>",
+      "refs": {
+        "ServiceEvents$member": null
+      }
+    },
+    "ServiceEvents": {
+      "base": null,
+      "refs": {
+        "Service$events": "<p>The event stream for your service. A maximum of 100 of the latest events are displayed.</p>"
+      }
+    },
+    "ServiceNotActiveException": {
+      "base": "<p>The specified service is not active. You cannot update a service that is not active. If you have previously deleted a service, you can re-create it with <a>CreateService</a>.</p>",
+      "refs": {
+      }
+    },
+    "ServiceNotFoundException": {
+      "base": "<p>The specified service could not be found. You can view your available services with <a>ListServices</a>. Amazon ECS services are cluster-specific and region-specific.</p>",
+      "refs": {
+      }
+    },
+    "Services": {
+      "base": null,
+      "refs": {
+        "DescribeServicesResponse$services": "<p>The list of services described.</p>"
+      }
+    },
+    "SortOrder": {
+      "base": null,
+      "refs": {
+        "ListTaskDefinitionsRequest$sort": "<p>The order in which to sort the results. Valid values are <code>ASC</code> and <code>DESC</code>. By default (<code>ASC</code>), task definitions are listed lexicographically by family name and in ascending numerical order by revision so that the newest task definitions in a family are listed last. Setting this parameter to <code>DESC</code> reverses the sort order on family name and revision so that the newest task definitions in a family are listed first.</p>"
+      }
+    },
+    "StartTaskRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartTaskResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopTaskRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StopTaskResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "Attribute$name": "<p>The name of the container instance attribute.</p>",
+        "Attribute$value": "<p>The value of the container instance attribute (at this time, the value here is <code>Null</code>, but this could change in future revisions for expandability).</p>",
+        "ClientException$message": null,
+        "Cluster$clusterArn": "<p>The Amazon Resource Name (ARN) that identifies the cluster. The ARN contains the <code>arn:aws:ecs</code> namespace, followed by the region of the cluster, the AWS account ID of the cluster owner, the <code>cluster</code> namespace, and then the cluster name. For example, arn:aws:ecs:<i>region</i>:<i>012345678910</i>:cluster/<i>test</i>.</p>",
+        "Cluster$clusterName": "<p>A user-generated string that you use to identify your cluster.</p>",
+        "Cluster$status": "<p>The status of the cluster. The valid values are <code>ACTIVE</code> or <code>INACTIVE</code>. <code>ACTIVE</code> indicates that you can register container instances with the cluster and the associated instances can accept tasks.</p>",
+        "Container$containerArn": "<p>The Amazon Resource Name (ARN) of the container.</p>",
+        "Container$taskArn": "<p>The Amazon Resource Name (ARN) of the task.</p>",
+        "Container$name": "<p>The name of the container.</p>",
+        "Container$lastStatus": "<p>The last known status of the container.</p>",
+        "Container$reason": "<p>A short (255 max characters) human-readable string to provide additional detail about a running or stopped container.</p>",
+        "ContainerDefinition$name": "<p>The name of a container. If you are linking multiple containers together in a task definition, the <code>name</code> of one container can be entered in the <code>links</code> of another container to connect the containers. Up to 255 letters (uppercase and lowercase), numbers, hyphens, and underscores are allowed. This parameter maps to <code>name</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--name</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>. </p>",
+        "ContainerDefinition$image": "<p>The image used to start a container. This string is passed directly to the Docker daemon. Images in the Docker Hub registry are available by default. Other repositories are specified with <code><i>repository-url</i>/<i>image</i>:<i>tag</i></code>. Up to 255 letters (uppercase and lowercase), numbers, hyphens, underscores, colons, periods, forward slashes, and number signs are allowed. This parameter maps to <code>Image</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>IMAGE</code> parameter of <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p> <ul> <li>Images in official repositories on Docker Hub use a single name (for example, <code>ubuntu</code> or <code>mongo</code>).</li> <li>Images in other repositories on Docker Hub are qualified with an organization name (for example, <code>amazon/amazon-ecs-agent</code>).</li> <li>Images in other online repositories are qualified further by a domain name (for example, <code>quay.io/assemblyline/ubuntu</code>).</li> </ul>",
+        "ContainerDefinition$hostname": "<p>The hostname to use for your container. This parameter maps to <code>Hostname</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--hostname</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>",
+        "ContainerDefinition$user": "<p>The user name to use inside the container. This parameter maps to <code>User</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--user</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>",
+        "ContainerDefinition$workingDirectory": "<p>The working directory in which to run commands inside the container. This parameter maps to <code>WorkingDir</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--workdir</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>",
+        "ContainerInstance$containerInstanceArn": "<p>The Amazon Resource Name (ARN) of the container instance. The ARN contains the <code>arn:aws:ecs</code> namespace, followed by the region of the container instance, the AWS account ID of the container instance owner, the <code>container-instance</code> namespace, and then the container instance ID. For example, arn:aws:ecs:<i>region</i>:<i>aws_account_id</i>:container-instance/<i>container_instance_ID</i>.</p>",
+        "ContainerInstance$ec2InstanceId": "<p>The EC2 instance ID of the container instance.</p>",
+        "ContainerInstance$status": "<p>The status of the container instance. The valid values are <code>ACTIVE</code> or <code>INACTIVE</code>. <code>ACTIVE</code> indicates that the container instance can accept tasks.</p>",
+        "ContainerOverride$name": "<p>The name of the container that receives the override.</p>",
+        "CreateClusterRequest$clusterName": "<p>The name of your cluster. If you do not specify a name for your cluster, you create a cluster named <code>default</code>. Up to 255 letters (uppercase and lowercase), numbers, hyphens, and underscores are allowed.</p>",
+        "CreateServiceRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster on which to run your service. If you do not specify a cluster, the default cluster is assumed.</p>",
+        "CreateServiceRequest$serviceName": "<p>The name of your service. Up to 255 letters (uppercase and lowercase), numbers, hyphens, and underscores are allowed. Service names must be unique within a cluster, but you can have similarly named services in multiple clusters within a region or across multiple regions.</p>",
+        "CreateServiceRequest$taskDefinition": "<p>The <code>family</code> and <code>revision</code> (<code>family:revision</code>) or full Amazon Resource Name (ARN) of the task definition to run in your service. If a <code>revision</code> is not specified, the latest <code>ACTIVE</code> revision is used.</p>",
+        "CreateServiceRequest$clientToken": "<p>Unique, case-sensitive identifier you provide to ensure the idempotency of the request. Up to 32 ASCII characters are allowed.</p>",
+        "CreateServiceRequest$role": "<p>The name or full Amazon Resource Name (ARN) of the IAM role that allows your Amazon ECS container agent to make calls to your load balancer on your behalf. This parameter is only required if you are using a load balancer with your service.</p>",
+        "DeleteClusterRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster to delete.</p>",
+        "DeleteServiceRequest$cluster": "<p>The name of the cluster that hosts the service to delete. If you do not specify a cluster, the default cluster is assumed.</p>",
+        "DeleteServiceRequest$service": "<p>The name of the service to delete.</p>",
+        "Deployment$id": "<p>The ID of the deployment.</p>",
+        "Deployment$status": "<p>The status of the deployment. Valid values are <code>PRIMARY</code> (for the most recent deployment), <code>ACTIVE</code> (for previous deployments that still have tasks running, but are being replaced with the <code>PRIMARY</code> deployment), and <code>INACTIVE</code> (for deployments that have been completely replaced).</p>",
+        "Deployment$taskDefinition": "<p>The most recent task definition that was specified for the service to use.</p>",
+        "DeregisterContainerInstanceRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that hosts the container instance to deregister. If you do not specify a cluster, the default cluster is assumed.</p>",
+        "DeregisterContainerInstanceRequest$containerInstance": "<p>The container instance ID or full Amazon Resource Name (ARN) of the container instance to deregister. The ARN contains the <code>arn:aws:ecs</code> namespace, followed by the region of the container instance, the AWS account ID of the container instance owner, the <code>container-instance</code> namespace, and then the container instance ID. For example, arn:aws:ecs:<i>region</i>:<i>aws_account_id</i>:container-instance/<i>container_instance_ID</i>.</p>",
+        "DeregisterTaskDefinitionRequest$taskDefinition": "<p>The <code>family</code> and <code>revision</code> (<code>family:revision</code>) or full Amazon Resource Name (ARN) of the task definition to deregister. You must specify a <code>revision</code>.</p>",
+        "DescribeContainerInstancesRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that hosts the container instances to describe. If you do not specify a cluster, the default cluster is assumed.</p>",
+        "DescribeServicesRequest$cluster": "<p>The name of the cluster that hosts the service to describe. If you do not specify a cluster, the default cluster is assumed.</p>",
+        "DescribeTaskDefinitionRequest$taskDefinition": "<p>The <code>family</code> for the latest <code>ACTIVE</code> revision, <code>family</code> and <code>revision</code> (<code>family:revision</code>) for a specific revision in the family, or full Amazon Resource Name (ARN) of the task definition to describe.</p>",
+        "DescribeTasksRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that hosts the task to describe. If you do not specify a cluster, the default cluster is assumed.</p>",
+        "DiscoverPollEndpointRequest$containerInstance": "<p>The container instance ID or full Amazon Resource Name (ARN) of the container instance. The ARN contains the <code>arn:aws:ecs</code> namespace, followed by the region of the container instance, the AWS account ID of the container instance owner, the <code>container-instance</code> namespace, and then the container instance ID. For example, arn:aws:ecs:<i>region</i>:<i>aws_account_id</i>:container-instance/<i>container_instance_ID</i>.</p>",
+        "DiscoverPollEndpointRequest$cluster": "<p>The cluster that the container instance belongs to.</p>",
+        "DiscoverPollEndpointResponse$endpoint": "<p>The endpoint for the Amazon ECS agent to poll.</p>",
+        "DiscoverPollEndpointResponse$telemetryEndpoint": "<p>The telemetry endpoint for the Amazon ECS agent.</p>",
+        "DockerLabelsMap$key": null,
+        "DockerLabelsMap$value": null,
+        "Failure$arn": "<p>The Amazon Resource Name (ARN) of the failed resource.</p>",
+        "Failure$reason": "<p>The reason for the failure.</p>",
+        "HostEntry$hostname": "<p>The hostname to use in the <code>/etc/hosts</code> entry.</p>",
+        "HostEntry$ipAddress": "<p>The IP address to use in the <code>/etc/hosts</code> entry.</p>",
+        "HostVolumeProperties$sourcePath": "<p>The path on the host container instance that is presented to the container. If this parameter is empty, then the Docker daemon has assigned a host path for you. If the <code>host</code> parameter contains a <code>sourcePath</code> file location, then the data volume persists at the specified location on the host container instance until you delete it manually. If the <code>sourcePath</code> value does not exist on the host container instance, the Docker daemon creates it. If the location does exist, the contents of the source path folder are exported.</p>",
+        "KeyValuePair$name": "<p>The name of the key value pair. For environment variables, this is the name of the environment variable.</p>",
+        "KeyValuePair$value": "<p>The value of the key value pair. For environment variables, this is the value of the environment variable.</p>",
+        "ListClustersRequest$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListClusters</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListClustersResponse$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListClusters</code> request. When the results of a <code>ListClusters</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListContainerInstancesRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that hosts the container instances to list. If you do not specify a cluster, the default cluster is assumed..</p>",
+        "ListContainerInstancesRequest$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListContainerInstances</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListContainerInstancesResponse$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListContainerInstances</code> request. When the results of a <code>ListContainerInstances</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListServicesRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that hosts the services to list. If you do not specify a cluster, the default cluster is assumed..</p>",
+        "ListServicesRequest$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListServices</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListServicesResponse$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListServices</code> request. When the results of a <code>ListServices</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListTaskDefinitionFamiliesRequest$familyPrefix": "<p>The <code>familyPrefix</code> is a string that is used to filter the results of <code>ListTaskDefinitionFamilies</code>. If you specify a <code>familyPrefix</code>, only task definition family names that begin with the <code>familyPrefix</code> string are returned.</p>",
+        "ListTaskDefinitionFamiliesRequest$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListTaskDefinitionFamilies</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListTaskDefinitionFamiliesResponse$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListTaskDefinitionFamilies</code> request. When the results of a <code>ListTaskDefinitionFamilies</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListTaskDefinitionsRequest$familyPrefix": "<p>The full family name with which to filter the <code>ListTaskDefinitions</code> results. Specifying a <code>familyPrefix</code> limits the listed task definitions to task definition revisions that belong to that family.</p>",
+        "ListTaskDefinitionsRequest$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListTaskDefinitions</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListTaskDefinitionsResponse$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListTaskDefinitions</code> request. When the results of a <code>ListTaskDefinitions</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListTasksRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that hosts the tasks to list. If you do not specify a cluster, the default cluster is assumed..</p>",
+        "ListTasksRequest$containerInstance": "<p>The container instance ID or full Amazon Resource Name (ARN) of the container instance with which to filter the <code>ListTasks</code> results. Specifying a <code>containerInstance</code> limits the results to tasks that belong to that container instance.</p>",
+        "ListTasksRequest$family": "<p>The name of the family with which to filter the <code>ListTasks</code> results. Specifying a <code>family</code> limits the results to tasks that belong to that family.</p>",
+        "ListTasksRequest$nextToken": "<p>The <code>nextToken</code> value returned from a previous paginated <code>ListTasks</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. This value is <code>null</code> when there are no more results to return.</p>",
+        "ListTasksRequest$startedBy": "<p>The <code>startedBy</code> value with which to filter the task results. Specifying a <code>startedBy</code> value limits the results to tasks that were started with that value.</p>",
+        "ListTasksRequest$serviceName": "<p>The name of the service with which to filter the <code>ListTasks</code> results. Specifying a <code>serviceName</code> limits the results to tasks that belong to that service.</p>",
+        "ListTasksResponse$nextToken": "<p>The <code>nextToken</code> value to include in a future <code>ListTasks</code> request. When the results of a <code>ListTasks</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return.</p>",
+        "LoadBalancer$loadBalancerName": "<p>The name of the load balancer.</p>",
+        "LoadBalancer$containerName": "<p>The name of the container (as it appears in a container definition) to associate with the load balancer.</p>",
+        "LogConfigurationOptionsMap$key": null,
+        "LogConfigurationOptionsMap$value": null,
+        "MountPoint$sourceVolume": "<p>The name of the volume to mount.</p>",
+        "MountPoint$containerPath": "<p>The path on the container to mount the host volume at.</p>",
+        "NetworkBinding$bindIP": "<p>The IP address that the container is bound to on the container instance.</p>",
+        "RegisterContainerInstanceRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster with which to register your container instance. If you do not specify a cluster, the default cluster is assumed..</p>",
+        "RegisterContainerInstanceRequest$instanceIdentityDocument": "<p>The instance identity document for the EC2 instance to register. This document can be found by running the following command from the instance: <code>curl http://169.254.169.254/latest/dynamic/instance-identity/document/</code></p>",
+        "RegisterContainerInstanceRequest$instanceIdentityDocumentSignature": "<p>The instance identity document signature for the EC2 instance to register. This signature can be found by running the following command from the instance: <code>curl http://169.254.169.254/latest/dynamic/instance-identity/signature/</code></p>",
+        "RegisterContainerInstanceRequest$containerInstanceArn": "<p>The Amazon Resource Name (ARN) of the container instance (if it was previously registered).</p>",
+        "RegisterTaskDefinitionRequest$family": "<p>You must specify a <code>family</code> for a task definition, which allows you to track multiple versions of the same task definition. The <code>family</code> is used as a name for your task definition. Up to 255 letters (uppercase and lowercase), numbers, hyphens, and underscores are allowed.</p>",
+        "Resource$name": "<p>The name of the resource, such as <code>CPU</code>, <code>MEMORY</code>, <code>PORTS</code>, or a user-defined resource.</p>",
+        "Resource$type": "<p>The type of the resource, such as <code>INTEGER</code>, <code>DOUBLE</code>, <code>LONG</code>, or <code>STRINGSET</code>.</p>",
+        "RunTaskRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster on which to run your task. If you do not specify a cluster, the default cluster is assumed..</p>",
+        "RunTaskRequest$taskDefinition": "<p>The <code>family</code> and <code>revision</code> (<code>family:revision</code>) or full Amazon Resource Name (ARN) of the task definition to run. If a <code>revision</code> is not specified, the latest <code>ACTIVE</code> revision is used.</p>",
+        "RunTaskRequest$startedBy": "<p>An optional tag specified when a task is started. For example if you automatically trigger a task to run a batch process job, you could apply a unique identifier for that job to your task with the <code>startedBy</code> parameter. You can then identify which tasks belong to that job by filtering the results of a <a>ListTasks</a> call with the <code>startedBy</code> value.</p> <p>If a task is started by an Amazon ECS service, then the <code>startedBy</code> parameter contains the deployment ID of the service that starts it.</p>",
+        "ServerException$message": null,
+        "Service$serviceArn": "<p>The Amazon Resource Name (ARN) that identifies the service. The ARN contains the <code>arn:aws:ecs</code> namespace, followed by the region of the service, the AWS account ID of the service owner, the <code>service</code> namespace, and then the service name. For example, arn:aws:ecs:<i>region</i>:<i>012345678910</i>:service/<i>my-service</i>.</p>",
+        "Service$serviceName": "<p>The name of your service. Up to 255 letters (uppercase and lowercase), numbers, hyphens, and underscores are allowed. Service names must be unique within a cluster, but you can have similarly named services in multiple clusters within a region or across multiple regions.</p>",
+        "Service$clusterArn": "<p>The Amazon Resource Name (ARN) of the of the cluster that hosts the service.</p>",
+        "Service$status": "<p>The status of the service. The valid values are <code>ACTIVE</code>, <code>DRAINING</code>, or <code>INACTIVE</code>.</p>",
+        "Service$taskDefinition": "<p>The task definition to use for tasks in the service. This value is specified when the service is created with <a>CreateService</a>, and it can be modified with <a>UpdateService</a>.</p>",
+        "Service$roleArn": "<p>The Amazon Resource Name (ARN) of the IAM role associated with the service that allows the Amazon ECS container agent to register container instances with a load balancer. </p>",
+        "ServiceEvent$id": "<p>The ID string of the event.</p>",
+        "ServiceEvent$message": "<p>The event message.</p>",
+        "StartTaskRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster on which to start your task. If you do not specify a cluster, the default cluster is assumed..</p>",
+        "StartTaskRequest$taskDefinition": "<p>The <code>family</code> and <code>revision</code> (<code>family:revision</code>) or full Amazon Resource Name (ARN) of the task definition to start. If a <code>revision</code> is not specified, the latest <code>ACTIVE</code> revision is used.</p>",
+        "StartTaskRequest$startedBy": "<p>An optional tag specified when a task is started. For example if you automatically trigger a task to run a batch process job, you could apply a unique identifier for that job to your task with the <code>startedBy</code> parameter. You can then identify which tasks belong to that job by filtering the results of a <a>ListTasks</a> call with the <code>startedBy</code> value.</p> <p>If a task is started by an Amazon ECS service, then the <code>startedBy</code> parameter contains the deployment ID of the service that starts it.</p>",
+        "StopTaskRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that hosts the task to stop. If you do not specify a cluster, the default cluster is assumed..</p>",
+        "StopTaskRequest$task": "<p>The task ID or full Amazon Resource Name (ARN) entry of the task to stop.</p>",
+        "StopTaskRequest$reason": "<p>An optional message specified when a task is stopped. For example, if you are using a custom scheduler, you can use this parameter to specify the reason for stopping the task here, and the message will appear in subsequent <a>DescribeTasks</a> API operations on this task. Up to 255 characters are allowed in this message.</p>",
+        "StringList$member": null,
+        "SubmitContainerStateChangeRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that hosts the container.</p>",
+        "SubmitContainerStateChangeRequest$task": "<p>The task ID or full Amazon Resource Name (ARN) of the task that hosts the container.</p>",
+        "SubmitContainerStateChangeRequest$containerName": "<p>The name of the container.</p>",
+        "SubmitContainerStateChangeRequest$status": "<p>The status of the state change request.</p>",
+        "SubmitContainerStateChangeRequest$reason": "<p>The reason for the state change request.</p>",
+        "SubmitContainerStateChangeResponse$acknowledgment": "<p>Acknowledgement of the state change.</p>",
+        "SubmitTaskStateChangeRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that hosts the task.</p>",
+        "SubmitTaskStateChangeRequest$task": "<p>The task ID or full Amazon Resource Name (ARN) of the task in the state change request.</p>",
+        "SubmitTaskStateChangeRequest$status": "<p>The status of the state change request.</p>",
+        "SubmitTaskStateChangeRequest$reason": "<p>The reason for the state change request.</p>",
+        "SubmitTaskStateChangeResponse$acknowledgment": "<p>Acknowledgement of the state change.</p>",
+        "Task$taskArn": "<p>The Amazon Resource Name (ARN) of the task.</p>",
+        "Task$clusterArn": "<p>The Amazon Resource Name (ARN) of the of the cluster that hosts the task.</p>",
+        "Task$taskDefinitionArn": "<p>The Amazon Resource Name (ARN) of the of the task definition that creates the task.</p>",
+        "Task$containerInstanceArn": "<p>The Amazon Resource Name (ARN) of the container instances that host the task.</p>",
+        "Task$lastStatus": "<p>The last known status of the task.</p>",
+        "Task$desiredStatus": "<p>The desired status of the task.</p>",
+        "Task$startedBy": "<p>The tag specified when a task is started. If the task is started by an Amazon ECS service, then the <code>startedBy</code> parameter contains the deployment ID of the service that starts it.</p>",
+        "Task$stoppedReason": "<p>The reason the task was stopped.</p>",
+        "TaskDefinition$taskDefinitionArn": "<p>The full Amazon Resource Name (ARN) of the of the task definition.</p>",
+        "TaskDefinition$family": "<p>The family of your task definition, used as the definition name.</p>",
+        "UpdateContainerAgentRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that your container instance is running on. If you do not specify a cluster, the default cluster is assumed.</p>",
+        "UpdateContainerAgentRequest$containerInstance": "<p>The container instance ID or full Amazon Resource Name (ARN) entries for the container instance on which you would like to update the Amazon ECS container agent.</p>",
+        "UpdateServiceRequest$cluster": "<p>The short name or full Amazon Resource Name (ARN) of the cluster that your service is running on. If you do not specify a cluster, the default cluster is assumed.</p>",
+        "UpdateServiceRequest$service": "<p>The name of the service to update.</p>",
+        "UpdateServiceRequest$taskDefinition": "<p>The <code>family</code> and <code>revision</code> (<code>family:revision</code>) or full Amazon Resource Name (ARN) of the task definition to run in your service. If a <code>revision</code> is not specified, the latest <code>ACTIVE</code> revision is used. If you modify the task definition with <code>UpdateService</code>, Amazon ECS spawns a task with the new version of the task definition and then stops an old task after the new version is running.</p>",
+        "VersionInfo$agentVersion": "<p>The version number of the Amazon ECS container agent.</p>",
+        "VersionInfo$agentHash": "<p>The Git commit hash for the Amazon ECS container agent build on the <a href=\"https://github.com/aws/amazon-ecs-agent/commits/master\">amazon-ecs-agent </a> GitHub repository.</p>",
+        "VersionInfo$dockerVersion": "<p>The Docker version running on the container instance.</p>",
+        "Volume$name": "<p>The name of the volume. Up to 255 letters (uppercase and lowercase), numbers, hyphens, and underscores are allowed. This name is referenced in the <code>sourceVolume</code> parameter of container definition <code>mountPoints</code>.</p>",
+        "VolumeFrom$sourceContainer": "<p>The name of the container to mount volumes from.</p>"
+      }
+    },
+    "StringList": {
+      "base": null,
+      "refs": {
+        "ContainerDefinition$links": "<p>The <code>link</code> parameter allows containers to communicate with each other without the need for port mappings, using the <code>name</code> parameter and optionally, an <code>alias</code> for the link. This construct is analogous to <code>name:alias</code> in Docker links. Up to 255 letters (uppercase and lowercase), numbers, hyphens, and underscores are allowed for each <code>name</code> and <code>alias</code>. For more information on linking Docker containers, see <a href=\"https://docs.docker.com/userguide/dockerlinks/\">https://docs.docker.com/userguide/dockerlinks/</a>. This parameter maps to <code>Links</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--link</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\"><code>docker run</code></a>.</p> <important> <p>Containers that are collocated on a single container instance may be able to communicate with each other without requiring links or host port mappings. Network isolation is achieved on the container instance using security groups and VPC settings.</p> </important>",
+        "ContainerDefinition$entryPoint": "<important> <p>Early versions of the Amazon ECS container agent do not properly handle <code>entryPoint</code> parameters. If you have problems using <code>entryPoint</code>, update your container agent or enter your commands and arguments as <code>command</code> array items instead.</p> </important> <p>The entry point that is passed to the container. This parameter maps to <code>Entrypoint</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--entrypoint</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>. For more information, see <a href=\"https://docs.docker.com/reference/builder/#entrypoint\">https://docs.docker.com/reference/builder/#entrypoint</a>.</p>",
+        "ContainerDefinition$command": "<p>The command that is passed to the container. This parameter maps to <code>Cmd</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>COMMAND</code> parameter to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>. For more information, see <a href=\"https://docs.docker.com/reference/builder/#cmd\">https://docs.docker.com/reference/builder/#cmd</a>.</p>",
+        "ContainerDefinition$dnsServers": "<p>A list of DNS servers that are presented to the container. This parameter maps to <code>Dns</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--dns</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>",
+        "ContainerDefinition$dnsSearchDomains": "<p>A list of DNS search domains that are presented to the container. This parameter maps to <code>DnsSearch</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--dns-search</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>",
+        "ContainerDefinition$dockerSecurityOptions": "<p>A list of strings to provide custom labels for SELinux and AppArmor multi-level security systems. This parameter maps to <code>SecurityOpt</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--security-opt</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p> <note> <p>The Amazon ECS container agent running on a container instance must register with the <code>ECS_SELINUX_CAPABLE=true</code> or <code>ECS_APPARMOR_CAPABLE=true</code> environment variables before containers placed on that instance can use these security options. For more information, see <a href=\"http://docs.aws.amazon.com/AmazonECS/latest/developerguide/developerguide/ecs-agent-config.html\">Amazon ECS Container Agent Configuration</a> in the <i>Amazon EC2 Container Service Developer Guide</i>.</p> </note>",
+        "ContainerOverride$command": "<p>The command to send to the container that overrides the default command from the Docker image or the task definition.</p>",
+        "DescribeClustersRequest$clusters": "<p>A space-separated list of cluster names or full cluster Amazon Resource Name (ARN) entries. If you do not specify a cluster, the default cluster is assumed.</p>",
+        "DescribeContainerInstancesRequest$containerInstances": "<p>A space-separated list of container instance IDs or full Amazon Resource Name (ARN) entries.</p>",
+        "DescribeServicesRequest$services": "<p>A list of services to describe.</p>",
+        "DescribeTasksRequest$tasks": "<p>A space-separated list of task IDs or full Amazon Resource Name (ARN) entries.</p>",
+        "ListClustersResponse$clusterArns": "<p>The list of full Amazon Resource Name (ARN) entries for each cluster associated with your account.</p>",
+        "ListContainerInstancesResponse$containerInstanceArns": "<p>The list of container instances with full Amazon Resource Name (ARN) entries for each container instance associated with the specified cluster.</p>",
+        "ListServicesResponse$serviceArns": "<p>The list of full Amazon Resource Name (ARN) entries for each service associated with the specified cluster.</p>",
+        "ListTaskDefinitionFamiliesResponse$families": "<p>The list of task definition family names that match the <code>ListTaskDefinitionFamilies</code> request.</p>",
+        "ListTaskDefinitionsResponse$taskDefinitionArns": "<p>The list of task definition Amazon Resource Name (ARN) entries for the <code>ListTaskDefinitions</code> request.</p>",
+        "ListTasksResponse$taskArns": "<p>The list of task Amazon Resource Name (ARN) entries for the <code>ListTasks</code> request.</p>",
+        "Resource$stringSetValue": "<p>When the <code>stringSetValue</code> type is set, the value of the resource must be a string type.</p>",
+        "StartTaskRequest$containerInstances": "<p>The container instance IDs or full Amazon Resource Name (ARN) entries for the container instances on which you would like to place your task.</p> <important> <p>The list of container instances to start tasks on is limited to 10.</p> </important>"
+      }
+    },
+    "SubmitContainerStateChangeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SubmitContainerStateChangeResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SubmitTaskStateChangeRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SubmitTaskStateChangeResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Task": {
+      "base": "<p>Details on a task in a cluster.</p>",
+      "refs": {
+        "StopTaskResponse$task": null,
+        "Tasks$member": null
+      }
+    },
+    "TaskDefinition": {
+      "base": "<p>Details of a task definition.</p>",
+      "refs": {
+        "DeregisterTaskDefinitionResponse$taskDefinition": "<p>The full description of the deregistered task.</p>",
+        "DescribeTaskDefinitionResponse$taskDefinition": "<p>The full task definition description.</p>",
+        "RegisterTaskDefinitionResponse$taskDefinition": "<p>The full description of the registered task definition.</p>"
+      }
+    },
+    "TaskDefinitionStatus": {
+      "base": null,
+      "refs": {
+        "ListTaskDefinitionsRequest$status": "<p>The task definition status with which to filter the <code>ListTaskDefinitions</code> results. By default, only <code>ACTIVE</code> task definitions are listed. By setting this parameter to <code>INACTIVE</code>, you can view task definitions that are <code>INACTIVE</code> as long as an active task or service still references them. If you paginate the resulting output, be sure to keep the <code>status</code> value constant in each subsequent request.</p>",
+        "TaskDefinition$status": "<p>The status of the task definition.</p>"
+      }
+    },
+    "TaskOverride": {
+      "base": "<p>The overrides associated with a task.</p>",
+      "refs": {
+        "RunTaskRequest$overrides": "<p>A list of container overrides in JSON format that specify the name of a container in the specified task definition and the overrides it should receive. You can override the default command for a container (that is specified in the task definition or Docker image) with a <code>command</code> override. You can also override existing environment variables (that are specified in the task definition or Docker image) on a container or add new environment variables to it with an <code>environment</code> override.</p> <note> <p>A total of 8192 characters are allowed for overrides. This limit includes the JSON formatting characters of the override structure.</p> </note>",
+        "StartTaskRequest$overrides": "<p>A list of container overrides in JSON format that specify the name of a container in the specified task definition and the overrides it should receive. You can override the default command for a container (that is specified in the task definition or Docker image) with a <code>command</code> override. You can also override existing environment variables (that are specified in the task definition or Docker image) on a container or add new environment variables to it with an <code>environment</code> override.</p> <note> <p>A total of 8192 characters are allowed for overrides. This limit includes the JSON formatting characters of the override structure.</p> </note>",
+        "Task$overrides": "<p>One or more container overrides.</p>"
+      }
+    },
+    "Tasks": {
+      "base": null,
+      "refs": {
+        "DescribeTasksResponse$tasks": "<p>The list of tasks.</p>",
+        "RunTaskResponse$tasks": "<p>A full description of the tasks that were run. Each task that was successfully placed on your cluster are described here.</p>",
+        "StartTaskResponse$tasks": "<p>A full description of the tasks that were started. Each task that was successfully placed on your container instances are described here.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "Deployment$createdAt": "<p>The Unix time in seconds and milliseconds when the service was created.</p>",
+        "Deployment$updatedAt": "<p>The Unix time in seconds and milliseconds when the service was last updated.</p>",
+        "ServiceEvent$createdAt": "<p>The Unix time in seconds and milliseconds when the event was triggered.</p>",
+        "Task$createdAt": "<p>The Unix time in seconds and milliseconds when the task was created (the task entered the <code>PENDING</code> state).</p>",
+        "Task$startedAt": "<p>The Unix time in seconds and milliseconds when the task was started (the task transitioned from the <code>PENDING</code> state to the <code>RUNNING</code> state).</p>",
+        "Task$stoppedAt": "<p>The Unix time in seconds and milliseconds when the task was stopped (the task transitioned from the <code>RUNNING</code> state to the <code>STOPPED</code> state).</p>"
+      }
+    },
+    "TransportProtocol": {
+      "base": null,
+      "refs": {
+        "NetworkBinding$protocol": "<p>The protocol used for the network binding.</p>",
+        "PortMapping$protocol": "<p>The protocol used for the port mapping. Valid values are <code>tcp</code> and <code>udp</code>. The default is <code>tcp</code>.</p>"
+      }
+    },
+    "Ulimit": {
+      "base": "<p>The <code>ulimit</code> settings to pass to the container.</p>",
+      "refs": {
+        "UlimitList$member": null
+      }
+    },
+    "UlimitList": {
+      "base": null,
+      "refs": {
+        "ContainerDefinition$ulimits": "<p>A list of <code>ulimits</code> to set in the container. This parameter maps to <code>Ulimits</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--ulimit</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>. Valid naming values are displayed in the <a>Ulimit</a> data type. This parameter requires version 1.18 of the Docker Remote API or greater on your container instance. To check the Docker Remote API version on your container instance, log into your container instance and run the following command: <code>sudo docker version | grep \"Server API version\"</code></p>"
+      }
+    },
+    "UlimitName": {
+      "base": null,
+      "refs": {
+        "Ulimit$name": "<p>The <code>type</code> of the <code>ulimit</code>.</p>"
+      }
+    },
+    "UpdateContainerAgentRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateContainerAgentResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateInProgressException": {
+      "base": "<p>There is already a current Amazon ECS container agent update in progress on the specified container instance. If the container agent becomes disconnected while it is in a transitional stage, such as <code>PENDING</code> or <code>STAGING</code>, the update process can get stuck in that state. However, when the agent reconnects, it resumes where it stopped previously.</p>",
+      "refs": {
+      }
+    },
+    "UpdateServiceRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateServiceResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VersionInfo": {
+      "base": "<p>The Docker and Amazon ECS container agent version information about a container instance.</p>",
+      "refs": {
+        "ContainerInstance$versionInfo": "<p>The version information for the Amazon ECS container agent and Docker daemon running on the container instance.</p>",
+        "RegisterContainerInstanceRequest$versionInfo": "<p>The version information for the Amazon ECS container agent and Docker daemon running on the container instance.</p>"
+      }
+    },
+    "Volume": {
+      "base": "<p>A data volume used in a task definition.</p>",
+      "refs": {
+        "VolumeList$member": null
+      }
+    },
+    "VolumeFrom": {
+      "base": "<p>Details on a data volume from another container.</p>",
+      "refs": {
+        "VolumeFromList$member": null
+      }
+    },
+    "VolumeFromList": {
+      "base": null,
+      "refs": {
+        "ContainerDefinition$volumesFrom": "<p>Data volumes to mount from another container. This parameter maps to <code>VolumesFrom</code> in the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/#create-a-container\">Create a container</a> section of the <a href=\"https://docs.docker.com/reference/api/docker_remote_api_v1.19/\">Docker Remote API</a> and the <code>--volumes-from</code> option to <a href=\"https://docs.docker.com/reference/commandline/run/\">docker run</a>.</p>"
+      }
+    },
+    "VolumeList": {
+      "base": null,
+      "refs": {
+        "RegisterTaskDefinitionRequest$volumes": "<p>A list of volume definitions in JSON format that containers in your task may use.</p>",
+        "TaskDefinition$volumes": "<p>The list of volumes in a task. For more information about volume definition parameters and defaults, see <a href=\"http://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_defintions.html\">Amazon ECS Task Definitions</a> in the <i>Amazon EC2 Container Service Developer Guide</i>.</p>"
+      }
+    }
+  }
+}

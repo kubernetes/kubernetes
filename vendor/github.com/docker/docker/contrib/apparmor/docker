@@ -1,0 +1,25 @@
+#include <tunables/global>
+
+profile docker-default flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  network,
+  capability,
+  file,
+  umount,
+
+  deny @{PROC}/sys/fs/** wklx,
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/sys/kernel/[^s][^h][^m]* wklx,
+  deny @{PROC}/sys/kernel/*/** wklx,
+
+  deny mount,
+
+  deny /sys/[^f]*/** wklx,
+  deny /sys/f[^s]*/** wklx,
+  deny /sys/fs/[^c]*/** wklx,
+  deny /sys/fs/c[^g]*/** wklx,
+  deny /sys/fs/cg[^r]*/** wklx,
+  deny /sys/firmware/efi/efivars/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+}

@@ -1,0 +1,1052 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/Q2Fm4OHaHKaTfeWzlGIBAoc7BO8\"",
+ "discoveryVersion": "v1",
+ "id": "resourceviews:v1beta2",
+ "name": "resourceviews",
+ "version": "v1beta2",
+ "revision": "20150708",
+ "title": "Google Compute Engine Instance Groups API",
+ "description": "The Resource View API allows users to create and manage logical sets of Google Compute Engine instances.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/compute/",
+ "labels": [
+  "limited_availability"
+ ],
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/resourceviews/v1beta2/projects/",
+ "basePath": "/resourceviews/v1beta2/projects/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "resourceviews/v1beta2/projects/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/cloud-platform": {
+     "description": "View and manage your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/cloud-platform.read-only": {
+     "description": "View your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/compute": {
+     "description": "View and manage your Google Compute Engine resources"
+    },
+    "https://www.googleapis.com/auth/compute.readonly": {
+     "description": "View your Google Compute Engine resources"
+    },
+    "https://www.googleapis.com/auth/ndev.cloudman": {
+     "description": "View and manage your Google Cloud Platform management resources and deployment status information"
+    },
+    "https://www.googleapis.com/auth/ndev.cloudman.readonly": {
+     "description": "View your Google Cloud Platform management resources and deployment status information"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Label": {
+   "id": "Label",
+   "type": "object",
+   "description": "The Label to be applied to the resource views.",
+   "properties": {
+    "key": {
+     "type": "string",
+     "description": "Key of the label."
+    },
+    "value": {
+     "type": "string",
+     "description": "Value of the label."
+    }
+   }
+  },
+  "ListResourceResponseItem": {
+   "id": "ListResourceResponseItem",
+   "type": "object",
+   "description": "The list response item that contains the resource and end points information.",
+   "properties": {
+    "endpoints": {
+     "type": "object",
+     "description": "The list of service end points on the resource.",
+     "additionalProperties": {
+      "type": "array",
+      "description": "The name of the service end point.",
+      "items": {
+       "type": "integer",
+       "format": "int32"
+      }
+     }
+    },
+    "resource": {
+     "type": "string",
+     "description": "The full URL of the resource."
+    }
+   }
+  },
+  "Operation": {
+   "id": "Operation",
+   "type": "object",
+   "description": "An operation resource, used to manage asynchronous API requests.",
+   "properties": {
+    "clientOperationId": {
+     "type": "string",
+     "description": "[Output only] An optional identifier specified by the client when the mutation was initiated. Must be unique for all operation resources in the project."
+    },
+    "creationTimestamp": {
+     "type": "string",
+     "description": "[Output Only] The time that this operation was requested, in RFC3339 text format."
+    },
+    "endTime": {
+     "type": "string",
+     "description": "[Output Only] The time that this operation was completed, in RFC3339 text format."
+    },
+    "error": {
+     "type": "object",
+     "description": "[Output Only] If errors occurred during processing of this operation, this field will be populated.",
+     "properties": {
+      "errors": {
+       "type": "array",
+       "description": "[Output Only] The array of errors encountered while processing this operation.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "code": {
+          "type": "string",
+          "description": "[Output Only] The error type identifier for this error."
+         },
+         "location": {
+          "type": "string",
+          "description": "[Output Only] Indicates the field in the request which caused the error. This property is optional."
+         },
+         "message": {
+          "type": "string",
+          "description": "[Output Only] An optional, human-readable error message."
+         }
+        }
+       }
+      }
+     }
+    },
+    "httpErrorMessage": {
+     "type": "string",
+     "description": "[Output only] If operation fails, the HTTP error message returned."
+    },
+    "httpErrorStatusCode": {
+     "type": "integer",
+     "description": "[Output only] If operation fails, the HTTP error status code returned.",
+     "format": "int32"
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output Only] Unique identifier for the resource, generated by the server.",
+     "format": "uint64"
+    },
+    "insertTime": {
+     "type": "string",
+     "description": "[Output Only] The time that this operation was requested, in RFC3339 text format."
+    },
+    "kind": {
+     "type": "string",
+     "description": "[Output only] Type of the resource.",
+     "default": "resourceviews#operation"
+    },
+    "name": {
+     "type": "string",
+     "description": "[Output Only] Name of the resource."
+    },
+    "operationType": {
+     "type": "string",
+     "description": "[Output only] Type of the operation. Operations include insert, update, and delete."
+    },
+    "progress": {
+     "type": "integer",
+     "description": "[Output only] An optional progress indicator that ranges from 0 to 100. There is no requirement that this be linear or support any granularity of operations. This should not be used to guess at when the operation will be complete. This number should be monotonically increasing as the operation progresses.",
+     "format": "int32"
+    },
+    "region": {
+     "type": "string",
+     "description": "[Output Only] URL of the region where the operation resides. Only available when performing regional operations."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output Only] Server-defined fully-qualified URL for this resource."
+    },
+    "startTime": {
+     "type": "string",
+     "description": "[Output Only] The time that this operation was started by the server, in RFC3339 text format."
+    },
+    "status": {
+     "type": "string",
+     "description": "[Output Only] Status of the operation."
+    },
+    "statusMessage": {
+     "type": "string",
+     "description": "[Output Only] An optional textual description of the current status of the operation."
+    },
+    "targetId": {
+     "type": "string",
+     "description": "[Output Only] Unique target ID which identifies a particular incarnation of the target.",
+     "format": "uint64"
+    },
+    "targetLink": {
+     "type": "string",
+     "description": "[Output only] URL of the resource the operation is mutating."
+    },
+    "user": {
+     "type": "string",
+     "description": "[Output Only] User who requested the operation, for example: user@example.com."
+    },
+    "warnings": {
+     "type": "array",
+     "description": "[Output Only] If there are issues with this operation, a warning is returned.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "[Output only] The warning type identifier for this warning."
+       },
+       "data": {
+        "type": "array",
+        "description": "[Output only] Metadata for this warning in key:value format.",
+        "items": {
+         "type": "object",
+         "properties": {
+          "key": {
+           "type": "string",
+           "description": "[Output Only] Metadata key for this warning."
+          },
+          "value": {
+           "type": "string",
+           "description": "[Output Only] Metadata value for this warning."
+          }
+         }
+        }
+       },
+       "message": {
+        "type": "string",
+        "description": "[Output only] Optional human-readable details for this warning."
+       }
+      }
+     }
+    },
+    "zone": {
+     "type": "string",
+     "description": "[Output Only] URL of the zone where the operation resides. Only available when performing per-zone operations."
+    }
+   }
+  },
+  "OperationList": {
+   "id": "OperationList",
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Unique identifier for the resource; defined by the server (output only)."
+    },
+    "items": {
+     "type": "array",
+     "description": "The operation resources.",
+     "items": {
+      "$ref": "Operation"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Type of resource.",
+     "default": "resourceviews#operationList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token used to continue a truncated list request (output only)."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Server defined URL for this resource (output only)."
+    }
+   }
+  },
+  "ResourceView": {
+   "id": "ResourceView",
+   "type": "object",
+   "description": "The resource view object.",
+   "properties": {
+    "creationTimestamp": {
+     "type": "string",
+     "description": "The creation time of the resource view."
+    },
+    "description": {
+     "type": "string",
+     "description": "The detailed description of the resource view."
+    },
+    "endpoints": {
+     "type": "array",
+     "description": "Services endpoint information.",
+     "items": {
+      "$ref": "ServiceEndpoint"
+     }
+    },
+    "fingerprint": {
+     "type": "string",
+     "description": "The fingerprint of the service endpoint information."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output Only] The ID of the resource view."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Type of the resource.",
+     "default": "resourceviews#resourceView"
+    },
+    "labels": {
+     "type": "array",
+     "description": "The labels for events.",
+     "items": {
+      "$ref": "Label"
+     }
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the resource view."
+    },
+    "network": {
+     "type": "string",
+     "description": "The URL of a Compute Engine network to which the resources in the view belong."
+    },
+    "resources": {
+     "type": "array",
+     "description": "A list of all resources in the resource view.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output Only] A self-link to the resource view."
+    },
+    "size": {
+     "type": "integer",
+     "description": "The total number of resources in the resource view.",
+     "format": "uint32"
+    }
+   }
+  },
+  "ServiceEndpoint": {
+   "id": "ServiceEndpoint",
+   "type": "object",
+   "description": "The service endpoint that may be started in a VM.",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "The name of the service endpoint."
+    },
+    "port": {
+     "type": "integer",
+     "description": "The port of the service endpoint.",
+     "format": "int32"
+    }
+   }
+  },
+  "ZoneViewsAddResourcesRequest": {
+   "id": "ZoneViewsAddResourcesRequest",
+   "type": "object",
+   "description": "The request to add resources to the resource view.",
+   "properties": {
+    "resources": {
+     "type": "array",
+     "description": "The list of resources to be added.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "ZoneViewsGetServiceResponse": {
+   "id": "ZoneViewsGetServiceResponse",
+   "type": "object",
+   "properties": {
+    "endpoints": {
+     "type": "array",
+     "description": "The service information.",
+     "items": {
+      "$ref": "ServiceEndpoint"
+     }
+    },
+    "fingerprint": {
+     "type": "string",
+     "description": "The fingerprint of the service information."
+    }
+   }
+  },
+  "ZoneViewsList": {
+   "id": "ZoneViewsList",
+   "type": "object",
+   "description": "The response to a list request.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The result that contains all resource views that meet the criteria.",
+     "items": {
+      "$ref": "ResourceView"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Type of resource.",
+     "default": "resourceviews#zoneViewsList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token used for pagination."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Server defined URL for this resource (output only)."
+    }
+   }
+  },
+  "ZoneViewsListResourcesResponse": {
+   "id": "ZoneViewsListResourcesResponse",
+   "type": "object",
+   "description": "The response to a list resource request.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The formatted JSON that is requested by the user.",
+     "items": {
+      "$ref": "ListResourceResponseItem"
+     }
+    },
+    "network": {
+     "type": "string",
+     "description": "The URL of a Compute Engine network to which the resources in the view belong."
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token used for pagination."
+    }
+   }
+  },
+  "ZoneViewsRemoveResourcesRequest": {
+   "id": "ZoneViewsRemoveResourcesRequest",
+   "type": "object",
+   "description": "The request to remove resources from the resource view.",
+   "properties": {
+    "resources": {
+     "type": "array",
+     "description": "The list of resources to be removed.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "ZoneViewsSetServiceRequest": {
+   "id": "ZoneViewsSetServiceRequest",
+   "type": "object",
+   "properties": {
+    "endpoints": {
+     "type": "array",
+     "description": "The service information to be updated.",
+     "items": {
+      "$ref": "ServiceEndpoint"
+     }
+    },
+    "fingerprint": {
+     "type": "string",
+     "description": "Fingerprint of the service information; a hash of the contents. This field is used for optimistic locking when updating the service entries."
+    },
+    "resourceName": {
+     "type": "string",
+     "description": "The name of the resource if user wants to update the service information of the resource."
+    }
+   }
+  }
+ },
+ "resources": {
+  "zoneOperations": {
+   "methods": {
+    "get": {
+     "id": "resourceviews.zoneOperations.get",
+     "path": "{project}/zones/{zone}/operations/{operation}",
+     "httpMethod": "GET",
+     "description": "Retrieves the specified zone-specific operation resource.",
+     "parameters": {
+      "operation": {
+       "type": "string",
+       "description": "Name of the operation resource to return.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "Name of the zone scoping this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "operation"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "list": {
+     "id": "resourceviews.zoneOperations.list",
+     "path": "{project}/zones/{zone}/operations",
+     "httpMethod": "GET",
+     "description": "Retrieves the list of operation resources contained within the specified zone.",
+     "parameters": {
+      "filter": {
+       "type": "string",
+       "description": "Optional. Filter expression for filtering listed resources.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Optional. Maximum count of results to be returned. Maximum value is 500 and default value is 500.",
+       "default": "500",
+       "format": "uint32",
+       "minimum": "0",
+       "maximum": "500",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Optional. Tag returned by a previous list request truncated by maxResults. Used to continue a previous list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "Name of the zone scoping this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone"
+     ],
+     "response": {
+      "$ref": "OperationList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    }
+   }
+  },
+  "zoneViews": {
+   "methods": {
+    "addResources": {
+     "id": "resourceviews.zoneViews.addResources",
+     "path": "{project}/zones/{zone}/resourceViews/{resourceView}/addResources",
+     "httpMethod": "POST",
+     "description": "Add resources to the view.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The project name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "resourceView": {
+       "type": "string",
+       "description": "The name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The zone name of the resource view.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "resourceView"
+     ],
+     "request": {
+      "$ref": "ZoneViewsAddResourcesRequest"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "delete": {
+     "id": "resourceviews.zoneViews.delete",
+     "path": "{project}/zones/{zone}/resourceViews/{resourceView}",
+     "httpMethod": "DELETE",
+     "description": "Delete a resource view.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The project name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "resourceView": {
+       "type": "string",
+       "description": "The name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The zone name of the resource view.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "resourceView"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "get": {
+     "id": "resourceviews.zoneViews.get",
+     "path": "{project}/zones/{zone}/resourceViews/{resourceView}",
+     "httpMethod": "GET",
+     "description": "Get the information of a zonal resource view.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The project name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "resourceView": {
+       "type": "string",
+       "description": "The name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The zone name of the resource view.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "resourceView"
+     ],
+     "response": {
+      "$ref": "ResourceView"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "getService": {
+     "id": "resourceviews.zoneViews.getService",
+     "path": "{project}/zones/{zone}/resourceViews/{resourceView}/getService",
+     "httpMethod": "POST",
+     "description": "Get the service information of a resource view or a resource.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The project name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "resourceName": {
+       "type": "string",
+       "description": "The name of the resource if user wants to get the service information of the resource.",
+       "location": "query"
+      },
+      "resourceView": {
+       "type": "string",
+       "description": "The name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The zone name of the resource view.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "resourceView"
+     ],
+     "response": {
+      "$ref": "ZoneViewsGetServiceResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "insert": {
+     "id": "resourceviews.zoneViews.insert",
+     "path": "{project}/zones/{zone}/resourceViews",
+     "httpMethod": "POST",
+     "description": "Create a resource view.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The project name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The zone name of the resource view.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone"
+     ],
+     "request": {
+      "$ref": "ResourceView"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "list": {
+     "id": "resourceviews.zoneViews.list",
+     "path": "{project}/zones/{zone}/resourceViews",
+     "httpMethod": "GET",
+     "description": "List resource views.",
+     "parameters": {
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum count of results to be returned. Acceptable values are 0 to 5000, inclusive. (Default: 5000)",
+       "default": "5000",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "5000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Specifies a nextPageToken returned by a previous list request. This token can be used to request the next page of results from a previous list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "The project name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The zone name of the resource view.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone"
+     ],
+     "response": {
+      "$ref": "ZoneViewsList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "listResources": {
+     "id": "resourceviews.zoneViews.listResources",
+     "path": "{project}/zones/{zone}/resourceViews/{resourceView}/resources",
+     "httpMethod": "GET",
+     "description": "List the resources of the resource view.",
+     "parameters": {
+      "format": {
+       "type": "string",
+       "description": "The requested format of the return value. It can be URL or URL_PORT. A JSON object will be included in the response based on the format. The default format is NONE, which results in no JSON in the response.",
+       "enum": [
+        "NONE",
+        "URL",
+        "URL_PORT"
+       ],
+       "enumDescriptions": [
+        "",
+        "",
+        ""
+       ],
+       "location": "query"
+      },
+      "listState": {
+       "type": "string",
+       "description": "The state of the instance to list. By default, it lists all instances.",
+       "default": "ALL",
+       "enum": [
+        "ALL",
+        "RUNNING"
+       ],
+       "enumDescriptions": [
+        "",
+        ""
+       ],
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum count of results to be returned. Acceptable values are 0 to 5000, inclusive. (Default: 5000)",
+       "default": "5000",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "5000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Specifies a nextPageToken returned by a previous list request. This token can be used to request the next page of results from a previous list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "The project name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "resourceView": {
+       "type": "string",
+       "description": "The name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "serviceName": {
+       "type": "string",
+       "description": "The service name to return in the response. It is optional and if it is not set, all the service end points will be returned.",
+       "location": "query"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The zone name of the resource view.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "resourceView"
+     ],
+     "response": {
+      "$ref": "ZoneViewsListResourcesResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/cloud-platform.read-only",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly",
+      "https://www.googleapis.com/auth/ndev.cloudman",
+      "https://www.googleapis.com/auth/ndev.cloudman.readonly"
+     ]
+    },
+    "removeResources": {
+     "id": "resourceviews.zoneViews.removeResources",
+     "path": "{project}/zones/{zone}/resourceViews/{resourceView}/removeResources",
+     "httpMethod": "POST",
+     "description": "Remove resources from the view.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The project name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "resourceView": {
+       "type": "string",
+       "description": "The name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The zone name of the resource view.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "resourceView"
+     ],
+     "request": {
+      "$ref": "ZoneViewsRemoveResourcesRequest"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    },
+    "setService": {
+     "id": "resourceviews.zoneViews.setService",
+     "path": "{project}/zones/{zone}/resourceViews/{resourceView}/setService",
+     "httpMethod": "POST",
+     "description": "Update the service information of a resource view or a resource.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "The project name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "resourceView": {
+       "type": "string",
+       "description": "The name of the resource view.",
+       "required": true,
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The zone name of the resource view.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "resourceView"
+     ],
+     "request": {
+      "$ref": "ZoneViewsSetServiceRequest"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/ndev.cloudman"
+     ]
+    }
+   }
+  }
+ }
+}

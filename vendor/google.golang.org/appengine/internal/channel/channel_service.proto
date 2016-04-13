@@ -1,0 +1,30 @@
+syntax = "proto2";
+option go_package = "channel";
+
+package appengine;
+
+message ChannelServiceError {
+  enum ErrorCode {
+    OK = 0;
+    INTERNAL_ERROR = 1;
+    INVALID_CHANNEL_KEY = 2;
+    BAD_MESSAGE = 3;
+    INVALID_CHANNEL_TOKEN_DURATION = 4;
+    APPID_ALIAS_REQUIRED = 5;
+  }
+}
+
+message CreateChannelRequest {
+  required string application_key = 1;
+  optional int32 duration_minutes = 2;
+}
+
+message CreateChannelResponse {
+  optional string token = 2;
+  optional int32 duration_minutes = 3;
+}
+
+message SendMessageRequest {
+  required string application_key = 1;
+  required string message = 2;
+}

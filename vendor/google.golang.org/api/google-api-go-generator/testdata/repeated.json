@@ -1,0 +1,65 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/3m5rB86FE5KuW1K3jAl88AxCreg\"",
+ "discoveryVersion": "v1",
+ "id": "repeated:v1",
+ "name": "repeated",
+ "version": "v1",
+ "title": "Example API",
+ "description": "The Example API demonstrates repeated fields.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "protocol": "rest",
+ "schemas": {
+ },
+ "resources": {
+  "accounts": {
+   "resources": {
+    "reports": {
+     "methods": {
+      "generate": {
+       "id": "adsense.accounts.reports.generate",
+       "path": "accounts/{accountId}/reports",
+       "httpMethod": "GET",
+       "description": "Generate an AdSense report based on the report request sent in the query parameters. Returns the result as JSON; to retrieve output in CSV format specify \"alt=csv\" as a query parameter.",
+       "parameters": {
+        "accountId": {
+         "type": "string",
+         "description": "Account upon which to report.",
+         "required": true,
+         "location": "path"
+        },
+        "currency": {
+         "type": "string",
+         "description": "Optional currency to use when reporting on monetary metrics. Defaults to the account's currency if not set.",
+         "pattern": "[a-zA-Z]+",
+         "location": "query"
+        },
+        "ids": {
+         "type": "string",
+         "description": "Select only user profiles with these IDs.",
+         "format": "int64",
+         "repeated": true,
+         "location": "query"
+        },
+        "dimension": {
+         "type": "string",
+         "description": "Dimensions to base the report on.",
+         "pattern": "[a-zA-Z_]+",
+         "repeated": true,
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "ids",
+        "currency",
+        "accountId",
+        "dimension"
+       ]
+      }
+     }
+    }
+   }
+  }
+ }
+}

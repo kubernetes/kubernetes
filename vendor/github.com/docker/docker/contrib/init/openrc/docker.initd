@@ -1,0 +1,34 @@
+#!/sbin/runscript
+# Copyright 1999-2013 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License v2
+# $Header: $
+
+DOCKER_LOGFILE=${DOCKER_LOGFILE:-/var/log/${SVCNAME}.log}
+DOCKER_PIDFILE=${DOCKER_PIDFILE:-/run/${SVCNAME}.pid}
+DOCKER_BINARY=${DOCKER_BINARY:-/usr/bin/docker}
+DOCKER_OPTS=${DOCKER_OPTS:-}
+
+start() {
+	checkpath -f -m 0644 -o root:docker "$DOCKER_LOGFILE"
+
+	ulimit -n 1048576
+	ulimit -u 1048576
+
+	ebegin "Starting docker daemon"
+	start-stop-daemon --start --background \
+		--exec "$DOCKER_BINARY" \
+		--pidfile "$DOCKER_PIDFILE" \
+		--stdout "$DOCKER_LOGFILE" \
+		--stderr "$DOCKER_LOGFILE" \
+		-- -d -p "$DOCKER_PIDFILE" \
+		$DOCKER_OPTS
+	eend $?
+}
+
+stop() {
+	ebegin "Stopping docker daemon"
+	start-stop-daemon --stop \
+		--exec "$DOCKER_BINARY" \
+		--pidfile "$DOCKER_PIDFILE"
+	eend $?
+}

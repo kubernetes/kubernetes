@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+#
+# Needs to be run from Mageia 4 or greater for kernel support for docker.
+#
+# Mageia 4 does not have docker available in official repos, so please
+# install and run the docker binary manually.
+#
+# Tested working versions are for Mageia 2 onwards (inc. cauldron).
+#
+set -e
+
+rootfsDir="$1"
+shift
+
+optTemp=$(getopt --options '+v:,m:' --longoptions 'version:,mirror:' --name mageia-urpmi -- "$@")
+eval set -- "$optTemp"
+unset optTemp
+
+installversion=
+mirror=
+while true; do
+	case "$1" in
+		-v|--version) installversion="$2" ; shift 2 ;;
+		-m|--mirror) mirror="$2" ; shift 2 ;;
+		--) shift ; break ;;
+	esac
+done
+
+if [ -z $installversion ]; then
+	# Attempt to match host version
+	if [ -r /etc/mageia-release ]; then
+		installversion="$(sed 's/^[^0-9\]*\([0-9.]\+\).*$/\1/' /etc/mageia-release)"
+	else
+		echo "Error: no version supplied and unable to detect host mageia version"
+		exit 1
+	fi
+fi
+
+if [ -z $mirror ]; then
+	# No mirror provided, default to mirrorlist
+	mirror="--mirrorlist https://mirrors.mageia.org/api/mageia.$installversion.x86_64.list"
+fi
+
+(
+	set -x
+	urpmi.addmedia --distrib \
+		$mirror \
+		--urpmi-root "$rootfsDir"
+	urpmi basesystem-minimal urpmi \
+		--auto \
+		--no-suggests \
+		--urpmi-root "$rootfsDir" \
+		--root "$rootfsDir"
+)
+
+"$(dirname "$BASH_SOURCE")/.febootstrap-minimize" "$rootfsDir"
+
+if [ -d "$rootfsDir/etc/sysconfig" ]; then
+	# allow networking init scripts inside the container to work without extra steps
+	echo 'NETWORKING=yes' > "$rootfsDir/etc/sysconfig/network"
+fi

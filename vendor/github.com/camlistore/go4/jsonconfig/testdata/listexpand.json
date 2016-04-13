@@ -1,0 +1,4 @@
+{
+  "list": ["foo", ["_env", "${TEST_BAR}"]],
+  "str": ["_env", "${TEST_BAR}"]
+}

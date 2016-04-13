@@ -1,0 +1,11 @@
+syntax="proto2";
+
+package empty;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.unmarshaler_all) = true;
+
+message TestRequest {
+
+}

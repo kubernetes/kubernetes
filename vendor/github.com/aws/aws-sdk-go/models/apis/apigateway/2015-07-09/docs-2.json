@@ -1,0 +1,1139 @@
+{
+  "version": "2.0",
+  "operations": {
+    "CreateApiKey": null,
+    "CreateBasePathMapping": "<p>Creates a new <a>BasePathMapping</a> resource.</p>",
+    "CreateDeployment": "<p>Creates a <a>Deployment</a> resource, which makes a specified <a>RestApi</a> callable over the internet.</p>",
+    "CreateDomainName": "<p>Creates a new domain name.</p>",
+    "CreateModel": "<p>Adds a new <a>Model</a> resource to an existing <a>RestApi</a> resource.</p>",
+    "CreateResource": "<p>Creates a <a>Resource</a> resource.</p>",
+    "CreateRestApi": "<p>Creates a new <a>RestApi</a> resource.</p>",
+    "CreateStage": "<p>Creates a <a>Stage</a> resource.</p>",
+    "DeleteApiKey": "<p>Deletes the <a>ApiKey</a> resource.</p>",
+    "DeleteBasePathMapping": "<p>Deletes the <a>BasePathMapping</a> resource.</p>",
+    "DeleteClientCertificate": null,
+    "DeleteDeployment": "<p>Deletes a <a>Deployment</a> resource. Deleting a deployment will only succeed if there are no <a>Stage</a> resources associated with it.</p>",
+    "DeleteDomainName": "<p>Deletes the <a>DomainName</a> resource.</p>",
+    "DeleteIntegration": "<p>Represents a delete integration.</p>",
+    "DeleteIntegrationResponse": "<p>Represents a delete integration response.</p>",
+    "DeleteMethod": "<p>Deletes an existing <a>Method</a> resource.</p>",
+    "DeleteMethodResponse": "<p>Deletes an existing <a>MethodResponse</a> resource.</p>",
+    "DeleteModel": "<p>Deletes a model.</p>",
+    "DeleteResource": "<p>Deletes a <a>Resource</a> resource.</p>",
+    "DeleteRestApi": "<p>Deletes the specified API.</p>",
+    "DeleteStage": "<p>Deletes a <a>Stage</a> resource.</p>",
+    "FlushStageCache": "<p>Flushes a stage's cache.</p>",
+    "GenerateClientCertificate": null,
+    "GetAccount": "<p>Gets information about the current <a>Account</a> resource.</p>",
+    "GetApiKey": "<p>Gets information about the current <a>ApiKey</a> resource.</p>",
+    "GetApiKeys": "<p>Gets information about the current <a>ApiKeys</a> resource.</p>",
+    "GetBasePathMapping": "<p>Describe a <a>BasePathMapping</a> resource.</p>",
+    "GetBasePathMappings": "<p>Represents a collection of <a>BasePathMapping</a> resources.</p>",
+    "GetClientCertificate": null,
+    "GetClientCertificates": null,
+    "GetDeployment": "<p>Gets information about a <a>Deployment</a> resource.</p>",
+    "GetDeployments": "<p>Gets information about a <a>Deployments</a> collection.</p>",
+    "GetDomainName": "<p>Represents a domain name that is contained in a simpler, more intuitive URL that can be called.</p>",
+    "GetDomainNames": "<p>Represents a collection of <a>DomainName</a> resources.</p>",
+    "GetIntegration": "<p>Represents a get integration.</p>",
+    "GetIntegrationResponse": "<p>Represents a get integration response.</p>",
+    "GetMethod": "<p>Describe an existing <a>Method</a> resource.</p>",
+    "GetMethodResponse": "<p>Describes a <a>MethodResponse</a> resource.</p>",
+    "GetModel": "<p>Describes an existing model defined for a <a>RestApi</a> resource.</p>",
+    "GetModelTemplate": "<p>Generates a sample mapping template that can be used to transform a payload into the structure of a model.</p>",
+    "GetModels": "<p>Describes existing <a>Models</a> defined for a <a>RestApi</a> resource.</p>",
+    "GetResource": "<p>Lists information about a resource.</p>",
+    "GetResources": "<p>Lists information about a collection of <a>Resource</a> resources.</p>",
+    "GetRestApi": "<p>Lists the <a>RestApi</a> resource in the collection.</p>",
+    "GetRestApis": "<p>Lists the <a>RestApis</a> resources for your collection.</p>",
+    "GetSdk": null,
+    "GetStage": "<p>Gets information about a <a>Stage</a> resource.</p>",
+    "GetStages": "<p>Gets information about one or more <a>Stage</a> resources.</p>",
+    "PutIntegration": "<p>Represents a put integration.</p>",
+    "PutIntegrationResponse": "<p>Represents a put integration.</p>",
+    "PutMethod": "<p>Add a method to an existing <a>Resource</a> resource.</p>",
+    "PutMethodResponse": "<p>Adds a <a>MethodResponse</a> to an existing <a>Method</a> resource.</p>",
+    "TestInvokeMethod": null,
+    "UpdateAccount": "<p>Changes information about the current <a>Account</a> resource.</p>",
+    "UpdateApiKey": "<p>Changes information about an <a>ApiKey</a> resource.</p>",
+    "UpdateBasePathMapping": "<p>Changes information about the <a>BasePathMapping</a> resource.</p>",
+    "UpdateClientCertificate": null,
+    "UpdateDeployment": "<p>Changes information about a <a>Deployment</a> resource.</p>",
+    "UpdateDomainName": "<p>Changes information about the <a>DomainName</a> resource.</p>",
+    "UpdateIntegration": "<p>Represents an update integration.</p>",
+    "UpdateIntegrationResponse": "<p>Represents an update integration response.</p>",
+    "UpdateMethod": "<p>Updates an existing <a>Method</a> resource.</p>",
+    "UpdateMethodResponse": "<p>Updates an existing <a>MethodResponse</a> resource.</p>",
+    "UpdateModel": "<p>Changes information about a model.</p>",
+    "UpdateResource": "<p>Changes information about a <a>Resource</a> resource.</p>",
+    "UpdateRestApi": "<p>Changes information about the specified API.</p>",
+    "UpdateStage": "<p>Changes information about a <a>Stage</a> resource.</p>"
+  },
+  "service": "<fullname>Amazon API Gateway</fullname> <p>Amazon API Gateway helps developers deliver robust, secure and scalable mobile and web application backends. Amazon API Gateway allows developers to securely connect mobile and web applications to APIs that run on AWS Lambda, Amazon EC2, or other publicly addressable web services that are hosted outside of AWS.</p>",
+  "shapes": {
+    "Account": {
+      "base": "<p>Represents an AWS account that is associated with Amazon API Gateway.</p>",
+      "refs": {
+      }
+    },
+    "ApiKey": {
+      "base": "<p>A resource that can be distributed to callers for executing <a>Method</a> resources that require an API key. API keys can be mapped to any <a>Stage</a> on any <a>RestApi</a>, which indicates that the callers with the API key can make requests to that stage.</p>",
+      "refs": {
+        "ListOfApiKey$member": null
+      }
+    },
+    "ApiKeys": {
+      "base": "<p>Represents a collection of <a>ApiKey</a> resources.</p>",
+      "refs": {
+      }
+    },
+    "BadRequestException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BasePathMapping": {
+      "base": "<p>Represents the base path that callers of the API that must provide as part of the URL after the domain name.</p>",
+      "refs": {
+        "ListOfBasePathMapping$member": null
+      }
+    },
+    "BasePathMappings": {
+      "base": "<p>Represents a collection of <a>BasePathMapping</a> resources.</p>",
+      "refs": {
+      }
+    },
+    "Blob": {
+      "base": null,
+      "refs": {
+        "SdkResponse$body": null
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "ApiKey$enabled": "<p>Specifies whether the API Key can be used by callers.</p>",
+        "CreateApiKeyRequest$enabled": "<p>Specifies whether the <a>ApiKey</a> can be used by callers.</p>",
+        "CreateStageRequest$cacheClusterEnabled": "<p>Whether cache clustering is enabled for the stage.</p>",
+        "GetModelRequest$flatten": "<p>Resolves all external model references and returns a flattened model schema.</p>",
+        "MethodSetting$metricsEnabled": "<p>Specifies whether Amazon CloudWatch metrics are enabled for this method. The PATCH path for this setting is <code>/{method_setting_key}/metrics/enabled</code>, and the value is a Boolean.</p>",
+        "MethodSetting$dataTraceEnabled": "<p>Specifies the whether data trace logging is enabled for this method, which effects the log entries pushed to Amazon CloudWatch Logs. The PATCH path for this setting is <code>/{method_setting_key}/logging/dataTrace</code>, and the value is a Boolean.</p>",
+        "MethodSetting$cachingEnabled": "<p>Specifies whether responses should be cached and returned for requests. A cache cluster must be enabled on the stage for responses to be cached. The PATCH path for this setting is <code>/{method_setting_key}/caching/enabled</code>, and the value is a Boolean.</p>",
+        "MethodSetting$cacheDataEncrypted": "<p>Specifies whether the cached responses are encrypted. The PATCH path for this setting is <code>/{method_setting_key}/caching/dataEncrypted</code>, and the value is a Boolean.</p>",
+        "MethodSnapshot$apiKeyRequired": "<p>Specifies whether the method requires a valid <a>ApiKey</a>.</p>",
+        "PutMethodRequest$apiKeyRequired": "<p>Specifies whether the method required a valid <a>ApiKey</a>.</p>",
+        "Stage$cacheClusterEnabled": "<p>Specifies whether a cache cluster is enabled for the stage.</p>"
+      }
+    },
+    "CacheClusterSize": {
+      "base": "<p>Returns the size of the <b>CacheCluster</b>.</p>",
+      "refs": {
+        "CreateDeploymentRequest$cacheClusterSize": "<p>Specifies the cache cluster size for the <a>Stage</a> resource specified in the input, if a cache cluster is enabled.</p>",
+        "CreateStageRequest$cacheClusterSize": "<p>The stage's cache cluster size.</p>",
+        "Stage$cacheClusterSize": "<p>The size of the cache cluster for the stage, if enabled.</p>"
+      }
+    },
+    "CacheClusterStatus": {
+      "base": "<p>Returns the status of the <b>CacheCluster</b>.</p>",
+      "refs": {
+        "Stage$cacheClusterStatus": "<p>The status of the cache cluster for the stage, if enabled.</p>"
+      }
+    },
+    "ClientCertificate": {
+      "base": null,
+      "refs": {
+        "ListOfClientCertificate$member": null
+      }
+    },
+    "ClientCertificates": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ConflictException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateApiKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateBasePathMappingRequest": {
+      "base": "<p>Requests Amazon API Gateway to create a new <a>BasePathMapping</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "CreateDeploymentRequest": {
+      "base": "<p>Requests Amazon API Gateway to create a <a>Deployment</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "CreateDomainNameRequest": {
+      "base": "<p>A request to create a new domain name.</p>",
+      "refs": {
+      }
+    },
+    "CreateModelRequest": {
+      "base": "<p>Request to add a new <a>Model</a> to an existing <a>RestApi</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "CreateResourceRequest": {
+      "base": "<p>Requests Amazon API Gateway to create a <a>Resource</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "CreateRestApiRequest": {
+      "base": "<p>Request to add a new <a>RestApi</a> resource to your collection.</p>",
+      "refs": {
+      }
+    },
+    "CreateStageRequest": {
+      "base": "<p>Requests Amazon API Gateway to create a <a>Stage</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "DeleteApiKeyRequest": {
+      "base": "<p>A request to delete the <a>ApiKey</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "DeleteBasePathMappingRequest": {
+      "base": "<p>A request to delete the <a>BasePathMapping</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "DeleteClientCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDeploymentRequest": {
+      "base": "<p>Requests Amazon API Gateway to delete a <a>Deployment</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "DeleteDomainNameRequest": {
+      "base": "<p>A request to delete the <a>DomainName</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "DeleteIntegrationRequest": {
+      "base": "<p>Represents a delete integration request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteIntegrationResponseRequest": {
+      "base": "<p>Represents a delete integration response request.</p>",
+      "refs": {
+      }
+    },
+    "DeleteMethodRequest": {
+      "base": "<p>Request to delete an existing <a>Method</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "DeleteMethodResponseRequest": {
+      "base": "<p>A request to delete an existing <a>MethodResponse</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "DeleteModelRequest": {
+      "base": "<p>Request to delete an existing model in an existing <a>RestApi</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "DeleteResourceRequest": {
+      "base": "<p>Request to delete a <a>Resource</a>.</p>",
+      "refs": {
+      }
+    },
+    "DeleteRestApiRequest": {
+      "base": "<p>Request to delete the specified API from your collection.</p>",
+      "refs": {
+      }
+    },
+    "DeleteStageRequest": {
+      "base": "<p>Requests Amazon API Gateway to delete a <a>Stage</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "Deployment": {
+      "base": "<p>An immutable representation of a <a>RestApi</a> resource that can be called by users using <a>Stages</a>. A deployment must be associated with a <a>Stage</a> for it to be callable over the Internet.</p>",
+      "refs": {
+        "ListOfDeployment$member": null
+      }
+    },
+    "Deployments": {
+      "base": "<p>Represents a collection resource that contains zero or more references to your existing deployments, and links that guide you on ways to interact with your collection. The collection offers a paginated view of the contained deployments.</p>",
+      "refs": {
+      }
+    },
+    "DomainName": {
+      "base": "<p>Represents a domain name that is contained in a simpler, more intuitive URL that can be called.</p>",
+      "refs": {
+        "ListOfDomainName$member": null
+      }
+    },
+    "DomainNames": {
+      "base": "<p>Represents a collection of <a>DomainName</a> resources.</p>",
+      "refs": {
+      }
+    },
+    "Double": {
+      "base": null,
+      "refs": {
+        "MethodSetting$throttlingRateLimit": "<p>Specifies the throttling rate limit. The PATCH path for this setting is <code>/{method_setting_key}/throttling/rateLimit</code>, and the value is a double.</p>",
+        "ThrottleSettings$rateLimit": "<p>Returns the rateLimit when <b>ThrottleSettings</b> is called.</p>"
+      }
+    },
+    "FlushStageCacheRequest": {
+      "base": "<p>Requests Amazon API Gateway to flush a stage's cache.</p>",
+      "refs": {
+      }
+    },
+    "GenerateClientCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetAccountRequest": {
+      "base": "<p>Requests Amazon API Gateway to get information about the current <a>Account</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetApiKeyRequest": {
+      "base": "<p>A request to get information about the current <a>ApiKey</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetApiKeysRequest": {
+      "base": "<p>A request to get information about the current <a>ApiKeys</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetBasePathMappingRequest": {
+      "base": "<p>Request to describe a <a>BasePathMapping</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetBasePathMappingsRequest": {
+      "base": "<p>A request to get information about a collection of <a>BasePathMapping</a> resources.</p>",
+      "refs": {
+      }
+    },
+    "GetClientCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetClientCertificatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetDeploymentRequest": {
+      "base": "<p>Requests Amazon API Gateway to get information about a <a>Deployment</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetDeploymentsRequest": {
+      "base": "<p>Requests Amazon API Gateway to get information about a <a>Deployments</a> collection.</p>",
+      "refs": {
+      }
+    },
+    "GetDomainNameRequest": {
+      "base": "<p>Request to get the name of a <a>DomainName</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetDomainNamesRequest": {
+      "base": "<p>Request to describe a collection of <a>DomainName</a> resources.</p>",
+      "refs": {
+      }
+    },
+    "GetIntegrationRequest": {
+      "base": "<p>Represents a get integration request.</p>",
+      "refs": {
+      }
+    },
+    "GetIntegrationResponseRequest": {
+      "base": "<p>Represents a get integration response request.</p>",
+      "refs": {
+      }
+    },
+    "GetMethodRequest": {
+      "base": "<p>Request to describe an existing <a>Method</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetMethodResponseRequest": {
+      "base": "<p>Request to describe a <a>MethodResponse</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetModelRequest": {
+      "base": "<p>Request to list information about a model in an existing <a>RestApi</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetModelTemplateRequest": {
+      "base": "<p>Request to generate a sample mapping template used to transform the payload.</p>",
+      "refs": {
+      }
+    },
+    "GetModelsRequest": {
+      "base": "<p>Request to list existing <a>Models</a> defined for a <a>RestApi</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetResourceRequest": {
+      "base": "<p>Request to list information about a resource.</p>",
+      "refs": {
+      }
+    },
+    "GetResourcesRequest": {
+      "base": "<p>Request to list information about a collection of resources.</p>",
+      "refs": {
+      }
+    },
+    "GetRestApiRequest": {
+      "base": "<p>Request to list an existing <a>RestApi</a> defined for your collection. </p>",
+      "refs": {
+      }
+    },
+    "GetRestApisRequest": {
+      "base": "<p>Request to list existing <a>RestApis</a> defined for your collection.</p>",
+      "refs": {
+      }
+    },
+    "GetSdkRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetStageRequest": {
+      "base": "<p>Requests Amazon API Gateway to get information about a <a>Stage</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "GetStagesRequest": {
+      "base": "<p>Requests Amazon API Gateway to get information about one or more <a>Stage</a> resources.</p>",
+      "refs": {
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "MethodSetting$throttlingBurstLimit": "<p>Specifies the throttling burst limit. The PATCH path for this setting is <code>/{method_setting_key}/throttling/burstLimit</code>, and the value is an integer.</p>",
+        "MethodSetting$cacheTtlInSeconds": "<p>Specifies the time to live (TTL) in seconds, for cached responses. The higher a the TTL, the longer the response will be cached. The PATCH path for this setting is <code>/{method_setting_key}/caching/ttlInSeconds</code>, and the value is an integer.</p>",
+        "TestInvokeMethodResponse$status": "<p>The HTTP status code.</p>",
+        "ThrottleSettings$burstLimit": "<p>Returns the burstLimit when <b>ThrottleSettings</b> is called.</p>"
+      }
+    },
+    "Integration": {
+      "base": "<p>Represents a HTTP, AWS, or Mock integration.</p>",
+      "refs": {
+        "Method$methodIntegration": "<p>The method's integration.</p>"
+      }
+    },
+    "IntegrationResponse": {
+      "base": "<p>Represents an integration response. The status code must map to an existing <a>MethodResponse</a>, and parameters and templates can be used to transform the backend response.</p>",
+      "refs": {
+        "MapOfIntegrationResponse$value": null
+      }
+    },
+    "IntegrationType": {
+      "base": "<p>The integration type. Possible values are HTTP, AWS, or Mock.</p>",
+      "refs": {
+        "Integration$type": "<p>Specifies the integration's type.</p>",
+        "PutIntegrationRequest$type": "<p>Specifies a put integration input's type.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListOfApiKey": {
+      "base": null,
+      "refs": {
+        "ApiKeys$items": "<p>The current page of any <a>ApiKey</a> resources in the collection of <a>ApiKey</a> resources.</p>"
+      }
+    },
+    "ListOfBasePathMapping": {
+      "base": null,
+      "refs": {
+        "BasePathMappings$items": "<p>The current page of any <a>BasePathMapping</a> resources in the collection of base path mapping resources.</p>"
+      }
+    },
+    "ListOfClientCertificate": {
+      "base": null,
+      "refs": {
+        "ClientCertificates$items": null
+      }
+    },
+    "ListOfDeployment": {
+      "base": null,
+      "refs": {
+        "Deployments$items": "<p>The current page of any <a>Deployment</a> resources in the collection of deployment resources.</p>"
+      }
+    },
+    "ListOfDomainName": {
+      "base": null,
+      "refs": {
+        "DomainNames$items": "<p>The current page of any <a>DomainName</a> resources in the collection of <a>DomainName</a> resources.</p>"
+      }
+    },
+    "ListOfModel": {
+      "base": null,
+      "refs": {
+        "Models$items": "<p>Gets the current <a>Model</a> resource in the collection.</p>"
+      }
+    },
+    "ListOfPatchOperation": {
+      "base": "A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.",
+      "refs": {
+        "UpdateAccountRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateApiKeyRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateBasePathMappingRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateClientCertificateRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateDeploymentRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateDomainNameRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateIntegrationRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateIntegrationResponseRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateMethodRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateMethodResponseRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateModelRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateResourceRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateRestApiRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>",
+        "UpdateStageRequest$patchOperations": "<p>A list of operations describing the updates to apply to the specified resource. The patches are applied in the order specified in the list.</p>"
+      }
+    },
+    "ListOfResource": {
+      "base": null,
+      "refs": {
+        "Resources$items": "<p>Gets the current <a>Resource</a> resource in the collection.</p>"
+      }
+    },
+    "ListOfRestApi": {
+      "base": null,
+      "refs": {
+        "RestApis$items": "<p>An array of links to the current page of <a>RestApi</a> resources.</p>"
+      }
+    },
+    "ListOfStage": {
+      "base": null,
+      "refs": {
+        "Stages$item": "<p>An individual <a>Stage</a> resource.</p>"
+      }
+    },
+    "ListOfStageKeys": {
+      "base": null,
+      "refs": {
+        "CreateApiKeyRequest$stageKeys": "<p>Specifies whether the <a>ApiKey</a> can be used by callers.</p>"
+      }
+    },
+    "ListOfString": {
+      "base": null,
+      "refs": {
+        "ApiKey$stageKeys": "<p>A list of <a>Stage</a> resources that are associated with the <a>ApiKey</a> resource.</p>",
+        "Integration$cacheKeyParameters": "<p>Specifies the integration's cache key parameters.</p>",
+        "PutIntegrationRequest$cacheKeyParameters": "<p>Specifies a put integration input's cache key parameters.</p>"
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "TestInvokeMethodResponse$latency": "<p>The execution latency of the test invoke request.</p>"
+      }
+    },
+    "MapOfHeaderValues": {
+      "base": null,
+      "refs": {
+        "TestInvokeMethodRequest$headers": null,
+        "TestInvokeMethodResponse$headers": "<p>The headers of HTTP response.</p>"
+      }
+    },
+    "MapOfIntegrationResponse": {
+      "base": null,
+      "refs": {
+        "Integration$integrationResponses": "<p>Specifies the integration's responses.</p>"
+      }
+    },
+    "MapOfMethod": {
+      "base": null,
+      "refs": {
+        "Resource$resourceMethods": "<p>Map of methods for this resource, which is included only if requested using the <b>embed</b> option.</p>"
+      }
+    },
+    "MapOfMethodResponse": {
+      "base": null,
+      "refs": {
+        "Method$methodResponses": "<p>Represents available responses that can be sent to the caller. Method responses are represented as a key/value map, with an HTTP status code as the key and a <a>MethodResponse</a> as the value. The status codes are available for the <a>Integration</a> responses to map to.</p>"
+      }
+    },
+    "MapOfMethodSettings": {
+      "base": null,
+      "refs": {
+        "Stage$methodSettings": "<p>A map that defines the method settings for a <a>Stage</a> resource. Keys are defined as <code>{resource_path}/{http_method}</code> for an individual method override, or <code>\\*/\\*</code> for the settings applied to all methods in the stage.</p>"
+      }
+    },
+    "MapOfMethodSnapshot": {
+      "base": null,
+      "refs": {
+        "PathToMapOfMethodSnapshot$value": null
+      }
+    },
+    "MapOfStringToBoolean": {
+      "base": null,
+      "refs": {
+        "Method$requestParameters": "<p>Represents request parameters that can be accepted by Amazon API Gateway. Request parameters are represented as a key/value map, with a source as the key and a Boolean flag as the value. The Boolean flag is used to specify whether the parameter is required. A source must match the pattern <code>method.request.{location}.{name}</code>, where <code>location</code> is either querystring, path, or header. <code>name</code> is a valid, unique parameter name. Sources specified here are available to the integration for mapping to integration request parameters or templates.</p>",
+        "MethodResponse$responseParameters": "<p>Represents response parameters that can be sent back to the caller by Amazon API Gateway. Response parameters are represented as a key/value map, with a destination as the key and a boolean flag as the value, which is used to specify whether the parameter is required. A destination must match the pattern <code>method.response.header.{name}</code>, where <code>name</code> is a valid, unique header name. Destinations specified here are available to the integration for mapping from integration response parameters.</p>",
+        "PutMethodRequest$requestParameters": "<p>Represents requests parameters that are sent with the backend request. Request parameters are represented as a key/value map, with a destination as the key and a source as the value. A source must match an existing method request parameter, or a static value. Static values must be enclosed with single quotes, and be pre-encoded based on their destination in the request. The destination must match the pattern <code>integration.request.{location}.{name}</code>, where <code>location</code> is either querystring, path, or header. <code>name</code> must be a valid, unique parameter name.</p>",
+        "PutMethodResponseRequest$responseParameters": "<p>Represents response parameters that can be sent back to the caller by Amazon API Gateway. Response parameters are represented as a key/value map, with a destination as the key and a Boolean flag as the value. The Boolean flag is used to specify whether the parameter is required. A destination must match the pattern <code>method.response.header.{name}</code>, where <code>name</code> is a valid, unique header name. Destinations specified here are available to the integration for mapping from integration response parameters.</p>"
+      }
+    },
+    "MapOfStringToString": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentRequest$variables": "<p>A map that defines the stage variables for the <a>Stage</a> resource that is associated with the new deployment. Variable names can have alphabetic characters, and the values must match [A-Za-z0-9-._~:/?#&amp;=,]+</p>",
+        "CreateStageRequest$variables": "<p>A map that defines the stage variables for the new <a>Stage</a> resource. Variable names can have alphabetic characters, and the values must match [A-Za-z0-9-._~:/?#&amp;=,]+</p>",
+        "GetSdkRequest$parameters": null,
+        "Integration$requestParameters": "<p>Represents requests parameters that are sent with the backend request. Request parameters are represented as a key/value map, with a destination as the key and a source as the value. A source must match an existing method request parameter, or a static value. Static values must be enclosed with single quotes, and be pre-encoded based on their destination in the request. The destination must match the pattern <code>integration.request.{location}.{name}</code>, where <code>location</code> is either querystring, path, or header. <code>name</code> must be a valid, unique parameter name.</p>",
+        "Integration$requestTemplates": "<p>Specifies the integration's request templates.</p>",
+        "IntegrationResponse$responseParameters": "<p>Represents response parameters that can be read from the backend response. Response parameters are represented as a key/value map, with a destination as the key and a source as the value. A destination must match an existing response parameter in the <a>Method</a>. The source can be a header from the backend response, or a static value. Static values are specified using enclosing single quotes, and backend response headers can be read using the pattern <code>integration.response.header.{name}</code>.</p>",
+        "IntegrationResponse$responseTemplates": "<p>Specifies the templates used to transform the integration response body. Response templates are represented as a key/value map, with a content-type as the key and a template as the value.</p>",
+        "Method$requestModels": "<p>Specifies the <a>Model</a> resources used for the request's content type. Request models are represented as a key/value map, with a content type as the key and a <a>Model</a> name as the value.</p>",
+        "MethodResponse$responseModels": "<p>Specifies the <a>Model</a> resources used for the response's content-type. Response models are represented as a key/value map, with a content-type as the key and a <a>Model</a> name as the value.</p>",
+        "PutIntegrationRequest$requestParameters": "<p>Represents request parameters that are sent with the backend request. Request parameters are represented as a key/value map, with a destination as the key and a source as the value. A source must match an existing method request parameter, or a static value. Static values must be enclosed with single quotes, and be pre-encoded based on their destination in the request. The destination must match the pattern <code>integration.request.{location}.{name}</code>, where <code>location</code> is either querystring, path, or header. <code>name</code> must be a valid, unique parameter name.</p>",
+        "PutIntegrationRequest$requestTemplates": "<p>Specifies the templates used to transform the method request body. Request templates are represented as a key/value map, with a content-type as the key and a template as the value.</p>",
+        "PutIntegrationResponseRequest$responseParameters": "<p>Represents response parameters that can be read from the backend response. Response parameters are represented as a key/value map, with a destination as the key and a source as the value. A destination must match an existing response parameter in the <a>Method</a>. The source can be a header from the backend response, or a static value. Static values are specified using enclosing single quotes, and backend response headers can be read using the pattern <code>integration.response.header.{name}</code>.</p>",
+        "PutIntegrationResponseRequest$responseTemplates": "<p>Specifies a put integration response's templates.</p>",
+        "PutMethodRequest$requestModels": "<p>Specifies the <a>Model</a> resources used for the request's content type. Request models are represented as a key/value map, with a content type as the key and a <a>Model</a> name as the value.</p>",
+        "PutMethodResponseRequest$responseModels": "<p>Specifies the <a>Model</a> resources used for the response's content type. Response models are represented as a key/value map, with a content type as the key and a <a>Model</a> name as the value.</p>",
+        "Stage$variables": "<p>A map that defines the stage variables for a <a>Stage</a> resource. Variable names can have alphabetic characters, and the values must match [A-Za-z0-9-._~:/?#&amp;=,]+</p>",
+        "TestInvokeMethodRequest$stageVariables": null
+      }
+    },
+    "Method": {
+      "base": "<p>Represents a method.</p>",
+      "refs": {
+        "MapOfMethod$value": null
+      }
+    },
+    "MethodResponse": {
+      "base": "<p>Represents a method response. Amazon API Gateway sends back the status code to the caller as the HTTP status code. Parameters and models can be used to transform the response from the method's integration.</p>",
+      "refs": {
+        "MapOfMethodResponse$value": null
+      }
+    },
+    "MethodSetting": {
+      "base": "<p>Specifies the method setting properties.</p>",
+      "refs": {
+        "MapOfMethodSettings$value": null
+      }
+    },
+    "MethodSnapshot": {
+      "base": "<p>Represents a summary of a <a>Method</a> resource, given a particular date and time.</p>",
+      "refs": {
+        "MapOfMethodSnapshot$value": null
+      }
+    },
+    "Model": {
+      "base": "<p>Represents the structure of a request or response payload for a method.</p>",
+      "refs": {
+        "ListOfModel$member": null
+      }
+    },
+    "Models": {
+      "base": "<p>Represents a collection of <a>Model</a> resources.</p>",
+      "refs": {
+      }
+    },
+    "NotFoundException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "NullableBoolean": {
+      "base": null,
+      "refs": {
+        "CreateDeploymentRequest$cacheClusterEnabled": "<p>Enables a cache cluster for the <a>Stage</a> resource specified in the input.</p>",
+        "MapOfStringToBoolean$value": null,
+        "Method$apiKeyRequired": "<p>Specifies whether the method requires a valid <a>ApiKey</a>.</p>"
+      }
+    },
+    "NullableInteger": {
+      "base": null,
+      "refs": {
+        "GetApiKeysRequest$limit": "<p>The maximum number of <a>ApiKeys</a> to get information about.</p>",
+        "GetBasePathMappingsRequest$limit": "<p>The maximum number of <a>BasePathMapping</a> resources in the collection to get information about. The default limit is 25. It should be an integer between 1 - 500.</p>",
+        "GetClientCertificatesRequest$limit": null,
+        "GetDeploymentsRequest$limit": "<p>The maximum number of <a>Deployment</a> resources in the collection to get information about. The default limit is 25. It should be an integer between 1 - 500.</p>",
+        "GetDomainNamesRequest$limit": "<p>The maximum number of <a>DomainName</a> resources in the collection to get information about. The default limit is 25. It should be an integer between 1 - 500.</p>",
+        "GetModelsRequest$limit": "<p>The maximum number of models in the collection to get information about. The default limit is 25. It should be an integer between 1 - 500.</p>",
+        "GetResourcesRequest$limit": "<p>The maximum number of <a>Resource</a> resources in the collection to get information about. The default limit is 25. It should be an integer between 1 - 500.</p>",
+        "GetRestApisRequest$limit": "<p>The maximum number of <a>RestApi</a> resources in the collection to get information about. The default limit is 25. It should be an integer between 1 - 500.</p>"
+      }
+    },
+    "PatchOperation": {
+      "base": "A single patch operation to apply to the specified resource. Please refer to http://tools.ietf.org/html/rfc6902#section-4 for an explanation of how each operation is used.",
+      "refs": {
+        "ListOfPatchOperation$member": null
+      }
+    },
+    "PathToMapOfMethodSnapshot": {
+      "base": null,
+      "refs": {
+        "Deployment$apiSummary": "<p>Gets a summary of the <a>RestApi</a> at the date and time that the deployment resource was created.</p>"
+      }
+    },
+    "PutIntegrationRequest": {
+      "base": "<p>Represents a put integration request.</p>",
+      "refs": {
+      }
+    },
+    "PutIntegrationResponseRequest": {
+      "base": "<p>Represents a put integration response request.</p>",
+      "refs": {
+      }
+    },
+    "PutMethodRequest": {
+      "base": "<p>Request to add a method to an existing <a>Resource</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "PutMethodResponseRequest": {
+      "base": "<p>Request to add a <a>MethodResponse</a> to an existing <a>Method</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "Resource": {
+      "base": "<p>Represents a resource.</p>",
+      "refs": {
+        "ListOfResource$member": null
+      }
+    },
+    "Resources": {
+      "base": "<p>Represents a collection of <a>Resource</a> resources.</p>",
+      "refs": {
+      }
+    },
+    "RestApi": {
+      "base": "<p>Represents a REST API.</p>",
+      "refs": {
+        "ListOfRestApi$member": null
+      }
+    },
+    "RestApis": {
+      "base": "<p>Contains references to your APIs and links that guide you in ways to interact with your collection. A collection offers a paginated view of your APIs.</p>",
+      "refs": {
+      }
+    },
+    "SdkResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Stage": {
+      "base": "<p>Represents a unique identifier for a version of a deployed <a>RestApi</a> that is callable by users.</p>",
+      "refs": {
+        "ListOfStage$member": null
+      }
+    },
+    "StageKey": {
+      "base": "<p>A reference to a unique stage identified in the format <code>{restApiId}/{stage}</code>.</p>",
+      "refs": {
+        "ListOfStageKeys$member": null
+      }
+    },
+    "Stages": {
+      "base": "<p>A list of <a>Stage</a> resource that are associated with the <a>ApiKey</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "StatusCode": {
+      "base": "<p>The status code.</p>",
+      "refs": {
+        "DeleteIntegrationResponseRequest$statusCode": "<p>Specifies a delete integration response request's status code.</p>",
+        "DeleteMethodResponseRequest$statusCode": "<p>The status code identifier for the <a>MethodResponse</a> resource.</p>",
+        "GetIntegrationResponseRequest$statusCode": "<p>Specifies a get integration response request's status code.</p>",
+        "GetMethodResponseRequest$statusCode": "<p>The status code identifier for the <a>MethodResponse</a> resource.</p>",
+        "IntegrationResponse$statusCode": "<p>Specifies the status code that is used to map the integration response to an existing <a>MethodResponse</a>.</p>",
+        "MethodResponse$statusCode": "<p>The method response's status code.</p>",
+        "PutIntegrationResponseRequest$statusCode": "<p>Specifies the status code that is used to map the integration response to an existing <a>MethodResponse</a>.</p>",
+        "PutMethodResponseRequest$statusCode": "<p>The method response's status code.</p>",
+        "UpdateIntegrationResponseRequest$statusCode": "<p>Specifies an update integration response request's status code.</p>",
+        "UpdateMethodResponseRequest$statusCode": "<p>The status code identifier for the <a>MethodResponse</a> resource.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "Account$cloudwatchRoleArn": "<p>Specifies the Amazon resource name (ARN) of an Amazon CloudWatch role for the current <a>Account</a> resource.</p>",
+        "ApiKey$id": "<p>The identifier of the API Key.</p>",
+        "ApiKey$name": "<p>The name of the API Key.</p>",
+        "ApiKey$description": "<p>The description of the API Key.</p>",
+        "ApiKeys$position": null,
+        "BadRequestException$message": null,
+        "BasePathMapping$basePath": "<p>The base path name that callers of the API must provide as part of the URL after the domain name.</p>",
+        "BasePathMapping$restApiId": "<p>The name of the API.</p>",
+        "BasePathMapping$stage": "<p>The name of the API's stage.</p>",
+        "BasePathMappings$position": null,
+        "ClientCertificate$clientCertificateId": null,
+        "ClientCertificate$description": null,
+        "ClientCertificate$pemEncodedCertificate": null,
+        "ClientCertificates$position": null,
+        "ConflictException$message": null,
+        "CreateApiKeyRequest$name": "<p>The name of the <a>ApiKey</a>.</p>",
+        "CreateApiKeyRequest$description": "<p>The description of the <a>ApiKey</a>.</p>",
+        "CreateBasePathMappingRequest$domainName": "<p>The domain name of the <a>BasePathMapping</a> resource to create.</p>",
+        "CreateBasePathMappingRequest$basePath": "<p>The base path name that callers of the API must provide as part of the URL after the domain name. This value must be unique for all of the mappings across a single API. Leave this blank if you do not want callers to specify a base path name after the domain name.</p>",
+        "CreateBasePathMappingRequest$restApiId": "<p>The name of the API that you want to apply this mapping to.</p>",
+        "CreateBasePathMappingRequest$stage": "<p>The name of the API's stage that you want to use for this mapping. Leave this blank if you do not want callers to explicitly specify the stage name after any base path name.</p>",
+        "CreateDeploymentRequest$restApiId": "<p>The <a>RestApi</a> resource identifier for the <a>Deployment</a> resource to create.</p>",
+        "CreateDeploymentRequest$stageName": "<p>The name of the <a>Stage</a> resource for the <a>Deployment</a> resource to create.</p>",
+        "CreateDeploymentRequest$stageDescription": "<p>The description of the <a>Stage</a> resource for the <a>Deployment</a> resource to create.</p>",
+        "CreateDeploymentRequest$description": "<p>The description for the <a>Deployment</a> resource to create.</p>",
+        "CreateDomainNameRequest$domainName": "<p>The name of the <a>DomainName</a> resource.</p>",
+        "CreateDomainNameRequest$certificateName": "<p>The name of the certificate.</p>",
+        "CreateDomainNameRequest$certificateBody": "<p>The body of the server certificate provided by your certificate authority.</p>",
+        "CreateDomainNameRequest$certificatePrivateKey": "<p>Your certificate's private key.</p>",
+        "CreateDomainNameRequest$certificateChain": "<p>The intermediate certificates and optionally the root certificate, one after the other without any blank lines. If you include the root certificate, your certificate chain must start with intermediate certificates and end with the root certificate. Use the intermediate certificates that were provided by your certificate authority. Do not include any intermediaries that are not in the chain of trust path.</p>",
+        "CreateModelRequest$restApiId": "<p>The <a>RestApi</a> identifier under which the <a>Model</a> will be created.</p>",
+        "CreateModelRequest$name": "<p>The name of the model.</p>",
+        "CreateModelRequest$description": "<p>The description of the model.</p>",
+        "CreateModelRequest$schema": "<p>The schema for the model. For <code>application/json</code> models, this should be <a target=\"_blank\" href=\"http://json-schema.org/documentation.html\">JSON-schema draft v4</a> model.</p>",
+        "CreateModelRequest$contentType": "<p>The content-type for the model.</p>",
+        "CreateResourceRequest$restApiId": "<p>The identifier of the <a>RestApi</a> for the resource. </p>",
+        "CreateResourceRequest$parentId": "<p>The parent resource's identifier.</p>",
+        "CreateResourceRequest$pathPart": "<p>The last path segment for this resource.</p>",
+        "CreateRestApiRequest$name": "<p>The name of the <a>RestApi</a>.</p>",
+        "CreateRestApiRequest$description": "<p>The description of the <a>RestApi</a>.</p>",
+        "CreateRestApiRequest$cloneFrom": "<p>The name of the <a>RestApi</a> that you want to clone from.</p>",
+        "CreateStageRequest$restApiId": "<p>The identifier of the <a>RestApi</a> resource for the <a>Stage</a> resource to create.</p>",
+        "CreateStageRequest$stageName": "<p>The name for the <a>Stage</a> resource.</p>",
+        "CreateStageRequest$deploymentId": "<p>The identifier of the <a>Deployment</a> resource for the <a>Stage</a> resource.</p>",
+        "CreateStageRequest$description": "<p>The description of the <a>Stage</a> resource.</p>",
+        "DeleteApiKeyRequest$apiKey": "<p>The identifier of the <a>ApiKey</a> resource to be deleted.</p>",
+        "DeleteBasePathMappingRequest$domainName": "<p>The domain name of the <a>BasePathMapping</a> resource to delete.</p>",
+        "DeleteBasePathMappingRequest$basePath": "<p>The base path name of the <a>BasePathMapping</a> resource to delete.</p>",
+        "DeleteClientCertificateRequest$clientCertificateId": null,
+        "DeleteDeploymentRequest$restApiId": "<p>The identifier of the <a>RestApi</a> resource for the <a>Deployment</a> resource to delete.</p>",
+        "DeleteDeploymentRequest$deploymentId": "<p>The identifier of the <a>Deployment</a> resource to delete.</p>",
+        "DeleteDomainNameRequest$domainName": "<p>The name of the <a>DomainName</a> resource to be deleted.</p>",
+        "DeleteIntegrationRequest$restApiId": "<p>Specifies a delete integration request's API identifier.</p>",
+        "DeleteIntegrationRequest$resourceId": "<p>Specifies a delete integration request's resource identifier.</p>",
+        "DeleteIntegrationRequest$httpMethod": "<p>Specifies a delete integration request's HTTP method.</p>",
+        "DeleteIntegrationResponseRequest$restApiId": "<p>Specifies a delete integration response request's API identifier.</p>",
+        "DeleteIntegrationResponseRequest$resourceId": "<p>Specifies a delete integration response request's resource identifier.</p>",
+        "DeleteIntegrationResponseRequest$httpMethod": "<p>Specifies a delete integration response request's HTTP method.</p>",
+        "DeleteMethodRequest$restApiId": "<p>The <a>RestApi</a> identifier for the <a>Method</a> resource.</p>",
+        "DeleteMethodRequest$resourceId": "<p>The <a>Resource</a> identifier for the <a>Method</a> resource.</p>",
+        "DeleteMethodRequest$httpMethod": "<p>The HTTP verb that identifies the <a>Method</a> resource.</p>",
+        "DeleteMethodResponseRequest$restApiId": "<p>The <a>RestApi</a> identifier for the <a>MethodResponse</a> resource.</p>",
+        "DeleteMethodResponseRequest$resourceId": "<p>The <a>Resource</a> identifier for the <a>MethodResponse</a> resource.</p>",
+        "DeleteMethodResponseRequest$httpMethod": "<p>The HTTP verb identifier for the parent <a>Method</a> resource.</p>",
+        "DeleteModelRequest$restApiId": "<p>The <a>RestApi</a> under which the model will be deleted.</p>",
+        "DeleteModelRequest$modelName": "<p>The name of the model to delete.</p>",
+        "DeleteResourceRequest$restApiId": "<p>The <a>RestApi</a> identifier for the <a>Resource</a> resource.</p>",
+        "DeleteResourceRequest$resourceId": "<p>The identifier of the <a>Resource</a> resource.</p>",
+        "DeleteRestApiRequest$restApiId": "<p>The ID of the <a>RestApi</a> you want to delete.</p>",
+        "DeleteStageRequest$restApiId": "<p>The identifier of the <a>RestApi</a> resource for the <a>Stage</a> resource to delete.</p>",
+        "DeleteStageRequest$stageName": "<p>The name of the <a>Stage</a> resource to delete.</p>",
+        "Deployment$id": "<p>The identifier for the deployment resource.</p>",
+        "Deployment$description": "<p>The description for the deployment resource.</p>",
+        "Deployments$position": null,
+        "DomainName$domainName": "<p>The name of the <a>DomainName</a> resource.</p>",
+        "DomainName$certificateName": "<p>The name of the certificate.</p>",
+        "DomainName$distributionDomainName": "<p>The domain name of the Amazon CloudFront distribution. For more information, see the <a target=\"_blank\" href=\"http://aws.amazon.com/documentation/cloudfront/\">Amazon CloudFront documentation</a>.</p>",
+        "DomainNames$position": null,
+        "FlushStageCacheRequest$restApiId": "<p>The API identifier of the stage to flush its cache.</p>",
+        "FlushStageCacheRequest$stageName": "<p>The name of the stage to flush its cache.</p>",
+        "GenerateClientCertificateRequest$description": null,
+        "GetApiKeyRequest$apiKey": "<p>The identifier of the <a>ApiKey</a> resource.</p>",
+        "GetApiKeysRequest$position": "<p>The position of the current <a>ApiKeys</a> resource to get information about.</p>",
+        "GetBasePathMappingRequest$domainName": "<p>The domain name of the <a>BasePathMapping</a> resource to be described.</p>",
+        "GetBasePathMappingRequest$basePath": "<p>The base path name that callers of the API must provide as part of the URL after the domain name. This value must be unique for all of the mappings across a single API. Leave this blank if you do not want callers to specify any base path name after the domain name.</p>",
+        "GetBasePathMappingsRequest$domainName": "<p>The domain name of a <a>BasePathMapping</a> resource.</p>",
+        "GetBasePathMappingsRequest$position": "<p>The position of the current <a>BasePathMapping</a> resource in the collection to get information about.</p>",
+        "GetClientCertificateRequest$clientCertificateId": null,
+        "GetClientCertificatesRequest$position": null,
+        "GetDeploymentRequest$restApiId": "<p>The identifier of the <a>RestApi</a> resource for the <a>Deployment</a> resource to get information about.</p>",
+        "GetDeploymentRequest$deploymentId": "<p>The identifier of the <a>Deployment</a> resource to get information about.</p>",
+        "GetDeploymentsRequest$restApiId": "<p>The identifier of the <a>RestApi</a> resource for the collection of <a>Deployment</a> resources to get information about.</p>",
+        "GetDeploymentsRequest$position": "<p>The position of the current <a>Deployment</a> resource in the collection to get information about.</p>",
+        "GetDomainNameRequest$domainName": "<p>The name of the <a>DomainName</a> resource.</p>",
+        "GetDomainNamesRequest$position": "<p>The position of the current domain names to get information about.</p>",
+        "GetIntegrationRequest$restApiId": "<p>Specifies a get integration request's API identifier.</p>",
+        "GetIntegrationRequest$resourceId": "<p>Specifies a get integration request's resource identifier</p>",
+        "GetIntegrationRequest$httpMethod": "<p>Specifies a get integration request's HTTP method.</p>",
+        "GetIntegrationResponseRequest$restApiId": "<p>Specifies a get integration response request's API identifier.</p>",
+        "GetIntegrationResponseRequest$resourceId": "<p>Specifies a get integration response request's resource identifier.</p>",
+        "GetIntegrationResponseRequest$httpMethod": "<p>Specifies a get integration response request's HTTP method.</p>",
+        "GetMethodRequest$restApiId": "<p>The <a>RestApi</a> identifier for the <a>Method</a> resource.</p>",
+        "GetMethodRequest$resourceId": "<p>The <a>Resource</a> identifier for the <a>Method</a> resource.</p>",
+        "GetMethodRequest$httpMethod": "<p>Specifies the put method request's HTTP method type.</p>",
+        "GetMethodResponseRequest$restApiId": "<p>The <a>RestApi</a> identifier for the <a>MethodResponse</a> resource.</p>",
+        "GetMethodResponseRequest$resourceId": "<p>The <a>Resource</a> identifier for the <a>MethodResponse</a> resource.</p>",
+        "GetMethodResponseRequest$httpMethod": "<p>The HTTP verb identifier for the parent <a>Method</a> resource.</p>",
+        "GetModelRequest$restApiId": "<p>The <a>RestApi</a> identifier under which the <a>Model</a> exists.</p>",
+        "GetModelRequest$modelName": "<p>The name of the model as an identifier.</p>",
+        "GetModelTemplateRequest$restApiId": "<p>The ID of the <a>RestApi</a> under which the model exists.</p>",
+        "GetModelTemplateRequest$modelName": "<p>The name of the model for which to generate a template.</p>",
+        "GetModelsRequest$restApiId": "<p>The <a>RestApi</a> identifier.</p>",
+        "GetModelsRequest$position": "<p>The position of the next set of results in the <a>Models</a> resource to get information about.</p>",
+        "GetResourceRequest$restApiId": "<p>The <a>RestApi</a> identifier for the resource.</p>",
+        "GetResourceRequest$resourceId": "<p>The identifier for the <a>Resource</a> resource.</p>",
+        "GetResourcesRequest$restApiId": "<p>The <a>RestApi</a> identifier for the Resource.</p>",
+        "GetResourcesRequest$position": "<p>The position of the next set of results in the current <a>Resources</a> resource to get information about.</p>",
+        "GetRestApiRequest$restApiId": "<p>The identifier of the <a>RestApi</a> resource.</p>",
+        "GetRestApisRequest$position": "<p>The position of the current <a>RestApis</a> resource in the collection to get information about.</p>",
+        "GetSdkRequest$restApiId": null,
+        "GetSdkRequest$stageName": null,
+        "GetSdkRequest$sdkType": null,
+        "GetStageRequest$restApiId": "<p>The identifier of the <a>RestApi</a> resource for the <a>Stage</a> resource to get information about.</p>",
+        "GetStageRequest$stageName": "<p>The name of the <a>Stage</a> resource to get information about.</p>",
+        "GetStagesRequest$restApiId": "<p>The stages' API identifiers.</p>",
+        "GetStagesRequest$deploymentId": "<p>The stages' deployment identifiers.</p>",
+        "Integration$httpMethod": "<p>Specifies the integration's HTTP method type.</p>",
+        "Integration$uri": "<p>Specifies the integration's Uniform Resource Identifier (URI). For HTTP integrations, the URI must be a fully formed, encoded HTTP(S) URL according to the <a target=\"_blank\" href=\"https://www.ietf.org/rfc/rfc3986.txt\">RFC-3986 specification</a>. For AWS integrations, the URI should be of the form <code>arn:aws:apigateway:{region}:{service}:{path|action}/{service_api}</code>. <code>Region</code> and <code>service</code> are used to determine the right endpoint. For AWS services that use the <code>Action=</code> query string parameter, <code>service_api</code> should be a valid action for the desired service. For RESTful AWS service APIs, <code>path</code> is used to indicate that the remaining substring in the URI should be treated as the path to the resource, including the initial <code>/</code>.</p>",
+        "Integration$credentials": "<p>Specifies the credentials required for the integration, if any. For AWS integrations, three options are available. To specify an IAM Role for Amazon API Gateway to assume, use the role's Amazon Resource Name (ARN). To require that the caller's identity be passed through from the request, specify the string <code>arn:aws:iam::\\*:user/\\*</code>. To use resource-based permissions on supported AWS services, specify null.</p>",
+        "Integration$cacheNamespace": "<p>Specifies the integration's cache namespace.</p>",
+        "IntegrationResponse$selectionPattern": "<p>Specifies the regular expression (regex) pattern used to choose an integration response based on the response from the backend. If the backend is an AWS Lambda function, the AWS Lambda function error header is matched. For all other HTTP and AWS backends, the HTTP status code is matched.</p>",
+        "LimitExceededException$retryAfterSeconds": null,
+        "LimitExceededException$message": null,
+        "ListOfString$member": null,
+        "MapOfHeaderValues$key": null,
+        "MapOfHeaderValues$value": null,
+        "MapOfIntegrationResponse$key": null,
+        "MapOfMethod$key": null,
+        "MapOfMethodResponse$key": null,
+        "MapOfMethodSettings$key": null,
+        "MapOfMethodSnapshot$key": null,
+        "MapOfStringToBoolean$key": null,
+        "MapOfStringToString$key": null,
+        "MapOfStringToString$value": null,
+        "Method$httpMethod": "<p>The HTTP method.</p>",
+        "Method$authorizationType": "<p>The method's authorization type.</p>",
+        "MethodSetting$loggingLevel": "<p>Specifies the logging level for this method, which effects the log entries pushed to Amazon CloudWatch Logs. The PATCH path for this setting is <code>/{method_setting_key}/logging/loglevel</code>, and the available levels are <code>OFF</code>, <code>ERROR</code>, and <code>INFO</code>.</p>",
+        "MethodSnapshot$authorizationType": "<p>Specifies the type of authorization used for the method.</p>",
+        "Model$id": "<p>The identifier for the model resource.</p>",
+        "Model$name": "<p>The name of the model.</p>",
+        "Model$description": "<p>The description of the model.</p>",
+        "Model$schema": "<p>The schema for the model. For <code>application/json</code> models, this should be <a target=\"_blank\" href=\"http://json-schema.org/documentation.html\">JSON-schema draft v4</a> model.</p>",
+        "Model$contentType": "<p>The content-type for the model.</p>",
+        "Models$position": null,
+        "NotFoundException$message": null,
+        "PatchOperation$path": "<p>Operation objects MUST have exactly one \"path\" member. That member's value is a string containing a `JSON-Pointer` value that references a location within the target document (the \"target location\") where the operation is performed.</p>",
+        "PatchOperation$value": "<p>The actual value content. </p>",
+        "PatchOperation$from": "<p>The \"move\" and \"copy\" operation object MUST contain a \"from\" member, which is a string containing a <code>JSON Pointer</code> value that references the location in the target document to move the value from.</p>",
+        "PathToMapOfMethodSnapshot$key": null,
+        "PutIntegrationRequest$restApiId": "<p>Specifies a put integration request's API identifier.</p>",
+        "PutIntegrationRequest$resourceId": "<p>Specifies a put integration request's resource ID.</p>",
+        "PutIntegrationRequest$httpMethod": "<p>Specifies a put integration request's HTTP method.</p>",
+        "PutIntegrationRequest$integrationHttpMethod": "<p>Specifies a put integration HTTP method.</p>",
+        "PutIntegrationRequest$uri": "<p>Specifies a put integration input's Uniform Resource Identifier (URI).</p>",
+        "PutIntegrationRequest$credentials": "<p>Specifies whether credentials are required for a put integration.</p>",
+        "PutIntegrationRequest$cacheNamespace": "<p>Specifies a put integration input's cache namespace.</p>",
+        "PutIntegrationResponseRequest$restApiId": "<p>Specifies a put integration response request's API identifier.</p>",
+        "PutIntegrationResponseRequest$resourceId": "<p>Specifies a put integration response request's resource identifier.</p>",
+        "PutIntegrationResponseRequest$httpMethod": "<p>Specifies a put integration response request's HTTP method.</p>",
+        "PutIntegrationResponseRequest$selectionPattern": "<p>Specifies the selection pattern of a put integration response.</p>",
+        "PutMethodRequest$restApiId": "<p>The <a>RestApi</a> identifier for the new <a>Method</a> resource.</p>",
+        "PutMethodRequest$resourceId": "<p>The <a>Resource</a> identifier for the new <a>Method</a> resource.</p>",
+        "PutMethodRequest$httpMethod": "<p>Specifies the put method request's HTTP method type.</p>",
+        "PutMethodRequest$authorizationType": "<p>Specifies the type of authorization used for the method.</p>",
+        "PutMethodResponseRequest$restApiId": "<p>The <a>RestApi</a> identifier for the <a>Method</a> resource.</p>",
+        "PutMethodResponseRequest$resourceId": "<p>The <a>Resource</a> identifier for the <a>Method</a> resource.</p>",
+        "PutMethodResponseRequest$httpMethod": "<p>The HTTP verb that identifies the <a>Method</a> resource.</p>",
+        "Resource$id": "<p>The resource's identifier.</p>",
+        "Resource$parentId": "<p>The parent resource's identifier.</p>",
+        "Resource$pathPart": "<p>The last path segment for this resource.</p>",
+        "Resource$path": "<p>The full path for this resource.</p>",
+        "Resources$position": null,
+        "RestApi$id": "<p>The API's identifier. This identifier is unique across all of your APIs in Amazon API Gateway.</p>",
+        "RestApi$name": "<p>The API's name.</p>",
+        "RestApi$description": "<p>The API's description.</p>",
+        "RestApis$position": null,
+        "SdkResponse$contentType": null,
+        "SdkResponse$contentDisposition": null,
+        "ServiceUnavailableException$retryAfterSeconds": null,
+        "ServiceUnavailableException$message": null,
+        "Stage$deploymentId": "<p>The identifier of the <a>Deployment</a> that the stage points to.</p>",
+        "Stage$clientCertificateId": null,
+        "Stage$stageName": "<p>The name of the stage is the first path segment in the Uniform Resource Identifier (URI) of a call to Amazon API Gateway.</p>",
+        "Stage$description": "<p>The stage's description.</p>",
+        "StageKey$restApiId": "<p>A list of <a>Stage</a> resources that are associated with the <a>ApiKey</a> resource.</p>",
+        "StageKey$stageName": "<p>The stage name in the <a>RestApi</a> that the stage key references.</p>",
+        "Template$value": "<p>The Apache <a target=\"_blank\" href=\"http://velocity.apache.org/engine/devel/vtl-reference-guide.html\">Velocity Template Language (VTL)</a> template content used for the template resource.</p>",
+        "TestInvokeMethodRequest$restApiId": null,
+        "TestInvokeMethodRequest$resourceId": null,
+        "TestInvokeMethodRequest$httpMethod": null,
+        "TestInvokeMethodRequest$pathWithQueryString": null,
+        "TestInvokeMethodRequest$body": null,
+        "TestInvokeMethodRequest$clientCertificateId": null,
+        "TestInvokeMethodResponse$body": "<p>The body of HTTP response.</p>",
+        "TestInvokeMethodResponse$log": "<p>The Amazon API Gateway execution log for the test invoke request.</p>",
+        "TooManyRequestsException$retryAfterSeconds": null,
+        "TooManyRequestsException$message": null,
+        "UnauthorizedException$message": null,
+        "UpdateApiKeyRequest$apiKey": "<p>The identifier of the <a>ApiKey</a> resource to be updated.</p>",
+        "UpdateBasePathMappingRequest$domainName": "<p>The domain name of the <a>BasePathMapping</a> resource to change.</p>",
+        "UpdateBasePathMappingRequest$basePath": "<p>The base path of the <a>BasePathMapping</a> resource to change.</p>",
+        "UpdateClientCertificateRequest$clientCertificateId": null,
+        "UpdateDeploymentRequest$restApiId": "<p>The replacement identifier of the <a>RestApi</a> resource for the <a>Deployment</a> resource to change information about.</p>",
+        "UpdateDeploymentRequest$deploymentId": "<p>The replacment identifier for the <a>Deployment</a> resource to change information about.</p>",
+        "UpdateDomainNameRequest$domainName": "<p>The name of the <a>DomainName</a> resource to be changed.</p>",
+        "UpdateIntegrationRequest$restApiId": "<p>Represents an update integration request's API identifier.</p>",
+        "UpdateIntegrationRequest$resourceId": "<p>Represents an update integration request's resource identifier.</p>",
+        "UpdateIntegrationRequest$httpMethod": "<p>Represents an update integration request's HTTP method.</p>",
+        "UpdateIntegrationResponseRequest$restApiId": "<p>Specifies an update integration response request's API identifier.</p>",
+        "UpdateIntegrationResponseRequest$resourceId": "<p>Specifies an update integration response request's resource identifier.</p>",
+        "UpdateIntegrationResponseRequest$httpMethod": "<p>Specifies an update integration response request's HTTP method.</p>",
+        "UpdateMethodRequest$restApiId": "<p>The <a>RestApi</a> identifier for the <a>Method</a> resource.</p>",
+        "UpdateMethodRequest$resourceId": "<p>The <a>Resource</a> identifier for the <a>Method</a> resource.</p>",
+        "UpdateMethodRequest$httpMethod": "<p>The HTTP verb that identifies the <a>Method</a> resource.</p>",
+        "UpdateMethodResponseRequest$restApiId": "<p>The <a>RestApi</a> identifier for the <a>MethodResponse</a> resource.</p>",
+        "UpdateMethodResponseRequest$resourceId": "<p>The <a>Resource</a> identifier for the <a>MethodResponse</a> resource.</p>",
+        "UpdateMethodResponseRequest$httpMethod": "<p>The HTTP verb identifier for the parent <a>Method</a> resource.</p>",
+        "UpdateModelRequest$restApiId": "<p>The <a>RestApi</a> identifier under which the model exists.</p>",
+        "UpdateModelRequest$modelName": "<p>The name of the model to update.</p>",
+        "UpdateResourceRequest$restApiId": "<p>The <a>RestApi</a> identifier for the <a>Resource</a> resource.</p>",
+        "UpdateResourceRequest$resourceId": "<p>The identifier of the <a>Resource</a> resource.</p>",
+        "UpdateRestApiRequest$restApiId": "<p>The ID of the <a>RestApi</a> you want to update.</p>",
+        "UpdateStageRequest$restApiId": "<p>The identifier of the <a>RestApi</a> resource for the <a>Stage</a> resource to change information about.</p>",
+        "UpdateStageRequest$stageName": "<p>The name of the <a>Stage</a> resource to change information about.</p>"
+      }
+    },
+    "Template": {
+      "base": "<p>Represents a mapping template used to transform a payload.</p>",
+      "refs": {
+      }
+    },
+    "TestInvokeMethodRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TestInvokeMethodResponse": {
+      "base": "<p>Represents the response of the test invoke request in HTTP method.</p>",
+      "refs": {
+      }
+    },
+    "ThrottleSettings": {
+      "base": "<p>Returns the throttle settings.</p>",
+      "refs": {
+        "Account$throttleSettings": "<p>Specifies the application programming interface (API) throttle settings for the current <a>Account</a> resource.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "ApiKey$createdDate": "<p>The date when the API Key was created, in <a target=\"_blank\" href=\"http://www.iso.org/iso/home/standards/iso8601.htm\">ISO 8601 format</a>.</p>",
+        "ApiKey$lastUpdatedDate": "<p>When the API Key was last updated, in ISO 8601 format.</p>",
+        "ClientCertificate$createdDate": null,
+        "ClientCertificate$expirationDate": null,
+        "Deployment$createdDate": "<p>The date and time that the deployment resource was created.</p>",
+        "DomainName$certificateUploadDate": "<p>The date when the certificate was uploaded, in <a target=\"_blank\" href=\"http://www.iso.org/iso/home/standards/iso8601.htm\">ISO 8601 format</a>.</p>",
+        "RestApi$createdDate": "<p>The date when the API was created, in <a target=\"_blank\" href=\"http://www.iso.org/iso/home/standards/iso8601.htm\">ISO 8601 format</a>.</p>",
+        "Stage$createdDate": "<p>The date and time that the stage was created, in <a target=\"_blank\" href=\"http://www.iso.org/iso/home/standards/iso8601.htm\">ISO 8601 format</a>.</p>",
+        "Stage$lastUpdatedDate": "<p>The date and time that information about the stage was last updated, in <a target=\"_blank\" href=\"http://www.iso.org/iso/home/standards/iso8601.htm\">ISO 8601 format</a>.</p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UnauthorizedException": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateAccountRequest": {
+      "base": "<p>Requests Amazon API Gateway to change information about the current <a>Account</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "UpdateApiKeyRequest": {
+      "base": "<p>A request to change information about an <a>ApiKey</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "UpdateBasePathMappingRequest": {
+      "base": "<p>A request to change information about the <a>BasePathMapping</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "UpdateClientCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateDeploymentRequest": {
+      "base": "<p>Requests Amazon API Gateway to change information about a <a>Deployment</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "UpdateDomainNameRequest": {
+      "base": "<p>A request to change information about the <a>DomainName</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "UpdateIntegrationRequest": {
+      "base": "<p>Represents an update integration request.</p>",
+      "refs": {
+      }
+    },
+    "UpdateIntegrationResponseRequest": {
+      "base": "<p>Represents an update integration response request.</p>",
+      "refs": {
+      }
+    },
+    "UpdateMethodRequest": {
+      "base": "<p>Request to update an existing <a>Method</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "UpdateMethodResponseRequest": {
+      "base": "<p>A request to update an existing <a>MethodResponse</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "UpdateModelRequest": {
+      "base": "<p>Request to update an existing model in an existing <a>RestApi</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "UpdateResourceRequest": {
+      "base": "<p>Request to change information about a <a>Resource</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "UpdateRestApiRequest": {
+      "base": "<p>Request to update an existing <a>RestApi</a> resource in your collection.</p>",
+      "refs": {
+      }
+    },
+    "UpdateStageRequest": {
+      "base": "<p>Requests Amazon API Gateway to change information about a <a>Stage</a> resource.</p>",
+      "refs": {
+      }
+    },
+    "op": {
+      "base": null,
+      "refs": {
+        "PatchOperation$op": "<p>A patch operation whose value indicates the operation to perform. Its value MUST be one of \"add\", \"remove\", \"replace\", \"move\", \"copy\", or \"test\"; other values are errors. </p>"
+      }
+    }
+  }
+}

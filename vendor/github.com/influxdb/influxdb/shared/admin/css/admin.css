@@ -1,0 +1,87 @@
+body {
+    padding-top: 70px;
+    /* Required padding for .navbar-fixed-top. Remove if using .navbar-static-top. Change if height of navigation changes. */
+}
+
+html,
+body {
+    height: 100%;
+    /* The html and body elements cannot have any padding or margin. */
+}
+
+code {
+    display: block;
+}
+
+#settings {
+    display: none;
+}
+
+#settings form > div {
+    margin-right: 20px;
+}
+
+#settings form input#port {
+    width: 80px;
+}
+
+#settings form label {
+    padding-right: 5px;
+}
+
+div#content {
+    margin-bottom: -10px;
+}
+
+div#table h2 {
+  color: #999;
+  margin-top: -8px;
+  font-size: 16px
+}
+
+textarea#content-data {
+    font-family: "Courier New";
+    height: 200px;
+}
+
+div#query-alerts {
+    margin-top: 30px;
+}
+
+div#modal-error, div#modal-success, div#query-error, div#query-success {
+    display: none; 
+}
+
+/* Wrapper for page content to push down footer */
+#wrap {
+    min-height: 100%;
+    height: auto !important;
+    height: 100%;
+    /* Negative indent footer by it's height */
+    margin: 0 auto -60px;
+}
+
+/* Set the fixed height of the footer here */
+#push,
+#footer {
+    height: 60px;
+}
+#footer {
+    background-color: #f5f5f5;
+    border-top: 1px solid #dfdfdf;
+}
+
+#footer p {
+    margin: 20px 0;
+}
+
+/* Lastly, apply responsive CSS fixes as necessary */
+@media (max-width: 767px) {
+    #footer {
+      margin-left: -20px;
+      margin-right: -20px;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+}
+

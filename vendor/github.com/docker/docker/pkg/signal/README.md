@@ -1,0 +1,1 @@
+This package provides helper functions for dealing with signals across various operating systems

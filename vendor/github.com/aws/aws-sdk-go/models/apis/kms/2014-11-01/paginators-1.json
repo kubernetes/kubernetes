@@ -1,0 +1,32 @@
+{
+  "pagination": {
+    "ListAliases": {
+      "limit_key": "Limit",
+      "input_token": "Marker",
+      "output_token": "NextMarker",
+      "more_results": "Truncated",
+      "result_key": "Aliases"
+    },
+    "ListGrants": {
+      "limit_key": "Limit",
+      "input_token": "Marker",
+      "output_token": "NextMarker",
+      "more_results": "Truncated",
+      "result_key": "Grants"
+    },
+    "ListKeyPolicies": {
+      "limit_key": "Limit",
+      "input_token": "Marker",
+      "output_token": "NextMarker",
+      "more_results": "Truncated",
+      "result_key": "PolicyNames"
+    },
+    "ListKeys": {
+      "limit_key": "Limit",
+      "input_token": "Marker",
+      "output_token": "NextMarker",
+      "more_results": "Truncated",
+      "result_key": "Keys"
+    }
+  }
+}

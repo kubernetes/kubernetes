@@ -1,0 +1,164 @@
+{
+  "pagination": {
+    "GetGroup": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "Users"
+    },
+    "ListAccessKeys": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "AccessKeyMetadata"
+    },
+    "ListAccountAliases": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "AccountAliases"
+    },
+    "ListAttachedGroupPolicies": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "AttachedPolicies"
+    },
+    "ListAttachedRolePolicies": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "AttachedPolicies"
+    },
+    "ListAttachedUserPolicies": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "AttachedPolicies"
+    },
+    "ListEntitiesForPolicy": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": [
+        "PolicyGroups",
+        "PolicyUsers",
+        "PolicyRoles"
+      ]
+    },
+    "ListGroupPolicies": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "PolicyNames"
+    },
+    "ListGroups": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "Groups"
+    },
+    "ListGroupsForUser": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "Groups"
+    },
+    "ListInstanceProfiles": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "InstanceProfiles"
+    },
+    "ListInstanceProfilesForRole": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "InstanceProfiles"
+    },
+    "ListMFADevices": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "MFADevices"
+    },
+    "ListPolicies": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "Policies"
+    },
+    "ListRolePolicies": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "PolicyNames"
+    },
+    "ListRoles": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "Roles"
+    },
+    "ListSAMLProviders": {
+      "result_key": "SAMLProviderList"
+    },
+    "ListServerCertificates": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "ServerCertificateMetadataList"
+    },
+    "ListSigningCertificates": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "Certificates"
+    },
+    "ListUserPolicies": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "PolicyNames"
+    },
+    "ListUsers": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "Users"
+    },
+    "ListVirtualMFADevices": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems",
+      "result_key": "VirtualMFADevices"
+    },
+    "GetAccountAuthorizationDetails": {
+      "input_token": "Marker",
+      "output_token": "Marker",
+      "more_results": "IsTruncated",
+      "limit_key": "MaxItems"
+    }
+  }
+}

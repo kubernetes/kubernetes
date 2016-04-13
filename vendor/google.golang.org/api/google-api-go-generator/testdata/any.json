@@ -1,0 +1,1018 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/WoU1Y-TPU2mFiyKWAKMijLjE-Hc\"",
+ "discoveryVersion": "v1",
+ "id": "logging:v1beta3",
+ "name": "logging",
+ "version": "v1beta3",
+ "revision": "20150326",
+ "title": "Google Cloud Logging API",
+ "description": "Google Cloud Logging API lets you create logs, ingest log entries, and manage log sinks.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "",
+ "protocol": "rest",
+ "baseUrl": "https://logging.googleapis.com/",
+ "basePath": "",
+ "rootUrl": "https://logging.googleapis.com/",
+ "servicePath": "",
+ "batchPath": "batch",
+ "parameters": {
+  "access_token": {
+   "type": "string",
+   "description": "OAuth access token.",
+   "location": "query"
+  },
+  "alt": {
+   "type": "string",
+   "description": "Data format for response.",
+   "default": "json",
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json",
+    "Media download with context-dependent Content-Type",
+    "Responses with Content-Type of application/x-protobuf"
+   ],
+   "location": "query"
+  },
+  "bearer_token": {
+   "type": "string",
+   "description": "OAuth bearer token.",
+   "location": "query"
+  },
+  "callback": {
+   "type": "string",
+   "description": "JSONP",
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "pp": {
+   "type": "boolean",
+   "description": "Pretty-print response.",
+   "default": "true",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+   "location": "query"
+  },
+  "$.xgafv": {
+   "type": "string",
+   "description": "V1 error format.",
+   "enumDescriptions": [
+    "v1 error format",
+    "v2 error format"
+   ],
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/cloud-platform": {
+     "description": "View and manage your data across Google Cloud Platform services"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "ListLogsResponse": {
+   "id": "ListLogsResponse",
+   "type": "object",
+   "description": "Result returned from ListLogs.",
+   "properties": {
+    "logs": {
+     "type": "array",
+     "description": "A list of log resources.",
+     "items": {
+      "$ref": "Log"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "If there are more results, then `nextPageToken` is returned in the response. To get the next batch of logs, use the value of `nextPageToken` as `pageToken` in the next call of `ListLogs`. If `nextPageToken` is empty, then there are no more results."
+    }
+   }
+  },
+  "Log": {
+   "id": "Log",
+   "type": "object",
+   "description": "A log object.",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "REQUIRED: The log's name name. Example: `\"compute.googleapis.com/activity_log\"`."
+    },
+    "displayName": {
+     "type": "string",
+     "description": "Name used when displaying the log to the user (for example, in a UI). Example: `\"activity_log\"`"
+    },
+    "payloadType": {
+     "type": "string",
+     "description": "Type URL describing the expected payload type for the log."
+    }
+   }
+  },
+  "Empty": {
+   "id": "Empty",
+   "type": "object",
+   "description": "A generic empty message that you can re-use to avoid defining duplicated empty messages in your APIs. A typical example is to use it as the request or the response type of an API method. For instance: service Foo { rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty); }"
+  },
+  "WriteLogEntriesRequest": {
+   "id": "WriteLogEntriesRequest",
+   "type": "object",
+   "description": "The parameters to WriteLogEntries.",
+   "properties": {
+    "commonLabels": {
+     "type": "object",
+     "description": "Metadata labels that apply to all entries in this request. If one of the log entries contains a (key, value) with the same key that is in `commonLabels`, then the entry's (key, value) overrides the one in `commonLabels`.",
+     "additionalProperties": {
+      "type": "string"
+     }
+    },
+    "entries": {
+     "type": "array",
+     "description": "Log entries to insert.",
+     "items": {
+      "$ref": "LogEntry"
+     }
+    }
+   }
+  },
+  "LogEntry": {
+   "id": "LogEntry",
+   "type": "object",
+   "description": "An individual entry in a log.",
+   "properties": {
+    "metadata": {
+     "$ref": "LogEntryMetadata",
+     "description": "Information about the log entry."
+    },
+    "protoPayload": {
+     "type": "object",
+     "description": "The log entry payload, represented as a protocol buffer that is expressed as a JSON object. You can only pass `protoPayload` values that belong to a set of approved types.",
+     "additionalProperties": {
+      "type": "any",
+      "description": "Properties of the object. Contains field @ype with type URL."
+     }
+    },
+    "textPayload": {
+     "type": "string",
+     "description": "The log entry payload, represented as a text string."
+    },
+    "structPayload": {
+     "type": "object",
+     "description": "The log entry payload, represented as a structure that is expressed as a JSON object.",
+     "additionalProperties": {
+      "type": "any",
+      "description": "Properties of the object."
+     }
+    },
+    "insertId": {
+     "type": "string",
+     "description": "A unique ID for the log entry. If you provide this field, the logging service considers other log entries in the same log with the same ID as duplicates which can be removed."
+    },
+    "log": {
+     "type": "string",
+     "description": "The log to which this entry belongs. When a log entry is ingested, the value of this field is set by the logging system."
+    }
+   }
+  },
+  "LogEntryMetadata": {
+   "id": "LogEntryMetadata",
+   "type": "object",
+   "description": "Additional data that is associated with a log entry, set by the service creating the log entry.",
+   "properties": {
+    "timestamp": {
+     "type": "string",
+     "description": "The time the event described by the log entry occurred. Timestamps must be later than January 1, 1970."
+    },
+    "severity": {
+     "type": "string",
+     "description": "The severity of the log entry.",
+     "default": "EMERGENCY",
+     "enum": [
+      "DEFAULT",
+      "DEBUG",
+      "INFO",
+      "NOTICE",
+      "WARNING",
+      "ERROR",
+      "CRITICAL",
+      "ALERT",
+      "EMERGENCY"
+     ],
+     "enumDescriptions": [
+      "This is the DEFAULT description",
+      "This is the DEBUG description",
+      "This is the INFO description",
+      "This is the NOTICE description",
+      "This is the WARNING description",
+      "This is the ERROR description",
+      "This is the CRITICAL description",
+      "This is the ALERT description",
+      "This is the EMERGENCY description"
+     ]
+    },
+    "projectId": {
+     "type": "string",
+     "description": "The project ID of the Google Cloud Platform service that created the log entry."
+    },
+    "serviceName": {
+     "type": "string",
+     "description": "The API name of the Google Cloud Platform service that created the log entry. For example, `\"compute.googleapis.com\"`."
+    },
+    "region": {
+     "type": "string",
+     "description": "The region name of the Google Cloud Platform service that created the log entry. For example, `\"us-central1\"`."
+    },
+    "zone": {
+     "type": "string",
+     "description": "The zone of the Google Cloud Platform service that created the log entry. For example, `\"us-central1-a\"`."
+    },
+    "userId": {
+     "type": "string",
+     "description": "The fully-qualified email address of the authenticated user that performed or requested the action represented by the log entry. If the log entry does not apply to an action taken by an authenticated user, then the field should be empty."
+    },
+    "labels": {
+     "type": "object",
+     "description": "A set of (key, value) data that provides additional information about the log entry. If the log entry is from one of the Google Cloud Platform sources listed below, the indicated (key, value) information must be provided: Google App Engine, service_name `appengine.googleapis.com`: \"appengine.googleapis.com/module_id\",  \"appengine.googleapis.com/version_id\",  and one of: \"appengine.googleapis.com/replica_index\",  \"appengine.googleapis.com/clone_id\",  or else provide the following Compute Engine labels: Google Compute Engine, service_name `compute.googleapis.com`: \"compute.googleapis.com/resource_type\", \"instance\" \"compute.googleapis.com/resource_id\",",
+     "additionalProperties": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "WriteLogEntriesResponse": {
+   "id": "WriteLogEntriesResponse",
+   "type": "object",
+   "description": "Result returned from WriteLogEntries. empty"
+  },
+  "ListLogServicesResponse": {
+   "id": "ListLogServicesResponse",
+   "type": "object",
+   "description": "Result returned from `ListLogServicesRequest`.",
+   "properties": {
+    "logServices": {
+     "type": "array",
+     "description": "A list of log services.",
+     "items": {
+      "$ref": "LogService"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "If there are more results, then `nextPageToken` is returned in the response. To get the next batch of services, use the value of `nextPageToken` as `pageToken` in the next call of `ListLogServices`. If `nextPageToken` is empty, then there are no more results."
+    }
+   }
+  },
+  "LogService": {
+   "id": "LogService",
+   "type": "object",
+   "description": "A log service object.",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "The service's name."
+    },
+    "indexKeys": {
+     "type": "array",
+     "description": "Label keys used when labeling log entries for this service. The order of the keys is significant, with higher priority keys coming earlier in the list.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "ListLogServiceIndexesResponse": {
+   "id": "ListLogServiceIndexesResponse",
+   "type": "object",
+   "description": "Result returned from ListLogServiceIndexesRequest.",
+   "properties": {
+    "serviceIndexPrefixes": {
+     "type": "array",
+     "description": "A list of log service index prefixes.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "If there are more results, then `nextPageToken` is returned in the response. To get the next batch of indexes, use the value of `nextPageToken` as `pageToken` in the next call of `ListLogServiceIndexess`. If `nextPageToken` is empty, then there are no more results."
+    }
+   }
+  },
+  "ListLogSinksResponse": {
+   "id": "ListLogSinksResponse",
+   "type": "object",
+   "description": "Result returned from `ListLogSinks`.",
+   "properties": {
+    "sinks": {
+     "type": "array",
+     "description": "The requested log sinks. If any of the returned `LogSink` objects have an empty `destination` field, then call `logServices.sinks.get` to retrieve the complete `LogSink` object.",
+     "items": {
+      "$ref": "LogSink"
+     }
+    }
+   }
+  },
+  "LogSink": {
+   "id": "LogSink",
+   "type": "object",
+   "description": "An object that describes where a log may be written.",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "The name of this sink. This is a client-assigned identifier for the resource. This is ignored by UpdateLogSink and UpdateLogServicesSink."
+    },
+    "destination": {
+     "type": "string",
+     "description": "The resource to send log entries to. The supported sink resource types are: + Google Cloud Storage: `storage.googleapis.com/BUCKET` or `BUCKET.storage.googleapis.com/` + Google BigQuery: `bigquery.googleapis.com/projects/PROJECT/datasets/DATASET` Currently the Cloud Logging API supports at most one sink for each resource type per log or log service resource."
+    },
+    "errors": {
+     "type": "array",
+     "description": "_Output only._ All active errors found for this sink.",
+     "items": {
+      "$ref": "LogError"
+     }
+    }
+   }
+  },
+  "LogError": {
+   "id": "LogError",
+   "type": "object",
+   "description": "A problem in a sink or the sink's configuration.",
+   "properties": {
+    "resource": {
+     "type": "string",
+     "description": "The resource associated with the error. It may be different from the sink destination. For example, the sink may point to a BigQuery dataset, but the error may refer to a table resource inside the dataset."
+    },
+    "status": {
+     "$ref": "Status",
+     "description": "The description of the last error observed."
+    },
+    "timeNanos": {
+     "type": "string",
+     "description": "The last time the error was observed, in nanoseconds since the Unix epoch.",
+     "format": "int64"
+    }
+   }
+  },
+  "Status": {
+   "id": "Status",
+   "type": "object",
+   "description": "Represents the RPC error status for Google APIs. See http://go/errormodel for details.",
+   "properties": {
+    "code": {
+     "type": "integer",
+     "description": "The status code, which should be an enum value of [google.rpc.Code][].",
+     "format": "int32"
+    },
+    "message": {
+     "type": "string",
+     "description": "A developer-facing error message, which should be in English. The user-facing error message should be localized and stored in the [google.rpc.Status.details][google.rpc.Status.details] field."
+    },
+    "details": {
+     "type": "array",
+     "description": "A list of messages that carry the error details. There will be a common set of message types for APIs to use.",
+     "items": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "any",
+       "description": "Properties of the object. Contains field @ype with type URL."
+      }
+     }
+    }
+   }
+  },
+  "ListLogServiceSinksResponse": {
+   "id": "ListLogServiceSinksResponse",
+   "type": "object",
+   "description": "Result returned from `ListLogServiceSinks`.",
+   "properties": {
+    "sinks": {
+     "type": "array",
+     "description": "The requested log service sinks. If any of the returned `LogSink` objects have an empty `destination` field, then call `logServices.sinks.get` to retrieve the complete `LogSink` object.",
+     "items": {
+      "$ref": "LogSink"
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "projects": {
+   "resources": {
+    "logs": {
+     "methods": {
+      "list": {
+       "id": "logging.projects.logs.list",
+       "path": "v1beta3/projects/{projectsId}/logs",
+       "httpMethod": "GET",
+       "description": "Lists log resources belonging to the specified project.",
+       "parameters": {
+        "projectsId": {
+         "type": "string",
+         "description": "Part of `projectName`. The project name for which to list the log resources.",
+         "required": true,
+         "location": "path"
+        },
+        "serviceName": {
+         "type": "string",
+         "description": "A service name for which to list logs. Only logs containing entries whose metadata includes this service name are returned. If `serviceName` and `serviceIndexPrefix` are both empty, then all log names are returned. To list all log names, regardless of service, leave both the `serviceName` and `serviceIndexPrefix` empty. To list log names containing entries with a particular service name (or explicitly empty service name) set `serviceName` to the desired value and `serviceIndexPrefix` to `\"/\"`.",
+         "location": "query"
+        },
+        "serviceIndexPrefix": {
+         "type": "string",
+         "description": "A log service index prefix for which to list logs. Only logs containing entries whose metadata that includes these label values (associated with index keys) are returned. The prefix is a slash separated list of values, and need not specify all index labels. An empty index (or a single slash) matches all log service indexes.",
+         "location": "query"
+        },
+        "pageSize": {
+         "type": "integer",
+         "description": "The maximum number of results to return.",
+         "format": "int32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "An opaque token, returned as `nextPageToken` by a prior `ListLogs` operation. If `pageToken` is supplied, then the other fields of this request are ignored, and instead the previous `ListLogs` operation is continued.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "projectsId"
+       ],
+       "response": {
+        "$ref": "ListLogsResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/cloud-platform"
+       ]
+      },
+      "delete": {
+       "id": "logging.projects.logs.delete",
+       "path": "v1beta3/projects/{projectsId}/logs/{logsId}",
+       "httpMethod": "DELETE",
+       "description": "Deletes the specified log resource and all log entries contained in it.",
+       "parameters": {
+        "projectsId": {
+         "type": "string",
+         "description": "Part of `logName`. The log resource to delete.",
+         "required": true,
+         "location": "path"
+        },
+        "logsId": {
+         "type": "string",
+         "description": "Part of `logName`. See documentation of `projectsId`.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "projectsId",
+        "logsId"
+       ],
+       "response": {
+        "$ref": "Empty"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/cloud-platform"
+       ]
+      }
+     },
+     "resources": {
+      "entries": {
+       "methods": {
+        "write": {
+         "id": "logging.projects.logs.entries.write",
+         "path": "v1beta3/projects/{projectsId}/logs/{logsId}/entries:write",
+         "httpMethod": "POST",
+         "description": "Creates one or more log entries in a log. You must supply a list of `LogEntry` objects, named `entries`. Each `LogEntry` object must contain a payload object and a `LogEntryMetadata` object that describes the entry. You must fill in all the fields of the entry, metadata, and payload. You can also supply a map, `commonLabels`, that supplies default (key, value) data for the `entries[].metadata.labels` maps, saving you the trouble of creating identical copies for each entry.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `logName`. The name of the log resource into which to insert the log entries.",
+           "required": true,
+           "location": "path"
+          },
+          "logsId": {
+           "type": "string",
+           "description": "Part of `logName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logsId"
+         ],
+         "request": {
+          "$ref": "WriteLogEntriesRequest"
+         },
+         "response": {
+          "$ref": "WriteLogEntriesResponse"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        }
+       }
+      },
+      "sinks": {
+       "methods": {
+        "list": {
+         "id": "logging.projects.logs.sinks.list",
+         "path": "v1beta3/projects/{projectsId}/logs/{logsId}/sinks",
+         "httpMethod": "GET",
+         "description": "Lists log sinks associated with the specified log.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `logName`. The log for which to list sinks.",
+           "required": true,
+           "location": "path"
+          },
+          "logsId": {
+           "type": "string",
+           "description": "Part of `logName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logsId"
+         ],
+         "response": {
+          "$ref": "ListLogSinksResponse"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        },
+        "get": {
+         "id": "logging.projects.logs.sinks.get",
+         "path": "v1beta3/projects/{projectsId}/logs/{logsId}/sinks/{sinksId}",
+         "httpMethod": "GET",
+         "description": "Gets the specified log sink resource.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `sinkName`. The name of the sink resource to return.",
+           "required": true,
+           "location": "path"
+          },
+          "logsId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          },
+          "sinksId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logsId",
+          "sinksId"
+         ],
+         "response": {
+          "$ref": "LogSink"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        },
+        "create": {
+         "id": "logging.projects.logs.sinks.create",
+         "path": "v1beta3/projects/{projectsId}/logs/{logsId}/sinks",
+         "httpMethod": "POST",
+         "description": "Creates the specified log sink resource.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `logName`. The log in which to create a sink resource.",
+           "required": true,
+           "location": "path"
+          },
+          "logsId": {
+           "type": "string",
+           "description": "Part of `logName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logsId"
+         ],
+         "request": {
+          "$ref": "LogSink"
+         },
+         "response": {
+          "$ref": "LogSink"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        },
+        "update": {
+         "id": "logging.projects.logs.sinks.update",
+         "path": "v1beta3/projects/{projectsId}/logs/{logsId}/sinks/{sinksId}",
+         "httpMethod": "PUT",
+         "description": "Creates or updates the specified log sink resource.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `sinkName`. The name of the sink to update.",
+           "required": true,
+           "location": "path"
+          },
+          "logsId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          },
+          "sinksId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logsId",
+          "sinksId"
+         ],
+         "request": {
+          "$ref": "LogSink"
+         },
+         "response": {
+          "$ref": "LogSink"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        },
+        "delete": {
+         "id": "logging.projects.logs.sinks.delete",
+         "path": "v1beta3/projects/{projectsId}/logs/{logsId}/sinks/{sinksId}",
+         "httpMethod": "DELETE",
+         "description": "Deletes the specified log sink resource.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `sinkName`. The name of the sink to delete.",
+           "required": true,
+           "location": "path"
+          },
+          "logsId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          },
+          "sinksId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logsId",
+          "sinksId"
+         ],
+         "response": {
+          "$ref": "Empty"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        }
+       }
+      }
+     }
+    },
+    "logServices": {
+     "methods": {
+      "list": {
+       "id": "logging.projects.logServices.list",
+       "path": "v1beta3/projects/{projectsId}/logServices",
+       "httpMethod": "GET",
+       "description": "Lists log services associated with log entries ingested for a project.",
+       "parameters": {
+        "projectsId": {
+         "type": "string",
+         "description": "Part of `projectName`. The project resource whose services are to be listed.",
+         "required": true,
+         "location": "path"
+        },
+        "log": {
+         "type": "string",
+         "description": "The name of the log resource whose services are to be listed. log for which to list services. When empty, all services are listed.",
+         "location": "query"
+        },
+        "pageSize": {
+         "type": "integer",
+         "description": "The maximum number of `LogService` objects to return in one operation.",
+         "format": "int32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "An opaque token, returned as `nextPageToken` by a prior `ListLogServices` operation. If `pageToken` is supplied, then the other fields of this request are ignored, and instead the previous `ListLogServices` operation is continued.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "projectsId"
+       ],
+       "response": {
+        "$ref": "ListLogServicesResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/cloud-platform"
+       ]
+      }
+     },
+     "resources": {
+      "indexes": {
+       "methods": {
+        "list": {
+         "id": "logging.projects.logServices.indexes.list",
+         "path": "v1beta3/projects/{projectsId}/logServices/{logServicesId}/indexes",
+         "httpMethod": "GET",
+         "description": "Lists log service indexes associated with a log service.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `serviceName`. A log service resource of the form `/projects/*/logServices/*`. The service indexes of the log service are returned. Example: `\"/projects/myProj/logServices/appengine.googleapis.com\"`.",
+           "required": true,
+           "location": "path"
+          },
+          "logServicesId": {
+           "type": "string",
+           "description": "Part of `serviceName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          },
+          "indexPrefix": {
+           "type": "string",
+           "description": "Restricts the indexes returned to be those with a specified prefix. The prefix has the form `\"/label_value/label_value/...\"`, in order corresponding to the [`LogService indexKeys`][google.logging.v1.LogService.index_keys]. Non-empty prefixes must begin with `/` . Example prefixes: + `\"/myModule/\"` retrieves App Engine versions associated with `myModule`. The trailing slash terminates the value. + `\"/myModule\"` retrieves App Engine modules with names beginning with `myModule`. + `\"\"` retrieves all indexes.",
+           "location": "query"
+          },
+          "depth": {
+           "type": "integer",
+           "description": "A limit to the number of levels of the index hierarchy that are expanded. If `depth` is 0, it defaults to the level specified by the prefix field (the number of slash separators). The default empty prefix implies a `depth` of 1. It is an error for `depth` to be any non-zero value less than the number of components in `indexPrefix`.",
+           "format": "int32",
+           "location": "query"
+          },
+          "log": {
+           "type": "string",
+           "description": "A log resource like `/projects/project_id/logs/log_name`, identifying the log for which to list service indexes.",
+           "location": "query"
+          },
+          "pageSize": {
+           "type": "integer",
+           "description": "The maximum number of log service index resources to return in one operation.",
+           "format": "int32",
+           "location": "query"
+          },
+          "pageToken": {
+           "type": "string",
+           "description": "An opaque token, returned as `nextPageToken` by a prior `ListLogServiceIndexes` operation. If `pageToken` is supplied, then the other fields of this request are ignored, and instead the previous `ListLogServiceIndexes` operation is continued.",
+           "location": "query"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logServicesId"
+         ],
+         "response": {
+          "$ref": "ListLogServiceIndexesResponse"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        }
+       }
+      },
+      "sinks": {
+       "methods": {
+        "list": {
+         "id": "logging.projects.logServices.sinks.list",
+         "path": "v1beta3/projects/{projectsId}/logServices/{logServicesId}/sinks",
+         "httpMethod": "GET",
+         "description": "Lists log service sinks associated with the specified service.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `serviceName`. The name of the service for which to list sinks.",
+           "required": true,
+           "location": "path"
+          },
+          "logServicesId": {
+           "type": "string",
+           "description": "Part of `serviceName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logServicesId"
+         ],
+         "response": {
+          "$ref": "ListLogServiceSinksResponse"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        },
+        "get": {
+         "id": "logging.projects.logServices.sinks.get",
+         "path": "v1beta3/projects/{projectsId}/logServices/{logServicesId}/sinks/{sinksId}",
+         "httpMethod": "GET",
+         "description": "Gets the specified log service sink resource.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `sinkName`. The name of the sink to return.",
+           "required": true,
+           "location": "path"
+          },
+          "logServicesId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          },
+          "sinksId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logServicesId",
+          "sinksId"
+         ],
+         "response": {
+          "$ref": "LogSink"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        },
+        "create": {
+         "id": "logging.projects.logServices.sinks.create",
+         "path": "v1beta3/projects/{projectsId}/logServices/{logServicesId}/sinks",
+         "httpMethod": "POST",
+         "description": "Creates the specified log service sink resource.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `serviceName`. The name of the service in which to create a sink.",
+           "required": true,
+           "location": "path"
+          },
+          "logServicesId": {
+           "type": "string",
+           "description": "Part of `serviceName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logServicesId"
+         ],
+         "request": {
+          "$ref": "LogSink"
+         },
+         "response": {
+          "$ref": "LogSink"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        },
+        "update": {
+         "id": "logging.projects.logServices.sinks.update",
+         "path": "v1beta3/projects/{projectsId}/logServices/{logServicesId}/sinks/{sinksId}",
+         "httpMethod": "PUT",
+         "description": "Creates or update the specified log service sink resource.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `sinkName`. The name of the sink to update.",
+           "required": true,
+           "location": "path"
+          },
+          "logServicesId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          },
+          "sinksId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logServicesId",
+          "sinksId"
+         ],
+         "request": {
+          "$ref": "LogSink"
+         },
+         "response": {
+          "$ref": "LogSink"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        },
+        "delete": {
+         "id": "logging.projects.logServices.sinks.delete",
+         "path": "v1beta3/projects/{projectsId}/logServices/{logServicesId}/sinks/{sinksId}",
+         "httpMethod": "DELETE",
+         "description": "Deletes the specified log service sink.",
+         "parameters": {
+          "projectsId": {
+           "type": "string",
+           "description": "Part of `sinkName`. The name of the sink to delete.",
+           "required": true,
+           "location": "path"
+          },
+          "logServicesId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          },
+          "sinksId": {
+           "type": "string",
+           "description": "Part of `sinkName`. See documentation of `projectsId`.",
+           "required": true,
+           "location": "path"
+          }
+         },
+         "parameterOrder": [
+          "projectsId",
+          "logServicesId",
+          "sinksId"
+         ],
+         "response": {
+          "$ref": "Empty"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,212 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/qJOZypus2JZqrrIOB0BaiZ76VFY\"",
+ "discoveryVersion": "v1",
+ "id": "cloudlatencytest:v2",
+ "name": "cloudlatencytest",
+ "version": "v2",
+ "revision": "20150206",
+ "title": "Google Cloud Network Performance Monitoring API",
+ "description": "A Test API to report latency data.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "",
+ "protocol": "rest",
+ "baseUrl": "https://cloudlatencytest-pa.googleapis.com/v2/statscollection/",
+ "basePath": "/v2/statscollection/",
+ "rootUrl": "https://cloudlatencytest-pa.googleapis.com/",
+ "servicePath": "v2/statscollection/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/monitoring.readonly": {
+     "description": "View monitoring data for all of your Google Cloud and API projects"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "AggregatedStats": {
+   "id": "AggregatedStats",
+   "type": "object",
+   "properties": {
+    "stats": {
+     "type": "array",
+     "items": {
+      "$ref": "Stats"
+     }
+    }
+   }
+  },
+  "AggregatedStatsReply": {
+   "id": "AggregatedStatsReply",
+   "type": "object",
+   "properties": {
+    "testValue": {
+     "type": "string"
+    }
+   }
+  },
+  "DoubleValue": {
+   "id": "DoubleValue",
+   "type": "object",
+   "properties": {
+    "label": {
+     "type": "string"
+    },
+    "value": {
+     "type": "number",
+     "format": "float"
+    }
+   }
+  },
+  "IntValue": {
+   "id": "IntValue",
+   "type": "object",
+   "properties": {
+    "label": {
+     "type": "string"
+    },
+    "value": {
+     "type": "string",
+     "format": "int64"
+    }
+   }
+  },
+  "Stats": {
+   "id": "Stats",
+   "type": "object",
+   "properties": {
+    "doubleValues": {
+     "type": "array",
+     "items": {
+      "$ref": "DoubleValue"
+     }
+    },
+    "intValues": {
+     "type": "array",
+     "items": {
+      "$ref": "IntValue"
+     }
+    },
+    "stringValues": {
+     "type": "array",
+     "items": {
+      "$ref": "StringValue"
+     }
+    },
+    "time": {
+     "type": "number",
+     "format": "double"
+    }
+   }
+  },
+  "StatsReply": {
+   "id": "StatsReply",
+   "type": "object",
+   "properties": {
+    "testValue": {
+     "type": "string"
+    }
+   }
+  },
+  "StringValue": {
+   "id": "StringValue",
+   "type": "object",
+   "properties": {
+    "label": {
+     "type": "string"
+    },
+    "value": {
+     "type": "string"
+    }
+   }
+  }
+ },
+ "resources": {
+  "statscollection": {
+   "methods": {
+    "updateaggregatedstats": {
+     "id": "cloudlatencytest.statscollection.updateaggregatedstats",
+     "path": "updateaggregatedstats",
+     "httpMethod": "POST",
+     "description": "RPC to update the new TCP stats.",
+     "request": {
+      "$ref": "AggregatedStats"
+     },
+     "response": {
+      "$ref": "AggregatedStatsReply"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/monitoring.readonly"
+     ]
+    },
+    "updatestats": {
+     "id": "cloudlatencytest.statscollection.updatestats",
+     "path": "updatestats",
+     "httpMethod": "POST",
+     "description": "RPC to update the new TCP stats.",
+     "request": {
+      "$ref": "Stats"
+     },
+     "response": {
+      "$ref": "StatsReply"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/monitoring.readonly"
+     ]
+    }
+   }
+  }
+ }
+}

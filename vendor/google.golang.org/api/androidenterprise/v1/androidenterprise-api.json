@@ -1,0 +1,2991 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/Is5ylelsw5UqvuGXXB6cSzQKB_A\"",
+ "discoveryVersion": "v1",
+ "id": "androidenterprise:v1",
+ "name": "androidenterprise",
+ "canonicalName": "Android Enterprise",
+ "version": "v1",
+ "revision": "20151215",
+ "title": "Google Play EMM API",
+ "description": "Allows MDMs/EMMs and enterprises to manage the deployment of apps to Android for Work users.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "https://www.google.com/images/icons/product/android-16.png",
+  "x32": "https://www.google.com/images/icons/product/android-32.png"
+ },
+ "documentationLink": "https://developers.google.com/android/work/play/emm-api",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/androidenterprise/v1/",
+ "basePath": "/androidenterprise/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "androidenterprise/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/androidenterprise": {
+     "description": "Manage corporate Android devices"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "AppRestrictionsSchema": {
+   "id": "AppRestrictionsSchema",
+   "type": "object",
+   "description": "Represents the list of app restrictions available to be pre-configured for the product.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#appRestrictionsSchema\".",
+     "default": "androidenterprise#appRestrictionsSchema"
+    },
+    "restrictions": {
+     "type": "array",
+     "description": "The set of restrictions that make up this schema.",
+     "items": {
+      "$ref": "AppRestrictionsSchemaRestriction"
+     }
+    }
+   }
+  },
+  "AppRestrictionsSchemaRestriction": {
+   "id": "AppRestrictionsSchemaRestriction",
+   "type": "object",
+   "description": "A restriction in the App Restriction Schema represents a piece of configuration that may be pre-applied.",
+   "properties": {
+    "defaultValue": {
+     "$ref": "AppRestrictionsSchemaRestrictionRestrictionValue",
+     "description": "The default value of the restriction."
+    },
+    "description": {
+     "type": "string",
+     "description": "A longer description of the restriction, giving more detail of what it affects."
+    },
+    "entry": {
+     "type": "array",
+     "description": "For choice or multiselect restrictions, the list of possible entries' human-readable names.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "entryValue": {
+     "type": "array",
+     "description": "For choice or multiselect restrictions, the list of possible entries' machine-readable values.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "key": {
+     "type": "string",
+     "description": "The unique key that the product uses to identify the restriction, e.g. \"com.google.android.gm.fieldname\"."
+    },
+    "restrictionType": {
+     "type": "string",
+     "description": "The type of the restriction."
+    },
+    "title": {
+     "type": "string",
+     "description": "The name of the restriction."
+    }
+   }
+  },
+  "AppRestrictionsSchemaRestrictionRestrictionValue": {
+   "id": "AppRestrictionsSchemaRestrictionRestrictionValue",
+   "type": "object",
+   "description": "A typed value for the restriction.",
+   "properties": {
+    "type": {
+     "type": "string",
+     "description": "The type of the value being provided."
+    },
+    "valueBool": {
+     "type": "boolean",
+     "description": "The boolean value - this will only be present if type is bool."
+    },
+    "valueInteger": {
+     "type": "integer",
+     "description": "The integer value - this will only be present if type is integer.",
+     "format": "int32"
+    },
+    "valueMultiselect": {
+     "type": "array",
+     "description": "The list of string values - this will only be present if type is multiselect.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "valueString": {
+     "type": "string",
+     "description": "The string value - this will be present for types string, choice and hidden."
+    }
+   }
+  },
+  "AppVersion": {
+   "id": "AppVersion",
+   "type": "object",
+   "description": "This represents a single version of the app.",
+   "properties": {
+    "versionCode": {
+     "type": "integer",
+     "description": "Unique increasing identifier for the app version.",
+     "format": "int32"
+    },
+    "versionString": {
+     "type": "string",
+     "description": "The string used in the Play Store by the app developer to identify the version. The string is not necessarily unique or localized (for example, the string could be \"1.4\")."
+    }
+   }
+  },
+  "ApprovalUrlInfo": {
+   "id": "ApprovalUrlInfo",
+   "type": "object",
+   "description": "Information on an approval URL.",
+   "properties": {
+    "approvalUrl": {
+     "type": "string",
+     "description": "A URL that displays a product's permissions and that can also be used to approve the product with the Products.approve call."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#approvalUrlInfo\".",
+     "default": "androidenterprise#approvalUrlInfo"
+    }
+   }
+  },
+  "Collection": {
+   "id": "Collection",
+   "type": "object",
+   "description": "A collection resource defines a named set of apps that is visible to a set of users in the Google Play Store app running on those users' managed devices. Those users can then install any of those apps if they wish (which will trigger creation of install and entitlement resources). A user cannot install an app on a managed device unless the app is listed in at least one collection that is visible to that user.\n\nNote that the API can be used to directly install an app regardless of whether it is in any collection - so an enterprise has a choice of either directly pushing apps to users, or allowing users to install apps if they want. Which is appropriate will depend on the enterprise's policies and the purpose of the apps concerned.",
+   "properties": {
+    "collectionId": {
+     "type": "string",
+     "description": "Arbitrary unique ID, allocated by the API on creation."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#collection\".",
+     "default": "androidenterprise#collection"
+    },
+    "name": {
+     "type": "string",
+     "description": "A user-friendly name for the collection (should be unique), e.g. \"Accounting apps\".",
+     "annotations": {
+      "required": [
+       "androidenterprise.collections.insert",
+       "androidenterprise.collections.update"
+      ]
+     }
+    },
+    "productId": {
+     "type": "array",
+     "description": "The IDs of the products in the collection, in the order in which they should be displayed.",
+     "items": {
+      "type": "string"
+     },
+     "annotations": {
+      "required": [
+       "androidenterprise.collections.insert",
+       "androidenterprise.collections.update"
+      ]
+     }
+    },
+    "visibility": {
+     "type": "string",
+     "description": "Whether this collection is visible to all users, or only to the users that have been granted access through the \"Collectionviewers\" API. With the launch of the \"setAvailableProductSet\" API, this property should always be set to \"viewersOnly\", as the \"allUsers\" option will bypass the \"availableProductSet\" for all users within a domain.\n\nThe \"allUsers\" setting is deprecated, and will be removed."
+    }
+   }
+  },
+  "CollectionViewersListResponse": {
+   "id": "CollectionViewersListResponse",
+   "type": "object",
+   "description": "The user resources for the collection.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#collectionViewersListResponse\".",
+     "default": "androidenterprise#collectionViewersListResponse"
+    },
+    "user": {
+     "type": "array",
+     "description": "A user of an enterprise.",
+     "items": {
+      "$ref": "User"
+     }
+    }
+   }
+  },
+  "CollectionsListResponse": {
+   "id": "CollectionsListResponse",
+   "type": "object",
+   "description": "The collection resources for the enterprise.",
+   "properties": {
+    "collection": {
+     "type": "array",
+     "description": "An ordered collection of products which can be made visible on the Google Play Store to a selected group of users.",
+     "items": {
+      "$ref": "Collection"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#collectionsListResponse\".",
+     "default": "androidenterprise#collectionsListResponse"
+    }
+   }
+  },
+  "Device": {
+   "id": "Device",
+   "type": "object",
+   "description": "A device resource represents a mobile device managed by the MDM and belonging to a specific enterprise user.\n\nThis collection cannot be modified via the API; it is automatically populated as devices are set up to be managed.",
+   "properties": {
+    "androidId": {
+     "type": "string",
+     "description": "The Google Play Services Android ID for the device encoded as a lowercase hex string, e.g. \"123456789abcdef0\"."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#device\".",
+     "default": "androidenterprise#device"
+    },
+    "managementType": {
+     "type": "string",
+     "description": "The mechanism by which this device is managed by the MDM. \"managedDevice\" means that the MDM's app is a device owner. \"managedProfile\" means that the MDM's app is the profile owner (and there is a separate personal profile which is not managed). \"containerApp\" means that the MDM's app is managing the Android for Work container app on the device."
+    }
+   }
+  },
+  "DeviceState": {
+   "id": "DeviceState",
+   "type": "object",
+   "description": "The state of a user's device, as accessed by the getState and setState methods on device resources.",
+   "properties": {
+    "accountState": {
+     "type": "string",
+     "description": "The state of the Google account on the device. \"enabled\" indicates that the Google account on the device can be used to access Google services (including Google Play), while \"disabled\" means that it cannot. A new device is initially in the \"disabled\" state."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#deviceState\".",
+     "default": "androidenterprise#deviceState"
+    }
+   }
+  },
+  "DevicesListResponse": {
+   "id": "DevicesListResponse",
+   "type": "object",
+   "description": "The device resources for the user.",
+   "properties": {
+    "device": {
+     "type": "array",
+     "description": "A managed device.",
+     "items": {
+      "$ref": "Device"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#devicesListResponse\".",
+     "default": "androidenterprise#devicesListResponse"
+    }
+   }
+  },
+  "Enterprise": {
+   "id": "Enterprise",
+   "type": "object",
+   "description": "An enterprise resource represents a binding between an organisation and their MDM.\n\nTo create an enterprise, an admin of the enterprise must first go through a Play for Work sign-up flow. At the end of this the admin will be presented with a token (a short opaque alphanumeric string). They must then present this to the MDM, who then supplies it to the enroll method. Until this is done the MDM will not have any access to the enterprise.\n\nAfter calling enroll the MDM should call setAccount to specify the service account that will be allowed to act on behalf of the enterprise, which will be required for access to the enterprise's data through this API. Only one call of setAccount is allowed for a given enterprise; the only way to change the account later is to unenroll the enterprise and enroll it again (obtaining a new token).\n\nThe MDM can unenroll an enterprise in order to sever the binding between them. Re-enrolling an enterprise is possible, but requires a new token to be retrieved. Enterprises.unenroll requires the MDM's credentials (as enroll does), not the enterprise's. Enterprises.unenroll can only be used for enterprises that were previously enrolled with the enroll call. Any enterprises that were enrolled using the (deprecated) Enterprises.insert call must be unenrolled with Enterprises.delete and can then be re-enrolled using the Enterprises.enroll call.\n\nThe ID for an enterprise is an opaque string. It is returned by insert and enroll and can also be retrieved if the enterprise's primary domain is known using the list method.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The unique ID for the enterprise."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#enterprise\".",
+     "default": "androidenterprise#enterprise"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the enterprise, e.g. \"Example Inc\"."
+    },
+    "primaryDomain": {
+     "type": "string",
+     "description": "The enterprise's primary domain, e.g. \"example.com\".",
+     "annotations": {
+      "required": [
+       "androidenterprise.enterprises.insert"
+      ]
+     }
+    }
+   }
+  },
+  "EnterpriseAccount": {
+   "id": "EnterpriseAccount",
+   "type": "object",
+   "description": "A service account that can be used to authenticate as the enterprise to API calls that require such authentication.",
+   "properties": {
+    "accountEmail": {
+     "type": "string",
+     "description": "The email address of the service account."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#enterpriseAccount\".",
+     "default": "androidenterprise#enterpriseAccount"
+    }
+   }
+  },
+  "EnterprisesListResponse": {
+   "id": "EnterprisesListResponse",
+   "type": "object",
+   "description": "The matching enterprise resources.",
+   "properties": {
+    "enterprise": {
+     "type": "array",
+     "description": "An enterprise.",
+     "items": {
+      "$ref": "Enterprise"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#enterprisesListResponse\".",
+     "default": "androidenterprise#enterprisesListResponse"
+    }
+   }
+  },
+  "EnterprisesSendTestPushNotificationResponse": {
+   "id": "EnterprisesSendTestPushNotificationResponse",
+   "type": "object",
+   "properties": {
+    "messageId": {
+     "type": "string",
+     "description": "The message ID of the test push notification that was sent."
+    },
+    "topicName": {
+     "type": "string",
+     "description": "The name of the Cloud Pub/Sub topic to which notifications for this enterprise's enrolled account will be sent."
+    }
+   }
+  },
+  "Entitlement": {
+   "id": "Entitlement",
+   "type": "object",
+   "description": "The existence of an entitlement resource means that a user has the right to use a particular app on any of their devices. This might be because the app is free or because they have been allocated a license to the app from a group license purchased by the enterprise.\n\nIt should always be true that a user has an app installed on one of their devices only if they have an entitlement to it. So if an entitlement is deleted, the app will be uninstalled from all devices. Similarly if the user installs an app (and is permitted to do so), or the MDM triggers an install of the app, an entitlement to that app is automatically created. If this is impossible - e.g. the enterprise has not purchased sufficient licenses - then installation fails.\n\nNote that entitlements are always user specific, not device specific; a user may have an entitlement even though they have not installed the app anywhere. Once they have an entitlement they can install the app on multiple devices.\n\nThe API can be used to create an entitlement. If the app is a free app, a group license for that app is created. If it's a paid app, creating the entitlement consumes one license; it remains consumed until the entitlement is removed. Optionally an installation of the app on all the user's managed devices can be triggered at the time the entitlement is created. An entitlement cannot be created for an app if the app requires permissions that the enterprise has not yet accepted.\n\nEntitlements for paid apps that are due to purchases by the user on a non-managed profile will have \"userPurchase\" as entitlement reason; those entitlements cannot be removed via the API.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#entitlement\".",
+     "default": "androidenterprise#entitlement"
+    },
+    "productId": {
+     "type": "string",
+     "description": "The ID of the product that the entitlement is for, e.g. \"app:com.google.android.gm\"."
+    },
+    "reason": {
+     "type": "string",
+     "description": "The reason for the entitlement, e.g. \"free\" for free apps. This is temporary, it will be replaced by the acquisition kind field of group licenses."
+    }
+   }
+  },
+  "EntitlementsListResponse": {
+   "id": "EntitlementsListResponse",
+   "type": "object",
+   "description": "The entitlement resources for the user.",
+   "properties": {
+    "entitlement": {
+     "type": "array",
+     "description": "An entitlement of a user to a product (e.g. an app). For example, a free app that they have installed, or a paid app that they have been allocated a license to.",
+     "items": {
+      "$ref": "Entitlement"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#entitlementsListResponse\".",
+     "default": "androidenterprise#entitlementsListResponse"
+    }
+   }
+  },
+  "GroupLicense": {
+   "id": "GroupLicense",
+   "type": "object",
+   "description": "A group license object indicates a product that an enterprise admin has approved for use in the enterprise. The product may be free or paid. For free products, a group license object is created in these cases: if the enterprise admin approves a product in Google Play, if the product is added to a collection, or if an entitlement for the product is created for a user via the API. For paid products, a group license object is only created as part of the first bulk purchase of that product in Google Play by the enterprise admin.\n\nThe API can be used to query group licenses; the available information includes the total number of licenses purchased (for paid products) and the total number of licenses that have been provisioned, that is, the total number of user entitlements in existence for the product.\n\nGroup license objects are never deleted. If, for example, a free app is added to a collection and then removed, the group license will remain, allowing the enterprise admin to keep track of any remaining entitlements. An enterprise admin may indicate they are no longer interested in the group license by marking it as unapproved in Google Play.",
+   "properties": {
+    "acquisitionKind": {
+     "type": "string",
+     "description": "How this group license was acquired. \"bulkPurchase\" means that this group license object was created because the enterprise purchased licenses for this product; this is \"free\" otherwise (for free products)."
+    },
+    "approval": {
+     "type": "string",
+     "description": "Whether the product to which this group license relates is currently approved by the enterprise, as either \"approved\" or \"unapproved\". Products are approved when a group license is first created, but this approval may be revoked by an enterprise admin via Google Play. Unapproved products will not be visible to end users in collections and new entitlements to them should not normally be created."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#groupLicense\".",
+     "default": "androidenterprise#groupLicense"
+    },
+    "numProvisioned": {
+     "type": "integer",
+     "description": "The total number of provisioned licenses for this product. Returned by read operations, but ignored in write operations.",
+     "format": "int32"
+    },
+    "numPurchased": {
+     "type": "integer",
+     "description": "The number of purchased licenses (possibly in multiple purchases). If this field is omitted then there is no limit on the number of licenses that can be provisioned (e.g. if the acquisition kind is \"free\").",
+     "format": "int32"
+    },
+    "productId": {
+     "type": "string",
+     "description": "The ID of the product that the license is for, e.g. \"app:com.google.android.gm\"."
+    }
+   }
+  },
+  "GroupLicenseUsersListResponse": {
+   "id": "GroupLicenseUsersListResponse",
+   "type": "object",
+   "description": "The user resources for the group license.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#groupLicenseUsersListResponse\".",
+     "default": "androidenterprise#groupLicenseUsersListResponse"
+    },
+    "user": {
+     "type": "array",
+     "description": "A user of an enterprise.",
+     "items": {
+      "$ref": "User"
+     }
+    }
+   }
+  },
+  "GroupLicensesListResponse": {
+   "id": "GroupLicensesListResponse",
+   "type": "object",
+   "description": "The grouplicense resources for the enterprise.",
+   "properties": {
+    "groupLicense": {
+     "type": "array",
+     "description": "A group license for a product approved for use in the enterprise.",
+     "items": {
+      "$ref": "GroupLicense"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#groupLicensesListResponse\".",
+     "default": "androidenterprise#groupLicensesListResponse"
+    }
+   }
+  },
+  "Install": {
+   "id": "Install",
+   "type": "object",
+   "description": "The existence of an install resource indicates that an app is installed on a particular device (or that an install is pending).\n\nThe API can be used to create an install resource using the update method. This triggers the actual install of the app on the device. If the user does not already have an entitlement for the app then an attempt is made to create one. If this fails (e.g. because the app is not free and there is no available license) then the creation of the install fails.\n\nThe API can also be used to update an installed app. If the update method is used on an existing install then the app will be updated to the latest available version.\n\nNote that it is not possible to force the installation of a specific version of an app; the version code is read-only.\n\nIf a user installs an app themselves (as permitted by the enterprise), then again an install resource and possibly an entitlement resource are automatically created.\n\nThe API can also be used to delete an install resource, which triggers the removal of the app from the device. Note that deleting an install does not automatically remove the corresponding entitlement, even if there are no remaining installs. The install resource will also be deleted if the user uninstalls the app themselves.",
+   "properties": {
+    "installState": {
+     "type": "string",
+     "description": "Install state. The state \"installPending\" means that an install request has recently been made and download to the device is in progress. The state \"installed\" means that the app has been installed. This field is read-only."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#install\".",
+     "default": "androidenterprise#install"
+    },
+    "productId": {
+     "type": "string",
+     "description": "The ID of the product that the install is for, e.g. \"app:com.google.android.gm\"."
+    },
+    "versionCode": {
+     "type": "integer",
+     "description": "The version of the installed product. Guaranteed to be set only if the install state is \"installed\".",
+     "format": "int32"
+    }
+   }
+  },
+  "InstallsListResponse": {
+   "id": "InstallsListResponse",
+   "type": "object",
+   "description": "The install resources for the device.",
+   "properties": {
+    "install": {
+     "type": "array",
+     "description": "An installation of an app for a user on a specific device. The existence of an install implies that the user must have an entitlement to the app.",
+     "items": {
+      "$ref": "Install"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#installsListResponse\".",
+     "default": "androidenterprise#installsListResponse"
+    }
+   }
+  },
+  "LocalizedText": {
+   "id": "LocalizedText",
+   "type": "object",
+   "description": "A localized string with its locale.",
+   "properties": {
+    "locale": {
+     "type": "string",
+     "description": "The BCP47 tag for a locale. (e.g. \"en-US\", \"de\")."
+    },
+    "text": {
+     "type": "string",
+     "description": "The text localized in the associated locale."
+    }
+   }
+  },
+  "Permission": {
+   "id": "Permission",
+   "type": "object",
+   "description": "A permission represents some extra capability, to be granted to an Android app, which requires explicit consent. An enterprise admin must consent to these permissions on behalf of their users before an entitlement for the app can be created.\n\nThe permissions collection is read-only. The information provided for each permission (localized name and description) is intended to be used in the MDM user interface when obtaining consent from the enterprise.",
+   "properties": {
+    "description": {
+     "type": "string",
+     "description": "A longer description of the permissions giving more details of what it affects."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#permission\".",
+     "default": "androidenterprise#permission"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the permission."
+    },
+    "permissionId": {
+     "type": "string",
+     "description": "An opaque string uniquely identifying the permission."
+    }
+   }
+  },
+  "Product": {
+   "id": "Product",
+   "type": "object",
+   "description": "A product represents an app in the Google Play Store that is available to at least some users in the enterprise. (Some apps are restricted to a single enterprise, and no information about them is made available outside that enterprise.)\n\nThe information provided for each product (localized name, icon, link to the full Google Play details page) is intended to allow a basic representation of the product within an MDM user interface.",
+   "properties": {
+    "appVersion": {
+     "type": "array",
+     "description": "App versions currently available for this product. The returned list contains only public versions. Alpha and beta versions are not included.",
+     "items": {
+      "$ref": "AppVersion"
+     }
+    },
+    "authorName": {
+     "type": "string",
+     "description": "The name of the author of the product (e.g. the app developer)."
+    },
+    "detailsUrl": {
+     "type": "string",
+     "description": "A link to the (consumer) Google Play details page for the product."
+    },
+    "distributionChannel": {
+     "type": "string",
+     "description": "How and to whom the package is made available. The value publicGoogleHosted means that the package is available through the Play Store and not restricted to a specific enterprise. The value privateGoogleHosted means that the package is a private app (restricted to an enterprise) but hosted by Google. The value privateSelfHosted means that the package is a private app (restricted to an enterprise) and is privately hosted."
+    },
+    "iconUrl": {
+     "type": "string",
+     "description": "A link to an image that can be used as an icon for the product."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#product\".",
+     "default": "androidenterprise#product"
+    },
+    "productId": {
+     "type": "string",
+     "description": "A string of the form app:\u003cpackage name\u003e. For example, app:com.google.android.gm represents the Gmail app."
+    },
+    "requiresContainerApp": {
+     "type": "boolean",
+     "description": "Whether this app can only be installed on devices using the Android for Work container app."
+    },
+    "title": {
+     "type": "string",
+     "description": "The name of the product."
+    },
+    "workDetailsUrl": {
+     "type": "string",
+     "description": "A link to the Google Play for Work details page for the product, for use by an Enterprise administrator."
+    }
+   }
+  },
+  "ProductPermission": {
+   "id": "ProductPermission",
+   "type": "object",
+   "description": "A product permissions resource represents the set of permissions required by a specific app and whether or not they have been accepted by an enterprise admin.\n\nThe API can be used to read the set of permissions, and also to update the set to indicate that permissions have been accepted.",
+   "properties": {
+    "permissionId": {
+     "type": "string",
+     "description": "An opaque string uniquely identifying the permission."
+    },
+    "state": {
+     "type": "string",
+     "description": "Whether the permission has been accepted or not."
+    }
+   }
+  },
+  "ProductPermissions": {
+   "id": "ProductPermissions",
+   "type": "object",
+   "description": "Information about the permissions required by a specific app and whether they have been accepted by the enterprise.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#productPermissions\".",
+     "default": "androidenterprise#productPermissions"
+    },
+    "permission": {
+     "type": "array",
+     "description": "The permissions required by the app.",
+     "items": {
+      "$ref": "ProductPermission"
+     },
+     "annotations": {
+      "required": [
+       "androidenterprise.products.updatePermissions"
+      ]
+     }
+    },
+    "productId": {
+     "type": "string",
+     "description": "The ID of the app that the permissions relate to, e.g. \"app:com.google.android.gm\"."
+    }
+   }
+  },
+  "ProductSet": {
+   "id": "ProductSet",
+   "type": "object",
+   "description": "A set of products.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#productSet\".",
+     "default": "androidenterprise#productSet"
+    },
+    "productId": {
+     "type": "array",
+     "description": "The list of product IDs making up the set of products.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "ProductsApproveRequest": {
+   "id": "ProductsApproveRequest",
+   "type": "object",
+   "properties": {
+    "approvalUrlInfo": {
+     "$ref": "ApprovalUrlInfo",
+     "description": "The approval URL that was shown to the user. Only the permissions shown to the user with that URL will be accepted, which may not be the product's entire set of permissions. For example, the URL may only display new permissions from an update after the product was approved, or not include new permissions if the product was updated since the URL was generated."
+    }
+   }
+  },
+  "ProductsGenerateApprovalUrlResponse": {
+   "id": "ProductsGenerateApprovalUrlResponse",
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "A URL that can be rendered in an iframe to display the permissions (if any) of a product. This URL can be used to approve the product only once and only within 24 hours of being generated, using the Products.approve call. If the product is currently unapproved and has no permissions, this URL will point to an empty page. If the product is currently approved, a URL will only be generated if that product has added permissions since it was last approved, and the URL will only display those new permissions that have not yet been accepted."
+    }
+   }
+  },
+  "StoreCluster": {
+   "id": "StoreCluster",
+   "type": "object",
+   "description": "Definition of a Google Play for Work store cluster, a list of products displayed as part of a store page.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Unique ID of this cluster. Assigned by the server. Immutable once assigned."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#storeCluster\".",
+     "default": "androidenterprise#storeCluster"
+    },
+    "name": {
+     "type": "array",
+     "description": "Ordered list of localized strings giving the name of this page. The text displayed is the one that best matches the user locale, or the first entry if there is no good match. There needs to be at least one entry.",
+     "items": {
+      "$ref": "LocalizedText"
+     }
+    },
+    "orderInPage": {
+     "type": "string",
+     "description": "String (US-ASCII only) used to determine order of this cluster within the parent page's elements. Page elements are sorted in lexicographic order of this field. Duplicated values are allowed, but ordering between elements with duplicate order is undefined.\n\nThe value of this field is never visible to a user, it is used solely for the purpose of defining an ordering. Maximum length is 20 characters."
+    },
+    "productId": {
+     "type": "array",
+     "description": "List of products in the order they are displayed in the cluster. There should not be duplicates within a cluster.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "StoreLayout": {
+   "id": "StoreLayout",
+   "type": "object",
+   "description": "General setting for the Google Play for Work store layout, currently only specifying the page to display the first time the store is opened.",
+   "properties": {
+    "homepageId": {
+     "type": "string",
+     "description": "The ID of the store page to be used as the homepage. The homepage will be used as the first page shown in the Google Play for Work store.\n\nIf there is no homepage set, an empty store is shown. The homepage can be unset (by not specifying it) to empty the store.\n\nIf there exists at least one page, this field must be set to the ID of a valid page."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#storeLayout\".",
+     "default": "androidenterprise#storeLayout"
+    }
+   }
+  },
+  "StoreLayoutClustersListResponse": {
+   "id": "StoreLayoutClustersListResponse",
+   "type": "object",
+   "description": "The store page resources for the enterprise.",
+   "properties": {
+    "cluster": {
+     "type": "array",
+     "description": "A store cluster of an enterprise.",
+     "items": {
+      "$ref": "StoreCluster"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#storeLayoutClustersListResponse\".",
+     "default": "androidenterprise#storeLayoutClustersListResponse"
+    }
+   }
+  },
+  "StoreLayoutPagesListResponse": {
+   "id": "StoreLayoutPagesListResponse",
+   "type": "object",
+   "description": "The store page resources for the enterprise.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#storeLayoutPagesListResponse\".",
+     "default": "androidenterprise#storeLayoutPagesListResponse"
+    },
+    "page": {
+     "type": "array",
+     "description": "A store page of an enterprise.",
+     "items": {
+      "$ref": "StorePage"
+     }
+    }
+   }
+  },
+  "StorePage": {
+   "id": "StorePage",
+   "type": "object",
+   "description": "Definition of a Google Play for Work store page, made of a localized name and links to other pages. A page also contains clusters defined as a subcollection.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Unique ID of this page. Assigned by the server. Immutable once assigned."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#storePage\".",
+     "default": "androidenterprise#storePage"
+    },
+    "link": {
+     "type": "array",
+     "description": "Ordered list of pages a user should be able to reach from this page. The pages must exist, must not be this page, and once a link is created the page linked to cannot be deleted until all links to it are removed. It is recommended that the basic pages are created first, before adding the links between pages.\n\nNo attempt is made to verify that all pages are reachable from the homepage.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "name": {
+     "type": "array",
+     "description": "Ordered list of localized strings giving the name of this page. The text displayed is the one that best matches the user locale, or the first entry if there is no good match. There needs to be at least one entry.",
+     "items": {
+      "$ref": "LocalizedText"
+     }
+    }
+   }
+  },
+  "User": {
+   "id": "User",
+   "type": "object",
+   "description": "A user resource represents an individual user within the enterprise's domain.\n\nNote that each user is associated with a Google account based on the user's corporate email address (which must be in one of the enterprise's domains). As part of installing an MDM app to manage a device the Google account must be provisioned to the device, and so the user resource must be created before that. This can be done using the Google Admin SDK Directory API.\n\nThe ID for a user is an opaque string. It can be retrieved using the list method queried by the user's primary email address.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The unique ID for the user."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#user\".",
+     "default": "androidenterprise#user"
+    },
+    "primaryEmail": {
+     "type": "string",
+     "description": "The user's primary email, e.g. \"jsmith@example.com\". Will always be set for Google managed users and not set for EMM managed users."
+    }
+   }
+  },
+  "UserToken": {
+   "id": "UserToken",
+   "type": "object",
+   "description": "A UserToken is used by a user when setting up a managed device or profile with their work account on a device. When the user enters their email address and token (activation code) the appropriate MDM app can be automatically downloaded.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#userToken\".",
+     "default": "androidenterprise#userToken"
+    },
+    "token": {
+     "type": "string",
+     "description": "The token (activation code) to be entered by the user. This consists of a sequence of decimal digits. Note that the leading digit may be 0."
+    },
+    "userId": {
+     "type": "string",
+     "description": "The unique ID for the user."
+    }
+   }
+  },
+  "UsersListResponse": {
+   "id": "UsersListResponse",
+   "type": "object",
+   "description": "The matching user resources.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"androidenterprise#usersListResponse\".",
+     "default": "androidenterprise#usersListResponse"
+    },
+    "user": {
+     "type": "array",
+     "description": "A user of an enterprise.",
+     "items": {
+      "$ref": "User"
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "collections": {
+   "methods": {
+    "delete": {
+     "id": "androidenterprise.collections.delete",
+     "path": "enterprises/{enterpriseId}/collections/{collectionId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a collection.",
+     "parameters": {
+      "collectionId": {
+       "type": "string",
+       "description": "The ID of the collection.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "collectionId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "get": {
+     "id": "androidenterprise.collections.get",
+     "path": "enterprises/{enterpriseId}/collections/{collectionId}",
+     "httpMethod": "GET",
+     "description": "Retrieves the details of a collection.",
+     "parameters": {
+      "collectionId": {
+       "type": "string",
+       "description": "The ID of the collection.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "collectionId"
+     ],
+     "response": {
+      "$ref": "Collection"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "insert": {
+     "id": "androidenterprise.collections.insert",
+     "path": "enterprises/{enterpriseId}/collections",
+     "httpMethod": "POST",
+     "description": "Creates a new collection.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "request": {
+      "$ref": "Collection"
+     },
+     "response": {
+      "$ref": "Collection"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.collections.list",
+     "path": "enterprises/{enterpriseId}/collections",
+     "httpMethod": "GET",
+     "description": "Retrieves the IDs of all the collections for an enterprise.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "response": {
+      "$ref": "CollectionsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "patch": {
+     "id": "androidenterprise.collections.patch",
+     "path": "enterprises/{enterpriseId}/collections/{collectionId}",
+     "httpMethod": "PATCH",
+     "description": "Updates a collection. This method supports patch semantics.",
+     "parameters": {
+      "collectionId": {
+       "type": "string",
+       "description": "The ID of the collection.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "collectionId"
+     ],
+     "request": {
+      "$ref": "Collection"
+     },
+     "response": {
+      "$ref": "Collection"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "update": {
+     "id": "androidenterprise.collections.update",
+     "path": "enterprises/{enterpriseId}/collections/{collectionId}",
+     "httpMethod": "PUT",
+     "description": "Updates a collection.",
+     "parameters": {
+      "collectionId": {
+       "type": "string",
+       "description": "The ID of the collection.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "collectionId"
+     ],
+     "request": {
+      "$ref": "Collection"
+     },
+     "response": {
+      "$ref": "Collection"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "collectionviewers": {
+   "methods": {
+    "delete": {
+     "id": "androidenterprise.collectionviewers.delete",
+     "path": "enterprises/{enterpriseId}/collections/{collectionId}/users/{userId}",
+     "httpMethod": "DELETE",
+     "description": "Removes the user from the list of those specifically allowed to see the collection. If the collection's visibility is set to viewersOnly then only such users will see the collection.",
+     "parameters": {
+      "collectionId": {
+       "type": "string",
+       "description": "The ID of the collection.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "collectionId",
+      "userId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "get": {
+     "id": "androidenterprise.collectionviewers.get",
+     "path": "enterprises/{enterpriseId}/collections/{collectionId}/users/{userId}",
+     "httpMethod": "GET",
+     "description": "Retrieves the ID of the user if they have been specifically allowed to see the collection. If the collection's visibility is set to viewersOnly then only these users will see the collection.",
+     "parameters": {
+      "collectionId": {
+       "type": "string",
+       "description": "The ID of the collection.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "collectionId",
+      "userId"
+     ],
+     "response": {
+      "$ref": "User"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.collectionviewers.list",
+     "path": "enterprises/{enterpriseId}/collections/{collectionId}/users",
+     "httpMethod": "GET",
+     "description": "Retrieves the IDs of the users who have been specifically allowed to see the collection. If the collection's visibility is set to viewersOnly then only these users will see the collection.",
+     "parameters": {
+      "collectionId": {
+       "type": "string",
+       "description": "The ID of the collection.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "collectionId"
+     ],
+     "response": {
+      "$ref": "CollectionViewersListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "patch": {
+     "id": "androidenterprise.collectionviewers.patch",
+     "path": "enterprises/{enterpriseId}/collections/{collectionId}/users/{userId}",
+     "httpMethod": "PATCH",
+     "description": "Adds the user to the list of those specifically allowed to see the collection. If the collection's visibility is set to viewersOnly then only such users will see the collection. This method supports patch semantics.",
+     "parameters": {
+      "collectionId": {
+       "type": "string",
+       "description": "The ID of the collection.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "collectionId",
+      "userId"
+     ],
+     "request": {
+      "$ref": "User"
+     },
+     "response": {
+      "$ref": "User"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "update": {
+     "id": "androidenterprise.collectionviewers.update",
+     "path": "enterprises/{enterpriseId}/collections/{collectionId}/users/{userId}",
+     "httpMethod": "PUT",
+     "description": "Adds the user to the list of those specifically allowed to see the collection. If the collection's visibility is set to viewersOnly then only such users will see the collection.",
+     "parameters": {
+      "collectionId": {
+       "type": "string",
+       "description": "The ID of the collection.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "collectionId",
+      "userId"
+     ],
+     "request": {
+      "$ref": "User"
+     },
+     "response": {
+      "$ref": "User"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "devices": {
+   "methods": {
+    "get": {
+     "id": "androidenterprise.devices.get",
+     "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}",
+     "httpMethod": "GET",
+     "description": "Retrieves the details of a device.",
+     "parameters": {
+      "deviceId": {
+       "type": "string",
+       "description": "The ID of the device.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "deviceId"
+     ],
+     "response": {
+      "$ref": "Device"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "getState": {
+     "id": "androidenterprise.devices.getState",
+     "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}/state",
+     "httpMethod": "GET",
+     "description": "Retrieves whether a device is enabled or disabled for access by the user to Google services. The device state takes effect only if enforcing EMM policies on Android devices is enabled in the Google Admin Console. Otherwise, the device state is ignored and all devices are allowed access to Google services.",
+     "parameters": {
+      "deviceId": {
+       "type": "string",
+       "description": "The ID of the device.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "deviceId"
+     ],
+     "response": {
+      "$ref": "DeviceState"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.devices.list",
+     "path": "enterprises/{enterpriseId}/users/{userId}/devices",
+     "httpMethod": "GET",
+     "description": "Retrieves the IDs of all of a user's devices.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId"
+     ],
+     "response": {
+      "$ref": "DevicesListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "setState": {
+     "id": "androidenterprise.devices.setState",
+     "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}/state",
+     "httpMethod": "PUT",
+     "description": "Sets whether a device is enabled or disabled for access by the user to Google services. The device state takes effect only if enforcing EMM policies on Android devices is enabled in the Google Admin Console. Otherwise, the device state is ignored and all devices are allowed access to Google services.",
+     "parameters": {
+      "deviceId": {
+       "type": "string",
+       "description": "The ID of the device.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "deviceId"
+     ],
+     "request": {
+      "$ref": "DeviceState"
+     },
+     "response": {
+      "$ref": "DeviceState"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "enterprises": {
+   "methods": {
+    "delete": {
+     "id": "androidenterprise.enterprises.delete",
+     "path": "enterprises/{enterpriseId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes the binding between the MDM and enterprise. This is now deprecated; use this to unenroll customers that were previously enrolled with the 'insert' call, then enroll them again with the 'enroll' call.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "enroll": {
+     "id": "androidenterprise.enterprises.enroll",
+     "path": "enterprises/enroll",
+     "httpMethod": "POST",
+     "description": "Enrolls an enterprise with the calling MDM.",
+     "parameters": {
+      "token": {
+       "type": "string",
+       "description": "The token provided by the enterprise to register the MDM.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "token"
+     ],
+     "request": {
+      "$ref": "Enterprise"
+     },
+     "response": {
+      "$ref": "Enterprise"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "get": {
+     "id": "androidenterprise.enterprises.get",
+     "path": "enterprises/{enterpriseId}",
+     "httpMethod": "GET",
+     "description": "Retrieves the name and domain of an enterprise.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "response": {
+      "$ref": "Enterprise"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "getStoreLayout": {
+     "id": "androidenterprise.enterprises.getStoreLayout",
+     "path": "enterprises/{enterpriseId}/storeLayout",
+     "httpMethod": "GET",
+     "description": "Returns the store layout resource.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "response": {
+      "$ref": "StoreLayout"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "insert": {
+     "id": "androidenterprise.enterprises.insert",
+     "path": "enterprises",
+     "httpMethod": "POST",
+     "description": "Establishes the binding between the MDM and an enterprise. This is now deprecated; use enroll instead.",
+     "parameters": {
+      "token": {
+       "type": "string",
+       "description": "The token provided by the enterprise to register the MDM.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "token"
+     ],
+     "request": {
+      "$ref": "Enterprise"
+     },
+     "response": {
+      "$ref": "Enterprise"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.enterprises.list",
+     "path": "enterprises",
+     "httpMethod": "GET",
+     "description": "Looks up an enterprise by domain name.",
+     "parameters": {
+      "domain": {
+       "type": "string",
+       "description": "The exact primary domain name of the enterprise to look up.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "domain"
+     ],
+     "response": {
+      "$ref": "EnterprisesListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "sendTestPushNotification": {
+     "id": "androidenterprise.enterprises.sendTestPushNotification",
+     "path": "enterprises/{enterpriseId}/sendTestPushNotification",
+     "httpMethod": "POST",
+     "description": "Sends a test push notification to validate the MDM integration with the Google Cloud Pub/Sub service for this enterprise.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "response": {
+      "$ref": "EnterprisesSendTestPushNotificationResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "setAccount": {
+     "id": "androidenterprise.enterprises.setAccount",
+     "path": "enterprises/{enterpriseId}/account",
+     "httpMethod": "PUT",
+     "description": "Set the account that will be used to authenticate to the API as the enterprise.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "request": {
+      "$ref": "EnterpriseAccount"
+     },
+     "response": {
+      "$ref": "EnterpriseAccount"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "setStoreLayout": {
+     "id": "androidenterprise.enterprises.setStoreLayout",
+     "path": "enterprises/{enterpriseId}/storeLayout",
+     "httpMethod": "PUT",
+     "description": "Sets the store layout resource.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "request": {
+      "$ref": "StoreLayout"
+     },
+     "response": {
+      "$ref": "StoreLayout"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "unenroll": {
+     "id": "androidenterprise.enterprises.unenroll",
+     "path": "enterprises/{enterpriseId}/unenroll",
+     "httpMethod": "POST",
+     "description": "Unenrolls an enterprise from the calling MDM.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "entitlements": {
+   "methods": {
+    "delete": {
+     "id": "androidenterprise.entitlements.delete",
+     "path": "enterprises/{enterpriseId}/users/{userId}/entitlements/{entitlementId}",
+     "httpMethod": "DELETE",
+     "description": "Removes an entitlement to an app for a user and uninstalls it.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "entitlementId": {
+       "type": "string",
+       "description": "The ID of the entitlement, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "entitlementId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "get": {
+     "id": "androidenterprise.entitlements.get",
+     "path": "enterprises/{enterpriseId}/users/{userId}/entitlements/{entitlementId}",
+     "httpMethod": "GET",
+     "description": "Retrieves details of an entitlement.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "entitlementId": {
+       "type": "string",
+       "description": "The ID of the entitlement, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "entitlementId"
+     ],
+     "response": {
+      "$ref": "Entitlement"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.entitlements.list",
+     "path": "enterprises/{enterpriseId}/users/{userId}/entitlements",
+     "httpMethod": "GET",
+     "description": "List of all entitlements for the specified user. Only the ID is set.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId"
+     ],
+     "response": {
+      "$ref": "EntitlementsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "patch": {
+     "id": "androidenterprise.entitlements.patch",
+     "path": "enterprises/{enterpriseId}/users/{userId}/entitlements/{entitlementId}",
+     "httpMethod": "PATCH",
+     "description": "Adds or updates an entitlement to an app for a user. This method supports patch semantics.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "entitlementId": {
+       "type": "string",
+       "description": "The ID of the entitlement, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      },
+      "install": {
+       "type": "boolean",
+       "description": "Set to true to also install the product on all the user's devices where possible. Failure to install on one or more devices will not prevent this operation from returning successfully, as long as the entitlement was successfully assigned to the user.",
+       "location": "query"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "entitlementId"
+     ],
+     "request": {
+      "$ref": "Entitlement"
+     },
+     "response": {
+      "$ref": "Entitlement"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "update": {
+     "id": "androidenterprise.entitlements.update",
+     "path": "enterprises/{enterpriseId}/users/{userId}/entitlements/{entitlementId}",
+     "httpMethod": "PUT",
+     "description": "Adds or updates an entitlement to an app for a user.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "entitlementId": {
+       "type": "string",
+       "description": "The ID of the entitlement, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      },
+      "install": {
+       "type": "boolean",
+       "description": "Set to true to also install the product on all the user's devices where possible. Failure to install on one or more devices will not prevent this operation from returning successfully, as long as the entitlement was successfully assigned to the user.",
+       "location": "query"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "entitlementId"
+     ],
+     "request": {
+      "$ref": "Entitlement"
+     },
+     "response": {
+      "$ref": "Entitlement"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "grouplicenses": {
+   "methods": {
+    "get": {
+     "id": "androidenterprise.grouplicenses.get",
+     "path": "enterprises/{enterpriseId}/groupLicenses/{groupLicenseId}",
+     "httpMethod": "GET",
+     "description": "Retrieves details of an enterprise's group license for a product.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "groupLicenseId": {
+       "type": "string",
+       "description": "The ID of the product the group license is for, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "groupLicenseId"
+     ],
+     "response": {
+      "$ref": "GroupLicense"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.grouplicenses.list",
+     "path": "enterprises/{enterpriseId}/groupLicenses",
+     "httpMethod": "GET",
+     "description": "Retrieves IDs of all products for which the enterprise has a group license.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "response": {
+      "$ref": "GroupLicensesListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "grouplicenseusers": {
+   "methods": {
+    "list": {
+     "id": "androidenterprise.grouplicenseusers.list",
+     "path": "enterprises/{enterpriseId}/groupLicenses/{groupLicenseId}/users",
+     "httpMethod": "GET",
+     "description": "Retrieves the IDs of the users who have been granted entitlements under the license.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "groupLicenseId": {
+       "type": "string",
+       "description": "The ID of the product the group license is for, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "groupLicenseId"
+     ],
+     "response": {
+      "$ref": "GroupLicenseUsersListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "installs": {
+   "methods": {
+    "delete": {
+     "id": "androidenterprise.installs.delete",
+     "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}/installs/{installId}",
+     "httpMethod": "DELETE",
+     "description": "Requests to remove an app from a device. A call to get or list will still show the app as installed on the device until it is actually removed.",
+     "parameters": {
+      "deviceId": {
+       "type": "string",
+       "description": "The Android ID of the device.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "installId": {
+       "type": "string",
+       "description": "The ID of the product represented by the install, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "deviceId",
+      "installId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "get": {
+     "id": "androidenterprise.installs.get",
+     "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}/installs/{installId}",
+     "httpMethod": "GET",
+     "description": "Retrieves details of an installation of an app on a device.",
+     "parameters": {
+      "deviceId": {
+       "type": "string",
+       "description": "The Android ID of the device.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "installId": {
+       "type": "string",
+       "description": "The ID of the product represented by the install, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "deviceId",
+      "installId"
+     ],
+     "response": {
+      "$ref": "Install"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.installs.list",
+     "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}/installs",
+     "httpMethod": "GET",
+     "description": "Retrieves the details of all apps installed on the specified device.",
+     "parameters": {
+      "deviceId": {
+       "type": "string",
+       "description": "The Android ID of the device.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "deviceId"
+     ],
+     "response": {
+      "$ref": "InstallsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "patch": {
+     "id": "androidenterprise.installs.patch",
+     "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}/installs/{installId}",
+     "httpMethod": "PATCH",
+     "description": "Requests to install the latest version of an app to a device. If the app is already installed then it is updated to the latest version if necessary. This method supports patch semantics.",
+     "parameters": {
+      "deviceId": {
+       "type": "string",
+       "description": "The Android ID of the device.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "installId": {
+       "type": "string",
+       "description": "The ID of the product represented by the install, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "deviceId",
+      "installId"
+     ],
+     "request": {
+      "$ref": "Install"
+     },
+     "response": {
+      "$ref": "Install"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "update": {
+     "id": "androidenterprise.installs.update",
+     "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}/installs/{installId}",
+     "httpMethod": "PUT",
+     "description": "Requests to install the latest version of an app to a device. If the app is already installed then it is updated to the latest version if necessary.",
+     "parameters": {
+      "deviceId": {
+       "type": "string",
+       "description": "The Android ID of the device.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "installId": {
+       "type": "string",
+       "description": "The ID of the product represented by the install, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId",
+      "deviceId",
+      "installId"
+     ],
+     "request": {
+      "$ref": "Install"
+     },
+     "response": {
+      "$ref": "Install"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "permissions": {
+   "methods": {
+    "get": {
+     "id": "androidenterprise.permissions.get",
+     "path": "permissions/{permissionId}",
+     "httpMethod": "GET",
+     "description": "Retrieves details of an Android app permission for display to an enterprise admin.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The BCP47 tag for the user's preferred language (e.g. \"en-US\", \"de\")",
+       "location": "query"
+      },
+      "permissionId": {
+       "type": "string",
+       "description": "The ID of the permission.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "permissionId"
+     ],
+     "response": {
+      "$ref": "Permission"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "products": {
+   "methods": {
+    "approve": {
+     "id": "androidenterprise.products.approve",
+     "path": "enterprises/{enterpriseId}/products/{productId}/approve",
+     "httpMethod": "POST",
+     "description": "Approves the specified product (and the relevant app permissions, if any).",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "productId": {
+       "type": "string",
+       "description": "The ID of the product.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "productId"
+     ],
+     "request": {
+      "$ref": "ProductsApproveRequest"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "generateApprovalUrl": {
+     "id": "androidenterprise.products.generateApprovalUrl",
+     "path": "enterprises/{enterpriseId}/products/{productId}/generateApprovalUrl",
+     "httpMethod": "POST",
+     "description": "Generates a URL that can be rendered in an iframe to display the permissions (if any) of a product. An enterprise admin must view these permissions and accept them on behalf of their organization in order to approve that product.\n\nAdmins should accept the displayed permissions by interacting with a separate UI element in the EMM console, which in turn should trigger the use of this URL as the approvalUrlInfo.approvalUrl property in a Products.approve call to approve the product. This URL can only be used to display permissions for up to 1 day.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "languageCode": {
+       "type": "string",
+       "description": "The BCP 47 language code used for permission names and descriptions in the returned iframe, for instance \"en-US\".",
+       "location": "query"
+      },
+      "productId": {
+       "type": "string",
+       "description": "The ID of the product.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "productId"
+     ],
+     "response": {
+      "$ref": "ProductsGenerateApprovalUrlResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "get": {
+     "id": "androidenterprise.products.get",
+     "path": "enterprises/{enterpriseId}/products/{productId}",
+     "httpMethod": "GET",
+     "description": "Retrieves details of a product for display to an enterprise admin.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "language": {
+       "type": "string",
+       "description": "The BCP47 tag for the user's preferred language (e.g. \"en-US\", \"de\").",
+       "location": "query"
+      },
+      "productId": {
+       "type": "string",
+       "description": "The ID of the product, e.g. \"app:com.google.android.gm\".",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "productId"
+     ],
+     "response": {
+      "$ref": "Product"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "getAppRestrictionsSchema": {
+     "id": "androidenterprise.products.getAppRestrictionsSchema",
+     "path": "enterprises/{enterpriseId}/products/{productId}/appRestrictionsSchema",
+     "httpMethod": "GET",
+     "description": "Retrieves the schema defining app restrictions configurable for this product. All products have a schema, but this may be empty if no app restrictions are defined.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "language": {
+       "type": "string",
+       "description": "The BCP47 tag for the user's preferred language (e.g. \"en-US\", \"de\").",
+       "location": "query"
+      },
+      "productId": {
+       "type": "string",
+       "description": "The ID of the product.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "productId"
+     ],
+     "response": {
+      "$ref": "AppRestrictionsSchema"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "getPermissions": {
+     "id": "androidenterprise.products.getPermissions",
+     "path": "enterprises/{enterpriseId}/products/{productId}/permissions",
+     "httpMethod": "GET",
+     "description": "Retrieves the Android app permissions required by this app.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "productId": {
+       "type": "string",
+       "description": "The ID of the product.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "productId"
+     ],
+     "response": {
+      "$ref": "ProductPermissions"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "updatePermissions": {
+     "id": "androidenterprise.products.updatePermissions",
+     "path": "enterprises/{enterpriseId}/products/{productId}/permissions",
+     "httpMethod": "PUT",
+     "description": "Updates the set of Android app permissions for this app that have been accepted by the enterprise.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "productId": {
+       "type": "string",
+       "description": "The ID of the product.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "productId"
+     ],
+     "request": {
+      "$ref": "ProductPermissions"
+     },
+     "response": {
+      "$ref": "ProductPermissions"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "storelayoutclusters": {
+   "methods": {
+    "delete": {
+     "id": "androidenterprise.storelayoutclusters.delete",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}/clusters/{clusterId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a cluster.",
+     "parameters": {
+      "clusterId": {
+       "type": "string",
+       "description": "The ID of the cluster.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId",
+      "clusterId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "get": {
+     "id": "androidenterprise.storelayoutclusters.get",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}/clusters/{clusterId}",
+     "httpMethod": "GET",
+     "description": "Retrieves details of a cluster.",
+     "parameters": {
+      "clusterId": {
+       "type": "string",
+       "description": "The ID of the cluster.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId",
+      "clusterId"
+     ],
+     "response": {
+      "$ref": "StoreCluster"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "insert": {
+     "id": "androidenterprise.storelayoutclusters.insert",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}/clusters",
+     "httpMethod": "POST",
+     "description": "Inserts a new cluster in a page.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId"
+     ],
+     "request": {
+      "$ref": "StoreCluster"
+     },
+     "response": {
+      "$ref": "StoreCluster"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.storelayoutclusters.list",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}/clusters",
+     "httpMethod": "GET",
+     "description": "Retrieves the details of all clusters on the specified page.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId"
+     ],
+     "response": {
+      "$ref": "StoreLayoutClustersListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "patch": {
+     "id": "androidenterprise.storelayoutclusters.patch",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}/clusters/{clusterId}",
+     "httpMethod": "PATCH",
+     "description": "Updates a cluster. This method supports patch semantics.",
+     "parameters": {
+      "clusterId": {
+       "type": "string",
+       "description": "The ID of the cluster.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId",
+      "clusterId"
+     ],
+     "request": {
+      "$ref": "StoreCluster"
+     },
+     "response": {
+      "$ref": "StoreCluster"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "update": {
+     "id": "androidenterprise.storelayoutclusters.update",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}/clusters/{clusterId}",
+     "httpMethod": "PUT",
+     "description": "Updates a cluster.",
+     "parameters": {
+      "clusterId": {
+       "type": "string",
+       "description": "The ID of the cluster.",
+       "required": true,
+       "location": "path"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId",
+      "clusterId"
+     ],
+     "request": {
+      "$ref": "StoreCluster"
+     },
+     "response": {
+      "$ref": "StoreCluster"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "storelayoutpages": {
+   "methods": {
+    "delete": {
+     "id": "androidenterprise.storelayoutpages.delete",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a store page.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "get": {
+     "id": "androidenterprise.storelayoutpages.get",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}",
+     "httpMethod": "GET",
+     "description": "Retrieves details of a store page.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId"
+     ],
+     "response": {
+      "$ref": "StorePage"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "insert": {
+     "id": "androidenterprise.storelayoutpages.insert",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages",
+     "httpMethod": "POST",
+     "description": "Inserts a new store page.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "request": {
+      "$ref": "StorePage"
+     },
+     "response": {
+      "$ref": "StorePage"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.storelayoutpages.list",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages",
+     "httpMethod": "GET",
+     "description": "Retrieves the details of all pages in the store.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId"
+     ],
+     "response": {
+      "$ref": "StoreLayoutPagesListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "patch": {
+     "id": "androidenterprise.storelayoutpages.patch",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}",
+     "httpMethod": "PATCH",
+     "description": "Updates the content of a store page. This method supports patch semantics.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId"
+     ],
+     "request": {
+      "$ref": "StorePage"
+     },
+     "response": {
+      "$ref": "StorePage"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "update": {
+     "id": "androidenterprise.storelayoutpages.update",
+     "path": "enterprises/{enterpriseId}/storeLayout/pages/{pageId}",
+     "httpMethod": "PUT",
+     "description": "Updates the content of a store page.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "pageId": {
+       "type": "string",
+       "description": "The ID of the page.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "pageId"
+     ],
+     "request": {
+      "$ref": "StorePage"
+     },
+     "response": {
+      "$ref": "StorePage"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  },
+  "users": {
+   "methods": {
+    "generateToken": {
+     "id": "androidenterprise.users.generateToken",
+     "path": "enterprises/{enterpriseId}/users/{userId}/token",
+     "httpMethod": "POST",
+     "description": "Generates a token (activation code) to allow this user to configure their work account in the Android Setup Wizard. Revokes any previously generated token.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId"
+     ],
+     "response": {
+      "$ref": "UserToken"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "get": {
+     "id": "androidenterprise.users.get",
+     "path": "enterprises/{enterpriseId}/users/{userId}",
+     "httpMethod": "GET",
+     "description": "Retrieves a user's details.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId"
+     ],
+     "response": {
+      "$ref": "User"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "getAvailableProductSet": {
+     "id": "androidenterprise.users.getAvailableProductSet",
+     "path": "enterprises/{enterpriseId}/users/{userId}/availableProductSet",
+     "httpMethod": "GET",
+     "description": "Retrieves the set of products a user is entitled to access.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId"
+     ],
+     "response": {
+      "$ref": "ProductSet"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "list": {
+     "id": "androidenterprise.users.list",
+     "path": "enterprises/{enterpriseId}/users",
+     "httpMethod": "GET",
+     "description": "Looks up a user by email address. This only works for Google managed users.",
+     "parameters": {
+      "email": {
+       "type": "string",
+       "description": "The exact primary email address of the user to look up.",
+       "required": true,
+       "location": "query"
+      },
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "email"
+     ],
+     "response": {
+      "$ref": "UsersListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "revokeToken": {
+     "id": "androidenterprise.users.revokeToken",
+     "path": "enterprises/{enterpriseId}/users/{userId}/token",
+     "httpMethod": "DELETE",
+     "description": "Revokes a previously generated token (activation code) for the user.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    },
+    "setAvailableProductSet": {
+     "id": "androidenterprise.users.setAvailableProductSet",
+     "path": "enterprises/{enterpriseId}/users/{userId}/availableProductSet",
+     "httpMethod": "PUT",
+     "description": "Modifies the set of products a user is entitled to access.",
+     "parameters": {
+      "enterpriseId": {
+       "type": "string",
+       "description": "The ID of the enterprise.",
+       "required": true,
+       "location": "path"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "enterpriseId",
+      "userId"
+     ],
+     "request": {
+      "$ref": "ProductSet"
+     },
+     "response": {
+      "$ref": "ProductSet"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/androidenterprise"
+     ]
+    }
+   }
+  }
+ }
+}

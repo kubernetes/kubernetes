@@ -1,0 +1,37 @@
+{
+    "acKind": "ImageManifest",
+    "acVersion": "0.7.4",
+    "name": "@RKT_STAGE1_NAME@",
+    "labels": [
+        {
+            "name": "version",
+            "value": "@RKT_STAGE1_VERSION@"
+        },
+        {
+            "name": "arch",
+            "value": "amd64"
+        },
+        {
+            "name": "os",
+            "value": "linux"
+        }
+    ],
+    "annotations": [
+        {
+            "name": "coreos.com/rkt/stage1/run",
+            "value": "/init"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/enter",
+            "value": "@RKT_STAGE1_ENTER@"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/gc",
+            "value": "/gc"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/interface-version",
+            "value": "2"
+        }
+    ]
+}

@@ -1,0 +1,3 @@
+# hide docker's loopback devices from udisks, and thus from user desktops
+SUBSYSTEM=="block", ENV{DM_NAME}=="docker-*", ENV{UDISKS_PRESENTATION_HIDE}="1", ENV{UDISKS_IGNORE}="1"
+SUBSYSTEM=="block", DEVPATH=="/devices/virtual/block/loop*", ATTR{loop/backing_file}=="/var/lib/docker/*", ENV{UDISKS_PRESENTATION_HIDE}="1", ENV{UDISKS_IGNORE}="1"

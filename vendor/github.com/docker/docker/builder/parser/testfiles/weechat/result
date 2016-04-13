@@ -1,0 +1,6 @@
+(from "ubuntu:14.04")
+(run "apt-get update -qy && apt-get install tmux zsh weechat-curses -y")
+(add ".weechat" "/.weechat")
+(add ".tmux.conf" "/")
+(run "echo \"export TERM=screen-256color\" >/.zshenv")
+(cmd "zsh -c weechat")

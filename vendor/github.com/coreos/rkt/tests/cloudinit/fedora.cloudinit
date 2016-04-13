@@ -1,0 +1,42 @@
+#!/bin/bash
+
+if [ "@DISABLE_OVERLAY@" = true ] ; then
+  # Workaround for SELinux: do not use overlay fs
+  /sbin/rmmod overlay || true
+  mv /lib/modules/`uname -r`/kernel/fs/overlayfs/overlay.ko.xz /root/overlay.ko.xz-disabled
+fi
+
+if [ "@DISABLE_SELINUX@" = true ] ; then
+  /usr/sbin/setenforce 0
+fi
+
+cat > /var/tmp/rkt-test.sh <<TESTEOF
+#!/bin/bash
+
+set -e
+set -x
+
+# Sometimes journald does not work well on old versions
+exec > >(tee -a "/var/tmp/rkt-test.log") 2>&1
+
+groupadd rkt
+gpasswd -a fedora rkt
+
+dnf -y -v update
+dnf -y -v groupinstall "Development Tools"
+dnf -y -v groupinstall "C Development Tools and Libraries"
+dnf -y -v install wget squashfs-tools patch glibc-static gnupg golang libacl-devel file
+# systemd-container only available in newer versions of Fedora
+dnf -y -v install systemd-container || true
+
+# unsquashfs is in /usr/sbin
+export PATH=/usr/lib64/ccache:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/fedora/.local/bin:/home/fedora/bin
+
+su - fedora --command="cd /var/tmp ; git clone --branch @GIT_BRANCH@ @GIT_URL@ rkt"
+su - fedora --command="PATH=\$PATH ; cd /var/tmp/rkt ; ./tests/run-build.sh @FLAVOR@"
+TESTEOF
+
+chmod +x /var/tmp/rkt-test.sh
+
+# "sh -c" is necessary, otherwise SELinux would reject the service
+systemd-run --unit=rkt-test sh -c /var/tmp/rkt-test.sh

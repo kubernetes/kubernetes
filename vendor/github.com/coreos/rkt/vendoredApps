@@ -1,0 +1,15 @@
+# Vendor in actool, which is used in building the stage1 ACI
+github.com/appc/spec/actool
+
+# Vendor in CNI plugins, which will become a part of the stage1 image
+github.com/appc/cni/plugins/ipam/dhcp
+github.com/appc/cni/plugins/ipam/host-local
+github.com/appc/cni/plugins/main/bridge
+github.com/appc/cni/plugins/main/ipvlan
+github.com/appc/cni/plugins/main/macvlan
+github.com/appc/cni/plugins/main/ptp
+github.com/appc/cni/plugins/meta/flannel
+github.com/appc/cni/plugins/meta/tuning
+
+# Vendor in ACE, which is used in functional tests
+github.com/appc/spec/ace

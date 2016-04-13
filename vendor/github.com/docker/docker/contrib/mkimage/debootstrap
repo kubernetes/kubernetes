@@ -1,0 +1,240 @@
+#!/usr/bin/env bash
+set -e
+
+rootfsDir="$1"
+shift
+
+# we have to do a little fancy footwork to make sure "rootfsDir" becomes the second non-option argument to debootstrap
+
+before=()
+while [ $# -gt 0 ] && [[ "$1" == -* ]]; do
+	before+=( "$1" )
+	shift
+done
+
+suite="$1"
+shift
+
+# get path to "chroot" in our current PATH
+chrootPath="$(type -P chroot)"
+rootfs_chroot() {
+	# "chroot" doesn't set PATH, so we need to set it explicitly to something our new debootstrap chroot can use appropriately!
+
+	# set PATH and chroot away!
+	PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' \
+		"$chrootPath" "$rootfsDir" "$@"
+}
+
+# allow for DEBOOTSTRAP=qemu-debootstrap ./mkimage.sh ...
+: ${DEBOOTSTRAP:=debootstrap}
+
+(
+	set -x
+	$DEBOOTSTRAP "${before[@]}" "$suite" "$rootfsDir" "$@"
+)
+
+# now for some Docker-specific tweaks
+
+# prevent init scripts from running during install/update
+echo >&2 "+ echo exit 101 > '$rootfsDir/usr/sbin/policy-rc.d'"
+cat > "$rootfsDir/usr/sbin/policy-rc.d" <<-'EOF'
+	#!/bin/sh
+
+	# For most Docker users, "apt-get install" only happens during "docker build",
+	# where starting services doesn't work and often fails in humorous ways. This
+	# prevents those failures by stopping the services from attempting to start.
+
+	exit 101
+EOF
+chmod +x "$rootfsDir/usr/sbin/policy-rc.d"
+
+# prevent upstart scripts from running during install/update
+(
+	set -x
+	rootfs_chroot dpkg-divert --local --rename --add /sbin/initctl
+	cp -a "$rootfsDir/usr/sbin/policy-rc.d" "$rootfsDir/sbin/initctl"
+	sed -i 's/^exit.*/exit 0/' "$rootfsDir/sbin/initctl"
+)
+
+# shrink a little, since apt makes us cache-fat (wheezy: ~157.5MB vs ~120MB)
+( set -x; rootfs_chroot apt-get clean )
+
+# this file is one APT creates to make sure we don't "autoremove" our currently
+# in-use kernel, which doesn't really apply to debootstraps/Docker images that
+# don't even have kernels installed
+rm -f "$rootfsDir/etc/apt/apt.conf.d/01autoremove-kernels"
+
+# Ubuntu 10.04 sucks... :)
+if strings "$rootfsDir/usr/bin/dpkg" | grep -q unsafe-io; then
+	# force dpkg not to call sync() after package extraction (speeding up installs)
+	echo >&2 "+ echo force-unsafe-io > '$rootfsDir/etc/dpkg/dpkg.cfg.d/docker-apt-speedup'"
+	cat > "$rootfsDir/etc/dpkg/dpkg.cfg.d/docker-apt-speedup" <<-'EOF'
+		# For most Docker users, package installs happen during "docker build", which
+		# doesn't survive power loss and gets restarted clean afterwards anyhow, so
+		# this minor tweak gives us a nice speedup (much nicer on spinning disks,
+		# obviously).
+
+		force-unsafe-io
+	EOF
+fi
+
+if [ -d "$rootfsDir/etc/apt/apt.conf.d" ]; then
+	# _keep_ us lean by effectively running "apt-get clean" after every install
+	aptGetClean='"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true";'
+	echo >&2 "+ cat > '$rootfsDir/etc/apt/apt.conf.d/docker-clean'"
+	cat > "$rootfsDir/etc/apt/apt.conf.d/docker-clean" <<-EOF
+		# Since for most Docker users, package installs happen in "docker build" steps,
+		# they essentially become individual layers due to the way Docker handles
+		# layering, especially using CoW filesystems.  What this means for us is that
+		# the caches that APT keeps end up just wasting space in those layers, making
+		# our layers unnecessarily large (especially since we'll normally never use
+		# these caches again and will instead just "docker build" again and make a brand
+		# new image).
+
+		# Ideally, these would just be invoking "apt-get clean", but in our testing,
+		# that ended up being cyclic and we got stuck on APT's lock, so we get this fun
+		# creation that's essentially just "apt-get clean".
+		DPkg::Post-Invoke { ${aptGetClean} };
+		APT::Update::Post-Invoke { ${aptGetClean} };
+
+		Dir::Cache::pkgcache "";
+		Dir::Cache::srcpkgcache "";
+
+		# Note that we do realize this isn't the ideal way to do this, and are always
+		# open to better suggestions (https://github.com/docker/docker/issues).
+	EOF
+
+	# remove apt-cache translations for fast "apt-get update"
+	echo >&2 "+ echo Acquire::Languages 'none' > '$rootfsDir/etc/apt/apt.conf.d/docker-no-languages'"
+	cat > "$rootfsDir/etc/apt/apt.conf.d/docker-no-languages" <<-'EOF'
+		# In Docker, we don't often need the "Translations" files, so we're just wasting
+		# time and space by downloading them, and this inhibits that.  For users that do
+		# need them, it's a simple matter to delete this file and "apt-get update". :)
+
+		Acquire::Languages "none";
+	EOF
+
+	echo >&2 "+ echo Acquire::GzipIndexes 'true' > '$rootfsDir/etc/apt/apt.conf.d/docker-gzip-indexes'"
+	cat > "$rootfsDir/etc/apt/apt.conf.d/docker-gzip-indexes" <<-'EOF'
+		# Since Docker users using "RUN apt-get update && apt-get install -y ..." in
+		# their Dockerfiles don't go delete the lists files afterwards, we want them to
+		# be as small as possible on-disk, so we explicitly request "gz" versions and
+		# tell Apt to keep them gzipped on-disk.
+
+		# For comparison, an "apt-get update" layer without this on a pristine
+		# "debian:wheezy" base image was "29.88 MB", where with this it was only
+		# "8.273 MB".
+
+		Acquire::GzipIndexes "true";
+		Acquire::CompressionTypes::Order:: "gz";
+	EOF
+
+	# update "autoremove" configuration to be aggressive about removing suggests deps that weren't manually installed
+	echo >&2 "+ echo Apt::AutoRemove::SuggestsImportant 'false' > '$rootfsDir/etc/apt/apt.conf.d/docker-autoremove-suggests'"
+	cat > "$rootfsDir/etc/apt/apt.conf.d/docker-autoremove-suggests" <<-'EOF'
+		# Since Docker users are looking for the smallest possible final images, the
+		# following emerges as a very common pattern:
+
+		#   RUN apt-get update \
+		#       && apt-get install -y <packages> \
+		#       && <do some compilation work> \
+		#       && apt-get purge -y --auto-remove <packages>
+
+		# By default, APT will actually _keep_ packages installed via Recommends or
+		# Depends if another package Suggests them, even and including if the package
+		# that originally caused them to be installed is removed.  Setting this to
+		# "false" ensures that APT is appropriately aggressive about removing the
+		# packages it added.
+
+		# https://aptitude.alioth.debian.org/doc/en/ch02s05s05.html#configApt-AutoRemove-SuggestsImportant
+		Apt::AutoRemove::SuggestsImportant "false";
+	EOF
+fi
+
+if [ -z "$DONT_TOUCH_SOURCES_LIST" ]; then
+	# tweak sources.list, where appropriate
+	lsbDist=
+	if [ -z "$lsbDist" -a -r "$rootfsDir/etc/os-release" ]; then
+		lsbDist="$(. "$rootfsDir/etc/os-release" && echo "$ID")"
+	fi
+	if [ -z "$lsbDist" -a -r "$rootfsDir/etc/lsb-release" ]; then
+		lsbDist="$(. "$rootfsDir/etc/lsb-release" && echo "$DISTRIB_ID")"
+	fi
+	if [ -z "$lsbDist" -a -r "$rootfsDir/etc/debian_version" ]; then
+		lsbDist='Debian'
+	fi
+	# normalize to lowercase for easier matching
+	lsbDist="$(echo "$lsbDist" | tr '[:upper:]' '[:lower:]')"
+	case "$lsbDist" in
+		debian)
+			# updates and security!
+			if [ "$suite" != 'sid' -a "$suite" != 'unstable' ]; then
+				(
+					set -x
+					sed -i "
+						p;
+						s/ $suite / ${suite}-updates /
+					" "$rootfsDir/etc/apt/sources.list"
+					echo "deb http://security.debian.org $suite/updates main" >> "$rootfsDir/etc/apt/sources.list"
+					# squeeze-lts
+					if [ -f "$rootfsDir/etc/debian_version" ]; then
+						ltsSuite=
+						case "$(cat "$rootfsDir/etc/debian_version")" in
+							6.*) ltsSuite='squeeze-lts' ;;
+							#7.*) ltsSuite='wheezy-lts' ;;
+							#8.*) ltsSuite='jessie-lts' ;;
+						esac
+						if [ "$ltsSuite" ]; then
+							head -1 "$rootfsDir/etc/apt/sources.list" \
+								| sed "s/ $suite / $ltsSuite /" \
+									>> "$rootfsDir/etc/apt/sources.list"
+						fi
+					fi
+				)
+			fi
+			;;
+		ubuntu)
+			# add the updates and security repositories
+			(
+				set -x
+				sed -i "
+					p;
+					s/ $suite / ${suite}-updates /; p;
+					s/ $suite-updates / ${suite}-security /
+				" "$rootfsDir/etc/apt/sources.list"
+			)
+			;;
+		tanglu)
+			# add the updates repository
+			if [ "$suite" != 'devel' ]; then
+				(
+					set -x
+					sed -i "
+						p;
+						s/ $suite / ${suite}-updates /
+					" "$rootfsDir/etc/apt/sources.list"
+				)
+			fi
+			;;
+		steamos)
+			# add contrib and non-free if "main" is the only component
+			(
+				set -x
+				sed -i "s/ $suite main$/ $suite main contrib non-free/" "$rootfsDir/etc/apt/sources.list"
+			)
+			;;
+	esac
+fi
+
+(
+	set -x
+
+	# make sure we're fully up-to-date
+	rootfs_chroot sh -xc 'apt-get update && apt-get dist-upgrade -y'
+
+	# delete all the apt list files since they're big and get stale quickly
+	rm -rf "$rootfsDir/var/lib/apt/lists"/*
+	# this forces "apt-get update" in dependent images, which is also good
+
+	mkdir "$rootfsDir/var/lib/apt/lists/partial" # Lucid... "E: Lists directory /var/lib/apt/lists/partial is missing."
+)

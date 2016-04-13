@@ -136,7 +136,7 @@
                 go get -u github.com/tools/godep
 
                 ./build/presubmit.sh
-                godep go build -tags test github.com/google/cadvisor/integration/runner
+                go build -tags test github.com/google/cadvisor/integration/runner
                 ./runner --logtostderr --test-retry-count=8 --test-retry-whitelist=integration/runner/retrywhitelist.txt \
                 --ssh-options "-i /home/jenkins/.ssh/google_compute_engine -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no" \
                 e2e-cadvisor-ubuntu-trusty \

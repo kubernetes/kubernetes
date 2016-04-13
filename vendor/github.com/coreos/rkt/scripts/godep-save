@@ -1,0 +1,33 @@
+#!/bin/bash -e
+
+# make sure we are running in a toplevel directory
+if ! [[ "$0" =~ "scripts/godep-save" ]]; then
+	echo "This script must be run in a toplevel rkt directory"
+	exit 255
+fi
+
+# make sure that we have the fixed version of godep, which vendors
+# external projects, but does not modify them.
+REQGV=41
+GV=$(godep version | sed -e 's/^godep v\([0-9]\+\).*/\1/')
+if [[ "${GV}" -lt "${REQGV}" ]]; then
+	echo "The godep tool is too old (${GV}), must be at least version ${REQGV}"
+	exit 255
+fi
+
+VA=vendoredApps
+APPS=''
+if [[ -r "${VA}" ]]; then
+	# grep filters all empty lines and all lines with comments
+	# only, sed removes the comments from the other lines
+	APPS=$(cat "${VA}" \
+		      | grep -v '^\([[:space:]]*#.*\)\?$' \
+		      | sed -e 's/[[:space:]]*#.*//g')
+else
+	echo "No file '${VA}' found"
+fi
+
+CMD="godep save ./... ${APPS}"
+
+echo Running ${CMD}
+exec ${CMD}

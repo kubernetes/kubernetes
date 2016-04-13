@@ -1,0 +1,500 @@
+// Copyright (c) 2015, Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package google.bigtable.v1;
+
+option java_multiple_files = true;
+option java_outer_classname = "BigtableDataProto";
+option java_package = "com.google.bigtable.v1";
+
+
+// Specifies the complete (requested) contents of a single row of a table.
+// Rows which exceed 256MiB in size cannot be read in full.
+message Row {
+  // The unique key which identifies this row within its table. This is the same
+  // key that's used to identify the row in, for example, a MutateRowRequest.
+  // May contain any non-empty byte string up to 4KiB in length.
+  bytes key = 1;
+
+  // May be empty, but only if the entire row is empty.
+  // The mutual ordering of column families is not specified.
+  repeated Family families = 2;
+}
+
+// Specifies (some of) the contents of a single row/column family of a table.
+message Family {
+  // The unique key which identifies this family within its row. This is the
+  // same key that's used to identify the family in, for example, a RowFilter
+  // which sets its "family_name_regex_filter" field.
+  // Must match [-_.a-zA-Z0-9]+, except that AggregatingRowProcessors may
+  // produce cells in a sentinel family with an empty name.
+  // Must be no greater than 64 characters in length.
+  string name = 1;
+
+  // Must not be empty. Sorted in order of increasing "qualifier".
+  repeated Column columns = 2;
+}
+
+// Specifies (some of) the contents of a single row/column of a table.
+message Column {
+  // The unique key which identifies this column within its family. This is the
+  // same key that's used to identify the column in, for example, a RowFilter
+  // which sets its "column_qualifier_regex_filter" field.
+  // May contain any byte string, including the empty string, up to 16kiB in
+  // length.
+  bytes qualifier = 1;
+
+  // Must not be empty. Sorted in order of decreasing "timestamp_micros".
+  repeated Cell cells = 2;
+}
+
+// Specifies (some of) the contents of a single row/column/timestamp of a table.
+message Cell {
+  // The cell's stored timestamp, which also uniquely identifies it within
+  // its column.
+  // Values are always expressed in microseconds, but individual tables may set
+  // a coarser "granularity" to further restrict the allowed values. For
+  // example, a table which specifies millisecond granularity will only allow
+  // values of "timestamp_micros" which are multiples of 1000.
+  int64 timestamp_micros = 1;
+
+  // The value stored in the cell.
+  // May contain any byte string, including the empty string, up to 100MiB in
+  // length.
+  bytes value = 2;
+
+  // Labels applied to the cell by a [RowFilter][google.bigtable.v1.RowFilter].
+  repeated string labels = 3;
+}
+
+// Specifies a contiguous range of rows.
+message RowRange {
+  // Inclusive lower bound. If left empty, interpreted as the empty string.
+  bytes start_key = 2;
+
+  // Exclusive upper bound. If left empty, interpreted as infinity.
+  bytes end_key = 3;
+}
+
+// Specifies a contiguous range of columns within a single column family.
+// The range spans from <column_family>:<start_qualifier> to
+// <column_family>:<end_qualifier>, where both bounds can be either inclusive or
+// exclusive.
+message ColumnRange {
+  // The name of the column family within which this range falls.
+  string family_name = 1;
+
+  // The column qualifier at which to start the range (within 'column_family').
+  // If neither field is set, interpreted as the empty string, inclusive.
+  oneof start_qualifier {
+    // Used when giving an inclusive lower bound for the range.
+    bytes start_qualifier_inclusive = 2;
+
+    // Used when giving an exclusive lower bound for the range.
+    bytes start_qualifier_exclusive = 3;
+  }
+
+  // The column qualifier at which to end the range (within 'column_family').
+  // If neither field is set, interpreted as the infinite string, exclusive.
+  oneof end_qualifier {
+    // Used when giving an inclusive upper bound for the range.
+    bytes end_qualifier_inclusive = 4;
+
+    // Used when giving an exclusive upper bound for the range.
+    bytes end_qualifier_exclusive = 5;
+  }
+}
+
+// Specified a contiguous range of microsecond timestamps.
+message TimestampRange {
+  // Inclusive lower bound. If left empty, interpreted as 0.
+  int64 start_timestamp_micros = 1;
+
+  // Exclusive upper bound. If left empty, interpreted as infinity.
+  int64 end_timestamp_micros = 2;
+}
+
+// Specifies a contiguous range of raw byte values.
+message ValueRange {
+  // The value at which to start the range.
+  // If neither field is set, interpreted as the empty string, inclusive.
+  oneof start_value {
+    // Used when giving an inclusive lower bound for the range.
+    bytes start_value_inclusive = 1;
+
+    // Used when giving an exclusive lower bound for the range.
+    bytes start_value_exclusive = 2;
+  }
+
+  // The value at which to end the range.
+  // If neither field is set, interpreted as the infinite string, exclusive.
+  oneof end_value {
+    // Used when giving an inclusive upper bound for the range.
+    bytes end_value_inclusive = 3;
+
+    // Used when giving an exclusive upper bound for the range.
+    bytes end_value_exclusive = 4;
+  }
+}
+
+// Takes a row as input and produces an alternate view of the row based on
+// specified rules. For example, a RowFilter might trim down a row to include
+// just the cells from columns matching a given regular expression, or might
+// return all the cells of a row but not their values. More complicated filters
+// can be composed out of these components to express requests such as, "within
+// every column of a particular family, give just the two most recent cells
+// which are older than timestamp X."
+//
+// There are two broad categories of RowFilters (true filters and transformers),
+// as well as two ways to compose simple filters into more complex ones
+// (chains and interleaves). They work as follows:
+//
+// * True filters alter the input row by excluding some of its cells wholesale
+// from the output row. An example of a true filter is the "value_regex_filter",
+// which excludes cells whose values don't match the specified pattern. All
+// regex true filters use RE2 syntax (https://github.com/google/re2/wiki/Syntax)
+// in raw byte mode (RE2::Latin1), and are evaluated as full matches. An
+// important point to keep in mind is that RE2(.) is equivalent by default to
+// RE2([^\n]), meaning that it does not match newlines. When attempting to match
+// an arbitrary byte, you should therefore use the escape sequence '\C', which
+// may need to be further escaped as '\\C' in your client language.
+//
+// * Transformers alter the input row by changing the values of some of its
+// cells in the output, without excluding them completely. Currently, the only
+// supported transformer is the "strip_value_transformer", which replaces every
+// cell's value with the empty string.
+//
+// * Chains and interleaves are described in more detail in the
+// RowFilter.Chain and RowFilter.Interleave documentation.
+//
+// The total serialized size of a RowFilter message must not
+// exceed 4096 bytes, and RowFilters may not be nested within each other
+// (in Chains or Interleaves) to a depth of more than 20.
+message RowFilter {
+  // A RowFilter which sends rows through several RowFilters in sequence.
+  message Chain {
+    // The elements of "filters" are chained together to process the input row:
+    // in row -> f(0) -> intermediate row -> f(1) -> ... -> f(N) -> out row
+    // The full chain is executed atomically.
+    repeated RowFilter filters = 1;
+  }
+
+  // A RowFilter which sends each row to each of several component
+  // RowFilters and interleaves the results.
+  message Interleave {
+    // The elements of "filters" all process a copy of the input row, and the
+    // results are pooled, sorted, and combined into a single output row.
+    // If multiple cells are produced with the same column and timestamp,
+    // they will all appear in the output row in an unspecified mutual order.
+    // Consider the following example, with three filters:
+    //
+    //                              input row
+    //                                  |
+    //        -----------------------------------------------------
+    //        |                         |                         |
+    //       f(0)                      f(1)                      f(2)
+    //        |                         |                         |
+    // 1: foo,bar,10,x             foo,bar,10,z              far,bar,7,a
+    // 2: foo,blah,11,z            far,blah,5,x              far,blah,5,x
+    //        |                         |                         |
+    //        -----------------------------------------------------
+    //                                  |
+    // 1:                        foo,bar,10,z     // could have switched with #2
+    // 2:                        foo,bar,10,x     // could have switched with #1
+    // 3:                        foo,blah,11,z
+    // 4:                        far,bar,7,a
+    // 5:                        far,blah,5,x     // identical to #6
+    // 6:                        far,blah,5,x     // identical to #5
+    // All interleaved filters are executed atomically.
+    repeated RowFilter filters = 1;
+  }
+
+  // A RowFilter which evaluates one of two possible RowFilters, depending on
+  // whether or not a predicate RowFilter outputs any cells from the input row.
+  //
+  // IMPORTANT NOTE: The predicate filter does not execute atomically with the
+  // true and false filters, which may lead to inconsistent or unexpected
+  // results. Additionally, Condition filters have poor performance, especially
+  // when filters are set for the false condition.
+  message Condition {
+    // If "predicate_filter" outputs any cells, then "true_filter" will be
+    // evaluated on the input row. Otherwise, "false_filter" will be evaluated.
+    RowFilter predicate_filter = 1;
+
+    // The filter to apply to the input row if "predicate_filter" returns any
+    // results. If not provided, no results will be returned in the true case.
+    RowFilter true_filter = 2;
+
+    // The filter to apply to the input row if "predicate_filter" does not
+    // return any results. If not provided, no results will be returned in the
+    // false case.
+    RowFilter false_filter = 3;
+  }
+
+  // Which of the possible RowFilter types to apply. If none are set, this
+  // RowFilter returns all cells in the input row.
+  oneof filter {
+    // Applies several RowFilters to the data in sequence, progressively
+    // narrowing the results.
+    Chain chain = 1;
+
+    // Applies several RowFilters to the data in parallel and combines the
+    // results.
+    Interleave interleave = 2;
+
+    // Applies one of two possible RowFilters to the data based on the output of
+    // a predicate RowFilter.
+    Condition condition = 3;
+
+    // ADVANCED USE ONLY.
+    // Hook for introspection into the RowFilter. Outputs all cells directly to
+    // the output of the read rather than to any parent filter. Consider the
+    // following example:
+    //
+    // Chain(
+    //   FamilyRegex("A"),
+    //   Interleave(
+    //     All(),
+    //     Chain(Label("foo"), Sink())
+    //   ),
+    //   QualifierRegex("B")
+    // )
+    //
+    //                         A,A,1,w
+    //                         A,B,2,x
+    //                         B,B,4,z
+    //                            |
+    //                     FamilyRegex("A")
+    //                            |
+    //                         A,A,1,w
+    //                         A,B,2,x
+    //                            |
+    //               +------------+-------------+
+    //               |                          |
+    //             All()                    Label(foo)
+    //               |                          |
+    //            A,A,1,w              A,A,1,w,labels:[foo]
+    //            A,B,2,x              A,B,2,x,labels:[foo]
+    //               |                          |
+    //               |                        Sink() --------------+
+    //               |                          |                  |
+    //               +------------+      x------+          A,A,1,w,labels:[foo]
+    //                            |                        A,B,2,x,labels:[foo]
+    //                         A,A,1,w                             |
+    //                         A,B,2,x                             |
+    //                            |                                |
+    //                    QualifierRegex("B")                      |
+    //                            |                                |
+    //                         A,B,2,x                             |
+    //                            |                                |
+    //                            +--------------------------------+
+    //                            |
+    //                         A,A,1,w,labels:[foo]
+    //                         A,B,2,x,labels:[foo]  // could be switched
+    //                         A,B,2,x               // could be switched
+    //
+    // Despite being excluded by the qualifier filter, a copy of every cell
+    // that reaches the sink is present in the final result.
+    //
+    // As with an [Interleave][google.bigtable.v1.RowFilter.Interleave],
+    // duplicate cells are possible, and appear in an unspecified mutual order.
+    // In this case we have a duplicate with column "A:B" and timestamp 2,
+    // because one copy passed through the all filter while the other was
+    // passed through the label and sink. Note that one copy has label "foo",
+    // while the other does not.
+    //
+    // Cannot be used within the `predicate_filter`, `true_filter`, or
+    // `false_filter` of a [Condition][google.bigtable.v1.RowFilter.Condition].
+    bool sink = 16;
+
+    // Matches all cells, regardless of input. Functionally equivalent to
+    // leaving `filter` unset, but included for completeness.
+    bool pass_all_filter = 17;
+
+    // Does not match any cells, regardless of input. Useful for temporarily
+    // disabling just part of a filter.
+    bool block_all_filter = 18;
+
+    // Matches only cells from rows whose keys satisfy the given RE2 regex. In
+    // other words, passes through the entire row when the key matches, and
+    // otherwise produces an empty row.
+    // Note that, since row keys can contain arbitrary bytes, the '\C' escape
+    // sequence must be used if a true wildcard is desired. The '.' character
+    // will not match the new line character '\n', which may be present in a
+    // binary key.
+    bytes row_key_regex_filter = 4;
+
+    // Matches all cells from a row with probability p, and matches no cells
+    // from the row with probability 1-p.
+    double row_sample_filter = 14;
+
+    // Matches only cells from columns whose families satisfy the given RE2
+    // regex. For technical reasons, the regex must not contain the ':'
+    // character, even if it is not being used as a literal.
+    // Note that, since column families cannot contain the new line character
+    // '\n', it is sufficient to use '.' as a full wildcard when matching
+    // column family names.
+    string family_name_regex_filter = 5;
+
+    // Matches only cells from columns whose qualifiers satisfy the given RE2
+    // regex.
+    // Note that, since column qualifiers can contain arbitrary bytes, the '\C'
+    // escape sequence must be used if a true wildcard is desired. The '.'
+    // character will not match the new line character '\n', which may be
+    // present in a binary qualifier.
+    bytes column_qualifier_regex_filter = 6;
+
+    // Matches only cells from columns within the given range.
+    ColumnRange column_range_filter = 7;
+
+    // Matches only cells with timestamps within the given range.
+    TimestampRange timestamp_range_filter = 8;
+
+    // Matches only cells with values that satisfy the given regular expression.
+    // Note that, since cell values can contain arbitrary bytes, the '\C' escape
+    // sequence must be used if a true wildcard is desired. The '.' character
+    // will not match the new line character '\n', which may be present in a
+    // binary value.
+    bytes value_regex_filter = 9;
+
+    // Matches only cells with values that fall within the given range.
+    ValueRange value_range_filter = 15;
+
+    // Skips the first N cells of each row, matching all subsequent cells.
+    int32 cells_per_row_offset_filter = 10;
+
+    // Matches only the first N cells of each row.
+    int32 cells_per_row_limit_filter = 11;
+
+    // Matches only the most recent N cells within each column. For example,
+    // if N=2, this filter would match column "foo:bar" at timestamps 10 and 9,
+    // skip all earlier cells in "foo:bar", and then begin matching again in
+    // column "foo:bar2".
+    int32 cells_per_column_limit_filter = 12;
+
+    // Replaces each cell's value with the empty string.
+    bool strip_value_transformer = 13;
+
+    // Applies the given label to all cells in the output row. This allows
+    // the client to determine which results were produced from which part of
+    // the filter.
+    //
+    // Values must be at most 15 characters in length, and match the RE2
+    // pattern [a-z0-9\\-]+
+    //
+    // Due to a technical limitation, it is not currently possible to apply
+    // multiple labels to a cell. As a result, a Chain may have no more than
+    // one sub-filter which contains a apply_label_transformer. It is okay for
+    // an Interleave to contain multiple apply_label_transformers, as they will
+    // be applied to separate copies of the input. This may be relaxed in the
+    // future.
+    string apply_label_transformer = 19;
+  }
+}
+
+// Specifies a particular change to be made to the contents of a row.
+message Mutation {
+  // A Mutation which sets the value of the specified cell.
+  message SetCell {
+    // The name of the family into which new data should be written.
+    // Must match [-_.a-zA-Z0-9]+
+    string family_name = 1;
+
+    // The qualifier of the column into which new data should be written.
+    // Can be any byte string, including the empty string.
+    bytes column_qualifier = 2;
+
+    // The timestamp of the cell into which new data should be written.
+    // Use -1 for current Bigtable server time.
+    // Otherwise, the client should set this value itself, noting that the
+    // default value is a timestamp of zero if the field is left unspecified.
+    // Values must match the "granularity" of the table (e.g. micros, millis).
+    int64 timestamp_micros = 3;
+
+    // The value to be written into the specified cell.
+    bytes value = 4;
+  }
+
+  // A Mutation which deletes cells from the specified column, optionally
+  // restricting the deletions to a given timestamp range.
+  message DeleteFromColumn {
+    // The name of the family from which cells should be deleted.
+    // Must match [-_.a-zA-Z0-9]+
+    string family_name = 1;
+
+    // The qualifier of the column from which cells should be deleted.
+    // Can be any byte string, including the empty string.
+    bytes column_qualifier = 2;
+
+    // The range of timestamps within which cells should be deleted.
+    TimestampRange time_range = 3;
+  }
+
+  // A Mutation which deletes all cells from the specified column family.
+  message DeleteFromFamily {
+    // The name of the family from which cells should be deleted.
+    // Must match [-_.a-zA-Z0-9]+
+    string family_name = 1;
+  }
+
+  // A Mutation which deletes all cells from the containing row.
+  message DeleteFromRow {
+
+  }
+
+  // Which of the possible Mutation types to apply.
+  oneof mutation {
+    // Set a cell's value.
+    SetCell set_cell = 1;
+
+    // Deletes cells from a column.
+    DeleteFromColumn delete_from_column = 2;
+
+    // Deletes cells from a column family.
+    DeleteFromFamily delete_from_family = 3;
+
+    // Deletes cells from the entire row.
+    DeleteFromRow delete_from_row = 4;
+  }
+}
+
+// Specifies an atomic read/modify/write operation on the latest value of the
+// specified column.
+message ReadModifyWriteRule {
+  // The name of the family to which the read/modify/write should be applied.
+  // Must match [-_.a-zA-Z0-9]+
+  string family_name = 1;
+
+  // The qualifier of the column to which the read/modify/write should be
+  // applied.
+  // Can be any byte string, including the empty string.
+  bytes column_qualifier = 2;
+
+  // The rule used to determine the column's new latest value from its current
+  // latest value.
+  oneof rule {
+    // Rule specifying that "append_value" be appended to the existing value.
+    // If the targeted cell is unset, it will be treated as containing the
+    // empty string.
+    bytes append_value = 3;
+
+    // Rule specifying that "increment_amount" be added to the existing value.
+    // If the targeted cell is unset, it will be treated as containing a zero.
+    // Otherwise, the targeted cell must contain an 8-byte value (interpreted
+    // as a 64-bit big-endian signed integer), or the entire request will fail.
+    int64 increment_amount = 4;
+  }
+}

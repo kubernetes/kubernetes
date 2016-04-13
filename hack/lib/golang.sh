@@ -252,7 +252,6 @@ kube::golang::create_gopath_tree() {
 #
 # Input Vars:
 #   KUBE_EXTRA_GOPATH - If set, this is included in created GOPATH
-#   KUBE_NO_GODEPS - If set, we don't add 'Godeps/_workspace' to GOPATH
 #
 # Output Vars:
 #   export GOPATH - A modified GOPATH to our created tree along with extra
@@ -296,12 +295,6 @@ EOF
   if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
     GOPATH="${GOPATH}:${KUBE_EXTRA_GOPATH}"
   fi
-
-  # Append the tree maintained by `godep` to the GOPATH unless KUBE_NO_GODEPS
-  # is defined.
-  if [[ -z ${KUBE_NO_GODEPS:-} ]]; then
-    GOPATH="${GOPATH}:${KUBE_ROOT}/Godeps/_workspace"
-  fi
   export GOPATH
 
   # Unset GOBIN in case it already exists in the current session.
@@ -331,20 +324,12 @@ kube::golang::place_bins() {
       platform_src=""
     fi
 
-    local gopaths=("${KUBE_GOPATH}")
-    # If targets were built inside Godeps, then we need to sync from there too.
-    if [[ -z ${KUBE_NO_GODEPS:-} ]]; then
-      gopaths+=("${KUBE_ROOT}/Godeps/_workspace")
+    local full_binpath_src="${KUBE_GOPATH}/bin${platform_src}"
+    if [[ -d "${full_binpath_src}" ]]; then
+      mkdir -p "${KUBE_OUTPUT_BINPATH}/${platform}"
+      find "${full_binpath_src}" -maxdepth 1 -type f -exec \
+        rsync -pt {} "${KUBE_OUTPUT_BINPATH}/${platform}" \;
     fi
-    local gopath
-    for gopath in "${gopaths[@]}"; do
-      local full_binpath_src="${gopath}/bin${platform_src}"
-      if [[ -d "${full_binpath_src}" ]]; then
-        mkdir -p "${KUBE_OUTPUT_BINPATH}/${platform}"
-        find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-          rsync -pt {} "${KUBE_OUTPUT_BINPATH}/${platform}" \;
-      fi
-    done
   done
 }
 

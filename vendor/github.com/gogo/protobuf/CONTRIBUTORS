@@ -1,0 +1,14 @@
+This is a list of contributors to the GoGo protobuf repository.
+
+# Names should be added to this file like so:
+#     Name <email address>
+
+# Please keep the list sorted.
+
+Walter Schulze <awalterschulze@gmail.com>
+
+The contributors to the Go protobuf repository:
+
+# This source code was written by the Go contributors.
+# The master list of contributors is in the main Go distribution,
+# visible at http://tip.golang.org/CONTRIBUTORS.

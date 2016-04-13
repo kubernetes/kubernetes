@@ -1,0 +1,13 @@
+*~
+
+/Makefile
+/autom4te.cache
+/config.log
+/config.status
+/.config.args
+/configure
+/build-rkt*
+/build-rir*
+.vagrant
+/tags
+/acbuild

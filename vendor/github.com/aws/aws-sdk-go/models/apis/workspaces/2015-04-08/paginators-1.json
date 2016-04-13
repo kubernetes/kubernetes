@@ -1,0 +1,20 @@
+{
+  "pagination": {
+    "DescribeWorkspaceBundles": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "result_key": "Bundles"
+    },
+    "DescribeWorkspaceDirectories": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "result_key": "Directories"
+    },
+    "DescribeWorkspaces": {
+      "limit_key": "Limit",
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "result_key": "Workspaces"
+    }
+  }
+}

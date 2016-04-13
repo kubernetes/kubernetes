@@ -1,0 +1,822 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/qiwkKULZKsE5qLcb8g90X8kbnl8\"",
+ "discoveryVersion": "v1",
+ "id": "proximitybeacon:v1beta1",
+ "name": "proximitybeacon",
+ "version": "v1beta1",
+ "revision": "20150729",
+ "title": "Google Proximity Beacon API",
+ "description": "This API provides services to register, manage, index, and search beacons.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/beacons/proximity/",
+ "protocol": "rest",
+ "baseUrl": "https://proximitybeacon.googleapis.com/",
+ "basePath": "/",
+ "rootUrl": "https://proximitybeacon.googleapis.com/",
+ "servicePath": "",
+ "batchPath": "batch",
+ "parameters": {
+  "access_token": {
+   "type": "string",
+   "description": "OAuth access token.",
+   "location": "query"
+  },
+  "alt": {
+   "type": "string",
+   "description": "Data format for response.",
+   "default": "json",
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json",
+    "Media download with context-dependent Content-Type",
+    "Responses with Content-Type of application/x-protobuf"
+   ],
+   "location": "query"
+  },
+  "bearer_token": {
+   "type": "string",
+   "description": "OAuth bearer token.",
+   "location": "query"
+  },
+  "callback": {
+   "type": "string",
+   "description": "JSONP",
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "pp": {
+   "type": "boolean",
+   "description": "Pretty-print response.",
+   "default": "true",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters.",
+   "location": "query"
+  },
+  "upload_protocol": {
+   "type": "string",
+   "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+   "location": "query"
+  },
+  "uploadType": {
+   "type": "string",
+   "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+   "location": "query"
+  },
+  "$.xgafv": {
+   "type": "string",
+   "description": "V1 error format.",
+   "enumDescriptions": [
+    "v1 error format",
+    "v2 error format"
+   ],
+   "location": "query"
+  }
+ },
+ "schemas": {
+  "Beacon": {
+   "id": "Beacon",
+   "type": "object",
+   "description": "Details of a beacon device.",
+   "properties": {
+    "beaconName": {
+     "type": "string",
+     "description": "Resource name of this beacon. A beacon name has the format \"beacons/N!beaconId\" where the beaconId is the base16 ID broadcast by the beacon and N is a code for the beacon's type. Possible values are `3` for Eddystone, `1` for iBeacon, or `5` for AltBeacon. This field must be left empty when registering. After reading a beacon, clients can use the name for future operations."
+    },
+    "advertisedId": {
+     "$ref": "AdvertisedId",
+     "description": "The identifier of a beacon as advertised by it. This field must be populated when registering. It may be empty when updating a beacon record because it is ignored in updates."
+    },
+    "status": {
+     "type": "string",
+     "description": "Current status of the beacon. Required.",
+     "enum": [
+      "STATUS_UNSPECIFIED",
+      "ACTIVE",
+      "DECOMMISSIONED",
+      "INACTIVE"
+     ]
+    },
+    "placeId": {
+     "type": "string",
+     "description": "The [Google Places API](/places/place-id) Place ID of the place where the beacon is deployed. This is given when the beacon is registered or updated, not automatically detected in any way. Optional."
+    },
+    "latLng": {
+     "$ref": "LatLng",
+     "description": "The location of the beacon, expressed as a latitude and longitude pair. This location is given when the beacon is registered or updated. It does not necessarily indicate the actual current location of the beacon. Optional."
+    },
+    "indoorLevel": {
+     "$ref": "IndoorLevel",
+     "description": "The indoor level information for this beacon, if known. As returned by the Google Maps API. Optional."
+    },
+    "expectedStability": {
+     "type": "string",
+     "description": "Expected location stability. This is set when the beacon is registered or updated, not automatically detected in any way. Optional.",
+     "enum": [
+      "STABILITY_UNSPECIFIED",
+      "STABLE",
+      "PORTABLE",
+      "MOBILE",
+      "ROVING"
+     ]
+    },
+    "description": {
+     "type": "string",
+     "description": "Free text used to identify and describe the beacon. Maximum length 140 characters. Optional."
+    },
+    "properties": {
+     "type": "object",
+     "description": "Properties of the beacon device, for example battery type or firmware version. Optional.",
+     "additionalProperties": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "AdvertisedId": {
+   "id": "AdvertisedId",
+   "type": "object",
+   "description": "Defines a unique identifier of a beacon as broadcast by the device.",
+   "properties": {
+    "type": {
+     "type": "string",
+     "description": "Specifies the identifier type. Required.",
+     "enum": [
+      "TYPE_UNSPECIFIED",
+      "EDDYSTONE",
+      "IBEACON",
+      "ALTBEACON"
+     ]
+    },
+    "id": {
+     "type": "string",
+     "description": "The actual beacon identifier, as broadcast by the beacon hardware. Must be [base64](http://tools.ietf.org/html/rfc4648#section-4) encoded in HTTP requests, and will be so encoded (with padding) in responses. The base64 encoding should be of the binary byte-stream and not any textual (such as hex) representation thereof. Required.",
+     "format": "byte"
+    }
+   }
+  },
+  "LatLng": {
+   "id": "LatLng",
+   "type": "object",
+   "description": "An object representing a latitude/longitude pair. This is expressed as a pair of doubles representing degrees latitude and degrees longitude. Unless specified otherwise, this must conform to the WGS84 standard. Values must be within normalized ranges. Example of normalization code in Python: def NormalizeLongitude(longitude): \"\"\"Wrapsdecimal degrees longitude to [-180.0, 180.0].\"\"\" q, r = divmod(longitude, 360.0) if r \u003e 180.0 or (r == 180.0 and q \u003c= -1.0): return r - 360.0 return r def NormalizeLatLng(latitude, longitude): \"\"\"Wraps decimal degrees latitude and longitude to [-180.0, 180.0] and [-90.0, 90.0], respectively.\"\"\" r = latitude % 360.0 if r = 270.0: return r - 360, NormalizeLongitude(longitude) else: return 180 - r, NormalizeLongitude(longitude + 180.0) assert 180.0 == NormalizeLongitude(180.0) assert -180.0 == NormalizeLongitude(-180.0) assert -179.0 == NormalizeLongitude(181.0) assert (0.0, 0.0) == NormalizeLatLng(360.0, 0.0) assert (0.0, 0.0) == NormalizeLatLng(-360.0, 0.0) assert (85.0, 180.0) == NormalizeLatLng(95.0, 0.0) assert (-85.0, -170.0) == NormalizeLatLng(-95.0, 10.0) assert (90.0, 10.0) == NormalizeLatLng(90.0, 10.0) assert (-90.0, -10.0) == NormalizeLatLng(-90.0, -10.0) assert (0.0, -170.0) == NormalizeLatLng(-180.0, 10.0) assert (0.0, -170.0) == NormalizeLatLng(180.0, 10.0) assert (-90.0, 10.0) == NormalizeLatLng(270.0, 10.0) assert (90.0, 10.0) == NormalizeLatLng(-270.0, 10.0)",
+   "properties": {
+    "latitude": {
+     "type": "number",
+     "description": "The latitude in degrees. It must be in the range [-90.0, +90.0].",
+     "format": "double"
+    },
+    "longitude": {
+     "type": "number",
+     "description": "The longitude in degrees. It must be in the range [-180.0, +180.0].",
+     "format": "double"
+    }
+   }
+  },
+  "IndoorLevel": {
+   "id": "IndoorLevel",
+   "type": "object",
+   "description": "Indoor level, a human-readable string as returned by Google Maps APIs, useful to indicate which floor of a building a beacon is located on.",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "The name of this level."
+    }
+   }
+  },
+  "Empty": {
+   "id": "Empty",
+   "type": "object",
+   "description": "A generic empty message that you can re-use to avoid defining duplicated empty messages in your APIs. A typical example is to use it as the request or the response type of an API method. For instance: service Foo { rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty); } The JSON representation for `Empty` is empty JSON object `{}`."
+  },
+  "ListBeaconsResponse": {
+   "id": "ListBeaconsResponse",
+   "type": "object",
+   "description": "Response that contains list beacon results and pagination help.",
+   "properties": {
+    "beacons": {
+     "type": "array",
+     "description": "The beacons that matched the search criteria.",
+     "items": {
+      "$ref": "Beacon"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "An opaque pagination token that the client may provide in their next request to retrieve the next page of results."
+    },
+    "totalCount": {
+     "type": "string",
+     "description": "Estimate of the total number of beacons matched by the query. Higher values may be less accurate.",
+     "format": "int64"
+    }
+   }
+  },
+  "BeaconAttachment": {
+   "id": "BeaconAttachment",
+   "type": "object",
+   "description": "Project-specific data associated with a beacon.",
+   "properties": {
+    "attachmentName": {
+     "type": "string",
+     "description": "Resource name of this attachment. Attachment names have the format: beacons/beacon_id/attachments/attachment_id. Leave this empty on creation."
+    },
+    "namespacedType": {
+     "type": "string",
+     "description": "Specifies what kind of attachment this is. Tells a client how to interpret the `data` field. Format is namespace/type. Namespace provides type separation between clients. Type describes the type of `data`, for use by the client when parsing the `data` field. Required."
+    },
+    "data": {
+     "type": "string",
+     "description": "An opaque data container for client-provided data. Must be [base64](http://tools.ietf.org/html/rfc4648#section-4) encoded in HTTP requests, and will be so encoded (with padding) in responses. Required.",
+     "format": "byte"
+    }
+   }
+  },
+  "ListBeaconAttachmentsResponse": {
+   "id": "ListBeaconAttachmentsResponse",
+   "type": "object",
+   "description": "Response to ListBeaconAttachments that contains the requested attachments.",
+   "properties": {
+    "attachments": {
+     "type": "array",
+     "description": "The attachments that corresponded to the request params.",
+     "items": {
+      "$ref": "BeaconAttachment"
+     }
+    }
+   }
+  },
+  "DeleteAttachmentsResponse": {
+   "id": "DeleteAttachmentsResponse",
+   "type": "object",
+   "description": "Response for a request to delete attachments.",
+   "properties": {
+    "numDeleted": {
+     "type": "integer",
+     "description": "The number of attachments that were deleted.",
+     "format": "int32"
+    }
+   }
+  },
+  "ListNamespacesResponse": {
+   "id": "ListNamespacesResponse",
+   "type": "object",
+   "description": "Response to ListNamespacesRequest that contains all the project's namespaces.",
+   "properties": {
+    "namespaces": {
+     "type": "array",
+     "description": "The attachments that corresponded to the request params.",
+     "items": {
+      "$ref": "Namespace"
+     }
+    }
+   }
+  },
+  "Namespace": {
+   "id": "Namespace",
+   "type": "object",
+   "description": "An attachment namespace defines read and write access for all the attachments created under it. Each namespace is globally unique, and owned by one project which is the only project that can create attachments under it.",
+   "properties": {
+    "namespaceName": {
+     "type": "string",
+     "description": "Resource name of this namespace. Namespaces names have the format: namespaces/namespace."
+    },
+    "servingVisibility": {
+     "type": "string",
+     "description": "Specifies what clients may receive attachments under this namespace via `beaconinfo.getforobserved`.",
+     "enum": [
+      "VISIBILITY_UNSPECIFIED",
+      "UNLISTED",
+      "PUBLIC"
+     ]
+    }
+   }
+  },
+  "ListDiagnosticsResponse": {
+   "id": "ListDiagnosticsResponse",
+   "type": "object",
+   "description": "Response that contains the requested diagnostics.",
+   "properties": {
+    "diagnostics": {
+     "type": "array",
+     "description": "The diagnostics matching the given request.",
+     "items": {
+      "$ref": "Diagnostics"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token that can be used for pagination. Returned only if the request matches more beacons than can be returned in this response."
+    }
+   }
+  },
+  "Diagnostics": {
+   "id": "Diagnostics",
+   "type": "object",
+   "description": "Diagnostics for a single beacon.",
+   "properties": {
+    "beaconName": {
+     "type": "string",
+     "description": "Resource name of the beacon."
+    },
+    "estimatedLowBatteryDate": {
+     "$ref": "Date",
+     "description": "The date when the battery is expected to be low. If the value is missing then there is no estimate for when the battery will be low. This value is only an estimate, not an exact date."
+    },
+    "alerts": {
+     "type": "array",
+     "description": "An unordered list of Alerts that the beacon has.",
+     "enumDescriptions": [
+      "Invalid value. Should never appear.",
+      "The beacon has been reported in a location different than its registered location. This may indicate that the beacon has been moved. This signal is not 100% accurate, but indicates that further investigation is worth while.",
+      "The battery level for the beacon is low enough that, given the beacon's current use, its battery will run out with in the next 60 days. This indicates that the battery should be replaced soon."
+     ],
+     "items": {
+      "type": "string",
+      "enum": [
+       "ALERT_UNSPECIFIED",
+       "WRONG_LOCATION",
+       "LOW_BATTERY"
+      ]
+     }
+    }
+   }
+  },
+  "Date": {
+   "id": "Date",
+   "type": "object",
+   "description": "Represents a whole calendar date, e.g. date of birth. The time of day and time zone are either specified elsewhere or are not significant. The date is relative to the Proleptic Gregorian Calendar. The day may be 0 to represent a year and month where the day is not significant, e.g. credit card expiration date. The year may be 0 to represent a month and day independent of year, e.g. anniversary date. Related types are [google.type.TimeOfDay][] and `google.protobuf.Timestamp`.",
+   "properties": {
+    "year": {
+     "type": "integer",
+     "description": "Year of date. Must be from 1 to 9,999, or 0 if specifying a date without a year.",
+     "format": "int32"
+    },
+    "month": {
+     "type": "integer",
+     "description": "Month of year of date. Must be from 1 to 12.",
+     "format": "int32"
+    },
+    "day": {
+     "type": "integer",
+     "description": "Day of month. Must be from 1 to 31 and valid for the year and month, or 0 if specifying a year/month where the day is not sigificant.",
+     "format": "int32"
+    }
+   }
+  },
+  "GetInfoForObservedBeaconsRequest": {
+   "id": "GetInfoForObservedBeaconsRequest",
+   "type": "object",
+   "description": "Request for beacon and attachment information about beacons that a mobile client has encountered \"in the wild\".",
+   "properties": {
+    "observations": {
+     "type": "array",
+     "description": "The beacons that the client has encountered. At least one must be given.",
+     "items": {
+      "$ref": "Observation"
+     }
+    },
+    "namespacedTypes": {
+     "type": "array",
+     "description": "Specifies what kind of attachments to include in the response. When given, the response will include only attachments of the given types. When empty, no attachments will be returned. Must be in the format namespace/type. Accepts `*` to specify all types in all namespaces. Optional.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "Observation": {
+   "id": "Observation",
+   "type": "object",
+   "description": "Represents one beacon observed once.",
+   "properties": {
+    "advertisedId": {
+     "$ref": "AdvertisedId",
+     "description": "The ID advertised by the beacon the client has encountered. Required."
+    },
+    "telemetry": {
+     "type": "string",
+     "description": "The array of telemetry bytes received from the beacon. The server is responsible for parsing it. This field may frequently be empty, as with a beacon that transmits telemetry only occasionally.",
+     "format": "byte"
+    },
+    "timestampMs": {
+     "type": "string",
+     "description": "Time when the beacon was observed. Being sourced from a mobile device, this time may be suspect."
+    }
+   }
+  },
+  "GetInfoForObservedBeaconsResponse": {
+   "id": "GetInfoForObservedBeaconsResponse",
+   "type": "object",
+   "description": "Information about the requested beacons, optionally including attachment data.",
+   "properties": {
+    "beacons": {
+     "type": "array",
+     "description": "Public information about beacons. May be empty if the request matched no beacons.",
+     "items": {
+      "$ref": "BeaconInfo"
+     }
+    }
+   }
+  },
+  "BeaconInfo": {
+   "id": "BeaconInfo",
+   "type": "object",
+   "description": "A subset of beacon information served via the `beaconinfo.getforobserved` method, which you call when users of your app encounter your beacons.",
+   "properties": {
+    "advertisedId": {
+     "$ref": "AdvertisedId",
+     "description": "The ID advertised by the beacon."
+    },
+    "beaconName": {
+     "type": "string",
+     "description": "The name under which the beacon is registered."
+    },
+    "description": {
+     "type": "string",
+     "description": "Free text used to identify or describe the beacon in a registered establishment. For example: \"entrance\", \"room 101\", etc. May be empty."
+    },
+    "attachments": {
+     "type": "array",
+     "description": "Attachments matching the type(s) requested. May be empty if no attachment types were requested, or if none matched.",
+     "items": {
+      "$ref": "AttachmentInfo"
+     }
+    }
+   }
+  },
+  "AttachmentInfo": {
+   "id": "AttachmentInfo",
+   "type": "object",
+   "description": "A subset of attachment information served via the `beaconinfo.getforobserved` method, used when your users encounter your beacons.",
+   "properties": {
+    "namespacedType": {
+     "type": "string",
+     "description": "Specifies what kind of attachment this is. Tells a client how to interpret the `data` field. Format is namespace/type, for example scrupulous-wombat-12345/welcome-message"
+    },
+    "data": {
+     "type": "string",
+     "description": "An opaque data container for client-provided data.",
+     "format": "byte"
+    }
+   }
+  }
+ },
+ "resources": {
+  "beacons": {
+   "methods": {
+    "register": {
+     "id": "proximitybeacon.beacons.register",
+     "path": "v1beta1/beacons:register",
+     "httpMethod": "POST",
+     "description": "Registers a previously unregistered beacon given its `advertisedId`. These IDs are unique within the system. An ID can be registered only once.",
+     "request": {
+      "$ref": "Beacon"
+     },
+     "response": {
+      "$ref": "Beacon"
+     }
+    },
+    "decommission": {
+     "id": "proximitybeacon.beacons.decommission",
+     "path": "v1beta1/{+beaconName}:decommission",
+     "httpMethod": "POST",
+     "description": "Decommissions the specified beacon in the service. This beacon will no longer be returned from `beaconinfo.getforobserved`. This operation is permanent -- you will not be able to re-register a beacon with this ID again.",
+     "parameters": {
+      "beaconName": {
+       "type": "string",
+       "description": "Beacon that should be decommissioned. Required.",
+       "required": true,
+       "pattern": "^beacons/[^/]*$",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "beaconName"
+     ],
+     "response": {
+      "$ref": "Empty"
+     }
+    },
+    "get": {
+     "id": "proximitybeacon.beacons.get",
+     "path": "v1beta1/{+beaconName}",
+     "httpMethod": "GET",
+     "description": "Returns detailed information about the specified beacon.",
+     "parameters": {
+      "beaconName": {
+       "type": "string",
+       "description": "Beacon that is requested.",
+       "required": true,
+       "pattern": "^beacons/[^/]*$",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "beaconName"
+     ],
+     "response": {
+      "$ref": "Beacon"
+     }
+    },
+    "list": {
+     "id": "proximitybeacon.beacons.list",
+     "path": "v1beta1/beacons",
+     "httpMethod": "GET",
+     "description": "Searches the beacon registry for beacons that match the given search criteria. Only those beacons that the client has permission to list will be returned.",
+     "parameters": {
+      "q": {
+       "type": "string",
+       "description": "Filter query string that supports the following field filters: * `description:\"\"` For example: `description:\"Room 3\"` Returns beacons whose description matches tokens in the string \"Room 3\" (not necessarily that exact string). The string must be double-quoted. * `status:` For example: `status:active` Returns beacons whose status matches the given value. Values must be one of the Beacon.Status enum values (case insensitive). Accepts multiple filters which will be combined with OR logic. * `stability:` For example: `stability:mobile` Returns beacons whose expected stability matches the given value. Values must be one of the Beacon.Stability enum values (case insensitive). Accepts multiple filters which will be combined with OR logic. * `place_id:\"\"` For example: `place_id:\"ChIJVSZzVR8FdkgRXGmmm6SslKw=\"` Returns beacons explicitly registered at the given place, expressed as a Place ID obtained from [Google Places API](/places/place-id). Does not match places inside the given place. Does not consider the beacon's actual location (which may be different from its registered place). Accepts multiple filters that will be combined with OR logic. The place ID must be double-quoted. * `registration_time[|=]` For example: `registration_time\u003e=1433116800` Returns beacons whose registration time matches the given filter. Supports the operators: , =. Timestamp must be expressed as an integer number of seconds since midnight January 1, 1970 UTC. Accepts at most two filters that will be combined with AND logic, to support \"between\" semantics. If more than two are supplied, the latter ones are ignored. * `lat: lng: radius:` For example: `lat:51.1232343 lng:-1.093852 radius:1000` Returns beacons whose registered location is within the given circle. When any of these fields are given, all are required. Latitude and longitude must be decimal degrees between -90.0 and 90.0 and between -180.0 and 180.0 respectively. Radius must be an integer number of meters less than 1,000,000 (1000 km). * `property:\"=\"` For example: `property:\"battery-type=CR2032\"` Returns beacons which have a property of the given name and value. Supports multiple filters which will be combined with OR logic. The entire name=value string must be double-quoted as one string. * `attachment_type:\"\"` For example: `attachment_type:\"my-namespace/my-type\"` Returns beacons having at least one attachment of the given namespaced type. Supports \"any within this namespace\" via the partial wildcard syntax: \"my-namespace/*\". Supports multiple filters which will be combined with OR logic. The string must be double-quoted. Multiple filters on the same field are combined with OR logic (except registration_time which is combined with AND logic). Multiple filters on different fields are combined with AND logic. Filters should be separated by spaces. As with any HTTP query string parameter, the whole filter expression must be URL-encoded. Example REST request: `GET /v1beta1/beacons?q=status:active%20lat:51.123%20lng:-1.095%20radius:1000`",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "A pagination token obtained from a previous request to list beacons.",
+       "location": "query"
+      },
+      "pageSize": {
+       "type": "integer",
+       "description": "The maximum number of records to return for this request, up to a server-defined upper limit.",
+       "format": "int32",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "ListBeaconsResponse"
+     }
+    },
+    "update": {
+     "id": "proximitybeacon.beacons.update",
+     "path": "v1beta1/{+beaconName}",
+     "httpMethod": "PUT",
+     "description": "Updates the information about the specified beacon. **Any field that you do not populate in the submitted beacon will be permanently erased**, so you should follow the \"read, modify, write\" pattern to avoid inadvertently destroying data. Changes to the beacon status via this method will be silently ignored. To update beacon status, use the separate methods on this API for (de)activation and decommissioning.",
+     "parameters": {
+      "beaconName": {
+       "type": "string",
+       "description": "Resource name of this beacon. A beacon name has the format \"beacons/N!beaconId\" where the beaconId is the base16 ID broadcast by the beacon and N is a code for the beacon's type. Possible values are `3` for Eddystone, `1` for iBeacon, or `5` for AltBeacon. This field must be left empty when registering. After reading a beacon, clients can use the name for future operations.",
+       "required": true,
+       "pattern": "^beacons/[^/]*$",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "beaconName"
+     ],
+     "request": {
+      "$ref": "Beacon"
+     },
+     "response": {
+      "$ref": "Beacon"
+     }
+    },
+    "activate": {
+     "id": "proximitybeacon.beacons.activate",
+     "path": "v1beta1/{+beaconName}:activate",
+     "httpMethod": "POST",
+     "description": "(Re)activates a beacon. A beacon that is active will return information and attachment data when queried via `beaconinfo.getforobserved`. Calling this method on an already active beacon will do nothing (but will return a successful response code).",
+     "parameters": {
+      "beaconName": {
+       "type": "string",
+       "description": "The beacon to activate. Required.",
+       "required": true,
+       "pattern": "^beacons/[^/]*$",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "beaconName"
+     ],
+     "response": {
+      "$ref": "Empty"
+     }
+    },
+    "deactivate": {
+     "id": "proximitybeacon.beacons.deactivate",
+     "path": "v1beta1/{+beaconName}:deactivate",
+     "httpMethod": "POST",
+     "description": "Deactivates a beacon. Once deactivated, the API will not return information nor attachment data for the beacon when queried via `beaconinfo.getforobserved`. Calling this method on an already inactive beacon will do nothing (but will return a successful response code).",
+     "parameters": {
+      "beaconName": {
+       "type": "string",
+       "description": "The beacon name of this beacon.",
+       "required": true,
+       "pattern": "^beacons/[^/]*$",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "beaconName"
+     ],
+     "response": {
+      "$ref": "Empty"
+     }
+    }
+   },
+   "resources": {
+    "attachments": {
+     "methods": {
+      "create": {
+       "id": "proximitybeacon.beacons.attachments.create",
+       "path": "v1beta1/{+beaconName}/attachments",
+       "httpMethod": "POST",
+       "description": "Associates the given data with the specified beacon. Attachment data must contain two parts:  \n- A namespaced type. \n- The actual attachment data itself.  The namespaced type consists of two parts, the namespace and the type. The namespace must be one of the values returned by the `namespaces` endpoint, while the type can be a string of any characters except for the forward slash (`/`) up to 100 characters in length. Attachment data can be up to 1024 bytes long.",
+       "parameters": {
+        "beaconName": {
+         "type": "string",
+         "description": "The beacon on which the attachment should be created. Required.",
+         "required": true,
+         "pattern": "^beacons/[^/]*$",
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "beaconName"
+       ],
+       "request": {
+        "$ref": "BeaconAttachment"
+       },
+       "response": {
+        "$ref": "BeaconAttachment"
+       }
+      },
+      "list": {
+       "id": "proximitybeacon.beacons.attachments.list",
+       "path": "v1beta1/{+beaconName}/attachments",
+       "httpMethod": "GET",
+       "description": "Returns the attachments for the specified beacon that match the specified namespaced-type pattern. To control which namespaced types are returned, you add the `namespacedType` query parameter to the request. You must either use `*/*`, to return all attachments, or the namespace must be one of the ones returned from the `namespaces` endpoint.",
+       "parameters": {
+        "beaconName": {
+         "type": "string",
+         "description": "The beacon whose attachments are to be fetched. Required.",
+         "required": true,
+         "pattern": "^beacons/[^/]*$",
+         "location": "path"
+        },
+        "namespacedType": {
+         "type": "string",
+         "description": "Specifies the namespace and type of attachment to include in response in namespace/type format. Accepts `*/*` to specify \"all types in all namespaces\".",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "beaconName"
+       ],
+       "response": {
+        "$ref": "ListBeaconAttachmentsResponse"
+       }
+      },
+      "delete": {
+       "id": "proximitybeacon.beacons.attachments.delete",
+       "path": "v1beta1/{+attachmentName}",
+       "httpMethod": "DELETE",
+       "description": "Deletes the specified attachment for the given beacon. Each attachment has a unique attachment name (`attachmentName`) which is returned when you fetch the attachment data via this API. You specify this with the delete request to control which attachment is removed. This operation cannot be undone.",
+       "parameters": {
+        "attachmentName": {
+         "type": "string",
+         "description": "The attachment name (`attachmentName`) of the attachment to remove. For example: `beacons/3!893737abc9/attachments/c5e937-af0-494-959-ec49d12738` Required.",
+         "required": true,
+         "pattern": "^beacons/[^/]*/attachments/[^/]*$",
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "attachmentName"
+       ],
+       "response": {
+        "$ref": "Empty"
+       }
+      },
+      "batchDelete": {
+       "id": "proximitybeacon.beacons.attachments.batchDelete",
+       "path": "v1beta1/{+beaconName}/attachments:batchDelete",
+       "httpMethod": "POST",
+       "description": "Deletes multiple attachments on a given beacon. This operation is permanent and cannot be undone. You can optionally specify `namespacedType` to choose which attachments should be deleted. If you do not specify `namespacedType`, all your attachments on the given beacon will be deleted. You also may explicitly specify `*/*` to delete all.",
+       "parameters": {
+        "beaconName": {
+         "type": "string",
+         "description": "The beacon whose attachments are to be deleted. Required.",
+         "required": true,
+         "pattern": "^beacons/[^/]*$",
+         "location": "path"
+        },
+        "namespacedType": {
+         "type": "string",
+         "description": "Specifies the namespace and type of attachments to delete in `namespace/type` format. Accepts `*/*` to specify \"all types in all namespaces\". Optional.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "beaconName"
+       ],
+       "response": {
+        "$ref": "DeleteAttachmentsResponse"
+       }
+      }
+     }
+    },
+    "diagnostics": {
+     "methods": {
+      "list": {
+       "id": "proximitybeacon.beacons.diagnostics.list",
+       "path": "v1beta1/{+beaconName}/diagnostics",
+       "httpMethod": "GET",
+       "description": "List the diagnostics for a single beacon. You can also list diagnostics for all the beacons owned by your Google Developers Console project by using the beacon name `beacons/-`.",
+       "parameters": {
+        "beaconName": {
+         "type": "string",
+         "description": "Beacon that the diagnostics are for.",
+         "required": true,
+         "pattern": "^beacons/[^/]*$",
+         "location": "path"
+        },
+        "pageSize": {
+         "type": "integer",
+         "description": "Specifies the maximum number of results to return. Defaults to 10. Maximum 1000. Optional.",
+         "format": "int32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "Requests results that occur after the `page_token`, obtained from the response to a previous request. Optional.",
+         "location": "query"
+        },
+        "alertFilter": {
+         "type": "string",
+         "description": "Requests only beacons that have the given alert. For example, to find beacons that have low batteries use `alert_filter=LOW_BATTERY`.",
+         "enum": [
+          "ALERT_UNSPECIFIED",
+          "WRONG_LOCATION",
+          "LOW_BATTERY"
+         ],
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "beaconName"
+       ],
+       "response": {
+        "$ref": "ListDiagnosticsResponse"
+       }
+      }
+     }
+    }
+   }
+  },
+  "namespaces": {
+   "methods": {
+    "list": {
+     "id": "proximitybeacon.namespaces.list",
+     "path": "v1beta1/namespaces",
+     "httpMethod": "GET",
+     "description": "Lists all attachment namespaces owned by your Google Developers Console project. Attachment data associated with a beacon must include a namespaced type, and the namespace must be owned by your project.",
+     "response": {
+      "$ref": "ListNamespacesResponse"
+     }
+    }
+   }
+  },
+  "beaconinfo": {
+   "methods": {
+    "getforobserved": {
+     "id": "proximitybeacon.beaconinfo.getforobserved",
+     "path": "v1beta1/beaconinfo:getforobserved",
+     "httpMethod": "POST",
+     "description": "Given one or more beacon observations, returns any beacon information and attachments accessible to your application.",
+     "request": {
+      "$ref": "GetInfoForObservedBeaconsRequest"
+     },
+     "response": {
+      "$ref": "GetInfoForObservedBeaconsResponse"
+     }
+    }
+   }
+  }
+ }
+}

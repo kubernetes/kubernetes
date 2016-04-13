@@ -1,0 +1,10 @@
+[Unit]
+Description=OpenSSH per-connection server daemon for %I
+DefaultDependencies=no
+Requires=sshd-prep.service
+After=sshd-prep.service
+
+[Service]
+ExecStart=-/usr/sbin/sshd -i -e
+StandardInput=socket
+StandardError=syslog

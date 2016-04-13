@@ -77,13 +77,10 @@ readonly DOCKER_MOUNT_ARGS_BASE=(
   --volume /etc/localtime:/etc/localtime:ro
 )
 
-# We create a Docker data container to cache incremental build artifacts.  We
-# need to cache both the go tree in _output and the go tree under Godeps.
+# We create a Docker data container to cache incremental build artifacts.
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
-readonly REMOTE_GODEP_GOPATH="/go/src/${KUBE_GO_PACKAGE}/Godeps/_workspace/pkg"
 readonly DOCKER_DATA_MOUNT_ARGS=(
   --volume "${REMOTE_OUTPUT_GOPATH}"
-  --volume "${REMOTE_GODEP_GOPATH}"
 )
 
 # This is where the final release artifacts are created locally
@@ -464,8 +461,9 @@ function kube::build::source_targets() {
     cmd
     docs
     examples
-    Godeps/_workspace/src
-    Godeps/Godeps.json
+    vendor
+    glide.lock
+    glide.yaml
     hack
     LICENSE
     pkg

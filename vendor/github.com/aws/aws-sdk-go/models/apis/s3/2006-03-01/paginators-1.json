@@ -1,0 +1,57 @@
+{
+  "pagination": {
+    "ListBuckets": {
+      "result_key": "Buckets"
+    },
+    "ListMultipartUploads": {
+      "limit_key": "MaxUploads",
+      "more_results": "IsTruncated",
+      "output_token": [
+        "NextKeyMarker",
+        "NextUploadIdMarker"
+      ],
+      "input_token": [
+        "KeyMarker",
+        "UploadIdMarker"
+      ],
+      "result_key": [
+        "Uploads",
+        "CommonPrefixes"
+      ]
+    },
+    "ListObjectVersions": {
+      "more_results": "IsTruncated",
+      "limit_key": "MaxKeys",
+      "output_token": [
+        "NextKeyMarker",
+        "NextVersionIdMarker"
+      ],
+      "input_token": [
+        "KeyMarker",
+        "VersionIdMarker"
+      ],
+      "result_key": [
+        "Versions",
+        "DeleteMarkers",
+        "CommonPrefixes"
+      ]
+    },
+    "ListObjects": {
+      "more_results": "IsTruncated",
+      "limit_key": "MaxKeys",
+      "output_token": "NextMarker || Contents[-1].Key",
+      "input_token": "Marker",
+      "result_key": [
+        "Contents",
+        "CommonPrefixes"
+      ]
+    },
+    "ListParts": {
+      "more_results": "IsTruncated",
+      "limit_key": "MaxParts",
+      "output_token": "NextPartNumberMarker",
+      "input_token": "PartNumberMarker",
+      "result_key": "Parts"
+    }
+  }
+}
