@@ -82,7 +82,7 @@ func (t *Tester) ReturnDeletedObject() *Tester {
 func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.tester.TestCreate(
 		valid,
-		t.setObject,
+		t.createObject,
 		t.getObject,
 		invalid...,
 	)
@@ -95,7 +95,7 @@ func (t *Tester) TestUpdate(valid runtime.Object, validUpdateFunc UpdateFunc, in
 	}
 	t.tester.TestUpdate(
 		valid,
-		t.setObject,
+		t.createObject,
 		t.getObject,
 		resttest.UpdateFunc(validUpdateFunc),
 		invalidFuncs...,
@@ -105,7 +105,7 @@ func (t *Tester) TestUpdate(valid runtime.Object, validUpdateFunc UpdateFunc, in
 func (t *Tester) TestDelete(valid runtime.Object) {
 	t.tester.TestDelete(
 		valid,
-		t.setObject,
+		t.createObject,
 		t.getObject,
 		errors.IsNotFound,
 	)
@@ -114,7 +114,7 @@ func (t *Tester) TestDelete(valid runtime.Object) {
 func (t *Tester) TestDeleteGraceful(valid runtime.Object, expectedGrace int64) {
 	t.tester.TestDeleteGraceful(
 		valid,
-		t.setObject,
+		t.createObject,
 		t.getObject,
 		expectedGrace,
 	)
@@ -181,7 +181,7 @@ func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object,
 	return result, nil
 }
 
-func (t *Tester) setObject(ctx api.Context, obj runtime.Object) error {
+func (t *Tester) createObject(ctx api.Context, obj runtime.Object) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
@@ -190,7 +190,7 @@ func (t *Tester) setObject(ctx api.Context, obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	return t.storage.Storage.Set(ctx, key, obj, nil, 0)
+	return t.storage.Storage.Create(ctx, key, obj, nil, 0)
 }
 
 func (t *Tester) setObjectsForList(objects []runtime.Object) []runtime.Object {
@@ -208,7 +208,7 @@ func (t *Tester) emitObject(obj runtime.Object, action string) error {
 
 	switch action {
 	case etcdstorage.EtcdCreate:
-		err = t.setObject(ctx, obj)
+		err = t.createObject(ctx, obj)
 	case etcdstorage.EtcdDelete:
 		accessor, err := meta.Accessor(obj)
 		if err != nil {

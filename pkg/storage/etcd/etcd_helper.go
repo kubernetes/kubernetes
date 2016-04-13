@@ -228,69 +228,6 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 	return err
 }
 
-// Implements storage.Interface.
-func (h *etcdHelper) Set(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	if ctx == nil {
-		glog.Errorf("Context is nil")
-	}
-
-	version := uint64(0)
-	var err error
-	if version, err = h.versioner.ObjectResourceVersion(obj); err != nil {
-		return errors.New("couldn't get resourceVersion from object")
-	}
-	if version != 0 {
-		// We cannot store object with resourceVersion in etcd, we need to clear it here.
-		if err := h.versioner.UpdateObject(obj, nil, 0); err != nil {
-			return errors.New("resourceVersion cannot be set on objects store in etcd")
-		}
-	}
-
-	var response *etcd.Response
-	data, err := runtime.Encode(h.codec, obj)
-	if err != nil {
-		return err
-	}
-	key = h.prefixEtcdKey(key)
-
-	create := true
-	if version != 0 {
-		create = false
-		startTime := time.Now()
-		opts := etcd.SetOptions{
-			TTL:       time.Duration(ttl) * time.Second,
-			PrevIndex: version,
-		}
-		response, err = h.etcdKeysAPI.Set(ctx, key, string(data), &opts)
-		metrics.RecordEtcdRequestLatency("compareAndSwap", getTypeName(obj), startTime)
-		if err != nil {
-			return toStorageErr(err, key, int64(version))
-		}
-	}
-	if create {
-		// Create will fail if a key already exists.
-		startTime := time.Now()
-		opts := etcd.SetOptions{
-			TTL:       time.Duration(ttl) * time.Second,
-			PrevExist: etcd.PrevNoExist,
-		}
-		response, err = h.etcdKeysAPI.Set(ctx, key, string(data), &opts)
-		if err != nil {
-			return toStorageErr(err, key, 0)
-		}
-		metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
-	}
-
-	if out != nil {
-		if _, err := conversion.EnforcePtr(out); err != nil {
-			panic("unable to convert output object to pointer")
-		}
-		_, _, err = h.extractObj(response, err, out, false, false)
-	}
-
-	return err
-}
-
 func checkPreconditions(preconditions *storage.Preconditions, out runtime.Object) error {
 	if preconditions == nil {
 		return nil

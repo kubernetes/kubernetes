@@ -235,11 +235,6 @@ func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Set(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	return c.storage.Set(ctx, key, obj, out, ttl)
-}
-
-// Implements storage.Interface.
 func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error {
 	return c.storage.Delete(ctx, key, out, preconditions)
 }

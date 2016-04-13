@@ -236,7 +236,7 @@ func TestWatch(t *testing.T) {
 	// Test normal case
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	returnObj := &api.Pod{}
-	err = h.Set(context.TODO(), key, pod, returnObj, 0)
+	err = h.Create(context.TODO(), key, pod, returnObj, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestWatchEtcdState(t *testing.T) {
 		Subsets:    emptySubsets(),
 	}
 
-	err = h.Set(context.TODO(), key, endpoint, endpoint, 0)
+	err = h.Create(context.TODO(), key, endpoint, endpoint, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -304,9 +304,18 @@ func TestWatchEtcdState(t *testing.T) {
 
 	subset := makeSubsets("127.0.0.1", 9000)
 	endpoint.Subsets = subset
+	endpoint.ResourceVersion = ""
 
 	// CAS the previous value
-	err = h.Set(context.TODO(), key, endpoint, endpoint, 0)
+	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		newObj, err := api.Scheme.DeepCopy(endpoint)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return nil, nil, err
+		}
+		return newObj.(*api.Endpoints), nil, nil
+	}
+	err = h.GuaranteedUpdate(context.TODO(), key, &api.Endpoints{}, false, nil, updateFn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -317,7 +326,7 @@ func TestWatchEtcdState(t *testing.T) {
 	}
 
 	if e, a := endpoint, event.Object; !api.Semantic.DeepDerivative(e, a) {
-		t.Errorf("Unexpected error: expected %v, got %v", e, a)
+		t.Errorf("Unexpected error: expected %#v, got %#v", e, a)
 	}
 }
 
@@ -332,14 +341,19 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// set before the watch and verify events
-	err := h.Set(context.TODO(), key, pod, pod, 0)
+	err := h.Create(context.TODO(), key, pod, pod, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	pod.ResourceVersion = ""
 
 	// check for concatenation on watch event with CAS
-	pod.Name = "bar"
-	err = h.Set(context.TODO(), key, pod, pod, 0)
+	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		pod := input.(*api.Pod)
+		pod.Name = "bar"
+		return pod, nil, nil
+	}
+	err = h.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, false, nil, updateFn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -356,7 +370,13 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		t.Errorf("Unexpected event %#v", event)
 	}
 
-	err = h.Set(context.TODO(), key, pod, pod, 0)
+	pod.Name = "baz"
+	updateFn = func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		pod := input.(*api.Pod)
+		pod.Name = "baz"
+		return pod, nil, nil
+	}
+	err = h.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, false, nil, updateFn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -367,7 +387,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	}
 
 	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
-		t.Errorf("Unexpected error: expected %v, got %v", e, a)
+		t.Errorf("Unexpected error: expected %#v, got %#v", e, a)
 	}
 }
 
