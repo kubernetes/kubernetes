@@ -86,7 +86,7 @@ func TestGet(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	if err := si.Set(ctx, key, &validController, nil, 0); err != nil {
+	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err := storage.Get(ctx, "foo")
@@ -105,7 +105,7 @@ func TestUpdate(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	if err := si.Set(ctx, key, &validController, nil, 0); err != nil {
+	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12

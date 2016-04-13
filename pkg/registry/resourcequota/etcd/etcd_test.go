@@ -147,7 +147,7 @@ func TestUpdateStatus(t *testing.T) {
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	resourcequotaStart := validNewResourceQuota()
-	err := storage.Storage.Set(ctx, key, resourcequotaStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, resourcequotaStart, nil, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

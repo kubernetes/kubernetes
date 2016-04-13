@@ -153,7 +153,7 @@ func TestUpdateStatus(t *testing.T) {
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	pvStart := validNewPersistentVolume("foo")
-	err := storage.Storage.Set(ctx, key, pvStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, pvStart, nil, 0)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
