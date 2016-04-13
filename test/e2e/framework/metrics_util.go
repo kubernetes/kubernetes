@@ -312,7 +312,7 @@ func VerifyPodStartupLatency(latency PodStartupLatency) error {
 // Resets latency metrics in apiserver.
 func ResetMetrics(c *client.Client) error {
 	Logf("Resetting latency metrics in apiserver...")
-	body, err := c.Get().AbsPath("/ResetMetrics").DoRaw()
+	body, err := c.Get().AbsPath("/resetMetrics").DoRaw()
 	if err != nil {
 		return err
 	}
