@@ -327,7 +327,7 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 		return false, ErrInsufficientFreeMemory
 	}
 	if len(exceedingNvidiaGPU) > 0 {
-		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient Devices", podName(pod), node)
+		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient NVIDIA GPU", podName(pod), node)
 		return false, ErrInsufficientFreeDevices
 	}
 

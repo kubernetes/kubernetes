@@ -32,32 +32,32 @@ type Cuda struct {
 }
 
 func ProbeGPUPlugin() gpuTypes.GPUPlugin {
-	glog.Infof("Hans: cuda.ProbeGPUPlugin()")
+	glog.Infof("kubelet: cuda.ProbeGPUPlugin()")
 	return &Cuda{
 		gpuInfo: gpuTypes.GPUInfo{CommonInfo: gpuTypes.GPUCommonInfo{Name: CudaName}},
 	}
 }
 
 func (cuda *Cuda) Name() string {
-	glog.Infof("Hans: cuda.Name()")
+	glog.Infof("kubelet: cuda.Name()")
 	cuda.gpuInfo.Lock.RLock()
 	defer cuda.gpuInfo.Lock.RUnlock()
 	return cuda.gpuInfo.CommonInfo.Name
 }
 
 func (cuda *Cuda) InitPlugin() error {
-	glog.Infof("Hans: cuda.InitPlugin()")
+	glog.Infof("kubelet: cuda.InitPlugin()")
 	nvidia.LoadUVM()
 	return nvidia.Init()
 }
 
 func (cuda *Cuda) ReleasePlugin() error {
-	glog.Infof("Hans: cuda.ReleasePlugin()")
+	glog.Infof("kubelet: cuda.ReleasePlugin()")
 	return nvidia.Shutdown()
 }
 
 func (cuda *Cuda) AllocGPU(gpuReqs int, podUID types.UID, container *api.Container) ([]int, error) {
-	glog.Infof("Hans: cuda.AllocGPU(): gpuReqs: %d, container(%s), pod(%s)", gpuReqs, container.Name, string(podUID))
+	glog.Infof("kubelet: cuda.AllocGPU(): gpuReqs: %d, container(%s), pod(%s)", gpuReqs, container.Name, string(podUID))
 
 	cuda.gpuInfo.Lock.Lock()
 	defer cuda.gpuInfo.Lock.Unlock()
@@ -67,7 +67,7 @@ func (cuda *Cuda) AllocGPU(gpuReqs int, podUID types.UID, container *api.Contain
 	containerHash := gpuUtil.HashContainerFromData(podUID, container)
 	gpuStatus, found := cuda.gpuInfo.GPUStatus[containerHash]
 	if found {
-		glog.Errorf("Hans: cuda.AllocGPU(): it already alloced gpu for(container(%s), pod(%s))", container.Name, string(podUID))
+		glog.Errorf("kubelet: cuda.AllocGPU(): it already alloced gpu for(container(%s), pod(%s))", container.Name, string(podUID))
 		return gpuStatus.GPUIndexes, nil
 	}
 
@@ -82,21 +82,21 @@ func (cuda *Cuda) AllocGPU(gpuReqs int, podUID types.UID, container *api.Contain
 	}
 
 	availableGPUNum := len(availableGPUIdx)
-	glog.Infof("Hans: cuda.AllocGPU(): availableGPUNum: %d, gpuReqs: %d, availableGPUIdx: %+v", availableGPUNum, gpuReqs, availableGPUIdx)
+	glog.Infof("kubelet: cuda.AllocGPU(): availableGPUNum: %d, gpuReqs: %d, availableGPUIdx: %+v", availableGPUNum, gpuReqs, availableGPUIdx)
 	if availableGPUNum >= gpuReqs {
-		glog.Infof("Hans: cuda.AllocGPU(): before alloc: gpustatus: %+v", cuda.gpuInfo.GPUStatus)
+		glog.Infof("kubelet: cuda.AllocGPU(): before alloc: gpustatus: %+v", cuda.gpuInfo.GPUStatus)
 		var result = make([]int, gpuReqs)
 		cc := copy(result, availableGPUIdx[:gpuReqs])
-		glog.Infof("Hans: cuda.AllocGPU(): cc: %d, result: %+v", cc, result)
+		glog.Infof("kubelet: cuda.AllocGPU(): cc: %d, result: %+v", cc, result)
 		if cc == gpuReqs {
 			// gpuUsageStatus := gpuTypes.GPUUsageStatus{PodID: podUID, ContainerName: container.Name, GPUIndexes: result}
 			gpuUsageStatus := gpuTypes.GPUUsageStatus{GPUIndexes: result}
-			glog.Infof("Hans: cuda.AllocGPU(): gupUsageStatus: %+v, containerHash: %d", gpuUsageStatus, containerHash)
+			glog.Infof("kubelet: cuda.AllocGPU(): gupUsageStatus: %+v, containerHash: %d", gpuUsageStatus, containerHash)
 			if cuda.gpuInfo.GPUStatus == nil {
 				cuda.gpuInfo.GPUStatus = map[gpuTypes.PodCotainerHashID]gpuTypes.GPUUsageStatus{}
 			}
 			cuda.gpuInfo.GPUStatus[containerHash] = gpuUsageStatus
-			glog.Infof("Hans: cuda.AllocGPU(): after alloc: gpustatus: %+v", cuda.gpuInfo.GPUStatus)
+			glog.Infof("kubelet: cuda.AllocGPU(): after alloc: gpustatus: %+v", cuda.gpuInfo.GPUStatus)
 			return result, nil
 		} else {
 			return []int{}, fmt.Errorf("Failed to generate gpu index slice")
@@ -114,7 +114,7 @@ func (cuda *Cuda) FreeGPU(PodUID types.UID, container *api.Container) error {
 		}
 	}()
 
-	glog.Infof("Hans: cuda.FreeGPU(): podId: %s, container: %s", string(PodUID), container.Name)
+	glog.Infof("kubelet: cuda.FreeGPU(): podId: %s, container: %s", string(PodUID), container.Name)
 
 	containerHash := gpuUtil.HashContainerFromData(PodUID, container)
 
@@ -129,7 +129,7 @@ func (cuda *Cuda) FreeGPU(PodUID types.UID, container *api.Container) error {
 }
 
 func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
-	glog.Infof("Hans: cuda.Detect()")
+	glog.Infof("kubelet: cuda.Detect()")
 
 	cuda.gpuInfo.Lock.Lock()
 	defer cuda.gpuInfo.Lock.Unlock()
@@ -171,12 +171,12 @@ func (cuda *Cuda) Detect() (*gpuTypes.GPUDevices, error) {
 	gpuDevices.GPUPlatform.Name = cuda.gpuInfo.CommonInfo.Name
 
 	cuda.gpuInfo.GPUDevices = &gpuDevices
-	glog.Infof("Hans: cuda.Detect(): gpuDevices:%+v", gpuDevices)
+	glog.Infof("kubelet: cuda.Detect(): gpuDevices:%+v", gpuDevices)
 	return cuda.gpuInfo.GPUDevices, nil
 }
 
 func (cuda *Cuda) InitGPUEnv() error {
-	glog.Infof("Hans: cuda.InitGPUEnv()")
+	glog.Infof("kubelet: cuda.InitGPUEnv()")
 	cuda.gpuInfo.Lock.Lock()
 	defer cuda.gpuInfo.Lock.Unlock()
 	// check whether it already done init
@@ -194,7 +194,7 @@ func (cuda *Cuda) InitGPUEnv() error {
 }
 
 func (cuda *Cuda) createLocalVolumes() error {
-	glog.Infof("Hans: cuda.createLocalVolumes()")
+	glog.Infof("kubelet: cuda.createLocalVolumes()")
 	drv, err := nvidia.GetDriverVersion()
 	if err != nil {
 		return err
@@ -207,7 +207,7 @@ func (cuda *Cuda) createLocalVolumes() error {
 	for _, v := range vols {
 		n := fmt.Sprintf("%s_%s", v.Name, drv)
 		if _, err := docker.InspectVolume(n); err == nil {
-			glog.Infof("Hans: volumes %s already exist", n)
+			glog.Infof("kubelet: volumes %s already exist", n)
 			return nil
 		} else {
 			// volumes is not exist and create it.
@@ -231,7 +231,7 @@ func (cuda *Cuda) createLocalVolumes() error {
 }
 
 func (cuda *Cuda) IsImageSupported(image string) (bool, error) {
-	glog.Infof("Hans: cuda.IsImageSupported(): image: %s", image)
+	glog.Infof("kubelet: cuda.IsImageSupported(): image: %s", image)
 	cv, err := nvidia.GetCUDAVersion()
 	if err != nil {
 		return false, fmt.Errorf("Failed to detect the host cuda version(%s)", err)
@@ -246,7 +246,7 @@ func (cuda *Cuda) IsImageSupported(image string) (bool, error) {
 }
 
 func (cuda *Cuda) GenerateDeviceOpts(gpuIdxes []int) ([]dockerClient.Device, error) {
-	glog.Infof("Hans: cuda.GenerateDeviceOpts()")
+	glog.Infof("kubelet: cuda.GenerateDeviceOpts()")
 	devicesOpts := []dockerClient.Device{}
 
 	cuda.gpuInfo.Lock.RLock()
@@ -278,7 +278,7 @@ func (cuda *Cuda) GenerateDeviceOpts(gpuIdxes []int) ([]dockerClient.Device, err
 }
 
 func (cuda *Cuda) GenerateVolumeOpts(image string) ([]string, error) {
-	glog.Infof("Hans: cuda.GenerateVolumeOpts()")
+	glog.Infof("kubelet: cuda.GenerateVolumeOpts()")
 	result := []string{}
 
 	// check whether the image need cuda support
@@ -286,7 +286,7 @@ func (cuda *Cuda) GenerateVolumeOpts(image string) ([]string, error) {
 	if err != nil {
 		return result, fmt.Errorf("Failed to detect whether cuda volume need or not(%s)", err)
 	}
-	glog.Infof("Hans: cuda.GenerateVolumeOpts(): volumesNeeded(): vols: %+v, err: %+v", vols, err)
+	glog.Infof("kubelet: cuda.GenerateVolumeOpts(): volumesNeeded(): vols: %+v, err: %+v", vols, err)
 	// the image needn't cuda support
 	if vols == nil {
 		return result, nil
@@ -315,7 +315,7 @@ func (cuda *Cuda) GenerateVolumeOpts(image string) ([]string, error) {
 }
 
 func (cuda *Cuda) volumesNeeded(image string) ([]string, error) {
-	glog.Infof("Hans: cuda.volumesNeeded()")
+	glog.Infof("kubelet: cuda.volumesNeeded()")
 	// it already pulled image.
 	label, err := docker.Label(image, labelVolumesNeeded)
 	if err != nil {
@@ -328,12 +328,12 @@ func (cuda *Cuda) volumesNeeded(image string) ([]string, error) {
 }
 
 func (cuda *Cuda) cudaSupported(image string, version string) (bool, error) {
-	glog.Infof("Hans: cuda.cudaSupported(): image: %s, version: %s", image, version)
+	glog.Infof("kubelet: cuda.cudaSupported(): image: %s, version: %s", image, version)
 	var vmaj, vmin int
 	var lmaj, lmin int
 
 	label, err := docker.Label(image, labelCUDAVersion)
-	glog.Infof("Hans: cuda.cudaSupported(): get label(%s): %s, err: %s", labelCUDAVersion, label, err)
+	glog.Infof("kubelet: cuda.cudaSupported(): get label(%s): %s, err: %s", labelCUDAVersion, label, err)
 	if err != nil {
 		return false, err
 	}
@@ -341,15 +341,15 @@ func (cuda *Cuda) cudaSupported(image string, version string) (bool, error) {
 	if label == "" {
 		return true, nil
 	}
-	glog.Infof("Hans: cuda.cudaSupported(): version: %s, label: %s", version, label)
+	glog.Infof("kubelet: cuda.cudaSupported(): version: %s, label: %s", version, label)
 	if _, err := fmt.Sscanf(version, "%d.%d", &vmaj, &vmin); err != nil {
 		return false, err
 	}
 	if _, err := fmt.Sscanf(label, "%d.%d", &lmaj, &lmin); err != nil {
 		return false, err
 	}
-	glog.Infof("Hans: cuda.cudaSupported(): vmaj:%d, vmin:%d", vmaj, vmin)
-	glog.Infof("Hans: cuda.cudaSupported(): lmaj:%d, lmin:%d", lmaj, lmin)
+	glog.Infof("kubelet: cuda.cudaSupported(): vmaj:%d, vmin:%d", vmaj, vmin)
+	glog.Infof("kubelet: cuda.cudaSupported(): lmaj:%d, lmin:%d", lmaj, lmin)
 	if lmaj > vmaj || (lmaj == vmaj && lmin > vmin) {
 		glog.Warningf("%s", fmt.Errorf("Unsupported CUDA version: %s < %s", label, version))
 		return false, nil
@@ -361,7 +361,7 @@ func (cuda *Cuda) cudaSupported(image string, version string) (bool, error) {
 // Note: it is used internally, so before invoke it,
 //       it must hold lock
 func (cuda *Cuda) getAvailableGPUs() ([]int, error) {
-	glog.Infof("Hans: cuda.getAvailableGPUs()")
+	glog.Infof("kubelet: cuda.getAvailableGPUs()")
 	occupiedGpuSet := sets.Int{}
 
 	// collect gpu usage information
@@ -379,7 +379,7 @@ func (cuda *Cuda) getAvailableGPUs() ([]int, error) {
 }
 
 func (cuda *Cuda) GetAvailableGPUs() ([]int, error) {
-	glog.Infof("Hans: cuda.GetAvailableGPUs()")
+	glog.Infof("kubelet: cuda.GetAvailableGPUs()")
 
 	cuda.gpuInfo.Lock.RLock()
 	defer cuda.gpuInfo.Lock.RUnlock()
@@ -389,7 +389,7 @@ func (cuda *Cuda) GetAvailableGPUs() ([]int, error) {
 }
 
 func (cuda *Cuda) UpdateGPUUsageStatus(newGPUStatus *map[gpuTypes.PodCotainerHashID]gpuTypes.GPUUsageStatus) {
-	glog.Infof("Hans: cuda.UpdateGPUUsageStatus()")
+	glog.Infof("kubelet: cuda.UpdateGPUUsageStatus()")
 
 	cuda.gpuInfo.Lock.Lock()
 	defer cuda.gpuInfo.Lock.Unlock()
@@ -398,7 +398,7 @@ func (cuda *Cuda) UpdateGPUUsageStatus(newGPUStatus *map[gpuTypes.PodCotainerHas
 }
 
 func (cuda *Cuda) ShowCurrentGPUUsageStatus() {
-	glog.Infof("Hans: cuda.ShowCurrentGPUUsageStatus()")
+	glog.Infof("kubelet: cuda.ShowCurrentGPUUsageStatus()")
 
 	cuda.gpuInfo.Lock.RLock()
 	defer cuda.gpuInfo.Lock.RUnlock()
