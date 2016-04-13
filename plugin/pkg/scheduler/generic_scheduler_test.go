@@ -34,7 +34,7 @@ import (
 )
 
 func falsePredicate(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
-	return false, algorithmpredicates.ErrFakePredicateError
+	return false, algorithmpredicates.ErrFakePredicate
 }
 
 func truePredicate(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
@@ -45,14 +45,14 @@ func matchesPredicate(pod *api.Pod, nodeName string, nodeInfo *schedulercache.No
 	if pod.Name == nodeName {
 		return true, nil
 	}
-	return false, algorithmpredicates.ErrFakePredicateError
+	return false, algorithmpredicates.ErrFakePredicate
 }
 
 func hasNoPodsPredicate(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo) (bool, error) {
 	if len(nodeInfo.Pods()) == 0 {
 		return true, nil
 	}
-	return false, algorithmpredicates.ErrFakePredicateError
+	return false, algorithmpredicates.ErrFakePredicate
 }
 
 func numericPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
@@ -192,7 +192,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:        []string{"machine1", "machine2"},
 			expectsErr:   true,
 			name:         "test 1",
-			wErr:         algorithmpredicates.ErrFakePredicateError,
+			wErr:         algorithmpredicates.ErrFakePredicate,
 		},
 		{
 			predicates:    map[string]algorithm.FitPredicate{"true": truePredicate},
@@ -313,7 +313,7 @@ func TestFindFitAllError(t *testing.T) {
 		if !found {
 			t.Errorf("failed to find node: %s in %v", node, predicateMap)
 		}
-		if failure != "false" {
+		if failure != "FakePredicateError" {
 			t.Errorf("unexpected failures: %v", failure)
 		}
 	}
@@ -330,7 +330,7 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, predicates, makeNodeList(nodes), nil)
-	if err != nil && !reflect.DeepEqual(err, algorithmpredicates.ErrFakePredicateError) {
+	if err != nil && !reflect.DeepEqual(err, algorithmpredicates.ErrFakePredicate) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -346,7 +346,7 @@ func TestFindFitSomeError(t *testing.T) {
 		if !found {
 			t.Errorf("failed to find node: %s in %v", node, predicateMap)
 		}
-		if failure != "false" {
+		if failure != "FakePredicateError" {
 			t.Errorf("unexpected failures: %v", failure)
 		}
 	}

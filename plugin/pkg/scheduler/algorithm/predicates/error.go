@@ -35,9 +35,9 @@ var (
 	ErrNodeLabelPresenceViolated = newPredicateFailureError("CheckNodeLabelPresence")
 	ErrServiceAffinityViolated   = newPredicateFailureError("CheckServiceAffinity")
 	ErrMaxVolumeCountExceeded    = newPredicateFailureError("MaxVolumeCount")
-	// ErrFakePredicateError is used for test only. The fake predicates returning false also returns error
-	// as ErrFakePredicateError.
-	ErrFakePredicateError = newPredicateFailureError("false")
+	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
+	// as ErrFakePredicate.
+	ErrFakePredicate = newPredicateFailureError("FakePredicateError")
 )
 
 // InsufficientResourceError is an error type that indicates what kind of resource limit is
