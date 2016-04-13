@@ -17,6 +17,7 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -24,7 +25,7 @@ import (
 func (c *FakeDeployments) Rollback(deploymentRollback *v1beta1.DeploymentRollback) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
-	action.Resource = "deployments"
+	action.Resource = unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}
 	action.Subresource = "rollback"
 	action.Object = deploymentRollback
 

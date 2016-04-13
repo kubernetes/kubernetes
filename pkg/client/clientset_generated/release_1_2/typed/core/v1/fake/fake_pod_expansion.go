@@ -17,6 +17,7 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -25,7 +26,7 @@ import (
 func (c *FakePods) Bind(binding *v1.Binding) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
-	action.Resource = "pods"
+	action.Resource = unversioned.GroupVersionResource{Version: "v1", Resource: "pods"}
 	action.Subresource = "bindings"
 	action.Object = binding
 
@@ -37,7 +38,7 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 	action := core.GenericActionImpl{}
 	action.Verb = "get"
 	action.Namespace = c.ns
-	action.Resource = "pod"
+	action.Resource = unversioned.GroupVersionResource{Version: "v1", Resource: "pods"}
 	action.Subresource = "logs"
 	action.Value = opts
 
