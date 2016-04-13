@@ -97,7 +97,6 @@
 
 - project:
     name: node-docker-canary-build
-    repoName: 'google/cadvisor'
     gitproject:
         - 'cadvisor':
             repoName: 'google/cadvisor'
@@ -116,7 +115,6 @@
 
 - project:
     name: node-gce-e2e
-    repoName: 'google/cadvisor'
     gitproject:
         - 'cadvisor':
             repoName: 'google/cadvisor'
