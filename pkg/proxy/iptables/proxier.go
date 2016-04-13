@@ -156,7 +156,7 @@ type Proxier struct {
 	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
 
-        // These are effectively const and do not need the mutex to be held.
+	// These are effectively const and do not need the mutex to be held.
 	syncPeriod     time.Duration
 	iptables       utiliptables.Interface
 	masqueradeAll  bool

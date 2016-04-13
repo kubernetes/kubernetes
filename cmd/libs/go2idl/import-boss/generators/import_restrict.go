@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
-
 	//"github.com/golang/glog"
 )
 
