@@ -1,0 +1,107 @@
+name: describe
+synopsis: Show details of a specific resource or group of resources
+description: |-
+  Show details of a specific resource or group of resources.
+
+  This command joins many API calls together to form a detailed description of a
+  given resource or group of resources.
+
+  $ kubectl describe TYPE NAME_PREFIX
+
+  will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
+  exists, it will output details for every resource that has a name prefixed with NAME_PREFIX
+
+  Possible resource types include (case insensitive): pods (po), services (svc), deployments,
+  replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
+  persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
+  serviceaccounts, ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
+  componentstatuses (cs), endpoints (ep), and secrets.
+options:
+- name: filename
+  shorthand: f
+  default_value: '[]'
+  usage: |
+    Filename, directory, or URL to a file containing the resource to describe
+- name: selector
+  shorthand: l
+  usage: Selector (label query) to filter on
+inherited_options:
+- name: alsologtostderr
+  default_value: "false"
+  usage: log to standard error as well as files
+- name: api-version
+  usage: |
+    DEPRECATED: The API version to use when talking to the server
+- name: certificate-authority
+  usage: Path to a cert. file for the certificate authority.
+- name: client-certificate
+  usage: Path to a client certificate file for TLS.
+- name: client-key
+  usage: Path to a client key file for TLS.
+- name: cluster
+  usage: The name of the kubeconfig cluster to use
+- name: context
+  usage: The name of the kubeconfig context to use
+- name: insecure-skip-tls-verify
+  default_value: "false"
+  usage: |
+    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+- name: kubeconfig
+  usage: Path to the kubeconfig file to use for CLI requests.
+- name: log-backtrace-at
+  default_value: :0
+  usage: when logging hits line file:N, emit a stack trace
+- name: log-dir
+  usage: If non-empty, write log files in this directory
+- name: log-flush-frequency
+  default_value: 5s
+  usage: Maximum number of seconds between log flushes
+- name: logtostderr
+  default_value: "true"
+  usage: log to standard error instead of files
+- name: match-server-version
+  default_value: "false"
+  usage: Require server version to match client version
+- name: namespace
+  usage: If present, the namespace scope for this CLI request.
+- name: password
+  usage: Password for basic authentication to the API server.
+- name: server
+  shorthand: s
+  usage: The address and port of the Kubernetes API server
+- name: stderrthreshold
+  default_value: "2"
+  usage: logs at or above this threshold go to stderr
+- name: token
+  usage: Bearer token for authentication to the API server.
+- name: user
+  usage: The name of the kubeconfig user to use
+- name: username
+  usage: Username for basic authentication to the API server.
+- name: v
+  default_value: "0"
+  usage: log level for V logs
+- name: vmodule
+  usage: |
+    comma-separated list of pattern=N settings for file-filtered logging
+example: |-
+  # Describe a node
+  kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
+
+  # Describe a pod
+  kubectl describe pods/nginx
+
+  # Describe a pod identified by type and name in "pod.json"
+  kubectl describe -f pod.json
+
+  # Describe all pods
+  kubectl describe pods
+
+  # Describe pods by label name=myLabel
+  kubectl describe po -l name=myLabel
+
+  # Describe all pods managed by the 'frontend' replication controller (rc-created pods
+  # get the name of the rc as a prefix in the pod the name).
+  kubectl describe pods frontend
+see_also:
+- kubectl
