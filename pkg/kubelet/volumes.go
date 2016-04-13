@@ -111,6 +111,15 @@ func (vh *volumeHost) GetHostName() string {
 	return vh.kubelet.hostname
 }
 
+// mountExternalVolumes mounts the volumes declared in a pod, attaching them
+// to the host if necessary, and returns a map containing information about
+// the volumes for the pod or an error.  This method is run multiple times,
+// and requires that implementations of Attach() and SetUp() be idempotent.
+//
+// Note, in the future, the attach-detach controller will handle attaching and
+// detaching volumes; this call site will be maintained for backward-
+// compatibility with current behavior of static pods and pods created via the
+// Kubelet's http API.
 func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, error) {
 	podVolumes := make(kubecontainer.VolumeMap)
 	for i := range pod.Spec.Volumes {
@@ -178,6 +187,9 @@ func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume
 	return result, true
 }
 
+// getPodVolumes examines the directory structure for a pod and returns
+// information about the name and kind of each presently mounted volume, or an
+// error.
 func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
 	var volumes []*volumeTuple
 	podVolDir := kl.getPodVolumesDir(podUID)
