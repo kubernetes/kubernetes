@@ -38,6 +38,22 @@ var KnownControllerManagerMetrics = map[string][]string{
 	"rest_client_request_latency_microseconds_count": {"url", "verb"},
 	"rest_client_request_latency_microseconds_sum":   {"url", "verb"},
 	"rest_client_request_status_codes":               {"method", "code", "host"},
+	"pv_recycler_controller_rate_limiter_use":        {},
+	"node_controller_rate_limiter_use":               {},
+	"serviceaccount_controller_rate_limiter_use":     {},
+	"route_controller_rate_limiter_use":              {},
+	"resource_quota_controller_rate_limiter_use":     {},
+	"replenishment_controller_rate_limiter_use":      {},
+	"job_controller_rate_limiter_use":                {},
+	"gc_controller_rate_limiter_use":                 {},
+	"endpoint_controller_rate_limiter_use":           {},
+	"replication_controller_rate_limiter_use":        {},
+	"replicaset_controller_rate_limiter_use":         {},
+	"deployment_controller_rate_limiter_use":         {},
+	"service_controller_rate_limiter_use":            {},
+	"pv_claim_binder_controller_rate_limiter_use":    {},
+	"namespace_controller_rate_limiter_use":          {},
+	"daemon_controller_rate_limiter_use":             {},
 }
 
 type ControllerManagerMetrics Metrics

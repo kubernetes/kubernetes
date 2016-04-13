@@ -23,6 +23,7 @@ import (
 )
 
 type ExtensionsInterface interface {
+	GetRESTClient() *restclient.RESTClient
 	DaemonSetsGetter
 	DeploymentsGetter
 	HorizontalPodAutoscalersGetter
@@ -117,4 +118,13 @@ func setConfigDefaults(config *restclient.Config) error {
 		config.Burst = 10
 	}
 	return nil
+}
+
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *ExtensionsClient) GetRESTClient() *restclient.RESTClient {
+	if c == nil {
+		return nil
+	}
+	return c.RESTClient
 }

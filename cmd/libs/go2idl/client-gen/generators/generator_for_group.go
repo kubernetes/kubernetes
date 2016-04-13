@@ -111,12 +111,14 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	} else {
 		sw.Do(setClientDefaultsTemplate, m)
 	}
+	sw.Do(getRESTClient, m)
 
 	return sw.Error()
 }
 
 var groupInterfaceTemplate = `
 type $.Group$Interface interface {
+    GetRESTClient() *$.RESTClient|raw$
     $range .types$ $.|publicPlural$Getter
     $end$
 }
@@ -165,6 +167,17 @@ func NewForConfigOrDie(c *$.Config|raw$) *$.Group$Client {
 		panic(err)
 	}
 	return client
+}
+`
+
+var getRESTClient = `
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *$.Group$Client) GetRESTClient() *$.RESTClient|raw$ {
+	if c == nil {
+		return nil
+	}
+	return c.RESTClient
 }
 `
 
