@@ -217,7 +217,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of DaemonSet",
       "nickname": "watchNamespacedDaemonSetList",
@@ -283,7 +283,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -532,7 +532,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind DaemonSet",
       "nickname": "watchNamespacedDaemonSet",
@@ -606,7 +606,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -699,7 +699,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of DaemonSet",
       "nickname": "watchNamespacedDaemonSetList",
@@ -757,7 +757,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -1042,7 +1042,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Deployment",
       "nickname": "watchNamespacedDeploymentList",
@@ -1108,7 +1108,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -1357,7 +1357,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Deployment",
       "nickname": "watchNamespacedDeployment",
@@ -1431,7 +1431,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -1524,7 +1524,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Deployment",
       "nickname": "watchNamespacedDeploymentList",
@@ -1582,7 +1582,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -2089,7 +2089,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
       "nickname": "watchNamespacedHorizontalPodAutoscalerList",
@@ -2155,7 +2155,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -2404,7 +2404,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind HorizontalPodAutoscaler",
       "nickname": "watchNamespacedHorizontalPodAutoscaler",
@@ -2478,7 +2478,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -2571,7 +2571,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
       "nickname": "watchNamespacedHorizontalPodAutoscalerList",
@@ -2629,7 +2629,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -2914,7 +2914,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Ingress",
       "nickname": "watchNamespacedIngressList",
@@ -2980,7 +2980,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -3229,7 +3229,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Ingress",
       "nickname": "watchNamespacedIngress",
@@ -3303,7 +3303,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -3396,7 +3396,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Ingress",
       "nickname": "watchNamespacedIngressList",
@@ -3454,7 +3454,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -3739,7 +3739,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Job",
       "nickname": "watchNamespacedJobList",
@@ -3805,7 +3805,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -4054,7 +4054,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Job",
       "nickname": "watchNamespacedJob",
@@ -4128,7 +4128,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -4221,7 +4221,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Job",
       "nickname": "watchNamespacedJobList",
@@ -4279,7 +4279,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -4564,7 +4564,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicaSet",
       "nickname": "watchNamespacedReplicaSetList",
@@ -4630,7 +4630,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -4879,7 +4879,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ReplicaSet",
       "nickname": "watchNamespacedReplicaSet",
@@ -4953,7 +4953,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -5046,7 +5046,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicaSet",
       "nickname": "watchNamespacedReplicaSetList",
@@ -5104,7 +5104,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -5713,7 +5713,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ThirdPartyResource",
       "nickname": "watchNamespacedThirdPartyResourceList",
@@ -5779,7 +5779,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -6028,7 +6028,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ThirdPartyResource",
       "nickname": "watchNamespacedThirdPartyResource",
@@ -6102,7 +6102,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -6195,7 +6195,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "json.WatchEvent",
+      "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ThirdPartyResource",
       "nickname": "watchNamespacedThirdPartyResourceList",
@@ -6253,7 +6253,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "json.WatchEvent"
+        "responseModel": "*versioned.Event"
        }
       ],
       "produces": [
@@ -7762,18 +7762,9 @@
      }
     }
    },
-   "json.WatchEvent": {
-    "id": "json.WatchEvent",
-    "properties": {
-     "type": {
-      "type": "string",
-      "description": "the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"
-     },
-     "object": {
-      "type": "string",
-      "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
-     }
-    }
+   "*versioned.Event": {
+    "id": "*versioned.Event",
+    "properties": {}
    },
    "unversioned.Patch": {
     "id": "unversioned.Patch",
