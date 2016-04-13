@@ -25,7 +25,9 @@ import json
 import os
 import re
 import subprocess
+import shutil
 import sys
+import tempfile
 import time
 import urllib2
 import xml.etree.ElementTree as ET
@@ -49,72 +51,34 @@ def get_jobs(server):
         yield job['name']
 
 def get_builds(server, job):
-    """Generates all build numbers for a given job."""
-    job_json = get_json('{}/job/{}/api/json'.format(server, job))
+    """Retrieves build numbers, statuses, and timestamps for a given job."""
+    job_json = get_json('{}/job/{}/api/json?tree={}'.format(
+        server, job, 'builds[number,timestamp,building]'))
     if not job_json:
         return
     for build in job_json['builds']:
-        yield build['number']
+        yield build['number'], build['building'], build['timestamp']
 
-def get_build_info(server, job, build):
-    """Returns building status along with timestamp for a given build."""
-    path = '{}/job/{}/{}/api/json'.format(server, job, str(build))
-    build_json = get_json(path)
-    if not build_json:
-        return
-    return build_json['building'], build_json['timestamp']
-
-def gcs_ls(path):
-    """Lists objects under a path on gcs."""
+def gcs_cp_junit(job, build, outdir):
     try:
-        result = subprocess.check_output(
-            ['gsutil', 'ls', path],
-            stderr=open(os.devnull, 'w'))
+        subprocess.check_output(['gsutil', '-m', 'cp',
+            'gs://kubernetes-jenkins/logs/{}/{}/artifacts/junit_*.xml'.format(
+                job, build), outdir], stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError:
-        result = b''
-    for subpath in result.decode('utf-8').split():
-        yield subpath
+        pass  # no artifacts matched
 
-def gcs_ls_build(job, build):
-    """Lists all files under a given job and build path."""
-    url = 'gs://kubernetes-jenkins/logs/{}/{}'.format(job, str(build))
-    for path in gcs_ls(url):
-        yield path
-
-def gcs_ls_artifacts(job, build):
-    """Lists all artifacts for a build."""
-    for path in gcs_ls_build(job, build):
-        if path.endswith('artifacts/'):
-            for artifact in gcs_ls(path):
-                yield artifact
-
-def gcs_ls_junit_paths(job, build):
-    """Lists the paths of JUnit XML files for a build."""
-    for path in gcs_ls_artifacts(job, build):
-        if re.match('.*/junit.*\.xml$', path):
-            yield path
-
-def gcs_get_tests(path):
-    """Generates test data out of the provided JUnit path.
+def get_tests_from_junit(path):
+    """Generates test data out of the provided JUnit file.
 
     Returns None if there's an issue parsing the XML.
     Yields name, time, failed, skipped for each test.
     """
-    try:
-        data = subprocess.check_output(
-            ['gsutil', 'cat', path], stderr=open(os.devnull, 'w'))
-    except subprocess.CalledProcessError:
-        return
-
-    try:
-        data = zlib.decompress(data, zlib.MAX_WBITS | 16)
-    except zlib.error:
-        # Don't fail if it's not gzipped.
-        pass
+    data = open(path).read()
 
     try:
         root = ET.fromstring(data)
     except ET.ParseError:
+        print("bad xml:", path)
         return
 
     for child in root:
@@ -129,18 +93,17 @@ def gcs_get_tests(path):
                 failed = True
         yield name, time, failed, skipped
 
-def get_tests_from_junit_path(path):
-    """Generates all tests in a JUnit GCS path."""
-    for test in gcs_get_tests(path):
-        if not test:
-            continue
-        yield test
-
 def get_tests_from_build(job, build):
     """Generates all tests for a build."""
-    for junit_path in gcs_ls_junit_paths(job, build):
-        for test in get_tests_from_junit_path(junit_path):
-            yield test
+    tmpdir = tempfile.mkdtemp(prefix='kube-test-history-')
+    try:
+        gcs_cp_junit(job, build, tmpdir)
+        for junit_path in os.listdir(tmpdir):
+            for test in get_tests_from_junit(
+                    os.path.join(tmpdir, junit_path)):
+                yield test
+    finally:
+        shutil.rmtree(tmpdir)
 
 def get_daily_builds(server, prefix):
     """Generates all (job, build) pairs for the last day."""
@@ -148,8 +111,8 @@ def get_daily_builds(server, prefix):
     for job in get_jobs(server):
         if not job.startswith(prefix):
             continue
-        for build in reversed(sorted(get_builds(server, job))):
-            building, timestamp = get_build_info(server, job, build)
+        for build, building, timestamp in sorted(
+                get_builds(server, job), reverse=True):
             # Skip if it's still building.
             if building:
                 continue
