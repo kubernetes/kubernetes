@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -24,8 +25,11 @@ import (
 // TODO: think better way to avoid duplication
 
 func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
+	if ps == nil {
+		return labels.Nothing(), nil
+	}
 	unversionedSelector := unversioned.LabelSelector{}
-	err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(ps, &unversionedSelector, nil)
+	err := api.Scheme.Convert(ps, &unversionedSelector)
 	if err != nil {
 		return nil, err
 	}
