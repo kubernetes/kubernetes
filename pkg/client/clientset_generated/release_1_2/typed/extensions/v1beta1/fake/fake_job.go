@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -32,9 +33,11 @@ type FakeJobs struct {
 	ns   string
 }
 
+const resource = unversioned.GroupVersionResource{group: "extensions", version: "v1beta1", resource: "job"}
+
 func (c *FakeJobs) Create(job *v1beta1.Job) (result *v1beta1.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("jobs", c.ns, job), &v1beta1.Job{})
+		Invokes(core.NewCreateAction(resource, c.ns, job), &v1beta1.Job{})
 
 	if obj == nil {
 		return nil, err
