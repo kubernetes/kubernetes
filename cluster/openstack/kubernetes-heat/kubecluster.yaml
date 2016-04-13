@@ -90,6 +90,31 @@ parameters:
       timeout for the Wait Conditions
     default: 6000
 
+  os_auth_url:
+    type: string
+    description: OpenStack Auth URL
+    default: false
+
+  os_username:
+    type: string
+    description: OpenStack Username
+    default: false
+
+  os_password:
+    type: string
+    description: OpenStack Password
+    default: false
+
+  os_region_name:
+    type: string
+    description: OpenStack Region Name
+    default: false
+
+  os_tenant_id:
+    type: string
+    description: OpenStack Tenant ID
+    default: false
+
   enable_proxy:
     type: string
     description: Whether or not to enable proxy settings
@@ -259,6 +284,11 @@ resources:
           template: {get_file: fragments/configure-salt.yaml}
           params:
             "$MASTER_IP": {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
+            "$OS_AUTH_URL": {get_param: os_auth_url}
+            "$OS_USERNAME": {get_param: os_username}
+            "$OS_PASSWORD": {get_param: os_password}
+            "$OS_REGION_NAME": {get_param: os_region_name}
+            "$OS_TENANT_ID": {get_param: os_tenant_id}
             "$role": "kubernetes-master"
 
   run_salt:
@@ -354,6 +384,11 @@ resources:
           cluster_name: {get_param: "OS::stack_name"}
           secgroup_base: {get_resource: secgroup_base}
           secgroup_node: {get_resource: secgroup_node}
+          os_auth_url: {get_param: os_auth_url}
+          os_username: {get_param: os_username}
+          os_password: {get_param: os_password}
+          os_region_name: {get_param: os_region_name}
+          os_tenant_id: {get_param: os_tenant_id}
           enable_proxy: {get_param: enable_proxy }
           ftp_proxy: {get_param: ftp_proxy }
           http_proxy: {get_param: http_proxy }
