@@ -121,7 +121,8 @@
     name: global
     disable_job: false
     emails: '$DEFAULT_RECIPIENTS'
-    cron-string: 'H/30 * * * *'
+    cron-string: 'H/30 * * * *'  # Set a 30m floor to start jobs.
+    sq-cron-string: 'H/5 * * * *'  # Lower floor to 5m for blocking jobs.
     # How long to wait after sending TERM to send KILL (minutes)
     kill-timeout: 15
     # Just to be safe, use the Jenkins timeout after a long time.

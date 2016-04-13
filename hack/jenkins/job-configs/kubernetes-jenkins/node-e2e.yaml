@@ -150,6 +150,7 @@
             owner: 'pszczesniak@google.com'
             shell: 'make test-unit test-integration'
         - 'kubelet':
+            cron-string: '{sq-cron-string}'
             repoName: 'kubernetes/kubernetes'
             gitbasedir: 'k8s.io/kubernetes'
             owner: 'pwittroc@google.com'
