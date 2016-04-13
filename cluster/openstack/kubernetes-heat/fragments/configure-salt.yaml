@@ -16,13 +16,22 @@ write_files:
         network_mode: openvswitch
         networkInterfaceName: eth0
         api_servers: $MASTER_IP
-        cloud: vagrant # It's not vagrant, but required to install Docker
+        cloud: openstack
+        cloud_config: /srv/kubernetes/openstack.conf
         roles:
           - $role
         runtime_config: ""
         docker_opts: ""
         master_extra_sans: "DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local,DNS:kubernetes-master"
         keep_host_etcd: true
+  - path: /srv/kubernetes/openstack.conf
+    content: |
+      [Global]
+      auth-url=$OS_AUTH_URL
+      username=$OS_USERNAME
+      password=$OS_PASSWORD
+      region=$OS_REGION_NAME
+      tenant-id=$OS_TENANT_ID
   - path: /srv/salt-overlay/pillar/cluster-params.sls
     content: |
       service_cluster_ip_range: 10.246.0.0/16

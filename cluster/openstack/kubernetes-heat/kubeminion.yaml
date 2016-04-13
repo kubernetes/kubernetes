@@ -41,6 +41,31 @@ parameters:
     type: string
     description: Token used by kube-proxy
 
+  os_auth_url:
+    type: string
+    description: OpenStack Auth URL
+    default: false
+
+  os_username:
+    type: string
+    description: OpenStack Username
+    default: false
+
+  os_password:
+    type: string
+    description: OpenStack Password
+    default: false
+
+  os_region_name:
+    type: string
+    description: OpenStack Region Name
+    default: false
+
+  os_tenant_id:
+    type: string
+    description: OpenStack Tenant ID
+    default: false
+
   enable_proxy:
     type: string
     description: Whether or not to enable proxy settings
@@ -172,6 +197,11 @@ resources:
           template: {get_file: fragments/configure-salt.yaml}
           params:
             "$MASTER_IP": {get_param: kube_master_ip}
+            "$OS_AUTH_URL": {get_param: os_auth_url}
+            "$OS_USERNAME": {get_param: os_username}
+            "$OS_PASSWORD": {get_param: os_password}
+            "$OS_REGION_NAME": {get_param: os_region_name}
+            "$OS_TENANT_ID": {get_param: os_tenant_id}
             "$role": "kubernetes-pool"
 
   run_salt:

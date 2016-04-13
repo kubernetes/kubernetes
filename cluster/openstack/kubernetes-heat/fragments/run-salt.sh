@@ -43,9 +43,6 @@ fi
 # Salt server runs at locahost
 echo "127.0.0.1 salt" >> /etc/hosts
 
-# Currently heat template tells a lie that the target is Vagrant. If Vagrant cloud provider is enabled, "Unable to construct api.Node object for kubelet" error will occur.
-sed -e 's/{{cloud_provider}}//' -i /srv/salt/kubelet/default
-
 # Run salt-call
 # salt-call wants to start docker daemon but is unable to.
 # See <https://github.com/projectatomic/docker-storage-setup/issues/77>.

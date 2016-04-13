@@ -200,6 +200,11 @@ function run-heat-script() {
       -P dns_nameserver=${DNS_SERVER} \
       -P kubernetes_salt_url=${swift_repo_url}/kubernetes-salt.tar.gz \
       -P kubernetes_server_url=${swift_repo_url}/kubernetes-server.tar.gz \
+      -P os_auth_url=${OS_AUTH_URL} \
+      -P os_username=${OS_USERNAME} \
+      -P os_password=${OS_PASSWORD} \
+      -P os_region_name=${OS_REGION_NAME} \
+      -P os_tenant_id=${OS_TENANT_ID} \
       -P enable_proxy=${ENABLE_PROXY} \
       -P ftp_proxy="${FTP_PROXY}" \
       -P http_proxy="${HTTP_PROXY}" \
