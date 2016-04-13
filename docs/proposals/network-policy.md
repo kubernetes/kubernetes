@@ -129,7 +129,7 @@ type NetworkPolicy struct {
 type NetworkPolicySpec struct {
   // Selects the pods which this NetworkPolicy object
   // applies to.
-  PodSelector map[string]string `json:"podSelector,omitempty"`
+  PodSelector *unversioned.LabelSelector `json:"podSelector,omitempty"`
 
   // List of ingress rules to be applied to the 
   // selected pods.
@@ -155,11 +155,11 @@ type NetworkPolicyPort struct {
 type NetworkPolicySource struct {
   // Label selector - selects pods in this namespace.
   // If 'Namespaces' is defined, this must not be.
-  Pods map[string]string `json:"pods,omitempty"`
+  Pods *unversioned.LabelSelector `json:"pods,omitempty"`
 
   // Label selector - selects namespaces.
   // If 'Pods' is defined, this must not be.
-  Namespaces map[string]string `json:"namespaces,omitempty"`
+  Namespaces *unversioned.LabelSelector `json:"namespaces,omitempty"`
 }
 ```
 
