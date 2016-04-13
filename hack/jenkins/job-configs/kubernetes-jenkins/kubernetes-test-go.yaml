@@ -73,6 +73,7 @@
     suffix:
         - 'go':
             branch: 'master'
+            cron-string: '{sq-cron-string}'
             timeout: 80
         - 'go-release-1.2':
             branch: 'release-1.2'
