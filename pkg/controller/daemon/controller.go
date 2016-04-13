@@ -23,16 +23,18 @@ import (
 	"time"
 
 	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
-	"k8s.io/kubernetes/pkg/client/record"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2/typed/core/v1"
+	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2/typed/extensions/v1beta1"
+	record "k8s.io/kubernetes/pkg/client/record/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -103,14 +105,14 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 
 	dsc := &DaemonSetsController{
 		kubeClient:    kubeClient,
-		eventRecorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "daemonset-controller"}),
+		eventRecorder: eventBroadcaster.NewRecorder(v1.EventSource{Component: "daemonset-controller"}),
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "daemon-set"}),
+			Recorder:   eventBroadcaster.NewRecorder(v1.EventSource{Component: "daemon-set"}),
 		},
 		burstReplicas: BurstReplicas,
 		expectations:  controller.NewControllerExpectations(),
@@ -126,18 +128,18 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
 			},
 		},
-		&extensions.DaemonSet{},
+		&v1beta1.DaemonSet{},
 		// TODO: Can we have much longer period here?
 		FullDaemonSetResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				ds := obj.(*extensions.DaemonSet)
+				ds := obj.(*v1beta1.DaemonSet)
 				glog.V(4).Infof("Adding daemon set %s", ds.Name)
 				dsc.enqueueDaemonSet(ds)
 			},
 			UpdateFunc: func(old, cur interface{}) {
-				oldDS := old.(*extensions.DaemonSet)
-				curDS := cur.(*extensions.DaemonSet)
+				oldDS := old.(*v1beta1.DaemonSet)
+				curDS := cur.(*v1beta1.DaemonSet)
 				// We should invalidate the whole lookup cache if a DS's selector has been updated.
 				//
 				// Imagine that you have two RSs:
@@ -157,7 +159,7 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 				dsc.enqueueDaemonSet(curDS)
 			},
 			DeleteFunc: func(obj interface{}) {
-				ds := obj.(*extensions.DaemonSet)
+				ds := obj.(*v1beta1.DaemonSet)
 				glog.V(4).Infof("Deleting daemon set %s", ds.Name)
 				dsc.enqueueDaemonSet(ds)
 			},
@@ -174,7 +176,7 @@ func NewDaemonSetsController(kubeClient clientset.Interface, resyncPeriod contro
 				return dsc.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
-		&api.Pod{},
+		&v1.Pod{},
 		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    dsc.addPod,
@@ -238,7 +240,7 @@ func (dsc *DaemonSetsController) worker() {
 
 func (dsc *DaemonSetsController) enqueueAllDaemonSets() {
 	glog.V(4).Infof("Enqueueing all daemon sets")
-	ds, err := dsc.dsStore.List()
+	ds, err := dsc.dsStore.V1beta1List()
 	if err != nil {
 		glog.Errorf("Error enqueueing daemon sets: %v", err)
 		return
@@ -248,7 +250,7 @@ func (dsc *DaemonSetsController) enqueueAllDaemonSets() {
 	}
 }
 
-func (dsc *DaemonSetsController) enqueueDaemonSet(ds *extensions.DaemonSet) {
+func (dsc *DaemonSetsController) enqueueDaemonSet(ds *v1beta1.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", ds, err)
@@ -259,10 +261,10 @@ func (dsc *DaemonSetsController) enqueueDaemonSet(ds *extensions.DaemonSet) {
 	dsc.queue.Add(key)
 }
 
-func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *extensions.DaemonSet {
+func (dsc *DaemonSetsController) getPodDaemonSet(pod *v1.Pod) *v1beta1.DaemonSet {
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := dsc.lookupCache.GetMatchingObject(pod); cached {
-		ds, ok := obj.(*extensions.DaemonSet)
+		ds, ok := obj.(*v1beta1.DaemonSet)
 		if !ok {
 			// This should not happen
 			glog.Errorf("lookup cache does not retuen a ReplicationController object")
@@ -272,7 +274,7 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *extensions.Daemo
 			return ds
 		}
 	}
-	sets, err := dsc.dsStore.GetPodDaemonSets(pod)
+	sets, err := dsc.dsStore.VersionedGetPodDaemonSets(pod)
 	if err != nil {
 		glog.V(4).Infof("No daemon sets found for pod %v, daemon set controller will avoid syncing", pod.Name)
 		return nil
@@ -292,7 +294,7 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *api.Pod) *extensions.Daemo
 }
 
 // isCacheValid check if the cache is valid
-func (dsc *DaemonSetsController) isCacheValid(pod *api.Pod, cachedDS *extensions.DaemonSet) bool {
+func (dsc *DaemonSetsController) isCacheValid(pod *v1.Pod, cachedDS *v1beta1.DaemonSet) bool {
 	_, exists, err := dsc.dsStore.Get(cachedDS)
 	// ds has been deleted or updated, cache is invalid
 	if err != nil || !exists || !isDaemonSetMatch(pod, cachedDS) {
@@ -303,11 +305,11 @@ func (dsc *DaemonSetsController) isCacheValid(pod *api.Pod, cachedDS *extensions
 
 // isDaemonSetMatch take a Pod and DaemonSet, return whether the Pod and DaemonSet are matching
 // TODO(mqliang): This logic is a copy from GetPodDaemonSets(), remove the duplication
-func isDaemonSetMatch(pod *api.Pod, ds *extensions.DaemonSet) bool {
+func isDaemonSetMatch(pod *v1.Pod, ds *v1beta1.DaemonSet) bool {
 	if ds.Namespace != pod.Namespace {
 		return false
 	}
-	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
+	selector, err := v1beta1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		err = fmt.Errorf("invalid selector: %v", err)
 		return false
@@ -321,7 +323,7 @@ func isDaemonSetMatch(pod *api.Pod, ds *extensions.DaemonSet) bool {
 }
 
 func (dsc *DaemonSetsController) addPod(obj interface{}) {
-	pod := obj.(*api.Pod)
+	pod := obj.(*v1.Pod)
 	glog.V(4).Infof("Pod %s added.", pod.Name)
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
 		dsKey, err := controller.KeyFunc(ds)
@@ -336,18 +338,18 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 
 // When a pod is updated, figure out what sets manage it and wake them
 // up. If the labels of the pod have changed we need to awaken both the old
-// and new set. old and cur must be *api.Pod types.
+// and new set. old and cur must be *v1.Pod types.
 func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 	if api.Semantic.DeepEqual(old, cur) {
 		// A periodic relist will send update events for all known pods.
 		return
 	}
-	curPod := cur.(*api.Pod)
+	curPod := cur.(*v1.Pod)
 	glog.V(4).Infof("Pod %s updated.", curPod.Name)
 	if curDS := dsc.getPodDaemonSet(curPod); curDS != nil {
 		dsc.enqueueDaemonSet(curDS)
 	}
-	oldPod := old.(*api.Pod)
+	oldPod := old.(*v1.Pod)
 	// If the labels have not changed, then the daemon set responsible for
 	// the pod is the same as it was before. In that case we have enqueued the daemon
 	// set above, and do not have to enqueue the set again.
@@ -361,7 +363,7 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 }
 
 func (dsc *DaemonSetsController) deletePod(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
+	pod, ok := obj.(*v1.Pod)
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
 	// the deleted key/value. Note that this value might be stale. If the pod
@@ -373,7 +375,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 			glog.Errorf("Couldn't get object from tombstone %+v", obj)
 			return
 		}
-		pod, ok = tombstone.Obj.(*api.Pod)
+		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
 			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
 			return
@@ -393,12 +395,12 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 
 func (dsc *DaemonSetsController) addNode(obj interface{}) {
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
-	dsList, err := dsc.dsStore.List()
+	dsList, err := dsc.dsStore.V1beta1List()
 	if err != nil {
 		glog.V(4).Infof("Error enqueueing daemon sets: %v", err)
 		return
 	}
-	node := obj.(*api.Node)
+	node := obj.(*v1.Node)
 	for i := range dsList.Items {
 		ds := &dsList.Items[i]
 		shouldEnqueue := dsc.nodeShouldRunDaemonPod(node, ds)
@@ -409,13 +411,13 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 }
 
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
-	oldNode := old.(*api.Node)
-	curNode := cur.(*api.Node)
+	oldNode := old.(*v1.Node)
+	curNode := cur.(*v1.Node)
 	if api.Semantic.DeepEqual(oldNode.Name, curNode.Name) && api.Semantic.DeepEqual(oldNode.Namespace, curNode.Namespace) && api.Semantic.DeepEqual(oldNode.Labels, curNode.Labels) {
 		// A periodic relist will send update events for all known pods.
 		return
 	}
-	dsList, err := dsc.dsStore.List()
+	dsList, err := dsc.dsStore.V1beta1List()
 	if err != nil {
 		glog.V(4).Infof("Error enqueueing daemon sets: %v", err)
 		return
@@ -431,13 +433,13 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 }
 
 // getNodesToDaemonSetPods returns a map from nodes to daemon pods (corresponding to ds) running on the nodes.
-func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) (map[string][]*api.Pod, error) {
-	nodeToDaemonPods := make(map[string][]*api.Pod)
-	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
+func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *v1beta1.DaemonSet) (map[string][]*v1.Pod, error) {
+	nodeToDaemonPods := make(map[string][]*v1.Pod)
+	selector, err := v1beta1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
-	daemonPods, err := dsc.podStore.Pods(ds.Namespace).List(selector)
+	daemonPods, err := dsc.podStore.Pods(ds.Namespace).V1List(selector)
 	if err != nil {
 		return nodeToDaemonPods, err
 	}
@@ -448,7 +450,7 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	return nodeToDaemonPods, nil
 }
 
-func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
+func (dsc *DaemonSetsController) manage(ds *v1beta1.DaemonSet) {
 	// Find out which nodes are running the daemon pods selected by ds.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
@@ -457,7 +459,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 
 	// For each node, if the node is running the daemon pod but isn't supposed to, kill the daemon
 	// pod. If the node is supposed to run the daemon pod, but isn't, create the daemon pod on the node.
-	nodeList, err := dsc.nodeStore.List()
+	nodeList, err := dsc.nodeStore.V1List()
 	if err != nil {
 		glog.Errorf("Couldn't get list of nodes when syncing daemon set %+v: %v", ds, err)
 	}
@@ -535,16 +537,16 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 	deleteWait.Wait()
 }
 
-func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int) error {
-	if ds.Status.DesiredNumberScheduled == desiredNumberScheduled && ds.Status.CurrentNumberScheduled == currentNumberScheduled && ds.Status.NumberMisscheduled == numberMisscheduled {
+func storeDaemonSetStatus(dsClient v1beta1extensions.DaemonSetInterface, ds *v1beta1.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int) error {
+	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled && int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled && int(ds.Status.NumberMisscheduled) == numberMisscheduled {
 		return nil
 	}
 
 	var updateErr, getErr error
 	for i := 0; i <= StatusUpdateRetries; i++ {
-		ds.Status.DesiredNumberScheduled = desiredNumberScheduled
-		ds.Status.CurrentNumberScheduled = currentNumberScheduled
-		ds.Status.NumberMisscheduled = numberMisscheduled
+		ds.Status.DesiredNumberScheduled = int32(desiredNumberScheduled)
+		ds.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
+		ds.Status.NumberMisscheduled = int32(numberMisscheduled)
 
 		_, updateErr = dsClient.UpdateStatus(ds)
 		if updateErr == nil {
@@ -561,14 +563,14 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 	return updateErr
 }
 
-func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet) {
+func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *v1beta1.DaemonSet) {
 	glog.V(4).Infof("Updating daemon set status")
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
 		glog.Errorf("Error getting node to daemon pod mapping for daemon set %+v: %v", ds, err)
 	}
 
-	nodeList, err := dsc.nodeStore.List()
+	nodeList, err := dsc.nodeStore.V1List()
 	if err != nil {
 		glog.Errorf("Couldn't get list of nodes when updating daemon set %+v: %v", ds, err)
 	}
@@ -623,7 +625,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		dsc.expectations.DeleteExpectations(key)
 		return nil
 	}
-	ds := obj.(*extensions.DaemonSet)
+	ds := obj.(*v1beta1.DaemonSet)
 
 	everything := unversioned.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {
@@ -648,7 +650,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return nil
 }
 
-func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *extensions.DaemonSet) bool {
+func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *v1beta1.DaemonSet) bool {
 	// Check if the node satisfies the daemon set's node selector.
 	nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
 	if !nodeSelector.Matches(labels.Set(node.Labels)) {
@@ -660,21 +662,21 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 	}
 
 	for _, c := range node.Status.Conditions {
-		if c.Type == api.NodeOutOfDisk && c.Status == api.ConditionTrue {
+		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
 			return false
 		}
 	}
 
-	newPod := &api.Pod{Spec: ds.Spec.Template.Spec}
+	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec}
 	newPod.Spec.NodeName = node.Name
-	pods := []*api.Pod{newPod}
+	pods := []*v1.Pod{newPod}
 
 	for _, m := range dsc.podStore.Store.List() {
-		pod := m.(*api.Pod)
+		pod := m.(*v1.Pod)
 		if pod.Spec.NodeName != node.Name {
 			continue
 		}
-		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+		if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 			continue
 		}
 		// ignore pods that belong to the daemonset when taking into account wheter
@@ -684,15 +686,15 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 		}
 		pods = append(pods, pod)
 	}
-	_, notFittingCPU, notFittingMemory := predicates.CheckPodsExceedingFreeResources(pods, node.Status.Allocatable)
+	_, notFittingCPU, notFittingMemory := predicates.V1CheckPodsExceedingFreeResources(pods, node.Status.Allocatable)
 	if len(notFittingCPU)+len(notFittingMemory) != 0 {
-		dsc.eventRecorder.Eventf(ds, api.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: insufficent free resources", node.ObjectMeta.Name)
+		dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: insufficent free resources", node.ObjectMeta.Name)
 		return false
 	}
 	ports := sets.String{}
 	for _, pod := range pods {
-		if errs := validation.AccumulateUniqueHostPorts(pod.Spec.Containers, &ports, field.NewPath("spec", "containers")); len(errs) > 0 {
-			dsc.eventRecorder.Eventf(ds, api.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: host port conflict", node.ObjectMeta.Name)
+		if errs := validation.V1AccumulateUniqueHostPorts(pod.Spec.Containers, &ports, field.NewPath("spec", "containers")); len(errs) > 0 {
+			dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: host port conflict", node.ObjectMeta.Name)
 			return false
 		}
 	}
@@ -700,7 +702,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []extensions.DaemonSet
+type byCreationTimestamp []v1beta1.DaemonSet
 
 func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
@@ -712,7 +714,7 @@ func (o byCreationTimestamp) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
 
-type podByCreationTimestamp []*api.Pod
+type podByCreationTimestamp []*v1.Pod
 
 func (o podByCreationTimestamp) Len() int      { return len(o) }
 func (o podByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

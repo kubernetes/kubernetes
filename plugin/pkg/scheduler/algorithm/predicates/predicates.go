@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 type NodeInfo interface {
@@ -397,6 +398,45 @@ func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceLi
 	memoryRequested := int64(0)
 	for _, pod := range pods {
 		podRequest := getResourceRequest(pod)
+		fitsCPU := (totalMilliCPU - milliCPURequested) >= podRequest.milliCPU
+		fitsMemory := (totalMemory - memoryRequested) >= podRequest.memory
+		if !fitsCPU {
+			// the pod doesn't fit due to CPU request
+			notFittingCPU = append(notFittingCPU, pod)
+			continue
+		}
+		if !fitsMemory {
+			// the pod doesn't fit due to Memory request
+			notFittingMemory = append(notFittingMemory, pod)
+			continue
+		}
+		// the pod fits
+		milliCPURequested += podRequest.milliCPU
+		memoryRequested += podRequest.memory
+		fitting = append(fitting, pod)
+	}
+	return
+}
+
+// A temporary duplication
+func v1GetResourceRequest(pod *v1.Pod) resourceRequest {
+	result := resourceRequest{}
+	for _, container := range pod.Spec.Containers {
+		requests := container.Resources.Requests
+		result.memory += requests.Memory().Value()
+		result.milliCPU += requests.Cpu().MilliValue()
+	}
+	return result
+}
+
+// A temporary duplication
+func V1CheckPodsExceedingFreeResources(pods []*v1.Pod, allocatable v1.ResourceList) (fitting []*v1.Pod, notFittingCPU, notFittingMemory []*v1.Pod) {
+	totalMilliCPU := allocatable.Cpu().MilliValue()
+	totalMemory := allocatable.Memory().Value()
+	milliCPURequested := int64(0)
+	memoryRequested := int64(0)
+	for _, pod := range pods {
+		podRequest := v1GetResourceRequest(pod)
 		fitsCPU := (totalMilliCPU - milliCPURequested) >= podRequest.milliCPU
 		fitsMemory := (totalMemory - memoryRequested) >= podRequest.memory
 		if !fitsCPU {

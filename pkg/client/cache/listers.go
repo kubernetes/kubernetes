@@ -129,6 +129,15 @@ func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
 	return machines, nil
 }
 
+// V1List is a temporary versioned duplication of List. The original code
+// will be removed once nodecontroller migrates to using a versioned client set.
+func (s *StoreToNodeLister) V1List() (machines v1.NodeList, err error) {
+	for _, m := range s.Store.List() {
+		machines.Items = append(machines.Items, *(m.(*v1.Node)))
+	}
+	return machines, nil
+}
+
 // NodeCondition returns a storeToNodeConditionLister
 func (s *StoreToNodeLister) NodeCondition(predicate NodeConditionPredicate) storeToNodeConditionLister {
 	// TODO: Move this filtering server side. Currently our selectors don't facilitate searching through a list so we
@@ -418,6 +427,15 @@ func (s *StoreToDaemonSetLister) List() (dss extensions.DaemonSetList, err error
 	return dss, nil
 }
 
+// V1beta1List is a temporary versioned duplication of List. The original code
+// will be removed once nodecontroller migrates to using a versioned client set.
+func (s *StoreToDaemonSetLister) V1beta1List() (dss v1beta1.DaemonSetList, err error) {
+	for _, c := range s.Store.List() {
+		dss.Items = append(dss.Items, *(c.(*v1beta1.DaemonSet)))
+	}
+	return dss, nil
+}
+
 // GetPodDaemonSets returns a list of daemon sets managing a pod.
 // Returns an error if and only if no matching daemon sets are found.
 func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []extensions.DaemonSet, err error) {
@@ -435,6 +453,41 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 			continue
 		}
 		selector, err = unversioned.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		if err != nil {
+			// this should not happen if the DaemonSet passed validation
+			return nil, err
+		}
+
+		// If a daemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		daemonSets = append(daemonSets, daemonSet)
+	}
+	if len(daemonSets) == 0 {
+		err = fmt.Errorf("could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
+// VersionedGetPodDaemonSets is a temporary duplicate of GetPodDaemonSets. The
+// original code will be removed when we migrate nodecontroller to using a
+// versioned clientset.
+func (s *StoreToDaemonSetLister) VersionedGetPodDaemonSets(pod *v1.Pod) (daemonSets []v1beta1.DaemonSet, err error) {
+	var selector labels.Selector
+	var daemonSet v1beta1.DaemonSet
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no daemon sets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		daemonSet = *m.(*v1beta1.DaemonSet)
+		if daemonSet.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = v1beta1.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
