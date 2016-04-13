@@ -19,10 +19,10 @@ package predicates
 import "fmt"
 
 var (
-	ErrExceededMaxPodNumber    = newInsufficientResourceError("PodCount")
-	ErrInsufficientFreeCPU     = newInsufficientResourceError("CPU")
-	ErrInsufficientFreeMemory  = newInsufficientResourceError("Memory")
-	ErrInsufficientFreeDevices = newInsufficientResourceError("Devices")
+	ErrExceededMaxPodNumber      = newInsufficientResourceError("PodCount")
+	ErrInsufficientFreeCPU       = newInsufficientResourceError("CPU")
+	ErrInsufficientFreeMemory    = newInsufficientResourceError("Memory")
+	ErrInsufficientFreeNvidiaGPU = newInsufficientResourceError("NvidiaGPU")
 )
 
 // InsufficientResourceError is an error type that indicates what kind of resource limit is

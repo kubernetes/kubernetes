@@ -290,7 +290,9 @@ func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceLi
 		memoryRequested += podRequest.memory
 		nvidiaGPURequested += podRequest.nvidiaGPU
 		fitting = append(fitting, pod)
+		glog.Infof("We need nvidia GPU : %v , podRequest: %v", nvidiaGPURequested, podRequest.nvidiaGPU)
 	}
+
 	return
 }
 
@@ -328,7 +330,7 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	}
 	if len(exceedingNvidiaGPU) > 0 {
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient NVIDIA GPU", podName(pod), node)
-		return false, ErrInsufficientFreeDevices
+		return false, ErrInsufficientFreeNvidiaGPU
 	}
 
 	glog.V(10).Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.", podName(pod), node, len(pods)-1, allocatable.Pods().Value())
