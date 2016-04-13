@@ -111,16 +111,27 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 		// return the exact pre-binding match, if found
 		unboundVolumes := []*api.PersistentVolume{}
 		for _, volume := range volumes {
-			// volume isn't currently bound or pre-bound.
-			if volume.Spec.ClaimRef == nil {
-				unboundVolumes = append(unboundVolumes, volume)
+			// see if PV's claimRef matches claim
+			if volume.Spec.ClaimRef != nil {
+				if volume.Spec.ClaimRef.Name == claim.Name && volume.Spec.ClaimRef.Namespace == claim.Namespace {
+					// claimRef has precedence over a pvc's volumeName
+					// exact match (note: no uid check)
+					return volume, nil
+				}
+				// skip this volume since it has a claimRef that doesn't match
 				continue
 			}
-
-			if claim.Name == volume.Spec.ClaimRef.Name && claim.Namespace == volume.Spec.ClaimRef.Namespace && claim.UID == volume.Spec.ClaimRef.UID {
-				// exact match! No search required.
-				return volume, nil
+			// nil claimRef, see if claim's VolumeName matches PV
+			if claim.Spec.VolumeName != "" {
+				if claim.Spec.VolumeName == volume.Name {
+					// nb: volumes don't have namespaces
+					return volume, nil
+				}
+				// skip this volume since it doesn't match claim's volumeName
+				continue
 			}
+			// volume isn't currently bound or pre-bound.
+			unboundVolumes = append(unboundVolumes, volume)
 		}
 
 		// a claim requesting provisioning will have an exact match pre-bound to the claim.

@@ -200,6 +200,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		return fmt.Errorf("Cannot reload volume %s: %v", volume.Name, err)
 	}
 	volume = newPv
+fmt.Printf("\n+++ syncVolume: pv=%v, inPhase=%v\n", volume.Name, volume.Status.Phase)
 
 	// volumes can be in one of the following states:
 	//
@@ -229,6 +230,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 
 	switch currentPhase {
 	case api.VolumePending:
+fmt.Printf("\n**** In volPending:\n")
 
 		// 4 possible states:
 		//  1.  ClaimRef != nil, Claim exists, Claim UID == ClaimRef UID: Prebound to claim. Make volume available for binding (it will match PVC).
@@ -268,7 +270,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				} else {
 					// Pending volumes that has a ClaimRef and the claim is missing and is was not recycled.
 					// It must have been freshly provisioned and the claim was deleted during the provisioning.
-					// Mark the volume as Released, it will be deleted.
+					// Mark the volume as Released, it may be deleted.
 					nextPhase = api.VolumeReleased
 				}
 			}
@@ -277,14 +279,20 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 			// The provisioner updates the PV and triggers this update for the volume.  Explicitly sync'ing
 			// the claim here prevents the need to wait until the next sync period when the claim would normally
 			// advance to Bound phase. Otherwise, the maximum wait time for the claim to be Bound is the default sync period.
-			if claim != nil && claim.Status.Phase == api.ClaimPending && keyExists(qosProvisioningKey, claim.Annotations) && isProvisioningComplete(volume) {
+			//if claim != nil && claim.Status.Phase == api.ClaimPending && keyExists(qosProvisioningKey, claim.Annotations) && isProvisioningComplete(volume) {
+			// Above if commented since syncClaim() is useful for speeding up all
+			//  pv binding, not just dynamic provisioning.
+			if claim != nil && claim.Status.Phase == api.ClaimPending {
+fmt.Printf("\n**** pv %v call to syncClaim()\n",volume.Name)
 				syncClaim(volumeIndex, binderClient, claim)
 			}
 		}
 		glog.V(5).Infof("PersistentVolume[%s] is available\n", volume.Name)
+fmt.Printf("\n**** leaving Pending: next phase=%v\n",nextPhase)
 
 	// available volumes await a claim
 	case api.VolumeAvailable:
+fmt.Printf("\n**** In volAvailable:\n")
 		if volume.Spec.ClaimRef != nil {
 			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
 			if err == nil {
@@ -297,9 +305,11 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				}
 			}
 		}
+fmt.Printf("\n**** leaving Available: next phase=%v\n",nextPhase)
 
 	//bound volumes require verification of their bound claims
 	case api.VolumeBound:
+fmt.Printf("\n**** In volBound:\n")
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
 		} else {
@@ -308,6 +318,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 			// A volume is Released when its bound claim cannot be found in the API server.
 			// A claim by the same name can be found if deleted and recreated before this controller can release
 			// the volume from the original claim, so a UID check is necessary.
+fmt.Printf("\n**** in Bound:, found pvc %v, err=%v, pvc uid=%v, claimRef uid=%v \n", claim.Name, err, claim.UID, volume.Spec.ClaimRef.UID)
 			if err != nil {
 				if errors.IsNotFound(err) {
 					nextPhase = api.VolumeReleased
@@ -318,25 +329,35 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				nextPhase = api.VolumeReleased
 			}
 		}
+fmt.Printf("\n**** leaving Bound: next phase=%v\n",nextPhase)
 
 	// released volumes require recycling
 	case api.VolumeReleased:
+fmt.Printf("\n**** In volReleased:\n")
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
-		} else {
-			// another process is watching for released volumes.
-			// PersistentVolumeReclaimPolicy is set per PersistentVolume
-			//  Recycle - sets the PV to Pending and back under this controller's management
-			//  Delete - delete events are handled by this controller's watch. PVs are removed from the index.
 		}
+		// another process is watching for released volumes.
+		// PersistentVolumeReclaimPolicy is set per PersistentVolume
+		//  Recycle - sets the PV to Pending and back under this controller's management
+		//  Delete - delete events are handled by this controller's watch. PVs are removed from the index.
+		_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
+		if err == nil {
+			glog.V(5).Infof("PersistentVolume[%s] is now bound\n", volume.Name)
+fmt.Printf("\n**** in Released:, found pvc _, changing pv to Bound \n")
+			nextPhase = api.VolumeBound
+		}
+fmt.Printf("\n**** leaving Released: next phase=%v\n",nextPhase)
 
 	// volumes are removed by processes external to this binder and must be removed from the cluster
 	case api.VolumeFailed:
+fmt.Printf("\n**** In volFailed:\n")
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
 		} else {
 			glog.V(5).Infof("PersistentVolume[%s] previously failed recycling.  Skipping.\n", volume.Name)
 		}
+fmt.Printf("\n**** leaving Released: next phase=%v\n",nextPhase)
 	}
 
 	if currentPhase != nextPhase {
@@ -353,6 +374,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		volumeIndex.Update(volume)
 	}
 
+fmt.Printf("\n--- syncVolume: pv=%v, outPhase=%v\n", volume.Name, volume.Status.Phase)
 	return nil
 }
 
@@ -366,9 +388,11 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 		return fmt.Errorf("Cannot reload claim %s/%s: %v", claim.Namespace, claim.Name, err)
 	}
 	claim = newClaim
+fmt.Printf("\n+++ syncClaim: claim=%v, inPhase=%v\n", claim.Name, claim.Status.Phase)
 
 	switch claim.Status.Phase {
 	case api.ClaimPending:
+fmt.Printf("\n**** In claimPending:\n")
 		// claims w/ a storage-class annotation for provisioning with *only* match volumes with a ClaimRef of the claim.
 		volume, err := volumeIndex.findBestMatchForClaim(claim)
 		if err != nil {
@@ -376,6 +400,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 		}
 
 		if volume == nil {
+fmt.Printf("\n**** pv==nil so returning...\n")
 			glog.V(5).Infof("A volume match does not exist for persistent claim: %s", claim.Name)
 			return nil
 		}
@@ -393,7 +418,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 		// Make a binding reference to the claim by persisting claimRef on the volume.
 		// The local cache must be updated with the new bind to prevent subsequent
 		// claims from binding to the volume.
-		if volume.Spec.ClaimRef == nil {
+		if volume.Spec.ClaimRef == nil || volume.Spec.ClaimRef.UID == "" {
 			clone, err := conversion.NewCloner().DeepCopy(volume)
 			if err != nil {
 				return fmt.Errorf("Error cloning pv: %v", err)
@@ -408,6 +433,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 			} else {
 				volume = updatedVolume
 				volumeIndex.Update(updatedVolume)
+fmt.Printf("\n**** in claim Pending: updated pv's %v claimRef to uid=%+v\n", volume.Name, volume.Spec.ClaimRef.UID)
 			}
 		}
 
@@ -431,6 +457,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 		}
 
 	case api.ClaimBound:
+fmt.Printf("\n**** In claimBound:\n")
 		// no-op.  Claim is bound, values from PV are set.  PVCs are technically mutable in the API server
 		// and we don't want to handle those changes at this time.
 
@@ -440,6 +467,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 	}
 
 	glog.V(5).Infof("PersistentVolumeClaim[%s] is bound\n", claim.Name)
+fmt.Printf("\n--- syncClaim: claim=%v, outPhase=%v\n", claim.Name, claim.Status.Phase)
 	return nil
 }
 
