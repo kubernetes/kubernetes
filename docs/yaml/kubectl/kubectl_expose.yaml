@@ -1,6 +1,6 @@
 name: expose
 synopsis: |
-  Take a replication controller, service, or pod and expose it as a new Kubernetes Service
+  Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service
 description: "Take a deployment, service, replica set, replication controller, or
   pod and expose it as a new Kubernetes service.\n\nLooks up a deployment, service,
   replica set, replication controller or pod by name and uses the selector\nfor that
@@ -64,6 +64,10 @@ options:
 - name: record
   default_value: "false"
   usage: Record current kubectl command in the resource annotation.
+- name: recursive
+  shorthand: R
+  default_value: "false"
+  usage: If true, process directory recursively.
 - name: save-config
   default_value: "false"
   usage: |

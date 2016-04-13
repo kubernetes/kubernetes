@@ -101,6 +101,7 @@ kube::golang::test_targets() {
     cmd/gendocs
     cmd/genkubedocs
     cmd/genman
+    cmd/genyaml
     cmd/mungedocs
     cmd/genbashcomp
     cmd/genconversion
