@@ -34,6 +34,9 @@ NODE_CPU=1
 
 SERVICE_CLUSTER_IP_RANGE="10.244.240.0/20"  # formerly PORTAL_NET
 
+# Admission Controllers to invoke prior to persisting objects in cluster
+ export ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,SecurityContextDeny"
+ 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch
