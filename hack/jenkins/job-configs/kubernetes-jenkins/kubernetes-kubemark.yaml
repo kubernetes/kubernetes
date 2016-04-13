@@ -39,8 +39,8 @@
     suffix:
         - '5-gce':
             description: 'Run minimal Kubemark to make sure it is not broken.'
-            timeout: 30
-            cron-string: 'H/30 * * * *'
+            timeout: 60
+            cron-string: 'H/5 * * * *'
             job-env: |
                 export E2E_NAME="kubemark-5"
                 export PROJECT="k8s-jenkins-kubemark"
