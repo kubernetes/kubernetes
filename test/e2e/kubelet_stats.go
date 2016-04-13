@@ -565,11 +565,11 @@ func (r *resourceCollector) Stop() {
 // the resource usage, and pushes it to the buffer.
 func (r *resourceCollector) collectStats(oldStatsMap map[string]*stats.ContainerStats) {
 	summary, err := getNodeStatsSummary(r.client, r.node)
-	cStatsMap := getSystemContainerStats(summary)
 	if err != nil {
 		Logf("Error getting node stats summary on %q, err: %v", r.node, err)
 		return
 	}
+	cStatsMap := getSystemContainerStats(summary)
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	for _, name := range r.containers {
