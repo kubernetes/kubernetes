@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -30,9 +31,11 @@ type FakeEndpoints struct {
 	ns   string
 }
 
+var endpointsResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "endpoints"}
+
 func (c *FakeEndpoints) Create(endpoints *v1.Endpoints) (result *v1.Endpoints, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("endpoints", c.ns, endpoints), &v1.Endpoints{})
+		Invokes(core.NewCreateAction(endpointsResource, c.ns, endpoints), &v1.Endpoints{})
 
 	if obj == nil {
 		return nil, err
@@ -42,7 +45,7 @@ func (c *FakeEndpoints) Create(endpoints *v1.Endpoints) (result *v1.Endpoints, e
 
 func (c *FakeEndpoints) Update(endpoints *v1.Endpoints) (result *v1.Endpoints, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("endpoints", c.ns, endpoints), &v1.Endpoints{})
+		Invokes(core.NewUpdateAction(endpointsResource, c.ns, endpoints), &v1.Endpoints{})
 
 	if obj == nil {
 		return nil, err
@@ -52,13 +55,13 @@ func (c *FakeEndpoints) Update(endpoints *v1.Endpoints) (result *v1.Endpoints, e
 
 func (c *FakeEndpoints) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("endpoints", c.ns, name), &v1.Endpoints{})
+		Invokes(core.NewDeleteAction(endpointsResource, c.ns, name), &v1.Endpoints{})
 
 	return err
 }
 
 func (c *FakeEndpoints) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("endpoints", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(endpointsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.EndpointsList{})
 	return err
@@ -66,7 +69,7 @@ func (c *FakeEndpoints) DeleteCollection(options *api.DeleteOptions, listOptions
 
 func (c *FakeEndpoints) Get(name string) (result *v1.Endpoints, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("endpoints", c.ns, name), &v1.Endpoints{})
+		Invokes(core.NewGetAction(endpointsResource, c.ns, name), &v1.Endpoints{})
 
 	if obj == nil {
 		return nil, err
@@ -76,7 +79,7 @@ func (c *FakeEndpoints) Get(name string) (result *v1.Endpoints, err error) {
 
 func (c *FakeEndpoints) List(opts api.ListOptions) (result *v1.EndpointsList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("endpoints", c.ns, opts), &v1.EndpointsList{})
+		Invokes(core.NewListAction(endpointsResource, c.ns, opts), &v1.EndpointsList{})
 
 	if obj == nil {
 		return nil, err
@@ -98,6 +101,6 @@ func (c *FakeEndpoints) List(opts api.ListOptions) (result *v1.EndpointsList, er
 // Watch returns a watch.Interface that watches the requested endpoints.
 func (c *FakeEndpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("endpoints", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(endpointsResource, c.ns, opts))
 
 }
