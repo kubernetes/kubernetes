@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -91,7 +90,7 @@ func TestAdmission(t *testing.T) {
 func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept bool) {
 	mockClient := &fake.Clientset{}
 	mockClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		if action.(testclient.GetAction).GetName() == pod.Name {
+		if action.(core.GetAction).GetName() == pod.Name {
 			return true, pod, nil
 		}
 		t.Errorf("Unexpected API call: %#v", action)

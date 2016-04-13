@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -188,7 +188,7 @@ func TestServiceAccountCreation(t *testing.T) {
 				t.Errorf("%s: Unexpected action %s", k, action)
 				break
 			}
-			createdAccount := action.(testclient.CreateAction).GetObject().(*api.ServiceAccount)
+			createdAccount := action.(core.CreateAction).GetObject().(*api.ServiceAccount)
 			if createdAccount.Name != expectedName {
 				t.Errorf("%s: Expected %s to be created, got %s", k, expectedName, createdAccount.Name)
 			}

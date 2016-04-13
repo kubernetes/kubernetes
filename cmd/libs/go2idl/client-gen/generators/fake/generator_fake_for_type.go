@@ -31,6 +31,7 @@ type genFakeForType struct {
 	generator.DefaultGen
 	outputPackage string
 	group         string
+	version       string
 	typeToMatch   *types.Type
 	imports       namer.ImportTracker
 }
@@ -78,16 +79,27 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	pkg := filepath.Base(t.Name.Package)
 	const pkgTestingCore = "k8s.io/kubernetes/pkg/client/testing/core"
 	namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+	canonicalGroup := g.group
+	if canonicalGroup == "core" {
+		canonicalGroup = ""
+	}
+	canonicalVersion := g.version
+	if canonicalVersion == "unversioned" {
+		canonicalVersion = ""
+	}
 	m := map[string]interface{}{
-		"type":             t,
-		"package":          pkg,
-		"Package":          namer.IC(pkg),
-		"namespaced":       namespaced,
-		"Group":            namer.IC(g.group),
-		"watchInterface":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
-		"apiDeleteOptions": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
-		"apiListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
-		"Everything":       c.Universe.Function(types.Name{Package: "k8s.io/kubernetes/pkg/labels", Name: "Everything"}),
+		"type":                 t,
+		"package":              pkg,
+		"Package":              namer.IC(pkg),
+		"namespaced":           namespaced,
+		"Group":                namer.IC(g.group),
+		"group":                canonicalGroup,
+		"version":              canonicalVersion,
+		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
+		"apiDeleteOptions":     c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
+		"apiListOptions":       c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
+		"GroupVersionResource": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/unversioned", Name: "GroupVersionResource"}),
+		"Everything":           c.Universe.Function(types.Name{Package: "k8s.io/kubernetes/pkg/labels", Name: "Everything"}),
 
 		"NewRootListAction":              c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootListAction"}),
 		"NewListAction":                  c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewListAction"}),
@@ -116,6 +128,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	}
 
 	if !noMethods {
+		sw.Do(resource, m)
 		sw.Do(createTemplate, m)
 		sw.Do(updateTemplate, m)
 		// Generate the UpdateStatus method if the type has a status
@@ -154,11 +167,15 @@ type Fake$.type|publicPlural$ struct {
 }
 `
 
+var resource = `
+var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.group$", Version: "$.version$", Resource: "$.type|allLowercasePlural$"}
+`
+
 var listTemplate = `
 func (c *Fake$.type|publicPlural$) List(opts $.apiListOptions|raw$) (result *$.type|raw$List, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewListAction|raw$("$.type|allLowercasePlural$", c.ns, opts), &$.type|raw$List{})
-		$else$Invokes($.NewRootListAction|raw$("$.type|allLowercasePlural$", opts), &$.type|raw$List{})$end$
+		$if .namespaced$Invokes($.NewListAction|raw$($.type|allLowercasePlural$Resource, c.ns, opts), &$.type|raw$List{})
+		$else$Invokes($.NewRootListAction|raw$($.type|allLowercasePlural$Resource, opts), &$.type|raw$List{})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -169,8 +186,8 @@ func (c *Fake$.type|publicPlural$) List(opts $.apiListOptions|raw$) (result *$.t
 var listUsingOptionsTemplate = `
 func (c *Fake$.type|publicPlural$) List(opts $.apiListOptions|raw$) (result *$.type|raw$List, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewListAction|raw$("$.type|allLowercasePlural$", c.ns, opts), &$.type|raw$List{})
-		$else$Invokes($.NewRootListAction|raw$("$.type|allLowercasePlural$", opts), &$.type|raw$List{})$end$
+		$if .namespaced$Invokes($.NewListAction|raw$($.type|allLowercasePlural$Resource, c.ns, opts), &$.type|raw$List{})
+		$else$Invokes($.NewRootListAction|raw$($.type|allLowercasePlural$Resource, opts), &$.type|raw$List{})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -192,8 +209,8 @@ func (c *Fake$.type|publicPlural$) List(opts $.apiListOptions|raw$) (result *$.t
 var getTemplate = `
 func (c *Fake$.type|publicPlural$) Get(name string) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewGetAction|raw$("$.type|allLowercasePlural$", c.ns, name), &$.type|raw${})
-		$else$Invokes($.NewRootGetAction|raw$("$.type|allLowercasePlural$", name), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewGetAction|raw$($.type|allLowercasePlural$Resource, c.ns, name), &$.type|raw${})
+		$else$Invokes($.NewRootGetAction|raw$($.type|allLowercasePlural$Resource, name), &$.type|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -204,16 +221,16 @@ func (c *Fake$.type|publicPlural$) Get(name string) (result *$.type|raw$, err er
 var deleteTemplate = `
 func (c *Fake$.type|publicPlural$) Delete(name string, options *$.apiDeleteOptions|raw$) error {
 	_, err := c.Fake.
-		$if .namespaced$Invokes($.NewDeleteAction|raw$("$.type|allLowercasePlural$", c.ns, name), &$.type|raw${})
-		$else$Invokes($.NewRootDeleteAction|raw$("$.type|allLowercasePlural$", name), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewDeleteAction|raw$($.type|allLowercasePlural$Resource, c.ns, name), &$.type|raw${})
+		$else$Invokes($.NewRootDeleteAction|raw$($.type|allLowercasePlural$Resource, name), &$.type|raw${})$end$
 	return err
 }
 `
 
 var deleteCollectionTemplate = `
 func (c *Fake$.type|publicPlural$) DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error {
-	$if .namespaced$action := $.NewDeleteCollectionAction|raw$("$.type|allLowercasePlural$", c.ns, listOptions)
-	$else$action := $.NewRootDeleteCollectionAction|raw$("$.type|allLowercasePlural$", listOptions)
+	$if .namespaced$action := $.NewDeleteCollectionAction|raw$($.type|allLowercasePlural$Resource, c.ns, listOptions)
+	$else$action := $.NewRootDeleteCollectionAction|raw$($.type|allLowercasePlural$Resource, listOptions)
 	$end$
 	_, err := c.Fake.Invokes(action, &$.type|raw$List{})
 	return err
@@ -223,8 +240,8 @@ func (c *Fake$.type|publicPlural$) DeleteCollection(options *$.apiDeleteOptions|
 var createTemplate = `
 func (c *Fake$.type|publicPlural$) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewCreateAction|raw$("$.type|allLowercasePlural$", c.ns, $.type|private$), &$.type|raw${})
-		$else$Invokes($.NewRootCreateAction|raw$("$.type|allLowercasePlural$", $.type|private$), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewCreateAction|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$), &$.type|raw${})
+		$else$Invokes($.NewRootCreateAction|raw$($.type|allLowercasePlural$Resource, $.type|private$), &$.type|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -235,8 +252,8 @@ func (c *Fake$.type|publicPlural$) Create($.type|private$ *$.type|raw$) (result 
 var updateTemplate = `
 func (c *Fake$.type|publicPlural$) Update($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewUpdateAction|raw$("$.type|allLowercasePlural$", c.ns, $.type|private$), &$.type|raw${})
-		$else$Invokes($.NewRootUpdateAction|raw$("$.type|allLowercasePlural$", $.type|private$), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewUpdateAction|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$), &$.type|raw${})
+		$else$Invokes($.NewRootUpdateAction|raw$($.type|allLowercasePlural$Resource, $.type|private$), &$.type|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -247,8 +264,8 @@ func (c *Fake$.type|publicPlural$) Update($.type|private$ *$.type|raw$) (result 
 var updateStatusTemplate = `
 func (c *Fake$.type|publicPlural$) UpdateStatus($.type|private$ *$.type|raw$) (*$.type|raw$, error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewUpdateSubresourceAction|raw$("$.type|allLowercasePlural$", "status", c.ns, $.type|private$), &$.type|raw${})
-		$else$Invokes($.NewRootUpdateSubresourceAction|raw$("$.type|allLowercasePlural$", "status", $.type|private$), &$.type|raw${})$end$
+		$if .namespaced$Invokes($.NewUpdateSubresourceAction|raw$($.type|allLowercasePlural$Resource, "status", c.ns, $.type|private$), &$.type|raw${})
+		$else$Invokes($.NewRootUpdateSubresourceAction|raw$($.type|allLowercasePlural$Resource, "status", $.type|private$), &$.type|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -260,7 +277,7 @@ var watchTemplate = `
 // Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
 func (c *Fake$.type|publicPlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error) {
 	return c.Fake.
-		$if .namespaced$InvokesWatch($.NewWatchAction|raw$("$.type|allLowercasePlural$", c.ns, opts))
-		$else$InvokesWatch($.NewRootWatchAction|raw$("$.type|allLowercasePlural$", opts))$end$
+		$if .namespaced$InvokesWatch($.NewWatchAction|raw$($.type|allLowercasePlural$Resource, c.ns, opts))
+		$else$InvokesWatch($.NewRootWatchAction|raw$($.type|allLowercasePlural$Resource, opts))$end$
 }
 `
