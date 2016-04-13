@@ -54,6 +54,29 @@ func NewPersistentVolumeOrderedIndex() *persistentVolumeOrderedIndex {
 	}
 }
 
+// isVolumePreboundToClaim returns true, if given volume is pre-bound or bound
+// to specific claim. Both claim.Name and claim.Namespace must be equal.
+// If claim.UID is present in volume.Spec.ClaimRef, it must be equal too.
+// Note: honors claim's VolumeName not matching volume's name.
+func isVolumeBoundToClaim(volume *api.PersistentVolume, claim *api.PersistentVolumeClaim) bool {
+	pvcPrebindMatch := false
+	if claim.Spec.VolumeName == volume.Name {
+		pvcPrebindMatch = true
+	}
+ 	if volume.Spec.ClaimRef == nil {
+		return pvcPrebindMatch
+	}
+	// volume defined a ClaimRef
+	if claim.Name != volume.Spec.ClaimRef.Name || claim.Namespace != volume.Spec.ClaimRef.Namespace {
+		return false
+	}
+	// claim's name and namespace match volume's ClaimRef
+	if volume.Spec.ClaimRef.UID != "" && claim.UID != volume.Spec.ClaimRef.UID {
+		return false
+	}
+	return true
+}
+
 // accessModesIndexFunc is an indexing function that returns a persistent volume's AccessModes as a string
 func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*api.PersistentVolume); ok {
@@ -111,16 +134,12 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 		// return the exact pre-binding match, if found
 		unboundVolumes := []*api.PersistentVolume{}
 		for _, volume := range volumes {
-			// volume isn't currently bound or pre-bound.
-			if volume.Spec.ClaimRef == nil {
-				unboundVolumes = append(unboundVolumes, volume)
-				continue
-			}
-
-			if claim.Name == volume.Spec.ClaimRef.Name && claim.Namespace == volume.Spec.ClaimRef.Namespace && claim.UID == volume.Spec.ClaimRef.UID {
-				// exact match! No search required.
+			// see if volume is pre-bound to claim
+			if isVolumeBoundToClaim(volume, claim) {
 				return volume, nil
 			}
+			// volume isn't currently bound or pre-bound.
+			unboundVolumes = append(unboundVolumes, volume)
 		}
 
 		// a claim requesting provisioning will have an exact match pre-bound to the claim.

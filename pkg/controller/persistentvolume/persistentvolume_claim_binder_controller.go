@@ -272,7 +272,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				} else {
 					// Pending volumes that has a ClaimRef and the claim is missing and is was not recycled.
 					// It must have been freshly provisioned and the claim was deleted during the provisioning.
-					// Mark the volume as Released, it will be deleted.
+					// Mark the volume as Released, it may be deleted.
 					nextPhase = api.VolumeReleased
 				}
 			}
@@ -281,7 +281,10 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 			// The provisioner updates the PV and triggers this update for the volume.  Explicitly sync'ing
 			// the claim here prevents the need to wait until the next sync period when the claim would normally
 			// advance to Bound phase. Otherwise, the maximum wait time for the claim to be Bound is the default sync period.
-			if claim != nil && claim.Status.Phase == api.ClaimPending && keyExists(qosProvisioningKey, claim.Annotations) && isProvisioningComplete(volume) {
+			//if claim != nil && claim.Status.Phase == api.ClaimPending && keyExists(qosProvisioningKey, claim.Annotations) && isProvisioningComplete(volume) {
+			// Above if commented since syncClaim() is useful for speeding up pvc binding where the pv has a claimRef and is created after the pvc
+			//  pv binding, not just dynamic provisioning.
+			if claim != nil && claim.Status.Phase == api.ClaimPending {
 				syncClaim(volumeIndex, binderClient, claim)
 			}
 		}
@@ -327,11 +330,18 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 	case api.VolumeReleased:
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
-		} else {
-			// another process is watching for released volumes.
-			// PersistentVolumeReclaimPolicy is set per PersistentVolume
-			//  Recycle - sets the PV to Pending and back under this controller's management
-			//  Delete - delete events are handled by this controller's watch. PVs are removed from the index.
+		}
+		// For pvs with their PersistentVolumeReclaimPolicy = Recycle or Delete,
+		// there is another process watching for released volumes.
+		//   Recycle - sets the PV to Pending and back under this controller's management
+		//   Delete - delete events are handled by this controller's watch. PVs are removed from the index.
+		// If the PersistentVolumeReclaimPolicy is Retain then we can re-use the volume.
+		if volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRetain {
+			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
+			if err == nil {
+				glog.V(5).Infof("PersistentVolume[%s] is now bound\n", volume.Name)
+				nextPhase = api.VolumeBound
+			}
 		}
 
 	// volumes are removed by processes external to this binder and must be removed from the cluster
@@ -373,7 +383,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 
 	switch claim.Status.Phase {
 	case api.ClaimPending:
-		// claims w/ a storage-class annotation for provisioning with *only* match volumes with a ClaimRef of the claim.
+		// claims w/ a storage-class annotation for provisioning will *only* match volumes with a ClaimRef of the claim.
 		volume, err := volumeIndex.findBestMatchForClaim(claim)
 		if err != nil {
 			return err
@@ -397,7 +407,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 		// Make a binding reference to the claim by persisting claimRef on the volume.
 		// The local cache must be updated with the new bind to prevent subsequent
 		// claims from binding to the volume.
-		if volume.Spec.ClaimRef == nil {
+		if volume.Spec.ClaimRef == nil || volume.Spec.ClaimRef.UID == "" {
 			clone, err := conversion.NewCloner().DeepCopy(volume)
 			if err != nil {
 				return fmt.Errorf("Error cloning pv: %v", err)
