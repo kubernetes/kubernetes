@@ -6,7 +6,7 @@ MIME-Version: 1.0
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment; filename="kube-install-minion.conf"
+Content-Disposition: attachment; filename="kube-install-node.conf"
 
 #upstart-job
 
@@ -41,7 +41,7 @@ Content-Disposition: attachment; filename="kube-env.conf"
 
 description "Prepare kube node environment"
 
-start on stopped kube-install-minion
+start on stopped kube-install-node
 
 script
 	set -o errexit
@@ -71,7 +71,7 @@ Content-Disposition: attachment; filename="kube-install-packages.conf"
 
 description "Install packages needed to run kubernetes"
 
-start on stopped kube-install-minion
+start on stopped kube-install-node
 
 script
 	set -o errexit
@@ -185,12 +185,12 @@ script
 	. /etc/kube-configure-helper.sh
 	. /etc/kube-env
 	prepare_log_file "/var/log/kube-proxy.log"
-	# Load the docker image from file /run/kube-docker-files/kube-proxy.tar.
+	# Load the docker image from file /home/kubernetes/kube-docker-files/kube-proxy.tar.
 	echo "Try to load docker image file kube-proxy.tar"
-	timeout 30 docker load -i /run/kube-docker-files/kube-proxy.tar
+	timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-proxy.tar
 	# Copy the manifest to /tmp to manipulate
 	tmp_file="/tmp/kube-proxy.manifest"
-	cp -f /run/kube-manifests/kubernetes/kube-proxy.manifest ${tmp_file}
+	cp -f /home/kubernetes/kube-manifests/kubernetes/kube-proxy.manifest ${tmp_file}
 	# Remove the lines of salt configuration and replace variables with values.
 	# NOTE: Changes to variable names in cluster/saltbase/salt/kube-proxy/kube-proxy.manifest
 	# may break this upstart job.
@@ -200,7 +200,7 @@ script
 	if [ -n "${KUBE_DOCKER_REGISTRY:-}" ]; then
 		kube_docker_registry=${KUBE_DOCKER_REGISTRY}
 	fi
-	kube_proxy_docker_tag=$(cat /run/kube-docker-files/kube-proxy.docker_tag)
+	kube_proxy_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-proxy.docker_tag)
 	test_args=""
 	if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
 		test_args="${KUBEPROXY_TEST_ARGS}"
@@ -237,14 +237,14 @@ script
 	set -o errexit
 	set -o nounset
 
-	# Kube-system pod manifest files are located at /run/kube-manifests/kubernetes.
 	. /etc/kube-configure-helper.sh
 	. /etc/kube-env
 	# Fluentd
 	start_fluentd
 	# Kube-registry-proxy
 	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
-		cp /run/kube-manifests/kubernetes/kube-registry-proxy.yaml /etc/kubernetes/manifests/
+		cp /home/kubernetes/kube-manifests/kubernetes/kube-registry-proxy.yaml \
+       /etc/kubernetes/manifests/
 	fi
 end script
 
