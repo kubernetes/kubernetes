@@ -106,7 +106,7 @@ kube::log::usage() {
 kube::log::usage_from_stdin() {
   local messages=()
   while read -r line; do
-    messages+=$line
+    messages+=("$line")
   done
 
   kube::log::usage "${messages[@]}"
@@ -129,7 +129,7 @@ kube::log::progress() {
 kube::log::info_from_stdin() {
   local messages=()
   while read -r line; do
-    messages+=$line
+    messages+=("$line")
   done
 
   kube::log::info "${messages[@]}"
