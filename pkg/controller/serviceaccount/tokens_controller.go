@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/secret"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -68,7 +69,9 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 		token:  options.TokenGenerator,
 		rootCA: options.RootCA,
 	}
-
+	if cl != nil && cl.Core().GetRESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().GetRESTClient().GetRateLimiter())
+	}
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {

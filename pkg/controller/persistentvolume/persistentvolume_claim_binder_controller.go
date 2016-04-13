@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -45,6 +46,9 @@ type PersistentVolumeClaimBinder struct {
 
 // NewPersistentVolumeClaimBinder creates a new PersistentVolumeClaimBinder
 func NewPersistentVolumeClaimBinder(kubeClient clientset.Interface, syncPeriod time.Duration) *PersistentVolumeClaimBinder {
+	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("pv_claim_binder_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
+	}
 	volumeIndex := NewPersistentVolumeOrderedIndex()
 	binderClient := NewBinderClient(kubeClient)
 	binder := &PersistentVolumeClaimBinder{
