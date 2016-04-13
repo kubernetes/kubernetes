@@ -165,7 +165,6 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 					err := fmt.Errorf("SchedulerPredicates failed due to %v, which is unexpected.", err)
 					return api.NodeList{}, FailedPredicateMap{}, err
 				}
-				break
 			}
 		}
 		if fits {

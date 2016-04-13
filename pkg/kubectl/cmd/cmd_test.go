@@ -221,9 +221,12 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 
 func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	f, t, c := NewTestFactory()
+	var multiRESTMapper meta.MultiRESTMapper
+	multiRESTMapper = append(multiRESTMapper, t.Mapper)
+	multiRESTMapper = append(multiRESTMapper, testapi.Default.RESTMapper())
 	f.Object = func(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
 		priorityRESTMapper := meta.PriorityRESTMapper{
-			Delegate: meta.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()},
+			Delegate: multiRESTMapper,
 			ResourcePriority: []unversioned.GroupVersionResource{
 				{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
 			},
