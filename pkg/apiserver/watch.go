@@ -17,32 +17,27 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
 	"reflect"
-	"regexp"
-	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/watch"
-	watchjson "k8s.io/kubernetes/pkg/watch/json"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 
 	"github.com/emicklei/go-restful"
-	"github.com/golang/glog"
 	"golang.org/x/net/websocket"
 )
 
-var (
-	connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
-
-	// nothing will ever be sent down this channel
-	neverExitWatch <-chan time.Time = make(chan time.Time)
-)
-
-func isWebsocketRequest(req *http.Request) bool {
-	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection"))) && strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
-}
+// nothing will ever be sent down this channel
+var neverExitWatch <-chan time.Time = make(chan time.Time)
 
 // timeoutFactory abstracts watch timeout logic for testing
 type timeoutFactory interface {
@@ -64,119 +59,218 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 	return t.C, t.Stop
 }
 
+type textEncodable interface {
+	// EncodesAsText should return true if objects should be transmitted as a WebSocket Text
+	// frame (otherwise, they will be sent as a Binary frame).
+	EncodesAsText() bool
+}
+
 // serveWatch handles serving requests to the server
+// TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
 func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Request, res *restful.Response, timeout time.Duration) {
-	s, mediaType, err := negotiateOutputSerializer(req.Request, scope.Serializer)
+	// negotiate for the stream serializer
+	serializer, mediaType, err := negotiateOutputSerializer(req.Request, scope.StreamSerializer)
 	if err != nil {
 		scope.err(err, res.ResponseWriter, req.Request)
 		return
 	}
-	// TODO: replace with typed serialization
-	if mediaType != "application/json" {
-		writeRawJSON(http.StatusNotAcceptable, (errNotAcceptable{[]string{"application/json"}}).Status(), res.ResponseWriter)
+	encoder := scope.StreamSerializer.EncoderForVersion(serializer, scope.Kind.GroupVersion())
+
+	useTextFraming := false
+	if encodable, ok := encoder.(textEncodable); ok && encodable.EncodesAsText() {
+		useTextFraming = true
+	}
+
+	// find the embedded serializer matching the media type
+	embeddedSerializer, ok := scope.Serializer.SerializerForMediaType(mediaType, nil)
+	if !ok {
+		scope.err(fmt.Errorf("no serializer defined for %q available for embedded encoding", mediaType), res.ResponseWriter, req.Request)
 		return
 	}
-	encoder := scope.Serializer.EncoderForVersion(s, scope.Kind.GroupVersion())
-	watchServer := &WatchServer{watcher, encoder, func(obj runtime.Object) {
-		if err := setSelfLink(obj, req, scope.Namer); err != nil {
-			glog.V(5).Infof("Failed to set self link for object %v: %v", reflect.TypeOf(obj), err)
-		}
-	}, &realTimeoutFactory{timeout}}
-	if isWebsocketRequest(req.Request) {
-		websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(res.ResponseWriter), req.Request)
-	} else {
-		watchServer.ServeHTTP(res.ResponseWriter, req.Request)
+	embeddedEncoder := scope.Serializer.EncoderForVersion(embeddedSerializer, scope.Kind.GroupVersion())
+
+	server := &WatchServer{
+		watching: watcher,
+		scope:    scope,
+
+		useTextFraming:  useTextFraming,
+		mediaType:       mediaType,
+		encoder:         encoder,
+		embeddedEncoder: embeddedEncoder,
+		fixup: func(obj runtime.Object) {
+			if err := setSelfLink(obj, req, scope.Namer); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to set link for object %v: %v", reflect.TypeOf(obj), err))
+			}
+		},
+
+		t: &realTimeoutFactory{timeout},
 	}
+
+	server.ServeHTTP(res.ResponseWriter, req.Request)
 }
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
 	watching watch.Interface
-	encoder  runtime.Encoder
-	fixup    func(runtime.Object)
-	t        timeoutFactory
+	scope    RequestScope
+
+	// true if websocket messages should use text framing (as opposed to binary framing)
+	useTextFraming bool
+	// the media type this watch is being served with
+	mediaType string
+	// used to encode the watch stream event itself
+	encoder runtime.Encoder
+	// used to encode the nested object in the watch stream
+	embeddedEncoder runtime.Encoder
+	fixup           func(runtime.Object)
+
+	t timeoutFactory
 }
 
-// HandleWS implements a websocket handler.
-func (w *WatchServer) HandleWS(ws *websocket.Conn) {
-	defer ws.Close()
-	done := make(chan struct{})
-	go func() {
-		var unused interface{}
-		// Expect this to block until the connection is closed. Client should not
-		// send anything.
-		websocket.JSON.Receive(ws, &unused)
-		close(done)
-	}()
-	for {
-		select {
-		case <-done:
-			w.watching.Stop()
-			return
-		case event, ok := <-w.watching.ResultChan():
-			if !ok {
-				// End of results.
-				return
-			}
-			w.fixup(event.Object)
-			obj, err := watchjson.Object(w.encoder, &event)
-			if err != nil {
-				// Client disconnect.
-				w.watching.Stop()
-				return
-			}
-			if err := websocket.JSON.Send(ws, obj); err != nil {
-				// Client disconnect.
-				w.watching.Stop()
-				return
-			}
-		}
-	}
-}
-
-// ServeHTTP serves a series of JSON encoded events via straight HTTP with
-// Transfer-Encoding: chunked.
-func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	loggedW := httplog.LogOf(req, w)
+// Serve serves a series of encoded events via HTTP with Transfer-Encoding: chunked
+// or over a websocket connection.
+func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w = httplog.Unlogged(w)
-	timeoutCh, cleanup := self.t.TimeoutCh()
-	defer cleanup()
-	defer self.watching.Stop()
+
+	if wsstream.IsWebSocketRequest(req) {
+		w.Header().Set("Content-Type", s.mediaType)
+		websocket.Handler(s.HandleWS).ServeHTTP(w, req)
+		return
+	}
 
 	cn, ok := w.(http.CloseNotifier)
 	if !ok {
-		loggedW.Addf("unable to get CloseNotifier: %#v", w)
-		http.NotFound(w, req)
+		err := fmt.Errorf("unable to start watch - can't get http.CloseNotifier: %#v", w)
+		utilruntime.HandleError(err)
+		s.scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		loggedW.Addf("unable to get Flusher: %#v", w)
-		http.NotFound(w, req)
+		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
+		utilruntime.HandleError(err)
+		s.scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
+
+	// get a framed encoder
+	f, ok := s.encoder.(streaming.Framer)
+	if !ok {
+		// programmer error
+		err := fmt.Errorf("no streaming support is available for media type %q", s.mediaType)
+		utilruntime.HandleError(err)
+		s.scope.err(errors.NewBadRequest(err.Error()), w, req)
+		return
+	}
+	framer := f.NewFrameWriter(w)
+	if framer == nil {
+		// programmer error
+		err := fmt.Errorf("no stream framing support is available for media type %q", s.mediaType)
+		utilruntime.HandleError(err)
+		s.scope.err(errors.NewBadRequest(err.Error()), w, req)
+		return
+	}
+	e := streaming.NewEncoder(framer, s.encoder)
+
+	// ensure the connection times out
+	timeoutCh, cleanup := s.t.TimeoutCh()
+	defer cleanup()
+	defer s.watching.Stop()
+
+	// begin the stream
+	w.Header().Set("Content-Type", s.mediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
-	// TODO: use arbitrary serialization on watch
-	encoder := watchjson.NewEncoder(w, self.encoder)
+
+	buf := &bytes.Buffer{}
 	for {
 		select {
 		case <-cn.CloseNotify():
 			return
 		case <-timeoutCh:
 			return
-		case event, ok := <-self.watching.ResultChan():
+		case event, ok := <-s.watching.ResultChan():
 			if !ok {
 				// End of results.
 				return
 			}
-			self.fixup(event.Object)
-			if err := encoder.Encode(&event); err != nil {
-				// Client disconnect.
+			obj := event.Object
+			s.fixup(obj)
+			if err := s.embeddedEncoder.EncodeToStream(obj, buf); err != nil {
+				// unexpected error
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
+				return
+			}
+			event.Object = &runtime.Unknown{
+				Raw: buf.Bytes(),
+				// ContentType is not required here because we are defaulting to the serializer
+				// type
+			}
+			if err := e.Encode((*versioned.InternalEvent)(&event)); err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
+				// client disconnect.
 				return
 			}
 			flusher.Flush()
+
+			buf.Reset()
+		}
+	}
+}
+
+// HandleWS implements a websocket handler.
+func (s *WatchServer) HandleWS(ws *websocket.Conn) {
+	defer ws.Close()
+	done := make(chan struct{})
+	go wsstream.IgnoreReceives(ws, 0)
+	buf := &bytes.Buffer{}
+	streamBuf := &bytes.Buffer{}
+	for {
+		select {
+		case <-done:
+			s.watching.Stop()
+			return
+		case event, ok := <-s.watching.ResultChan():
+			if !ok {
+				// End of results.
+				return
+			}
+			obj := event.Object
+			s.fixup(obj)
+			if err := s.embeddedEncoder.EncodeToStream(obj, buf); err != nil {
+				// unexpected error
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
+				return
+			}
+			event.Object = &runtime.Unknown{
+				Raw: buf.Bytes(),
+				// ContentType is not required here because we are defaulting to the serializer
+				// type
+			}
+			// the internal event will be versioned by the encoder
+			internalEvent := versioned.InternalEvent(event)
+			if err := s.encoder.EncodeToStream(&internalEvent, streamBuf); err != nil {
+				// encoding error
+				utilruntime.HandleError(fmt.Errorf("unable to encode event: %v", err))
+				s.watching.Stop()
+				return
+			}
+			if s.useTextFraming {
+				if err := websocket.Message.Send(ws, streamBuf.String()); err != nil {
+					// Client disconnect.
+					s.watching.Stop()
+					return
+				}
+			} else {
+				if err := websocket.Message.Send(ws, streamBuf.Bytes()); err != nil {
+					// Client disconnect.
+					s.watching.Stop()
+					return
+				}
+			}
+			buf.Reset()
+			streamBuf.Reset()
 		}
 	}
 }

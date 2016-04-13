@@ -82,7 +82,7 @@ func (r *Reader) handle(ws *websocket.Conn) {
 	encode := len(ws.Config().Protocol) > 0 && ws.Config().Protocol[0] == base64BinaryWebSocketProtocol
 	defer close(r.err)
 	defer ws.Close()
-	go ignoreReceives(ws, r.timeout)
+	go IgnoreReceives(ws, r.timeout)
 	r.err <- messageCopy(ws, r.r, encode, r.ping, r.timeout)
 }
 

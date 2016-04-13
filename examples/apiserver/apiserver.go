@@ -86,8 +86,9 @@ func Run() error {
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			groupVersion.Version: restStorageMap,
 		},
-		Scheme:               api.Scheme,
-		NegotiatedSerializer: api.Codecs,
+		Scheme:                     api.Scheme,
+		NegotiatedSerializer:       api.Codecs,
+		NegotiatedStreamSerializer: api.StreamCodecs,
 	}
 	if err := s.InstallAPIGroups([]genericapiserver.APIGroupInfo{apiGroupInfo}); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
