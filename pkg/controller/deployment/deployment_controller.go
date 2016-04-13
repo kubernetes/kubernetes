@@ -40,6 +40,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/integer"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 	rsutil "k8s.io/kubernetes/pkg/util/replicaset"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -97,6 +98,9 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: client.Core().Events("")})
 
+	if client != nil && client.Core().GetRESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.Core().GetRESTClient().GetRateLimiter())
+	}
 	dc := &DeploymentController{
 		client:        client,
 		eventRecorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "deployment-controller"}),

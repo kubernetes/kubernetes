@@ -150,8 +150,10 @@ func New(config Config) *Executor {
 		nodeInfos:         config.NodeInfos,
 		initCompleted:     make(chan struct{}),
 		registry:          config.Registry,
-		kubeAPI:           &clientAPIWrapper{config.APIClient},
-		nodeAPI:           &clientAPIWrapper{config.APIClient},
+	}
+	if config.APIClient != nil {
+		k.kubeAPI = &clientAPIWrapper{config.APIClient.Core()}
+		k.nodeAPI = &clientAPIWrapper{config.APIClient.Core()}
 	}
 
 	// apply functional options

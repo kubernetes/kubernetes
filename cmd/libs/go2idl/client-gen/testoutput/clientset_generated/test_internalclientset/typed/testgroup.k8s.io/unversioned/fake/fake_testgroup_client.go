@@ -18,6 +18,7 @@ package fake
 
 import (
 	unversioned "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -27,4 +28,10 @@ type FakeTestgroup struct {
 
 func (c *FakeTestgroup) TestTypes(namespace string) unversioned.TestTypeInterface {
 	return &FakeTestTypes{c, namespace}
+}
+
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *FakeTestgroup) GetRESTClient() *restclient.RESTClient {
+	return nil
 }
