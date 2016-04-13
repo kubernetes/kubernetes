@@ -208,6 +208,38 @@ func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (c
 	return
 }
 
+// UnversionedGetPodControllers is a unversioned duplication of
+// GetPodControllers. It will be removed after we migrate scheduler to use
+// clientset.
+func (s *StoreToReplicationControllerLister) UnversionedGetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+	var selector labels.Selector
+	var rc api.ReplicationController
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		rc = *m.(*api.ReplicationController)
+		if rc.Namespace != pod.Namespace {
+			continue
+		}
+		labelSet := labels.Set(rc.Spec.Selector)
+		selector = labels.Set(rc.Spec.Selector).AsSelector()
+
+		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		controllers = append(controllers, rc)
+	}
+	if len(controllers) == 0 {
+		err = fmt.Errorf("could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
 // GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
 func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (controllers []v1.ReplicationController, err error) {
 	var selector labels.Selector
