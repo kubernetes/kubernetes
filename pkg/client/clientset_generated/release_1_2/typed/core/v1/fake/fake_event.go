@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -30,9 +31,11 @@ type FakeEvents struct {
 	ns   string
 }
 
+var eventsResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}
+
 func (c *FakeEvents) Create(event *v1.Event) (result *v1.Event, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("events", c.ns, event), &v1.Event{})
+		Invokes(core.NewCreateAction(eventsResource, c.ns, event), &v1.Event{})
 
 	if obj == nil {
 		return nil, err
@@ -42,7 +45,7 @@ func (c *FakeEvents) Create(event *v1.Event) (result *v1.Event, err error) {
 
 func (c *FakeEvents) Update(event *v1.Event) (result *v1.Event, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("events", c.ns, event), &v1.Event{})
+		Invokes(core.NewUpdateAction(eventsResource, c.ns, event), &v1.Event{})
 
 	if obj == nil {
 		return nil, err
@@ -52,13 +55,13 @@ func (c *FakeEvents) Update(event *v1.Event) (result *v1.Event, err error) {
 
 func (c *FakeEvents) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("events", c.ns, name), &v1.Event{})
+		Invokes(core.NewDeleteAction(eventsResource, c.ns, name), &v1.Event{})
 
 	return err
 }
 
 func (c *FakeEvents) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("events", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(eventsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.EventList{})
 	return err
@@ -66,7 +69,7 @@ func (c *FakeEvents) DeleteCollection(options *api.DeleteOptions, listOptions ap
 
 func (c *FakeEvents) Get(name string) (result *v1.Event, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("events", c.ns, name), &v1.Event{})
+		Invokes(core.NewGetAction(eventsResource, c.ns, name), &v1.Event{})
 
 	if obj == nil {
 		return nil, err
@@ -76,7 +79,7 @@ func (c *FakeEvents) Get(name string) (result *v1.Event, err error) {
 
 func (c *FakeEvents) List(opts api.ListOptions) (result *v1.EventList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("events", c.ns, opts), &v1.EventList{})
+		Invokes(core.NewListAction(eventsResource, c.ns, opts), &v1.EventList{})
 
 	if obj == nil {
 		return nil, err
@@ -98,6 +101,6 @@ func (c *FakeEvents) List(opts api.ListOptions) (result *v1.EventList, err error
 // Watch returns a watch.Interface that watches the requested events.
 func (c *FakeEvents) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("events", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(eventsResource, c.ns, opts))
 
 }

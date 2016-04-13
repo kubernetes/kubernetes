@@ -24,7 +24,7 @@ import (
 func (c *FakeNamespaces) Finalize(namespace *v1.Namespace) (*v1.Namespace, error) {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
-	action.Resource = "namespaces"
+	action.Resource = namespacesResource
 	action.Subresource = "finalize"
 	action.Object = namespace
 

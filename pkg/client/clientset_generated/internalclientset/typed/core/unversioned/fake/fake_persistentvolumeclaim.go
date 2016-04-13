@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -29,9 +30,11 @@ type FakePersistentVolumeClaims struct {
 	ns   string
 }
 
+var persistentvolumeclaimsResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "persistentvolumeclaims"}
+
 func (c *FakePersistentVolumeClaims) Create(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("persistentvolumeclaims", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
+		Invokes(core.NewCreateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
@@ -41,7 +44,7 @@ func (c *FakePersistentVolumeClaims) Create(persistentVolumeClaim *api.Persisten
 
 func (c *FakePersistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("persistentvolumeclaims", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
+		Invokes(core.NewUpdateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
@@ -51,7 +54,7 @@ func (c *FakePersistentVolumeClaims) Update(persistentVolumeClaim *api.Persisten
 
 func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("persistentvolumeclaims", "status", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
+		Invokes(core.NewUpdateSubresourceAction(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
@@ -61,13 +64,13 @@ func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.Per
 
 func (c *FakePersistentVolumeClaims) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("persistentvolumeclaims", c.ns, name), &api.PersistentVolumeClaim{})
+		Invokes(core.NewDeleteAction(persistentvolumeclaimsResource, c.ns, name), &api.PersistentVolumeClaim{})
 
 	return err
 }
 
 func (c *FakePersistentVolumeClaims) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("persistentvolumeclaims", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(persistentvolumeclaimsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.PersistentVolumeClaimList{})
 	return err
@@ -75,7 +78,7 @@ func (c *FakePersistentVolumeClaims) DeleteCollection(options *api.DeleteOptions
 
 func (c *FakePersistentVolumeClaims) Get(name string) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("persistentvolumeclaims", c.ns, name), &api.PersistentVolumeClaim{})
+		Invokes(core.NewGetAction(persistentvolumeclaimsResource, c.ns, name), &api.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
@@ -85,7 +88,7 @@ func (c *FakePersistentVolumeClaims) Get(name string) (result *api.PersistentVol
 
 func (c *FakePersistentVolumeClaims) List(opts api.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("persistentvolumeclaims", c.ns, opts), &api.PersistentVolumeClaimList{})
+		Invokes(core.NewListAction(persistentvolumeclaimsResource, c.ns, opts), &api.PersistentVolumeClaimList{})
 
 	if obj == nil {
 		return nil, err
@@ -107,6 +110,6 @@ func (c *FakePersistentVolumeClaims) List(opts api.ListOptions) (result *api.Per
 // Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
 func (c *FakePersistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("persistentvolumeclaims", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(persistentvolumeclaimsResource, c.ns, opts))
 
 }

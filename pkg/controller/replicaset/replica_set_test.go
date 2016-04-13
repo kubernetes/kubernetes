@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -626,19 +625,19 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	updateReplicaCount(fakeRSClient, *rs, numReplicas, 0)
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
-		if a.GetResource() != "replicasets" {
+		if a.GetResource().Resource != "replicasets" {
 			t.Errorf("Unexpected action %+v", a)
 			continue
 		}
 
 		switch action := a.(type) {
-		case testclient.GetAction:
+		case core.GetAction:
 			gets++
 			// Make sure the get is for the right ReplicaSet even though the update failed.
 			if action.GetName() != rs.Name {
 				t.Errorf("Expected get for ReplicaSet %v, got %+v instead", rs.Name, action.GetName())
 			}
-		case testclient.UpdateAction:
+		case core.UpdateAction:
 			updates++
 			// Confirm that the update has the right status.Replicas even though the Get
 			// returned a ReplicaSet with replicas=1.

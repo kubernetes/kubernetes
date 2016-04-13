@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	v1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2/typed/core/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
-	v1 "k8s.io/kubernetes/pkg/client/typed/generated/core/v1"
 )
 
 type FakeCore struct {
