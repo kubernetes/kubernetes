@@ -542,7 +542,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 
 	// TODO: Do this in a single pass, or use an index.
-	filteredPods := controller.V1FilterActivePods(podList.Items)
+	filteredPods := controller.FilterActivePods(podList.Items)
 	if rsNeedsSync {
 		rsc.manageReplicas(filteredPods, &rs)
 	}
