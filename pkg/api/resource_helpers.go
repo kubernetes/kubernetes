@@ -41,6 +41,14 @@ func (self *ResourceList) Memory() *resource.Quantity {
 	return &resource.Quantity{}
 }
 
+// Returns the NvidiaGPU number.
+func (self *ResourceList) NvidiaGPU() *resource.Quantity {
+	if val, ok := (*self)[ResourceNvidiaGPU]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}
+
 func (self *ResourceList) Pods() *resource.Quantity {
 	if val, ok := (*self)[ResourcePods]; ok {
 		return &val
