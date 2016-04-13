@@ -39,24 +39,24 @@ import (
 
 var alwaysReady = func() bool { return true }
 
-func newJob(parallelism, completions int) *v1beta1.Job {
+func newJob(parallelism, completions int32) *v1beta1.Job {
 	j := &v1beta1.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "foobar",
-			Namespace: api.NamespaceDefault,
+			Namespace: v1.NamespaceDefault,
 		},
 		Spec: v1beta1.JobSpec{
-			Selector: &unversioned.LabelSelector{
+			Selector: &v1beta1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
 				},
 				Spec: v1.PodSpec{
-					Containers: []api.Container{
+					Containers: []v1.Container{
 						{Image: "foo/bar"},
 					},
 				},
@@ -92,7 +92,7 @@ func newPodList(count int, status v1.PodPhase, job *v1beta1.Job) []v1.Pod {
 	pods := []v1.Pod{}
 	for i := 0; i < count; i++ {
 		newPod := v1.Pod{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: v1.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%v", rand.String(10)),
 				Labels:    job.Spec.Selector.MatchLabels,
 				Namespace: job.Namespace,
@@ -107,21 +107,21 @@ func newPodList(count int, status v1.PodPhase, job *v1beta1.Job) []v1.Pod {
 func TestControllerSyncJob(t *testing.T) {
 	testCases := map[string]struct {
 		// job setup
-		parallelism int
-		completions int
+		parallelism int32
+		completions int32
 
 		// pod setup
 		podControllerError error
-		activePods         int
-		succeededPods      int
-		failedPods         int
+		activePods         int32
+		succeededPods      int32
+		failedPods         int32
 
 		// expectations
 		expectedCreations int
 		expectedDeletions int
-		expectedActive    int
-		expectedSucceeded int
-		expectedFailed    int
+		expectedActive    int32
+		expectedSucceeded int32
+		expectedFailed    int32
 		expectedComplete  bool
 	}{
 		"job start": {
@@ -222,13 +222,13 @@ func TestControllerSyncJob(t *testing.T) {
 		// job & pods setup
 		job := newJob(tc.parallelism, tc.completions)
 		manager.jobStore.Store.Add(job)
-		for _, pod := range newPodList(tc.activePods, v1.PodRunning, job) {
+		for _, pod := range newPodList(int(tc.activePods), v1.PodRunning, job) {
 			manager.podStore.Store.Add(&pod)
 		}
-		for _, pod := range newPodList(tc.succeededPods, v1.PodSucceeded, job) {
+		for _, pod := range newPodList(int(tc.succeededPods), v1.PodSucceeded, job) {
 			manager.podStore.Store.Add(&pod)
 		}
-		for _, pod := range newPodList(tc.failedPods, v1.PodFailed, job) {
+		for _, pod := range newPodList(int(tc.failedPods), v1.PodFailed, job) {
 			manager.podStore.Store.Add(&pod)
 		}
 
@@ -268,8 +268,8 @@ func TestControllerSyncJob(t *testing.T) {
 func TestSyncJobPastDeadline(t *testing.T) {
 	testCases := map[string]struct {
 		// job setup
-		parallelism           int
-		completions           int
+		parallelism           int32
+		completions           int32
 		activeDeadlineSeconds int64
 		startTime             int64
 
@@ -280,9 +280,9 @@ func TestSyncJobPastDeadline(t *testing.T) {
 
 		// expectations
 		expectedDeletions int
-		expectedActive    int
-		expectedSucceeded int
-		expectedFailed    int
+		expectedActive    int32
+		expectedSucceeded int32
+		expectedFailed    int32
 	}{
 		"activeDeadlineSeconds less than single pod execution": {
 			1, 1, 10, 15,
@@ -365,7 +365,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 
 func getCondition(job *v1beta1.Job, condition v1beta1.JobConditionType) bool {
 	for _, v := range job.Status.Conditions {
-		if v.Type == condition && v.Status == api.ConditionTrue {
+		if v.Type == condition && v.Status == v1.ConditionTrue {
 			return true
 		}
 	}
@@ -485,25 +485,25 @@ func TestJobPodLookup(t *testing.T) {
 		// pods without labels don't match any job
 		{
 			job: &v1beta1.Job{
-				ObjectMeta: api.ObjectMeta{Name: "basic"},
+				ObjectMeta: v1.ObjectMeta{Name: "basic"},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo1", Namespace: api.NamespaceAll},
+				ObjectMeta: v1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll},
 			},
 			expectedName: "",
 		},
 		// matching labels, different namespace
 		{
 			job: &v1beta1.Job{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: v1.ObjectMeta{Name: "foo"},
 				Spec: v1beta1.JobSpec{
-					Selector: &unversioned.LabelSelector{
+					Selector: &v1beta1.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar"},
 					},
 				},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "foo2",
 					Namespace: "ns",
 					Labels:    map[string]string{"foo": "bar"},
@@ -514,13 +514,13 @@ func TestJobPodLookup(t *testing.T) {
 		// matching ns and labels returns
 		{
 			job: &v1beta1.Job{
-				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
+				ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
 				Spec: v1beta1.JobSpec{
-					Selector: &unversioned.LabelSelector{
-						MatchExpressions: []unversioned.LabelSelectorRequirement{
+					Selector: &v1beta1.LabelSelector{
+						MatchExpressions: []v1beta1.LabelSelectorRequirement{
 							{
 								Key:      "foo",
-								Operator: unversioned.LabelSelectorOpIn,
+								Operator: v1beta1.LabelSelectorOpIn,
 								Values:   []string{"bar"},
 							},
 						},
@@ -528,7 +528,7 @@ func TestJobPodLookup(t *testing.T) {
 				},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "foo3",
 					Namespace: "ns",
 					Labels:    map[string]string{"foo": "bar"},
@@ -641,7 +641,7 @@ func TestIsJobFinished(t *testing.T) {
 		Status: v1beta1.JobStatus{
 			Conditions: []v1beta1.JobCondition{{
 				Type:   v1beta1.JobComplete,
-				Status: api.ConditionTrue,
+				Status: v1.ConditionTrue,
 			}},
 		},
 	}
@@ -650,12 +650,12 @@ func TestIsJobFinished(t *testing.T) {
 		t.Error("Job was expected to be finished")
 	}
 
-	job.Status.Conditions[0].Status = api.ConditionFalse
+	job.Status.Conditions[0].Status = v1.ConditionFalse
 	if isJobFinished(job) {
 		t.Error("Job was not expected to be finished")
 	}
 
-	job.Status.Conditions[0].Status = api.ConditionUnknown
+	job.Status.Conditions[0].Status = v1.ConditionUnknown
 	if isJobFinished(job) {
 		t.Error("Job was not expected to be finished")
 	}
