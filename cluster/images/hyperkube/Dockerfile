@@ -50,6 +50,9 @@ COPY safe_format_and_mount /usr/share/google/safe_format_and_mount
 COPY setup-files.sh /setup-files.sh
 COPY make-ca-cert.sh /make-ca-cert.sh
 
+# easy-rsa package required by make-ca-cert
+ADD https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz /root/kube/
+
 # Make scripts executable
 RUN chmod a+rx \
         /hyperkube \
