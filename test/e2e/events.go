@@ -26,17 +26,18 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = KubeDescribe("Events", func() {
-	framework := NewDefaultFramework("events")
+var _ = framework.KubeDescribe("Events", func() {
+	f := framework.NewDefaultFramework("events")
 
 	It("should be sent by kubelets and the scheduler about pods scheduling and running [Conformance]", func() {
 
-		podClient := framework.Client.Pods(framework.Namespace.Name)
+		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
 		name := "send-events-" + string(util.NewUUID())
@@ -66,10 +67,10 @@ var _ = KubeDescribe("Events", func() {
 			podClient.Delete(pod.Name, nil)
 		}()
 		if _, err := podClient.Create(pod); err != nil {
-			Failf("Failed to create pod: %v", err)
+			framework.Failf("Failed to create pod: %v", err)
 		}
 
-		expectNoError(framework.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
@@ -80,21 +81,21 @@ var _ = KubeDescribe("Events", func() {
 		By("retrieving the pod")
 		podWithUid, err := podClient.Get(pod.Name)
 		if err != nil {
-			Failf("Failed to get pod: %v", err)
+			framework.Failf("Failed to get pod: %v", err)
 		}
 		fmt.Printf("%+v\n", podWithUid)
 		var events *api.EventList
 		// Check for scheduler event about the pod.
 		By("checking for scheduler event about the pod")
-		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.kind":      "Pod",
 				"involvedObject.uid":       string(podWithUid.UID),
-				"involvedObject.namespace": framework.Namespace.Name,
+				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   api.DefaultSchedulerName,
 			}.AsSelector()
 			options := api.ListOptions{FieldSelector: selector}
-			events, err := framework.Client.Events(framework.Namespace.Name).List(options)
+			events, err := f.Client.Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
 			}
@@ -106,15 +107,15 @@ var _ = KubeDescribe("Events", func() {
 		}))
 		// Check for kubelet event about the pod.
 		By("checking for kubelet event about the pod")
-		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.uid":       string(podWithUid.UID),
 				"involvedObject.kind":      "Pod",
-				"involvedObject.namespace": framework.Namespace.Name,
+				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   "kubelet",
 			}.AsSelector()
 			options := api.ListOptions{FieldSelector: selector}
-			events, err = framework.Client.Events(framework.Namespace.Name).List(options)
+			events, err = f.Client.Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
 			}

@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -34,15 +35,15 @@ const (
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
 //
-var _ = KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)", func() {
+var _ = framework.KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)", func() {
 	var rc *ResourceConsumer
-	f := NewDefaultFramework("horizontal-pod-autoscaling")
+	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
 	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5 and verify decision stability"
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability"
 
 	// These tests take ~20 minutes each.
-	KubeDescribe("[Serial] [Slow] Deployment", func() {
+	framework.KubeDescribe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
 		It(titleUp, func() {
 			scaleUp("test-deployment", kindDeployment, rc, f)
@@ -53,7 +54,7 @@ var _ = KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)", func() 
 	})
 
 	// These tests take ~20 minutes each.
-	KubeDescribe("[Serial] [Slow] ReplicaSet", func() {
+	framework.KubeDescribe("[Serial] [Slow] ReplicaSet", func() {
 		// CPU tests via deployments
 		It(titleUp, func() {
 			scaleUp("rs", kindReplicaSet, rc, f)
@@ -63,7 +64,7 @@ var _ = KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)", func() 
 		})
 	})
 	// These tests take ~20 minutes each.
-	KubeDescribe("[Serial] [Slow] ReplicationController", func() {
+	framework.KubeDescribe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
 		It(titleUp, func() {
 			scaleUp("rc", kindRC, rc, f)
@@ -73,7 +74,7 @@ var _ = KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)", func() 
 		})
 	})
 
-	KubeDescribe("ReplicationController light", func() {
+	framework.KubeDescribe("ReplicationController light", func() {
 		It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
@@ -123,7 +124,7 @@ type HPAScaleTest struct {
 // The first state change is due to the CPU being consumed initially, which HPA responds to by changing pod counts.
 // The second state change (optional) is due to the CPU burst parameter, which HPA again responds to.
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
-func (scaleTest *HPAScaleTest) run(name, kind string, rc *ResourceConsumer, f *Framework) {
+func (scaleTest *HPAScaleTest) run(name, kind string, rc *ResourceConsumer, f *framework.Framework) {
 	rc = NewDynamicResourceConsumer(name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 100, f)
 	defer rc.CleanUp()
 	createCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods, scaleTest.useV1)
@@ -137,7 +138,7 @@ func (scaleTest *HPAScaleTest) run(name, kind string, rc *ResourceConsumer, f *F
 	}
 }
 
-func scaleUp(name, kind string, rc *ResourceConsumer, f *Framework) {
+func scaleUp(name, kind string, rc *ResourceConsumer, f *framework.Framework) {
 	scaleTest := &HPAScaleTest{
 		initPods:                    1,
 		totalInitialCPUUsage:        250,
@@ -153,7 +154,7 @@ func scaleUp(name, kind string, rc *ResourceConsumer, f *Framework) {
 	scaleTest.run(name, kind, rc, f)
 }
 
-func scaleDown(name, kind string, rc *ResourceConsumer, f *Framework) {
+func scaleDown(name, kind string, rc *ResourceConsumer, f *framework.Framework) {
 	scaleTest := &HPAScaleTest{
 		initPods:                    5,
 		totalInitialCPUUsage:        400,
@@ -192,5 +193,5 @@ func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 	} else {
 		_, errHPA = rc.framework.Client.Extensions().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
 	}
-	expectNoError(errHPA)
+	framework.ExpectNoError(errHPA)
 }

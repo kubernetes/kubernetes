@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -36,7 +37,7 @@ const (
 	// restart all nodes will be this number times the number of nodes.)
 	restartPerNodeTimeout = 5 * time.Minute
 
-	// How often to poll the statues of a restart.
+	// How often to framework.Poll the statues of a restart.
 	restartPoll = 20 * time.Second
 
 	// How long a node is allowed to become "Ready" after it is restarted before
@@ -48,16 +49,16 @@ const (
 	restartPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = KubeDescribe("Restart [Disruptive]", func() {
-	f := NewDefaultFramework("restart")
-	var ps *podStore
+var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
+	f := framework.NewDefaultFramework("restart")
+	var ps *framework.PodStore
 
 	BeforeEach(func() {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
-		SkipUnlessProviderIs("gce", "gke")
+		framework.SkipUnlessProviderIs("gce", "gke")
 
-		ps = newPodStore(f.Client, api.NamespaceSystem, labels.Everything(), fields.Everything())
+		ps = framework.NewPodStore(f.Client, api.NamespaceSystem, labels.Everything(), fields.Everything())
 	})
 
 	AfterEach(func() {
@@ -67,12 +68,12 @@ var _ = KubeDescribe("Restart [Disruptive]", func() {
 	})
 
 	It("should restart all nodes and ensure all nodes and pods recover", func() {
-		nn := testContext.CloudConfig.NumNodes
+		nn := framework.TestContext.CloudConfig.NumNodes
 
 		By("ensuring all nodes are ready")
-		nodeNamesBefore, err := checkNodesReady(f.Client, nodeReadyInitialTimeout, nn)
+		nodeNamesBefore, err := checkNodesReady(f.Client, framework.NodeReadyInitialTimeout, nn)
 		Expect(err).NotTo(HaveOccurred())
-		Logf("Got the following nodes before restart: %v", nodeNamesBefore)
+		framework.Logf("Got the following nodes before restart: %v", nodeNamesBefore)
 
 		By("ensuring all pods are running and ready")
 		pods := ps.List()
@@ -81,24 +82,24 @@ var _ = KubeDescribe("Restart [Disruptive]", func() {
 			podNamesBefore[i] = p.ObjectMeta.Name
 		}
 		ns := api.NamespaceSystem
-		if !checkPodsRunningReady(f.Client, ns, podNamesBefore, podReadyBeforeTimeout) {
-			Failf("At least one pod wasn't running and ready at test start.")
+		if !framework.CheckPodsRunningReady(f.Client, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
+			framework.Failf("At least one pod wasn't running and ready at test start.")
 		}
 
 		By("restarting all of the nodes")
-		err = restartNodes(testContext.Provider, restartPerNodeTimeout)
+		err = restartNodes(framework.TestContext.Provider, restartPerNodeTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("ensuring all nodes are ready after the restart")
 		nodeNamesAfter, err := checkNodesReady(f.Client, restartNodeReadyAgainTimeout, nn)
 		Expect(err).NotTo(HaveOccurred())
-		Logf("Got the following nodes after restart: %v", nodeNamesAfter)
+		framework.Logf("Got the following nodes after restart: %v", nodeNamesAfter)
 
 		// Make sure that we have the same number of nodes. We're not checking
 		// that the names match because that's implementation specific.
 		By("ensuring the same number of nodes exist after the restart")
 		if len(nodeNamesBefore) != len(nodeNamesAfter) {
-			Failf("Had %d nodes before nodes were restarted, but now only have %d",
+			framework.Failf("Had %d nodes before nodes were restarted, but now only have %d",
 				len(nodeNamesBefore), len(nodeNamesAfter))
 		}
 
@@ -110,23 +111,23 @@ var _ = KubeDescribe("Restart [Disruptive]", func() {
 		podNamesAfter, err := waitForNPods(ps, len(podNamesBefore), restartPodReadyAgainTimeout)
 		Expect(err).NotTo(HaveOccurred())
 		remaining := restartPodReadyAgainTimeout - time.Since(podCheckStart)
-		if !checkPodsRunningReady(f.Client, ns, podNamesAfter, remaining) {
-			Failf("At least one pod wasn't running and ready after the restart.")
+		if !framework.CheckPodsRunningReady(f.Client, ns, podNamesAfter, remaining) {
+			framework.Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})
 })
 
 // waitForNPods tries to list pods using c until it finds expect of them,
 // returning their names if it can do so before timeout.
-func waitForNPods(ps *podStore, expect int, timeout time.Duration) ([]string, error) {
+func waitForNPods(ps *framework.PodStore, expect int, timeout time.Duration) ([]string, error) {
 	// Loop until we find expect pods or timeout is passed.
 	var pods []*api.Pod
 	var errLast error
-	found := wait.Poll(poll, timeout, func() (bool, error) {
+	found := wait.Poll(framework.Poll, timeout, func() (bool, error) {
 		pods = ps.List()
 		if len(pods) != expect {
 			errLast = fmt.Errorf("expected to find %d pods but found only %d", expect, len(pods))
-			Logf("Error getting pods: %v", errLast)
+			framework.Logf("Error getting pods: %v", errLast)
 			return false, nil
 		}
 		return true, nil
@@ -151,7 +152,7 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 	var nodeList *api.NodeList
 	var errLast error
 	start := time.Now()
-	found := wait.Poll(poll, nt, func() (bool, error) {
+	found := wait.Poll(framework.Poll, nt, func() (bool, error) {
 		// A rolling-update (GCE/GKE implementation of restart) can complete before the apiserver
 		// knows about all of the nodes. Thus, we retry the list nodes call
 		// until we get the expected number of nodes.
@@ -163,7 +164,7 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 		if len(nodeList.Items) != expect {
 			errLast = fmt.Errorf("expected to find %d nodes but found only %d (%v elapsed)",
 				expect, len(nodeList.Items), time.Since(start))
-			Logf("%v", errLast)
+			framework.Logf("%v", errLast)
 			return false, nil
 		}
 		return true, nil
@@ -176,7 +177,7 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 		return nodeNames, fmt.Errorf("couldn't find %d nodes within %v; last error: %v",
 			expect, nt, errLast)
 	}
-	Logf("Successfully found %d nodes", expect)
+	framework.Logf("Successfully found %d nodes", expect)
 
 	// Next, ensure in parallel that all the nodes are ready. We subtract the
 	// time we spent waiting above.
@@ -184,7 +185,7 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 	result := make(chan bool, len(nodeList.Items))
 	for _, n := range nodeNames {
 		n := n
-		go func() { result <- waitForNodeToBeReady(c, n, timeout) }()
+		go func() { result <- framework.WaitForNodeToBeReady(c, n, timeout) }()
 	}
 	failed := false
 	// TODO(mbforbes): Change to `for range` syntax once we support only Go

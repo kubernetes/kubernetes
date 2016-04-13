@@ -38,6 +38,7 @@ import (
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -45,19 +46,19 @@ const (
 	gcePDDetachPollTime = 10 * time.Second
 )
 
-var _ = KubeDescribe("Pod Disks", func() {
+var _ = framework.KubeDescribe("Pod Disks", func() {
 	var (
 		podClient client.PodInterface
 		host0Name string
 		host1Name string
 	)
-	framework := NewDefaultFramework("pod-disks")
+	f := framework.NewDefaultFramework("pod-disks")
 
 	BeforeEach(func() {
-		SkipUnlessNodeCountIsAtLeast(2)
+		framework.SkipUnlessNodeCountIsAtLeast(2)
 
-		podClient = framework.Client.Pods(framework.Namespace.Name)
-		nodes := ListSchedulableNodesOrDie(framework.Client)
+		podClient = f.Client.Pods(f.Namespace.Name)
+		nodes := framework.ListSchedulableNodesOrDie(f.Client)
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
 
@@ -68,11 +69,11 @@ var _ = KubeDescribe("Pod Disks", func() {
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host [Slow]", func() {
-		SkipUnlessProviderIs("gce", "gke", "aws")
+		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
 		diskName, err := createPDWithRetry()
-		expectNoError(err, "Error creating PD")
+		framework.ExpectNoError(err, "Error creating PD")
 
 		host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
 		host1Pod := testPDPod([]string{diskName}, host1Name, false /* readOnly */, 1 /* numContainers */)
@@ -89,43 +90,43 @@ var _ = KubeDescribe("Pod Disks", func() {
 
 		By("submitting host0Pod to kubernetes")
 		_, err = podClient.Create(host0Pod)
-		expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
-		expectNoError(framework.WaitForPodRunningSlow(host0Pod.Name))
+		framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
 		testFile := "/testpd1/tracker"
 		testFileContents := fmt.Sprintf("%v", mathrand.Int())
 
-		expectNoError(framework.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-		Logf("Wrote value: %v", testFileContents)
+		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+		framework.Logf("Wrote value: %v", testFileContents)
 
 		By("deleting host0Pod")
-		expectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
+		framework.ExpectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 
 		By("submitting host1Pod to kubernetes")
 		_, err = podClient.Create(host1Pod)
-		expectNoError(err, "Failed to create host1Pod")
+		framework.ExpectNoError(err, "Failed to create host1Pod")
 
-		expectNoError(framework.WaitForPodRunningSlow(host1Pod.Name))
+		framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
 
-		v, err := framework.ReadFileViaContainer(host1Pod.Name, containerName, testFile)
-		expectNoError(err)
-		Logf("Read value: %v", v)
+		v, err := f.ReadFileViaContainer(host1Pod.Name, containerName, testFile)
+		framework.ExpectNoError(err)
+		framework.Logf("Read value: %v", v)
 
 		Expect(strings.TrimSpace(v)).To(Equal(strings.TrimSpace(testFileContents)))
 
 		By("deleting host1Pod")
-		expectNoError(podClient.Delete(host1Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host1Pod")
+		framework.ExpectNoError(podClient.Delete(host1Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host1Pod")
 
 		return
 	})
 
 	It("should schedule a pod w/ a readonly PD on two hosts, then remove both. [Slow]", func() {
-		SkipUnlessProviderIs("gce", "gke")
+		framework.SkipUnlessProviderIs("gce", "gke")
 
 		By("creating PD")
 		diskName, err := createPDWithRetry()
-		expectNoError(err, "Error creating PD")
+		framework.ExpectNoError(err, "Error creating PD")
 
 		rwPod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
 		host0ROPod := testPDPod([]string{diskName}, host0Name, true /* readOnly */, 1 /* numContainers */)
@@ -143,36 +144,36 @@ var _ = KubeDescribe("Pod Disks", func() {
 
 		By("submitting rwPod to ensure PD is formatted")
 		_, err = podClient.Create(rwPod)
-		expectNoError(err, "Failed to create rwPod")
-		expectNoError(framework.WaitForPodRunningSlow(rwPod.Name))
-		expectNoError(podClient.Delete(rwPod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
-		expectNoError(waitForPDDetach(diskName, host0Name))
+		framework.ExpectNoError(err, "Failed to create rwPod")
+		framework.ExpectNoError(f.WaitForPodRunningSlow(rwPod.Name))
+		framework.ExpectNoError(podClient.Delete(rwPod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
+		framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
 
 		By("submitting host0ROPod to kubernetes")
 		_, err = podClient.Create(host0ROPod)
-		expectNoError(err, "Failed to create host0ROPod")
+		framework.ExpectNoError(err, "Failed to create host0ROPod")
 
 		By("submitting host1ROPod to kubernetes")
 		_, err = podClient.Create(host1ROPod)
-		expectNoError(err, "Failed to create host1ROPod")
+		framework.ExpectNoError(err, "Failed to create host1ROPod")
 
-		expectNoError(framework.WaitForPodRunningSlow(host0ROPod.Name))
+		framework.ExpectNoError(f.WaitForPodRunningSlow(host0ROPod.Name))
 
-		expectNoError(framework.WaitForPodRunningSlow(host1ROPod.Name))
+		framework.ExpectNoError(f.WaitForPodRunningSlow(host1ROPod.Name))
 
 		By("deleting host0ROPod")
-		expectNoError(podClient.Delete(host0ROPod.Name, api.NewDeleteOptions(0)), "Failed to delete host0ROPod")
+		framework.ExpectNoError(podClient.Delete(host0ROPod.Name, api.NewDeleteOptions(0)), "Failed to delete host0ROPod")
 
 		By("deleting host1ROPod")
-		expectNoError(podClient.Delete(host1ROPod.Name, api.NewDeleteOptions(0)), "Failed to delete host1ROPod")
+		framework.ExpectNoError(podClient.Delete(host1ROPod.Name, api.NewDeleteOptions(0)), "Failed to delete host1ROPod")
 	})
 
 	It("should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession [Slow]", func() {
-		SkipUnlessProviderIs("gce", "gke", "aws")
+		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
 		diskName, err := createPDWithRetry()
-		expectNoError(err, "Error creating PD")
+		framework.ExpectNoError(err, "Error creating PD")
 		numContainers := 4
 
 		host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, numContainers)
@@ -187,43 +188,43 @@ var _ = KubeDescribe("Pod Disks", func() {
 
 		fileAndContentToVerify := make(map[string]string)
 		for i := 0; i < 3; i++ {
-			Logf("PD Read/Writer Iteration #%v", i)
+			framework.Logf("PD Read/Writer Iteration #%v", i)
 			By("submitting host0Pod to kubernetes")
 			_, err = podClient.Create(host0Pod)
-			expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
+			framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
-			expectNoError(framework.WaitForPodRunningSlow(host0Pod.Name))
+			framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
 			// randomly select a container and read/verify pd contents from it
 			containerName := fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
-			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
+			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			// Randomly select a container to write a file to PD from
 			containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
 			testFile := fmt.Sprintf("/testpd1/tracker%v", i)
 			testFileContents := fmt.Sprintf("%v", mathrand.Int())
 			fileAndContentToVerify[testFile] = testFileContents
-			expectNoError(framework.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-			Logf("Wrote value: \"%v\" to PD %q from pod %q container %q", testFileContents, diskName, host0Pod.Name, containerName)
+			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+			framework.Logf("Wrote value: \"%v\" to PD %q from pod %q container %q", testFileContents, diskName, host0Pod.Name, containerName)
 
 			// Randomly select a container and read/verify pd contents from it
 			containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
-			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
+			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			By("deleting host0Pod")
-			expectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
+			framework.ExpectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 		}
 	})
 
 	It("should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession [Slow]", func() {
-		SkipUnlessProviderIs("gce", "gke", "aws")
+		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD1")
 		disk1Name, err := createPDWithRetry()
-		expectNoError(err, "Error creating PD1")
+		framework.ExpectNoError(err, "Error creating PD1")
 		By("creating PD2")
 		disk2Name, err := createPDWithRetry()
-		expectNoError(err, "Error creating PD2")
+		framework.ExpectNoError(err, "Error creating PD2")
 
 		host0Pod := testPDPod([]string{disk1Name, disk2Name}, host0Name, false /* readOnly */, 1 /* numContainers */)
 
@@ -239,15 +240,15 @@ var _ = KubeDescribe("Pod Disks", func() {
 		containerName := "mycontainer"
 		fileAndContentToVerify := make(map[string]string)
 		for i := 0; i < 3; i++ {
-			Logf("PD Read/Writer Iteration #%v", i)
+			framework.Logf("PD Read/Writer Iteration #%v", i)
 			By("submitting host0Pod to kubernetes")
 			_, err = podClient.Create(host0Pod)
-			expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
+			framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
-			expectNoError(framework.WaitForPodRunningSlow(host0Pod.Name))
+			framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
 			// Read/verify pd contents for both disks from container
-			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
+			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			// Write a file to both PDs from container
 			testFilePD1 := fmt.Sprintf("/testpd1/tracker%v", i)
@@ -256,16 +257,16 @@ var _ = KubeDescribe("Pod Disks", func() {
 			testFilePD2Contents := fmt.Sprintf("%v", mathrand.Int())
 			fileAndContentToVerify[testFilePD1] = testFilePD1Contents
 			fileAndContentToVerify[testFilePD2] = testFilePD2Contents
-			expectNoError(framework.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD1, testFilePD1Contents))
-			Logf("Wrote value: \"%v\" to PD1 (%q) from pod %q container %q", testFilePD1Contents, disk1Name, host0Pod.Name, containerName)
-			expectNoError(framework.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD2, testFilePD2Contents))
-			Logf("Wrote value: \"%v\" to PD2 (%q) from pod %q container %q", testFilePD2Contents, disk2Name, host0Pod.Name, containerName)
+			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD1, testFilePD1Contents))
+			framework.Logf("Wrote value: \"%v\" to PD1 (%q) from pod %q container %q", testFilePD1Contents, disk1Name, host0Pod.Name, containerName)
+			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD2, testFilePD2Contents))
+			framework.Logf("Wrote value: \"%v\" to PD2 (%q) from pod %q container %q", testFilePD2Contents, disk2Name, host0Pod.Name, containerName)
 
 			// Read/verify pd contents for both disks from container
-			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
+			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			By("deleting host0Pod")
-			expectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
+			framework.ExpectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 		}
 	})
 })
@@ -275,10 +276,10 @@ func createPDWithRetry() (string, error) {
 	var err error
 	for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
 		if newDiskName, err = createPD(); err != nil {
-			Logf("Couldn't create a new PD. Sleeping 5 seconds (%v)", err)
+			framework.Logf("Couldn't create a new PD. Sleeping 5 seconds (%v)", err)
 			continue
 		}
-		Logf("Successfully created a new PD: %q.", newDiskName)
+		framework.Logf("Successfully created a new PD: %q.", newDiskName)
 		break
 	}
 	return newDiskName, err
@@ -288,30 +289,30 @@ func deletePDWithRetry(diskName string) {
 	var err error
 	for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
 		if err = deletePD(diskName); err != nil {
-			Logf("Couldn't delete PD %q. Sleeping 5 seconds (%v)", diskName, err)
+			framework.Logf("Couldn't delete PD %q. Sleeping 5 seconds (%v)", diskName, err)
 			continue
 		}
-		Logf("Successfully deleted PD %q.", diskName)
+		framework.Logf("Successfully deleted PD %q.", diskName)
 		break
 	}
-	expectNoError(err, "Error deleting PD")
+	framework.ExpectNoError(err, "Error deleting PD")
 }
 
-func verifyPDContentsViaContainer(f *Framework, podName, containerName string, fileAndContentToVerify map[string]string) {
+func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName string, fileAndContentToVerify map[string]string) {
 	for filePath, expectedContents := range fileAndContentToVerify {
 		v, err := f.ReadFileViaContainer(podName, containerName, filePath)
 		if err != nil {
-			Logf("Error reading file: %v", err)
+			framework.Logf("Error reading file: %v", err)
 		}
-		expectNoError(err)
-		Logf("Read file %q with content: %v", filePath, v)
+		framework.ExpectNoError(err)
+		framework.Logf("Read file %q with content: %v", filePath, v)
 		Expect(strings.TrimSpace(v)).To(Equal(strings.TrimSpace(expectedContents)))
 	}
 }
 
 func createPD() (string, error) {
-	if testContext.Provider == "gce" || testContext.Provider == "gke" {
-		pdName := fmt.Sprintf("%s-%s", testContext.prefix, string(util.NewUUID()))
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
+		pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(util.NewUUID()))
 
 		gceCloud, err := getGCECloud()
 		if err != nil {
@@ -319,12 +320,12 @@ func createPD() (string, error) {
 		}
 
 		tags := map[string]string{}
-		err = gceCloud.CreateDisk(pdName, testContext.CloudConfig.Zone, 10 /* sizeGb */, tags)
+		err = gceCloud.CreateDisk(pdName, framework.TestContext.CloudConfig.Zone, 10 /* sizeGb */, tags)
 		if err != nil {
 			return "", err
 		}
 		return pdName, nil
-	} else if testContext.Provider == "aws" {
+	} else if framework.TestContext.Provider == "aws" {
 		client := ec2.New(session.New())
 
 		request := &ec2.CreateVolumeInput{}
@@ -347,7 +348,7 @@ func createPD() (string, error) {
 }
 
 func deletePD(pdName string) error {
-	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		gceCloud, err := getGCECloud()
 		if err != nil {
 			return err
@@ -361,10 +362,10 @@ func deletePD(pdName string) error {
 				return nil
 			}
 
-			Logf("Error deleting PD %q: %v", pdName, err)
+			framework.Logf("Error deleting PD %q: %v", pdName, err)
 		}
 		return err
-	} else if testContext.Provider == "aws" {
+	} else if framework.TestContext.Provider == "aws" {
 		client := ec2.New(session.New())
 
 		tokens := strings.Split(pdName, "/")
@@ -374,7 +375,7 @@ func deletePD(pdName string) error {
 		_, err := client.DeleteVolume(request)
 		if err != nil {
 			if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
-				Logf("Volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+				framework.Logf("Volume deletion implicitly succeeded because volume %q does not exist.", pdName)
 			} else {
 				return fmt.Errorf("error deleting EBS volumes: %v", err)
 			}
@@ -386,7 +387,7 @@ func deletePD(pdName string) error {
 }
 
 func detachPD(hostName, pdName string) error {
-	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		instanceName := strings.Split(hostName, ".")[0]
 
 		gceCloud, err := getGCECloud()
@@ -401,11 +402,11 @@ func detachPD(hostName, pdName string) error {
 				return nil
 			}
 
-			Logf("Error detaching PD %q: %v", pdName, err)
+			framework.Logf("Error detaching PD %q: %v", pdName, err)
 		}
 
 		return err
-	} else if testContext.Provider == "aws" {
+	} else if framework.TestContext.Provider == "aws" {
 		client := ec2.New(session.New())
 
 		tokens := strings.Split(pdName, "/")
@@ -462,7 +463,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 		},
 	}
 
-	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		pod.Spec.Volumes = make([]api.Volume, len(diskNames))
 		for k, diskName := range diskNames {
 			pod.Spec.Volumes[k].Name = fmt.Sprintf("testpd%v", k+1)
@@ -474,7 +475,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 				},
 			}
 		}
-	} else if testContext.Provider == "aws" {
+	} else if framework.TestContext.Provider == "aws" {
 		pod.Spec.Volumes = make([]api.Volume, len(diskNames))
 		for k, diskName := range diskNames {
 			pod.Spec.Volumes[k].Name = fmt.Sprintf("testpd%v", k+1)
@@ -487,7 +488,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 			}
 		}
 	} else {
-		panic("Unknown provider: " + testContext.Provider)
+		panic("Unknown provider: " + framework.TestContext.Provider)
 	}
 
 	return pod
@@ -495,7 +496,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 
 // Waits for specified PD to to detach from specified hostName
 func waitForPDDetach(diskName, hostName string) error {
-	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		gceCloud, err := getGCECloud()
 		if err != nil {
 			return err
@@ -504,17 +505,17 @@ func waitForPDDetach(diskName, hostName string) error {
 		for start := time.Now(); time.Since(start) < gcePDDetachTimeout; time.Sleep(gcePDDetachPollTime) {
 			diskAttached, err := gceCloud.DiskIsAttached(diskName, hostName)
 			if err != nil {
-				Logf("Error waiting for PD %q to detach from node %q. 'DiskIsAttached(...)' failed with %v", diskName, hostName, err)
+				framework.Logf("Error waiting for PD %q to detach from node %q. 'DiskIsAttached(...)' failed with %v", diskName, hostName, err)
 				return err
 			}
 
 			if !diskAttached {
 				// Specified disk does not appear to be attached to specified node
-				Logf("GCE PD %q appears to have successfully detached from %q.", diskName, hostName)
+				framework.Logf("GCE PD %q appears to have successfully detached from %q.", diskName, hostName)
 				return nil
 			}
 
-			Logf("Waiting for GCE PD %q to detach from %q.", diskName, hostName)
+			framework.Logf("Waiting for GCE PD %q to detach from %q.", diskName, hostName)
 		}
 
 		return fmt.Errorf("Gave up waiting for GCE PD %q to detach from %q after %v", diskName, hostName, gcePDDetachTimeout)
@@ -524,10 +525,10 @@ func waitForPDDetach(diskName, hostName string) error {
 }
 
 func getGCECloud() (*gcecloud.GCECloud, error) {
-	gceCloud, ok := testContext.CloudConfig.Provider.(*gcecloud.GCECloud)
+	gceCloud, ok := framework.TestContext.CloudConfig.Provider.(*gcecloud.GCECloud)
 
 	if !ok {
-		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", testContext.CloudConfig.Provider)
+		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", framework.TestContext.CloudConfig.Provider)
 	}
 
 	return gceCloud, nil

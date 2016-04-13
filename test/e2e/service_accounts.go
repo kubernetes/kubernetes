@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -33,29 +34,29 @@ import (
 
 var serviceAccountTokenNamespaceVersion = version.MustParse("v1.2.0")
 
-var _ = KubeDescribe("ServiceAccounts", func() {
-	f := NewDefaultFramework("svcaccounts")
+var _ = framework.KubeDescribe("ServiceAccounts", func() {
+	f := framework.NewDefaultFramework("svcaccounts")
 
 	It("should ensure a single API token exists", func() {
 		// wait for the service account to reference a single secret
 		var secrets []api.ObjectReference
-		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
 			By("waiting for a single token reference")
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
 			if apierrors.IsNotFound(err) {
-				Logf("default service account was not found")
+				framework.Logf("default service account was not found")
 				return false, nil
 			}
 			if err != nil {
-				Logf("error getting default service account: %v", err)
+				framework.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			switch len(sa.Secrets) {
 			case 0:
-				Logf("default service account has no secret references")
+				framework.Logf("default service account has no secret references")
 				return false, nil
 			case 1:
-				Logf("default service account has a single secret reference")
+				framework.Logf("default service account has a single secret reference")
 				secrets = sa.Secrets
 				return true, nil
 			default:
@@ -68,32 +69,32 @@ var _ = KubeDescribe("ServiceAccounts", func() {
 			By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
-			expectNoError(err)
+			framework.ExpectNoError(err)
 			Expect(sa.Secrets).To(Equal(secrets))
 		}
 
 		// delete the referenced secret
 		By("deleting the service account token")
-		expectNoError(f.Client.Secrets(f.Namespace.Name).Delete(secrets[0].Name))
+		framework.ExpectNoError(f.Client.Secrets(f.Namespace.Name).Delete(secrets[0].Name))
 
 		// wait for the referenced secret to be removed, and another one autocreated
-		expectNoError(wait.Poll(time.Millisecond*500, serviceAccountProvisionTimeout, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("waiting for a new token reference")
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
 			if err != nil {
-				Logf("error getting default service account: %v", err)
+				framework.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			switch len(sa.Secrets) {
 			case 0:
-				Logf("default service account has no secret references")
+				framework.Logf("default service account has no secret references")
 				return false, nil
 			case 1:
 				if sa.Secrets[0] == secrets[0] {
-					Logf("default service account still has the deleted secret reference")
+					framework.Logf("default service account still has the deleted secret reference")
 					return false, nil
 				}
-				Logf("default service account has a new single secret reference")
+				framework.Logf("default service account has a new single secret reference")
 				secrets = sa.Secrets
 				return true, nil
 			default:
@@ -106,7 +107,7 @@ var _ = KubeDescribe("ServiceAccounts", func() {
 			By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
-			expectNoError(err)
+			framework.ExpectNoError(err)
 			Expect(sa.Secrets).To(Equal(secrets))
 		}
 
@@ -114,26 +115,26 @@ var _ = KubeDescribe("ServiceAccounts", func() {
 		By("deleting the reference to the service account token")
 		{
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
-			expectNoError(err)
+			framework.ExpectNoError(err)
 			sa.Secrets = nil
 			_, updateErr := f.Client.ServiceAccounts(f.Namespace.Name).Update(sa)
-			expectNoError(updateErr)
+			framework.ExpectNoError(updateErr)
 		}
 
 		// wait for another one to be autocreated
-		expectNoError(wait.Poll(time.Millisecond*500, serviceAccountProvisionTimeout, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("waiting for a new token to be created and added")
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
 			if err != nil {
-				Logf("error getting default service account: %v", err)
+				framework.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			switch len(sa.Secrets) {
 			case 0:
-				Logf("default service account has no secret references")
+				framework.Logf("default service account has no secret references")
 				return false, nil
 			case 1:
-				Logf("default service account has a new single secret reference")
+				framework.Logf("default service account has a new single secret reference")
 				secrets = sa.Secrets
 				return true, nil
 			default:
@@ -146,7 +147,7 @@ var _ = KubeDescribe("ServiceAccounts", func() {
 			By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
-			expectNoError(err)
+			framework.ExpectNoError(err)
 			Expect(sa.Secrets).To(Equal(secrets))
 		}
 	})
@@ -156,25 +157,25 @@ var _ = KubeDescribe("ServiceAccounts", func() {
 		var rootCAContent string
 
 		// Standard get, update retry loop
-		expectNoError(wait.Poll(time.Millisecond*500, serviceAccountProvisionTimeout, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("getting the auto-created API token")
 			sa, err := f.Client.ServiceAccounts(f.Namespace.Name).Get("default")
 			if apierrors.IsNotFound(err) {
-				Logf("default service account was not found")
+				framework.Logf("default service account was not found")
 				return false, nil
 			}
 			if err != nil {
-				Logf("error getting default service account: %v", err)
+				framework.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			if len(sa.Secrets) == 0 {
-				Logf("default service account has no secret references")
+				framework.Logf("default service account has no secret references")
 				return false, nil
 			}
 			for _, secretRef := range sa.Secrets {
 				secret, err := f.Client.Secrets(f.Namespace.Name).Get(secretRef.Name)
 				if err != nil {
-					Logf("Error getting secret %s: %v", secretRef.Name, err)
+					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
 					continue
 				}
 				if secret.Type == api.SecretTypeServiceAccountToken {
@@ -184,7 +185,7 @@ var _ = KubeDescribe("ServiceAccounts", func() {
 				}
 			}
 
-			Logf("default service account has no secret references to valid service account tokens")
+			framework.Logf("default service account has no secret references to valid service account tokens")
 			return false, nil
 		}))
 
@@ -213,7 +214,7 @@ var _ = KubeDescribe("ServiceAccounts", func() {
 			},
 		}
 
-		supportsTokenNamespace, _ := serverVersionGTE(serviceAccountTokenNamespaceVersion, f.Client)
+		supportsTokenNamespace, _ := framework.ServerVersionGTE(serviceAccountTokenNamespaceVersion, f.Client)
 		if supportsTokenNamespace {
 			pod.Spec.Containers = append(pod.Spec.Containers, api.Container{
 				Name:  "namespace-test",

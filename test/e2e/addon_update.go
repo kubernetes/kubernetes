@@ -27,6 +27,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -188,18 +189,18 @@ type stringPair struct {
 	data, fileName string
 }
 
-var _ = KubeDescribe("Addon update", func() {
+var _ = framework.KubeDescribe("Addon update", func() {
 
 	var dir string
 	var sshClient *ssh.Client
-	f := NewDefaultFramework("addon-update-test")
+	f := framework.NewDefaultFramework("addon-update-test")
 
 	BeforeEach(func() {
 		// This test requires:
 		// - SSH master access
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
-		if !providerIs("gce") {
+		if !framework.ProviderIs("gce") {
 			return
 		}
 
@@ -210,26 +211,26 @@ var _ = KubeDescribe("Addon update", func() {
 		// Reduce the addon update intervals so that we have faster response
 		// to changes in the addon directory.
 		// do not use "service" command because it clears the environment variables
-		switch testContext.OSDistro {
+		switch framework.TestContext.OSDistro {
 		case "debian":
 			sshExecAndVerify(sshClient, "sudo TEST_ADDON_CHECK_INTERVAL_SEC=1 /etc/init.d/kube-addons restart")
 		case "trusty":
 			sshExecAndVerify(sshClient, "sudo initctl restart kube-addons TEST_ADDON_CHECK_INTERVAL_SEC=1")
 		default:
-			Failf("Unsupported OS distro type %s", testContext.OSDistro)
+			framework.Failf("Unsupported OS distro type %s", framework.TestContext.OSDistro)
 		}
 	})
 
 	AfterEach(func() {
 		if sshClient != nil {
 			// restart addon_update with the default options
-			switch testContext.OSDistro {
+			switch framework.TestContext.OSDistro {
 			case "debian":
 				sshExec(sshClient, "sudo /etc/init.d/kube-addons restart")
 			case "trusty":
 				sshExec(sshClient, "sudo initctl restart kube-addons")
 			default:
-				Failf("Unsupported OS distro type %s", testContext.OSDistro)
+				framework.Failf("Unsupported OS distro type %s", framework.TestContext.OSDistro)
 			}
 			sshClient.Close()
 		}
@@ -242,7 +243,7 @@ var _ = KubeDescribe("Addon update", func() {
 		// - master access
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
-		SkipUnlessProviderIs("gce")
+		framework.SkipUnlessProviderIs("gce")
 
 		//these tests are long, so I squeezed several cases in one scenario
 		Expect(sshClient).NotTo(BeNil())
@@ -337,20 +338,20 @@ var _ = KubeDescribe("Addon update", func() {
 })
 
 func waitForServiceInAddonTest(c *client.Client, addonNamespace, name string, exist bool) {
-	expectNoError(waitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
+	framework.ExpectNoError(framework.WaitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
 func waitForReplicationControllerInAddonTest(c *client.Client, addonNamespace, name string, exist bool) {
-	expectNoError(waitForReplicationController(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
+	framework.ExpectNoError(framework.WaitForReplicationController(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
 // TODO marekbiskup 2015-06-11: merge the ssh code into pkg/util/ssh.go after
 // kubernetes v1.0 is released. In particular the code of sshExec.
 func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
-	signer, err := getSigner(testContext.Provider)
+	signer, err := framework.GetSigner(framework.TestContext.Provider)
 	if err != nil {
-		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", testContext.Provider, err)
+		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", framework.TestContext.Provider, err)
 	}
 
 	config := &ssh.ClientConfig{
@@ -358,7 +359,7 @@ func getMasterSSHClient() (*ssh.Client, error) {
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 	}
 
-	host := getMasterHost() + ":22"
+	host := framework.GetMasterHost() + ":22"
 	client, err := ssh.Dial("tcp", host, config)
 	if err != nil {
 		return nil, fmt.Errorf("error getting SSH client to host %s: '%v'", host, err)
@@ -373,7 +374,7 @@ func sshExecAndVerify(client *ssh.Client, cmd string) {
 }
 
 func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
-	Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
+	framework.Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
 	session, err := client.NewSession()
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error creating session to host %s: '%v'", client.RemoteAddr(), err)
@@ -405,7 +406,7 @@ func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
 }
 
 func writeRemoteFile(sshClient *ssh.Client, data, dir, fileName string, mode os.FileMode) error {
-	Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, sshClient.RemoteAddr()))
+	framework.Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, sshClient.RemoteAddr()))
 	session, err := sshClient.NewSession()
 	if err != nil {
 		return fmt.Errorf("error creating session to host %s: '%v'", sshClient.RemoteAddr(), err)

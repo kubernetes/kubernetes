@@ -21,13 +21,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = KubeDescribe("LimitRange", func() {
-	f := NewDefaultFramework("limitrange")
+var _ = framework.KubeDescribe("LimitRange", func() {
+	f := framework.NewDefaultFramework("limitrange")
 
 	It("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
 		By("Creating a LimitRange")
@@ -63,7 +64,7 @@ var _ = KubeDescribe("LimitRange", func() {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
 			if err != nil {
 				// Print the pod to help in debugging.
-				Logf("Pod %+v does not have the expected requirements", pod)
+				framework.Logf("Pod %+v does not have the expected requirements", pod)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}
@@ -84,7 +85,7 @@ var _ = KubeDescribe("LimitRange", func() {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
 			if err != nil {
 				// Print the pod to help in debugging.
-				Logf("Pod %+v does not have the expected requirements", pod)
+				framework.Logf("Pod %+v does not have the expected requirements", pod)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}
@@ -103,12 +104,12 @@ var _ = KubeDescribe("LimitRange", func() {
 })
 
 func equalResourceRequirement(expected api.ResourceRequirements, actual api.ResourceRequirements) error {
-	Logf("Verifying requests: expected %s with actual %s", expected.Requests, actual.Requests)
+	framework.Logf("Verifying requests: expected %s with actual %s", expected.Requests, actual.Requests)
 	err := equalResourceList(expected.Requests, actual.Requests)
 	if err != nil {
 		return err
 	}
-	Logf("Verifying limits: expected %v with actual %v", expected.Limits, actual.Limits)
+	framework.Logf("Verifying limits: expected %v with actual %v", expected.Limits, actual.Limits)
 	err = equalResourceList(expected.Limits, actual.Limits)
 	if err != nil {
 		return err
