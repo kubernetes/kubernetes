@@ -586,17 +586,17 @@ func (s *StoreToJobLister) Exists(job *extensions.Job) (bool, error) {
 }
 
 // StoreToJobLister lists all jobs in the store.
-func (s *StoreToJobLister) List() (jobs extensions.JobList, err error) {
+func (s *StoreToJobLister) List() (jobs v1beta1.JobList, err error) {
 	for _, c := range s.Store.List() {
-		jobs.Items = append(jobs.Items, *(c.(*extensions.Job)))
+		jobs.Items = append(jobs.Items, *(c.(*v1beta1.Job)))
 	}
 	return jobs, nil
 }
 
 // GetPodJobs returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
-func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err error) {
+func (s *StoreToJobLister) GetPodJobs(pod *v1.Pod) (jobs []v1beta1.Job, err error) {
 	var selector labels.Selector
-	var job extensions.Job
+	var job v1beta1.Job
 
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no jobs found for pod %v because it has no labels", pod.Name)
@@ -604,12 +604,12 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 	}
 
 	for _, m := range s.Store.List() {
-		job = *m.(*extensions.Job)
+		job = *m.(*v1beta1.Job)
 		if job.Namespace != pod.Namespace {
 			continue
 		}
 
-		selector, _ = unversioned.LabelSelectorAsSelector(job.Spec.Selector)
+		selector, _ = v1beta1.LabelSelectorAsSelector(job.Spec.Selector)
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
