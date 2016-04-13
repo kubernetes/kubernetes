@@ -2770,9 +2770,9 @@ func (kl *Kubelet) setNodeStatusGPUInfo(node *api.Node) {
 	}
 
 	if node.Status.Capacity != nil && node.Status.Allocatable != nil {
-		node.Status.Capacity[api.ResourceDevices] = *resource.NewMilliQuantity(int64(totalGpuNum*1000), resource.DecimalSI)
+		node.Status.Capacity[api.ResourceNvidiaGPU] = *resource.NewMilliQuantity(int64(totalGpuNum*1000), resource.DecimalSI)
 		//node.Status.Allocatable[api.ResourceDevices] = *resource.NewMilliQuantity(int64(availableGpuNum*1000), resource.DecimalSI)
-		node.Status.Allocatable[api.ResourceDevices] = *resource.NewMilliQuantity(int64(totalGpuNum*1000), resource.DecimalSI)
+		node.Status.Allocatable[api.ResourceNvidiaGPU] = *resource.NewMilliQuantity(int64(totalGpuNum*1000), resource.DecimalSI)
 	}
 
 	glog.Errorf("Hans:setNodeStatusGPUInfo(): Available GPU num: %d", availableGpuNum)

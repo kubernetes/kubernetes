@@ -243,7 +243,7 @@ type resourceRequest struct {
 	milliCPU int64
 	memory   int64
 	// Needs to be changed.
-	devices int64
+	nvidiaGPU int64
 }
 
 func getResourceRequest(pod *api.Pod) resourceRequest {
@@ -252,23 +252,23 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 		requests := container.Resources.Requests
 		result.memory += requests.Memory().Value()
 		result.milliCPU += requests.Cpu().MilliValue()
-		result.devices += requests.Devices().Value()
+		result.nvidiaGPU += requests.NvidiaGPU().Value()
 	}
 	return result
 }
 
-func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory, notFittingDevices []*api.Pod) {
+func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory, notFittingNvidiaGPU []*api.Pod) {
 	totalMilliCPU := allocatable.Cpu().MilliValue()
 	totalMemory := allocatable.Memory().Value()
-	totalDevices := allocatable.Devices().Value()
+	totalNvidiaGPU := allocatable.NvidiaGPU().Value()
 	milliCPURequested := int64(0)
 	memoryRequested := int64(0)
-	devicesRequested := int64(0)
+	nvidiaGPURequested := int64(0)
 	for _, pod := range pods {
 		podRequest := getResourceRequest(pod)
 		fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
-		fitDevices := (totalDevices - devicesRequested) >= podRequest.devices
+		fitNvidiaGPU := (totalNvidiaGPU - nvidiaGPURequested) >= podRequest.nvidiaGPU/1000
 		if !fitsCPU {
 			// the pod doesn't fit due to CPU request
 			notFittingCPU = append(notFittingCPU, pod)
@@ -279,16 +279,16 @@ func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceLi
 			notFittingMemory = append(notFittingMemory, pod)
 			continue
 		}
-		if !fitDevices {
-			// the pod doesn't fit due to devices request
-			notFittingDevices = append(notFittingDevices, pod)
+		if !fitNvidiaGPU {
+			// the pod doesn't fit due to nvidia GPU request
+			notFittingNvidiaGPU = append(notFittingNvidiaGPU, pod)
 			continue
 		}
 
 		// the pod fits
 		milliCPURequested += podRequest.milliCPU
 		memoryRequested += podRequest.memory
-		devicesRequested += podRequest.devices
+		nvidiaGPURequested += podRequest.nvidiaGPU
 		fitting = append(fitting, pod)
 	}
 	return
@@ -312,12 +312,12 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	}
 
 	podRequest := getResourceRequest(pod)
-	if podRequest.milliCPU == 0 && podRequest.memory == 0 && podRequest.devices == 0 {
+	if podRequest.milliCPU == 0 && podRequest.memory == 0 && podRequest.nvidiaGPU == 0 {
 		return true, nil
 	}
 
 	pods := append(existingPods, pod)
-	_, exceedingCPU, exceedingMemory, exceedingDevices := CheckPodsExceedingFreeResources(pods, allocatable)
+	_, exceedingCPU, exceedingMemory, exceedingNvidiaGPU := CheckPodsExceedingFreeResources(pods, allocatable)
 	if len(exceedingCPU) > 0 {
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient CPU", podName(pod), node)
 		return false, ErrInsufficientFreeCPU
@@ -326,7 +326,7 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient Memory", podName(pod), node)
 		return false, ErrInsufficientFreeMemory
 	}
-	if len(exceedingDevices) > 0 {
+	if len(exceedingNvidiaGPU) > 0 {
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient Devices", podName(pod), node)
 		return false, ErrInsufficientFreeDevices
 	}

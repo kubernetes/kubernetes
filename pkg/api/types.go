@@ -1645,7 +1645,7 @@ const (
 	ResourceStorage ResourceName = "storage"
 	// Number of Pods that may be running on this Node: see ResourcePods
 	// Devices
-	ResourceDevices ResourceName = "devices"
+	ResourceNvidiaGPU ResourceName = "nvidiaGPU"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
