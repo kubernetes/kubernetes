@@ -26,10 +26,11 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
-	"k8s.io/kubernetes/pkg/client/record"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2/typed/core/v1"
+	record "k8s.io/kubernetes/pkg/client/record/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -97,13 +98,13 @@ type ReplicationManager struct {
 func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "replication-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(v1.EventSource{Component: "replication-controller"}),
 		},
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
@@ -119,14 +120,14 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 				return rm.kubeClient.Core().ReplicationControllers(api.NamespaceAll).Watch(options)
 			},
 		},
-		&api.ReplicationController{},
+		&v1.ReplicationController{},
 		// TODO: Can we have much longer period here?
 		FullControllerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
-				oldRC := old.(*api.ReplicationController)
-				curRC := cur.(*api.ReplicationController)
+				oldRC := old.(*v1.ReplicationController)
+				curRC := cur.(*v1.ReplicationController)
 
 				// We should invalidate the whole lookup cache if a RC's selector has been updated.
 				//
@@ -176,7 +177,7 @@ func NewReplicationManager(kubeClient clientset.Interface, resyncPeriod controll
 				return rm.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
-		&api.Pod{},
+		&v1.Pod{},
 		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: rm.addPod,
@@ -218,10 +219,10 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodController returns the controller managing the given pod.
 // TODO: Surface that we are ignoring multiple controllers for a single pod.
-func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationController {
+func (rm *ReplicationManager) getPodController(pod *v1.Pod) *v1.ReplicationController {
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rm.lookupCache.GetMatchingObject(pod); cached {
-		controller, ok := obj.(*api.ReplicationController)
+		controller, ok := obj.(*v1.ReplicationController)
 		if !ok {
 			// This should not happen
 			glog.Errorf("lookup cache does not retuen a ReplicationController object")
@@ -258,7 +259,7 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 }
 
 // isCacheValid check if the cache is valid
-func (rm *ReplicationManager) isCacheValid(pod *api.Pod, cachedRC *api.ReplicationController) bool {
+func (rm *ReplicationManager) isCacheValid(pod *v1.Pod, cachedRC *v1.ReplicationController) bool {
 	_, exists, err := rm.rcStore.Get(cachedRC)
 	// rc has been deleted or updated, cache is invalid
 	if err != nil || !exists || !isControllerMatch(pod, cachedRC) {
@@ -269,7 +270,7 @@ func (rm *ReplicationManager) isCacheValid(pod *api.Pod, cachedRC *api.Replicati
 
 // isControllerMatch take a Pod and ReplicationController, return whether the Pod and ReplicationController are matching
 // TODO(mqliang): This logic is a copy from GetPodControllers(), remove the duplication
-func isControllerMatch(pod *api.Pod, rc *api.ReplicationController) bool {
+func isControllerMatch(pod *v1.Pod, rc *v1.ReplicationController) bool {
 	if rc.Namespace != pod.Namespace {
 		return false
 	}
@@ -285,7 +286,7 @@ func isControllerMatch(pod *api.Pod, rc *api.ReplicationController) bool {
 
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
 func (rm *ReplicationManager) addPod(obj interface{}) {
-	pod := obj.(*api.Pod)
+	pod := obj.(*v1.Pod)
 
 	rc := rm.getPodController(pod)
 	if rc == nil {
@@ -309,18 +310,18 @@ func (rm *ReplicationManager) addPod(obj interface{}) {
 
 // When a pod is updated, figure out what controller/s manage it and wake them
 // up. If the labels of the pod have changed we need to awaken both the old
-// and new controller. old and cur must be *api.Pod types.
+// and new controller. old and cur must be *v1.Pod types.
 func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 	if api.Semantic.DeepEqual(old, cur) {
 		// A periodic relist will send update events for all known pods.
 		return
 	}
-	curPod := cur.(*api.Pod)
+	curPod := cur.(*v1.Pod)
 	rc := rm.getPodController(curPod)
 	if rc == nil {
 		return
 	}
-	oldPod := old.(*api.Pod)
+	oldPod := old.(*v1.Pod)
 
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
@@ -343,9 +344,9 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 }
 
 // When a pod is deleted, enqueue the controller that manages the pod and update its expectations.
-// obj could be an *api.Pod, or a DeletionFinalStateUnknown marker item.
+// obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
 func (rm *ReplicationManager) deletePod(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
+	pod, ok := obj.(*v1.Pod)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
@@ -357,7 +358,7 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 			glog.Errorf("Couldn't get object from tombstone %+v", obj)
 			return
 		}
-		pod, ok = tombstone.Obj.(*api.Pod)
+		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
 			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
 			return
@@ -370,12 +371,12 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 			glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
 			return
 		}
-		rm.expectations.DeletionObserved(rcKey, controller.PodKey(pod))
+		rm.expectations.DeletionObserved(rcKey, controller.V1PodKey(pod))
 		rm.enqueueController(rc)
 	}
 }
 
-// obj could be an *api.ReplicationController, or a DeletionFinalStateUnknown marker item.
+// obj could be an *v1.ReplicationController, or a DeletionFinalStateUnknown marker item.
 func (rm *ReplicationManager) enqueueController(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
@@ -411,8 +412,8 @@ func (rm *ReplicationManager) worker() {
 }
 
 // manageReplicas checks and updates replicas for the given replication controller.
-func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.ReplicationController) {
-	diff := len(filteredPods) - rc.Spec.Replicas
+func (rm *ReplicationManager) manageReplicas(filteredPods []*v1.Pod, rc *v1.ReplicationController) {
+	diff := len(filteredPods) - int(*rc.Spec.Replicas)
 	rcKey, err := controller.KeyFunc(rc)
 	if err != nil {
 		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
@@ -450,11 +451,11 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		}
 		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
 		// No need to sort pods if we are about to delete all of them
-		if rc.Spec.Replicas != 0 {
+		if int(*rc.Spec.Replicas) != 0 {
 			// Sort the pods in the order such that not-ready < ready, unscheduled
 			// < scheduled, and pending < running. This ensures that we delete pods
 			// in the earlier stages whenever possible.
-			sort.Sort(controller.ActivePods(filteredPods))
+			sort.Sort(controller.V1ActivePods(filteredPods))
 		}
 		// Snapshot the UIDs (ns/name) of the pods we're expecting to see
 		// deleted, so we know to record their expectations exactly once either
@@ -464,7 +465,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		// expired even if other pods are deleted.
 		deletedPodKeys := []string{}
 		for i := 0; i < diff; i++ {
-			deletedPodKeys = append(deletedPodKeys, controller.PodKey(filteredPods[i]))
+			deletedPodKeys = append(deletedPodKeys, controller.V1PodKey(filteredPods[i]))
 		}
 		// We use pod namespace/name as a UID to wait for deletions, so if the
 		// labels on a pod/rc change in a way that the pod gets orphaned, the
@@ -477,7 +478,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 				defer wait.Done()
 				if err := rm.podControl.DeletePod(rc.Namespace, filteredPods[ix].Name, rc); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
-					podKey := controller.PodKey(filteredPods[ix])
+					podKey := controller.V1PodKey(filteredPods[ix])
 					glog.V(2).Infof("Failed to delete %v, decrementing expectations for controller %q/%q", podKey, rc.Namespace, rc.Name)
 					rm.expectations.DeletionObserved(rcKey, podKey)
 					utilruntime.HandleError(err)
@@ -516,7 +517,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		rm.queue.Add(key)
 		return err
 	}
-	rc := *obj.(*api.ReplicationController)
+	rc := *obj.(*v1.ReplicationController)
 
 	// Check the expectations of the rc before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
@@ -527,7 +528,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		return err
 	}
 	rcNeedsSync := rm.expectations.SatisfiedExpectations(rcKey)
-	podList, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelector())
+	podList, err := rm.podStore.Pods(rc.Namespace).V1List(labels.Set(rc.Spec.Selector).AsSelector())
 	if err != nil {
 		glog.Errorf("Error getting pods for rc %q: %v", key, err)
 		rm.queue.Add(key)

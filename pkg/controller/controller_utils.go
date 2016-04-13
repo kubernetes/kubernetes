@@ -645,8 +645,8 @@ func v1maxContainerRestarts(pod *v1.Pod) int {
 }
 
 // FilterActivePods returns pods that have not terminated.
-func FilterActivePods(pods []api.Pod) []*api.Pod {
-	var result []*api.Pod
+func FilterActivePods(pods []v1.Pod) []*v1.Pod {
+	var result []*v1.Pod
 	for i := range pods {
 		p := pods[i]
 		if IsPodActive(p) {
@@ -659,29 +659,7 @@ func FilterActivePods(pods []api.Pod) []*api.Pod {
 	return result
 }
 
-// Yet another versioned duplication.
-func V1FilterActivePods(pods []v1.Pod) []*v1.Pod {
-	var result []*v1.Pod
-	for i := range pods {
-		p := pods[i]
-		if V1IsPodActive(p) {
-			result = append(result, &p)
-		} else {
-			glog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
-				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
-		}
-	}
-	return result
-}
-
-func IsPodActive(p api.Pod) bool {
-	return api.PodSucceeded != p.Status.Phase &&
-		api.PodFailed != p.Status.Phase &&
-		p.DeletionTimestamp == nil
-}
-
-// Yet another versioned duplication.
-func V1IsPodActive(p v1.Pod) bool {
+func IsPodActive(p v1.Pod) bool {
 	return v1.PodSucceeded != p.Status.Phase &&
 		v1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil

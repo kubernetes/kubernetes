@@ -200,9 +200,9 @@ func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (c
 }
 
 // GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
-func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (controllers []v1.ReplicationController, err error) {
 	var selector labels.Selector
-	var rc api.ReplicationController
+	var rc v1.ReplicationController
 
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
@@ -210,7 +210,7 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 	}
 
 	for _, m := range s.Store.List() {
-		rc = *m.(*api.ReplicationController)
+		rc = *m.(*v1.ReplicationController)
 		if rc.Namespace != pod.Namespace {
 			continue
 		}
