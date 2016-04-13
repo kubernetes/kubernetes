@@ -77,6 +77,8 @@ type ClusterStatus struct {
 	ClusterMeta `json:",inline"`
 }
 
+// +genclient=true,nonNamespaced=true
+
 // Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
 type Cluster struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -100,6 +102,8 @@ type ClusterList struct {
 	// List of Cluster objects.
 	Items []Cluster `json:"items"`
 }
+
+// +genclient=true
 
 // SubReplicaSet represents the configuration of a replica set scheduled to a Cluster.
 type SubReplicaSet struct {
