@@ -27,15 +27,16 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = KubeDescribe("Generated release_1_2 clientset", func() {
-	framework := NewDefaultFramework("clientset")
+var _ = framework.KubeDescribe("Generated release_1_2 clientset", func() {
+	f := framework.NewDefaultFramework("clientset")
 	It("should create pods, delete pods, watch pods", func() {
-		podClient := framework.Clientset_1_2.Core().Pods(framework.Namespace.Name)
+		podClient := f.Clientset_1_2.Core().Pods(f.Namespace.Name)
 		By("creating the pod")
 		name := "pod" + string(util.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -72,7 +73,7 @@ var _ = KubeDescribe("Generated release_1_2 clientset", func() {
 		options := api.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
 		if err != nil {
-			Failf("Failed to query for pods: %v", err)
+			framework.Failf("Failed to query for pods: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
 		options = api.ListOptions{
@@ -81,7 +82,7 @@ var _ = KubeDescribe("Generated release_1_2 clientset", func() {
 		}
 		w, err := podClient.Watch(options)
 		if err != nil {
-			Failf("Failed to set up watch: %v", err)
+			framework.Failf("Failed to set up watch: %v", err)
 		}
 
 		By("submitting the pod to kubernetes")
@@ -91,7 +92,7 @@ var _ = KubeDescribe("Generated release_1_2 clientset", func() {
 		defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		pod, err = podClient.Create(pod)
 		if err != nil {
-			Failf("Failed to create pod: %v", err)
+			framework.Failf("Failed to create pod: %v", err)
 		}
 
 		By("verifying the pod is in kubernetes")
@@ -102,7 +103,7 @@ var _ = KubeDescribe("Generated release_1_2 clientset", func() {
 		}
 		pods, err = podClient.List(options)
 		if err != nil {
-			Failf("Failed to query for pods: %v", err)
+			framework.Failf("Failed to query for pods: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(1))
 
@@ -110,19 +111,19 @@ var _ = KubeDescribe("Generated release_1_2 clientset", func() {
 		select {
 		case event, _ := <-w.ResultChan():
 			if event.Type != watch.Added {
-				Failf("Failed to observe pod creation: %v", event)
+				framework.Failf("Failed to observe pod creation: %v", event)
 			}
-		case <-time.After(podStartTimeout):
+		case <-time.After(framework.PodStartTimeout):
 			Fail("Timeout while waiting for pod creation")
 		}
 
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
-		expectNoError(framework.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		By("deleting the pod gracefully")
 		if err := podClient.Delete(pod.Name, api.NewDeleteOptions(30)); err != nil {
-			Failf("Failed to delete pod: %v", err)
+			framework.Failf("Failed to delete pod: %v", err)
 		}
 
 		By("verifying pod deletion was observed")

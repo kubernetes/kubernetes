@@ -19,14 +19,15 @@ package e2e
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
 
 // These tests exercise the Kubernetes expansion syntax $(VAR).
 // For more information, see: docs/design/expansion.md
-var _ = KubeDescribe("Variable Expansion", func() {
-	framework := NewDefaultFramework("var-expansion")
+var _ = framework.KubeDescribe("Variable Expansion", func() {
+	f := framework.NewDefaultFramework("var-expansion")
 
 	It("should allow composing env vars into new env vars [Conformance]", func() {
 		podName := "var-expansion-" + string(util.NewUUID())
@@ -61,7 +62,7 @@ var _ = KubeDescribe("Variable Expansion", func() {
 			},
 		}
 
-		framework.TestContainerOutput("env composition", pod, 0, []string{
+		f.TestContainerOutput("env composition", pod, 0, []string{
 			"FOO=foo-value",
 			"BAR=bar-value",
 			"FOOBAR=foo-value;;bar-value",
@@ -93,7 +94,7 @@ var _ = KubeDescribe("Variable Expansion", func() {
 			},
 		}
 
-		framework.TestContainerOutput("substitution in container's command", pod, 0, []string{
+		f.TestContainerOutput("substitution in container's command", pod, 0, []string{
 			"test-value",
 		})
 	})
@@ -124,7 +125,7 @@ var _ = KubeDescribe("Variable Expansion", func() {
 			},
 		}
 
-		framework.TestContainerOutput("substitution in container's args", pod, 0, []string{
+		f.TestContainerOutput("substitution in container's args", pod, 0, []string{
 			"test-value",
 		})
 	})

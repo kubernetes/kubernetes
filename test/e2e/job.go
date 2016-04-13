@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -39,8 +40,8 @@ const (
 	jobSelectorKey = "job"
 )
 
-var _ = KubeDescribe("Job", func() {
-	f := NewDefaultFramework("job")
+var _ = framework.KubeDescribe("Job", func() {
+	f := framework.NewDefaultFramework("job")
 	parallelism := 2
 	completions := 4
 	lotsOfFailures := 5 // more than completions
@@ -101,7 +102,7 @@ var _ = KubeDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job shows many failures")
-		err = wait.Poll(poll, jobTimeout, func() (bool, error) {
+		err = wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
 			curr, err := f.Client.Extensions().Jobs(f.Namespace.Name).Get(job.Name)
 			if err != nil {
 				return false, err
@@ -271,7 +272,7 @@ func deleteJob(c *client.Client, ns, name string) error {
 // Wait for all pods to become Running.  Only use when pods will run for a long time, or it will be racy.
 func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: jobName}))
-	return wait.Poll(poll, jobTimeout, func() (bool, error) {
+	return wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
 		options := api.ListOptions{LabelSelector: label}
 		pods, err := c.Pods(ns).List(options)
 		if err != nil {
@@ -289,7 +290,7 @@ func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int
 
 // Wait for job to reach completions.
 func waitForJobFinish(c *client.Client, ns, jobName string, completions int) error {
-	return wait.Poll(poll, jobTimeout, func() (bool, error) {
+	return wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
 		curr, err := c.Extensions().Jobs(ns).Get(jobName)
 		if err != nil {
 			return false, err
@@ -300,7 +301,7 @@ func waitForJobFinish(c *client.Client, ns, jobName string, completions int) err
 
 // Wait for job fail.
 func waitForJobFail(c *client.Client, ns, jobName string) error {
-	return wait.Poll(poll, jobTimeout, func() (bool, error) {
+	return wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
 		curr, err := c.Extensions().Jobs(ns).Get(jobName)
 		if err != nil {
 			return false, err

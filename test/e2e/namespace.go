@@ -26,12 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-func extinguish(f *Framework, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
+func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
 	var err error
 
 	By("Creating testing namespaces")
@@ -50,13 +51,13 @@ func extinguish(f *Framework, totalNS int, maxAllowedAfterDel int, maxSeconds in
 	//Wait 10 seconds, then SEND delete requests for all the namespaces.
 	By("Waiting 10 seconds")
 	time.Sleep(time.Duration(10 * time.Second))
-	deleted, err := deleteNamespaces(f.Client, []string{"nslifetest"}, nil /* skipFilter */)
+	deleted, err := framework.DeleteNamespaces(f.Client, []string{"nslifetest"}, nil /* skipFilter */)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(deleted)).To(Equal(totalNS))
 
 	By("Waiting for namespaces to vanish")
 	//Now POLL until all namespaces have been eradicated.
-	expectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
+	framework.ExpectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
 			var cnt = 0
 			nsList, err := f.Client.Namespaces().List(api.ListOptions{})
@@ -69,14 +70,14 @@ func extinguish(f *Framework, totalNS int, maxAllowedAfterDel int, maxSeconds in
 				}
 			}
 			if cnt > maxAllowedAfterDel {
-				Logf("Remaining namespaces : %v", cnt)
+				framework.Logf("Remaining namespaces : %v", cnt)
 				return false, nil
 			}
 			return true, nil
 		}))
 }
 
-func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *Framework) {
+func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	var err error
 
 	By("Creating a test namespace")
@@ -84,7 +85,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Waiting for a default service account to be provisioned in namespace")
-	err = waitForDefaultServiceAccountInNamespace(f.Client, namespace.Name)
+	err = framework.WaitForDefaultServiceAccountInNamespace(f.Client, namespace.Name)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating a pod in the namespace")
@@ -105,7 +106,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Waiting for the pod to have running status")
-	expectNoError(waitForPodRunningInNamespace(f.Client, pod.Name, pod.Namespace))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, pod.Namespace))
 
 	By("Deleting the namespace")
 	err = f.Client.Namespaces().Delete(namespace.Name)
@@ -113,7 +114,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *Framework) {
 
 	By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60) + *pod.Spec.TerminationGracePeriodSeconds
-	expectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
+	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
 			_, err = f.Client.Namespaces().Get(namespace.Name)
 			if err != nil && errors.IsNotFound(err) {
@@ -127,7 +128,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *Framework) {
 	Expect(err).To(HaveOccurred())
 }
 
-func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *Framework) {
+func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	var err error
 
 	By("Creating a test namespace")
@@ -135,7 +136,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Waiting for a default service account to be provisioned in namespace")
-	err = waitForDefaultServiceAccountInNamespace(f.Client, namespace.Name)
+	err = framework.WaitForDefaultServiceAccountInNamespace(f.Client, namespace.Name)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating a service in the namespace")
@@ -165,7 +166,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *Framework) {
 
 	By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60)
-	expectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
+	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
 			_, err = f.Client.Namespaces().Get(namespace.Name)
 			if err != nil && errors.IsNotFound(err) {
@@ -207,9 +208,9 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *Framework) {
 // that each have a variable amount of content in the associated Namespace.
 // When run in [Serial] this test appears to delete Namespace objects at a
 // rate of approximately 1 per second.
-var _ = KubeDescribe("Namespaces [Serial]", func() {
+var _ = framework.KubeDescribe("Namespaces [Serial]", func() {
 
-	f := NewDefaultFramework("namespaces")
+	f := framework.NewDefaultFramework("namespaces")
 
 	It("should ensure that all pods are removed when a namespace is deleted.",
 		func() { ensurePodsAreRemovedWhenNamespaceIsDeleted(f) })

@@ -24,11 +24,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/controller/framework"
+	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -39,8 +40,8 @@ func (d durations) Len() int           { return len(d) }
 func (d durations) Less(i, j int) bool { return d[i] < d[j] }
 func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 
-var _ = KubeDescribe("Service endpoints latency", func() {
-	f := NewDefaultFramework("svc-latency")
+var _ = framework.KubeDescribe("Service endpoints latency", func() {
+	f := framework.NewDefaultFramework("svc-latency")
 
 	It("should not be very high [Conformance]", func() {
 		const (
@@ -91,14 +92,14 @@ var _ = KubeDescribe("Service endpoints latency", func() {
 			}
 			return dSorted[est]
 		}
-		Logf("Latencies: %v", dSorted)
+		framework.Logf("Latencies: %v", dSorted)
 		p50 := percentile(50)
 		p90 := percentile(90)
 		p99 := percentile(99)
-		Logf("50 %%ile: %v", p50)
-		Logf("90 %%ile: %v", p90)
-		Logf("99 %%ile: %v", p99)
-		Logf("Total sample count: %v", len(dSorted))
+		framework.Logf("50 %%ile: %v", p50)
+		framework.Logf("90 %%ile: %v", p90)
+		framework.Logf("99 %%ile: %v", p99)
+		framework.Logf("Total sample count: %v", len(dSorted))
 
 		if p50 > limitMedian {
 			failing.Insert("Median latency should be less than " + limitMedian.String())
@@ -114,8 +115,8 @@ var _ = KubeDescribe("Service endpoints latency", func() {
 	})
 })
 
-func runServiceLatencies(f *Framework, inParallel, total int) (output []time.Duration, err error) {
-	cfg := RCConfig{
+func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
+	cfg := framework.RCConfig{
 		Client:       f.Client,
 		Image:        "gcr.io/google_containers/pause:2.0",
 		Name:         "svc-latency-rc",
@@ -123,10 +124,10 @@ func runServiceLatencies(f *Framework, inParallel, total int) (output []time.Dur
 		Replicas:     1,
 		PollInterval: time.Second,
 	}
-	if err := RunRC(cfg); err != nil {
+	if err := framework.RunRC(cfg); err != nil {
 		return nil, err
 	}
-	defer DeleteRC(f.Client, f.Namespace.Name, cfg.Name)
+	defer framework.DeleteRC(f.Client, f.Namespace.Name, cfg.Name)
 
 	// Run a single watcher, to reduce the number of API calls we have to
 	// make; this is to minimize the timing error. It's how kube-proxy
@@ -164,7 +165,7 @@ func runServiceLatencies(f *Framework, inParallel, total int) (output []time.Dur
 	for i := 0; i < total; i++ {
 		select {
 		case e := <-errs:
-			Logf("Got error: %v", e)
+			framework.Logf("Got error: %v", e)
 			errCount += 1
 		case d := <-durations:
 			output = append(output, d)
@@ -273,8 +274,8 @@ func (eq *endpointQueries) added(e *api.Endpoints) {
 }
 
 // blocks until it has finished syncing.
-func startEndpointWatcher(f *Framework, q *endpointQueries) {
-	_, controller := framework.NewInformer(
+func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
+	_, controller := controllerframework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return f.Client.Endpoints(f.Namespace.Name).List(options)
@@ -285,7 +286,7 @@ func startEndpointWatcher(f *Framework, q *endpointQueries) {
 		},
 		&api.Endpoints{},
 		0,
-		framework.ResourceEventHandlerFuncs{
+		controllerframework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if e, ok := obj.(*api.Endpoints); ok {
 					if len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0 {
@@ -311,7 +312,7 @@ func startEndpointWatcher(f *Framework, q *endpointQueries) {
 	}
 }
 
-func singleServiceLatency(f *Framework, name string, q *endpointQueries) (time.Duration, error) {
+func singleServiceLatency(f *framework.Framework, name string, q *endpointQueries) (time.Duration, error) {
 	// Make a service that points to that pod.
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{
@@ -329,7 +330,7 @@ func singleServiceLatency(f *Framework, name string, q *endpointQueries) (time.D
 	if err != nil {
 		return 0, err
 	}
-	Logf("Created: %v", gotSvc.Name)
+	framework.Logf("Created: %v", gotSvc.Name)
 	defer f.Client.Services(gotSvc.Namespace).Delete(gotSvc.Name)
 
 	if e := q.request(gotSvc.Name); e == nil {
@@ -337,6 +338,6 @@ func singleServiceLatency(f *Framework, name string, q *endpointQueries) (time.D
 	}
 	stopTime := time.Now()
 	d := stopTime.Sub(startTime)
-	Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
+	framework.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
 	return d, nil
 }
