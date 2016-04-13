@@ -278,7 +278,7 @@ func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
 }
 
 func IsPodAvailable(pod *api.Pod, minReadySeconds int) bool {
-	if !controller.IsPodActive(*pod) {
+	if !controller.UnversionedIsPodActive(*pod) {
 		return false
 	}
 	// Check if we've passed minReadySeconds since LastTransitionTime

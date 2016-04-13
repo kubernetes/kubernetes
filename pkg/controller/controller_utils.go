@@ -659,6 +659,13 @@ func FilterActivePods(pods []v1.Pod) []*v1.Pod {
 	return result
 }
 
+// UnversionedIsPodActive is a temporary duplication of IsPodActive. It will be
+// removed when we migrate the deployment to use versioned clientset.
+func UnversionedIsPodActive(p api.Pod) bool {
+	return api.PodSucceeded != p.Status.Phase &&
+		api.PodFailed != p.Status.Phase &&
+		p.DeletionTimestamp == nil
+}
 func IsPodActive(p v1.Pod) bool {
 	return v1.PodSucceeded != p.Status.Phase &&
 		v1.PodFailed != p.Status.Phase &&
