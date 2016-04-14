@@ -887,7 +887,7 @@
     suffix:
         - 'gke-1.1-1.2-kubectl-skew':
             description: 'Deploys a cluster at v1.1 and runs the v1.2 Kubectl tests.'
-            timeout: 30
+            timeout: 120
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
                 export E2E_NAME="gke-1-1-1-2-ctl-skew"
@@ -898,7 +898,7 @@
                 export E2E_OPT="--check_version_skew=false"
         - 'gke-1.1-1.2-upgrade-master':
             description: 'Deploys a cluster at v1.1, upgrades its master to v1.2, and runs v1.1 tests against it.'
-            timeout: 30
+            timeout: 300
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
                 export E2E_NAME="gke-1-1-1-2-upg-mas"
@@ -908,9 +908,10 @@
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
                 export E2E_OPT="--check_version_skew=false"
+                export GINKGO_TEST_ARGS="--ginkgo.skip={default-skip-list-1-1}"
         - 'gke-1.1-1.2-upgrade-cluster':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.1 tests against it.'
-            timeout: 30
+            timeout: 300
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
                 export E2E_NAME="gke-1-1-1-2-upg-clu"
@@ -920,9 +921,10 @@
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
                 export E2E_OPT="--check_version_skew=false"
+                export GINKGO_TEST_ARGS="--ginkgo.skip={default-skip-list-1-1}"
         - 'gke-1.1-1.2-upgrade-cluster-new':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.2 tests against it.'
-            timeout: 30
+            timeout: 300
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
                 export E2E_NAME="gke-1-1-1-2-upg-clu-new"
