@@ -42,7 +42,7 @@ fi
 
 echo -ne "Checking for files that need gofmt... "
 files_need_gofmt=()
-files=($(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "third_party" -e "Godeps"))
+files=($(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "^third_party" -e "^vendor"))
 for file in "${files[@]}"; do
   # Check for files that fail gofmt.
   diff="$(git show ":${file}" | gofmt -s -d 2>&1)"

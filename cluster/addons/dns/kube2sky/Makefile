@@ -46,7 +46,7 @@ all: container
 
 kube2sky: kube2sky.go
 	# Only build kube2sky. This requires go and godep in PATH
-	CGO_ENABLED=0 GOARCH=$(ARCH) GOARM=$(GOARM) godep go build -a -installsuffix cgo --ldflags '-w' ./kube2sky.go
+	CGO_ENABLED=0 GOARCH=$(ARCH) GOARM=$(GOARM) go build -a -installsuffix cgo --ldflags '-w' ./kube2sky.go
 
 container:
 	# Copy the content in this dir to the temp dir
@@ -80,7 +80,7 @@ clean:
 	rm -f kube2sky
 
 test: clean
-	godep go test -v --vmodule=*=4
+	go test -v --vmodule=*=4
 
 
 .PHONY: all kube2sky container push clean test

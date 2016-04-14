@@ -54,7 +54,7 @@ func New() *Generator {
 		OutputBase:       sourceTree,
 		GoHeaderFilePath: filepath.Join(sourceTree, "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt"),
 	}
-	defaultProtoImport := filepath.Join(sourceTree, "k8s.io", "kubernetes", "Godeps", "_workspace", "src", "github.com", "gogo", "protobuf", "protobuf")
+	defaultProtoImport := filepath.Join(sourceTree, "k8s.io", "kubernetes", "vendor", "github.com", "gogo", "protobuf", "protobuf")
 	return &Generator{
 		Common:      common,
 		OutputBase:  sourceTree,

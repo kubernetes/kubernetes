@@ -52,7 +52,7 @@ export LOG_LEVEL=4
 cd /go/src/k8s.io/kubernetes
 
 ./hack/build-go.sh
-godep go install ./...
+go install ./cmd/...
 ./hack/install-etcd.sh
 
 ./hack/verify-all.sh -v

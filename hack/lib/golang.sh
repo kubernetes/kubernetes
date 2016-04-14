@@ -113,7 +113,7 @@ kube::golang::test_targets() {
     cmd/genswaggertypedocs
     cmd/linkcheck
     examples/k8petstore/web-server/src
-    github.com/onsi/ginkgo/ginkgo
+    vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
     test/e2e_node/e2e_node.test
   )
@@ -257,15 +257,14 @@ kube::golang::create_gopath_tree() {
 # ${PATH}. If not running on Travis, it will also check that the Go version is
 # good enough for the Kubernetes build.
 #
-# Input Vars:
+# Inputs:
 #   KUBE_EXTRA_GOPATH - If set, this is included in created GOPATH
-#   KUBE_NO_GODEPS - If set, we don't add 'Godeps/_workspace' to GOPATH
 #
-# Output Vars:
-#   export GOPATH - A modified GOPATH to our created tree along with extra
-#     stuff.
-#   export GOBIN - This is actively unset if already set as we want binaries
-#     placed in a predictable place.
+# Outputs:
+#   env-var GOPATH points to our local output dir
+#   env-var GOBIN is unset (we want binaries in a predictable place)
+#   env-var GO15VENDOREXPERIMENT=1
+#   current directory is within GOPATH
 kube::golang::setup_env() {
   kube::golang::create_gopath_tree
 
@@ -293,22 +292,26 @@ EOF
     fi
   fi
 
-  GOPATH=${KUBE_GOPATH}
+  export GOPATH=${KUBE_GOPATH}
 
   # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
   if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
     GOPATH="${GOPATH}:${KUBE_EXTRA_GOPATH}"
   fi
 
-  # Append the tree maintained by `godep` to the GOPATH unless KUBE_NO_GODEPS
-  # is defined.
-  if [[ -z ${KUBE_NO_GODEPS:-} ]]; then
-    GOPATH="${GOPATH}:${KUBE_ROOT}/Godeps/_workspace"
-  fi
-  export GOPATH
+  # Change directories so that we are within the GOPATH.  Some tools get really
+  # upset if this is not true.  We use a whole fake GOPATH here to collect the
+  # resultant binaries.  Go will not let us use GOBIN with `go install` and
+  # cross-compiling, and `go install -o <file>` only works for a single pkg.
+  local subdir
+  subdir=$(pwd | sed "s|$KUBE_ROOT||")
+  cd "${KUBE_GOPATH}/src/${KUBE_GO_PACKAGE}/${subdir}"
 
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
+
+  # This seems to matter to some tools (godep, ugorji, ginkgo...)
+  export GO15VENDOREXPERIMENT=1
 }
 
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
@@ -334,20 +337,12 @@ kube::golang::place_bins() {
       platform_src=""
     fi
 
-    local gopaths=("${KUBE_GOPATH}")
-    # If targets were built inside Godeps, then we need to sync from there too.
-    if [[ -z ${KUBE_NO_GODEPS:-} ]]; then
-      gopaths+=("${KUBE_ROOT}/Godeps/_workspace")
+    local full_binpath_src="${KUBE_GOPATH}/bin${platform_src}"
+    if [[ -d "${full_binpath_src}" ]]; then
+      mkdir -p "${KUBE_OUTPUT_BINPATH}/${platform}"
+      find "${full_binpath_src}" -maxdepth 1 -type f -exec \
+        rsync -pt {} "${KUBE_OUTPUT_BINPATH}/${platform}" \;
     fi
-    local gopath
-    for gopath in "${gopaths[@]}"; do
-      local full_binpath_src="${gopath}/bin${platform_src}"
-      if [[ -d "${full_binpath_src}" ]]; then
-        mkdir -p "${KUBE_OUTPUT_BINPATH}/${platform}"
-        find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-          rsync -pt {} "${KUBE_OUTPUT_BINPATH}/${platform}" \;
-      fi
-    done
   done
 }
 
