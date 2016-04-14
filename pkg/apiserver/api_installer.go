@@ -491,7 +491,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("read"+namespaced+kind+strings.Title(subresource)).
+				Operation("reads"+namespaced+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), a.group.Serializer.SupportedMediaTypes()...)...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Writes(versionedObject)
