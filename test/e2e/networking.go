@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 
 	It("should provide Internet connection for containers [Conformance]", func() {
 		By("Running container which tries to wget google.com")
-		framework.ExpectNoError(framework.CheckConnectivityToHost(f, "", "wget-test", "google.com"))
+		framework.ExpectNoError(framework.CheckConnectivityToHost(f, "", "wget-test", "google.com", 30))
 	})
 
 	// First test because it has no dependencies on variables created later on.
@@ -216,6 +216,8 @@ var _ = framework.KubeDescribe("Networking", func() {
 	// Marked with [Flaky] until the tests prove themselves stable.
 	framework.KubeDescribe("[Flaky] Granular Checks", func() {
 
+		connectivityTimeout := 10
+
 		It("should function for pod communication on a single node", func() {
 
 			By("Picking a node")
@@ -229,7 +231,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 			ip := framework.LaunchWebserverPod(f, podName, node.Name)
 
 			By("Checking that the webserver is accessible from a pod on the same node")
-			framework.ExpectNoError(framework.CheckConnectivityToHost(f, node.Name, "same-node-wget", ip))
+			framework.ExpectNoError(framework.CheckConnectivityToHost(f, node.Name, "same-node-wget", ip, connectivityTimeout))
 		})
 
 		It("should function for pod communication between nodes", func() {
@@ -253,7 +255,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 			ip := framework.LaunchWebserverPod(f, podName, node1.Name)
 
 			By("Checking that the webserver is accessible from a pod on a different node")
-			framework.ExpectNoError(framework.CheckConnectivityToHost(f, node2.Name, "different-node-wget", ip))
+			framework.ExpectNoError(framework.CheckConnectivityToHost(f, node2.Name, "different-node-wget", ip, connectivityTimeout))
 		})
 	})
 })
