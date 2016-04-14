@@ -292,9 +292,7 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 // will be returned. The program exits if error occurs.
 func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 	if dockerEndpoint == "fake://" {
-		return &FakeDockerClient{
-			VersionInfo: docker.Env{"ApiVersion=1.18", "Version=1.6.0"},
-		}
+		return NewFakeDockerClient()
 	}
 	client, err := getDockerClient(dockerEndpoint)
 	if err != nil {
