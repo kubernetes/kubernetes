@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // ScaleOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -122,43 +121,47 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return err
 	}
 
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-	info := infos[0]
-	mapping := info.ResourceMapping()
-	scaler, err := f.Scaler(mapping)
-	if err != nil {
-		return err
-	}
+	infos := []*resource.Info{}
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err == nil {
+			infos = append(infos, info)
+		}
+		return nil
+	})
 
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
 	if len(resourceVersion) != 0 && len(infos) > 1 {
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
 	}
-	currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
-	if currentSize != -1 && len(infos) > 1 {
-		return fmt.Errorf("cannot use --current-replicas with multiple resources")
-	}
-	precondition := &kubectl.ScalePrecondition{Size: currentSize, ResourceVersion: resourceVersion}
-	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
-	var waitForReplicas *kubectl.RetryParams
-	if timeout := cmdutil.GetFlagDuration(cmd, "timeout"); timeout != 0 {
-		waitForReplicas = kubectl.NewRetryParams(kubectl.Interval, timeout)
-	}
 
-	errs := []error{}
-	for _, info := range infos {
+	counter := 0
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+
+		mapping := info.ResourceMapping()
+		scaler, err := f.Scaler(mapping)
+		if err != nil {
+			return err
+		}
+
+		currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
+		precondition := &kubectl.ScalePrecondition{Size: currentSize, ResourceVersion: resourceVersion}
+		retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
+
+		var waitForReplicas *kubectl.RetryParams
+		if timeout := cmdutil.GetFlagDuration(cmd, "timeout"); timeout != 0 {
+			waitForReplicas = kubectl.NewRetryParams(kubectl.Interval, timeout)
+		}
+
 		if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
-			errs = append(errs, err)
-			continue
+			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
 			patchBytes, err := cmdutil.ChangeResourcePatch(info, f.Command())
 			if err != nil {
-				errs = append(errs, err)
-				continue
+				return err
 			}
 			mapping := info.ResourceMapping()
 			client, err := f.ClientForMapping(mapping)
@@ -168,12 +171,18 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			helper := resource.NewHelper(client, mapping)
 			_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patchBytes)
 			if err != nil {
-				errs = append(errs, err)
-				continue
+				return err
 			}
 		}
+		counter++
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "scaled")
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-
-	return utilerrors.NewAggregate(errs)
+	if counter == 0 {
+		return fmt.Errorf("no objects passed to scale")
+	}
+	return nil
 }
