@@ -22,7 +22,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -87,6 +89,20 @@ func (s storePodsNamespacer) List(selector labels.Selector) (pods api.PodList, e
 	return list, nil
 }
 
+// A verioned duplication.
+func (s storePodsNamespacer) V1List(selector labels.Selector) (pods v1.PodList, err error) {
+	list := v1.PodList{}
+	for _, m := range s.store.List() {
+		pod := m.(*v1.Pod)
+		if s.namespace == v1.NamespaceAll || s.namespace == pod.Namespace {
+			if selector.Matches(labels.Set(pod.Labels)) {
+				list.Items = append(list.Items, *pod)
+			}
+		}
+	}
+	return list, nil
+}
+
 // Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
 func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
 	_, exists, err := s.Store.Get(pod)
@@ -109,6 +125,15 @@ type StoreToNodeLister struct {
 func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
 	for _, m := range s.Store.List() {
 		machines.Items = append(machines.Items, *(m.(*api.Node)))
+	}
+	return machines, nil
+}
+
+// V1List is a temporary versioned duplication of List. The original code
+// will be removed once nodecontroller migrates to using a versioned client set.
+func (s *StoreToNodeLister) V1List() (machines v1.NodeList, err error) {
+	for _, m := range s.Store.List() {
+		machines.Items = append(machines.Items, *(m.(*v1.Node)))
 	}
 	return machines, nil
 }
@@ -153,11 +178,20 @@ func (s *StoreToReplicationControllerLister) Exists(controller *api.ReplicationC
 	return exists, nil
 }
 
-// StoreToReplicationControllerLister lists all controllers in the store.
-// TODO: converge on the interface in pkg/client
-func (s *StoreToReplicationControllerLister) List() (controllers []api.ReplicationController, err error) {
+// UnversionedList is an unversioned duplication of List. It will be removed
+// after we migrate scheduler to use clientset.
+func (s *StoreToReplicationControllerLister) UnversionedList() (controllers []api.ReplicationController, err error) {
 	for _, c := range s.Store.List() {
 		controllers = append(controllers, *(c.(*api.ReplicationController)))
+	}
+	return controllers, nil
+}
+
+// StoreToReplicationControllerLister lists all controllers in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToReplicationControllerLister) List() (controllers []v1.ReplicationController, err error) {
+	for _, c := range s.Store.List() {
+		controllers = append(controllers, *(c.(*v1.ReplicationController)))
 	}
 	return controllers, nil
 }
@@ -183,8 +217,10 @@ func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (c
 	return
 }
 
-// GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
-func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+// UnversionedGetPodControllers is a unversioned duplication of
+// GetPodControllers. It will be removed after we migrate scheduler to use
+// clientset.
+func (s *StoreToReplicationControllerLister) UnversionedGetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
 	var selector labels.Selector
 	var rc api.ReplicationController
 
@@ -195,6 +231,36 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 
 	for _, m := range s.Store.List() {
 		rc = *m.(*api.ReplicationController)
+		if rc.Namespace != pod.Namespace {
+			continue
+		}
+		labelSet := labels.Set(rc.Spec.Selector)
+		selector = labels.Set(rc.Spec.Selector).AsSelector()
+
+		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		controllers = append(controllers, rc)
+	}
+	if len(controllers) == 0 {
+		err = fmt.Errorf("could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
+// GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
+func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (controllers []v1.ReplicationController, err error) {
+	var selector labels.Selector
+	var rc v1.ReplicationController
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		rc = *m.(*v1.ReplicationController)
 		if rc.Namespace != pod.Namespace {
 			continue
 		}
@@ -345,6 +411,40 @@ func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensi
 	return
 }
 
+// VersionedGetPodReplicaSets has the same logic as the GetPodReplicaSets but operates on versioned pod and replicaset.
+// This is a temporary arrangement. GetPodReplicaSets will be removed when all controllers are migrated to use the versioned clients.
+func (s *StoreToReplicaSetLister) VersionedGetPodReplicaSets(pod *v1.Pod) (rss []v1beta1.ReplicaSet, err error) {
+	var selector labels.Selector
+	var rs v1beta1.ReplicaSet
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		rs = *m.(*v1beta1.ReplicaSet)
+		if rs.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = v1beta1.LabelSelectorAsSelector(rs.Spec.Selector)
+		if err != nil {
+			err = fmt.Errorf("invalid selector: %v", err)
+			return
+		}
+
+		// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		rss = append(rss, rs)
+	}
+	if len(rss) == 0 {
+		err = fmt.Errorf("could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
 // StoreToDaemonSetLister gives a store List and Exists methods. The store must contain only DaemonSets.
 type StoreToDaemonSetLister struct {
 	Store
@@ -368,6 +468,15 @@ func (s *StoreToDaemonSetLister) List() (dss extensions.DaemonSetList, err error
 	return dss, nil
 }
 
+// V1beta1List is a temporary versioned duplication of List. The original code
+// will be removed once nodecontroller migrates to using a versioned client set.
+func (s *StoreToDaemonSetLister) V1beta1List() (dss v1beta1.DaemonSetList, err error) {
+	for _, c := range s.Store.List() {
+		dss.Items = append(dss.Items, *(c.(*v1beta1.DaemonSet)))
+	}
+	return dss, nil
+}
+
 // GetPodDaemonSets returns a list of daemon sets managing a pod.
 // Returns an error if and only if no matching daemon sets are found.
 func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []extensions.DaemonSet, err error) {
@@ -385,6 +494,41 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 			continue
 		}
 		selector, err = unversioned.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		if err != nil {
+			// this should not happen if the DaemonSet passed validation
+			return nil, err
+		}
+
+		// If a daemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		daemonSets = append(daemonSets, daemonSet)
+	}
+	if len(daemonSets) == 0 {
+		err = fmt.Errorf("could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
+// VersionedGetPodDaemonSets is a temporary duplicate of GetPodDaemonSets. The
+// original code will be removed when we migrate nodecontroller to using a
+// versioned clientset.
+func (s *StoreToDaemonSetLister) VersionedGetPodDaemonSets(pod *v1.Pod) (daemonSets []v1beta1.DaemonSet, err error) {
+	var selector labels.Selector
+	var daemonSet v1beta1.DaemonSet
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no daemon sets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		daemonSet = *m.(*v1beta1.DaemonSet)
+		if daemonSet.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = v1beta1.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
@@ -483,17 +627,17 @@ func (s *StoreToJobLister) Exists(job *extensions.Job) (bool, error) {
 }
 
 // StoreToJobLister lists all jobs in the store.
-func (s *StoreToJobLister) List() (jobs extensions.JobList, err error) {
+func (s *StoreToJobLister) List() (jobs v1beta1.JobList, err error) {
 	for _, c := range s.Store.List() {
-		jobs.Items = append(jobs.Items, *(c.(*extensions.Job)))
+		jobs.Items = append(jobs.Items, *(c.(*v1beta1.Job)))
 	}
 	return jobs, nil
 }
 
 // GetPodJobs returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
-func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err error) {
+func (s *StoreToJobLister) GetPodJobs(pod *v1.Pod) (jobs []v1beta1.Job, err error) {
 	var selector labels.Selector
-	var job extensions.Job
+	var job v1beta1.Job
 
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no jobs found for pod %v because it has no labels", pod.Name)
@@ -501,12 +645,12 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 	}
 
 	for _, m := range s.Store.List() {
-		job = *m.(*extensions.Job)
+		job = *m.(*v1beta1.Job)
 		if job.Namespace != pod.Namespace {
 			continue
 		}
 
-		selector, _ = unversioned.LabelSelectorAsSelector(job.Spec.Selector)
+		selector, _ = v1beta1.LabelSelectorAsSelector(job.Spec.Selector)
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}

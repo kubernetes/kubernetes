@@ -89,7 +89,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
 		}
 	}
-	rcs, err := s.controllerLister.GetPodControllers(pod)
+	rcs, err := s.controllerLister.UnversionedGetPodControllers(pod)
 	if err == nil {
 		for _, rc := range rcs {
 			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))

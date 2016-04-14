@@ -18,6 +18,7 @@ package fake
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/fields"
@@ -25,9 +26,9 @@ import (
 )
 
 func (c *FakeEvents) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
-	action := core.NewRootCreateAction("events", event)
+	action := core.NewRootCreateAction(unversioned.GroupVersionResource{Version: "v1", Resource: "events"}, event)
 	if c.ns != "" {
-		action = core.NewCreateAction("events", c.ns, event)
+		action = core.NewCreateAction(unversioned.GroupVersionResource{Version: "v1", Resource: "events"}, c.ns, event)
 	}
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
@@ -39,9 +40,9 @@ func (c *FakeEvents) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error
 
 // Update replaces an existing event. Returns the copy of the event the server returns, or an error.
 func (c *FakeEvents) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
-	action := core.NewRootUpdateAction("events", event)
+	action := core.NewRootUpdateAction(unversioned.GroupVersionResource{Version: "v1", Resource: "events"}, event)
 	if c.ns != "" {
-		action = core.NewUpdateAction("events", c.ns, event)
+		action = core.NewUpdateAction(unversioned.GroupVersionResource{Version: "v1", Resource: "events"}, c.ns, event)
 	}
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
@@ -53,9 +54,9 @@ func (c *FakeEvents) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error
 
 // Patch patches an existing event. Returns the copy of the event the server returns, or an error.
 func (c *FakeEvents) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
-	action := core.NewRootPatchAction("events", event)
+	action := core.NewRootPatchAction(unversioned.GroupVersionResource{Version: "v1", Resource: "events"}, event)
 	if c.ns != "" {
-		action = core.NewPatchAction("events", c.ns, event)
+		action = core.NewPatchAction(unversioned.GroupVersionResource{Version: "v1", Resource: "events"}, c.ns, event)
 	}
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
@@ -67,9 +68,9 @@ func (c *FakeEvents) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
 
 // Search returns a list of events matching the specified object.
 func (c *FakeEvents) Search(objOrRef runtime.Object) (*v1.EventList, error) {
-	action := core.NewRootListAction("events", api.ListOptions{})
+	action := core.NewRootListAction(unversioned.GroupVersionResource{Version: "v1", Resource: "events"}, api.ListOptions{})
 	if c.ns != "" {
-		action = core.NewListAction("events", c.ns, api.ListOptions{})
+		action = core.NewListAction(unversioned.GroupVersionResource{Version: "v1", Resource: "events"}, c.ns, api.ListOptions{})
 	}
 	obj, err := c.Fake.Invokes(action, &v1.EventList{})
 	if obj == nil {
@@ -82,7 +83,7 @@ func (c *FakeEvents) Search(objOrRef runtime.Object) (*v1.EventList, error) {
 func (c *FakeEvents) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
 	action := core.GenericActionImpl{}
 	action.Verb = "get-field-selector"
-	action.Resource = "events"
+	action.Resource = unversioned.GroupVersionResource{Version: "v1", Resource: "events"}
 
 	c.Fake.Invokes(action, nil)
 	return fields.Everything()

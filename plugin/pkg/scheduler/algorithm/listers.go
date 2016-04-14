@@ -96,22 +96,22 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []api.Service,
 
 // ControllerLister interface represents anything that can produce a list of ReplicationController; the list is consumed by a scheduler.
 type ControllerLister interface {
-	// Lists all the replication controllers
-	List() ([]api.ReplicationController, error)
+	// UnversionedLists all the replication controllers
+	UnversionedList() ([]api.ReplicationController, error)
 	// Gets the services for the given pod
-	GetPodControllers(*api.Pod) ([]api.ReplicationController, error)
+	UnversionedGetPodControllers(*api.Pod) ([]api.ReplicationController, error)
 }
 
 // EmptyControllerLister implements ControllerLister on []api.ReplicationController returning empty data
 type EmptyControllerLister struct{}
 
 // List returns nil
-func (f EmptyControllerLister) List() ([]api.ReplicationController, error) {
+func (f EmptyControllerLister) UnversionedList() ([]api.ReplicationController, error) {
 	return nil, nil
 }
 
 // GetPodControllers returns nil
-func (f EmptyControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+func (f EmptyControllerLister) UnversionedGetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
 	return nil, nil
 }
 
@@ -123,8 +123,8 @@ func (f FakeControllerLister) List() ([]api.ReplicationController, error) {
 	return f, nil
 }
 
-// GetPodControllers gets the ReplicationControllers that have the selector that match the labels on the given pod
-func (f FakeControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+// UnversionedGetPodControllers gets the ReplicationControllers that have the selector that match the labels on the given pod
+func (f FakeControllerLister) UnversionedGetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
 	var selector labels.Selector
 
 	for _, controller := range f {

@@ -17,6 +17,7 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -24,7 +25,7 @@ import (
 func (c *FakeNamespaces) Finalize(namespace *v1.Namespace) (*v1.Namespace, error) {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
-	action.Resource = "namespaces"
+	action.Resource = unversioned.GroupVersionResource{Version: "v1", Resource: "namespaces"}
 	action.Subresource = "finalize"
 	action.Object = namespace
 

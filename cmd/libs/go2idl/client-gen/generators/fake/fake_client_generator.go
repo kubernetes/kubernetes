@@ -54,6 +54,7 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 					},
 					outputPackage: outputPackagePath,
 					group:         gv.Group,
+					version:       gv.Version,
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
 				})

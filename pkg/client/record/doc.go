@@ -15,4 +15,8 @@ limitations under the License.
 */
 
 // Package record has all client logic for recording and reporting events.
+
+// This package is a temporary duplication of the record/v1 package, the only
+// difference is that this package operates on the unversioned Event. We will
+// remove this package when we convert components to use a versioned client set.
 package record

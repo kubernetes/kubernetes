@@ -33,6 +33,7 @@ import (
 	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/resource"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -1148,6 +1149,30 @@ func validateProbe(probe *api.Probe, fldPath *field.Path) field.ErrorList {
 // AccumulateUniqueHostPorts extracts each HostPort of each Container,
 // accumulating the results and returning an error if any ports conflict.
 func AccumulateUniqueHostPorts(containers []api.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for ci, ctr := range containers {
+		idxPath := fldPath.Index(ci)
+		portsPath := idxPath.Child("ports")
+		for pi := range ctr.Ports {
+			idxPath := portsPath.Index(pi)
+			port := ctr.Ports[pi].HostPort
+			if port == 0 {
+				continue
+			}
+			str := fmt.Sprintf("%d/%s", port, ctr.Ports[pi].Protocol)
+			if accumulator.Has(str) {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("hostPort"), str))
+			} else {
+				accumulator.Insert(str)
+			}
+		}
+	}
+	return allErrs
+}
+
+// V1AccumulateUniqueHostPorts is a versioned duplication of AccumulateUniqueHostPorts.
+func V1AccumulateUniqueHostPorts(containers []v1.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for ci, ctr := range containers {

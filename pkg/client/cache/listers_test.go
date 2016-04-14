@@ -21,7 +21,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -126,34 +128,34 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
 	lister := StoreToReplicationControllerLister{store}
 	testCases := []struct {
-		inRCs      []*api.ReplicationController
-		list       func() ([]api.ReplicationController, error)
+		inRCs      []*v1.ReplicationController
+		list       func() ([]v1.ReplicationController, error)
 		outRCNames sets.String
 		expectErr  bool
 	}{
 		// Basic listing with all labels and no selectors
 		{
-			inRCs: []*api.ReplicationController{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+			inRCs: []*v1.ReplicationController{
+				{ObjectMeta: v1.ObjectMeta{Name: "basic"}},
 			},
-			list: func() ([]api.ReplicationController, error) {
+			list: func() ([]v1.ReplicationController, error) {
 				return lister.List()
 			},
 			outRCNames: sets.NewString("basic"),
 		},
 		// No pod labels
 		{
-			inRCs: []*api.ReplicationController{
+			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
-					Spec: api.ReplicationControllerSpec{
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
+					Spec: v1.ReplicationControllerSpec{
 						Selector: map[string]string{"foo": "baz"},
 					},
 				},
 			},
-			list: func() ([]api.ReplicationController, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
+			list: func() ([]v1.ReplicationController, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
 				return lister.GetPodControllers(pod)
 			},
@@ -162,14 +164,14 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 		},
 		// No RC selectors
 		{
-			inRCs: []*api.ReplicationController{
+			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
-			list: func() ([]api.ReplicationController, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+			list: func() ([]v1.ReplicationController, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod1",
 						Namespace: "ns",
 						Labels:    map[string]string{"foo": "bar"},
@@ -182,23 +184,23 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 		},
 		// Matching labels to selectors and namespace
 		{
-			inRCs: []*api.ReplicationController{
+			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Spec: api.ReplicationControllerSpec{
+					ObjectMeta: v1.ObjectMeta{Name: "foo"},
+					Spec: v1.ReplicationControllerSpec{
 						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
-					Spec: api.ReplicationControllerSpec{
+					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
+					Spec: v1.ReplicationControllerSpec{
 						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 			},
-			list: func() ([]api.ReplicationController, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+			list: func() ([]v1.ReplicationController, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod1",
 						Labels:    map[string]string{"foo": "bar"},
 						Namespace: "ns",
@@ -476,18 +478,18 @@ func TestStoreToJobLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
 	lister := StoreToJobLister{store}
 	testCases := []struct {
-		inJobs      []*extensions.Job
-		list        func() ([]extensions.Job, error)
+		inJobs      []*v1beta1.Job
+		list        func() ([]v1beta1.Job, error)
 		outJobNames sets.String
 		expectErr   bool
 		msg         string
 	}{
 		// Basic listing
 		{
-			inJobs: []*extensions.Job{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+			inJobs: []*v1beta1.Job{
+				{ObjectMeta: v1.ObjectMeta{Name: "basic"}},
 			},
-			list: func() ([]extensions.Job, error) {
+			list: func() ([]v1beta1.Job, error) {
 				list, err := lister.List()
 				return list.Items, err
 			},
@@ -496,12 +498,12 @@ func TestStoreToJobLister(t *testing.T) {
 		},
 		// Listing multiple jobs
 		{
-			inJobs: []*extensions.Job{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
-				{ObjectMeta: api.ObjectMeta{Name: "complex"}},
-				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
+			inJobs: []*v1beta1.Job{
+				{ObjectMeta: v1.ObjectMeta{Name: "basic"}},
+				{ObjectMeta: v1.ObjectMeta{Name: "complex"}},
+				{ObjectMeta: v1.ObjectMeta{Name: "complex2"}},
 			},
-			list: func() ([]extensions.Job, error) {
+			list: func() ([]v1beta1.Job, error) {
 				list, err := lister.List()
 				return list.Items, err
 			},
@@ -510,19 +512,19 @@ func TestStoreToJobLister(t *testing.T) {
 		},
 		// No pod labels
 		{
-			inJobs: []*extensions.Job{
+			inJobs: []*v1beta1.Job{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
-					Spec: extensions.JobSpec{
-						Selector: &unversioned.LabelSelector{
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
+					Spec: v1beta1.JobSpec{
+						Selector: &v1beta1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "baz"},
 						},
 					},
 				},
 			},
-			list: func() ([]extensions.Job, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{Name: "pod", Namespace: "ns"},
+			list: func() ([]v1beta1.Job, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{Name: "pod", Namespace: "ns"},
 				}
 				return lister.GetPodJobs(pod)
 			},
@@ -532,14 +534,14 @@ func TestStoreToJobLister(t *testing.T) {
 		},
 		// No Job selectors
 		{
-			inJobs: []*extensions.Job{
+			inJobs: []*v1beta1.Job{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
-			list: func() ([]extensions.Job, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+			list: func() ([]v1beta1.Job, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod",
 						Namespace: "ns",
 						Labels:    map[string]string{"foo": "bar"},
@@ -553,27 +555,27 @@ func TestStoreToJobLister(t *testing.T) {
 		},
 		// Matching labels to selectors and namespace
 		{
-			inJobs: []*extensions.Job{
+			inJobs: []*v1beta1.Job{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Spec: extensions.JobSpec{
-						Selector: &unversioned.LabelSelector{
+					ObjectMeta: v1.ObjectMeta{Name: "foo"},
+					Spec: v1beta1.JobSpec{
+						Selector: &v1beta1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
-					Spec: extensions.JobSpec{
-						Selector: &unversioned.LabelSelector{
+					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
+					Spec: v1beta1.JobSpec{
+						Selector: &v1beta1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
 				},
 			},
-			list: func() ([]extensions.Job, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+			list: func() ([]v1beta1.Job, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod",
 						Labels:    map[string]string{"foo": "bar"},
 						Namespace: "ns",
@@ -586,27 +588,27 @@ func TestStoreToJobLister(t *testing.T) {
 		},
 		// Matching labels to selectors and namespace, error case
 		{
-			inJobs: []*extensions.Job{
+			inJobs: []*v1beta1.Job{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "foo"},
-					Spec: extensions.JobSpec{
-						Selector: &unversioned.LabelSelector{
+					ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "foo"},
+					Spec: v1beta1.JobSpec{
+						Selector: &v1beta1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "bar"},
-					Spec: extensions.JobSpec{
-						Selector: &unversioned.LabelSelector{
+					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "bar"},
+					Spec: v1beta1.JobSpec{
+						Selector: &v1beta1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
 						},
 					},
 				},
 			},
-			list: func() ([]extensions.Job, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+			list: func() ([]v1beta1.Job, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod",
 						Labels:    map[string]string{"foo": "bar"},
 						Namespace: "baz",
