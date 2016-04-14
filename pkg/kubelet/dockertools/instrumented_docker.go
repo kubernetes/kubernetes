@@ -67,7 +67,7 @@ func (in instrumentedDockerInterface) InspectContainer(id string) (*dockertypes.
 	return out, err
 }
 
-func (in instrumentedDockerInterface) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
+func (in instrumentedDockerInterface) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
 

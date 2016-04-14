@@ -28,6 +28,7 @@ import (
 
 	"github.com/docker/docker/pkg/jsonmessage"
 	dockertypes "github.com/docker/engine-api/types"
+	dockernat "github.com/docker/go-connections/nat"
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -744,37 +745,37 @@ func TestMakePortsAndBindings(t *testing.T) {
 	}
 
 	// Construct expected bindings
-	expectPortBindings := map[string][]docker.PortBinding{
+	expectPortBindings := map[string][]dockernat.PortBinding{
 		"80/tcp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "8080",
 				HostIP:   "127.0.0.1",
 			},
 		},
 		"443/tcp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "443",
 				HostIP:   "",
 			},
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "446",
 				HostIP:   "",
 			},
 		},
 		"443/udp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "446",
 				HostIP:   "",
 			},
 		},
 		"444/udp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "444",
 				HostIP:   "",
 			},
 		},
 		"445/tcp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "445",
 				HostIP:   "",
 			},

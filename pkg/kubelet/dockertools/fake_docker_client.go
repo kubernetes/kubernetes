@@ -305,7 +305,7 @@ func (f *FakeDockerClient) normalSleep(mean, stdDev, cutOffMillis int) {
 
 // CreateContainer is a test-spy implementation of DockerInterface.CreateContainer.
 // It adds an entry "create" to the internal method call record.
-func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*docker.Container, error) {
+func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "create")
@@ -315,28 +315,21 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	// This is not a very good fake. We'll just add this container's name to the list.
 	// Docker likes to add a '/', so copy that behavior.
 	name := "/" + c.Name
+	id := name
 	f.Created = append(f.Created, name)
 	// The newest container should be in front, because we assume so in GetPodStatus()
 	f.RunningContainerList = append([]dockertypes.Container{
 		{ID: name, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
 	}, f.RunningContainerList...)
-	// TODO(random-liu): Remove this convertion when we refactor CreateContainer
-	config := &dockercontainer.Config{}
-	convertType(c.Config, config)
-	hostConfig := &dockercontainer.HostConfig{}
-	convertType(c.HostConfig, hostConfig)
-	container := convertFakeContainer(&FakeContainer{ID: name, Name: name, Config: config, HostConfig: hostConfig})
-	containerCopy := *container
-	f.ContainerMap[name] = &containerCopy
+	f.ContainerMap[name] = convertFakeContainer(&FakeContainer{ID: id, Name: name, Config: c.Config, HostConfig: c.HostConfig})
 	f.normalSleep(100, 25, 25)
-	// TODO(random-liu): This will be refactored soon, we could do this because only the returned id is used.
-	return &docker.Container{ID: container.ID}, nil
+	return &dockertypes.ContainerCreateResponse{ID: id}, nil
 }
 
 // StartContainer is a test-spy implementation of DockerInterface.StartContainer.
 // It adds an entry "start" to the internal method call record.
 // The HostConfig at StartContainer will be deprecated from docker 1.10. Now in
-// docker manager the HostConfig is set when CreateContainer().
+// docker manager the HostConfig is set when ContainerCreate().
 // TODO(random-liu): Remove the HostConfig here when it is completely removed in
 // docker 1.12.
 func (f *FakeDockerClient) StartContainer(id string, _ *docker.HostConfig) error {
@@ -542,4 +535,9 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// dockerTimestampToString converts the timestamp to string
+func dockerTimestampToString(t time.Time) string {
+	return t.Format(time.RFC3339Nano)
 }

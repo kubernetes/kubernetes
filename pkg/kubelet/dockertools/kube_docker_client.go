@@ -29,7 +29,6 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
-	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerfilters "github.com/docker/engine-api/types/filters"
 	docker "github.com/fsouza/go-dockerclient"
 	"golang.org/x/net/context"
@@ -125,24 +124,12 @@ func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 	return &containerJSON, nil
 }
 
-func (d *kubeDockerClient) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
-	config := &dockercontainer.Config{}
-	if err := convertType(opts.Config, config); err != nil {
-		return nil, err
-	}
-	hostConfig := &dockercontainer.HostConfig{}
-	if err := convertType(opts.HostConfig, hostConfig); err != nil {
-		return nil, err
-	}
-	resp, err := d.client.ContainerCreate(getDefaultContext(), config, hostConfig, nil, opts.Name)
+func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
+	createResp, err := d.client.ContainerCreate(getDefaultContext(), opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
 	if err != nil {
 		return nil, err
 	}
-	container := &docker.Container{}
-	if err := convertType(&resp, container); err != nil {
-		return nil, err
-	}
-	return container, nil
+	return &createResp, nil
 }
 
 // TODO(random-liu): The HostConfig at container start is deprecated, will remove this in the following refactoring.
@@ -382,11 +369,6 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 func parseDockerTimestamp(s string) (time.Time, error) {
 	// Timestamp returned by Docker is in time.RFC3339Nano format.
 	return time.Parse(time.RFC3339Nano, s)
-}
-
-// dockerTimestampToString converts the timestamp to string
-func dockerTimestampToString(t time.Time) string {
-	return t.Format(time.RFC3339Nano)
 }
 
 // containerNotFoundError is the error returned by InspectContainer when container not found. We
