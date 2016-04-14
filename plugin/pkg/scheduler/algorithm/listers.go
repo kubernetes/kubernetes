@@ -119,7 +119,7 @@ func (f EmptyControllerLister) UnversionedGetPodControllers(pod *api.Pod) (contr
 type FakeControllerLister []api.ReplicationController
 
 // List returns []api.ReplicationController, the list of all ReplicationControllers.
-func (f FakeControllerLister) List() ([]api.ReplicationController, error) {
+func (f FakeControllerLister) UnversionedList() ([]api.ReplicationController, error) {
 	return f, nil
 }
 
