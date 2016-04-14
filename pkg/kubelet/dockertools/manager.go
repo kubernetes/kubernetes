@@ -33,6 +33,9 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	dockertypes "github.com/docker/engine-api/types"
+	dockercontainer "github.com/docker/engine-api/types/container"
+	dockerstrslice "github.com/docker/engine-api/types/strslice"
+	dockernat "github.com/docker/go-connections/nat"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -477,9 +480,9 @@ func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool) (r
 	return
 }
 
-func makePortsAndBindings(portMappings []kubecontainer.PortMapping) (map[docker.Port]struct{}, map[docker.Port][]docker.PortBinding) {
-	exposedPorts := map[docker.Port]struct{}{}
-	portBindings := map[docker.Port][]docker.PortBinding{}
+func makePortsAndBindings(portMappings []kubecontainer.PortMapping) (map[dockernat.Port]struct{}, map[dockernat.Port][]dockernat.PortBinding) {
+	exposedPorts := map[dockernat.Port]struct{}{}
+	portBindings := map[dockernat.Port][]dockernat.PortBinding{}
 	for _, port := range portMappings {
 		exteriorPort := port.HostPort
 		if exteriorPort == 0 {
@@ -500,10 +503,10 @@ func makePortsAndBindings(portMappings []kubecontainer.PortMapping) (map[docker.
 			protocol = "/tcp"
 		}
 
-		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
+		dockerPort := dockernat.Port(strconv.Itoa(interiorPort) + protocol)
 		exposedPorts[dockerPort] = struct{}{}
 
-		hostBinding := docker.PortBinding{
+		hostBinding := dockernat.PortBinding{
 			HostPort: strconv.Itoa(exteriorPort),
 			HostIP:   port.HostIP,
 		}
@@ -514,7 +517,7 @@ func makePortsAndBindings(portMappings []kubecontainer.PortMapping) (map[docker.
 			portBindings[dockerPort] = append(existedBindings, hostBinding)
 		} else {
 			// Otherwise, it's fresh new port binding
-			portBindings[dockerPort] = []docker.PortBinding{
+			portBindings[dockerPort] = []dockernat.PortBinding{
 				hostBinding,
 			}
 		}
@@ -599,17 +602,18 @@ func (dm *DockerManager) runContainer(
 		}
 	}
 
-	hc := &docker.HostConfig{
+	hc := &dockercontainer.HostConfig{
 		Binds:          binds,
-		NetworkMode:    netMode,
-		IpcMode:        ipcMode,
-		UTSMode:        utsMode,
-		PidMode:        pidMode,
+		NetworkMode:    dockercontainer.NetworkMode(netMode),
+		IpcMode:        dockercontainer.IpcMode(ipcMode),
+		UTSMode:        dockercontainer.UTSMode(utsMode),
+		PidMode:        dockercontainer.PidMode(pidMode),
 		ReadonlyRootfs: readOnlyRootFilesystem(container),
-		// Memory and CPU are set here for newer versions of Docker (1.6+).
-		Memory:      memoryLimit,
-		MemorySwap:  -1,
-		CPUShares:   cpuShares,
+		Resources: dockercontainer.Resources{
+			Memory:     memoryLimit,
+			MemorySwap: -1,
+			CPUShares:  cpuShares,
+		},
 		SecurityOpt: securityOpts,
 	}
 
@@ -633,15 +637,11 @@ func (dm *DockerManager) runContainer(
 		hc.CgroupParent = opts.CgroupParent
 	}
 
-	dockerOpts := docker.CreateContainerOptions{
+	dockerOpts := dockertypes.ContainerCreateConfig{
 		Name: containerName,
-		Config: &docker.Config{
-			Env:   makeEnvList(opts.Envs),
-			Image: container.Image,
-			// Memory and CPU are set here for older versions of Docker (pre-1.6).
-			Memory:     memoryLimit,
-			MemorySwap: -1,
-			CPUShares:  cpuShares,
+		Config: &dockercontainer.Config{
+			Env:        makeEnvList(opts.Envs),
+			Image:      container.Image,
 			WorkingDir: container.WorkingDir,
 			Labels:     labels,
 			// Interactive containers:
@@ -657,36 +657,39 @@ func (dm *DockerManager) runContainer(
 		setInfraContainerNetworkConfig(pod, netMode, opts, dockerOpts)
 	}
 
-	setEntrypointAndCommand(container, opts, &dockerOpts)
+	setEntrypointAndCommand(container, opts, dockerOpts)
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
 	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
 	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig)
-	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
+	createResp, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
 		dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
 		return kubecontainer.ContainerID{}, err
 	}
-	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created container with docker id %v", utilstrings.ShortenString(dockerContainer.ID, 12))
+	if len(createResp.Warnings) != 0 {
+		glog.V(2).Infof("Container %q of pod %q created with warnings: %v", container.Name, format.Pod(pod), createResp.Warnings)
+	}
+	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created container with docker id %v", utilstrings.ShortenString(createResp.ID, 12))
 
-	if err = dm.client.StartContainer(dockerContainer.ID, nil); err != nil {
+	if err = dm.client.StartContainer(createResp.ID, nil); err != nil {
 		dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToStartContainer,
-			"Failed to start container with docker id %v with error: %v", utilstrings.ShortenString(dockerContainer.ID, 12), err)
+			"Failed to start container with docker id %v with error: %v", utilstrings.ShortenString(createResp.ID, 12), err)
 		return kubecontainer.ContainerID{}, err
 	}
-	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.StartedContainer, "Started container with docker id %v", utilstrings.ShortenString(dockerContainer.ID, 12))
+	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.StartedContainer, "Started container with docker id %v", utilstrings.ShortenString(createResp.ID, 12))
 
-	return kubecontainer.DockerID(dockerContainer.ID).ContainerID(), nil
+	return kubecontainer.DockerID(createResp.ID).ContainerID(), nil
 }
 
 // setInfraContainerNetworkConfig sets the network configuration for the infra-container. We only set network configuration for infra-container, all
 // the user containers will share the same network namespace with infra-container.
-func setInfraContainerNetworkConfig(pod *api.Pod, netMode string, opts *kubecontainer.RunContainerOptions, dockerOpts docker.CreateContainerOptions) {
+func setInfraContainerNetworkConfig(pod *api.Pod, netMode string, opts *kubecontainer.RunContainerOptions, dockerOpts dockertypes.ContainerCreateConfig) {
 	exposedPorts, portBindings := makePortsAndBindings(opts.PortMappings)
 	dockerOpts.Config.ExposedPorts = exposedPorts
-	dockerOpts.HostConfig.PortBindings = portBindings
+	dockerOpts.HostConfig.PortBindings = dockernat.PortMap(portBindings)
 
 	if netMode != namespaceModeHost {
 		dockerOpts.Config.Hostname = opts.Hostname
@@ -699,11 +702,11 @@ func setInfraContainerNetworkConfig(pod *api.Pod, netMode string, opts *kubecont
 	}
 }
 
-func setEntrypointAndCommand(container *api.Container, opts *kubecontainer.RunContainerOptions, dockerOpts *docker.CreateContainerOptions) {
+func setEntrypointAndCommand(container *api.Container, opts *kubecontainer.RunContainerOptions, dockerOpts dockertypes.ContainerCreateConfig) {
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
 
-	dockerOpts.Config.Entrypoint = command
-	dockerOpts.Config.Cmd = args
+	dockerOpts.Config.Entrypoint = dockerstrslice.StrSlice(command)
+	dockerOpts.Config.Cmd = dockerstrslice.StrSlice(args)
 }
 
 // A helper function to get the KubeletContainerName and hash from a docker

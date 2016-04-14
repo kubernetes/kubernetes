@@ -19,21 +19,21 @@ package securitycontext
 import (
 	"k8s.io/kubernetes/pkg/api"
 
-	docker "github.com/fsouza/go-dockerclient"
+	dockercontainer "github.com/docker/engine-api/types/container"
 )
 
 type SecurityContextProvider interface {
 	// ModifyContainerConfig is called before the Docker createContainer call.
 	// The security context provider can make changes to the Config with which
 	// the container is created.
-	ModifyContainerConfig(pod *api.Pod, container *api.Container, config *docker.Config)
+	ModifyContainerConfig(pod *api.Pod, container *api.Container, config *dockercontainer.Config)
 
 	// ModifyHostConfig is called before the Docker createContainer call.
 	// The security context provider can make changes to the HostConfig, affecting
 	// security options, whether the container is privileged, volume binds, etc.
 	// An error is returned if it's not possible to secure the container as requested
 	// with a security context.
-	ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig)
+	ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig)
 }
 
 const (

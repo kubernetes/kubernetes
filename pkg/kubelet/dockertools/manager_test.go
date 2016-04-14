@@ -31,6 +31,7 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
+	dockerstrslice "github.com/docker/engine-api/types/strslice"
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
@@ -164,13 +165,13 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 		name      string
 		container *api.Container
 		envs      []kubecontainer.EnvVar
-		expected  *docker.CreateContainerOptions
+		expected  *dockertypes.ContainerCreateConfig
 	}{
 		{
 			name:      "none",
 			container: &api.Container{},
-			expected: &docker.CreateContainerOptions{
-				Config: &docker.Config{},
+			expected: &dockertypes.ContainerCreateConfig{
+				Config: &dockercontainer.Config{},
 			},
 		},
 		{
@@ -178,9 +179,9 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 			container: &api.Container{
 				Command: []string{"foo", "bar"},
 			},
-			expected: &docker.CreateContainerOptions{
-				Config: &docker.Config{
-					Entrypoint: []string{"foo", "bar"},
+			expected: &dockertypes.ContainerCreateConfig{
+				Config: &dockercontainer.Config{
+					Entrypoint: dockerstrslice.StrSlice([]string{"foo", "bar"}),
 				},
 			},
 		},
@@ -199,9 +200,9 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 					Value: "boo",
 				},
 			},
-			expected: &docker.CreateContainerOptions{
-				Config: &docker.Config{
-					Entrypoint: []string{"foo", "zoo", "boo"},
+			expected: &dockertypes.ContainerCreateConfig{
+				Config: &dockercontainer.Config{
+					Entrypoint: dockerstrslice.StrSlice([]string{"foo", "zoo", "boo"}),
 				},
 			},
 		},
@@ -210,8 +211,8 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 			container: &api.Container{
 				Args: []string{"foo", "bar"},
 			},
-			expected: &docker.CreateContainerOptions{
-				Config: &docker.Config{
+			expected: &dockertypes.ContainerCreateConfig{
+				Config: &dockercontainer.Config{
 					Cmd: []string{"foo", "bar"},
 				},
 			},
@@ -231,9 +232,9 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 					Value: "trap",
 				},
 			},
-			expected: &docker.CreateContainerOptions{
-				Config: &docker.Config{
-					Cmd: []string{"zap", "hap", "trap"},
+			expected: &dockertypes.ContainerCreateConfig{
+				Config: &dockercontainer.Config{
+					Cmd: dockerstrslice.StrSlice([]string{"zap", "hap", "trap"}),
 				},
 			},
 		},
@@ -243,10 +244,10 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 				Command: []string{"foo"},
 				Args:    []string{"bar", "baz"},
 			},
-			expected: &docker.CreateContainerOptions{
-				Config: &docker.Config{
-					Entrypoint: []string{"foo"},
-					Cmd:        []string{"bar", "baz"},
+			expected: &dockertypes.ContainerCreateConfig{
+				Config: &dockercontainer.Config{
+					Entrypoint: dockerstrslice.StrSlice([]string{"foo"}),
+					Cmd:        dockerstrslice.StrSlice([]string{"bar", "baz"}),
 				},
 			},
 		},
@@ -270,10 +271,10 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 					Value: "roo",
 				},
 			},
-			expected: &docker.CreateContainerOptions{
-				Config: &docker.Config{
-					Entrypoint: []string{"boo--zoo", "foo", "roo"},
-					Cmd:        []string{"foo", "zoo", "boo"},
+			expected: &dockertypes.ContainerCreateConfig{
+				Config: &dockercontainer.Config{
+					Entrypoint: dockerstrslice.StrSlice([]string{"boo--zoo", "foo", "roo"}),
+					Cmd:        dockerstrslice.StrSlice([]string{"foo", "zoo", "boo"}),
 				},
 			},
 		},
@@ -284,8 +285,8 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 			Envs: tc.envs,
 		}
 
-		actualOpts := &docker.CreateContainerOptions{
-			Config: &docker.Config{},
+		actualOpts := dockertypes.ContainerCreateConfig{
+			Config: &dockercontainer.Config{},
 		}
 		setEntrypointAndCommand(tc.container, opts, actualOpts)
 
