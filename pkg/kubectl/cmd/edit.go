@@ -86,6 +86,15 @@ var errExit = fmt.Errorf("exit directly")
 func NewCmdEdit(f *cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &EditOptions{}
 
+	// retrieve a list of handled resources from printer as valid args
+	validArgs, argAliases := []string{}, []string{}
+	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
+	cmdutil.CheckErr(err)
+	if p != nil {
+		validArgs = p.HandledResources()
+		argAliases = kubectl.ResourceAliases(validArgs)
+	}
+
 	cmd := &cobra.Command{
 		Use:     "edit (RESOURCE/NAME | -f FILENAME)",
 		Short:   "Edit a resource on the server",
@@ -98,6 +107,8 @@ func NewCmdEdit(f *cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 			}
 			cmdutil.CheckErr(err)
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	usage := "Filename, directory, or URL to file to use to edit the resource"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)

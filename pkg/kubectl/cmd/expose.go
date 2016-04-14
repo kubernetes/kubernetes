@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -38,14 +39,21 @@ type ExposeOptions struct {
 }
 
 const (
-	expose_long = `Take a deployment, service, replica set, replication controller, or pod and expose it as a new Kubernetes service.
+	expose_resources = `
+  pod (po), service (svc), replicationcontroller (rc),
+  deployment, replicaset (rs)
+`
+
+	expose_long = `Expose a resource as a new Kubernetes service.
 
 Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
 for that resource as the selector for a new service on the specified port. A deployment or replica set
 will be exposed as a service only if its selector is convertible to a selector that service supports,
 i.e. when the selector contains only the matchLabels component. Note that if no port is specified via
 --port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no 
-labels are specified, the new service will re-use the labels from the resource it exposes.`
+labels are specified, the new service will re-use the labels from the resource it exposes.
+
+Possible resources include (case insensitive):` + expose_resources
 
 	expose_example = `# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 kubectl expose rc nginx --port=80 --target-port=8000
@@ -72,6 +80,13 @@ kubectl expose deployment nginx --port=80 --target-port=8000`
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ExposeOptions{}
 
+	validArgs, argAliases := []string{}, []string{}
+	resources := regexp.MustCompile(`\s*,`).Split(expose_resources, -1)
+	for _, r := range resources {
+		validArgs = append(validArgs, strings.Fields(r)[0])
+		argAliases = kubectl.ResourceAliases(validArgs)
+	}
+
 	cmd := &cobra.Command{
 		Use:     "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
 		Short:   "Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service",
@@ -81,6 +96,8 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunExpose(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "service/v2", "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.")

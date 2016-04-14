@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/golang/glog"
@@ -58,6 +59,13 @@ type AnnotateOptions struct {
 }
 
 const (
+	annotate_resources = `
+  pod (po), service (svc), replicationcontroller (rc),
+  node (no), event (ev), componentstatuse (cs),
+  limitrange (limits), persistentvolume (pv), persistentvolumeclaim (pvc),
+  horizontalpodautoscaler (hpa), resourcequota (quota), secret
+`
+
 	annotate_long = `Update the annotations on one or more resources.
 
 An annotation is a key/value pair that can hold larger (compared to a label), and possibly not human-readable, data.
@@ -65,10 +73,8 @@ It is intended to store non-identifying auxiliary data, especially data manipula
 If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
 If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
-Possible resources include (case insensitive): pods (po), services (svc),
-replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
-limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-horizontalpodautoscalers (hpa), resourcequotas (quota) or secrets.`
+Possible resources include (case insensitive):` + annotate_resources
+
 	annotate_example = `# Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
 # If the same annotation is set multiple times, only the last value will be applied
 kubectl annotate pods foo description='my frontend'
@@ -93,6 +99,13 @@ kubectl annotate pods foo description-`
 func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AnnotateOptions{}
 
+	validArgs, argAliases := []string{}, []string{}
+	resources := regexp.MustCompile(`\s*,`).Split(annotate_resources, -1)
+	for _, r := range resources {
+		validArgs = append(validArgs, strings.Fields(r)[0])
+		argAliases = kubectl.ResourceAliases(validArgs)
+	}
+
 	cmd := &cobra.Command{
 		Use:     "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   "Update the annotations on a resource",
@@ -109,6 +122,8 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 				cmdutil.CheckErr(err)
 			}
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
