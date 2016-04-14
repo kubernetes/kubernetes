@@ -651,6 +651,40 @@ func (r *ResourceMonitor) GetLatest() (ResourceUsagePerNode, error) {
 	return result, utilerrors.NewAggregate(errs)
 }
 
+func (r *ResourceMonitor) GetMasterNodeLatest(usagePerNode ResourceUsagePerNode) ResourceUsagePerNode {
+	result := make(ResourceUsagePerNode)
+	var masterUsage ResourceUsagePerContainer
+	var nodesUsage []ResourceUsagePerContainer
+	for node, usage := range usagePerNode {
+		if strings.HasSuffix(node, "master") {
+			masterUsage = usage
+		} else {
+			nodesUsage = append(nodesUsage, usage)
+		}
+	}
+	nodeAvgUsage := make(ResourceUsagePerContainer)
+	for _, nodeUsage := range nodesUsage {
+		for c, usage := range nodeUsage {
+			if _, found := nodeAvgUsage[c]; !found {
+				nodeAvgUsage[c] = &ContainerResourceUsage{Name: usage.Name}
+			}
+			nodeAvgUsage[c].CPUUsageInCores += usage.CPUUsageInCores
+			nodeAvgUsage[c].MemoryRSSInBytes += usage.MemoryRSSInBytes
+			nodeAvgUsage[c].MemoryWorkingSetInBytes += usage.MemoryWorkingSetInBytes
+			nodeAvgUsage[c].MemoryRSSInBytes += usage.MemoryRSSInBytes
+		}
+	}
+	for c := range nodeAvgUsage {
+		nodeAvgUsage[c].CPUUsageInCores /= float64(len(nodesUsage))
+		nodeAvgUsage[c].MemoryUsageInBytes /= uint64(len(nodesUsage))
+		nodeAvgUsage[c].MemoryWorkingSetInBytes /= uint64(len(nodesUsage))
+		nodeAvgUsage[c].MemoryRSSInBytes /= uint64(len(nodesUsage))
+	}
+	result["master"] = masterUsage
+	result["node"] = nodeAvgUsage
+	return result
+}
+
 // ContainersCPUSummary is indexed by the container name with each entry a
 // (percentile, value) map.
 type ContainersCPUSummary map[string]map[float64]float64
@@ -710,5 +744,38 @@ func (r *ResourceMonitor) GetCPUSummary() NodesCPUSummary {
 			result[nodeName][containerName] = data
 		}
 	}
+	return result
+}
+
+func (r *ResourceMonitor) GetMasterNodeCPUSummary(summaryPerNode NodesCPUSummary) NodesCPUSummary {
+	result := make(NodesCPUSummary)
+	var masterSummary ContainersCPUSummary
+	var nodesSummaries []ContainersCPUSummary
+	for node, summary := range summaryPerNode {
+		if strings.HasSuffix(node, "master") {
+			masterSummary = summary
+		} else {
+			nodesSummaries = append(nodesSummaries, summary)
+		}
+	}
+
+	nodeAvgSummary := make(ContainersCPUSummary)
+	for _, nodeSummary := range nodesSummaries {
+		for c, summary := range nodeSummary {
+			if _, found := nodeAvgSummary[c]; !found {
+				nodeAvgSummary[c] = map[float64]float64{}
+			}
+			for perc, value := range summary {
+				nodeAvgSummary[c][perc] += value
+			}
+		}
+	}
+	for c := range nodeAvgSummary {
+		for perc := range nodeAvgSummary[c] {
+			nodeAvgSummary[c][perc] /= float64(len(nodesSummaries))
+		}
+	}
+	result["master"] = masterSummary
+	result["node"] = nodeAvgSummary
 	return result
 }

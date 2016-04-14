@@ -1,0 +1,104 @@
+/*
+Copyright 2016 The Kubernetes Authors All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package framework
+
+import (
+	"fmt"
+
+	"k8s.io/kubernetes/test/e2e/perftype"
+)
+
+// TODO(random-liu): Change the tests to actually use PerfData from the begining instead of
+// translating one to the other here.
+
+// ApiCallToPerfData transforms APIResponsiveness to PerfData.
+func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
+	perfData := &perftype.PerfData{}
+	for _, apicall := range apicalls.APICalls {
+		item := perftype.DataItem{
+			Data: map[string]float64{
+				"Perc50": float64(apicall.Latency.Perc50) / 1000000, // us -> ms
+				"Perc90": float64(apicall.Latency.Perc90) / 1000000,
+				"Perc99": float64(apicall.Latency.Perc99) / 1000000,
+			},
+			Unit: "ms",
+			Labels: map[string]string{
+				"Verb":     apicall.Verb,
+				"Resource": apicall.Resource,
+			},
+		}
+		perfData.DataItems = append(perfData.DataItems, item)
+	}
+	return perfData
+}
+
+// ResourceUsageToPerfData transforms ResourceUsagePerNode to PerfData. Notice that this function
+// only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
+func ResourceUsageToPerfData(usagePerNode ResourceUsagePerNode) *perftype.PerfData {
+	items := []perftype.DataItem{}
+	for node, usages := range usagePerNode {
+		for c, usage := range usages {
+			item := perftype.DataItem{
+				Data: map[string]float64{
+					"memory":     float64(usage.MemoryRSSInBytes) / (1024 * 1024),
+					"workingset": float64(usage.MemoryWorkingSetInBytes) / (1024 * 1024),
+					"rss":        float64(usage.MemoryRSSInBytes) / (1024 * 1024),
+				},
+				Unit: "MB",
+				Labels: map[string]string{
+					"node":      node,
+					"container": c,
+					"resource":  "memory",
+				},
+			}
+			items = append(items, item)
+		}
+	}
+	return &perftype.PerfData{DataItems: items}
+}
+
+// CPUUsageToPerfData transforms NodesCPUSummary to PerfData.
+func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
+	items := []perftype.DataItem{}
+	for node, usages := range usagePerNode {
+		for c, usage := range usages {
+			data := map[string]float64{}
+			for perc, value := range usage {
+				data[fmt.Sprintf("Perc%02.0f", perc*100)] = value * 100
+			}
+			item := perftype.DataItem{
+				Data: data,
+				Unit: "%",
+				Labels: map[string]string{
+					"node":      node,
+					"container": c,
+					"resource":  "cpu",
+				},
+			}
+			items = append(items, item)
+		}
+	}
+	return &perftype.PerfData{DataItems: items}
+}
+
+// PrintPerfData prints the perfdata in json format with PerfResultTag prefix.
+// If an error occurs, nothing will be printed.
+func PrintPerfData(p *perftype.PerfData) {
+	if str := PrettyPrintJSON(p); str != "" {
+		Logf("%s", perftype.PerfResultTag+" "+str)
+	}
+}
