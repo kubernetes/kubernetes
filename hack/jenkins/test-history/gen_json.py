@@ -22,6 +22,7 @@ Writes the JSON out to tests.json.
 from __future__ import print_function
 
 import json
+import os
 import sys
 import time
 import urllib2
@@ -81,10 +82,33 @@ def get_daily_builds(server, prefix):
                 break
             yield job, build
 
+def builds_for_tests(tests):
+    builds_have = set()
+    for test in tests.itervalues():
+        for builds in test.itervalues():
+            for build in builds:
+                builds_have.add(build['build'])
+    return builds_have
+
+def remove_unwanted(tests, builds_wanted):
+    for test in tests.values():
+        for job, builds in test.items():  # intentional copy
+            builds[:] = [b for b in builds if b['build'] in builds_wanted]
+            if not builds:
+                test.pop(job)
+
 def get_tests(server, prefix):
     """Returns a dictionary of tests to be JSON encoded."""
     tests = {}
+    builds_have = set()
+    builds_wanted = set()
+    if os.path.exists('tests.json'):
+        tests = json.load(open('tests.json'))
+        builds_have = builds_for_tests(tests)
     for job, build in get_daily_builds(server, prefix):
+        builds_wanted.add(build)
+        if build in builds_have:
+            continue
         print('{}/{}'.format(job, str(build)))
         for name, duration, failed, skipped in get_tests_from_build(
                 server, job, build):
@@ -99,6 +123,7 @@ def get_tests(server, prefix):
                 'failed': failed,
                 'time': duration
             })
+    remove_unwanted(tests, builds_wanted)
     return tests
 
 if __name__ == '__main__':

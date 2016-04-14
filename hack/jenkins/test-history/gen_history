@@ -19,9 +19,15 @@
 
 set -o errexit
 set -o nounset
+set -o xtrace
 
 readonly jenkins="$1"
 readonly datestr=$(date +"%Y-%m-%d")
+
+# Download previous json report, for incremental report generation
+# This will fail when the day rolls over -- meaning a new report will be
+# generated.
+gsutil -q cp -a "${gcs_acl}" -z json "gs://${bucket}/logs/${datestr}.json" "tests.json" || true
 
 # Create JSON report
 time python gen_json.py "${jenkins}" kubernetes
