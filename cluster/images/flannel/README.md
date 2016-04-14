@@ -14,6 +14,12 @@ $ make push ARCH=amd64
 
 $ make push ARCH=arm
 # ---> gcr.io/google_containers/flannel-arm:TAG
+
+$ make push ARCH=arm64
+# ---> gcr.io/google_containers/flannel-arm64:TAG
+
+$ make push ARCH=ppc64le
+# ---> gcr.io/google_containers/flannel-ppc64le:TAG
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

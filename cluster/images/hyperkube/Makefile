@@ -15,7 +15,7 @@
 # Build the hyperkube image.
 #
 # Usage:
-#   VERSION=v1.2.0 [ARCH=amd64] [REGISTRY="gcr.io/google_containers"] make build
+#   [ARCH=amd64] [REGISTRY="gcr.io/google_containers"] make (build|push) VERSION={some_version_number e.g. v1.2.0}
 
 REGISTRY?="gcr.io/google_containers"
 ARCH?=amd64
@@ -27,11 +27,21 @@ ifeq ($(ARCH),amd64)
 endif
 ifeq ($(ARCH),arm)
 	BASEIMAGE?=armel/debian:jessie
+	QEMUARCH=arm
+endif
+ifeq ($(ARCH),arm64)
+	BASEIMAGE?=aarch64/debian:jessie
+	QEMUARCH=aarch64
+endif
+ifeq ($(ARCH),ppc64le)
+	BASEIMAGE?=ppc64le/debian:jessie
+	QEMUARCH=ppc64le
 endif
 
 all: build
 
 build:
+
 ifndef VERSION
     $(error VERSION is undefined)
 endif
@@ -40,7 +50,8 @@ endif
 	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" master-multi.json master.json kube-proxy.json
-	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" master-multi.json master.json kube-proxy.json etcd.json Dockerfile
+	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" master-multi.json master.json kube-proxy.json etcd.json
+	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 	rm ${TEMP_DIR}/*.back
 
@@ -51,7 +62,7 @@ else
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-${ARCH}-static.tar.xz | tar -xJ -C ${TEMP_DIR}
+	curl -sSL --retry 5 https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-${QEMUARCH}-static.tar.xz | tar -xJ -C ${TEMP_DIR}
 	cd ${TEMP_DIR} && sed -i "s/CROSS_BUILD_//g" Dockerfile
 endif
 

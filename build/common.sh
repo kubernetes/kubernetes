@@ -48,7 +48,7 @@ readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.6.0-1"
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.6.0-2"
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>"
 
 # Here we map the output directories across both the local and remote _output
@@ -672,9 +672,8 @@ function kube::release::clean_cruft() {
 function kube::release::package_hyperkube() {
   # If we have these variables set then we want to build all docker images.
   if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-    for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
+    for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
 
-      local arch=${platform##*/}
       kube::log::status "Building hyperkube image for arch: ${arch}"
       REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
     done
@@ -1515,6 +1514,7 @@ function kube::release::gcs::publish() {
 # Globals:
 #   KUBE_DOCKER_REGISTRY
 #   KUBE_DOCKER_IMAGE_TAG
+#   KUBE_SERVER_PLATFORMS
 # Returns:
 #   If new pushing docker images was successful.
 function kube::release::docker::release() {
@@ -1526,11 +1526,6 @@ function kube::release::docker::release() {
     "hyperkube"
   )
 
-  local archs=(
-    "amd64"
-    "arm"
-  )
-
   local docker_push_cmd=("${DOCKER[@]}")
   if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
     docker_push_cmd=("gcloud" "docker")
@@ -1540,7 +1535,8 @@ function kube::release::docker::release() {
     # Activate credentials for the k8s.production.user@gmail.com
     gcloud config set account k8s.production.user@gmail.com
   fi
-  for arch in "${archs[@]}"; do
+      
+  for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
     for binary in "${binaries[@]}"; do
 
       local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"

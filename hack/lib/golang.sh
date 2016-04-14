@@ -64,6 +64,8 @@ else
   readonly KUBE_SERVER_PLATFORMS=(
     linux/amd64
     linux/arm
+    linux/arm64
+    linux/ppc64le
   )
 
   # If we update this we should also update the set of golang compilers we build
@@ -72,6 +74,8 @@ else
     linux/amd64
     linux/386
     linux/arm
+    linux/arm64
+    linux/ppc64le
     darwin/amd64
     darwin/386
     windows/amd64
