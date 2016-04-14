@@ -2674,6 +2674,8 @@ const (
 	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
 	// ResourceServicesNodePorts, number
 	ResourceServicesNodePorts ResourceName = "services.nodeports"
+	// ResourceServicesLoadBalancers, number
+	ResourceServicesLoadBalancers ResourceName = "services.loadbalancers"
 	// CPU request, in cores. (500m = .5 cores)
 	ResourceCPURequest ResourceName = "cpu.request"
 	// CPU limit, in cores. (500m = .5 cores)
