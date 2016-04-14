@@ -24,7 +24,7 @@ import (
 	"sort"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
@@ -111,7 +111,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	for i := numToKeep; i < len(containers); i++ {
-		err := cgc.client.RemoveContainer(docker.RemoveContainerOptions{ID: containers[i].id, RemoveVolumes: true})
+		err := cgc.client.RemoveContainer(containers[i].id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
 		if err != nil {
 			glog.Warningf("Failed to remove dead container %q: %v", containers[i].name, err)
 		}
@@ -195,7 +195,7 @@ func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy)
 	// Remove unidentified containers.
 	for _, container := range unidentifiedContainers {
 		glog.Infof("Removing unidentified dead container %q with ID %q", container.name, container.id)
-		err = cgc.client.RemoveContainer(docker.RemoveContainerOptions{ID: container.id, RemoveVolumes: true})
+		err = cgc.client.RemoveContainer(container.id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
 		if err != nil {
 			glog.Warningf("Failed to remove unidentified dead container %q: %v", container.name, err)
 		}
