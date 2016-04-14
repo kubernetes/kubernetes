@@ -109,7 +109,11 @@
 "kind": "Pod",
 "metadata": {
   "name":"kube-apiserver",
-  "namespace": "kube-system"
+  "namespace": "kube-system",
+  "labels": {
+    "tier": "control-plane",
+    "component": "kube-apiserver"
+  }
 },
 "spec":{
 "hostNetwork": true,
