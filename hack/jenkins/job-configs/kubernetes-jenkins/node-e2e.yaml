@@ -95,7 +95,7 @@
         - ansicolor:
             colormap: xterm
         - timeout:
-            timeout: 30
+            timeout: 45
             fail: true
         - timestamps
         - inject:
