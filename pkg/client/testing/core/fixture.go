@@ -58,11 +58,9 @@ type ObjectScheme interface {
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 	return func(action Action) (bool, runtime.Object, error) {
 		resource := action.GetResource()
-		if len(resource.Version) == 0 {
-			resource.Version = runtime.APIVersionInternal
-		}
-		fmt.Println("CHAO: resource=", resource)
 		kind, err := mapper.KindFor(resource)
+		// This is a temporary fix. Because there is no internal resource, so the caller has no way to express it expects to get an internal kind back.
+		kind.Version = resource.Version
 		if err != nil {
 			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
 		}
