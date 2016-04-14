@@ -19,8 +19,7 @@ FROM BASEIMAGE
 CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get -yy -q \
-    install \
+    && DEBIAN_FRONTEND=noninteractive apt-get -yy -q install \
     iptables \
     ethtool \
     ca-certificates \
@@ -34,21 +33,26 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
 
 RUN cp /usr/bin/nsenter /nsenter
 
+# Copy the hyperkube binary
 COPY hyperkube /hyperkube
-RUN chmod a+rx /hyperkube
 
-COPY master-multi.json /etc/kubernetes/manifests-multi/master.json
-COPY kube-proxy.json /etc/kubernetes/manifests-multi/kube-proxy.json
-
+# Manifests for the docker guide
 COPY master.json /etc/kubernetes/manifests/master.json
 COPY etcd.json /etc/kubernetes/manifests/etcd.json
 COPY kube-proxy.json /etc/kubernetes/manifests/kube-proxy.json
 
+# Manifests for the docker-multinode guide
+COPY master-multi.json /etc/kubernetes/manifests-multi/master.json
+COPY kube-proxy.json /etc/kubernetes/manifests-multi/kube-proxy.json
+
+# Other required scripts for the setup
 COPY safe_format_and_mount /usr/share/google/safe_format_and_mount
-RUN chmod a+rx /usr/share/google/safe_format_and_mount
-
 COPY setup-files.sh /setup-files.sh
-RUN chmod a+rx /setup-files.sh
-
 COPY make-ca-cert.sh /make-ca-cert.sh
-RUN chmod a+x /make-ca-cert.sh
+
+# Make scripts executable
+RUN chmod a+rx \
+        /hyperkube \
+        /usr/share/google/safe_format_and_mount \
+        /setup-files.sh \
+        /make-ca-cert.sh
