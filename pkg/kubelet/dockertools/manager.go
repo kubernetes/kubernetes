@@ -684,7 +684,7 @@ func (dm *DockerManager) runContainer(
 	}
 
 	glog.Errorf("Hans: runContainer(): container: %+v", container)
-	gpuRequest := int(container.Resources.Requests.Gpu().MilliValue())
+	gpuRequest := int(container.Resources.Requests.Gpu().Value())
 	glog.Errorf("Hans: runContainer(): gpuRequest: %d", gpuRequest)
 	deviceOpts := []docker.Device{}
 	if gpuRequest > 0 {
