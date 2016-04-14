@@ -19,15 +19,16 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/client-gen
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/conversion-gen
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/deepcopy-gen
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/set-gen
+BUILD_TARGETS=(
+  cmd/libs/go2idl/client-gen
+  cmd/libs/go2idl/conversion-gen
+  cmd/libs/go2idl/deepcopy-gen
+  cmd/libs/go2idl/set-gen
+)
+"${KUBE_ROOT}/hack/build-go.sh" ${BUILD_TARGETS[*]}
 
 "${KUBE_ROOT}/hack/after-build/run-codegen.sh" --verify-only

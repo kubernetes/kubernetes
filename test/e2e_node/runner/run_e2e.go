@@ -15,9 +15,9 @@ limitations under the License.
 */
 
 // To run the e2e tests against one or more hosts on gce:
-// $ godep go run run_e2e.go --logtostderr --v 2 --ssh-env gce --hosts <comma separated hosts>
+// $ go run run_e2e.go --logtostderr --v 2 --ssh-env gce --hosts <comma separated hosts>
 // To run the e2e tests against one or more images on gce and provision them:
-// $ godep go run run_e2e.go --logtostderr --v 2 --project <project> --zone <zone> --ssh-env gce --images <comma separated images>
+// $ go run run_e2e.go --logtostderr --v 2 --project <project> --zone <zone> --ssh-env gce --images <comma separated images>
 package main
 
 import (

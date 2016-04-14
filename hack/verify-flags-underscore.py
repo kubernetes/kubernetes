@@ -53,8 +53,8 @@ def get_all_files(rootdir):
     all_files = []
     for root, dirs, files in os.walk(rootdir):
         # don't visit certain dirs
-        if 'Godeps' in dirs:
-            dirs.remove('Godeps')
+        if 'vendor' in dirs:
+            dirs.remove('vendor')
         if '_gopath' in dirs:
             dirs.remove('_gopath')
         if 'third_party' in dirs:

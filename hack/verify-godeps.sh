@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 # As of go 1.6, the vendor experiment is enabled by default.
-export GO15VENDOREXPERIMENT=0
+export GO15VENDOREXPERIMENT=1
 
 #### HACK ####
 # Sometimes godep just can't handle things. This lets use manually put
