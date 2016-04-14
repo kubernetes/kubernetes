@@ -514,52 +514,12 @@ func (f *FakePodControl) Clear() {
 }
 
 // ActivePods type allows custom sorting of pods so a controller can pick the best ones to delete.
-type ActivePods []*api.Pod
+type ActivePods []*v1.Pod
 
 func (s ActivePods) Len() int      { return len(s) }
 func (s ActivePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s ActivePods) Less(i, j int) bool {
-	// 1. Unassigned < assigned
-	// If only one of the pods is unassigned, the unassigned one is smaller
-	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {
-		return len(s[i].Spec.NodeName) == 0
-	}
-	// 2. PodPending < PodUnknown < PodRunning
-	m := map[api.PodPhase]int{api.PodPending: 0, api.PodUnknown: 1, api.PodRunning: 2}
-	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
-		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
-	}
-	// 3. Not ready < ready
-	// If only one of the pods is not ready, the not ready one is smaller
-	if api.IsPodReady(s[i]) != api.IsPodReady(s[j]) {
-		return !api.IsPodReady(s[i])
-	}
-	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
-	//       see https://github.com/kubernetes/kubernetes/issues/22065
-	// 4. Been ready for empty time < less time < more time
-	// If both pods are ready, the latest ready one is smaller
-	if api.IsPodReady(s[i]) && api.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
-		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
-	}
-	// 5. Pods with containers with higher restart counts < lower restart counts
-	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
-		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
-	}
-	// 6. Empty creation time pods < newer pods < older pods
-	if !s[i].CreationTimestamp.Equal(s[j].CreationTimestamp) {
-		return afterOrZero(s[i].CreationTimestamp, s[j].CreationTimestamp)
-	}
-	return false
-}
-
-// V1ActivePods is a versioned duplication.
-type V1ActivePods []*v1.Pod
-
-func (s V1ActivePods) Len() int      { return len(s) }
-func (s V1ActivePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-
-func (s V1ActivePods) Less(i, j int) bool {
 	// 1. Unassigned < assigned
 	// If only one of the pods is unassigned, the unassigned one is smaller
 	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {

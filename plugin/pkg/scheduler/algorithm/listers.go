@@ -106,7 +106,7 @@ type ControllerLister interface {
 type EmptyControllerLister struct{}
 
 // List returns nil
-func (f EmptyControllerLister) List() ([]api.ReplicationController, error) {
+func (f EmptyControllerLister) UnversionedList() ([]api.ReplicationController, error) {
 	return nil, nil
 }
 

@@ -18,6 +18,7 @@ package securitycontext
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -28,6 +29,16 @@ func ValidSecurityContextWithContainerDefaults() *api.SecurityContext {
 	priv := false
 	return &api.SecurityContext{
 		Capabilities: &api.Capabilities{},
+		Privileged:   &priv,
+	}
+}
+
+// V1ValidSecurityContextWithContainerDefaults is a temporary duplicate which
+// return v1 SecuritContext.
+func V1ValidSecurityContextWithContainerDefaults() *v1.SecurityContext {
+	priv := false
+	return &v1.SecurityContext{
+		Capabilities: &v1.Capabilities{},
 		Privileged:   &priv,
 	}
 }

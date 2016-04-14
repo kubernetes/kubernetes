@@ -463,7 +463,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int, job *v1b
 		// Sort the pods in the order such that not-ready < ready, unscheduled
 		// < scheduled, and pending < running. This ensures that we delete pods
 		// in the earlier stages whenever possible.
-		sort.Sort(controller.V1ActivePods(activePods))
+		sort.Sort(controller.ActivePods(activePods))
 
 		active -= diff
 		wait := sync.WaitGroup{}
