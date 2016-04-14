@@ -114,6 +114,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("expose", false, "If true, a public, external service is created for the container(s) which are run")
 	cmd.Flags().String("service-generator", "service/v2", "The name of the generator to use for creating a service.  Only used if --expose is true")
 	cmd.Flags().String("service-overrides", "", "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.")
+	cmd.Flags().Bool("hide-message", false, "If true, the verbose message will be hidden.")
 }
 
 func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
@@ -274,6 +275,23 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		return f.PrintObject(cmd, mapper, obj, cmdOut)
 	}
 	cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], "created")
+
+	// Prints 1.2 changes warning
+	if outputFormat == "" && !cmdutil.GetFlagBool(cmd, "hide-message") {
+		generatedResourceOutput := fmt.Sprintf("%s/%s", mapping.Resource, args[0])
+		msg := fmt.Sprintf(
+			`
+You have generated a %s resource. You can feed the generated resource to a subsequent command, such as
+"kubectl get %s", or "kubectl expose %s".
+If you want to write a script to do that automatically, use "-o name" flag while doing "kubectl run", and it
+will generate short output "%s" instead, which is perfect for script input.
+"--generator" flag can be used with "kubectl run" to generate other types of resources, for example, set it to
+"run/v1" creates a Replication Controller, and "run-pod/v1" creates a Pod.
+If you wish to hide this message when running "kubectl run", set "--hide-message=true".
+`,
+			mapping.Resource, generatedResourceOutput, generatedResourceOutput, generatedResourceOutput)
+		cmdOut.Write([]byte(msg))
+	}
 	return nil
 }
 
