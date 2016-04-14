@@ -127,20 +127,7 @@ script
 	# Assemble command line flags based on env variables, which will put the string
 	# of flags in variable KUBELET_CMD_FLAGS
 	assemble_kubelet_flags
-	
-	/usr/bin/kubelet \
-		--enable-debugging-handlers=false \
-		--cloud-provider=gce \
-		--config=/etc/kubernetes/manifests \
-		--allow-privileged=true \
-		--cluster-dns=${DNS_SERVER_IP} \
-		--cluster-domain=${DNS_DOMAIN} \
-		--configure-cbr0=${ALLOCATE_NODE_CIDRS} \
-		--cgroup-root=/ \
-		--system-cgroups=/system \
-		--kubelet-cgroups=/kubelet \
-		--babysit-daemons=true \
-		${KUBELET_CMD_FLAGS} 1>>/var/log/kubelet.log 2>&1
+	/usr/bin/kubelet ${KUBELET_CMD_FLAGS} 1>>/var/log/kubelet.log 2>&1
 end script
 
 # Wait for 10s to start kubelet again.
