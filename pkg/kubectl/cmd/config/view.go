@@ -32,7 +32,7 @@ import (
 )
 
 type ViewOptions struct {
-	ConfigAccess ConfigAccess
+	ConfigAccess clientcmd.ConfigAccess
 	Merge        flag.Tristate
 	Flatten      bool
 	Minify       bool
@@ -50,7 +50,7 @@ kubectl config view
 kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`
 )
 
-func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
+func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &ViewOptions{ConfigAccess: ConfigAccess}
 	// Default to yaml
 	defaultOutputFormat := "yaml"

@@ -33,7 +33,7 @@ import (
 )
 
 type createAuthInfoOptions struct {
-	configAccess      ConfigAccess
+	configAccess      clientcmd.ConfigAccess
 	name              string
 	authPath          util.StringFlag
 	clientCertificate util.StringFlag
@@ -69,7 +69,7 @@ kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU
 # Embed client certificate data in the "cluster-admin" entry
 kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`
 
-func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createAuthInfoOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
@@ -122,7 +122,7 @@ func (o createAuthInfoOptions) run() error {
 	authInfo := o.modifyAuthInfo(*startingStanza)
 	config.AuthInfos[o.name] = &authInfo
 
-	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 
