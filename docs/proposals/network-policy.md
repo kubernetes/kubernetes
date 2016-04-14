@@ -114,7 +114,7 @@ Each item in the `from` list may declare at most ONE of the following:
 
 Note:
 - For a given pod, any ingress traffic which does not match one of the ingress rules from any of the NetworkPolicy objects which select it will be dropped via a default
-drop behavior.  This only occurs when `networkIsolation=false` on the namespace.
+drop behavior.  This only occurs when `networkIsolation=true` on the namespace.
 - All ingress rules are whitelist rules, meaning that it should be easy to resolve the case where multiple
 NetworkPolicy objects select the same set of pods, as there can be no conflicting rules.
 - All pods will always be accessible from the host that they are running on.  This is required to allow for kubelet health checks.
@@ -164,6 +164,37 @@ type NetworkPolicySource struct {
   // If 'Pods' is defined, this must not be.
   Namespaces *unversioned.LabelSelector `json:"namespaces,omitempty"`
 }
+```
+
+### Behavior
+
+This section attempts to define the behavior of this API using pseudo-ish-code.
+
+```python
+def is_traffic_allowed(traffic, pod):
+  """
+  Returns True if traffic is allowed to this pod, False otherwise.
+  """
+  if namespace.networkIsolation == False:
+    # If networkIsolation is disabled, all traffic is allowed.
+    return True 
+  else:
+    # If networkIsolation is enabled, only allow traffic 
+    # that matches a network policy which selects this pod.
+    for network_policy in all_network_policies:
+      if not network_policy.podSelector.selects(pod):
+        # This policy doesn't select this pod. Try the next one. 
+        continue
+
+      # This policy selects this pod.  Check each ingress rule 
+      # defined on this policy to see if it allows the traffic.
+      for ingress_rule in network_policy.ingress:
+        if ingress_rule.from.matches(traffic) and \
+             ingress_rule.ports.matches(traffic):
+          return True 
+
+  # networkIsolation is True and no policies match the given pod.
+  return False
 ```
 
 
