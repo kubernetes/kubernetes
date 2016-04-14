@@ -63,6 +63,15 @@ kubectl patch pod valid-pod -type='json' -p='[{"op": "replace", "path": "/spec/c
 func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &PatchOptions{}
 
+	// retrieve a list of handled resources from printer as valid args
+	validArgs, argAliases := []string{}, []string{}
+	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
+	cmdutil.CheckErr(err)
+	if p != nil {
+		validArgs = p.HandledResources()
+		argAliases = kubectl.ResourceAliases(validArgs)
+	}
+
 	cmd := &cobra.Command{
 		Use:     "patch (-f FILENAME | TYPE NAME) -p PATCH",
 		Short:   "Update field(s) of a resource using strategic merge patch.",
@@ -74,6 +83,8 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunPatch(f, out, cmd, args, shortOutput, options)
 			cmdutil.CheckErr(err)
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
