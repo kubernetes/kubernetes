@@ -569,6 +569,24 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 	return manifest, nil
 }
 
+// TODO(yifan): Can make rkt handle this when '--net=host'. See https://github.com/coreos/rkt/issues/2430.
+func makeHostNetworkMount(opts *kubecontainer.RunContainerOptions) (*kubecontainer.Mount, *kubecontainer.Mount) {
+	hostsMount := kubecontainer.Mount{
+		Name:          "kubernetes-hostnetwork-hosts-conf",
+		ContainerPath: "/etc/hosts",
+		HostPath:      "/etc/hosts",
+		ReadOnly:      true,
+	}
+	resolvMount := kubecontainer.Mount{
+		Name:          "kubernetes-hostnetwork-resolv-conf",
+		ContainerPath: "/etc/resolv.conf",
+		HostPath:      "/etc/resolv.conf",
+		ReadOnly:      true,
+	}
+	opts.Mounts = append(opts.Mounts, hostsMount, resolvMount)
+	return &hostsMount, &resolvMount
+}
+
 func makeContainerLogMount(opts *kubecontainer.RunContainerOptions, container *api.Container) (*kubecontainer.Mount, error) {
 	if opts.PodContainerDir == "" || container.TerminationMessagePath == "" {
 		return nil, nil
@@ -590,7 +608,7 @@ func makeContainerLogMount(opts *kubecontainer.RunContainerOptions, container *a
 		return nil, err
 	}
 
-	mnt := &kubecontainer.Mount{
+	mnt := kubecontainer.Mount{
 		// Use a random name for the termination message mount, so that
 		// when a container restarts, it will not overwrite the old termination
 		// message.
@@ -599,9 +617,9 @@ func makeContainerLogMount(opts *kubecontainer.RunContainerOptions, container *a
 		HostPath:      containerLogPath,
 		ReadOnly:      false,
 	}
-	opts.Mounts = append(opts.Mounts, *mnt)
+	opts.Mounts = append(opts.Mounts, mnt)
 
-	return mnt, nil
+	return &mnt, nil
 }
 
 func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets []api.Secret, manifest *appcschema.PodManifest) error {
@@ -636,6 +654,23 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets [
 	mnt, err := makeContainerLogMount(opts, &c)
 	if err != nil {
 		return err
+	}
+
+	// If run in 'hostnetwork' mode, then mount the host's /etc/resolv.conf and /etc/hosts,
+	// and add volumes.
+	var hostsMnt, resolvMnt *kubecontainer.Mount
+	if kubecontainer.IsHostNetworkPod(pod) {
+		hostsMnt, resolvMnt = makeHostNetworkMount(opts)
+		manifest.Volumes = append(manifest.Volumes, appctypes.Volume{
+			Name:   convertToACName(hostsMnt.Name),
+			Kind:   "host",
+			Source: hostsMnt.HostPath,
+		})
+		manifest.Volumes = append(manifest.Volumes, appctypes.Volume{
+			Name:   convertToACName(resolvMnt.Name),
+			Kind:   "host",
+			Source: resolvMnt.HostPath,
+		})
 	}
 
 	ctx := securitycontext.DetermineEffectiveSecurityContext(pod, &c)
@@ -751,30 +786,39 @@ func serviceFilePath(serviceName string) string {
 func (r *Runtime) generateRunCommand(pod *api.Pod, uuid string) (string, error) {
 	runPrepared := r.buildCommand("run-prepared").Args
 
+	var hostname string
+	var err error
 	// Setup network configuration.
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
+	if kubecontainer.IsHostNetworkPod(pod) {
 		runPrepared = append(runPrepared, "--net=host")
+
+		// TODO(yifan): Let runtimeHelper.GeneratePodHostNameAndDomain() to handle this.
+		hostname, err = os.Hostname()
+		if err != nil {
+			return "", err
+		}
 	} else {
 		runPrepared = append(runPrepared, fmt.Sprintf("--net=%s", defaultNetworkName))
+
+		// Setup DNS.
+		dnsServers, dnsSearches, err := r.runtimeHelper.GetClusterDNS(pod)
+		if err != nil {
+			return "", err
+		}
+		for _, server := range dnsServers {
+			runPrepared = append(runPrepared, fmt.Sprintf("--dns=%s", server))
+		}
+		for _, search := range dnsSearches {
+			runPrepared = append(runPrepared, fmt.Sprintf("--dns-search=%s", search))
+		}
+		if len(dnsServers) > 0 || len(dnsSearches) > 0 {
+			runPrepared = append(runPrepared, fmt.Sprintf("--dns-opt=%s", defaultDNSOption))
+		}
+
+		// TODO(yifan): host domain is not being used.
+		hostname, _ = r.runtimeHelper.GeneratePodHostNameAndDomain(pod)
 	}
 
-	// Setup DNS.
-	dnsServers, dnsSearches, err := r.runtimeHelper.GetClusterDNS(pod)
-	if err != nil {
-		return "", err
-	}
-	for _, server := range dnsServers {
-		runPrepared = append(runPrepared, fmt.Sprintf("--dns=%s", server))
-	}
-	for _, search := range dnsSearches {
-		runPrepared = append(runPrepared, fmt.Sprintf("--dns-search=%s", search))
-	}
-	if len(dnsServers) > 0 || len(dnsSearches) > 0 {
-		runPrepared = append(runPrepared, fmt.Sprintf("--dns-opt=%s", defaultDNSOption))
-	}
-
-	// TODO(yifan): host domain is not being used.
-	hostname, _ := r.runtimeHelper.GeneratePodHostNameAndDomain(pod)
 	runPrepared = append(runPrepared, fmt.Sprintf("--hostname=%s", hostname))
 	runPrepared = append(runPrepared, uuid)
 	return strings.Join(runPrepared, " "), nil
