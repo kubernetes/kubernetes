@@ -42,6 +42,7 @@ export KUBE_RACE=-race
 export KUBE_COVER="n"
 # Produce a JUnit-style XML test report for Jenkins.
 export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
+export ARTIFACTS_DIR=${WORKSPACE}/artifacts
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 export KUBE_TIMEOUT='-timeout 300s'
