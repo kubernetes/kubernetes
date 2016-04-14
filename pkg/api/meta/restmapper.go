@@ -204,7 +204,7 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resourceType string) (string, e
 func coerceResourceForMatching(resource unversioned.GroupVersionResource) unversioned.GroupVersionResource {
 	resource.Resource = strings.ToLower(resource.Resource)
 	if resource.Version == runtime.APIVersionInternal {
-		//		resource.Version = ""
+		resource.Version = ""
 	}
 
 	return resource
