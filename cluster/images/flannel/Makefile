@@ -20,7 +20,7 @@
 TAG?=0.5.5
 ARCH?=amd64
 REGISTRY?=gcr.io/google_containers
-KUBE_CROSS_TAG=v1.4.2-1
+KUBE_CROSS_TAG=v1.6.0-2
 GOARM=6
 TEMP_DIR:=$(shell mktemp -d)
 BASEIMAGE?=gcr.io/google_containers/debian-iptables-${ARCH}:v2
@@ -28,10 +28,16 @@ BASEIMAGE?=gcr.io/google_containers/debian-iptables-${ARCH}:v2
 ifeq ($(ARCH),arm)
 	CC=arm-linux-gnueabi-gcc
 endif
+ifeq ($(ARCH),arm64)
+	CC=aarch64-linux-gnu-gcc
+endif
+ifeq ($(ARCH),ppc64le)
+	CC=powerpc64le-linux-gnu-gcc
+endif
 
 build:
 ifeq ($(ARCH),amd64)
-	# If we should build an amd64 flannel, go with the official one
+	# If we should build an amd64 flannel image, go with the official one
 	docker pull quay.io/coreos/flannel:$(TAG)
 
 	docker tag -f quay.io/coreos/flannel:$(TAG) $(REGISTRY)/flannel-$(ARCH):$(TAG)
@@ -40,8 +46,8 @@ else
 	cp ./* $(TEMP_DIR)
 
 	docker run -it -v $(TEMP_DIR):/flannel/bin gcr.io/google_containers/kube-cross:$(KUBE_CROSS_TAG) /bin/bash -c \
-    	"curl -sSL https://github.com/coreos/flannel/archive/v${TAG}.tar.gz | tar -C /flannel -xz --strip-components=1 \
-    	&& cd /flannel && GOARM=$(GOARM) GOARCH=$(ARCH) CC=$(CC) CGO_ENABLED=1 ./build"
+		"curl -sSL https://github.com/coreos/flannel/archive/v${TAG}.tar.gz | tar -C /flannel -xz --strip-components=1 \
+		&& cd /flannel && GOARM=$(GOARM) GOARCH=$(ARCH) CC=$(CC) CGO_ENABLED=1 ./build"
 
 	# Replace BASEIMAGE with the real base image
 	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
