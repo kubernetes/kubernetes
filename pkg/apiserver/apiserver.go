@@ -351,7 +351,7 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 
 // handleVersion writes the server's version information.
 func handleVersion(req *restful.Request, resp *restful.Response) {
-	writeRawJSON(http.StatusOK, version.Get(), resp.ResponseWriter)
+	WriteRawJSON(http.StatusOK, version.Get(), resp.ResponseWriter)
 }
 
 // APIVersionHandler returns a handler which will list the provided versions as available.
@@ -430,7 +430,7 @@ func writeNegotiated(s runtime.NegotiatedSerializer, gv unversioned.GroupVersion
 	serializer, contentType, err := negotiateOutputSerializer(req, s)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeRawJSON(int(status.Code), status, w)
+		WriteRawJSON(int(status.Code), status, w)
 		return
 	}
 
@@ -469,8 +469,8 @@ func errorJSONFatal(err error, codec runtime.Encoder, w http.ResponseWriter) int
 	return code
 }
 
-// writeRawJSON writes a non-API object in JSON.
-func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
+// WriteRawJSON writes a non-API object in JSON.
+func WriteRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 	output, err := json.MarshalIndent(object, "", "  ")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -2966,7 +2966,7 @@ func (m *marshalError) MarshalJSON() ([]byte, error) {
 
 func TestWriteRAWJSONMarshalError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		writeRawJSON(http.StatusOK, &marshalError{errors.New("Undecodable")}, w)
+		WriteRawJSON(http.StatusOK, &marshalError{errors.New("Undecodable")}, w)
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
