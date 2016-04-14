@@ -48,6 +48,9 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 	if len(config.UserAgent) > 0 {
 		rt = NewUserAgentRoundTripper(config.UserAgent, rt)
 	}
+	if len(config.Impersonate) > 0 {
+		rt = NewImpersonatingRoundTripper(config.Impersonate, rt)
+	}
 	return rt, nil
 }
 
@@ -129,6 +132,35 @@ func (rt *basicAuthRoundTripper) CancelRequest(req *http.Request) {
 }
 
 func (rt *basicAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
+
+type impersonatingRoundTripper struct {
+	impersonate string
+	delegate    http.RoundTripper
+}
+
+// NewImpersonatingRoundTripper will add an Act-As header to a request unless it has already been set.
+func NewImpersonatingRoundTripper(impersonate string, delegate http.RoundTripper) http.RoundTripper {
+	return &impersonatingRoundTripper{impersonate, delegate}
+}
+
+func (rt *impersonatingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Impersonate-User")) != 0 {
+		return rt.delegate.RoundTrip(req)
+	}
+	req = cloneRequest(req)
+	req.Header.Set("Impersonate-User", rt.impersonate)
+	return rt.delegate.RoundTrip(req)
+}
+
+func (rt *impersonatingRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.delegate.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
+func (rt *impersonatingRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.delegate }
 
 type bearerAuthRoundTripper struct {
 	bearer string
