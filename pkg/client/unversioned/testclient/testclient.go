@@ -285,6 +285,10 @@ func (c *Fake) Batch() client.BatchInterface {
 	return &FakeBatch{c}
 }
 
+func (c *Fake) Certificates() client.CertificatesInterface {
+	return &FakeCertificates{c}
+}
+
 func (c *Fake) Extensions() client.ExtensionsInterface {
 	return &FakeExperimental{c}
 }
