@@ -19,11 +19,14 @@ FROM golang:1.6.0
 
 ENV GOARM 6
 ENV KUBE_DYNAMIC_CROSSPLATFORMS \
-  armel
+  armel \
+  arm64 \
+  ppc64el
 
 ENV KUBE_CROSSPLATFORMS \
   linux/386 \
-  linux/arm \
+  linux/arm linux/arm64 \
+  linux/ppc64le \
   darwin/amd64 darwin/386 \
   windows/amd64 windows/386
 
