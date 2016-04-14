@@ -70,6 +70,9 @@ type Config struct {
 	// Server requires plugin-specified authentication.
 	AuthProvider *clientcmdapi.AuthProviderConfig
 
+	// Callback to persist config for AuthProvider.
+	AuthConfigPersister AuthProviderConfigPersister
+
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
 
