@@ -88,8 +88,8 @@ func (f *fakeRuntimeHelper) GetClusterDNS(pod *api.Pod) ([]string, []string, err
 }
 
 // This is not used by docker runtime.
-func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
-	return "", ""
+func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, error) {
+	return "", "", nil
 }
 
 func (f *fakeRuntimeHelper) GetPodDir(types.UID) string {

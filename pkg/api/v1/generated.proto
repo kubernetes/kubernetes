@@ -524,6 +524,9 @@ message EndpointAddress {
   // TODO: This should allow hostname or IP, See #4447.
   optional string ip = 1;
 
+  // The Hostname of this endpoint
+  optional string hostname = 3;
+
   // Reference to object providing the endpoint.
   optional ObjectReference targetRef = 2;
 }
@@ -1946,6 +1949,14 @@ message PodSpec {
   // in the case of docker, only DockerConfig type secrets are honored.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod
   repeated LocalObjectReference imagePullSecrets = 15;
+
+  // Specifies the hostname of the Pod
+  // If not specified, the pod's hostname will be set to a system-defined value.
+  optional string hostname = 16;
+
+  // If specified, the fully qualified Pod hostname will be "<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>".
+  // If not specified, the pod will not have a domainname at all.
+  optional string subdomain = 17;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

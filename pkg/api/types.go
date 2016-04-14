@@ -1229,6 +1229,12 @@ type PodSpec struct {
 	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
 	// in the case of docker, only DockerConfig type secrets are honored.
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	// Specifies the hostname of the Pod.
+	// If not specified, the pod's hostname will be set to a system-defined value.
+	Hostname string `json:"hostname,omitempty"`
+	// If specified, the fully qualified Pod hostname will be "<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>".
+	// If not specified, the pod will not have a domainname at all.
+	Subdomain string `json:"subdomain,omitempty"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -1632,7 +1638,9 @@ type EndpointAddress struct {
 	// kubernetes components, like kube-proxy, are not IPv6 ready.
 	// TODO: This should allow hostname or IP, see #4447.
 	IP string
-
+	// Optional: Hostname of this endpoint
+	// Meant to be used by DNS servers etc.
+	Hostname string `json:"hostname,omitempty"`
 	// Optional: The kubernetes object related to the entry point.
 	TargetRef *ObjectReference
 }

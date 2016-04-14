@@ -661,6 +661,7 @@ func DeepCopy_api_EmptyDirVolumeSource(in EmptyDirVolumeSource, out *EmptyDirVol
 
 func DeepCopy_api_EndpointAddress(in EndpointAddress, out *EndpointAddress, c *conversion.Cloner) error {
 	out.IP = in.IP
+	out.Hostname = in.Hostname
 	if in.TargetRef != nil {
 		in, out := in.TargetRef, &out.TargetRef
 		*out = new(ObjectReference)
@@ -2158,6 +2159,8 @@ func DeepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 	} else {
 		out.ImagePullSecrets = nil
 	}
+	out.Hostname = in.Hostname
+	out.Subdomain = in.Subdomain
 	return nil
 }
 

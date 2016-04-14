@@ -1379,7 +1379,7 @@ func makePortMappings(container *api.Container) (ports []kubecontainer.PortMappi
 	return
 }
 
-func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
+func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, error) {
 	// TODO(vmarmol): Handle better.
 	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
 	clusterDomain := kl.clusterDomain
@@ -1389,10 +1389,18 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
 		podAnnotations = make(map[string]string)
 	}
 	hostname := pod.Name
-	hostnameCandidate := podAnnotations[utilpod.PodHostnameAnnotation]
-	if utilvalidation.IsDNS1123Label(hostnameCandidate) {
-		// use hostname annotation, if specified.
-		hostname = hostnameCandidate
+	if len(pod.Spec.Hostname) > 0 {
+		if utilvalidation.IsDNS1123Label(pod.Spec.Hostname) {
+			hostname = pod.Spec.Hostname
+		} else {
+			return "", "", fmt.Errorf("Pod Hostname %q is not a valid DNS label.", pod.Spec.Hostname)
+		}
+	} else {
+		hostnameCandidate := podAnnotations[utilpod.PodHostnameAnnotation]
+		if utilvalidation.IsDNS1123Label(hostnameCandidate) {
+			// use hostname annotation, if specified.
+			hostname = hostnameCandidate
+		}
 	}
 	if len(hostname) > hostnameMaxLen {
 		hostname = hostname[:hostnameMaxLen]
@@ -1400,11 +1408,19 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
 	}
 
 	hostDomain := ""
-	subdomainCandidate := pod.Annotations[utilpod.PodSubdomainAnnotation]
-	if utilvalidation.IsDNS1123Label(subdomainCandidate) {
-		hostDomain = fmt.Sprintf("%s.%s.svc.%s", subdomainCandidate, pod.Namespace, clusterDomain)
+	if len(pod.Spec.Subdomain) > 0 {
+		if utilvalidation.IsDNS1123Label(pod.Spec.Subdomain) {
+			hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
+		} else {
+			return "", "", fmt.Errorf("Pod Subdomain %q is not a valid DNS label.", pod.Spec.Subdomain)
+		}
+	} else {
+		subdomainCandidate := pod.Annotations[utilpod.PodSubdomainAnnotation]
+		if utilvalidation.IsDNS1123Label(subdomainCandidate) {
+			hostDomain = fmt.Sprintf("%s.%s.svc.%s", subdomainCandidate, pod.Namespace, clusterDomain)
+		}
 	}
-	return hostname, hostDomain
+	return hostname, hostDomain, nil
 }
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
@@ -1412,7 +1428,10 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: kl.cgroupRoot}
-	hostname, hostDomainName := kl.GeneratePodHostNameAndDomain(pod)
+	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
+	if err != nil {
+		return nil, err
+	}
 	opts.Hostname = hostname
 	vol, ok := kl.volumeManager.GetVolumes(pod.UID)
 	if !ok {
