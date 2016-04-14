@@ -26,7 +26,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -627,7 +626,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	}
 	ds := obj.(*v1beta1.DaemonSet)
 
-	everything := unversioned.LabelSelector{}
+	everything := v1beta1.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {
 		dsc.eventRecorder.Eventf(ds, api.EventTypeWarning, "SelectingAll", "This daemon set is selecting all pods. A non-empty selector is required.")
 		return nil
