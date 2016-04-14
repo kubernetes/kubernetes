@@ -309,12 +309,12 @@ func TestFindFitAllError(t *testing.T) {
 	}
 
 	for _, node := range nodes {
-		failures, found := predicateMap[node]
+		failure, found := predicateMap[node]
 		if !found {
 			t.Errorf("failed to find node: %s in %v", node, predicateMap)
 		}
-		if len(failures) != 1 || !failures.Has("false") {
-			t.Errorf("unexpected failures: %v", failures)
+		if failure != "false" {
+			t.Errorf("unexpected failures: %v", failure)
 		}
 	}
 }
@@ -342,12 +342,12 @@ func TestFindFitSomeError(t *testing.T) {
 		if node == pod.Name {
 			continue
 		}
-		failures, found := predicateMap[node]
+		failure, found := predicateMap[node]
 		if !found {
 			t.Errorf("failed to find node: %s in %v", node, predicateMap)
 		}
-		if len(failures) != 1 || !failures.Has("false") {
-			t.Errorf("unexpected failures: %v", failures)
+		if failure != "false" {
+			t.Errorf("unexpected failures: %v", failure)
 		}
 	}
 }

@@ -21,20 +21,18 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-type FailedPredicateMap map[string]sets.String
+type FailedPredicateMap map[string]string
 
 type FitError struct {
 	Pod              *api.Pod
@@ -47,8 +45,8 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 func (f *FitError) Error() string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("pod (%s) failed to fit in any node\n", f.Pod.Name))
-	for node, predicateList := range f.FailedPredicates {
-		reason := fmt.Sprintf("fit failure on node (%s): %s\n", node, strings.Join(predicateList.List(), ","))
+	for node, predicate := range f.FailedPredicates {
+		reason := fmt.Sprintf("fit failure on node (%s): %s\n", node, predicate)
 		buf.WriteString(reason)
 	}
 	return buf.String()
@@ -151,15 +149,12 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 			}
 			if !fit {
 				fits = false
-				if _, found := failedPredicateMap[node.Name]; !found {
-					failedPredicateMap[node.Name] = sets.String{}
-				}
 				if re, ok := err.(*predicates.InsufficientResourceError); ok {
-					failedPredicateMap[node.Name].Insert(fmt.Sprintf("Insufficient %s", re.ResourceName))
+					failedPredicateMap[node.Name] = fmt.Sprintf("Insufficient %s", re.ResourceName)
 					break
 				}
 				if re, ok := err.(*predicates.PredicateFailureError); ok {
-					failedPredicateMap[node.Name].Insert(re.PredicateName)
+					failedPredicateMap[node.Name] = re.PredicateName
 					break
 				} else {
 					err := fmt.Errorf("SchedulerPredicates failed due to %v, which is unexpected.", err)
