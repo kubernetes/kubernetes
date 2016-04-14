@@ -1933,7 +1933,7 @@ func TestGetPodStatusNoSuchContainer(t *testing.T) {
 			},
 		}})
 
-	fakeDocker.Errors = map[string]error{"inspect": &docker.NoSuchContainer{}}
+	fakeDocker.InjectErrors(map[string]error{"inspect": &docker.NoSuchContainer{}})
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
 	// Verify that we will try to start new contrainers even if the inspections
