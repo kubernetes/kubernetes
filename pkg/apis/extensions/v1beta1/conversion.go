@@ -32,8 +32,6 @@ import (
 func addConversionFuncs(scheme *runtime.Scheme) {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
-		Convert_api_PodSpec_To_v1_PodSpec,
-		Convert_v1_PodSpec_To_api_PodSpec,
 		Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
 		Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
 		Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec,
@@ -82,17 +80,6 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-}
-
-// The following two PodSpec conversions functions where copied from pkg/api/conversion.go
-// for the generated functions to work properly.
-// This should be fixed: https://github.com/kubernetes/kubernetes/issues/12977
-func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
-	return v1.Convert_api_PodSpec_To_v1_PodSpec(in, out, s)
-}
-
-func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conversion.Scope) error {
-	return v1.Convert_v1_PodSpec_To_api_PodSpec(in, out, s)
 }
 
 func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
@@ -371,7 +358,7 @@ func Convert_extensions_JobSpec_To_v1beta1_JobSpec(in *extensions.JobSpec, out *
 	}
 	// END non-standard conversion
 
-	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -423,7 +410,7 @@ func Convert_v1beta1_JobSpec_To_extensions_JobSpec(in *JobSpec, out *extensions.
 	}
 	// END non-standard conversion
 
-	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
