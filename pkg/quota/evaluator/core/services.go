@@ -31,6 +31,7 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 	allResources := []api.ResourceName{
 		api.ResourceServices,
 		api.ResourceServicesNodePorts,
+		api.ResourceServicesLoadBalancers,
 	}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Service",
@@ -56,6 +57,8 @@ func ServiceUsageFunc(object runtime.Object) api.ResourceList {
 		switch service.Spec.Type {
 		case api.ServiceTypeNodePort:
 			result[api.ResourceServicesNodePorts] = resource.MustParse("1")
+		case api.ServiceTypeLoadBalancer:
+			result[api.ResourceServicesLoadBalancers] = resource.MustParse("1")
 		}
 	}
 	return result
@@ -64,7 +67,7 @@ func ServiceUsageFunc(object runtime.Object) api.ResourceList {
 // QuotaServiceType returns true if the service type is eligible to track against a quota
 func QuotaServiceType(service *api.Service) bool {
 	switch service.Spec.Type {
-	case api.ServiceTypeNodePort:
+	case api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer:
 		return true
 	}
 	return false
