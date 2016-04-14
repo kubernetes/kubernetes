@@ -19,12 +19,14 @@ package restclient
 import (
 	"fmt"
 	"net/http"
+	"reflect"
+	"strconv"
 	"testing"
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
-func TestTransportConfigAuthPlugins(t *testing.T) {
+func TestAuthPluginWrapTransport(t *testing.T) {
 	if err := RegisterAuthProviderPlugin("pluginA", pluginAProvider); err != nil {
 		t.Errorf("Unexpected error: failed to register pluginA: %v", err)
 	}
@@ -92,6 +94,83 @@ func TestTransportConfigAuthPlugins(t *testing.T) {
 	}
 }
 
+func TestAuthPluginPersist(t *testing.T) {
+	// register pluginA by a different name so we don't collide across tests.
+	if err := RegisterAuthProviderPlugin("pluginA2", pluginAProvider); err != nil {
+		t.Errorf("Unexpected error: failed to register pluginA: %v", err)
+	}
+	if err := RegisterAuthProviderPlugin("pluginPersist", pluginPersistProvider); err != nil {
+		t.Errorf("Unexpected error: failed to register pluginPersist: %v", err)
+	}
+	fooBarConfig := map[string]string{"foo": "bar"}
+	testCases := []struct {
+		plugin                       string
+		startingConfig               map[string]string
+		expectedConfigAfterLogin     map[string]string
+		expectedConfigAfterRoundTrip map[string]string
+	}{
+		// non-persisting plugins should work fine without modifying config.
+		{"pluginA2", map[string]string{}, map[string]string{}, map[string]string{}},
+		{"pluginA2", fooBarConfig, fooBarConfig, fooBarConfig},
+		// plugins that persist config should be able to persist when they want.
+		{
+			"pluginPersist",
+			map[string]string{},
+			map[string]string{
+				"login": "Y",
+			},
+			map[string]string{
+				"login":      "Y",
+				"roundTrips": "1",
+			},
+		},
+		{
+			"pluginPersist",
+			map[string]string{
+				"login":      "Y",
+				"roundTrips": "123",
+			},
+			map[string]string{
+				"login":      "Y",
+				"roundTrips": "123",
+			},
+			map[string]string{
+				"login":      "Y",
+				"roundTrips": "124",
+			},
+		},
+	}
+	for i, tc := range testCases {
+		cfg := &clientcmdapi.AuthProviderConfig{
+			Name:   tc.plugin,
+			Config: tc.startingConfig,
+		}
+		persister := &inMemoryPersister{make(map[string]string)}
+		persister.Persist(tc.startingConfig)
+		plugin, err := GetAuthProvider("127.0.0.1", cfg, persister)
+		if err != nil {
+			t.Errorf("%d. Unexpected error: failed to get plugin %q: %v", i, tc.plugin, err)
+		}
+		if err := plugin.Login(); err != nil {
+			t.Errorf("%d. Unexpected error calling Login() w/ plugin %q: %v", i, tc.plugin, err)
+		}
+		// Make sure the plugin persisted what we expect after Login().
+		if !reflect.DeepEqual(persister.savedConfig, tc.expectedConfigAfterLogin) {
+			t.Errorf("%d. Unexpected persisted config after calling %s.Login(): \nGot:\n%v\nExpected:\n%v",
+				i, tc.plugin, persister.savedConfig, tc.expectedConfigAfterLogin)
+		}
+		if _, err := plugin.WrapTransport(&emptyTransport{}).RoundTrip(&http.Request{}); err != nil {
+			t.Errorf("%d. Unexpected error round-tripping w/ plugin %q: %v", i, tc.plugin, err)
+		}
+		// Make sure the plugin persisted what we expect after RoundTrip().
+		if !reflect.DeepEqual(persister.savedConfig, tc.expectedConfigAfterRoundTrip) {
+			t.Errorf("%d. Unexpected persisted config after calling %s.WrapTransport.RoundTrip(): \nGot:\n%v\nExpected:\n%v",
+				i, tc.plugin, persister.savedConfig, tc.expectedConfigAfterLogin)
+		}
+	}
+
+}
+
 // emptyTransport provides an empty http.Response with an initialized header
 // to allow wrapping RoundTrippers to set header values.
 type emptyTransport struct{}
@@ -137,7 +216,9 @@ func (*pluginA) WrapTransport(rt http.RoundTripper) http.RoundTripper {
 	return &wrapTransportA{rt}
 }
 
-func pluginAProvider() (AuthProvider, error) {
+func (*pluginA) Login() error { return nil }
+
+func pluginAProvider(string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
 	return &pluginA{}, nil
 }
 
@@ -161,11 +242,70 @@ func (*pluginB) WrapTransport(rt http.RoundTripper) http.RoundTripper {
 	return &wrapTransportB{rt}
 }
 
-func pluginBProvider() (AuthProvider, error) {
+func (*pluginB) Login() error { return nil }
+
+func pluginBProvider(string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
 	return &pluginB{}, nil
 }
 
 // pluginFailProvider simulates a registered AuthPlugin that fails to load.
-func pluginFailProvider() (AuthProvider, error) {
+func pluginFailProvider(string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
 	return nil, fmt.Errorf("Failed to load AuthProvider")
+}
+
+type inMemoryPersister struct {
+	savedConfig map[string]string
+}
+
+func (i *inMemoryPersister) Persist(config map[string]string) error {
+	i.savedConfig = make(map[string]string)
+	for k, v := range config {
+		i.savedConfig[k] = v
+	}
+	return nil
+}
+
+// wrapTransportPersist increments the "roundTrips" entry from the config when
+// roundTrip is called.
+type wrapTransportPersist struct {
+	rt        http.RoundTripper
+	config    map[string]string
+	persister AuthProviderConfigPersister
+}
+
+func (w *wrapTransportPersist) RoundTrip(req *http.Request) (*http.Response, error) {
+	roundTrips := 0
+	if rtVal, ok := w.config["roundTrips"]; ok {
+		var err error
+		roundTrips, err = strconv.Atoi(rtVal)
+		if err != nil {
+			return nil, err
+		}
+	}
+	roundTrips++
+	w.config["roundTrips"] = fmt.Sprintf("%d", roundTrips)
+	if err := w.persister.Persist(w.config); err != nil {
+		return nil, err
+	}
+	return w.rt.RoundTrip(req)
+}
+
+type pluginPersist struct {
+	config    map[string]string
+	persister AuthProviderConfigPersister
+}
+
+func (p *pluginPersist) WrapTransport(rt http.RoundTripper) http.RoundTripper {
+	return &wrapTransportPersist{rt, p.config, p.persister}
+}
+
+// Login sets the config entry "login" to "Y".
+func (p *pluginPersist) Login() error {
+	p.config["login"] = "Y"
+	p.persister.Persist(p.config)
+	return nil
+}
+
+func pluginPersistProvider(_ string, config map[string]string, persister AuthProviderConfigPersister) (AuthProvider, error) {
+	return &pluginPersist{config, persister}, nil
 }

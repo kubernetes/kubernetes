@@ -60,7 +60,7 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 func (c *Config) transportConfig() (*transport.Config, error) {
 	wt := c.WrapTransport
 	if c.AuthProvider != nil {
-		provider, err := GetAuthProvider(c.AuthProvider)
+		provider, err := GetAuthProvider(c.Host, c.AuthProvider, c.AuthConfigPersister)
 		if err != nil {
 			return nil, err
 		}
