@@ -108,7 +108,7 @@ func (r *Request) ReadEntity(entityPointer interface{}) (err error) {
 	}
 
 	// lookup the EntityReader
-	entityReader, ok := entityAccessRegistry.AccessorAt(contentType)
+	entityReader, ok := entityAccessRegistry.accessorAt(contentType)
 	if !ok {
 		return NewError(http.StatusBadRequest, "Unable to unmarshal content of type:"+contentType)
 	}
