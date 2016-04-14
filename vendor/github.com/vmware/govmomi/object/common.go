@@ -69,3 +69,17 @@ func (c Common) Destroy(ctx context.Context) (*Task, error) {
 
 	return NewTask(c.c, res.Returnval), nil
 }
+
+func (c Common) Rename(ctx context.Context, name string) (*Task, error) {
+	req := types.Rename_Task{
+		This:    c.Reference(),
+		NewName: name,
+	}
+
+	res, err := methods.Rename_Task(ctx, c.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(c.c, res.Returnval), nil
+}

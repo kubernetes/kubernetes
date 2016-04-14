@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 
 	"github.com/golang/glog"
 )
@@ -79,6 +81,7 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 
 	return allPlugins
 }
@@ -97,6 +100,8 @@ func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.
 		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeVolumePlugins())
 	case cloud != nil && openstack.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
+	case cloud != nil && vsphere.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(vsphere_volume.ProbeVolumePlugins())
 	}
 	return nil, nil
 }
