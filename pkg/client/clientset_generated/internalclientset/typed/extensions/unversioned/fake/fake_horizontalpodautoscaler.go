@@ -33,7 +33,7 @@ type FakeHorizontalPodAutoscalers struct {
 	ns   string
 }
 
-var horizontalpodautoscalersResource = unversioned.GroupVersionResource{Group: "extensions", Version: "unversioned", Resource: "horizontalpodautoscalers"}
+var horizontalpodautoscalersResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "horizontalpodautoscalers"}
 
 func (c *FakeHorizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.

@@ -32,7 +32,7 @@ type FakeLimitRanges struct {
 	ns   string
 }
 
-var limitrangesResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "limitranges"}
+var limitrangesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "limitranges"}
 
 func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.

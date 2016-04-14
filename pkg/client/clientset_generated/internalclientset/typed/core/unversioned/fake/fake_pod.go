@@ -32,7 +32,7 @@ type FakePods struct {
 	ns   string
 }
 
-var podsResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "pods"}
+var podsResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "pods"}
 
 func (c *FakePods) Create(pod *api.Pod) (result *api.Pod, err error) {
 	obj, err := c.Fake.

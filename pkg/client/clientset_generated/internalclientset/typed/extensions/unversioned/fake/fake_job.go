@@ -33,7 +33,7 @@ type FakeJobs struct {
 	ns   string
 }
 
-var jobsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "unversioned", Resource: "jobs"}
+var jobsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "jobs"}
 
 func (c *FakeJobs) Create(job *extensions.Job) (result *extensions.Job, err error) {
 	obj, err := c.Fake.

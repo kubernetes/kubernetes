@@ -32,7 +32,7 @@ type FakeConfigMaps struct {
 	ns   string
 }
 
-var configmapsResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "configmaps"}
+var configmapsResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "configmaps"}
 
 func (c *FakeConfigMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
 	obj, err := c.Fake.

@@ -79,14 +79,26 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	pkg := filepath.Base(t.Name.Package)
 	const pkgTestingCore = "k8s.io/kubernetes/pkg/client/testing/core"
 	namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+	canonizeGroup := func(group string) string {
+		if group == "core" {
+			return ""
+		}
+		return group
+	}
+	canonizeVersion := func(version string) string {
+		if version == "unversioned" {
+			return ""
+		}
+		return version
+	}
 	m := map[string]interface{}{
 		"type":                 t,
 		"package":              pkg,
 		"Package":              namer.IC(pkg),
 		"namespaced":           namespaced,
 		"Group":                namer.IC(g.group),
-		"group":                namer.IL(g.group),
-		"version":              g.version,
+		"group":                canonizeGroup(g.group),
+		"version":              canonizeVersion(g.version),
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
 		"apiDeleteOptions":     c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
 		"apiListOptions":       c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),

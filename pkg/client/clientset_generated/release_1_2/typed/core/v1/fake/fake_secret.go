@@ -33,7 +33,7 @@ type FakeSecrets struct {
 	ns   string
 }
 
-var secretsResource = unversioned.GroupVersionResource{Group: "core", Version: "v1", Resource: "secrets"}
+var secretsResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
 
 func (c *FakeSecrets) Create(secret *v1.Secret) (result *v1.Secret, err error) {
 	obj, err := c.Fake.

@@ -32,7 +32,7 @@ type FakePersistentVolumeClaims struct {
 	ns   string
 }
 
-var persistentvolumeclaimsResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "persistentvolumeclaims"}
+var persistentvolumeclaimsResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "persistentvolumeclaims"}
 
 func (c *FakePersistentVolumeClaims) Create(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.

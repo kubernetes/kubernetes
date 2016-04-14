@@ -32,7 +32,7 @@ type FakeResourceQuotas struct {
 	ns   string
 }
 
-var resourcequotasResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "resourcequotas"}
+var resourcequotasResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "resourcequotas"}
 
 func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	obj, err := c.Fake.

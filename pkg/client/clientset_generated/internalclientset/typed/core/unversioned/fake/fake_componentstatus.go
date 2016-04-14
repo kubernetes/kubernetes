@@ -31,7 +31,7 @@ type FakeComponentStatuses struct {
 	Fake *FakeCore
 }
 
-var componentstatusesResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "componentstatuses"}
+var componentstatusesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "componentstatuses"}
 
 func (c *FakeComponentStatuses) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	obj, err := c.Fake.

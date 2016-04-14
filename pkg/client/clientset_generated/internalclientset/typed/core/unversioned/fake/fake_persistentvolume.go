@@ -31,7 +31,7 @@ type FakePersistentVolumes struct {
 	Fake *FakeCore
 }
 
-var persistentvolumesResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "persistentvolumes"}
+var persistentvolumesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "persistentvolumes"}
 
 func (c *FakePersistentVolumes) Create(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	obj, err := c.Fake.

@@ -33,7 +33,7 @@ type FakeIngresses struct {
 	ns   string
 }
 
-var ingressesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "unversioned", Resource: "ingresses"}
+var ingressesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "ingresses"}
 
 func (c *FakeIngresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.

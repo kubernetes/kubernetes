@@ -33,7 +33,7 @@ type FakeDaemonSets struct {
 	ns   string
 }
 
-var daemonsetsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "unversioned", Resource: "daemonsets"}
+var daemonsetsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "daemonsets"}
 
 func (c *FakeDaemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.

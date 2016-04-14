@@ -33,7 +33,7 @@ type FakeReplicationControllers struct {
 	ns   string
 }
 
-var replicationcontrollersResource = unversioned.GroupVersionResource{Group: "core", Version: "v1", Resource: "replicationcontrollers"}
+var replicationcontrollersResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"}
 
 func (c *FakeReplicationControllers) Create(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.

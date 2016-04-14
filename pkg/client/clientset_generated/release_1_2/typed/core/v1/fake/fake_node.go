@@ -32,7 +32,7 @@ type FakeNodes struct {
 	Fake *FakeCore
 }
 
-var nodesResource = unversioned.GroupVersionResource{Group: "core", Version: "v1", Resource: "nodes"}
+var nodesResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}
 
 func (c *FakeNodes) Create(node *v1.Node) (result *v1.Node, err error) {
 	obj, err := c.Fake.

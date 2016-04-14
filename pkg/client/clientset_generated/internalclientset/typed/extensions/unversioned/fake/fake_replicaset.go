@@ -33,7 +33,7 @@ type FakeReplicaSets struct {
 	ns   string
 }
 
-var replicasetsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "unversioned", Resource: "replicasets"}
+var replicasetsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "replicasets"}
 
 func (c *FakeReplicaSets) Create(replicaSet *extensions.ReplicaSet) (result *extensions.ReplicaSet, err error) {
 	obj, err := c.Fake.

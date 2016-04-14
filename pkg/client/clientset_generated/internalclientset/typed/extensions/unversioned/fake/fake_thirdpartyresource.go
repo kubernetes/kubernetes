@@ -33,7 +33,7 @@ type FakeThirdPartyResources struct {
 	ns   string
 }
 
-var thirdpartyresourcesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "unversioned", Resource: "thirdpartyresources"}
+var thirdpartyresourcesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "thirdpartyresources"}
 
 func (c *FakeThirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	obj, err := c.Fake.

@@ -32,7 +32,7 @@ type FakeEvents struct {
 	ns   string
 }
 
-var eventsResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "events"}
+var eventsResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "events"}
 
 func (c *FakeEvents) Create(event *api.Event) (result *api.Event, err error) {
 	obj, err := c.Fake.

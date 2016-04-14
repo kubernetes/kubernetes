@@ -32,7 +32,7 @@ type FakeEndpoints struct {
 	ns   string
 }
 
-var endpointsResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "endpoints"}
+var endpointsResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "endpoints"}
 
 func (c *FakeEndpoints) Create(endpoints *api.Endpoints) (result *api.Endpoints, err error) {
 	obj, err := c.Fake.

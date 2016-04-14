@@ -31,7 +31,7 @@ type FakeNamespaces struct {
 	Fake *FakeCore
 }
 
-var namespacesResource = unversioned.GroupVersionResource{Group: "core", Version: "unversioned", Resource: "namespaces"}
+var namespacesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "namespaces"}
 
 func (c *FakeNamespaces) Create(namespace *api.Namespace) (result *api.Namespace, err error) {
 	obj, err := c.Fake.

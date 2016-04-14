@@ -33,7 +33,7 @@ type FakeDeployments struct {
 	ns   string
 }
 
-var deploymentsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "unversioned", Resource: "deployments"}
+var deploymentsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "deployments"}
 
 func (c *FakeDeployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	obj, err := c.Fake.
