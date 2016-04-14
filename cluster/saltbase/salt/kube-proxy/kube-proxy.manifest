@@ -26,6 +26,9 @@ kind: Pod
 metadata:
   name: kube-proxy
   namespace: kube-system
+  labels:
+    tier: node
+    component: kube-proxy
 spec:
   hostNetwork: true
   containers:
