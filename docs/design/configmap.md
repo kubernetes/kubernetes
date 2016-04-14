@@ -36,8 +36,8 @@ Documentation for other releases can be found at
 
 ## Abstract
 
-The `ConfigMap` API resource stores data used for the configuration of applications deployed on
-Kubernetes.
+The `ConfigMap` API resource stores data used for the configuration of
+applications deployed on Kubernetes.
 
 The main focus of this resource is to:
 
@@ -47,71 +47,74 @@ The main focus of this resource is to:
 
 ## Motivation
 
-A `Secret`-like API resource is needed to store configuration data that pods can consume.
+A `Secret`-like API resource is needed to store configuration data that pods can
+consume.
 
 Goals of this design:
 
-1.  Describe a `ConfigMap` API resource
-2.  Describe the semantics of consuming `ConfigMap` as environment variables
-3.  Describe the semantics of consuming `ConfigMap` as files in a volume
+1.  Describe a `ConfigMap` API resource.
+2.  Describe the semantics of consuming `ConfigMap` as environment variables.
+3.  Describe the semantics of consuming `ConfigMap` as files in a volume.
 
 ## Use Cases
 
-1. As a user, I want to be able to consume configuration data as environment variables
-2. As a user, I want to be able to consume configuration data as files in a volume
-3. As a user, I want my view of configuration data in files to be eventually consistent with changes
-   to the data
+1. As a user, I want to be able to consume configuration data as environment
+variables.
+2. As a user, I want to be able to consume configuration data as files in a
+volume.
+3. As a user, I want my view of configuration data in files to be eventually
+consistent with changes to the data.
 
 ### Consuming `ConfigMap` as Environment Variables
 
-Many programs read their configuration from environment variables.  `ConfigMap` should be possible
-to consume in environment variables.  The rough series of events for consuming `ConfigMap` this way
-is:
+A series of events for consuming `ConfigMap` as environment variables:
 
-1. A `ConfigMap` object is created
-2. A pod that consumes the configuration data via environment variables is created
-3. The pod is scheduled onto a node
-4. The kubelet retrieves the `ConfigMap` resource(s) referenced by the pod and starts the container
-   processes with the appropriate data in environment variables
+1. Create a `ConfigMap` object.
+2. Create a pod to consume the configuration data via environment variables.
+3. The pod is scheduled onto a node.
+4. The Kubelet retrieves the `ConfigMap` resource(s) referenced by the pod and
+starts the container processes with the appropriate configuration data from
+environment variables.
 
 ### Consuming `ConfigMap` in Volumes
 
-Many programs read their configuration from configuration files.  `ConfigMap` should be possible
-to consume in a volume.  The rough series of events for consuming `ConfigMap` this way
-is:
+A series of events for consuming `ConfigMap` as configuration files in a volume:
 
-1. A `ConfigMap` object is created
-2. A new pod using the `ConfigMap` via the volume plugin is created
-3. The pod is scheduled onto a node
-4. The Kubelet creates an instance of the volume plugin and calls its `Setup()` method
-5. The volume plugin retrieves the `ConfigMap` resource(s) referenced by the pod and projects
-   the appropriate data into the volume
+1. Create a `ConfigMap` object.
+2. Create a new pod using the `ConfigMap` via a volume plugin.
+3. The pod is scheduled onto a node.
+4. The Kubelet creates an instance of the volume plugin and calls its `Setup()`
+method.
+5. The volume plugin retrieves the `ConfigMap` resource(s) referenced by the pod
+and projects the appropriate configuration data into the volume.
 
 ### Consuming `ConfigMap`  Updates
 
-Any long-running system has configuration that is mutated over time.  Changes made to configuration
-data must be made visible to pods consuming data in volumes so that they can respond to those
-changes.
+Any long-running system has configuration that is mutated over time. Changes
+made to configuration data must be made visible to pods consuming data in
+volumes so that they can respond to those changes.
 
-The `resourceVersion` of the `ConfigMap` object will be updated by the API server every time the
-object is modified.  After an update, modifications will be made visible to the consumer container:
+The `resourceVersion` of the `ConfigMap` object will be updated by the API
+server every time the object is modified. After an update, modifications will be
+made visible to the consumer container:
 
-1. A `ConfigMap` object is created
-2. A new pod using the `ConfigMap` via the volume plugin is created
-3. The pod is scheduled onto a node
-4. During the sync loop, the Kubelet creates an instance of the volume plugin and calls its
-   `Setup()` method
-5. The volume plugin retrieves the `ConfigMap` resource(s) referenced by the pod and projects
-   the appropriate data into the volume
-6. The `ConfigMap` referenced by the pod is updated
-7. During the next iteration of the `syncLoop`, the Kubelet creates an instance of the volume plugin
-   and calls its `Setup()` method
-8. The volume plugin projects the updated data into the volume atomically
+1. Create a `ConfigMap` object.
+2. Create a new pod using the `ConfigMap` via the volume plugin.
+3. The pod is scheduled onto a node.
+4. During the sync loop, the Kubelet creates an instance of the volume plugin
+and calls its `Setup()` method.
+5. The volume plugin retrieves the `ConfigMap` resource(s) referenced by the pod
+and projects the appropriate data into the volume.
+6. The `ConfigMap` referenced by the pod is updated.
+7. During the next iteration of the `syncLoop`, the Kubelet creates an instance
+of the volume plugin and calls its `Setup()` method.
+8. The volume plugin projects the updated data into the volume atomically.
 
-It is the consuming pod's responsibility to make use of the updated data once it is made visible.
+It is the consuming pod's responsibility to make use of the updated data once it
+is made visible.
 
-Because environment variables cannot be updated without restarting a container, configuration data
-consumed in environment variables will not be updated.
+Because environment variables cannot be updated without restarting a container,
+configuration data consumed in environment variables will not be updated.
 
 ### Advantages
 
@@ -133,8 +136,8 @@ type ConfigMap struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-  // Data contains the configuration data.  Each key must be a valid DNS_SUBDOMAIN or leading
-  // dot followed by valid DNS_SUBDOMAIN.
+  // Data contains the configuration data.  Each key must be a valid
+  // DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN.
 	Data map[string]string `json:"data,omitempty"`
 }
 
@@ -146,7 +149,8 @@ type ConfigMapList struct {
 }
 ```
 
-A `Registry` implementation for `ConfigMap` will be added to `pkg/registry/configmap`.
+A `Registry` implementation for `ConfigMap` will be added to
+`pkg/registry/configmap`.
 
 ### Environment Variables
 
@@ -174,8 +178,8 @@ type ConfigMapKeySelector struct {
 
 ### Volume Source
 
-A new `ConfigMapVolumeSource` type of volume source containing the `ConfigMap` object will be
-added to the `VolumeSource` struct in the API:
+A new `ConfigMapVolumeSource` type of volume source containing the `ConfigMap`
+object will be added to the `VolumeSource` struct in the API:
 
 ```go
 package api
@@ -209,13 +213,14 @@ type KeyToPath struct {
 }
 ```
 
-**Note:** The update logic used in the downward API volume plug-in will be extracted and re-used in
-the volume plug-in for `ConfigMap`.
+**Note:** The update logic used in the downward API volume plug-in will be
+extracted and re-used in the volume plug-in for `ConfigMap`.
 
 ### Changes to Secret
 
-We will update the Secret volume plugin to have a similar API to the new ConfigMap volume plugin.
-The secret volume plugin will also begin updating secret content in the volume when secrets change.
+We will update the Secret volume plugin to have a similar API to the new
+`ConfigMap` volume plugin. The secret volume plugin will also begin updating
+secret content in the volume when secrets change.
 
 ## Examples
 
@@ -281,7 +286,8 @@ spec:
 
 #### Consuming `ConfigMap` as Volumes
 
-`redis-volume-config` is intended to be used as a volume containing a config file:
+`redis-volume-config` is intended to be used as a volume containing a config
+file:
 
 ```yaml
 apiVersion: v1
@@ -320,8 +326,8 @@ spec:
 
 ## Future Improvements
 
-In the future, we may add the ability to specify an init-container that can watch the volume
-contents for updates and respond to changes when they occur.
+In the future, we may add the ability to specify an init-container that can
+watch the volume contents for updates and respond to changes when they occur.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/configmap.md?pixel)]()
