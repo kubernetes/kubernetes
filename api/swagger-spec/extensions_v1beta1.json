@@ -6699,6 +6699,14 @@
        "$ref": "v1.LocalObjectReference"
       },
       "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod"
+     },
+     "hostname": {
+      "type": "string",
+      "description": "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value."
+     },
+     "subdomain": {
+      "type": "string",
+      "description": "If specified, the fully qualified Pod hostname will be \"\u003chostname\u003e.\u003csubdomain\u003e.\u003cpod namespace\u003e.svc.\u003ccluster domain\u003e\". If not specified, the pod will not have a domainname at all."
      }
     }
    },

@@ -1425,6 +1425,15 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), spec.ActiveDeadlineSeconds, "must be greater than 0"))
 		}
 	}
+
+	if len(spec.Hostname) > 0 && !validation.IsDNS1123Label(spec.Hostname) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostname"), spec.Hostname, DNS1123LabelErrorMsg))
+	}
+
+	if len(spec.Subdomain) > 0 && !validation.IsDNS1123Label(spec.Subdomain) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("subdomain"), spec.Subdomain, DNS1123LabelErrorMsg))
+	}
+
 	return allErrs
 }
 
@@ -2275,7 +2284,7 @@ func ValidateSecret(secret *api.Secret) field.ErrorList {
 		if _, exists := secret.Data[api.TLSPrivateKeyKey]; !exists {
 			allErrs = append(allErrs, field.Required(dataPath.Key(api.TLSPrivateKeyKey), ""))
 		}
-		// TODO: Verify that the key matches the cert.
+	// TODO: Verify that the key matches the cert.
 	default:
 		// no-op
 	}
@@ -2589,6 +2598,9 @@ func validateEndpointSubsets(subsets []api.EndpointSubset, fldPath *field.Path) 
 		for addr := range ss.Addresses {
 			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr))...)
 		}
+		for addr := range ss.NotReadyAddresses {
+			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr))...)
+		}
 		for port := range ss.Ports {
 			allErrs = append(allErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1, idxPath.Child("ports").Index(port))...)
 		}
@@ -2601,6 +2613,11 @@ func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 	if !validation.IsValidIP(address.IP) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, "must be a valid IP address"))
+	}
+	if len(address.Hostname) > 0 && !validation.IsDNS1123Label(address.Hostname) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostname"), address.Hostname, DNS1123LabelErrorMsg))
+	}
+	if len(allErrs) > 0 {
 		return allErrs
 	}
 	return validateIpIsNotLinkLocalOrLoopback(address.IP, fldPath.Child("ip"))
