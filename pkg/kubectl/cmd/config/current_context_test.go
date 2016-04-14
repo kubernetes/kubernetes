@@ -64,7 +64,7 @@ func (test currentContextTest) run(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	pathOptions := NewDefaultPathOptions()
+	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
 	options := CurrentContextOptions{

@@ -19,13 +19,15 @@ package config
 import (
 	"fmt"
 	"io"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 type CurrentContextOptions struct {
-	ConfigAccess ConfigAccess
+	ConfigAccess clientcmd.ConfigAccess
 }
 
 const (
@@ -34,7 +36,7 @@ const (
 kubectl config current-context`
 )
 
-func NewCmdConfigCurrentContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &CurrentContextOptions{ConfigAccess: configAccess}
 
 	cmd := &cobra.Command{
