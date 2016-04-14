@@ -328,11 +328,7 @@ func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) 
 
 // StartContainer is a test-spy implementation of DockerInterface.StartContainer.
 // It adds an entry "start" to the internal method call record.
-// The HostConfig at StartContainer will be deprecated from docker 1.10. Now in
-// docker manager the HostConfig is set when ContainerCreate().
-// TODO(random-liu): Remove the HostConfig here when it is completely removed in
-// docker 1.12.
-func (f *FakeDockerClient) StartContainer(id string, _ *docker.HostConfig) error {
+func (f *FakeDockerClient) StartContainer(id string) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start")
@@ -355,7 +351,7 @@ func (f *FakeDockerClient) StartContainer(id string, _ *docker.HostConfig) error
 
 // StopContainer is a test-spy implementation of DockerInterface.StopContainer.
 // It adds an entry "stop" to the internal method call record.
-func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
+func (f *FakeDockerClient) StopContainer(id string, timeout int) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "stop")
@@ -393,7 +389,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	return nil
 }
 
-func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) error {
+func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "remove")
@@ -402,10 +398,10 @@ func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) e
 		return err
 	}
 	for i := range f.ExitedContainerList {
-		if f.ExitedContainerList[i].ID == opts.ID {
-			delete(f.ContainerMap, opts.ID)
+		if f.ExitedContainerList[i].ID == id {
+			delete(f.ContainerMap, id)
 			f.ExitedContainerList = append(f.ExitedContainerList[:i], f.ExitedContainerList[i+1:]...)
-			f.Removed = append(f.Removed, opts.ID)
+			f.Removed = append(f.Removed, id)
 			return nil
 		}
 
@@ -423,7 +419,7 @@ func (f *FakeDockerClient) Logs(opts docker.LogsOptions) error {
 	return f.popError("logs")
 }
 
-// PullImage is a test-spy implementation of DockerInterface.StopContainer.
+// PullImage is a test-spy implementation of DockerInterface.PullImage.
 // It adds an entry "pull" to the internal method call record.
 func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
 	f.Lock()

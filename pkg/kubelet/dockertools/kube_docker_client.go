@@ -132,22 +132,18 @@ func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfi
 	return &createResp, nil
 }
 
-// TODO(random-liu): The HostConfig at container start is deprecated, will remove this in the following refactoring.
-func (d *kubeDockerClient) StartContainer(id string, _ *docker.HostConfig) error {
+func (d *kubeDockerClient) StartContainer(id string) error {
 	return d.client.ContainerStart(getDefaultContext(), id)
 }
 
 // Stopping an already stopped container will not cause an error in engine-api.
-func (d *kubeDockerClient) StopContainer(id string, timeout uint) error {
-	return d.client.ContainerStop(getDefaultContext(), id, int(timeout))
+func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
+	return d.client.ContainerStop(getDefaultContext(), id, timeout)
 }
 
-func (d *kubeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) error {
-	return d.client.ContainerRemove(getDefaultContext(), dockertypes.ContainerRemoveOptions{
-		ContainerID:   opts.ID,
-		RemoveVolumes: opts.RemoveVolumes,
-		Force:         opts.Force,
-	})
+func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
+	opts.ContainerID = id
+	return d.client.ContainerRemove(getDefaultContext(), opts)
 }
 
 func (d *kubeDockerClient) InspectImage(image string) (*docker.Image, error) {

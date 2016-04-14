@@ -76,16 +76,16 @@ func (in instrumentedDockerInterface) CreateContainer(opts dockertypes.Container
 	return out, err
 }
 
-func (in instrumentedDockerInterface) StartContainer(id string, hostConfig *docker.HostConfig) error {
+func (in instrumentedDockerInterface) StartContainer(id string) error {
 	const operation = "start_container"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.StartContainer(id, hostConfig)
+	err := in.client.StartContainer(id)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedDockerInterface) StopContainer(id string, timeout uint) error {
+func (in instrumentedDockerInterface) StopContainer(id string, timeout int) error {
 	const operation = "stop_container"
 	defer recordOperation(operation, time.Now())
 
@@ -94,11 +94,11 @@ func (in instrumentedDockerInterface) StopContainer(id string, timeout uint) err
 	return err
 }
 
-func (in instrumentedDockerInterface) RemoveContainer(opts docker.RemoveContainerOptions) error {
+func (in instrumentedDockerInterface) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
 	const operation = "remove_container"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.RemoveContainer(opts)
+	err := in.client.RemoveContainer(id, opts)
 	recordError(operation, err)
 	return err
 }
