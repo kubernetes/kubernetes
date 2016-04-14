@@ -825,7 +825,7 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 	var ports []api.ContainerPort
 
 	// Check network mode.
-	if usesHostNetwork(pod) {
+	if kubecontainer.IsHostNetworkPod(pod) {
 		dockerPodInfraContainer, err := dm.client.InspectContainer(podInfraContainerStatus.ID.ID)
 		if err != nil {
 			return false, err
@@ -851,11 +851,6 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 		Env:             dm.podInfraContainerEnv,
 	}
 	return podInfraContainerStatus.Hash != kubecontainer.HashContainer(expectedPodInfraContainer), nil
-}
-
-// pod must not be nil
-func usesHostNetwork(pod *api.Pod) bool {
-	return pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork
 }
 
 // determine if the container root should be a read only filesystem.
@@ -1484,7 +1479,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	}
 
 	utsMode := ""
-	if usesHostNetwork(pod) {
+	if kubecontainer.IsHostNetworkPod(pod) {
 		utsMode = namespaceModeHost
 	}
 
@@ -1653,7 +1648,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 	netNamespace := ""
 	var ports []api.ContainerPort
 
-	if usesHostNetwork(pod) {
+	if kubecontainer.IsHostNetworkPod(pod) {
 		netNamespace = namespaceModeHost
 	} else if dm.networkPlugin.Name() == "cni" || dm.networkPlugin.Name() == "kubenet" {
 		netNamespace = "none"
@@ -1906,7 +1901,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 
 		setupNetworkResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod))
 		result.AddSyncResult(setupNetworkResult)
-		if !usesHostNetwork(pod) {
+		if !kubecontainer.IsHostNetworkPod(pod) {
 			// Call the networking plugin
 			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
 			if err != nil {
