@@ -29,8 +29,8 @@ func init() {
 // initialize Command
 var initCmd = &cobra.Command{
 	Use:     "init [name]",
-	Aliases: []string{"initialize", "initalise", "create"},
-	Short:   "Initalize a Cobra Application",
+	Aliases: []string{"initialize", "initialise", "create"},
+	Short:   "Initialize a Cobra Application",
 	Long: `Initialize (cobra init) will create a new application, with a license
 and the appropriate structure for a Cobra-based CLI application.
 
@@ -41,7 +41,7 @@ and the appropriate structure for a Cobra-based CLI application.
   * If an absolute path is provided, it will be created;
   * If the directory already exists but is empty, it will be used.
 
-Init will not use an exiting directory with contents.`,
+Init will not use an existing directory with contents.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		switch len(args) {
@@ -55,11 +55,11 @@ Init will not use an exiting directory with contents.`,
 			er("init doesn't support more than 1 parameter")
 		}
 		guessProjectPath()
-		initalizePath(projectPath)
+		initializePath(projectPath)
 	},
 }
 
-func initalizePath(path string) {
+func initializePath(path string) {
 	b, err := exists(path)
 	if err != nil {
 		er(err)
@@ -150,7 +150,7 @@ import (
 {{if .viper}}
 var cfgFile string
 {{ end }}
-// This represents the base command when called without any subcommands
+// RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "{{ .appName }}",
 	Short: "A brief description of your application",

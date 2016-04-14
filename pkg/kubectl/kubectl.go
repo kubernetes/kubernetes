@@ -175,6 +175,35 @@ func expandResourceShortcut(resource unversioned.GroupVersionResource) unversion
 	return resource
 }
 
+// ResourceAliases returns the resource shortcuts and plural forms for the given resources.
+func ResourceAliases(rs []string) []string {
+	as := make([]string, 0, len(rs))
+	plurals := make(map[string]struct{}, len(rs))
+	for _, r := range rs {
+		var plural string
+		switch {
+		case r == "endpoints":
+			plural = r // exception. "endpoint" does not exist. Why?
+		case strings.HasSuffix(r, "y"):
+			plural = r[0:len(r)-1] + "ies"
+		case strings.HasSuffix(r, "s"):
+			plural = r + "es"
+		default:
+			plural = r + "s"
+		}
+		as = append(as, plural)
+
+		plurals[plural] = struct{}{}
+	}
+
+	for sf, r := range shortForms {
+		if _, found := plurals[r]; found {
+			as = append(as, sf)
+		}
+	}
+	return as
+}
+
 // parseFileSource parses the source given. Acceptable formats include:
 //
 // 1.  source-path: the basename will become the key name
