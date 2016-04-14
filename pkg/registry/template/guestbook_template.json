@@ -1,0 +1,149 @@
+{
+    "kind": "Template",
+    "apiVersion": "extensions/v1beta1",
+    "metadata": {
+        "name": "guestbook-example",
+        "creationTimestamp": null,
+        "annotations": {
+            "description": "Example shows how to build a simple multi-tier application using Kubernetes and Docker"
+        }
+    },
+    "objects": [
+        {
+            "apiVersion": "v1",
+            "kind": "ReplicationController",
+            "metadata": {
+                "creationTimestamp": null,
+                "labels": {
+                    "name": "redis-master"
+                },
+                "name": "${MASTER_NAME}"
+            },
+            "spec": {
+                "replicas": 3,
+                "selector": {
+                    "name": "redis-master"
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "name": "redis-master"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "capabilities": {},
+                                "env": [
+                                    {
+                                        "name": "PASSWORD",
+                                        "value": "${PASSWORD}"
+                                    }
+                                ],
+                                "image": "brendanburns/php-redis",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "${MASTER_NAME}",
+                                "ports": [
+                                    {
+                                        "containerPort": 80,
+                                        "hostPort": 8000,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "resources": {},
+                                "securityContext": {
+                                    "capabilities": {},
+                                    "privileged": false
+                                },
+                                "terminationMessagePath": "/dev/termination-log"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "restartPolicy": "Always",
+                        "serviceAccount": ""
+                    }
+                }
+            },
+            "status": {
+                "replicas": 0
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "ReplicationController",
+            "metadata": {
+                "creationTimestamp": null,
+                "labels": {
+                    "name": "redis-slave"
+                },
+                "name": "redis-slave"
+            },
+            "spec": {
+                "replicas": 2,
+                "selector": {
+                    "name": "${SLAVE_NAME}"
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "name": "redis-slave"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "capabilities": {},
+                                "env": [
+                                    {
+                                        "name": "REDIS_PASSWORD",
+                                        "value": "${PASSWORD}"
+                                    }
+                                ],
+                                "image": "brendanburns/redis-slave",
+                                "imagePullPolicy": "IfNotPresent",
+                                "name": "${SLAVE_NAME}",
+                                "ports": [
+                                    {
+                                        "containerPort": 6379,
+                                        "hostPort": 6380,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "resources": {},
+                                "securityContext": {
+                                    "capabilities": {},
+                                    "privileged": false
+                                },
+                                "terminationMessagePath": "/dev/termination-log"
+                            }
+                        ],
+                        "dnsPolicy": "ClusterFirst",
+                        "restartPolicy": "Always",
+                        "serviceAccount": ""
+                    }
+                }
+            },
+            "status": {
+                "replicas": 0
+            }
+        }
+    ],
+    "parameters": [
+        {
+            "name": "SLAVE_NAME",
+            "description": "Slave name",
+            "value": "redis-slave"
+        },
+        {
+            "name": "MASTER_NAME",
+            "description": "Master name",
+            "value": "redis-master"
+        },
+        {
+            "name": "PASSWORD",
+            "value": "foo"
+        }
+    ]
+}
