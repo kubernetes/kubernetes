@@ -18,12 +18,20 @@ package main
 
 import (
 	"k8s.io/kubernetes/examples/apiserver"
+	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 )
 
 func main() {
-	if err := apiserver.Run(); err != nil {
+	serverRunOptions := apiserver.NewServerRunOptions()
+
+	// Parse command line flags.
+	serverRunOptions.AddFlags(pflag.CommandLine)
+	flag.InitFlags()
+
+	if err := apiserver.Run(serverRunOptions); err != nil {
 		glog.Fatalf("Error in bringing up the server: %v", err)
 	}
 }
