@@ -1947,7 +1947,7 @@ func findTag(tags []*ec2.Tag, key string) (string, bool) {
 }
 
 // Finds the subnets associated with the cluster, by matching tags.
-// For maximal backwards compatability, if no subnets are tagged, it will fall-back to the current subnet.
+// For maximal backwards compatibility, if no subnets are tagged, it will fall-back to the current subnet.
 // However, in future this will likely be treated as an error.
 func (c *AWSCloud) findSubnets() ([]*ec2.Subnet, error) {
 	request := &ec2.DescribeSubnetsInput{}

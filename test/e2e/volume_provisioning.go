@@ -33,7 +33,7 @@ const (
 	// Requested size of the volume
 	requestedSize = "1500Mi"
 	// Expected size of the volume is 2GiB, because all three supported cloud
-	// providers  allocate volumes in 1GiB chunks.
+	// providers allocate volumes in 1GiB chunks.
 	expectedSize = "2Gi"
 )
 
@@ -91,7 +91,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			// We start two pods:
 			// - The first writes 'hello word' to the /mnt/test (= the volume).
 			// - The second one runs grep 'hello world' on /mnt/test.
-			// If both suceed, Kubernetes actually allocated something that is
+			// If both succeed, Kubernetes actually allocated something that is
 			// persistent across pods.
 			By("checking the created volume is writable")
 			runInPodWithVolume(c, ns, claim.Name, "echo 'hello world' > /mnt/test/data")

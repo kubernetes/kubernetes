@@ -243,7 +243,7 @@ func deleteEachItem(
 }
 
 // deleteAllContentForGroupVersionResource will use the dynamic client to delete each resource identified in gvr.
-// It returns an estimate of the time remaining before the remaing resources are deleted.
+// It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
 func deleteAllContentForGroupVersionResource(
 	kubeClient clientset.Interface,
@@ -303,7 +303,7 @@ func deleteAllContentForGroupVersionResource(
 }
 
 // deleteAllContent will use the dynamic client to delete each resource identified in groupVersionResources.
-// It returns an estimate of the time remaining before the remaing resources are deleted.
+// It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
 func deleteAllContent(
 	kubeClient clientset.Interface,
