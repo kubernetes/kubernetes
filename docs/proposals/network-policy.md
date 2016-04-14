@@ -73,8 +73,11 @@ The `networkIsolation` field will default to `false` if not specified.
 Once the namespace is isolated, a mechanism to selectively allow traffic into the namespace and between pods within
 the namespace is required.  That is accomplished through ingress rules on `NetworkPolicy`
 objects (of which there can be multiple in a single namespace).  Pods selected by
-a NetworkPolicy should allow any incoming connections that match any
-ingress rule, per the network plugin’s capabilities.
+one or more NetworkPolicy objects should allow any incoming connections that match any
+ingress rule on those NetworkPolicy objects, per the network plugin’s capabilities.
+
+If `networkIsolation=false` on a namespace, then all traffic is allowed to / from pods in that namespace independent of any 
+NetworkPolicy objects what may have selected them.
 
 ```yaml
 kind: NetworkPolicy
@@ -110,7 +113,8 @@ Each item in the `from` list may declare at most ONE of the following:
 - `namespaces`: A label selector which selects namespaces.
 
 Note:
-- For a given pod, any ingress traffic which does not match one of the ingress rules from any of the NetworkPolicy objects which select it will be dropped via a default drop behavior (this occurs whether or not network-isolation has been enabled on the Namespace).  This allows you to apply policy to specific pods, even if the entire namespace isn't isolated.
+- For a given pod, any ingress traffic which does not match one of the ingress rules from any of the NetworkPolicy objects which select it will be dropped via a default
+drop behavior.  This only occurs when `networkIsolation=false` on the namespace.
 - All ingress rules are whitelist rules, meaning that it should be easy to resolve the case where multiple
 NetworkPolicy objects select the same set of pods, as there can be no conflicting rules.
 - All pods will always be accessible from the host that they are running on.  This is required to allow for kubelet health checks.
