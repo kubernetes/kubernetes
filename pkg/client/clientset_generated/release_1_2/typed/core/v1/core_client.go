@@ -151,7 +151,8 @@ func setConfigDefaults(config *restclient.Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
+	config.Codec, _ = api.Codecs.SerializerForFileExtension("json")
+
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

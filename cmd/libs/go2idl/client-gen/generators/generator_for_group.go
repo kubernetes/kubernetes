@@ -29,6 +29,7 @@ type genGroup struct {
 	generator.DefaultGen
 	outputPackage string
 	group         string
+	version       string
 	// types in this group
 	types   []*types.Type
 	imports namer.ImportTracker
@@ -102,7 +103,11 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw.Do(newClientForConfigTemplate, m)
 	sw.Do(newClientForConfigOrDieTemplate, m)
 	sw.Do(newClientForRESTClientTemplate, m)
-	sw.Do(setClientDefaultsTemplate, m)
+	if g.version == "unversioned" {
+		sw.Do(legacySetClientDefaultsTemplate, m)
+	} else {
+		sw.Do(setClientDefaultsTemplate, m)
+	}
 
 	return sw.Error()
 }
@@ -166,7 +171,7 @@ func New(c *$.RESTClient|raw$) *$.Group$Client {
 	return &$.Group$Client{c}
 }
 `
-var setClientDefaultsTemplate = `
+var legacySetClientDefaultsTemplate = `
 func setConfigDefaults(config *$.Config|raw$) error {
 	// if $.group$ group is not registered, return an error
 	g, err := $.latestGroup|raw$("$.canonicalGroup$")
@@ -184,6 +189,35 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	//}
 
 	config.Codec = $.codecs|raw$.LegacyCodec(*config.GroupVersion)
+	if config.QPS == 0 {
+		config.QPS = 5
+	}
+	if config.Burst == 0 {
+		config.Burst = 10
+	}
+	return nil
+}
+`
+
+var setClientDefaultsTemplate = `
+func setConfigDefaults(config *$.Config|raw$) error {
+	// if $.group$ group is not registered, return an error
+	g, err := $.latestGroup|raw$("$.canonicalGroup$")
+	if err != nil {
+		return err
+	}
+	config.APIPath = $.apiPath$
+	if config.UserAgent == "" {
+		config.UserAgent = $.DefaultKubernetesUserAgent|raw$()
+	}
+	// TODO: Unconditionally set the config.Version, until we fix the config.
+	//if config.Version == "" {
+	copyGroupVersion := g.GroupVersion
+	config.GroupVersion = &copyGroupVersion
+	//}
+
+	config.Codec, _ = $.codecs|raw$.SerializerForFileExtension("json")
+
 	if config.QPS == 0 {
 		config.QPS = 5
 	}
