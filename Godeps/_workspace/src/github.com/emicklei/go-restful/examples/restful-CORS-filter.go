@@ -54,6 +54,7 @@ func main() {
 	cors := restful.CrossOriginResourceSharing{
 		ExposeHeaders:  []string{"X-My-Header"},
 		AllowedHeaders: []string{"Content-Type", "Accept"},
+		AllowedMethods: []string{"GET", "POST"},
 		CookiesAllowed: false,
 		Container:      wsContainer}
 	wsContainer.Filter(cors.Filter)
