@@ -44,9 +44,9 @@ There are 4 distinct networking problems to solve:
 ## Model and motivation
 
 Kubernetes deviates from the default Docker networking model (though as of
-Docker 1.8 their network plugins are getting closer).  The goal is for each pod
+Docker 1.8 their network plugins are getting closer). The goal is for each pod
 to have an IP in a flat shared networking namespace that has full communication
-with other physical computers and containers across the network.  IP-per-pod
+with other physical computers and containers across the network. IP-per-pod
 creates a clean, backward-compatible model where pods can be treated much like
 VMs or physical hosts from the perspectives of port allocation, networking,
 naming, service discovery, load balancing, application configuration, and
@@ -71,15 +71,15 @@ among other problems.
 All containers within a pod behave as if they are on the same host with regard
 to networking. They can all reach each other’s ports on localhost.  This offers
 simplicity (static ports know a priori), security (ports bound to localhost
-are visible within the pod but never outside it), and performance.  This also
+are visible within the pod but never outside it), and performance. This also
 reduces friction for applications moving from the world of uncontainerized apps
-on physical or virtual hosts.  People running application stacks together on
+on physical or virtual hosts. People running application stacks together on
 the same host have already figured out how to make ports not conflict and have
 arranged for clients to find them.
 
 The approach does reduce isolation between containers within a pod &mdash;
 ports could conflict, and there can be no container-private ports, but these
-seem to be relatively minor issues with plausible future workarounds.  Besides,
+seem to be relatively minor issues with plausible future workarounds. Besides,
 the premise of pods is that containers within a pod share some resources
 (volumes, cpu, ram, etc.) and therefore expect and tolerate reduced isolation.
 Additionally, the user can control what containers belong to the same pod
@@ -88,7 +88,7 @@ whereas, in general, they don't control what pods land together on a host.
 ## Pod to pod
 
 Because every pod gets a "real" (not machine-private) IP address, pods can
-communicate without proxies or translations.  The pod can use well-known port
+communicate without proxies or translations. The pod can use well-known port
 numbers and can avoid the use of higher-level service discovery systems like
 DNS-SD, Consul, or Etcd.
 
@@ -98,7 +98,7 @@ each pod has its own IP address that other pods can know. By making IP addresses
 and ports the same both inside and outside the pods, we create a NAT-less, flat
 address space. Running "ip addr show" should work as expected. This would enable
 all existing naming/discovery mechanisms to work out of the box, including
-self-registration mechanisms and applications that distribute IP addresses.  We
+self-registration mechanisms and applications that distribute IP addresses. We
 should be optimizing for inter-pod network communication. Within a pod,
 containers are more likely to use communication through volumes (e.g., tmpfs) or
 IPC.
@@ -141,7 +141,7 @@ gcloud compute routes add "${NODE_NAMES[$i]}" \
   --next-hop-instance-zone "${ZONE}" &
 ```
 
-GCE itself does not know anything about these IPs, though.  This means that when
+GCE itself does not know anything about these IPs, though. This means that when
 a pod tries to egress beyond GCE's project the packets must be SNAT'ed
 (masqueraded) to the VM's IP, which GCE recognizes and allows.
 
@@ -161,26 +161,26 @@ to serve the purpose outside of GCE.
 ## Pod to service
 
 The [service](../user-guide/services.md) abstraction provides a way to group pods under a
-common access policy (e.g. load-balanced).  The implementation of this creates a
+common access policy (e.g. load-balanced). The implementation of this creates a
 virtual IP which clients can access and which is transparently proxied to the
-pods in a Service.  Each node runs a kube-proxy process which programs
+pods in a Service. Each node runs a kube-proxy process which programs
 `iptables` rules to trap access to service IPs and redirect them to the correct
-backends.  This provides a highly-available load-balancing solution with low
+backends. This provides a highly-available load-balancing solution with low
 performance overhead by balancing client traffic from a node on that same node.
 
 ## External to internal
 
 So far the discussion has been about how to access a pod or service from within
-the cluster.  Accessing a pod from outside the cluster is a bit more tricky.  We
+the cluster. Accessing a pod from outside the cluster is a bit more tricky. We
 want to offer highly-available, high-performance load balancing to target
-Kubernetes Services.  Most public cloud providers are simply not flexible enough
+Kubernetes Services. Most public cloud providers are simply not flexible enough
 yet.
 
 The way this is generally implemented is to set up external load balancers (e.g.
-GCE's ForwardingRules or AWS's ELB) which target all nodes in a cluster.  When
+GCE's ForwardingRules or AWS's ELB) which target all nodes in a cluster. When
 traffic arrives at a node it is recognized as being part of a particular Service
-and routed to an appropriate backend Pod.  This does mean that some traffic will
-get double-bounced on the network.  Once cloud providers have better offerings
+and routed to an appropriate backend Pod. This does mean that some traffic will
+get double-bounced on the network. Once cloud providers have better offerings
 we can take advantage of those.
 
 ## Challenges and future work
@@ -207,7 +207,13 @@ External IP assignment would also simplify DNS support (see below).
 
 ### IPv6
 
-IPv6 would be a nice option, also, but we can't depend on it yet. Docker support is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974), [Docker issue #6923](https://github.com/dotcloud/docker/issues/6923), [Docker issue #6975](https://github.com/dotcloud/docker/issues/6975). Additionally, direct ipv6 assignment to instances doesn't appear to be supported by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull requests from people running Kubernetes on bare metal, though. :-)
+IPv6 would be a nice option, also, but we can't depend on it yet. Docker support
+is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974),
+[Docker issue #6923](https://github.com/dotcloud/docker/issues/6923),
+[Docker issue #6975](https://github.com/dotcloud/docker/issues/6975).
+Additionally, direct ipv6 assignment to instances doesn't appear to be supported
+by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull
+requests from people running Kubernetes on bare metal, though. :-)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
