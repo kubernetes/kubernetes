@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/spf13/cobra"
 )
@@ -97,16 +97,8 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
-	infos, err := r.Infos()
+	err = r.Err()
 	if err != nil {
-		return err
-	}
-	if len(infos) > 1 {
-		return fmt.Errorf("multiple resources provided: %v", args)
-	}
-	info := infos[0]
-	mapping := info.ResourceMapping()
-	if err := f.CanBeAutoscaled(mapping.GroupVersionKind.GroupKind()); err != nil {
 		return err
 	}
 
@@ -118,62 +110,84 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
 	}
 	names := generator.ParamNames()
-	params := kubectl.MakeParams(cmd, names)
-	name := info.Name
-	params["default-name"] = name
 
-	params["scaleRef-kind"] = mapping.GroupVersionKind.Kind
-	params["scaleRef-name"] = name
-	params["scaleRef-apiVersion"] = mapping.GroupVersionKind.GroupVersion().String()
-
-	if err = kubectl.ValidateParams(names, params); err != nil {
-		return err
-	}
-	// Check for invalid flags used against the present generator.
-	if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
-		return err
-	}
-
-	// Generate new object
-	object, err := generator.Generate(params)
-	if err != nil {
-		return err
-	}
-
-	resourceMapper := &resource.Mapper{
-		ObjectTyper:  typer,
-		RESTMapper:   mapper,
-		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-		Decoder:      f.Decoder(true),
-	}
-	hpa, err := resourceMapper.InfoForObject(object, nil)
-	if err != nil {
-		return err
-	}
-	if cmdutil.ShouldRecord(cmd, hpa) {
-		if err := cmdutil.RecordChangeCause(hpa.Object, f.Command()); err != nil {
+	count := 0
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
 			return err
 		}
-		object = hpa.Object
-	}
-	// TODO: extract this flag to a central location, when such a location exists.
-	if cmdutil.GetFlagBool(cmd, "dry-run") {
-		return f.PrintObject(cmd, mapper, object, out)
-	}
 
-	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa, f.JSONEncoder()); err != nil {
-		return err
-	}
+		mapping := info.ResourceMapping()
+		if err := f.CanBeAutoscaled(mapping.GroupVersionKind.GroupKind()); err != nil {
+			return err
+		}
 
-	object, err = resource.NewHelper(hpa.Client, hpa.Mapping).Create(namespace, false, object)
+		name := info.Name
+		params := kubectl.MakeParams(cmd, names)
+		params["default-name"] = name
+
+		params["scaleRef-kind"] = mapping.GroupVersionKind.Kind
+		params["scaleRef-name"] = name
+		params["scaleRef-apiVersion"] = mapping.GroupVersionKind.GroupVersion().String()
+
+		if err = kubectl.ValidateParams(names, params); err != nil {
+			return err
+		}
+		// Check for invalid flags used against the present generator.
+		if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
+			return err
+		}
+
+		// Generate new object
+		object, err := generator.Generate(params)
+		if err != nil {
+			return err
+		}
+
+		resourceMapper := &resource.Mapper{
+			ObjectTyper:  typer,
+			RESTMapper:   mapper,
+			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+			Decoder:      f.Decoder(true),
+		}
+		hpa, err := resourceMapper.InfoForObject(object, nil)
+		if err != nil {
+			return err
+		}
+		if cmdutil.ShouldRecord(cmd, hpa) {
+			if err := cmdutil.RecordChangeCause(hpa.Object, f.Command()); err != nil {
+				return err
+			}
+			object = hpa.Object
+		}
+		// TODO: extract this flag to a central location, when such a location exists.
+		if cmdutil.GetFlagBool(cmd, "dry-run") {
+			return f.PrintObject(cmd, mapper, object, out)
+		}
+
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa, f.JSONEncoder()); err != nil {
+			return err
+		}
+
+		object, err = resource.NewHelper(hpa.Client, hpa.Mapping).Create(namespace, false, object)
+		if err != nil {
+			return err
+		}
+
+		count++
+		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
+			return f.PrintObject(cmd, mapper, object, out)
+		}
+
+		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "autoscaled")
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-
-	if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-		return f.PrintObject(cmd, mapper, object, out)
+	if count == 0 {
+		return fmt.Errorf("no objects passed to autoscale")
 	}
-	cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "autoscaled")
 	return nil
 }
 
@@ -186,5 +200,5 @@ func validateFlags(cmd *cobra.Command) error {
 	if cpu > 100 {
 		errs = append(errs, fmt.Errorf("CPU utilization (%%) cannot exceed 100"))
 	}
-	return errors.NewAggregate(errs)
+	return utilerrors.NewAggregate(errs)
 }
