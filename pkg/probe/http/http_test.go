@@ -86,6 +86,20 @@ func TestHTTPProbeChecker(t *testing.T) {
 			},
 		},
 		{
+			// Echo handler that returns the contents of Host in the body
+			func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(200)
+				w.Write([]byte(r.Host))
+			},
+			http.Header{
+				"Host": {"muffins.cupcakes.org"},
+			},
+			probe.Success,
+			[]string{
+				"muffins.cupcakes.org",
+			},
+		},
+		{
 			handleReq(FailureCode, "fail body"),
 			nil,
 			probe.Failure,

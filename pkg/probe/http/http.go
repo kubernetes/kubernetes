@@ -63,6 +63,9 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client HTTPGetInterface) (pr
 		return probe.Failure, err.Error(), nil
 	}
 	req.Header = headers
+	if headers.Get("Host") != "" {
+		req.Host = headers.Get("Host")
+	}
 	res, err := client.Do(req)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
