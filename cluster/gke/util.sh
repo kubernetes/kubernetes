@@ -236,6 +236,9 @@ function detect-node-names {
     "${NODE_INSTANCE_GROUP}" --zone "${ZONE}" --project "${PROJECT}" \
     --format=yaml | grep instance: | cut -d ' ' -f 2))
 
+  # Strip path if return value is selflink
+  NODE_NAMES=($(for i in ${NODE_NAMES[@]}; do basename "$i"; done))
+
   echo "NODE_NAMES=${NODE_NAMES[*]}"
 }
 
