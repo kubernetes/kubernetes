@@ -32,7 +32,7 @@ import (
 )
 
 type createClusterOptions struct {
-	configAccess          ConfigAccess
+	configAccess          clientcmd.ConfigAccess
 	name                  string
 	server                util.StringFlag
 	apiVersion            util.StringFlag
@@ -54,7 +54,7 @@ kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca
 kubectl config set-cluster e2e --insecure-skip-tls-verify=true`
 )
 
-func NewCmdConfigSetCluster(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
@@ -108,7 +108,7 @@ func (o createClusterOptions) run() error {
 	cluster := o.modifyCluster(*startingStanza)
 	config.Clusters[o.name] = &cluster
 
-	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 
