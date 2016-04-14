@@ -57,10 +57,16 @@ type ObjectScheme interface {
 // TODO: add support for sub resources
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 	return func(action Action) (bool, runtime.Object, error) {
-		kind, err := mapper.KindFor(action.GetResource())
+		resource := action.GetResource()
+		if len(resource.Version) == 0 {
+			resource.Version = runtime.APIVersionInternal
+		}
+		fmt.Println("CHAO: resource=", resource)
+		kind, err := mapper.KindFor(resource)
 		if err != nil {
 			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
 		}
+		fmt.Println("CHAO: kin=", kind)
 
 		// TODO: have mapper return a Kind for a subresource?
 		switch castAction := action.(type) {
