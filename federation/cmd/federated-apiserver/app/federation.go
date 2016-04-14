@@ -72,10 +72,11 @@ func installFederationAPI(m *master.Master, d genericapiserver.StorageDestinatio
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			"v1alpha1": clusterResources,
 		},
-		OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
-		Scheme:                 api.Scheme,
-		ParameterCodec:         api.ParameterCodec,
-		NegotiatedSerializer:   api.Codecs,
+		OptionsExternalVersion:     &registered.GroupOrDie(api.GroupName).GroupVersion,
+		Scheme:                     api.Scheme,
+		ParameterCodec:             api.ParameterCodec,
+		NegotiatedSerializer:       api.Codecs,
+		NegotiatedStreamSerializer: api.StreamCodecs,
 	}
 	if err := m.InstallAPIGroup(&apiGroupInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
