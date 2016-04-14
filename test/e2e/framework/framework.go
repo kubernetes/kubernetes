@@ -27,8 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	adapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/release_1_2"
+	adapter_1_2 "k8s.io/kubernetes/pkg/client/unversioned/adapters/release_1_2"
+	adapter_1_3 "k8s.io/kubernetes/pkg/client/unversioned/adapters/release_1_3"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/metrics"
 
@@ -47,6 +49,7 @@ type Framework struct {
 
 	Client        *client.Client
 	Clientset_1_2 *release_1_2.Clientset
+	Clientset_1_3 *release_1_3.Clientset
 
 	Namespace                *api.Namespace   // Every test has at least one namespace
 	namespacesToDelete       []*api.Namespace // Some tests have more than one.
@@ -119,7 +122,8 @@ func (f *Framework) BeforeEach() {
 	Expect(err).NotTo(HaveOccurred())
 
 	f.Client = c
-	f.Clientset_1_2 = adapter.FromUnversionedClient(c)
+	f.Clientset_1_2 = adapter_1_2.FromUnversionedClient(c)
+	f.Clientset_1_3 = adapter_1_3.FromUnversionedClient(c)
 
 	By("Building a namespace api object")
 	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
