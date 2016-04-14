@@ -108,6 +108,7 @@ etcd-keyfile
 etcd-mutation-timeout
 etcd-prefix
 etcd-quorum-read
+etcd-cache-entries
 etcd-server
 etcd-servers
 etcd-servers-overrides
