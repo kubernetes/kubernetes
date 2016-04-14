@@ -40,7 +40,7 @@ find_files() {
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
-        -o -wholename '*/Godeps/*' \
+        -o -wholename '*/vendor/*' \
       \) -prune \
     \) -name '*.go'
 }

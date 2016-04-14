@@ -17,7 +17,7 @@
 TAG = 1.0
 
 cauldron:
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 godep go build -a -installsuffix cgo --ldflags '-w' cauldron.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -a -installsuffix cgo --ldflags '-w' cauldron.go
 
 container:	cauldron
 	docker build -t kubernetes/cauldron:$(TAG) .
