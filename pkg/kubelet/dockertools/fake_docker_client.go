@@ -402,6 +402,8 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 }
 
 func (f *FakeDockerClient) Version() (*docker.Env, error) {
+	f.Lock()
+	defer f.Unlock()
 	return &f.VersionInfo, f.popError("version")
 }
 
