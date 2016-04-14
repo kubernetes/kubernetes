@@ -127,6 +127,7 @@ func NewKubeletServer() *KubeletServer {
 			RegistryBurst:                  10,
 			RegistryPullQPS:                5.0,
 			KubeletCgroups:                 "",
+			ResolverConfig:                 kubetypes.ResolvConfDefault,
 			RktPath:                        "",
 			RktAPIEndpoint:                 rkt.DefaultRktAPIServiceEndpoint,
 			RktStage1Image:                 "",
@@ -233,7 +234,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DockerExecHandlerName, "docker-exec-handler", s.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.")
 	fs.StringVar(&s.NonMasqueradeCIDR, "non-masquerade-cidr", s.NonMasqueradeCIDR, "Traffic to IPs outside this range will use IP masquerade.")
 	fs.StringVar(&s.PodCIDR, "pod-cidr", "", "The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.")
-	fs.StringVar(&s.ResolverConfig, "resolv-conf", kubetypes.ResolvConfDefault, "Resolver configuration file used as the basis for the container DNS resolution configuration.")
+	fs.StringVar(&s.ResolverConfig, "resolv-conf", s.ResolverConfig, "Resolver configuration file used as the basis for the container DNS resolution configuration.")
 	fs.BoolVar(&s.CPUCFSQuota, "cpu-cfs-quota", s.CPUCFSQuota, "Enable CPU CFS quota enforcement for containers that specify CPU limits")
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
