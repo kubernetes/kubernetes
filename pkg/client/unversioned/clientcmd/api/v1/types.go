@@ -82,6 +82,8 @@ type AuthInfo struct {
 	ClientKeyData []byte `json:"client-key-data,omitempty"`
 	// Token is the bearer token for authentication to the kubernetes cluster.
 	Token string `json:"token,omitempty"`
+	// Impersonate is the username to imperonate.  The name matches the flag.
+	Impersonate string `json:"as,omitempty"`
 	// Username is the username for basic authentication to the kubernetes cluster.
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.

@@ -62,6 +62,9 @@ type Config struct {
 	// TODO: demonstrate an OAuth2 compatible client.
 	BearerToken string
 
+	// Impersonate is the username that this RESTClient will impersonate
+	Impersonate string
+
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
 

@@ -47,6 +47,7 @@ type AuthOverrideFlags struct {
 	ClientCertificate FlagInfo
 	ClientKey         FlagInfo
 	Token             FlagInfo
+	Impersonate       FlagInfo
 	Username          FlagInfo
 	Password          FlagInfo
 }
@@ -115,6 +116,7 @@ const (
 	FlagCAFile       = "certificate-authority"
 	FlagEmbedCerts   = "embed-certs"
 	FlagBearerToken  = "token"
+	FlagImpersonate  = "as"
 	FlagUsername     = "username"
 	FlagPassword     = "password"
 )
@@ -125,6 +127,7 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client certificate file for TLS."},
 		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS."},
 		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server."},
+		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation."},
 		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server."},
 		Password:          FlagInfo{prefix + FlagPassword, "", "", "Password for basic authentication to the API server."},
 	}
@@ -164,6 +167,7 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 	flagNames.ClientCertificate.BindStringFlag(flags, &authInfo.ClientCertificate)
 	flagNames.ClientKey.BindStringFlag(flags, &authInfo.ClientKey)
 	flagNames.Token.BindStringFlag(flags, &authInfo.Token)
+	flagNames.Impersonate.BindStringFlag(flags, &authInfo.Impersonate)
 	flagNames.Username.BindStringFlag(flags, &authInfo.Username)
 	flagNames.Password.BindStringFlag(flags, &authInfo.Password)
 }
