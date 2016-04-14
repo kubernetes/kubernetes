@@ -302,14 +302,13 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 		}
 		return result, nil
 	}
-	if resourceVersion < oldest {
-		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest))
+	if resourceVersion < oldest-1 {
+		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
 	}
 
-	// Binary search the smallest index at which resourceVersion is not smaller than
-	// the given one.
+	// Binary search the smallest index at which resourceVersion is greater than the given one.
 	f := func(i int) bool {
-		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion >= resourceVersion
+		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion > resourceVersion
 	}
 	first := sort.Search(size, f)
 	result := make([]watchCacheEvent, size-first)
