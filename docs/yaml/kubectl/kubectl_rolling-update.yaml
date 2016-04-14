@@ -26,6 +26,10 @@ options:
 - name: image
   usage: |
     Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: no-headers
   default_value: "false"
   usage: When using the default output, don't print headers.
@@ -38,8 +42,8 @@ options:
     Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
 - name: poll-interval
   default_value: 3s
-  usage: "Time delay between polling for replication controller status after the update.
-    Valid time units are \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\", \"h\".\n"
+  usage: |
+    Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 - name: rollback
   default_value: "false"
   usage: |
@@ -65,12 +69,12 @@ options:
     Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
 - name: timeout
   default_value: 5m0s
-  usage: "Max time to wait for a replication controller to update before giving up.
-    Valid time units are \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\", \"h\".\n"
+  usage: |
+    Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 - name: update-period
   default_value: 1m0s
-  usage: "Time to wait between updating pods. Valid time units are \"ns\", \"us\"
-    (or \"µs\"), \"ms\", \"s\", \"m\", \"h\".\n"
+  usage: |
+    Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 - name: validate
   default_value: "true"
   usage: |

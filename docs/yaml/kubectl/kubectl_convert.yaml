@@ -16,6 +16,10 @@ options:
   default_value: '[]'
   usage: |
     Filename, directory, or URL to file to need to get converted.
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: local
   default_value: "true"
   usage: |
@@ -30,6 +34,10 @@ options:
 - name: output-version
   usage: |
     Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
+- name: recursive
+  shorthand: R
+  default_value: "false"
+  usage: If true, process directory recursively.
 - name: schema-cache-dir
   default_value: ~/.kube/schema
   usage: |

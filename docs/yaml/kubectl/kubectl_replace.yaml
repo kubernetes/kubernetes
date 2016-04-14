@@ -25,6 +25,10 @@ options:
   default_value: "-1"
   usage: |
     Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: output
   shorthand: o
   usage: |
@@ -32,6 +36,10 @@ options:
 - name: record
   default_value: "false"
   usage: Record current kubectl command in the resource annotation.
+- name: recursive
+  shorthand: R
+  default_value: "false"
+  usage: If true, process directory recursively.
 - name: save-config
   default_value: "false"
   usage: |

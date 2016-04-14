@@ -20,6 +20,10 @@ options:
   default_value: '[]'
   usage: |
     Filename, directory, or URL to a file identifying the resource to update the labels
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: no-headers
   default_value: "false"
   usage: When using the default output, don't print headers.
@@ -37,6 +41,10 @@ options:
 - name: record
   default_value: "false"
   usage: Record current kubectl command in the resource annotation.
+- name: recursive
+  shorthand: R
+  default_value: "false"
+  usage: If true, process directory recursively.
 - name: resource-version
   usage: |
     If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.

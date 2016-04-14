@@ -10,6 +10,10 @@ options:
   shorthand: f
   default_value: "false"
   usage: Specify if the logs should be streamed.
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: interactive
   default_value: "false"
   usage: If true, prompt the user for input when required.

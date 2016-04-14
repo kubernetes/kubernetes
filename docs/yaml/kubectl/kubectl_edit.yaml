@@ -26,6 +26,10 @@ options:
   default_value: '[]'
   usage: |
     Filename, directory, or URL to file to use to edit the resource
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: output
   shorthand: o
   default_value: yaml
@@ -36,6 +40,10 @@ options:
 - name: record
   default_value: "false"
   usage: Record current kubectl command in the resource annotation.
+- name: recursive
+  shorthand: R
+  default_value: "false"
+  usage: If true, process directory recursively.
 - name: save-config
   default_value: "false"
   usage: |
