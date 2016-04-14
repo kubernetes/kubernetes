@@ -32,10 +32,18 @@ options:
   default_value: "false"
   usage: |
     Treat "resource not found" as a successful delete. Defaults to "true" when --all is specified.
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: output
   shorthand: o
   usage: |
     Output mode. Use "-o name" for shorter output (resource/name).
+- name: recursive
+  shorthand: R
+  default_value: "false"
+  usage: If true, process directory recursively.
 - name: selector
   shorthand: l
   usage: Selector (label query) to filter on.

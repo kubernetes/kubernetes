@@ -2,6 +2,11 @@ name: cluster-info
 synopsis: Display cluster info
 description: |
   Display addresses of the master and services with label kubernetes.io/cluster-service=true
+options:
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 inherited_options:
 - name: alsologtostderr
   default_value: "false"

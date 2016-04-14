@@ -6,9 +6,13 @@ description: |-
   Possible resource types include (case insensitive): pods (po), services (svc), deployments,
   replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
   persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
-  serviceaccounts, ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
+  serviceaccounts (sa), ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
   componentstatuses (cs), endpoints (ep), and secrets.
 options:
+- name: include-extended-apis
+  default_value: "true"
+  usage: |
+    If true, include definitions of new APIs via calls to the API server. [default true]
 - name: recursive
   default_value: "false"
   usage: Print the fields of fields (Currently only 1 level deep)
