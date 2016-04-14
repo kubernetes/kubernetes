@@ -189,12 +189,20 @@ func assignValue(val reflect.Value, fi []int, pv reflect.Value) {
 				npv := reflect.New(pt)
 				npv.Elem().Set(pv)
 				pv = npv
+				pt = pv.Type()
 			} else {
 				panic(fmt.Sprintf("type %s doesn't implement %s", pt.Name(), rt.Name()))
 			}
 		}
 
-		rv.Set(pv)
+		if pt.AssignableTo(rt) {
+			rv.Set(pv)
+		} else if rt.ConvertibleTo(pt) {
+			rv.Set(pv.Convert(rt))
+		} else {
+			panic(fmt.Sprintf("cannot assign %s (%s) to %s (%s)", rt.Name(), rt.Kind(), pt.Name(), pt.Kind()))
+		}
+
 		return
 	}
 
