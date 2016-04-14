@@ -18,13 +18,14 @@ package fake
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
-	action.Resource = "namespaces"
+	action.Resource = unversioned.GroupVersionResource{Resource: "namespaces"}
 	action.Subresource = "finalize"
 	action.Object = namespace
 

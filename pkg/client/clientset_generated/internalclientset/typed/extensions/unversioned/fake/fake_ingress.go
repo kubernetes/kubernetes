@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -32,9 +33,11 @@ type FakeIngresses struct {
 	ns   string
 }
 
+var ingressesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "unversioned", Resource: "ingresses"}
+
 func (c *FakeIngresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("ingresses", c.ns, ingress), &extensions.Ingress{})
+		Invokes(core.NewCreateAction(ingressesResource, c.ns, ingress), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +47,7 @@ func (c *FakeIngresses) Create(ingress *extensions.Ingress) (result *extensions.
 
 func (c *FakeIngresses) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("ingresses", c.ns, ingress), &extensions.Ingress{})
+		Invokes(core.NewUpdateAction(ingressesResource, c.ns, ingress), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -54,7 +57,7 @@ func (c *FakeIngresses) Update(ingress *extensions.Ingress) (result *extensions.
 
 func (c *FakeIngresses) UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("ingresses", "status", c.ns, ingress), &extensions.Ingress{})
+		Invokes(core.NewUpdateSubresourceAction(ingressesResource, "status", c.ns, ingress), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -64,13 +67,13 @@ func (c *FakeIngresses) UpdateStatus(ingress *extensions.Ingress) (*extensions.I
 
 func (c *FakeIngresses) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("ingresses", c.ns, name), &extensions.Ingress{})
+		Invokes(core.NewDeleteAction(ingressesResource, c.ns, name), &extensions.Ingress{})
 
 	return err
 }
 
 func (c *FakeIngresses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("ingresses", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(ingressesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.IngressList{})
 	return err
@@ -78,7 +81,7 @@ func (c *FakeIngresses) DeleteCollection(options *api.DeleteOptions, listOptions
 
 func (c *FakeIngresses) Get(name string) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("ingresses", c.ns, name), &extensions.Ingress{})
+		Invokes(core.NewGetAction(ingressesResource, c.ns, name), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -88,7 +91,7 @@ func (c *FakeIngresses) Get(name string) (result *extensions.Ingress, err error)
 
 func (c *FakeIngresses) List(opts api.ListOptions) (result *extensions.IngressList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("ingresses", c.ns, opts), &extensions.IngressList{})
+		Invokes(core.NewListAction(ingressesResource, c.ns, opts), &extensions.IngressList{})
 
 	if obj == nil {
 		return nil, err
@@ -110,6 +113,6 @@ func (c *FakeIngresses) List(opts api.ListOptions) (result *extensions.IngressLi
 // Watch returns a watch.Interface that watches the requested ingresses.
 func (c *FakeIngresses) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("ingresses", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(ingressesResource, c.ns, opts))
 
 }

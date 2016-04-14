@@ -20,6 +20,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -32,9 +33,11 @@ type FakeJobs struct {
 	ns   string
 }
 
+var jobsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "unversioned", Resource: "jobs"}
+
 func (c *FakeJobs) Create(job *extensions.Job) (result *extensions.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("jobs", c.ns, job), &extensions.Job{})
+		Invokes(core.NewCreateAction(jobsResource, c.ns, job), &extensions.Job{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +47,7 @@ func (c *FakeJobs) Create(job *extensions.Job) (result *extensions.Job, err erro
 
 func (c *FakeJobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("jobs", c.ns, job), &extensions.Job{})
+		Invokes(core.NewUpdateAction(jobsResource, c.ns, job), &extensions.Job{})
 
 	if obj == nil {
 		return nil, err
@@ -54,7 +57,7 @@ func (c *FakeJobs) Update(job *extensions.Job) (result *extensions.Job, err erro
 
 func (c *FakeJobs) UpdateStatus(job *extensions.Job) (*extensions.Job, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("jobs", "status", c.ns, job), &extensions.Job{})
+		Invokes(core.NewUpdateSubresourceAction(jobsResource, "status", c.ns, job), &extensions.Job{})
 
 	if obj == nil {
 		return nil, err
@@ -64,13 +67,13 @@ func (c *FakeJobs) UpdateStatus(job *extensions.Job) (*extensions.Job, error) {
 
 func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("jobs", c.ns, name), &extensions.Job{})
+		Invokes(core.NewDeleteAction(jobsResource, c.ns, name), &extensions.Job{})
 
 	return err
 }
 
 func (c *FakeJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("jobs", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.JobList{})
 	return err
@@ -78,7 +81,7 @@ func (c *FakeJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.
 
 func (c *FakeJobs) Get(name string) (result *extensions.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("jobs", c.ns, name), &extensions.Job{})
+		Invokes(core.NewGetAction(jobsResource, c.ns, name), &extensions.Job{})
 
 	if obj == nil {
 		return nil, err
@@ -88,7 +91,7 @@ func (c *FakeJobs) Get(name string) (result *extensions.Job, err error) {
 
 func (c *FakeJobs) List(opts api.ListOptions) (result *extensions.JobList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("jobs", c.ns, opts), &extensions.JobList{})
+		Invokes(core.NewListAction(jobsResource, c.ns, opts), &extensions.JobList{})
 
 	if obj == nil {
 		return nil, err
@@ -110,6 +113,6 @@ func (c *FakeJobs) List(opts api.ListOptions) (result *extensions.JobList, err e
 // Watch returns a watch.Interface that watches the requested jobs.
 func (c *FakeJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("jobs", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(jobsResource, c.ns, opts))
 
 }
