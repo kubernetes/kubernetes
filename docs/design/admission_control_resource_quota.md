@@ -36,7 +36,8 @@ Documentation for other releases can be found at
 
 ## Background
 
-This document describes a system for enforcing hard resource usage limits per namespace as part of admission control.
+This document describes a system for enforcing hard resource usage limits per
+namespace as part of admission control.
 
 ## Use cases
 
@@ -103,7 +104,7 @@ type ResourceQuotaList struct {
 
 ## Quota Tracked Resources
 
-The following resources are supported by the quota system.
+The following resources are supported by the quota system:
 
 | Resource | Description |
 | ------------ | ----------- |
@@ -116,16 +117,19 @@ The following resources are supported by the quota system.
 | secrets | Total number of secrets |
 | persistentvolumeclaims | Total number of persistent volume claims |
 
-If a third-party wants to track additional resources, it must follow the resource naming conventions prescribed
-by Kubernetes.  This means the resource must have a fully-qualified name (i.e. mycompany.org/shinynewresource)
+If a third-party wants to track additional resources, it must follow the
+resource naming conventions prescribed by Kubernetes. This means the resource
+must have a fully-qualified name (i.e. mycompany.org/shinynewresource)
 
 ## Resource Requirements: Requests vs Limits
 
-If a resource supports the ability to distinguish between a request and a limit for a resource,
-the quota tracking system will only cost the request value against the quota usage.  If a resource
-is tracked by quota, and no request value is provided, the associated entity is rejected as part of admission.
+If a resource supports the ability to distinguish between a request and a limit
+for a resource, the quota tracking system will only cost the request value
+against the quota usage. If a resource is tracked by quota, and no request value
+is provided, the associated entity is rejected as part of admission.
 
-For an example, consider the following scenarios relative to tracking quota on CPU:
+For an example, consider the following scenarios relative to tracking quota on
+CPU:
 
 | Pod | Container | Request CPU | Limit CPU | Result |
 | --- | --------- | ----------- | --------- | ------ |
@@ -134,13 +138,14 @@ For an example, consider the following scenarios relative to tracking quota on C
 | Y | C2 | none | 500m | The quota usage is incremented 500m since request will default to limit |
 | Z | C3 | none | none | The pod is rejected since it does not enumerate a request. |
 
-The rationale for accounting for the requested amount of a resource versus the limit is the belief
-that a user should only be charged for what they are scheduled against in the cluster.  In addition,
-attempting to track usage against actual usage, where request < actual < limit, is considered highly
-volatile.
+The rationale for accounting for the requested amount of a resource versus the
+limit is the belief that a user should only be charged for what they are
+scheduled against in the cluster. In addition, attempting to track usage against
+actual usage, where request < actual < limit, is considered highly volatile.
 
-As a consequence of this decision, the user is able to spread its usage of a resource across multiple tiers
-of service.  Let's demonstrate this via an example with a 4 cpu quota.
+As a consequence of this decision, the user is able to spread its usage of a
+resource across multiple tiers of service.  Let's demonstrate this via an
+example with a 4 cpu quota.
 
 The quota may be allocated as follows:
 
@@ -150,48 +155,62 @@ The quota may be allocated as follows:
 | Y | C2 | 2 | 2 | Guaranteed | 2 |
 | Z | C3 | 1 | 3 | Burstable | 1 |
 
-It is possible that the pods may consume 9 cpu over a given time period depending on the nodes available cpu
-that held pod X and Z, but since we scheduled X and Z relative to the request, we only track the requesting
-value against their allocated quota.  If one wants to restrict the ratio between the request and limit,
-it is encouraged that the user define a **LimitRange** with **LimitRequestRatio** to control burst out behavior.
-This would in effect, let an administrator keep the difference between request and limit more in line with
+It is possible that the pods may consume 9 cpu over a given time period
+depending on the nodes available cpu that held pod X and Z, but since we
+scheduled X and Z relative to the request, we only track the requesting value
+against their allocated quota. If one wants to restrict the ratio between the
+request and limit, it is encouraged that the user define a **LimitRange** with
+**LimitRequestRatio** to control burst out behavior. This would in effect, let
+an administrator keep the difference between request and limit more in line with
 tracked usage if desired.
 
 ## Status API
 
-A REST API endpoint to update the status section of the **ResourceQuota** is exposed.  It requires an atomic compare-and-swap
-in order to keep resource usage tracking consistent.
+A REST API endpoint to update the status section of the **ResourceQuota** is
+exposed. It requires an atomic compare-and-swap in order to keep resource usage
+tracking consistent.
 
 ## Resource Quota Controller
 
-A resource quota controller monitors observed usage for tracked resources in the **Namespace**.
+A resource quota controller monitors observed usage for tracked resources in the
+**Namespace**.
 
-If there is observed difference between the current usage stats versus the current **ResourceQuota.Status**, the controller
-posts an update of the currently observed usage metrics to the **ResourceQuota** via the /status endpoint.
+If there is observed difference between the current usage stats versus the
+current **ResourceQuota.Status**, the controller posts an update of the
+currently observed usage metrics to the **ResourceQuota** via the /status
+endpoint.
 
-The resource quota controller is the only component capable of monitoring and recording usage updates after a DELETE operation
-since admission control is incapable of guaranteeing a DELETE request actually succeeded.
+The resource quota controller is the only component capable of monitoring and
+recording usage updates after a DELETE operation since admission control is
+incapable of guaranteeing a DELETE request actually succeeded.
 
 ## AdmissionControl plugin: ResourceQuota
 
 The **ResourceQuota** plug-in introspects all incoming admission requests.
 
-To enable the plug-in and support for ResourceQuota, the kube-apiserver must be configured as follows:
+To enable the plug-in and support for ResourceQuota, the kube-apiserver must be
+configured as follows:
 
 ```
 $ kube-apiserver --admission-control=ResourceQuota
 ```
 
-It makes decisions by evaluating the incoming object against all defined **ResourceQuota.Status.Hard** resource limits in the request
-namespace.  If acceptance of the resource would cause the total usage of a named resource to exceed its hard limit, the request is denied.
+It makes decisions by evaluating the incoming object against all defined
+**ResourceQuota.Status.Hard** resource limits in the request namespace. If
+acceptance of the resource would cause the total usage of a named resource to
+exceed its hard limit, the request is denied.
 
-If the incoming request does not cause the total usage to exceed any of the enumerated hard resource limits, the plug-in will post a
-**ResourceQuota.Status** document to the server to atomically update the observed usage based on the previously read
-**ResourceQuota.ResourceVersion**.  This keeps incremental usage atomically consistent, but does introduce a bottleneck (intentionally)
-into the system.
+If the incoming request does not cause the total usage to exceed any of the
+enumerated hard resource limits, the plug-in will post a
+**ResourceQuota.Status** document to the server to atomically update the
+observed usage based on the previously read **ResourceQuota.ResourceVersion**.
+This keeps incremental usage atomically consistent, but does introduce a
+bottleneck (intentionally) into the system.
 
-To optimize system performance, it is encouraged that all resource quotas are tracked on the same **ResourceQuota** document in a **Namespace**.  As a result, its encouraged to impose a cap on the total number of individual quotas that are tracked in the **Namespace**
-to 1 in the **ResourceQuota** document.
+To optimize system performance, it is encouraged that all resource quotas are
+tracked on the same **ResourceQuota** document in a **Namespace**. As a result,
+it is encouraged to impose a cap on the total number of individual quotas that
+are tracked in the **Namespace** to 1 in the **ResourceQuota** document.
 
 ## kubectl
 
@@ -199,7 +218,7 @@ kubectl is modified to support the **ResourceQuota** resource.
 
 `kubectl describe` provides a human-readable output of quota.
 
-For example,
+For example:
 
 ```console
 $ kubectl create -f docs/admin/resourcequota/namespace.yaml

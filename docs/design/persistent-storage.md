@@ -34,43 +34,60 @@ Documentation for other releases can be found at
 
 # Persistent Storage
 
-This document proposes a model for managing persistent, cluster-scoped storage for applications requiring long lived data.
+This document proposes a model for managing persistent, cluster-scoped storage
+for applications requiring long lived data.
 
 ### Abstract
 
 Two new API kinds:
 
-A `PersistentVolume` (PV) is a storage resource provisioned by an administrator.  It is analogous to a node. See [Persistent Volume Guide](../user-guide/persistent-volumes/) for how to use it.
+A `PersistentVolume` (PV) is a storage resource provisioned by an administrator.
+It is analogous to a node. See [Persistent Volume Guide](../user-guide/persistent-volumes/)
+for how to use it.
 
-A `PersistentVolumeClaim` (PVC) is a user's request for a persistent volume to use in a pod. It is analogous to a pod.
+A `PersistentVolumeClaim` (PVC) is a user's request for a persistent volume to
+use in a pod. It is analogous to a pod.
 
 One new system component:
 
-`PersistentVolumeClaimBinder` is a singleton running in master that watches all PersistentVolumeClaims in the system and binds them to the closest matching available PersistentVolume. The volume manager watches the API for newly created volumes to manage.
+`PersistentVolumeClaimBinder` is a singleton running in master that watches all
+PersistentVolumeClaims in the system and binds them to the closest matching
+available PersistentVolume. The volume manager watches the API for newly created
+volumes to manage.
 
 One new volume:
 
-`PersistentVolumeClaimVolumeSource` references the user's PVC in the same namespace.  This volume finds the bound PV and mounts that volume for the pod.  A `PersistentVolumeClaimVolumeSource` is, essentially, a wrapper around another type of volume that is owned by someone else (the system).
+`PersistentVolumeClaimVolumeSource` references the user's PVC in the same
+namespace. This volume finds the bound PV and mounts that volume for the pod. A
+`PersistentVolumeClaimVolumeSource` is, essentially, a wrapper around another
+type of volume that is owned by someone else (the system).
 
-Kubernetes makes no guarantees at runtime that the underlying storage exists or is available.  High availability is left to the storage provider.
+Kubernetes makes no guarantees at runtime that the underlying storage exists or
+is available. High availability is left to the storage provider.
 
 ### Goals
 
-* Allow administrators to describe available storage
-* Allow pod authors to discover and request persistent volumes to use with pods
-* Enforce security through access control lists and securing storage to the same namespace as the pod volume
-* Enforce quotas through admission control
-* Enforce scheduler rules by resource counting
-* Ensure developers can rely on storage being available without being closely bound to a particular disk, server, network, or storage device.
-
+* Allow administrators to describe available storage.
+* Allow pod authors to discover and request persistent volumes to use with pods.
+* Enforce security through access control lists and securing storage to the same
+namespace as the pod volume.
+* Enforce quotas through admission control.
+* Enforce scheduler rules by resource counting.
+* Ensure developers can rely on storage being available without being closely
+bound to a particular disk, server, network, or storage device.
 
 #### Describe available storage
 
-Cluster administrators use the API to manage *PersistentVolumes*.  A custom store `NewPersistentVolumeOrderedIndex` will index volumes by access modes and sort by storage capacity.  The `PersistentVolumeClaimBinder` watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
+Cluster administrators use the API to manage *PersistentVolumes*. A custom store
+`NewPersistentVolumeOrderedIndex` will index volumes by access modes and sort by
+storage capacity. The `PersistentVolumeClaimBinder` watches for new claims for
+storage and binds them to an available volume by matching the volume's
+characteristics (AccessModes and storage size) to the user's request.
 
 PVs are system objects and, thus, have no namespace.
 
-Many means of dynamic provisioning will be eventually be implemented for various storage types.
+Many means of dynamic provisioning will be eventually be implemented for various
+storage types.
 
 
 ##### PersistentVolume API
@@ -87,11 +104,15 @@ Many means of dynamic provisioning will be eventually be implemented for various
 
 #### Request Storage
 
-Kubernetes users request persistent storage for their pod by creating a ```PersistentVolumeClaim```.  Their request for storage is described by their requirements for resources and mount capabilities.
+Kubernetes users request persistent storage for their pod by creating a
+```PersistentVolumeClaim```. Their request for storage is described by their
+requirements for resources and mount capabilities.
 
-Requests for volumes are bound to available volumes by the volume manager, if a suitable match is found.  Requests for resources can go unfulfilled.
+Requests for volumes are bound to available volumes by the volume manager, if a
+suitable match is found. Requests for resources can go unfulfilled.
 
-Users attach their claim to their pod using a new ```PersistentVolumeClaimVolumeSource``` volume source.
+Users attach their claim to their pod using a new
+```PersistentVolumeClaimVolumeSource``` volume source.
 
 
 ##### PersistentVolumeClaim API
@@ -110,23 +131,31 @@ Users attach their claim to their pod using a new ```PersistentVolumeClaimVolume
 
 #### Scheduling constraints
 
-Scheduling constraints are to be handled similar to pod resource constraints.  Pods will need to be annotated or decorated with the number of resources it requires on a node.  Similarly, a node will need to list how many it has used or available.
+Scheduling constraints are to be handled similar to pod resource constraints.
+Pods will need to be annotated or decorated with the number of resources it
+requires on a node. Similarly, a node will need to list how many it has used or
+available.
 
 TBD
 
 
 #### Events
 
-The implementation of persistent storage will not require events to communicate to the user the state of their claim.  The CLI for bound claims contains a reference to the backing persistent volume.  This is always present in the API and CLI, making an event to communicate the same unnecessary.
+The implementation of persistent storage will not require events to communicate
+to the user the state of their claim. The CLI for bound claims contains a
+reference to the backing persistent volume. This is always present in the API
+and CLI, making an event to communicate the same unnecessary.
 
-Events that communicate the state of a mounted volume are left to the volume plugins.
-
+Events that communicate the state of a mounted volume are left to the volume
+plugins.
 
 ### Example
 
 #### Admin provisions storage
 
-An administrator provisions storage by posting PVs to the API.  Various way to automate this task can be scripted.  Dynamic provisioning is a future feature that can maintain levels of PVs.
+An administrator provisions storage by posting PVs to the API. Various ways to
+automate this task can be scripted. Dynamic provisioning is a future feature
+that can maintain levels of PVs.
 
 ```yaml
 POST:
@@ -152,7 +181,8 @@ pv0001              map[]               10737418240         RWO                 
 
 #### Users request storage
 
-A user requests storage by posting a PVC to the API.  Their request contains the AccessModes they wish their volume to have and the minimum size needed.
+A user requests storage by posting a PVC to the API. Their request contains the
+AccessModes they wish their volume to have and the minimum size needed.
 
 The user must be within a namespace to create PVCs.
 
@@ -181,7 +211,10 @@ myclaim-1           map[]               pending
 
 #### Matching and binding
 
-  The ```PersistentVolumeClaimBinder``` attempts to find an available volume that most closely matches the user's request.  If one exists, they are bound by putting a reference on the PV to the PVC.  Requests can go unfulfilled if a suitable match is not found.
+The ```PersistentVolumeClaimBinder``` attempts to find an available volume that
+most closely matches the user's request. If one exists, they are bound by
+putting a reference on the PV to the PVC. Requests can go unfulfilled if a
+suitable match is not found.
 
 ```console
 $ kubectl get pv
@@ -198,9 +231,12 @@ myclaim-1           map[]               Bound               b16e91d6-c0ef-11e4-8
 
 #### Claim usage
 
-The claim holder can use their claim as a volume.  The ```PersistentVolumeClaimVolumeSource``` knows to fetch the PV backing the claim and mount its volume for a pod.
+The claim holder can use their claim as a volume.  The ```PersistentVolumeClaimVolumeSource``` knows to fetch the PV backing the claim
+and mount its volume for a pod.
 
-The claim holder owns the claim and its data for as long as the claim exists.  The pod using the claim can be deleted, but the claim remains in the user's namespace.  It can be used again and again by many pods.
+The claim holder owns the claim and its data for as long as the claim exists.
+The pod using the claim can be deleted, but the claim remains in the user's
+namespace. It can be used again and again by many pods.
 
 ```yaml
 POST: 
@@ -233,9 +269,11 @@ When a claim holder is finished with their data, they can delete their claim.
 $ kubectl delete pvc myclaim-1
 ```
 
-The ```PersistentVolumeClaimBinder``` will reconcile this by removing the claim reference from the PV and change the PVs status to 'Released'.
+The ```PersistentVolumeClaimBinder``` will reconcile this by removing the claim
+reference from the PV and change the PVs status to 'Released'.
 
-Admins can script the recycling of released volumes.  Future dynamic provisioners will understand how a volume should be recycled.
+Admins can script the recycling of released volumes. Future dynamic provisioners
+will understand how a volume should be recycled.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

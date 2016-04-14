@@ -36,40 +36,41 @@ Documentation for other releases can be found at
 
 ## Introduction
 
-This document proposes a new label selector representation, called `NodeSelector`,
-that is similar in many ways to `LabelSelector`, but is a bit more flexible and is
-intended to be used only for selecting nodes.
+This document proposes a new label selector representation, called
+`NodeSelector`, that is similar in many ways to `LabelSelector`, but is a bit
+more flexible and is intended to be used only for selecting nodes.
 
-In addition, we propose to replace the `map[string]string` in `PodSpec` that the scheduler
-currently uses as part of restricting the set of nodes onto which a pod is
-eligible to schedule, with a field of type `Affinity` that contains one or
-more affinity specifications. In this document we discuss `NodeAffinity`, which
-contains one or more of the following
+In addition, we propose to replace the `map[string]string` in `PodSpec` that the
+scheduler currently uses as part of restricting the set of nodes onto which a
+pod is eligible to schedule, with a field of type `Affinity` that contains one
+or more affinity specifications. In this document we discuss `NodeAffinity`,
+which contains one or more of the following:
 * a field called `RequiredDuringSchedulingRequiredDuringExecution` that will be
 represented by a `NodeSelector`, and thus generalizes the scheduling behavior of
 the current `map[string]string` but still serves the purpose of restricting
-the set of nodes onto which the pod can schedule. In addition, unlike the behavior
-of the current `map[string]string`, when it becomes violated the system will
-try to eventually evict the pod from its node.
-* a field called `RequiredDuringSchedulingIgnoredDuringExecution` which is identical
-to `RequiredDuringSchedulingRequiredDuringExecution` except that the system
-may or may not try to eventually evict the pod from its node.
-* a field called `PreferredDuringSchedulingIgnoredDuringExecution` that specifies which nodes are
-preferred for scheduling among those that meet all scheduling requirements.
+the set of nodes onto which the pod can schedule. In addition, unlike the
+behavior of the current `map[string]string`, when it becomes violated the system
+will try to eventually evict the pod from its node.
+* a field called `RequiredDuringSchedulingIgnoredDuringExecution` which is
+identical to `RequiredDuringSchedulingRequiredDuringExecution` except that the
+system may or may not try to eventually evict the pod from its node.
+* a field called `PreferredDuringSchedulingIgnoredDuringExecution` that
+specifies which nodes are preferred for scheduling among those that meet all
+scheduling requirements.
 
 (In practice, as discussed later, we will actually *add* the `Affinity` field
-rather than replacing `map[string]string`, due to backward compatibility requirements.)
+rather than replacing `map[string]string`, due to backward compatibility
+requirements.)
 
-The affiniy specifications described above allow a pod to request various properties
-that are inherent to nodes, for example "run this pod on a node with an Intel CPU" or, in a
-multi-zone cluster, "run this pod on a node in zone Z."
+The affiniy specifications described above allow a pod to request various
+properties that are inherent to nodes, for example "run this pod on a node with
+an Intel CPU" or, in a multi-zone cluster, "run this pod on a node in zone Z."
 ([This issue](https://github.com/kubernetes/kubernetes/issues/9044) describes
-some of the properties that a node might publish as labels, which affinity expressions
-can match against.)
-They do *not* allow a pod to request to schedule
-(or not schedule) on a node based on what other pods are running on the node. That
-feature is called "inter-pod topological affinity/anti-afinity" and is described
-[here](https://github.com/kubernetes/kubernetes/pull/18265).
+some of the properties that a node might publish as labels, which affinity
+expressions can match against.) They do *not* allow a pod to request to schedule
+(or not schedule) on a node based on what other pods are running on the node.
+That feature is called "inter-pod topological affinity/anti-afinity" and is
+described [here](https://github.com/kubernetes/kubernetes/pull/18265).
 
 ## API
 
@@ -171,9 +172,9 @@ type PreferredSchedulingTerm struct {
 }
 ```
 
-Unfortunately, the name of the existing `map[string]string` field in PodSpec is `NodeSelector`
-and we can't change it since this name is part of the API. Hopefully this won't
-cause too much confusion.
+Unfortunately, the name of the existing `map[string]string` field in PodSpec is
+`NodeSelector` and we can't change it since this name is part of the API.
+Hopefully this won't cause too much confusion.
 
 ## Examples
 
@@ -186,81 +187,91 @@ cause too much confusion.
 
 ## Backward compatibility
 
-When we add `Affinity` to PodSpec, we will deprecate, but not remove, the current field in PodSpec
+When we add `Affinity` to PodSpec, we will deprecate, but not remove, the
+current field in PodSpec
 
 ```go
 NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 ```
 
-Old version of the scheduler will ignore the `Affinity` field.
-New versions of the scheduler will apply their scheduling predicates to both `Affinity` and `nodeSelector`,
-i.e. the pod can only schedule onto nodes that satisfy both sets of requirements. We will not
-attempt to convert between `Affinity` and `nodeSelector`.
+Old version of the scheduler will ignore the `Affinity` field. New versions of
+the scheduler will apply their scheduling predicates to both `Affinity` and
+`nodeSelector`, i.e. the pod can only schedule onto nodes that satisfy both sets
+of requirements. We will not attempt to convert between `Affinity` and
+`nodeSelector`.
 
-Old versions of non-scheduling clients will not know how to do anything semantically meaningful
-with `Affinity`, but we don't expect that this will cause a problem.
+Old versions of non-scheduling clients will not know how to do anything
+semantically meaningful with `Affinity`, but we don't expect that this will
+cause a problem.
 
 See [this comment](https://github.com/kubernetes/kubernetes/issues/341#issuecomment-140809259)
 for more discussion.
 
-Users should not start using `NodeAffinity` until the full implementation has been in Kubelet and the master
-for enough binary versions that we feel comfortable that we will not need to roll back either Kubelet
-or master to a version that does not support them. Longer-term we will use a programatic approach to
-enforcing this (#4855).
+Users should not start using `NodeAffinity` until the full implementation has
+been in Kubelet and the master for enough binary versions that we feel
+comfortable that we will not need to roll back either Kubelet or master to a
+version that does not support them. Longer-term we will use a programatic
+approach to enforcing this (#4855).
 
 ## Implementation plan
 
-1. Add the `Affinity` field to PodSpec and the `NodeAffinity`, `PreferredDuringSchedulingIgnoredDuringExecution`,
-and `RequiredDuringSchedulingIgnoredDuringExecution` types to the API
-2. Implement a scheduler predicate that takes `RequiredDuringSchedulingIgnoredDuringExecution` into account
-3. Implement a scheduler priority function that takes `PreferredDuringSchedulingIgnoredDuringExecution` into account
-4. At this point, the feature can be deployed and `PodSpec.NodeSelector` can be marked as deprecated
-5. Add the `RequiredDuringSchedulingRequiredDuringExecution` field to the API
-6. Modify the scheduler predicate from step 2 to also take `RequiredDuringSchedulingRequiredDuringExecution` into account
-7. Add `RequiredDuringSchedulingRequiredDuringExecution` to Kubelet's admission decision
-8. Implement code in Kubelet *or* the controllers that evicts a pod that no longer satisfies
-`RequiredDuringSchedulingRequiredDuringExecution`
-(see [this comment](https://github.com/kubernetes/kubernetes/issues/12744#issuecomment-164372008)).
+1. Add the `Affinity` field to PodSpec and the `NodeAffinity`,
+`PreferredDuringSchedulingIgnoredDuringExecution`, and
+`RequiredDuringSchedulingIgnoredDuringExecution` types to the API.
+2. Implement a scheduler predicate that takes
+`RequiredDuringSchedulingIgnoredDuringExecution` into account.
+3. Implement a scheduler priority function that takes
+`PreferredDuringSchedulingIgnoredDuringExecution` into account.
+4. At this point, the feature can be deployed and `PodSpec.NodeSelector` can be
+marked as deprecated.
+5. Add the `RequiredDuringSchedulingRequiredDuringExecution` field to the API.
+6. Modify the scheduler predicate from step 2 to also take
+`RequiredDuringSchedulingRequiredDuringExecution` into account.
+7. Add `RequiredDuringSchedulingRequiredDuringExecution` to Kubelet's admission
+decision.
+8. Implement code in Kubelet *or* the controllers that evicts a pod that no
+longer satisfies `RequiredDuringSchedulingRequiredDuringExecution` (see [this comment](https://github.com/kubernetes/kubernetes/issues/12744#issuecomment-164372008)).
 
-We assume Kubelet publishes labels describing the node's membership in all of the relevant scheduling
-domains (e.g. node name, rack name, availability zone name, etc.). See #9044.
+We assume Kubelet publishes labels describing the node's membership in all of
+the relevant scheduling domains (e.g. node name, rack name, availability zone
+name, etc.). See #9044.
 
 ## Extensibility
 
-The design described here is the result of careful analysis of use cases, a decade of experience
-with Borg at Google, and a review of similar features in other open-source container orchestration
-systems. We believe that it properly balances the goal of expressiveness against the goals of
-simplicity and efficiency of implementation. However, we recognize that
-use cases may arise in the future that cannot be expressed using the syntax described here.
-Although we are not implementing an affinity-specific extensibility mechanism for a variety
-of reasons (simplicity of the codebase, simplicity of cluster deployment, desire for Kubernetes
-users to get a consistent experience, etc.), the regular Kubernetes
-annotation mechanism can be used to add or replace affinity rules. The way this work would is
+The design described here is the result of careful analysis of use cases, a
+decade of experience with Borg at Google, and a review of similar features in
+other open-source container orchestration systems. We believe that it properly
+balances the goal of expressiveness against the goals of simplicity and
+efficiency of implementation. However, we recognize that use cases may arise in
+the future that cannot be expressed using the syntax described here. Although we
+are not implementing an affinity-specific extensibility mechanism for a variety
+of reasons (simplicity of the codebase, simplicity of cluster deployment, desire
+for Kubernetes users to get a consistent experience, etc.), the regular
+Kubernetes annotation mechanism can be used to add or replace affinity rules.
+The way this work would is:
 
 1. Define one or more annotations to describe the new affinity rule(s)
-1. User (or an admission controller) attaches the annotation(s) to pods to request the desired scheduling behavior.
-If the new rule(s) *replace* one or more fields of `Affinity` then the user would omit those fields
-from `Affinity`; if they are *additional rules*, then the user would fill in `Affinity` as well as the
-annotation(s).
+1. User (or an admission controller) attaches the annotation(s) to pods to
+request the desired scheduling behavior. If the new rule(s) *replace* one or
+more fields of `Affinity` then the user would omit those fields from `Affinity`;
+if they are *additional rules*, then the user would fill in `Affinity` as well
+as the annotation(s).
 1. Scheduler takes the annotation(s) into account when scheduling.
 
-If some particular new syntax becomes popular, we would consider upstreaming it by integrating
-it into the standard `Affinity`.
+If some particular new syntax becomes popular, we would consider upstreaming it
+by integrating it into the standard `Affinity`.
 
 ## Future work
 
-Are there any other fields we should convert from `map[string]string` to `NodeSelector`?
+Are there any other fields we should convert from `map[string]string` to
+`NodeSelector`?
 
 ## Related issues
 
 The review for this proposal is in #18261.
 
-The main related issue is #341. Issue #367 is also related. Those issues reference other
-related issues.
-
-
-
-
+The main related issue is #341. Issue #367 is also related. Those issues
+reference other related issues.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
