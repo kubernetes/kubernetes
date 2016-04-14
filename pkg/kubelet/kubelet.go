@@ -425,6 +425,7 @@ func NewMainKubelet(
 			containerRefManager,
 			klet.livenessManager,
 			klet.volumeManager,
+			klet.httpClient,
 			imageBackOff,
 			serializeImagePulls,
 		)
