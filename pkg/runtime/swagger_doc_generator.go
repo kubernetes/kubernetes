@@ -113,6 +113,37 @@ func fieldName(field *ast.Field) string {
 	return jsonTag
 }
 
+// A buffer of lines that will be written.
+type bufferedLine struct {
+	line        string
+	indentation int
+}
+
+type buffer struct {
+	lines []bufferedLine
+}
+
+func newBuffer() *buffer {
+	return &buffer{
+		lines: make([]bufferedLine, 0),
+	}
+}
+
+func (b *buffer) addLine(line string, indent int) {
+	b.lines = append(b.lines, bufferedLine{line, indent})
+}
+
+func (b *buffer) flushLines(w io.Writer) error {
+	for _, line := range b.lines {
+		indentation := strings.Repeat("\t", line.indentation)
+		fullLine := fmt.Sprintf("%s%s", indentation, line.line)
+		if _, err := io.WriteString(w, fullLine); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func writeFuncHeader(b *buffer, structName string, indent int) {
 	s := fmt.Sprintf("var map_%s = map[string]string {\n", structName)
 	b.addLine(s, indent)
