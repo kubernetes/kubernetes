@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	versionedwatch "k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 // GroupName is the group name use in this package
@@ -44,6 +45,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&v1.DeleteOptions{},
 		&v1.ExportOptions{},
 	)
+	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
 }
 
 func (obj *Cluster) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
