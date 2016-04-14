@@ -144,7 +144,7 @@ func (f *Framework) BeforeEach() {
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData {
-		f.gatherer, err = NewResourceUsageGatherer(c)
+		f.gatherer, err = NewResourceUsageGatherer(c, ResourceGathererOptions{inKubemark: ProviderIs("kubemark")})
 		if err != nil {
 			Logf("Error while creating NewResourceUsageGatherer: %v", err)
 		} else {
