@@ -96,8 +96,8 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []api.Service,
 
 // ControllerLister interface represents anything that can produce a list of ReplicationController; the list is consumed by a scheduler.
 type ControllerLister interface {
-	// Lists all the replication controllers
-	List() ([]api.ReplicationController, error)
+	// UnversionedLists all the replication controllers
+	UnversionedList() ([]api.ReplicationController, error)
 	// Gets the services for the given pod
 	UnversionedGetPodControllers(*api.Pod) ([]api.ReplicationController, error)
 }

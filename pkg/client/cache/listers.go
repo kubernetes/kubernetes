@@ -178,11 +178,20 @@ func (s *StoreToReplicationControllerLister) Exists(controller *api.ReplicationC
 	return exists, nil
 }
 
-// StoreToReplicationControllerLister lists all controllers in the store.
-// TODO: converge on the interface in pkg/client
-func (s *StoreToReplicationControllerLister) List() (controllers []api.ReplicationController, err error) {
+// UnversionedList is an unversioned duplication of List. It will be removed
+// after we migrate scheduler to use clientset.
+func (s *StoreToReplicationControllerLister) UnversionedList() (controllers []api.ReplicationController, err error) {
 	for _, c := range s.Store.List() {
 		controllers = append(controllers, *(c.(*api.ReplicationController)))
+	}
+	return controllers, nil
+}
+
+// StoreToReplicationControllerLister lists all controllers in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToReplicationControllerLister) List() (controllers []v1.ReplicationController, err error) {
+	for _, c := range s.Store.List() {
+		controllers = append(controllers, *(c.(*v1.ReplicationController)))
 	}
 	return controllers, nil
 }
