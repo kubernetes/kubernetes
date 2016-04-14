@@ -103,7 +103,6 @@ kube::golang::test_targets() {
     cmd/genman
     cmd/mungedocs
     cmd/genbashcomp
-    cmd/genconversion
     cmd/genswaggertypedocs
     examples/k8petstore/web-server/src
     github.com/onsi/ginkgo/ginkgo
