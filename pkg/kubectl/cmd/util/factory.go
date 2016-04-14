@@ -36,13 +36,13 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/federation/apis/federation"
+	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -321,8 +321,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return c.AutoscalingClient.RESTClient, nil
 			case batch.GroupName:
 				return c.BatchClient.RESTClient, nil
-			case apps.GroupName:
-				return c.AppsClient.RESTClient, nil
 			case extensions.GroupName:
 				return c.ExtensionsClient.RESTClient, nil
 			case api.SchemeGroupVersion.Group:
@@ -906,13 +904,6 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		}
 		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
 	}
-	if gvk.Group == apps.GroupName {
-		if c.c.AppsClient == nil {
-			return errors.New("unable to validate: no autoscaling client")
-		}
-		return getSchemaAndValidate(c.c.AppsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
-	}
-
 	if gvk.Group == batch.GroupName {
 		if c.c.BatchClient == nil {
 			return errors.New("unable to validate: no batch client")

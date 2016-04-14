@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -419,7 +418,6 @@ var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
 var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
 var ingressColumns = []string{"NAME", "RULE", "BACKEND", "ADDRESS", "AGE"}
-var petSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "STATUS", "AGE"}
 var daemonSetColumns = []string{"NAME", "DESIRED", "CURRENT", "NODE-SELECTOR", "AGE"}
@@ -461,8 +459,6 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(serviceColumns, printServiceList)
 	h.Handler(ingressColumns, printIngress)
 	h.Handler(ingressColumns, printIngressList)
-	h.Handler(petSetColumns, printPetSet)
-	h.Handler(petSetColumns, printPetSetList)
 	h.Handler(endpointColumns, printEndpoints)
 	h.Handler(endpointColumns, printEndpointsList)
 	h.Handler(nodeColumns, printNode)
@@ -850,21 +846,10 @@ func printSubReplicaSetList(list *federation.SubReplicaSetList, w io.Writer, opt
 }
 
 func printCluster(c *federation.Cluster, w io.Writer, options PrintOptions) error {
-	var statuses []string
-	for _, condition := range c.Status.Conditions {
-		if condition.Status == api.ConditionTrue {
-			statuses = append(statuses, string(condition.Type))
-		} else {
-			statuses = append(statuses, "Not"+string(condition.Type))
-		}
-	}
-	if len(statuses) == 0 {
-		statuses = append(statuses, "Unknown")
-	}
-
+	name := c.Name
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-		c.Name,
-		strings.Join(statuses, ","),
+		name,
+		c.Status.Phase,
 		c.Status.Version,
 		translateTimestamp(c.CreationTimestamp),
 	); err != nil {
@@ -1099,53 +1084,6 @@ func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions
 func printIngressList(ingressList *extensions.IngressList, w io.Writer, options PrintOptions) error {
 	for _, ingress := range ingressList.Items {
 		if err := printIngress(&ingress, w, options); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func printPetSet(ps *apps.PetSet, w io.Writer, options PrintOptions) error {
-	name := ps.Name
-	namespace := ps.Namespace
-	containers := ps.Spec.Template.Spec.Containers
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
-	}
-	desiredReplicas := ps.Spec.Replicas
-	currentReplicas := ps.Status.Replicas
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
-		name,
-		desiredReplicas,
-		currentReplicas,
-		translateTimestamp(ps.CreationTimestamp),
-	); err != nil {
-		return err
-	}
-	if options.Wide {
-		if err := layoutContainers(containers, w); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintf(w, "\t%s", unversioned.FormatLabelSelector(ps.Spec.Selector)); err != nil {
-			return err
-		}
-	}
-	if _, err := fmt.Fprint(w, appendLabels(ps.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, appendAllLabels(options.ShowLabels, ps.Labels)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func printPetSetList(petSetList *apps.PetSetList, w io.Writer, options PrintOptions) error {
-	for _, ps := range petSetList.Items {
-		if err := printPetSet(&ps, w, options); err != nil {
 			return err
 		}
 	}
