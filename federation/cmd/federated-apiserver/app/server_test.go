@@ -17,7 +17,9 @@ limitations under the License.
 package app
 
 import (
+	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	"encoding/json"
@@ -26,7 +28,14 @@ import (
 	"io/ioutil"
 	fed_v1a1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"net"
 	"net/http"
 	"time"
@@ -73,13 +82,164 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 	}
 }
 
-var insecurePort = 8081
-var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
+func TestUpdateEtcdOverrides(t *testing.T) {
+	storageVersions := map[string]string{
+		"":           "v1",
+		"extensions": "extensions/v1beta1",
+	}
+
+	testCases := []struct {
+		apigroup string
+		resource string
+		servers  []string
+	}{
+		{
+			apigroup: api.GroupName,
+			resource: "resource",
+			servers:  []string{"http://127.0.0.1:10000"},
+		},
+		{
+			apigroup: api.GroupName,
+			resource: "resource",
+			servers:  []string{"http://127.0.0.1:10000", "http://127.0.0.1:20000"},
+		},
+		{
+			apigroup: extensions.GroupName,
+			resource: "resource",
+			servers:  []string{"http://127.0.0.1:10000"},
+		},
+	}
+
+	for _, test := range testCases {
+		newEtcd := func(_ runtime.NegotiatedSerializer, _, _ string, etcdConfig etcdstorage.EtcdConfig) (storage.Interface, error) {
+			if !reflect.DeepEqual(test.servers, etcdConfig.ServerList) {
+				t.Errorf("unexpected server list, expected: %#v, got: %#v", test.servers, etcdConfig.ServerList)
+			}
+			return nil, nil
+		}
+		storageDestinations := genericapiserver.NewStorageDestinations()
+		override := test.apigroup + "/" + test.resource + "#" + strings.Join(test.servers, ";")
+		defaultEtcdConfig := etcdstorage.EtcdConfig{
+			Prefix:     genericapiserver.DefaultEtcdPathPrefix,
+			ServerList: []string{"http://127.0.0.1"},
+		}
+		updateEtcdOverrides([]string{override}, storageVersions, defaultEtcdConfig, &storageDestinations, newEtcd)
+		apigroup, ok := storageDestinations.APIGroups[test.apigroup]
+		if !ok {
+			t.Errorf("apigroup: %s not created", test.apigroup)
+			continue
+		}
+		if apigroup.Overrides == nil {
+			t.Errorf("Overrides not created for: %s", test.apigroup)
+			continue
+		}
+		if _, ok := apigroup.Overrides[test.resource]; !ok {
+			t.Errorf("override not created for: %s", test.resource)
+			continue
+		}
+	}
+}
+
+func TestParseRuntimeConfig(t *testing.T) {
+	testCases := []struct {
+		runtimeConfig     map[string]string
+		expectedAPIConfig func() *genericapiserver.ResourceConfig
+		err               bool
+	}{
+		{
+			runtimeConfig: map[string]string{},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				return master.DefaultAPIResourceConfigSource()
+			},
+			err: false,
+		},
+		{
+			// Cannot override v1 resources.
+			runtimeConfig: map[string]string{
+				"api/v1/pods": "false",
+			},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				return master.DefaultAPIResourceConfigSource()
+			},
+			err: true,
+		},
+		{
+			// Disable v1.
+			runtimeConfig: map[string]string{
+				"api/v1": "false",
+			},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := master.DefaultAPIResourceConfigSource()
+				config.DisableVersions(unversioned.GroupVersion{Group: "", Version: "v1"})
+				return config
+			},
+			err: false,
+		},
+		{
+			// Disable extensions.
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1": "false",
+			},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := master.DefaultAPIResourceConfigSource()
+				config.DisableVersions(unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"})
+				return config
+			},
+			err: false,
+		},
+		{
+			// Disable deployments.
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/deployments": "false",
+			},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := master.DefaultAPIResourceConfigSource()
+				config.DisableResources(unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"})
+				return config
+			},
+			err: false,
+		},
+		{
+			// Enable deployments and disable jobs.
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/anything": "true",
+				"extensions/v1beta1/jobs":     "false",
+			},
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := master.DefaultAPIResourceConfigSource()
+				config.DisableResources(unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "jobs"})
+				config.EnableResources(unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "anything"})
+				return config
+			},
+			err: false,
+		},
+	}
+	for _, test := range testCases {
+		s := &options.APIServer{
+			RuntimeConfig: test.runtimeConfig,
+		}
+		actualDisablers, err := parseRuntimeConfig(s)
+
+		if err == nil && test.err {
+			t.Fatalf("expected error for test: %v", test)
+		} else if err != nil && !test.err {
+			t.Fatalf("unexpected error: %s, for test: %v", err, test)
+		}
+
+		expectedConfig := test.expectedAPIConfig()
+		if err == nil && !reflect.DeepEqual(actualDisablers, expectedConfig) {
+			t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %v\n expected: %v", test.runtimeConfig, actualDisablers, expectedConfig)
+		}
+	}
+
+}
+
+var serverIP = "http://localhost:8080"
 var groupVersion = fed_v1a1.SchemeGroupVersion
 
 func TestRun(t *testing.T) {
 	s := options.NewAPIServer()
-	s.InsecurePort = insecurePort
+	//TODO: s.
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.ServiceClusterIPRange = *ipNet
 	s.EtcdConfig.ServerList = []string{"http://localhost:4001"}
@@ -213,11 +373,4 @@ func testAPIResourceList(t *testing.T) {
 	found = findResource(apiResourceList.APIResources, "clusters/status")
 	assert.NotNil(t, found)
 	assert.False(t, found.Namespaced)
-	found = findResource(apiResourceList.APIResources, "subreplicasets")
-	assert.NotNil(t, found)
-	assert.True(t, found.Namespaced)
-	found = findResource(apiResourceList.APIResources, "subreplicasets/status")
-	assert.NotNil(t, found)
-	assert.True(t, found.Namespaced)
-
 }
