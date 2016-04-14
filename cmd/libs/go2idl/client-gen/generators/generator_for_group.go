@@ -19,6 +19,7 @@ package generators
 import (
 	"io"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
@@ -71,8 +72,8 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	}
 
 	m := map[string]interface{}{
-		"group":                      g.group,
-		"Group":                      namer.IC(g.group),
+		"group":                      normalization.BeforeFirstDot(g.group),
+		"Group":                      namer.IC(normalization.BeforeFirstDot(g.group)),
 		"canonicalGroup":             canonize(g.group),
 		"types":                      g.types,
 		"Config":                     c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
@@ -89,7 +90,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	for _, t := range g.types {
 		wrapper := map[string]interface{}{
 			"type":  t,
-			"Group": namer.IC(g.group),
+			"Group": namer.IC(normalization.BeforeFirstDot(g.group)),
 		}
 		namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
 		if namespaced {

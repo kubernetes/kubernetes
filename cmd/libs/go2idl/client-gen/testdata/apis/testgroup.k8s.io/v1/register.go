@@ -23,7 +23,7 @@ import (
 	versionedwatch "k8s.io/kubernetes/pkg/watch/versioned"
 )
 
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup", Version: "v1"}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup.k8s.io", Version: "v1"}
 
 func AddToScheme(scheme *runtime.Scheme) {
 	// Add the API to Scheme.
