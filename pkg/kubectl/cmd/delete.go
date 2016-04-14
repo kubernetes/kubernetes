@@ -71,11 +71,12 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DeleteOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
-	validArgs := []string{}
+	validArgs, argAliases := []string{}, []string{}
 	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
+		argAliases = kubectl.ResourceAliases(validArgs)
 	}
 
 	cmd := &cobra.Command{
@@ -88,7 +89,8 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunDelete(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
-		ValidArgs: validArgs,
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	usage := "Filename, directory, or URL to a file containing the resource to delete."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)

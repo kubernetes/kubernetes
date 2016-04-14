@@ -24,7 +24,7 @@ import (
 var cfgFile string
 var userLicense string
 
-// This represents the base command when called without any subcommands
+// RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "cobra",
 	Short: "A generator for Cobra based Applications",
