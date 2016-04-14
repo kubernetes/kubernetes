@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -2751,7 +2750,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
 		t.Fatalf("unexpected actions: %v", actions)
 	}
-	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
+	updatedNode, ok := actions[1].(core.UpdateAction).GetObject().(*api.Node)
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
@@ -2826,7 +2825,7 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
 		t.Fatalf("unexpected actions: %v", actions)
 	}
-	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
+	updatedNode, ok := actions[1].(core.UpdateAction).GetObject().(*api.Node)
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
@@ -2979,7 +2978,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	if len(actions) != 2 {
 		t.Errorf("unexpected actions: %v", actions)
 	}
-	updateAction, ok := actions[1].(testclient.UpdateAction)
+	updateAction, ok := actions[1].(core.UpdateAction)
 	if !ok {
 		t.Errorf("unexpected action type.  expected UpdateAction, got %#v", actions[1])
 	}
@@ -3138,7 +3137,7 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 		if len(actions) != 2 {
 			t.Errorf("%d. unexpected actions: %v", tcIdx, actions)
 		}
-		updateAction, ok := actions[1].(testclient.UpdateAction)
+		updateAction, ok := actions[1].(core.UpdateAction)
 		if !ok {
 			t.Errorf("%d. unexpected action type.  expected UpdateAction, got %#v", tcIdx, actions[1])
 		}
@@ -3254,7 +3253,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
 			t.Fatalf("unexpected actions: %v", actions)
 		}
-		updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
+		updatedNode, ok := actions[1].(core.UpdateAction).GetObject().(*api.Node)
 		if !ok {
 			t.Errorf("unexpected action type.  expected UpdateAction, got %#v", actions[1])
 		}
