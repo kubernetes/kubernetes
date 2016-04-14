@@ -61,17 +61,18 @@ func (c *EtcdStorageConfig) NewStorage() (storage.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewEtcdStorage(etcdClient, c.Codec, c.Config.Prefix, c.Config.Quorum), nil
+	return NewEtcdStorage(etcdClient, c.Codec, c.Config.Prefix, c.Config.Quorum, c.Config.CacheEntries), nil
 }
 
 // Configuration object for constructing etcd.Config
 type EtcdConfig struct {
-	Prefix     string
-	ServerList []string
-	KeyFile    string
-	CertFile   string
-	CAFile     string
-	Quorum     bool
+	Prefix       string
+	ServerList   []string
+	KeyFile      string
+	CertFile     string
+	CAFile       string
+	Quorum       bool
+	CacheEntries int
 }
 
 func (c *EtcdConfig) newEtcdClient() (etcd.Client, error) {
@@ -120,7 +121,7 @@ func (c *EtcdConfig) newHttpTransport() (*http.Transport, error) {
 
 // Creates a new storage interface from the client
 // TODO: deprecate in favor of storage.Config abstraction over time
-func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool) storage.Interface {
+func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, entries int) storage.Interface {
 	return &etcdHelper{
 		etcdMembersAPI: etcd.NewMembersAPI(client),
 		etcdKeysAPI:    etcd.NewKeysAPI(client),
@@ -129,7 +130,7 @@ func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quor
 		copier:         api.Scheme,
 		pathPrefix:     path.Join("/", prefix),
 		quorum:         quorum,
-		cache:          utilcache.NewCache(maxEtcdCacheEntries),
+		cache:          utilcache.NewCache(entries),
 	}
 }
 
@@ -154,7 +155,6 @@ type etcdHelper struct {
 	// This depends on etcd's indexes being globally unique across all objects/types. This will
 	// have to revisited if we decide to do things like multiple etcd clusters, or etcd will
 	// support multi-object transaction that will result in many objects with the same index.
-	// Number of entries stored in the cache is controlled by maxEtcdCacheEntries constant.
 	// TODO: Measure how much this cache helps after the conversion code is optimized.
 	cache utilcache.Cache
 }
@@ -655,7 +655,7 @@ type etcdCache interface {
 	addToCache(index uint64, obj runtime.Object)
 }
 
-const maxEtcdCacheEntries int = 50000
+const DefaultCacheEntries int = 50000
 
 func getTypeName(obj interface{}) string {
 	return reflect.TypeOf(obj).String()

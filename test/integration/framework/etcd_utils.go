@@ -52,21 +52,21 @@ func NewAutoscalingEtcdStorage(client etcd.Client) storage.Interface {
 	if client == nil {
 		client = NewEtcdClient()
 	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Autoscaling.Codec(), etcdtest.PathPrefix(), false)
+	return etcdstorage.NewEtcdStorage(client, testapi.Autoscaling.Codec(), etcdtest.PathPrefix(), false, etcdstorage.DefaultCacheEntries)
 }
 
 func NewBatchEtcdStorage(client etcd.Client) storage.Interface {
 	if client == nil {
 		client = NewEtcdClient()
 	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false)
+	return etcdstorage.NewEtcdStorage(client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false, etcdstorage.DefaultCacheEntries)
 }
 
 func NewExtensionsEtcdStorage(client etcd.Client) storage.Interface {
 	if client == nil {
 		client = NewEtcdClient()
 	}
-	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false)
+	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false, etcdstorage.DefaultCacheEntries)
 }
 
 func RequireEtcd() {
