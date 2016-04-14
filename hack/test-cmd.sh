@@ -241,7 +241,6 @@ runTests() {
     kube_flags=(
       -s "http://127.0.0.1:${API_PORT}"
       --match-server-version
-      --api-version="${version}"
     )
     [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
   fi
@@ -1744,12 +1743,6 @@ __EOF__
   kube::test::clear_all
 }
 
-kube_api_versions=(
-  ""
-  v1
-)
-for version in "${kube_api_versions[@]}"; do
-  KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" runTests "${version}"
-done
+KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" runTests "v1"
 
 kube::log::status "TEST PASSED"
