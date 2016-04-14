@@ -59,6 +59,7 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 		group := normalization.Group(gv.Group)
 		version := normalization.Version(gv.Version)
 		typedClientPath := filepath.Join(g.typedClientPath, group, version)
+		group = normalization.BeforeFirstDot(group)
 		imports = append(imports, fmt.Sprintf("%s%s \"%s\"", version, group, typedClientPath))
 		imports = append(imports, "github.com/golang/glog")
 	}
@@ -79,7 +80,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 	allGroups := []arg{}
 	for _, gv := range g.groupVersions {
-		group := normalization.Group(gv.Group)
+		group := normalization.BeforeFirstDot(normalization.Group(gv.Group))
 		version := normalization.Version(gv.Version)
 		allGroups = append(allGroups, arg{namer.IC(group), version + group})
 	}

@@ -65,7 +65,7 @@ func New(c *restclient.RESTClient) *TestgroupClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if testgroup group is not registered, return an error
-	g, err := registered.Group("testgroup")
+	g, err := registered.Group("testgroup.k8s.io")
 	if err != nil {
 		return err
 	}

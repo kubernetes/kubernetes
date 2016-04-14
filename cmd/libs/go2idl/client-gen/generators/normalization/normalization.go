@@ -16,7 +16,11 @@ limitations under the License.
 
 package normalization
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+import (
+	"strings"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
+)
 
 func Group(group string) string {
 	if group == "api" {
@@ -34,4 +38,8 @@ func Version(version string) string {
 
 func GroupVersion(gv unversioned.GroupVersion) unversioned.GroupVersion {
 	return unversioned.GroupVersion{Group: Group(gv.Group), Version: Version(gv.Version)}
+}
+
+func BeforeFirstDot(dotted string) string {
+	return strings.Split(dotted, ".")[0]
 }
