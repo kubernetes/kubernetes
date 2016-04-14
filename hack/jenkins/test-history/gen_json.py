@@ -22,16 +22,9 @@ Writes the JSON out to tests.json.
 from __future__ import print_function
 
 import json
-import os
-import re
-import subprocess
-import shutil
 import sys
-import tempfile
 import time
 import urllib2
-import xml.etree.ElementTree as ET
-import zlib
 
 
 def get_json(url):
@@ -59,51 +52,18 @@ def get_builds(server, job):
     for build in job_json['builds']:
         yield build['number'], build['building'], build['timestamp']
 
-def gcs_cp_junit(job, build, outdir):
-    try:
-        subprocess.check_output(['gsutil', '-m', 'cp',
-            'gs://kubernetes-jenkins/logs/{}/{}/artifacts/junit_*.xml'.format(
-                job, build), outdir], stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError:
-        pass  # no artifacts matched
-
-def get_tests_from_junit(path):
-    """Generates test data out of the provided JUnit file.
-
-    Returns None if there's an issue parsing the XML.
-    Yields name, time, failed, skipped for each test.
-    """
-    data = open(path).read()
-
-    try:
-        root = ET.fromstring(data)
-    except ET.ParseError:
-        print("bad xml:", path)
-        return
-
-    for child in root:
-        name = child.attrib['name']
-        time = float(child.attrib['time'])
-        failed = False
-        skipped = False
-        for param in child:
-            if param.tag == 'skipped':
-                skipped = True
-            elif param.tag == 'failure':
-                failed = True
-        yield name, time, failed, skipped
-
-def get_tests_from_build(job, build):
+def get_tests_from_build(server, job, build):
     """Generates all tests for a build."""
-    tmpdir = tempfile.mkdtemp(prefix='kube-test-history-')
-    try:
-        gcs_cp_junit(job, build, tmpdir)
-        for junit_path in os.listdir(tmpdir):
-            for test in get_tests_from_junit(
-                    os.path.join(tmpdir, junit_path)):
-                yield test
-    finally:
-        shutil.rmtree(tmpdir)
+    report = get_json('{}/job/{}/{}/testReport/api/json?tree={}'.format(
+        server, job, build, 'suites[cases[name,status,duration]]'))
+    if report is None:
+        return
+    for suite in report['suites']:
+        for case in suite['cases']:
+            status = case['status']
+            failed = status == 'FAILED'
+            skipped = status == 'SKIPPED'
+            yield case['name'], case['duration'], failed, skipped
 
 def get_daily_builds(server, prefix):
     """Generates all (job, build) pairs for the last day."""
@@ -126,7 +86,8 @@ def get_tests(server, prefix):
     tests = {}
     for job, build in get_daily_builds(server, prefix):
         print('{}/{}'.format(job, str(build)))
-        for name, duration, failed, skipped in get_tests_from_build(job, build):
+        for name, duration, failed, skipped in get_tests_from_build(
+                server, job, build):
             if name not in tests:
                 tests[name] = {}
             if skipped:
