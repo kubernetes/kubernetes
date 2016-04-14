@@ -30,9 +30,22 @@ type AuthProvider interface {
 	// WrapTransport allows the plugin to create a modified RoundTripper that
 	// attaches authorization headers (or other info) to requests.
 	WrapTransport(http.RoundTripper) http.RoundTripper
+	// Login allows the plugin to initialize its configuration. It must not
+	// require direct user interaction.
+	Login() error
 }
 
-type Factory func() (AuthProvider, error)
+// Factory generates an AuthProvider plugin.
+//  clusterAddress is the address of the current cluster.
+//  config is the inital configuration for this plugin.
+//  persister allows the plugin to save updated configuration.
+type Factory func(clusterAddress string, config map[string]string, persister AuthProviderConfigPersister) (AuthProvider, error)
+
+// AuthProviderConfigPersister allows a plugin to persist configuration info
+// for just itself.
+type AuthProviderConfigPersister interface {
+	Persist(map[string]string) error
+}
 
 // All registered auth provider plugins.
 var pluginsLock sync.Mutex
@@ -49,12 +62,12 @@ func RegisterAuthProviderPlugin(name string, plugin Factory) error {
 	return nil
 }
 
-func GetAuthProvider(apc *clientcmdapi.AuthProviderConfig) (AuthProvider, error) {
+func GetAuthProvider(clusterAddress string, apc *clientcmdapi.AuthProviderConfig, persister AuthProviderConfigPersister) (AuthProvider, error) {
 	pluginsLock.Lock()
 	defer pluginsLock.Unlock()
 	p, ok := plugins[apc.Name]
 	if !ok {
 		return nil, fmt.Errorf("No Auth Provider found for name %q", apc.Name)
 	}
-	return p()
+	return p(clusterAddress, apc.Config, persister)
 }

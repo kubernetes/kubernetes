@@ -56,7 +56,7 @@ func TestKubectlValidation(t *testing.T) {
 		Context:        *ctx,
 		CurrentContext: "test",
 	}
-	cmdConfig := clientcmd.NewNonInteractiveClientConfig(*cfg, "test", &overrides)
+	cmdConfig := clientcmd.NewNonInteractiveClientConfig(*cfg, "test", &overrides, nil)
 	factory := util.NewFactory(cmdConfig)
 	schema, err := factory.Validator(true, "")
 	if err != nil {
