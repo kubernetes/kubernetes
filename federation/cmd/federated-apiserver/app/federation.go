@@ -36,25 +36,25 @@ import (
 func addFederationAPIGroup(d genericapiserver.StorageDestinations, s *options.APIServer) {
 	glog.Infof("Configuring federation/v1alpha1 storage destination")
 	storageVersions := s.StorageGroupsToGroupVersions()
-	controlplaneGroup, err := registered.Group(federation.GroupName)
+	federationGroup, err := registered.Group(federation.GroupName)
 	if err != nil {
-		glog.Fatalf("Conttrolplane API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+		glog.Fatalf("Federation API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 	}
 	// Figure out what storage group/version we should use.
-	storageGroupVersion, found := storageVersions[controlplaneGroup.GroupVersion.Group]
+	storageGroupVersion, found := storageVersions[federationGroup.GroupVersion.Group]
 	if !found {
-		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", controlplaneGroup.GroupVersion.Group, storageVersions)
+		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", federationGroup.GroupVersion.Group, storageVersions)
 	}
 
 	if storageGroupVersion != v1alpha1.SchemeGroupVersion.String() {
 		glog.Fatalf("The storage version for federation must be '%v'", v1alpha1.SchemeGroupVersion.String())
 	}
 	glog.Infof("Using %v for federation group storage version", storageGroupVersion)
-	controlplaneEtcdStorage, err := newEtcd(api.Codecs, storageGroupVersion, federation.SchemeGroupVersion.String(), s.EtcdConfig)
+	federationEtcdStorage, err := newEtcd(api.Codecs, storageGroupVersion, federation.SchemeGroupVersion.String(), s.EtcdConfig)
 	if err != nil {
 		glog.Fatalf("Invalid federation storage version or misconfigured etcd: %v", err)
 	}
-	d.AddAPIGroup(federation.GroupName, controlplaneEtcdStorage)
+	d.AddAPIGroup(federation.GroupName, federationEtcdStorage)
 }
 
 func installFederationAPI(m *master.Master, d genericapiserver.StorageDestinations) {
