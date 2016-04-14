@@ -42,7 +42,7 @@ type Builder struct {
 
 	fset *token.FileSet
 	// map of package id to list of parsed files
-	parsed map[string][]*ast.File
+	parsed map[string][]parsedFile
 
 	// Set by makePackages, used by importer() and friends.
 	pkgs map[string]*tc.Package
@@ -56,6 +56,12 @@ type Builder struct {
 
 	// map of package to list of packages it imports.
 	importGraph map[string]map[string]struct{}
+}
+
+// parsedFile is for tracking files with name
+type parsedFile struct {
+	name string
+	file *ast.File
 }
 
 // key type for finding comments.
@@ -79,7 +85,7 @@ func New() *Builder {
 		context:               &c,
 		buildInfo:             map[string]*build.Package{},
 		fset:                  token.NewFileSet(),
-		parsed:                map[string][]*ast.File{},
+		parsed:                map[string][]parsedFile{},
 		userRequested:         map[string]bool{},
 		endLineToCommentGroup: map[fileLine]*ast.CommentGroup{},
 		importGraph:           map[string]map[string]struct{}{},
@@ -135,7 +141,7 @@ func (b *Builder) addFile(name string, src []byte, userRequested bool) error {
 		return err
 	}
 	pkg := filepath.Dir(name)
-	b.parsed[pkg] = append(b.parsed[pkg], p)
+	b.parsed[pkg] = append(b.parsed[pkg], parsedFile{name, p})
 	b.userRequested[pkg] = userRequested
 	for _, c := range p.Comments {
 		position := b.fset.Position(c.End())
@@ -272,9 +278,13 @@ func (b *Builder) typeCheckPackage(id string) (*tc.Package, error) {
 		// already processing this package.
 		return nil, fmt.Errorf("circular dependency for %q", id)
 	}
-	files, ok := b.parsed[id]
+	parsedFiles, ok := b.parsed[id]
 	if !ok {
 		return nil, fmt.Errorf("No files for pkg %q: %#v", id, b.parsed)
+	}
+	files := make([]*ast.File, len(parsedFiles))
+	for i := range parsedFiles {
+		files[i] = parsedFiles[i].file
 	}
 	b.pkgs[id] = nil
 	c := tc.Config{
@@ -325,6 +335,18 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 			// *packages* they depend on.
 			continue
 		}
+
+		for _, f := range b.parsed[pkgPath] {
+			if strings.HasSuffix(f.name, "/doc.go") {
+				if f.file.Doc != nil {
+					tp := u.Package(pkgPath)
+					for _, c := range f.file.Doc.List {
+						tp.DocComments = append(tp.DocComments, c.Text)
+					}
+				}
+			}
+		}
+
 		s := pkg.Scope()
 		for _, n := range s.Names() {
 			obj := s.Lookup(n)
