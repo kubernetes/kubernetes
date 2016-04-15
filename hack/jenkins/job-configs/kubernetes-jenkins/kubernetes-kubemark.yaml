@@ -48,6 +48,7 @@
                 export E2E_TEST="false"
                 export USE_KUBEMARK="true"
                 export KUBEMARK_TESTS="starting\s30\spods\sper\snode"
+                export KUBEMARK_TEST_ARGS="--gather-resource-usage=true"
                 # Override defaults to be independent from GCE defaults and set kubemark parameters
                 export NUM_NODES="1"
                 export MASTER_SIZE="n1-standard-1"
@@ -65,6 +66,7 @@
                 export E2E_TEST="false"
                 export USE_KUBEMARK="true"
                 export KUBEMARK_TESTS="\[Feature:HighDensityPerformance\]"
+                export KUBEMARK_TEST_ARGS="--gather-resource-usage=true"
                 # Override defaults to be independent from GCE defaults and set kubemark parameters
                 export NUM_NODES="3"
                 export MASTER_SIZE="n1-standard-2"
@@ -83,6 +85,7 @@
                 export E2E_TEST="false"
                 export USE_KUBEMARK="true"
                 export KUBEMARK_TESTS="\[Feature:Performance\]"
+                export KUBEMARK_TEST_ARGS="--gather-resource-usage=true"
                 export FAIL_ON_GCP_RESOURCE_LEAK="false"
                 # Override defaults to be independent from GCE defaults and set kubemark parameters
                 export NUM_NODES="6"
@@ -103,6 +106,7 @@
                 export E2E_TEST="false"
                 export USE_KUBEMARK="true"
                 export KUBEMARK_TESTS="\[Feature:Performance\]"
+                export KUBEMARK_TEST_ARGS="--gather-resource-usage=true"
                 export FAIL_ON_GCP_RESOURCE_LEAK="false"
                 # Override defaults to be independent from GCE defaults and set kubemark parameters
                 # We need 11 so that we won't hit max-pods limit (set to 100). TODO: do it in a nicer way.
