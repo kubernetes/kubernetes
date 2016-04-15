@@ -782,10 +782,11 @@ func validateLabelValue(v string) error {
 }
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
-// nil and empty Sets are considered equivalent to Everything().
+// nil Set is equivalent to Nothing() and an empty Sets are considered equivalent
+// to Everything().
 func SelectorFromSet(ls Set) Selector {
 	if ls == nil {
-		return internalSelector{}
+		return Nothing()
 	}
 	var requirements internalSelector
 	for label, value := range ls {

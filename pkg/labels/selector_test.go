@@ -95,7 +95,7 @@ func expectNoMatch(t *testing.T, selector string, ls Set) {
 
 func TestEverything(t *testing.T) {
 	if !Everything().Matches(Set{"x": "y"}) {
-		t.Errorf("Nil selector didn't match")
+		t.Errorf("Empty selector didn't match")
 	}
 	if !Everything().Empty() {
 		t.Errorf("Everything was not empty")
@@ -163,11 +163,11 @@ func TestSetMatches(t *testing.T) {
 
 func TestNilMapIsValid(t *testing.T) {
 	selector := Set(nil).AsSelector()
-	if selector == nil {
-		t.Errorf("Selector for nil set should be Everything")
+	if selector != Nothing() {
+		t.Errorf("Selector for nil set should be Nothing")
 	}
-	if !selector.Empty() {
-		t.Errorf("Selector for nil set should be Empty")
+	if selector.Empty() {
+		t.Errorf("Selector for nil set should be not be Empty")
 	}
 }
 
