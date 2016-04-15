@@ -462,9 +462,6 @@
         - 'gce-release-1.1':
             timeout: 175
             description: 'Run E2E tests on GCE from the current release branch.'
-        - 'gce-disruptive-1.1':
-            timeout: 180
-            description: 'Run disruptive E2E tests on GCE from the current release branch.'
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
