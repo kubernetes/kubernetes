@@ -767,8 +767,8 @@ func (proxier *Proxier) syncProxyRules() {
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
 
-	// Accumulate new local ports that we have opened.
-	newLocalPorts := map[localPort]closeable{}
+	// Accumulate the set of local ports that we will be holding open once this update is complete
+	replacementPortsMap := map[localPort]closeable{}
 
 	// Build rules for each service.
 	for svcName, svcInfo := range proxier.serviceMap {
@@ -814,14 +814,15 @@ func (proxier *Proxier) syncProxyRules() {
 					protocol: protocol,
 				}
 				if proxier.portsMap[lp] != nil {
-					newLocalPorts[lp] = proxier.portsMap[lp]
+					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
+					replacementPortsMap[lp] = proxier.portsMap[lp]
 				} else {
 					socket, err := openLocalPort(&lp)
 					if err != nil {
 						glog.Errorf("can't open %s, skipping this externalIP: %v", lp.String(), err)
 						continue
 					}
-					newLocalPorts[lp] = socket
+					replacementPortsMap[lp] = socket
 				}
 			} // We're holding the port, so it's OK to install iptables rules.
 			args := []string{
@@ -877,14 +878,15 @@ func (proxier *Proxier) syncProxyRules() {
 				protocol: protocol,
 			}
 			if proxier.portsMap[lp] != nil {
-				newLocalPorts[lp] = proxier.portsMap[lp]
+				glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
+				replacementPortsMap[lp] = proxier.portsMap[lp]
 			} else {
 				socket, err := openLocalPort(&lp)
 				if err != nil {
 					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
 					continue
 				}
-				newLocalPorts[lp] = socket
+				replacementPortsMap[lp] = socket
 			} // We're holding the port, so it's OK to install iptables rules.
 
 			args := []string{
@@ -1024,20 +1026,17 @@ func (proxier *Proxier) syncProxyRules() {
 	if err != nil {
 		glog.Errorf("Failed to execute iptables-restore: %v", err)
 		// Revert new local ports.
-		for k, v := range newLocalPorts {
-			glog.Errorf("Closing local port %s", k.String())
-			v.Close()
-		}
+		revertPorts(replacementPortsMap, proxier.portsMap)
 		return
 	}
 
 	// Close old local ports and save new ones.
 	for k, v := range proxier.portsMap {
-		if newLocalPorts[k] == nil {
+		if replacementPortsMap[k] == nil {
 			v.Close()
 		}
 	}
-	proxier.portsMap = newLocalPorts
+	proxier.portsMap = replacementPortsMap
 
 	// Clean up the older SNAT rule which was directly in POSTROUTING.
 	// TODO(thockin): Remove this for v1.3 or v1.4.
@@ -1197,4 +1196,16 @@ func openLocalPort(lp *localPort) (closeable, error) {
 	}
 	glog.V(2).Infof("Opened local port %s", lp.String())
 	return socket, nil
+}
+
+// revertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only
+// closes the ports opened in this sync.
+func revertPorts(replacementPortsMap, originalPortsMap map[localPort]closeable) {
+	for k, v := range replacementPortsMap {
+		// Only close newly opened local ports - leave ones that were open before this update
+		if originalPortsMap[k] == nil {
+			glog.V(2).Infof("Closing local port %s after iptables-restore failure", k.String())
+			v.Close()
+		}
+	}
 }
