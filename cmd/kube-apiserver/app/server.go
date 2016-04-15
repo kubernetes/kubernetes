@@ -38,6 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -346,6 +348,29 @@ func Run(s *options.APIServer) error {
 		storageDestinations.AddAPIGroup(batch.GroupName, batchEtcdStorage)
 	}
 
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapi.SchemeGroupVersion) {
+		glog.Infof("Configuring apps/v1alpha1 storage destination")
+		appsGroup, err := registered.Group(apps.GroupName)
+		if err != nil {
+			glog.Fatalf("Apps API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
+		}
+		// Figure out what storage group/version we should use.
+		storageGroupVersion, found := storageVersions[appsGroup.GroupVersion.Group]
+		if !found {
+			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", appsGroup.GroupVersion.Group, storageVersions)
+		}
+
+		if storageGroupVersion != "apps/v1alpha1" {
+			glog.Fatalf("The storage version for apps must be apps/v1alpha1")
+		}
+		glog.Infof("Using %v for petset group storage version", storageGroupVersion)
+		appsEtcdStorage, err := newEtcd(api.Codecs, storageGroupVersion, "apps/__internal", s.EtcdConfig)
+		if err != nil {
+			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
+		}
+		storageDestinations.AddAPIGroup(apps.GroupName, appsEtcdStorage)
+	}
+
 	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdConfig, &storageDestinations, newEtcd)
 
 	// Default to the private server key for service account token signing
@@ -477,6 +502,7 @@ func parseRuntimeConfig(s *options.APIServer) (genericapiserver.APIResourceConfi
 		extensionsapiv1beta1.SchemeGroupVersion: extensionsGroupVersionString,
 		batchapiv1.SchemeGroupVersion:           batchapiv1.SchemeGroupVersion.String(),
 		autoscalingapiv1.SchemeGroupVersion:     autoscalingapiv1.SchemeGroupVersion.String(),
+		appsapi.SchemeGroupVersion:              appsapi.SchemeGroupVersion.String(),
 	}
 
 	resourceConfig := master.DefaultAPIResourceConfigSource()

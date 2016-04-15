@@ -29,6 +29,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -157,6 +158,8 @@ func NewMasterConfig() *master.Config {
 	storageVersions[autoscaling.GroupName] = testapi.Autoscaling.GroupVersion().String()
 	batchEtcdStorage := NewBatchEtcdStorage(etcdClient)
 	storageVersions[batch.GroupName] = testapi.Batch.GroupVersion().String()
+	appsEtcdStorage := NewAppsEtcdStorage(etcdClient)
+	storageVersions[apps.GroupName] = testapi.Apps.GroupVersion().String()
 	expEtcdStorage := NewExtensionsEtcdStorage(etcdClient)
 	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
 
@@ -164,6 +167,7 @@ func NewMasterConfig() *master.Config {
 	storageDestinations.AddAPIGroup(api.GroupName, etcdStorage)
 	storageDestinations.AddAPIGroup(autoscaling.GroupName, autoscalingEtcdStorage)
 	storageDestinations.AddAPIGroup(batch.GroupName, batchEtcdStorage)
+	storageDestinations.AddAPIGroup(apps.GroupName, appsEtcdStorage)
 	storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
 
 	return &master.Config{

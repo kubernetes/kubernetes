@@ -55,6 +55,10 @@ func TestBatchPrefix(t *testing.T) {
 	testPrefix(t, "/apis/batch/")
 }
 
+func TestAppsPrefix(t *testing.T) {
+	testPrefix(t, "/apis/apps/")
+}
+
 func TestExtensionsPrefix(t *testing.T) {
 	testPrefix(t, "/apis/extensions/")
 }
