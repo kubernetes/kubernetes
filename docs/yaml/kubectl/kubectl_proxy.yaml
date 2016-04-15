@@ -64,6 +64,8 @@ inherited_options:
 - name: api-version
   usage: |
     DEPRECATED: The API version to use when talking to the server
+- name: as
+  usage: Username to impersonate for the operation.
 - name: certificate-authority
   usage: Path to a cert. file for the certificate authority.
 - name: client-certificate
