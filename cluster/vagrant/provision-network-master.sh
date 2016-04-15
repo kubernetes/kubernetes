@@ -36,6 +36,11 @@ ETCD_INITIAL_ADVERTISE_PEER_URLS="http://${MASTER_IP}:4380"
 ETCD_INITIAL_CLUSTER="flannel=http://${MASTER_IP}:4380"
 ETCD_ADVERTISE_CLIENT_URLS="${FLANNEL_ETCD_URL}"
 EOF
+
+    # fix the etcd boot failure issue
+    sed -i '/^Restart/a RestartSec=10' /usr/lib/systemd/system/etcd.service
+    systemctl daemon-reload
+
     # Enable and start etcd
     systemctl enable etcd
     systemctl start etcd
