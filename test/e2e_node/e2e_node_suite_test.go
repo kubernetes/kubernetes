@@ -30,6 +30,8 @@ import (
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/types"
 	. "github.com/onsi/gomega"
 )
 
@@ -46,7 +48,8 @@ func TestE2eNode(t *testing.T) {
 	flag.Parse()
 	rand.Seed(time.Now().UTC().UnixNano())
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "E2eNode Suite")
+	reporters := []Reporter{&LogReporter{}}
+	RunSpecsWithDefaultAndCustomReporters(t, "E2eNode Suite", reporters)
 }
 
 // Setup the kubelet on the node
@@ -78,15 +81,39 @@ var _ = AfterSuite(func() {
 	if e2es != nil && *startServices && *stopServices {
 		glog.Infof("Stopping node services...")
 		e2es.stop()
-		b := &bytes.Buffer{}
+	}
+})
+
+var _ Reporter = &LogReporter{}
+
+type LogReporter struct{}
+
+func (lr *LogReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
+	b := &bytes.Buffer{}
+	b.WriteString("******************************************************\n")
+	glog.V(2).Infof(b.String())
+}
+
+func (lr *LogReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {}
+
+func (lr *LogReporter) SpecWillRun(specSummary *types.SpecSummary) {}
+
+func (lr *LogReporter) SpecDidComplete(specSummary *types.SpecSummary) {}
+
+func (lr *LogReporter) AfterSuiteDidRun(setupSummary *types.SetupSummary) {}
+
+func (lr *LogReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
+	// Only log the binary output if the suite failed.
+	b := &bytes.Buffer{}
+	if e2es != nil && !summary.SuiteSucceeded {
+		b.WriteString(fmt.Sprintf("Process Log For Failed Suite On %s\n", *nodeName))
 		b.WriteString("-------------------------------------------------------------\n")
 		b.WriteString(fmt.Sprintf("kubelet output:\n%s\n", e2es.kubeletCombinedOut.String()))
 		b.WriteString("-------------------------------------------------------------\n")
-		b.WriteString(fmt.Sprintf("apiserver output:\n%s", e2es.apiServerCombinedOut.String()))
+		b.WriteString(fmt.Sprintf("apiserver output:\n%s\n", e2es.apiServerCombinedOut.String()))
 		b.WriteString("-------------------------------------------------------------\n")
-		b.WriteString(fmt.Sprintf("etcd output:\n%s", e2es.etcdCombinedOut.String()))
-		b.WriteString("-------------------------------------------------------------\n")
-		glog.V(2).Infof(b.String())
-
+		b.WriteString(fmt.Sprintf("etcd output:\n%s\n", e2es.etcdCombinedOut.String()))
 	}
-})
+	b.WriteString("******************************************************\n")
+	glog.V(2).Infof(b.String())
+}
