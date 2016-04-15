@@ -25,9 +25,9 @@ KUBERNETES_KEYPAIR_NAME=${KUBERNETES_KEYPAIR_NAME:-kubernetes_keypair}
 # Kubernetes release tar file
 KUBERNETES_RELEASE_TAR=${KUBERNETES_RELEASE_TAR:-kubernetes-server-linux-amd64.tar.gz}
 
-NUMBER_OF_MINIONS=${NUMBER_OF_MINIONS-1}
+NUMBER_OF_MINIONS=${NUMBER_OF_MINIONS-3}
 
-MAX_NUMBER_OF_MINIONS=${MAX_NUMBER_OF_MINIONS:-1}
+MAX_NUMBER_OF_MINIONS=${MAX_NUMBER_OF_MINIONS:-3}
 
 MASTER_FLAVOR=${MASTER_FLAVOR:-m1.small}
 
@@ -40,6 +40,9 @@ SWIFT_SERVER_URL=${SWIFT_SERVER_URL:-http://192.168.123.100:8080}
 # Flag indicates if new image must be created. If 'false' then image with IMAGE_ID will be used.
 # If 'true' then new image will be created from file config-image.sh
 CREATE_IMAGE=${CREATE_IMAGE:-true} # use "true" for devstack
+
+# Flag indicates if image should be downloaded
+DOWNLOAD_IMAGE=${DOWNLOAD_IMAGE:-true}
 
 # Image id which will be used for kubernetes stack
 IMAGE_ID=${IMAGE_ID:-f0f394b1-5546-4b68-b2bc-8abe8a7e6b8b}
