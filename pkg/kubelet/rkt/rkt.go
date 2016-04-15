@@ -238,11 +238,11 @@ func (r *Runtime) runCommand(args ...string) ([]string, error) {
 	return strings.Split(strings.TrimSpace(stdout.String()), "\n"), nil
 }
 
-// makePodServiceFileName constructs the unit file name for a pod using its UID.
-func makePodServiceFileName(uid types.UID) string {
+// makePodServiceFileName constructs the unit file name for a pod using its rkt pod uuid.
+func makePodServiceFileName(uuid string) string {
 	// TODO(yifan): Add name for readability? We need to consider the
 	// limit of the length.
-	return fmt.Sprintf("%s_%s.service", kubernetesUnitPrefix, uid)
+	return fmt.Sprintf("%s_%s.service", kubernetesUnitPrefix, uuid)
 }
 
 // setIsolators sets the apps' isolators according to the security context and resource spec.
@@ -846,14 +846,7 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 		newUnitOption("Service", "KillMode", "mixed"),
 	}
 
-	// Check if there's old rkt pod corresponding to the same pod, if so, update the restart count.
-	var needReload bool
-	serviceName := makePodServiceFileName(pod.UID)
-	if _, err := os.Stat(serviceFilePath(serviceName)); err == nil {
-		// Service file already exists, that means the pod is being restarted.
-		needReload = true
-	}
-
+	serviceName := makePodServiceFileName(uuid)
 	glog.V(4).Infof("rkt: Creating service file %q for pod %q", serviceName, format.Pod(pod))
 	serviceFile, err := os.Create(serviceFilePath(serviceName))
 	if err != nil {
@@ -863,11 +856,6 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 		return "", nil, err
 	}
 	serviceFile.Close()
-	if needReload {
-		if err := r.systemd.Reload(); err != nil {
-			return "", nil, err
-		}
-	}
 
 	return serviceName, apiPodToruntimePod(uuid, pod), nil
 }
@@ -1153,7 +1141,12 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 		r.waitPreStopHooks(pod, &runningPod)
 	}
 
-	serviceName := makePodServiceFileName(runningPod.ID)
+	containerID, err := parseContainerID(runningPod.Containers[0].ID)
+	if err != nil {
+		glog.Errorf("rkt: Failed to get rkt uuid of the pod %q: %v", runningPod.Name, err)
+		return err
+	}
+	serviceName := makePodServiceFileName(containerID.uuid)
 	r.generateEvents(&runningPod, "Killing", nil)
 	for _, c := range runningPod.Containers {
 		r.containerRefManager.ClearRef(c.ID)
@@ -1169,8 +1162,7 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	// Since all service file have 'KillMode=mixed', the processes in
 	// the unit's cgroup will receive a SIGKILL if the normal stop timeouts.
 	reschan := make(chan string)
-	_, err := r.systemd.StopUnit(serviceName, "replace", reschan)
-	if err != nil {
+	if _, err = r.systemd.StopUnit(serviceName, "replace", reschan); err != nil {
 		glog.Errorf("rkt: Failed to stop unit %q: %v", serviceName, err)
 		return err
 	}
