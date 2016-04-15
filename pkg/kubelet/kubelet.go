@@ -1730,7 +1730,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 		}
 	}
 
-	apiPodStatus := kl.generatePodStatus(pod, podStatus)
+	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
 	// Record the time it takes for the pod to become running.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok || existingStatus.Phase == api.PodPending && apiPodStatus.Phase == api.PodRunning &&
@@ -1944,7 +1944,7 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 			if err != nil {
 				return err
 			}
-			status = kl.generatePodStatus(pod, s)
+			status = kl.generateAPIPodStatus(pod, s)
 		}
 		if status.Phase == api.PodRunning {
 			possibleCIDRs.Insert(fmt.Sprintf("%s/32", status.PodIP))
@@ -3280,7 +3280,7 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	}
 }
 
-func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
+func (kl *Kubelet) generateAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
 	glog.V(3).Infof("Generating status for %q", format.Pod(pod))
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {
@@ -3315,11 +3315,10 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodS
 	return *s
 }
 
-// TODO(random-liu): Move this to some better place.
-// TODO(random-liu): Add test for convertStatusToAPIStatus()
 func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) *api.PodStatus {
 	var apiPodStatus api.PodStatus
 	uid := pod.UID
+	apiPodStatus.PodIP = podStatus.IP
 
 	convertContainerStatus := func(cs *kubecontainer.ContainerStatus) *api.ContainerStatus {
 		cid := cs.ID.String()
@@ -3348,104 +3347,83 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontain
 		return status
 	}
 
-	// Make the latest container status comes first.
-	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
-
-	statuses := make(map[string]*api.ContainerStatus, len(pod.Spec.Containers))
-	// Create a map of expected containers based on the pod spec.
-	expectedContainers := make(map[string]api.Container)
-	for _, container := range pod.Spec.Containers {
-		expectedContainers[container.Name] = container
-	}
-
-	containerDone := sets.NewString()
-	apiPodStatus.PodIP = podStatus.IP
-	for _, containerStatus := range podStatus.ContainerStatuses {
-		cName := containerStatus.Name
-		if _, ok := expectedContainers[cName]; !ok {
-			// This would also ignore the infra container.
-			continue
-		}
-		if containerDone.Has(cName) {
-			continue
-		}
-		status := convertContainerStatus(containerStatus)
-		if existing, found := statuses[cName]; found {
-			existing.LastTerminationState = status.State
-			containerDone.Insert(cName)
-		} else {
-			statuses[cName] = status
-		}
-	}
-
-	// Handle the containers for which we cannot find any associated active or dead containers or are in restart backoff
 	// Fetch old containers statuses from old pod status.
-	// TODO(random-liu) Maybe it's better to get status from status manager, because it takes the newest status and there is not
-	// status in api.Pod of static pod.
 	oldStatuses := make(map[string]api.ContainerStatus, len(pod.Spec.Containers))
 	for _, status := range pod.Status.ContainerStatuses {
 		oldStatuses[status.Name] = status
 	}
+
+	// Set all container statuses to default waiting state
+	statuses := make(map[string]*api.ContainerStatus, len(pod.Spec.Containers))
+	defaultWaitingState := api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerCreating"}}
 	for _, container := range pod.Spec.Containers {
-		// TODO(random-liu): We should define "Waiting" state better. And cleanup the following code.
-		if containerStatus, found := statuses[container.Name]; found {
-			reason, message, ok := kl.reasonCache.Get(uid, container.Name)
-			if ok && reason == kubecontainer.ErrCrashLoopBackOff {
-				containerStatus.LastTerminationState = containerStatus.State
-				containerStatus.State = api.ContainerState{
-					Waiting: &api.ContainerStateWaiting{
-						Reason:  reason.Error(),
-						Message: message,
-					},
-				}
-			}
+		status := &api.ContainerStatus{
+			Name:  container.Name,
+			Image: container.Image,
+			State: defaultWaitingState,
+		}
+		// Apply some values from the old statuses as the default values.
+		if oldStatus, found := oldStatuses[container.Name]; found {
+			status.RestartCount = oldStatus.RestartCount
+			status.LastTerminationState = oldStatus.LastTerminationState
+		}
+		statuses[container.Name] = status
+	}
+
+	// Make the latest container status comes first.
+	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+
+	// Set container statuses according to the statuses seen in pod status
+	containerSeen := map[string]int{}
+	for _, cStatus := range podStatus.ContainerStatuses {
+		cName := cStatus.Name
+		if _, ok := statuses[cName]; !ok {
+			// This would also ignore the infra container.
 			continue
 		}
-		var containerStatus api.ContainerStatus
-		containerStatus.Name = container.Name
-		containerStatus.Image = container.Image
-		if oldStatus, found := oldStatuses[container.Name]; found {
-			// Some states may be lost due to GC; apply the last observed
-			// values if possible.
-			containerStatus.RestartCount = oldStatus.RestartCount
-			containerStatus.LastTerminationState = oldStatus.LastTerminationState
+		if containerSeen[cName] >= 2 {
+			continue
 		}
-		reason, _, ok := kl.reasonCache.Get(uid, container.Name)
+		status := convertContainerStatus(cStatus)
+		if containerSeen[cName] == 0 {
+			statuses[cName] = status
+		} else {
+			statuses[cName].LastTerminationState = status.State
+		}
+		containerSeen[cName] = containerSeen[cName] + 1
+	}
 
-		if !ok {
-			// default position for a container
-			// At this point there are no active or dead containers, the reasonCache is empty (no entry or the entry has expired)
-			// its reasonable to say the container is being created till a more accurate reason is logged
-			containerStatus.State = api.ContainerState{
-				Waiting: &api.ContainerStateWaiting{
-					Reason:  fmt.Sprintf("ContainerCreating"),
-					Message: fmt.Sprintf("Image: %s is ready, container is creating", container.Image),
-				},
-			}
-		} else if reason == kubecontainer.ErrImagePullBackOff ||
-			reason == kubecontainer.ErrImageInspect ||
-			reason == kubecontainer.ErrImagePull ||
-			reason == kubecontainer.ErrImageNeverPull ||
-			reason == kubecontainer.RegistryUnavailable {
-			// mark it as waiting, reason will be filled bellow
-			containerStatus.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
-		} else if reason == kubecontainer.ErrRunContainer {
-			// mark it as waiting, reason will be filled bellow
-			containerStatus.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
+	// Handle the containers failed to be started, which should be in Waiting state.
+	for _, container := range pod.Spec.Containers {
+		// If a container should be restarted in next syncpod, it is *Waiting*.
+		if !kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
+			continue
 		}
-		statuses[container.Name] = &containerStatus
+		status := statuses[container.Name]
+		reason, message, ok := kl.reasonCache.Get(uid, container.Name)
+		if !ok {
+			// In fact, we could also apply Waiting state here, but it is less informative,
+			// and the container will be restarted soon, so we prefer the original state here.
+			// Note that with the current implementation of ShouldContainerBeRestarted the original state here
+			// could be:
+			//   * Waiting: There is no associated historical container and start failure reason record.
+			//   * Terminated: The container is terminated.
+			continue
+		}
+		if status.State.Terminated != nil {
+			status.LastTerminationState = status.State
+		}
+		status.State = api.ContainerState{
+			Waiting: &api.ContainerStateWaiting{
+				Reason:  reason.Error(),
+				Message: message,
+			},
+		}
+		statuses[container.Name] = status
 	}
 
 	apiPodStatus.ContainerStatuses = make([]api.ContainerStatus, 0)
-	for containerName, status := range statuses {
-		if status.State.Waiting != nil {
-			status.State.Running = nil
-			// For containers in the waiting state, fill in a specific reason if it is recorded.
-			if reason, message, ok := kl.reasonCache.Get(uid, containerName); ok {
-				status.State.Waiting.Reason = reason.Error()
-				status.State.Waiting.Message = message
-			}
-		}
+	for _, status := range statuses {
 		apiPodStatus.ContainerStatuses = append(apiPodStatus.ContainerStatuses, *status)
 	}
 
