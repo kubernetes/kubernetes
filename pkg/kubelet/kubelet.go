@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/atomic"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -426,6 +427,8 @@ func NewMainKubelet(
 			klet.livenessManager,
 			klet.volumeManager,
 			klet.httpClient,
+			utilexec.New(),
+			kubecontainer.RealOS{},
 			imageBackOff,
 			serializeImagePulls,
 		)
@@ -830,8 +833,12 @@ func (kl *Kubelet) getPluginDir(pluginName string) string {
 	return path.Join(kl.getPluginsDir(), pluginName)
 }
 
-// getPodDir returns the full path to the per-pod data directory for the
-// specified pod.  This directory may not exist if the pod does not exist.
+// GetPodDir returns the full path to the per-pod data directory for the
+// specified pod. This directory may not exist if the pod does not exist.
+func (kl *Kubelet) GetPodDir(podUID types.UID) string {
+	return kl.getPodDir(podUID)
+}
+
 func (kl *Kubelet) getPodDir(podUID types.UID) string {
 	// Backwards compat.  The "old" stuff should be removed before 1.0
 	// release.  The thinking here is this:
