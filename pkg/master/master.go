@@ -32,6 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -62,6 +64,7 @@ import (
 	nodeetcd "k8s.io/kubernetes/pkg/registry/node/etcd"
 	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
 	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
+	petsetetcd "k8s.io/kubernetes/pkg/registry/petset/etcd"
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
 	pspetcd "k8s.io/kubernetes/pkg/registry/podsecuritypolicy/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
@@ -349,6 +352,38 @@ func (m *Master) InstallAPIs(c *Config) {
 		allGroups = append(allGroups, group)
 	}
 
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(appsapi.SchemeGroupVersion) {
+		appsResources := m.getAppsResources(c)
+		appsGroupMeta := registered.GroupOrDie(apps.GroupName)
+
+		// Hard code preferred group version to apps/v1alpha1
+		appsGroupMeta.GroupVersion = appsapi.SchemeGroupVersion
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *appsGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1alpha1": appsResources,
+			},
+			OptionsExternalVersion:     &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                     api.Scheme,
+			ParameterCodec:             api.ParameterCodec,
+			NegotiatedSerializer:       api.Codecs,
+			NegotiatedStreamSerializer: api.StreamCodecs,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		appsGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: appsGroupMeta.GroupVersion.String(),
+			Version:      appsGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             appsGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{appsGVForDiscovery},
+			PreferredVersion: appsGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+
+	}
 	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
@@ -824,6 +859,27 @@ func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
 	return storage
 }
 
+// getPetSetResources returns the resources for batch api
+func (m *Master) getAppsResources(c *Config) map[string]rest.Storage {
+	// TODO update when we support more than one version of this group
+	version := appsapi.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("petsets")) {
+		restOptions := func(resource string) generic.RESTOptions {
+			return generic.RESTOptions{
+				Storage:                 c.StorageDestinations.Get(apps.GroupName, resource),
+				Decorator:               m.StorageDecorator(),
+				DeleteCollectionWorkers: m.deleteCollectionWorkers,
+			}
+		}
+		petsetStorage, petsetStatusStorage := petsetetcd.NewREST(restOptions("petsets"))
+		storage["petsets"] = petsetStorage
+		storage["petsets/status"] = petsetStatusStorage
+	}
+	return storage
+}
+
 // findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.
 func findExternalAddress(node *api.Node) (string, error) {
 	var fallback string
@@ -876,7 +932,7 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion)
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion)
 
 	// all extensions resources except these are disabled by default
 	ret.EnableResources(
