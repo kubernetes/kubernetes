@@ -1039,6 +1039,11 @@ func TestSetApp(t *testing.T) {
 }
 
 func TestGenerateRunCommand(t *testing.T) {
+	hostName, err := os.Hostname()
+	if err != nil {
+		t.Fatalf("Cannot get the hostname: %v", err)
+	}
+
 	tests := []struct {
 		pod  *api.Pod
 		uuid string
@@ -1094,9 +1099,9 @@ func TestGenerateRunCommand(t *testing.T) {
 			"rkt-uuid-foo",
 			[]string{},
 			[]string{},
-			"pod-hostname-foo",
+			"",
 			nil,
-			"/bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=pod-hostname-foo rkt-uuid-foo",
+			fmt.Sprintf("/bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=%s rkt-uuid-foo", hostName),
 		},
 		// Case #3, returns dns, dns searches, with private-net.
 		{
@@ -1117,7 +1122,7 @@ func TestGenerateRunCommand(t *testing.T) {
 			nil,
 			"/bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=rkt.kubernetes.io --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 --hostname=pod-hostname-foo rkt-uuid-foo",
 		},
-		// Case #4, returns dns, dns searches, with host-network.
+		// Case #4, returns no dns, dns searches, with host-network.
 		{
 			&api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -1134,7 +1139,7 @@ func TestGenerateRunCommand(t *testing.T) {
 			[]string{"."},
 			"pod-hostname-foo",
 			nil,
-			"/bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 --hostname=pod-hostname-foo rkt-uuid-foo",
+			fmt.Sprintf("/bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=%s rkt-uuid-foo", hostName),
 		},
 	}
 
