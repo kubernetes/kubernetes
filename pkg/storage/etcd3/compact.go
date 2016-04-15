@@ -30,6 +30,7 @@ import (
 // interval: the interval between each compaction. The first compaction happens after "interval".
 func compactor(ctx context.Context, client *clientv3.Client, interval time.Duration) {
 	var curRev int64
+	var err error
 	for {
 		select {
 		case <-time.After(interval):
@@ -37,21 +38,29 @@ func compactor(ctx context.Context, client *clientv3.Client, interval time.Durat
 			return
 		}
 
-		resp, err := client.Get(ctx, "/")
+		curRev, err = compact(ctx, client, curRev)
 		if err != nil {
-			glog.Errorf("compactor: Get failed: %v", err)
+			glog.Error(err)
 			continue
 		}
-		oldRev := curRev
-		curRev = resp.Header.Revision
-		if oldRev == 0 {
-			continue
-		}
-		err = client.Compact(ctx, oldRev)
-		if err != nil {
-			glog.Errorf("compactor: Compact failed: %v", err)
-			continue
-		}
-		glog.V(4).Infof("compactor: Compacted rev %d", oldRev)
+		glog.Infof("compactor: Compacted rev %d", curRev)
 	}
+}
+
+// compact compacts etcd store and returns current rev.
+// If it couldn't get current revision, the old rev will be returned.
+func compact(ctx context.Context, client *clientv3.Client, oldRev int64) (int64, error) {
+	resp, err := client.Get(ctx, "/")
+	if err != nil {
+		return oldRev, err
+	}
+	curRev := resp.Header.Revision
+	if oldRev == 0 {
+		return curRev, nil
+	}
+	err = client.Compact(ctx, oldRev)
+	if err != nil {
+		return curRev, err
+	}
+	return curRev, nil
 }
