@@ -144,10 +144,14 @@ function add-keypair() {
 #   IMAGE_PATH
 #   OPENSTACK_IMAGE_NAME
 function create-glance-image() {
-  if [ $CREATE_IMAGE = true ]; then
+  if [[ ${CREATE_IMAGE} == "true" ]]; then
     local image_status=$(nova image-show ${OPENSTACK_IMAGE_NAME} | awk '$2=="id" {print $4}')
 
     if [[ ! $image_status ]]; then
+      if [[ "${DOWNLOAD_IMAGE}" == "true" ]]; then
+        mkdir -p ${IMAGE_PATH}
+        curl -L ${IMAGE_URL_PATH}/${IMAGE_FILE} -o ${IMAGE_PATH}/${IMAGE_FILE} -z ${IMAGE_PATH}/${IMAGE_FILE}
+      fi
       echo "[INFO] Create image ${OPENSTACK_IMAGE_NAME}"
       glance image-create --name ${OPENSTACK_IMAGE_NAME} --disk-format ${IMAGE_FORMAT} \
         --container-format ${CONTAINER_FORMAT} --file ${IMAGE_PATH}/${IMAGE_FILE}
@@ -227,7 +231,7 @@ function run-heat-script() {
 function configure-kubectl() {
 
   export KUBE_MASTER_IP=$(nova show "${STACK_NAME}"-master | awk '$3=="network" {print $6}')
-  export CONTEXT="openstack"
+  export CONTEXT="openstack-${STACK_NAME}"
   export KUBE_BEARER_TOKEN="TokenKubelet"
   create-kubeconfig
 }

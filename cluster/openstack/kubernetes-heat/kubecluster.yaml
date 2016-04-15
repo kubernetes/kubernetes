@@ -2,7 +2,7 @@ heat_template_version: 2014-10-16
 
 description: >
   Kubernetes cluster with one master and one or more worker nodes
-  (as specified by the number_of_minions parameter, which defaults to 2).
+  (as specified by the number_of_minions parameter, which defaults to 3).
 
 parameters:
   plugin_version:
@@ -44,7 +44,7 @@ parameters:
   number_of_minions:
     type: number
     description: how many kubernetes minions to spawn initially
-    default: 1
+    default: 3
 
   max_number_of_minions:
     type: number
