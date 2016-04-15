@@ -94,6 +94,8 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container 
 		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelType, effectiveSC.SELinuxOptions.Type)
 		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelLevel, effectiveSC.SELinuxOptions.Level)
 	}
+
+	hostConfig.ReadonlyRootfs = readOnlyRootFilesystem(container)
 }
 
 // modifySecurityOption adds the security option of name to the config array with value in the form
@@ -159,6 +161,11 @@ func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *
 		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
 	}
 
+	if containerSc.ReadOnlyRootFilesystem != nil {
+		effectiveSc.ReadOnlyRootFilesystem = new(bool)
+		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
+	}
+
 	return effectiveSc
 }
 
@@ -184,4 +191,9 @@ func securityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityContext {
 	}
 
 	return synthesized
+}
+
+// determine if the container root should be a read only filesystem.
+func readOnlyRootFilesystem(container *api.Container) bool {
+	return container.SecurityContext != nil && container.SecurityContext.ReadOnlyRootFilesystem != nil && *container.SecurityContext.ReadOnlyRootFilesystem
 }

@@ -113,6 +113,20 @@ func TestModifyHostConfig(t *testing.T) {
 	// seLinuxLabelsSC := fullValidSecurityContext()
 	// seLinuxLabelsHC := fullValidHostConfig()
 
+	readOnlyRootFileSystemSCNil := fullValidSecurityContext()
+	readOnlyRootFileSystemSCNil.ReadOnlyRootFilesystem = nil
+
+	readOnlyRootFileSystemSCFalse := fullValidSecurityContext()
+	readOnlyRootFileSystemSCFalse.ReadOnlyRootFilesystem = new(bool)
+	*readOnlyRootFileSystemSCFalse.ReadOnlyRootFilesystem = false
+
+	readOnlyRootFileSystemSCTrue := fullValidSecurityContext()
+	readOnlyRootFileSystemSCTrue.ReadOnlyRootFilesystem = new(bool)
+	*readOnlyRootFileSystemSCTrue.ReadOnlyRootFilesystem = true
+
+	readOnlyRootFileSystemSCTrueHC := fullValidHostConfig()
+	readOnlyRootFileSystemSCTrueHC.ReadonlyRootfs = true
+
 	cases := []struct {
 		name     string
 		podSc    *api.PodSecurityContext
@@ -155,6 +169,21 @@ func TestModifyHostConfig(t *testing.T) {
 			podSc:    overridePodSecurityContext(),
 			sc:       fullValidSecurityContext(),
 			expected: fullValidHostConfig(),
+		},
+		{
+			name:     "container.Security context has nil ReadOnlyRootFileSystem",
+			sc:       readOnlyRootFileSystemSCNil,
+			expected: fullValidHostConfig(),
+		},
+		{
+			name:     "container.Security context has false ReadOnlyRootFileSystem",
+			sc:       readOnlyRootFileSystemSCFalse,
+			expected: fullValidHostConfig(),
+		},
+		{
+			name:     "container.Security context has true ReadOnlyRootFileSystem",
+			sc:       readOnlyRootFileSystemSCTrue,
+			expected: readOnlyRootFileSystemSCTrueHC,
 		},
 	}
 
@@ -259,6 +288,56 @@ func TestModifySecurityOption(t *testing.T) {
 	}
 }
 
+func TestDetermineEffectiveSecurityContext(t *testing.T) {
+	fullySpecifiedSecurityContext := securityContextWith(boolPtr(true), intPtr(1), boolPtr(true), boolPtr(true))
+
+	scWithNoSELinux := securityContextWith(boolPtr(true), intPtr(1), boolPtr(true), boolPtr(true))
+	scWithNoSELinux.SELinuxOptions = nil
+
+	podSCFillsInContainerSCValsExpected := securityContextWith(boolPtr(true), intPtr(1), boolPtr(true), boolPtr(true))
+	podSCFillsInContainerSCValsExpected.SELinuxOptions = overridePodSecurityContext().SELinuxOptions
+
+	tests := map[string]struct {
+		podSC       *api.PodSecurityContext
+		containerSC *api.SecurityContext
+		expectedSC  *api.SecurityContext
+	}{
+		"nil pod and container SC": {},
+		"nil pod SC, fully specified container SC": {
+			containerSC: fullySpecifiedSecurityContext,
+			expectedSC:  fullySpecifiedSecurityContext,
+		},
+		"container SC overrides pod SC": {
+			podSC:       overridePodSecurityContext(),
+			containerSC: fullySpecifiedSecurityContext,
+			expectedSC:  fullySpecifiedSecurityContext,
+		},
+		"pod SC fills in container SC values": {
+			podSC:       overridePodSecurityContext(),
+			containerSC: scWithNoSELinux,
+			expectedSC:  podSCFillsInContainerSCValsExpected,
+		},
+	}
+
+	for k, v := range tests {
+		pod := api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: v.podSC,
+				Containers: []api.Container{
+					{
+						SecurityContext: v.containerSC,
+					},
+				},
+			},
+		}
+		actualSC := DetermineEffectiveSecurityContext(&pod, &pod.Spec.Containers[0])
+		if !reflect.DeepEqual(v.expectedSC, actualSC) {
+			t.Errorf("%s had unexpected changes to the SC. Expected %#v, wanted %#v", k, v.expectedSC, actualSC)
+		}
+	}
+
+}
+
 func overridePodSecurityContext() *api.PodSecurityContext {
 	return &api.PodSecurityContext{
 		SELinuxOptions: &api.SELinuxOptions{
@@ -270,10 +349,27 @@ func overridePodSecurityContext() *api.PodSecurityContext {
 	}
 }
 
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func intPtr(i int64) *int64 {
+	return &i
+}
+
 func fullValidPodSecurityContext() *api.PodSecurityContext {
 	return &api.PodSecurityContext{
 		SELinuxOptions: inputSELinuxOptions(),
 	}
+}
+
+func securityContextWith(privileged *bool, runAsUser *int64, runAsNonRoot *bool, readOnlyRootFS *bool) *api.SecurityContext {
+	sc := fullValidSecurityContext()
+	sc.Privileged = privileged
+	sc.RunAsUser = runAsUser
+	sc.RunAsNonRoot = runAsNonRoot
+	sc.ReadOnlyRootFilesystem = readOnlyRootFS
+	return sc
 }
 
 func fullValidSecurityContext() *api.SecurityContext {
