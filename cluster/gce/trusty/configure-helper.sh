@@ -181,10 +181,14 @@ assemble_kubelet_flags() {
   fi
   # Add the unconditional flags
   KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --cloud-provider=gce --allow-privileged=true --cgroup-root=/ --system-cgroups=/system --kubelet-cgroups=/kubelet --babysit-daemons=true --config=/etc/kubernetes/manifests --cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
+  echo "KUBELET_OPTS=\"${KUBELET_CMD_FLAGS}\"" > /etc/default/kubelet
 }
 
 restart_docker_daemon() {
-  readonly DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
+  DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
+  if [ "${TEST_CLUSTER:-}" = "true" ]; then
+    DOCKER_OPTS="${DOCKER_OPTS} --debug"
+  fi
   echo "DOCKER_OPTS=\"${DOCKER_OPTS} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
   # Make sure the network interface cbr0 is created before restarting docker daemon
   while ! [ -L /sys/class/net/cbr0 ]; do
