@@ -478,11 +478,11 @@ var _ = framework.KubeDescribe("Density", func() {
 					node, ok := nodes[name]
 					Expect(ok).To(Equal(true))
 
-					scheduleLag = append(scheduleLag, framework.PodLatencyData{name, node, sched.Time.Sub(create.Time)})
-					startupLag = append(startupLag, framework.PodLatencyData{name, node, run.Time.Sub(sched.Time)})
-					watchLag = append(watchLag, framework.PodLatencyData{name, node, watch.Time.Sub(run.Time)})
-					schedToWatchLag = append(schedToWatchLag, framework.PodLatencyData{name, node, watch.Time.Sub(sched.Time)})
-					e2eLag = append(e2eLag, framework.PodLatencyData{name, node, watch.Time.Sub(create.Time)})
+					scheduleLag = append(scheduleLag, framework.PodLatencyData{Name: name, Node: node, Latency: sched.Time.Sub(create.Time)})
+					startupLag = append(startupLag, framework.PodLatencyData{Name: name, Node: node, Latency: run.Time.Sub(sched.Time)})
+					watchLag = append(watchLag, framework.PodLatencyData{Name: name, Node: node, Latency: watch.Time.Sub(run.Time)})
+					schedToWatchLag = append(schedToWatchLag, framework.PodLatencyData{Name: name, Node: node, Latency: watch.Time.Sub(sched.Time)})
+					e2eLag = append(e2eLag, framework.PodLatencyData{Name: name, Node: node, Latency: watch.Time.Sub(create.Time)})
 				}
 
 				sort.Sort(framework.LatencySlice(scheduleLag))

@@ -566,7 +566,7 @@ func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]ap
 		// Keep trying...
 		return false, nil
 	})
-	Logf("WaitFor completed.  Pods found = %v out of %v", timeout, len(pods), atLeast)
+	Logf("WaitFor completed with timeout %v.  Pods found = %v out of %v", timeout, len(pods), atLeast)
 	return pods, err
 }
 

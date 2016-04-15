@@ -54,12 +54,12 @@ type Clientset struct {
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
-	return &fakediscovery.FakeDiscovery{&c.Fake}
+	return &fakediscovery.FakeDiscovery{Fake: &c.Fake}
 }
 
 var _ clientset.Interface = &Clientset{}
 
 // Testgroup retrieves the TestgroupClient
 func (c *Clientset) Testgroup() unversionedtestgroup.TestgroupInterface {
-	return &fakeunversionedtestgroup.FakeTestgroup{&c.Fake}
+	return &fakeunversionedtestgroup.FakeTestgroup{Fake: &c.Fake}
 }

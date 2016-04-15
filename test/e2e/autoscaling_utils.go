@@ -386,13 +386,13 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 		break
 	case kindDeployment:
 		dpConfig := framework.DeploymentConfig{
-			rcConfig,
+			RCConfig: rcConfig,
 		}
 		framework.ExpectNoError(framework.RunDeployment(dpConfig))
 		break
 	case kindReplicaSet:
 		rsConfig := framework.ReplicaSetConfig{
-			rcConfig,
+			RCConfig: rcConfig,
 		}
 		framework.ExpectNoError(framework.RunReplicaSet(rsConfig))
 		break
