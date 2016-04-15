@@ -55,7 +55,17 @@ ensure-packages() {
 
 # A hookpoint for setting up local devices
 ensure-local-disks() {
-  :
+ for ssd in /dev/disk/by-id/google-local-ssd-*; do
+    if [ -e "$ssd" ]; then
+      ssdnum=`echo $ssd | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
+      echo "Formatting and mounting local SSD $ssd to /mnt/ssd$ssdnum"
+      mkdir -p /mnt/ssd$ssdnum
+      /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${ssd}" /mnt/ssd$ssdnum &>/var/log/local-ssd-$ssdnum-mount.log || \
+      { echo "Local SSD $ssdnum mount failed, review /var/log/local-ssd-$ssdnum-mount.log"; return 1; }
+    else
+      echo "No local SSD disks found."
+    fi
+  done
 }
 
 function ensure-install-dir() {
