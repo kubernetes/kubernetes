@@ -82,6 +82,11 @@ func (j *jwtProvider) Enabled() bool {
 	return true
 }
 
+// LazyProvide implements DockerConfigProvider. Should never be called.
+func (j *jwtProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
+	return nil
+}
+
 // Provide implements DockerConfigProvider
 func (j *jwtProvider) Provide() credentialprovider.DockerConfig {
 	cfg := credentialprovider.DockerConfig{}
