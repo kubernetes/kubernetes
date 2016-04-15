@@ -337,7 +337,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 
 	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("filename", "../../../examples/cassandra/cassandra.yaml")
+	cmd.Flags().Set("filename", "../../../examples/cassandra/cassandra-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := []runtime.Object{&pods.Items[0]}
@@ -789,9 +789,9 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
-			case "/namespaces/test/pods/cassandra":
+			case "/namespaces/test/replicationcontrollers/cassandra":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods[0])}, nil
-			case "/watch/namespaces/test/pods/cassandra":
+			case "/watch/namespaces/test/replicationcontrollers/cassandra":
 				return &http.Response{StatusCode: 200, Body: watchBody(codec, events)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -805,7 +805,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.Flags().Set("filename", "../../../examples/cassandra/cassandra.yaml")
+	cmd.Flags().Set("filename", "../../../examples/cassandra/cassandra-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := []runtime.Object{&pods[0], events[0].Object, events[1].Object}

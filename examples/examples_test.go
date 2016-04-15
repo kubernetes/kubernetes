@@ -262,7 +262,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"cassandra-daemonset":  &extensions.DaemonSet{},
 			"cassandra-controller": &api.ReplicationController{},
 			"cassandra-service":    &api.Service{},
-			"cassandra":            &api.Pod{},
 		},
 		"../examples/celery-rabbitmq": {
 			"celery-controller":   &api.ReplicationController{},
