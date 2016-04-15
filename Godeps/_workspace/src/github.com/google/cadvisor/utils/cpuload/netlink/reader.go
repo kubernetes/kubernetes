@@ -66,11 +66,12 @@ func (self *NetlinkReader) GetCpuLoad(name string, path string) (info.LoadStats,
 	}
 
 	cfd, err := os.Open(path)
+	defer cfd.Close()
 	if err != nil {
 		return info.LoadStats{}, fmt.Errorf("failed to open cgroup path %s: %q", path, err)
 	}
 
-	stats, err := getLoadStats(self.familyId, cfd.Fd(), self.conn)
+	stats, err := getLoadStats(self.familyId, cfd, self.conn)
 	if err != nil {
 		return info.LoadStats{}, err
 	}

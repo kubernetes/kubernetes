@@ -19,7 +19,6 @@ package fs
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -40,6 +39,7 @@ import (
 const (
 	LabelSystemRoot   = "root"
 	LabelDockerImages = "docker-images"
+	LabelRktImages    = "rkt-images"
 )
 
 type partition struct {
@@ -62,8 +62,14 @@ type RealFsInfo struct {
 
 type Context struct {
 	// docker root directory.
-	DockerRoot string
-	DockerInfo map[string]string
+	Docker  DockerContext
+	RktPath string
+}
+
+type DockerContext struct {
+	Root         string
+	Driver       string
+	DriverStatus map[string]string
 }
 
 func NewFsInfo(context Context) (FsInfo, error) {
@@ -76,6 +82,11 @@ func NewFsInfo(context Context) (FsInfo, error) {
 		labels:     make(map[string]string, 0),
 		dmsetup:    &defaultDmsetupClient{},
 	}
+
+	fsInfo.addSystemRootLabel(mounts)
+	fsInfo.addDockerImagesLabel(context, mounts)
+	fsInfo.addRktImagesLabel(context, mounts)
+
 	supportedFsType := map[string]bool{
 		// all ext systems are checked through prefix.
 		"btrfs": true,
@@ -102,12 +113,7 @@ func NewFsInfo(context Context) (FsInfo, error) {
 		}
 	}
 
-	// need to call this before the log line below printing out the partitions, as this function may
-	// add a "partition" for devicemapper to fsInfo.partitions
-	fsInfo.addDockerImagesLabel(context)
-
 	glog.Infof("Filesystem partitions: %+v", fsInfo.partitions)
-	fsInfo.addSystemRootLabel()
 	return fsInfo, nil
 }
 
@@ -115,22 +121,17 @@ func NewFsInfo(context Context) (FsInfo, error) {
 // docker is using devicemapper for its storage driver. If a loopback device is being used, don't
 // return any information or error, as we want to report based on the actual partition where the
 // loopback file resides, inside of the loopback file itself.
-func (self *RealFsInfo) getDockerDeviceMapperInfo(dockerInfo map[string]string) (string, *partition, error) {
-	if storageDriver, ok := dockerInfo["Driver"]; ok && storageDriver != DeviceMapper.String() {
+func (self *RealFsInfo) getDockerDeviceMapperInfo(context DockerContext) (string, *partition, error) {
+	if context.Driver != DeviceMapper.String() {
 		return "", nil, nil
 	}
 
-	var driverStatus [][]string
-	if err := json.Unmarshal([]byte(dockerInfo["DriverStatus"]), &driverStatus); err != nil {
-		return "", nil, err
-	}
-
-	dataLoopFile := dockerStatusValue(driverStatus, "Data loop file")
+	dataLoopFile := context.DriverStatus["Data loop file"]
 	if len(dataLoopFile) > 0 {
 		return "", nil, nil
 	}
 
-	dev, major, minor, blockSize, err := dockerDMDevice(driverStatus, self.dmsetup)
+	dev, major, minor, blockSize, err := dockerDMDevice(context.DriverStatus, self.dmsetup)
 	if err != nil {
 		return "", nil, err
 	}
@@ -144,19 +145,24 @@ func (self *RealFsInfo) getDockerDeviceMapperInfo(dockerInfo map[string]string) 
 }
 
 // addSystemRootLabel attempts to determine which device contains the mount for /.
-func (self *RealFsInfo) addSystemRootLabel() {
-	for src, p := range self.partitions {
-		if p.mountpoint == "/" {
-			if _, ok := self.labels[LabelSystemRoot]; !ok {
-				self.labels[LabelSystemRoot] = src
+func (self *RealFsInfo) addSystemRootLabel(mounts []*mount.Info) {
+	for _, m := range mounts {
+		if m.Mountpoint == "/" {
+			self.partitions[m.Source] = partition{
+				fsType:     m.Fstype,
+				mountpoint: m.Mountpoint,
+				major:      uint(m.Major),
+				minor:      uint(m.Minor),
 			}
+			self.labels[LabelSystemRoot] = m.Source
+			return
 		}
 	}
 }
 
 // addDockerImagesLabel attempts to determine which device contains the mount for docker images.
-func (self *RealFsInfo) addDockerImagesLabel(context Context) {
-	dockerDev, dockerPartition, err := self.getDockerDeviceMapperInfo(context.DockerInfo)
+func (self *RealFsInfo) addDockerImagesLabel(context Context, mounts []*mount.Info) {
+	dockerDev, dockerPartition, err := self.getDockerDeviceMapperInfo(context.Docker)
 	if err != nil {
 		glog.Warningf("Could not get Docker devicemapper device: %v", err)
 	}
@@ -164,47 +170,63 @@ func (self *RealFsInfo) addDockerImagesLabel(context Context) {
 		self.partitions[dockerDev] = *dockerPartition
 		self.labels[LabelDockerImages] = dockerDev
 	} else {
-		dockerPaths := getDockerImagePaths(context)
+		self.updateContainerImagesPath(LabelDockerImages, mounts, getDockerImagePaths(context))
+	}
+}
 
-		for src, p := range self.partitions {
-			self.updateDockerImagesPath(src, p.mountpoint, dockerPaths)
+func (self *RealFsInfo) addRktImagesLabel(context Context, mounts []*mount.Info) {
+	if context.RktPath != "" {
+		rktPath := context.RktPath
+		rktImagesPaths := map[string]struct{}{
+			"/": {},
 		}
+		for rktPath != "/" && rktPath != "." {
+			rktImagesPaths[rktPath] = struct{}{}
+			rktPath = filepath.Dir(rktPath)
+		}
+		self.updateContainerImagesPath(LabelRktImages, mounts, rktImagesPaths)
 	}
 }
 
 // Generate a list of possible mount points for docker image management from the docker root directory.
 // Right now, we look for each type of supported graph driver directories, but we can do better by parsing
 // some of the context from `docker info`.
-func getDockerImagePaths(context Context) []string {
+func getDockerImagePaths(context Context) map[string]struct{} {
+	dockerImagePaths := map[string]struct{}{
+		"/": {},
+	}
+
 	// TODO(rjnagal): Detect docker root and graphdriver directories from docker info.
-	dockerRoot := context.DockerRoot
-	dockerImagePaths := []string{}
+	dockerRoot := context.Docker.Root
 	for _, dir := range []string{"devicemapper", "btrfs", "aufs", "overlay", "zfs"} {
-		dockerImagePaths = append(dockerImagePaths, path.Join(dockerRoot, dir))
+		dockerImagePaths[path.Join(dockerRoot, dir)] = struct{}{}
 	}
 	for dockerRoot != "/" && dockerRoot != "." {
-		dockerImagePaths = append(dockerImagePaths, dockerRoot)
+		dockerImagePaths[dockerRoot] = struct{}{}
 		dockerRoot = filepath.Dir(dockerRoot)
 	}
-	dockerImagePaths = append(dockerImagePaths, "/")
 	return dockerImagePaths
 }
 
-// This method compares the mountpoint with possible docker image mount points. If a match is found,
-// docker images label is added to the partition.
-func (self *RealFsInfo) updateDockerImagesPath(source string, mountpoint string, dockerImagePaths []string) {
-	for _, v := range dockerImagePaths {
-		if v == mountpoint {
-			if i, ok := self.labels[LabelDockerImages]; ok {
-				// pick the innermost mountpoint.
-				mnt := self.partitions[i].mountpoint
-				if len(mnt) < len(mountpoint) {
-					self.labels[LabelDockerImages] = source
-				}
-			} else {
-				self.labels[LabelDockerImages] = source
+// This method compares the mountpoints with possible container image mount points. If a match is found,
+// the label is added to the partition.
+func (self *RealFsInfo) updateContainerImagesPath(label string, mounts []*mount.Info, containerImagePaths map[string]struct{}) {
+	var useMount *mount.Info
+	for _, m := range mounts {
+		if _, ok := containerImagePaths[m.Mountpoint]; ok {
+			if useMount == nil || (len(useMount.Mountpoint) < len(m.Mountpoint)) {
+				useMount = m
 			}
 		}
+	}
+	if useMount != nil {
+		self.partitions[useMount.Source] = partition{
+			fsType:     useMount.Fstype,
+			mountpoint: useMount.Mountpoint,
+			major:      uint(useMount.Major),
+			minor:      uint(useMount.Minor),
+		}
+		self.labels[label] = useMount.Source
 	}
 }
 
@@ -412,15 +434,6 @@ func getVfsStats(path string) (total uint64, free uint64, avail uint64, inodes u
 	return total, free, avail, inodes, inodesFree, nil
 }
 
-func dockerStatusValue(status [][]string, target string) string {
-	for _, v := range status {
-		if len(v) == 2 && strings.ToLower(v[0]) == strings.ToLower(target) {
-			return v[1]
-		}
-	}
-	return ""
-}
-
 // dmsetupClient knows to to interact with dmsetup to retrieve information about devicemapper.
 type dmsetupClient interface {
 	table(poolName string) ([]byte, error)
@@ -438,9 +451,9 @@ func (*defaultDmsetupClient) table(poolName string) ([]byte, error) {
 
 // Devicemapper thin provisioning is detailed at
 // https://www.kernel.org/doc/Documentation/device-mapper/thin-provisioning.txt
-func dockerDMDevice(driverStatus [][]string, dmsetup dmsetupClient) (string, uint, uint, uint, error) {
-	poolName := dockerStatusValue(driverStatus, "Pool Name")
-	if len(poolName) == 0 {
+func dockerDMDevice(driverStatus map[string]string, dmsetup dmsetupClient) (string, uint, uint, uint, error) {
+	poolName, ok := driverStatus["Pool Name"]
+	if !ok || len(poolName) == 0 {
 		return "", 0, 0, 0, fmt.Errorf("Could not get dm pool name")
 	}
 

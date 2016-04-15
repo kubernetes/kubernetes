@@ -16,7 +16,6 @@
 package manager
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -31,6 +30,8 @@ import (
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/container/raw"
+	"github.com/google/cadvisor/container/rkt"
+	"github.com/google/cadvisor/container/systemd"
 	"github.com/google/cadvisor/events"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
@@ -60,7 +61,7 @@ type Manager interface {
 	// Stops the manager.
 	Stop() error
 
-	// Get information about a container.
+	//  information about a container.
 	GetContainerInfo(containerName string, query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 
 	// Get V2 information about a container.
@@ -131,11 +132,23 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 	}
 	glog.Infof("cAdvisor running in container: %q", selfContainer)
 
-	dockerInfo, err := docker.DockerInfo()
+	dockerInfo, err := dockerInfo()
 	if err != nil {
 		glog.Warningf("Unable to connect to Docker: %v", err)
 	}
-	context := fs.Context{DockerRoot: docker.RootDir(), DockerInfo: dockerInfo}
+	rktPath, err := rkt.RktPath()
+	if err != nil {
+		glog.Warningf("unable to connect to Rkt api service: %v", err)
+	}
+
+	context := fs.Context{
+		Docker: fs.DockerContext{
+			Root:         docker.RootDir(),
+			Driver:       dockerInfo.Driver,
+			DriverStatus: dockerInfo.DriverStatus,
+		},
+		RktPath: rktPath,
+	}
 	fsInfo, err := fs.NewFsInfo(context)
 	if err != nil {
 		return nil, err
@@ -206,13 +219,21 @@ type manager struct {
 
 // Start the container manager.
 func (self *manager) Start() error {
-	// Register Docker container factory.
 	err := docker.Register(self, self.fsInfo, self.ignoreMetrics)
 	if err != nil {
 		glog.Errorf("Docker container factory registration failed: %v.", err)
 	}
 
-	// Register the raw driver.
+	err = rkt.Register(self, self.fsInfo, self.ignoreMetrics)
+	if err != nil {
+		glog.Errorf("Registration of the rkt container factory failed: %v", err)
+	}
+
+	err = systemd.Register(self, self.fsInfo, self.ignoreMetrics)
+	if err != nil {
+		glog.Errorf("Registration of the systemd container factory failed: %v", err)
+	}
+
 	err = raw.Register(self, self.fsInfo, self.ignoreMetrics)
 	if err != nil {
 		glog.Errorf("Registration of the raw container factory failed: %v", err)
@@ -1150,58 +1171,31 @@ func (m *manager) DockerImages() ([]DockerImage, error) {
 }
 
 func (m *manager) DockerInfo() (DockerStatus, error) {
-	info, err := docker.DockerInfo()
+	return dockerInfo()
+}
+
+func dockerInfo() (DockerStatus, error) {
+	dockerInfo, err := docker.DockerInfo()
 	if err != nil {
 		return DockerStatus{}, err
 	}
-	versionInfo, err := m.GetVersionInfo()
+	versionInfo, err := getVersionInfo()
 	if err != nil {
 		return DockerStatus{}, err
 	}
 	out := DockerStatus{}
 	out.Version = versionInfo.DockerVersion
-	if val, ok := info["KernelVersion"]; ok {
-		out.KernelVersion = val
-	}
-	if val, ok := info["OperatingSystem"]; ok {
-		out.OS = val
-	}
-	if val, ok := info["Name"]; ok {
-		out.Hostname = val
-	}
-	if val, ok := info["DockerRootDir"]; ok {
-		out.RootDir = val
-	}
-	if val, ok := info["Driver"]; ok {
-		out.Driver = val
-	}
-	if val, ok := info["ExecutionDriver"]; ok {
-		out.ExecDriver = val
-	}
-	if val, ok := info["Images"]; ok {
-		n, err := strconv.Atoi(val)
-		if err == nil {
-			out.NumImages = n
-		}
-	}
-	if val, ok := info["Containers"]; ok {
-		n, err := strconv.Atoi(val)
-		if err == nil {
-			out.NumContainers = n
-		}
-	}
-	if val, ok := info["DriverStatus"]; ok {
-		var driverStatus [][]string
-		err := json.Unmarshal([]byte(val), &driverStatus)
-		if err != nil {
-			return DockerStatus{}, err
-		}
-		out.DriverStatus = make(map[string]string)
-		for _, v := range driverStatus {
-			if len(v) == 2 {
-				out.DriverStatus[v[0]] = v[1]
-			}
-		}
+	out.KernelVersion = dockerInfo.KernelVersion
+	out.OS = dockerInfo.OperatingSystem
+	out.Hostname = dockerInfo.Name
+	out.RootDir = dockerInfo.DockerRootDir
+	out.Driver = dockerInfo.Driver
+	out.ExecDriver = dockerInfo.ExecutionDriver
+	out.NumImages = dockerInfo.Images
+	out.NumContainers = dockerInfo.Containers
+	out.DriverStatus = make(map[string]string, len(dockerInfo.DriverStatus))
+	for _, v := range dockerInfo.DriverStatus {
+		out.DriverStatus[v[0]] = v[1]
 	}
 	return out, nil
 }
