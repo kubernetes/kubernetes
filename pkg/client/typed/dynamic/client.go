@@ -49,6 +49,10 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 
 	conf.Codec = dynamicCodec{}
 
+	if conf.APIPath == "" {
+		conf.APIPath = "/api"
+	}
+
 	if len(conf.UserAgent) == 0 {
 		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
@@ -71,11 +75,10 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 // Resource returns an API interface to the specified resource for
 // this client's group and version. If resource is not a namespaced
 // resource, then namespace is ignored.
-func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
+func (c *Client) Resource(resource *unversioned.APIResource) *ResourceClient {
 	return &ResourceClient{
 		cl:       c.cl,
 		resource: resource,
-		ns:       namespace,
 	}
 }
 
@@ -111,6 +114,14 @@ func (rc *ResourceClient) namespace(req *restclient.Request) *restclient.Request
 	return req
 }
 
+// Namespace sets namespace for the resource client.
+func (rc *ResourceClient) Namespace(ns string) *ResourceClient {
+	if rc.resource.Namespaced {
+		rc.ns = ns
+	}
+	return rc
+}
+
 // List returns a list of objects for this resource.
 func (rc *ResourceClient) List(opts v1.ListOptions) (*runtime.UnstructuredList, error) {
 	result := new(runtime.UnstructuredList)
@@ -122,16 +133,12 @@ func (rc *ResourceClient) List(opts v1.ListOptions) (*runtime.UnstructuredList, 
 	return result, err
 }
 
-func (rc *ResourceClient) get(name string) *restclient.Request {
-	return rc.namespace(rc.cl.Get()).
-		Resource(rc.resource.Name).
-		Name(name)
-}
-
 // Get gets the resource with the specified name.
 func (rc *ResourceClient) Get(name string) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	err := rc.get(name).
+	err := rc.namespace(rc.cl.Get()).
+		Resource(rc.resource.Name).
+		Name(name).
 		Do().
 		Into(result)
 	return result, err
@@ -168,25 +175,16 @@ func (rc *ResourceClient) Create(obj *runtime.Unstructured) (*runtime.Unstructur
 	return result, err
 }
 
-// update provides the request object to update the provided resource.
-func (rc *ResourceClient) update(obj *runtime.Unstructured) (*restclient.Request, error) {
-	if len(obj.Name) == 0 {
-		return nil, errors.New("object missing name")
-	}
-	return rc.namespace(rc.cl.Put()).
-		Resource(rc.resource.Name).
-		Name(obj.Name).
-		Body(obj), nil
-}
-
 // Update updates the provided resource.
 func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	req, err := rc.update(obj)
-	if err != nil {
-		return result, err
+	if len(obj.Name) == 0 {
+		return result, errors.New("object missing name")
 	}
-	err = req.
+	err := rc.namespace(rc.cl.Put()).
+		Resource(rc.resource.Name).
+		Name(obj.Name).
+		Body(obj).
 		Do().
 		Into(result)
 	return result, err
@@ -200,10 +198,14 @@ func (rc *ResourceClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Watch()
 }
 
-// Get gets the resource with the specified name.
-func (src *SubresourceClient) Get(name string) (*runtime.Unstructured, error) {
+// Get gets the subresource for the resource with the specified name.
+// The parameter is the name of the resource because, subresources do not have their
+// own names. They are identified by the name of their parent resource.
+func (src *SubresourceClient) Get(resourceName string) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	err := src.resourceCl.get(name).
+	err := src.resourceCl.namespace(src.resourceCl.cl.Get()).
+		Resource(src.resourceCl.resource.Name).
+		Name(resourceName).
 		SubResource(src.subresource).
 		Do().
 		Into(result)
@@ -213,11 +215,14 @@ func (src *SubresourceClient) Get(name string) (*runtime.Unstructured, error) {
 // Update updates the provided subresource.
 func (src *SubresourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
-	req, err := src.resourceCl.update(obj)
-	if err != nil {
-		return result, err
+	if len(obj.Name) == 0 {
+		return result, errors.New("object missing name")
 	}
-	err = req.SubResource(src.subresource).
+	err := src.resourceCl.namespace(src.resourceCl.cl.Put()).
+		Resource(src.resourceCl.resource.Name).
+		Name(obj.Name).
+		Body(obj).
+		SubResource(src.subresource).
 		Do().
 		Into(result)
 	return result, err

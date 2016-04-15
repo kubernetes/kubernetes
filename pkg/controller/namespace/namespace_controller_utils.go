@@ -155,7 +155,7 @@ func deleteCollection(
 	}
 
 	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
-	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(nil, v1.ListOptions{})
+	err := dynamicClient.Resource(&apiResource).Namespace(namespace).DeleteCollection(nil, v1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -197,7 +197,7 @@ func listCollection(
 	}
 
 	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
-	unstructuredList, err := dynamicClient.Resource(&apiResource, namespace).List(v1.ListOptions{})
+	unstructuredList, err := dynamicClient.Resource(&apiResource).Namespace(namespace).List(v1.ListOptions{})
 	if err == nil {
 		return unstructuredList, true, nil
 	}
@@ -235,7 +235,7 @@ func deleteEachItem(
 	}
 	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
 	for _, item := range unstructuredList.Items {
-		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.Name, nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+		if err = dynamicClient.Resource(&apiResource).Namespace(namespace).Delete(item.Name, nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}

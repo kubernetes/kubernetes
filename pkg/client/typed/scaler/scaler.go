@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scale
+// Package scaler defines and implements an interface polymorphic consumption
+// of the scale subresource.
+package scaler
 
 import (
 	"fmt"
@@ -30,28 +32,56 @@ import (
 )
 
 type Client struct {
-	dc *dynamic.Client
+	coredc *dynamic.Client
+	extdc  *dynamic.Client
 }
 
-type ScaleInterface interface {
+// ScalerInterface defines a set of methods required to consume the Scale subresource
+// irrespective of the concrete Scale API type.
+type ScalerInterface interface {
 	getScale() *runtime.Unstructured
 	Replicas() (int, error)
 	SetReplicas(replicas int)
-	Selector() (string, error)
+	Selector() (labels.Selector, error)
 }
 
+// NewClient returns a new client to operate on the scale subresource. The returned client
+// is backed by a dynamic client which uses its own codec.
 func NewClient(conf *restclient.Config) (*Client, error) {
-	dc, err := dynamic.NewClient(&conf2)
+	// conf is passed as a pointer, do not modify it
+	coreConf := *conf
+	if coreConf.APIPath == "" {
+		coreConf.APIPath = "/api"
+	}
+	coreConf.GroupVersion = &unversioned.GroupVersion{
+		Group:   "",
+		Version: "v1",
+	}
+	coredc, err := dynamic.NewClient(&coreConf)
+	if err != nil {
+		return nil, err
+	}
+
+	extConf := *conf
+	if extConf.APIPath == "" {
+		extConf.APIPath = "/apis"
+	}
+	extConf.GroupVersion = &unversioned.GroupVersion{
+		Group:   "extensions",
+		Version: "v1beta1",
+	}
+	extdc, err := dynamic.NewClient(&extConf)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		dc: dc,
+		coredc: coredc,
+		extdc:  extdc,
 	}, nil
 }
 
-// NewForConfigOrDie creates a new dynamic client for the given config and
+// NewForConfigOrDie creates a new scale client for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(conf *restclient.Config) *Client {
 	cl, err := NewClient(conf)
@@ -61,8 +91,15 @@ func NewForConfigOrDie(conf *restclient.Config) *Client {
 	return cl
 }
 
+func (c *Client) client(gv unversioned.GroupVersion) *dynamic.Client {
+	if len(gv.Group) == 0 && gv.Version == "v1" {
+		return c.coredc
+	}
+	return c.extdc
+}
+
 // TODO(madhusudancs): Implement this as a codec decoder.
-func (c *Client) decode(res *runtime.Unstructured) (ScaleInterface, error) {
+func (c *Client) decode(res *runtime.Unstructured) (ScalerInterface, error) {
 	if res.TypeMeta.Kind != "Scale" {
 		return nil, fmt.Errorf("object should be of Kind `Scale`, got `%s`", res.TypeMeta.Kind)
 	}
@@ -76,18 +113,24 @@ func (c *Client) decode(res *runtime.Unstructured) (ScaleInterface, error) {
 	}
 }
 
-func apiPrefix(gv GroupVersion) string {
-	if len(groupVersion.Group) == 0 && len(groupVersion.Version) == "v1" {
-		return "api"
-	}
-	return "apis"
-}
-
-func (c *Client) Get(scaleRef extensions.SubresourceReference, namespace string) (ScaleInterface, error) {
+func (c *Client) Get(scaleRef extensions.SubresourceReference, namespace string) (ScalerInterface, error) {
 	gv, err := unversioned.ParseGroupVersion(scaleRef.APIVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing group version from scale reference: %v", err)
 	}
+
+	// Second return value isn't an error here, it is just the singular version of
+	// of the resource name. Since we don't care about the singular version in our
+	// case we can just ignore it.
+	// TODO: KindToResource only works for resources which can be derived from their kinds
+	// by just converting the kind to lowercase and pluralizing it. This might not work for
+	// all kinds and/or resources, example Node/Minion. A DiscoverRESTMapper should be able to
+	// provide an appropriate mapping from kinds to resources and it is being worked on right
+	// now. The only target resources for HPA Scale right now are replicationcontrollers,
+	// replicasets and deployments, and all of them fall within the class of resources
+	// that can be simply converted by pluralizing the lower case of their kind names. So
+	// leaving KindToResource() function call for now. But it should be replaced with
+	// DiscoveryRESTMapper when it is ready.
 	gvr, _ := meta.KindToResource(gv.WithKind(scaleRef.Kind))
 
 	resource := &unversioned.APIResource{
@@ -95,14 +138,14 @@ func (c *Client) Get(scaleRef extensions.SubresourceReference, namespace string)
 		Namespaced: true,
 		Kind:       scaleRef.Kind,
 	}
-	res, err := c.dc.Resource(resource, namespace).Subresource(scaleRef.Subresource).Get(scaleRef.Name)
+	res, err := c.client(gv).Resource(resource).Namespace(namespace).Subresource(scaleRef.Subresource).Get(scaleRef.Name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch resource %s(%s): %v", scaleRef.Name, scaleRef.Kind, err)
 	}
 	return c.decode(res)
 }
 
-func (c *Client) Update(scaleRef extensions.SubresourceReference, namespace string, obj ScaleInterface) (ScaleInterface, error) {
+func (c *Client) Update(scaleRef extensions.SubresourceReference, namespace string, obj ScalerInterface) (ScalerInterface, error) {
 	gv, err := unversioned.ParseGroupVersion(scaleRef.APIVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing group version from scale reference: %v", err)
@@ -114,8 +157,7 @@ func (c *Client) Update(scaleRef extensions.SubresourceReference, namespace stri
 		Namespaced: true,
 		Kind:       scaleRef.Kind,
 	}
-	res, err := c.dc.Resource(resource, namespace).Subresource(scaleRef.Subresource).Update(obj.getScale())
-
+	res, err := c.client(gv).Resource(resource).Namespace(namespace).Subresource(scaleRef.Subresource).Update(obj.getScale())
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch resource %s(%s): %v", scaleRef.Name, scaleRef.Kind, err)
 	}
@@ -156,7 +198,6 @@ func (s *scale) Replicas() (int, error) {
 	// to float64 here and then cast the value to int before returning.
 	r, ok := ri.(float64)
 	if !ok {
-		fmt.Printf("ri type: %T\n", ri)
 		return 0, fmt.Errorf("`Replicas` field isn't of expected type")
 	}
 	return int(r), nil
@@ -176,14 +217,14 @@ type extScale struct {
 	scale
 }
 
-func (s *extScale) Selector() (string, error) {
+func (s *extScale) Selector() (labels.Selector, error) {
 	seli, err := field(s.obj.Object, "status", "selector")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	selMap, ok := seli.(map[string]interface{})
 	if !ok {
-		return "", fmt.Errorf("`Selector` isn't of expected type")
+		return nil, fmt.Errorf("`Selector` isn't of expected type")
 	}
 
 	selector := make(map[string]string)
@@ -191,21 +232,26 @@ func (s *extScale) Selector() (string, error) {
 		selector[key] = val.(string)
 	}
 
-	return labels.SelectorFromSet(selector).String(), nil
+	return labels.SelectorFromSet(selector), nil
 }
 
 type asScale struct {
 	scale
 }
 
-func (s *asScale) Selector() (string, error) {
+func (s *asScale) Selector() (labels.Selector, error) {
 	seli, err := field(s.obj.Object, "status", "selector")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	selector, ok := seli.(string)
 	if !ok {
-		return "", fmt.Errorf("`Selector` isn't of expected type")
+		return nil, fmt.Errorf("`Selector` isn't of expected type")
 	}
-	return selector, nil
+	// TODO: Eliminate deserialization/reserialization of the selector.
+	parsedSelector, err := labels.Parse(selector)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't convert selector string to a corresponding selector object: %v", err)
+	}
+	return parsedSelector, nil
 }

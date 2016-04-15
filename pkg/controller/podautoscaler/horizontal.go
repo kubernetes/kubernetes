@@ -31,11 +31,10 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	unversionedcore "k8s.io/kubernetes/pkg/client/typed/generated/core/unversioned"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
-	scaleclient "k8s.io/kubernetes/pkg/client/typed/scale"
+	scaleclient "k8s.io/kubernetes/pkg/client/typed/scaler"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -105,16 +104,16 @@ func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (
 	)
 }
 
-func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, scaleNamespacer unversionedextensions.ScalesGetter, hpaNamespacer unversionedextensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient, resyncPeriod time.Duration) *HorizontalController {
+func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, hpaNamespacer unversionedextensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient, scaleClient *scaleclient.Client, resyncPeriod time.Duration) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	controller := &HorizontalController{
-		metricsClient:   metricsClient,
-		eventRecorder:   recorder,
-		scaleNamespacer: scaleNamespacer,
-		hpaNamespacer:   hpaNamespacer,
+		metricsClient: metricsClient,
+		eventRecorder: recorder,
+		scaleClient:   scaleClient,
+		hpaNamespacer: hpaNamespacer,
 	}
 	store, frameworkController := newInformer(controller, resyncPeriod)
 	controller.store = store
@@ -131,7 +130,7 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Shutting down HPA Controller")
 }
 
-func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.HorizontalPodAutoscaler, replicas int, selector string) (int, *int, time.Time, error) {
+func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.HorizontalPodAutoscaler, currentReplicas int, selector labels.Selector) (int, *int, time.Time, error) {
 	targetUtilization := defaultTargetCPUUtilizationPercentage
 	if hpa.Spec.CPUUtilization != nil {
 		targetUtilization = hpa.Spec.CPUUtilization.TargetPercentage
@@ -146,9 +145,9 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.
 
 	usageRatio := float64(*currentUtilization) / float64(targetUtilization)
 	if math.Abs(1.0-usageRatio) > tolerance {
-		return int(math.Ceil(usageRatio * float64(replicas))), currentUtilization, timestamp, nil
+		return int(math.Ceil(usageRatio * float64(currentReplicas))), currentUtilization, timestamp, nil
 	} else {
-		return replicas, currentUtilization, timestamp, nil
+		return currentReplicas, currentUtilization, timestamp, nil
 	}
 }
 
@@ -157,7 +156,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.
 // Returns number of replicas, metric which required highest number of replicas,
 // status string (also json-serialized extensions.CustomMetricsCurrentStatusList),
 // last timestamp of the metrics involved in computations or error, if occurred.
-func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.HorizontalPodAutoscaler, currentReplicas int, selector string, cmAnnotation string) (replicas int, metric string, status string, timestamp time.Time, err error) {
+func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.HorizontalPodAutoscaler, currentReplicas int, selector labels.Selector, cmAnnotation string) (replicas int, metric string, status string, timestamp time.Time, err error) {
 	replicas = 0
 	metric = ""
 	status = ""
