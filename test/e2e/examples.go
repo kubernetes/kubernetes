@@ -208,24 +208,14 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				return filepath.Join(framework.TestContext.RepoRoot, "examples", "cassandra", file)
 			}
 			serviceYaml := mkpath("cassandra-service.yaml")
-			podYaml := mkpath("cassandra.yaml")
 			controllerYaml := mkpath("cassandra-controller.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			By("Starting the cassandra service and pod")
+			By("Starting the cassandra service")
 			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
-			framework.RunKubectlOrDie("create", "-f", podYaml, nsFlag)
-
-			framework.Logf("waiting for first cassandra pod")
-			err := framework.WaitForPodRunningInNamespace(c, "cassandra", ns)
-			Expect(err).NotTo(HaveOccurred())
-
-			framework.Logf("waiting for thrift listener online")
-			_, err = framework.LookForStringInLog(ns, "cassandra", "cassandra", "Listening for thrift clients", serverStartTimeout)
-			Expect(err).NotTo(HaveOccurred())
 
 			framework.Logf("wait for service")
-			err = framework.WaitForEndpoint(c, ns, "cassandra")
+			err := framework.WaitForEndpoint(c, ns, "cassandra")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create an RC with n nodes in it.  Each node will then be verified.
