@@ -38,6 +38,8 @@ import (
 
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	appsapi "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -79,12 +81,15 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	storageDestinations.AddAPIGroup(
 		batch.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
 	storageDestinations.AddAPIGroup(
+		apps.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Apps.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
+	storageDestinations.AddAPIGroup(
 		extensions.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
 
 	config.StorageDestinations = storageDestinations
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
 	storageVersions[autoscaling.GroupName] = testapi.Autoscaling.GroupVersion().String()
 	storageVersions[batch.GroupName] = testapi.Batch.GroupVersion().String()
+	storageVersions[apps.GroupName] = testapi.Apps.GroupVersion().String()
 	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
 	config.StorageVersions = storageVersions
 	config.PublicAddress = net.ParseIP("192.168.10.4")
@@ -123,7 +128,7 @@ func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *ass
 // limitedAPIResourceConfigSource only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion)
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion)
 	return ret
 }
 
@@ -410,7 +415,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expectGroupNames := sets.NewString(autoscaling.GroupName, batch.GroupName, extensions.GroupName)
+	expectGroupNames := sets.NewString(autoscaling.GroupName, batch.GroupName, apps.GroupName, extensions.GroupName)
 	expectVersions := map[string][]unversioned.GroupVersionForDiscovery{
 		autoscaling.GroupName: {
 			{
@@ -422,6 +427,12 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 			{
 				GroupVersion: testapi.Batch.GroupVersion().String(),
 				Version:      testapi.Batch.GroupVersion().Version,
+			},
+		},
+		apps.GroupName: {
+			{
+				GroupVersion: testapi.Apps.GroupVersion().String(),
+				Version:      testapi.Apps.GroupVersion().Version,
 			},
 		},
 		extensions.GroupName: {
@@ -439,6 +450,10 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		batch.GroupName: {
 			GroupVersion: config.StorageVersions[batch.GroupName],
 			Version:      apiutil.GetVersion(config.StorageVersions[batch.GroupName]),
+		},
+		apps.GroupName: {
+			GroupVersion: config.StorageVersions[apps.GroupName],
+			Version:      apiutil.GetVersion(config.StorageVersions[apps.GroupName]),
 		},
 		extensions.GroupName: {
 			GroupVersion: config.StorageVersions[extensions.GroupName],
