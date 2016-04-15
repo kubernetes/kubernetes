@@ -103,25 +103,30 @@ func (cache *schedulerCache) List(selector labels.Selector) ([]*api.Pod, error) 
 }
 
 func (cache *schedulerCache) list(selector labels.Selector, ns string) ([]*api.Pod, error) {
-	podsLock := sync.Mutext{}
+	podsLock := sync.Mutex{}
 	var pods []*api.Pod
 
-	listPods := func(i int) {
-		var nodePods []*api.Pod
-		for _, pod := range cache.nodes[i].pods {
-			if ns == api.NamespaceAll || ns == pod.Namespace {
-				if selector.Matches(labels.Set(pod.Labels)) {
-					nodePods = append(nodePods, pod)
+	wg := sync.WaitGroup{}
+	wg.Add(len(cache.nodes))
+	for _, nodeInfo := range cache.nodes {
+		go func(info *NodeInfo) {
+			defer wg.Done()
+
+			var nodePods []*api.Pod
+			for _, pod := range info.pods {
+				if ns == api.NamespaceAll || ns == pod.Namespace {
+					if selector.Matches(labels.Set(pod.Labels)) {
+						nodePods = append(nodePods, pod)
+					}
 				}
 			}
-		}
-		if len(nodePods) > 0 {
-			podsLock.Lock()
-			defer podsLock.Unlock()
-			pods = append(pods, nodePods...)
-		}
+			if len(nodePods) > 0 {
+				podsLock.Lock()
+				defer podsLock.Unlock()
+				pods = append(pods, nodePods...)
+			}
+		}(nodeInfo)
 	}
-	workqueue.Parallelize(16, len(cache.nodes), listPods)
 	return pods, nil
 }
 
