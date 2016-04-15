@@ -1,6 +1,6 @@
 - job:
-    name: 'jenkins-gcloud-update'
-    description: 'Run gcloud components update. Test owner: spxtr.'
+    name: 'jenkins-daily-maintenance'
+    description: 'Run gcloud components update and clean Docker images. Test owner: spxtr.'
     logrotate:
         numToKeep: 200
     builders:
@@ -9,14 +9,18 @@
             gcloud components update
             gcloud components update alpha
             gcloud components update beta
+            # Copied from http://blog.yohanliyanage.com/2015/05/docker-clean-up-after-yourself/
+            docker rm -v $(docker ps -a -q -f 'status=exited' -f 'status=dead') || true
+            docker rmi $(docker images -q -f 'dangling=true') || true
+            docker run -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/docker:/var/lib/docker --rm martin/docker-cleanup-volumes
 
 - job:
-    name: 'jenkins-gcloud-update-all'
-    description: 'Update gcloud components on all nodes. Test owner: spxtr.'
+    name: 'jenkins-daily-maintenance-all'
+    description: 'Run jenkins-daily-maintenance on all nodes. Test owner: spxtr.'
     logrotate:
         numToKeep: 200
     builders:
-        # Run jenkins-gcloud-update on all nodes.
+        # Run jenkins-daily-maintenance on all nodes.
         - raw:
             xml: |
                 <hudson.plugins.parameterizedtrigger.TriggerBuilder plugin="parameterized-trigger@2.29">
@@ -26,7 +30,7 @@
                             <configFactories>
                                 <org.jvnet.jenkins.plugins.nodelabelparameter.parameterizedtrigger.AllNodesBuildParameterFactory plugin="nodelabelparameter@1.7"/>
                             </configFactories>
-                            <projects>jenkins-gcloud-update</projects>
+                            <projects>jenkins-daily-maintenance</projects>
                             <condition>ALWAYS</condition>
                             <triggerWithNoParameters>false</triggerWithNoParameters>
                             <block>
