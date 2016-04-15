@@ -51,7 +51,6 @@ if ! $ALL ; then
 fi
 
 BASH_TARGETS="codecgen
-	generated-conversions
 	generated-docs
 	generated-swagger-docs
 	swagger-spec
