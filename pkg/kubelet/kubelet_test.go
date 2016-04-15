@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -4691,5 +4692,193 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		podStatus.ContainerStatuses = test.statuses
 		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus)
 		verifyStatus(t, i, apiStatus, test.expectedState, test.expectedLastTerminationState)
+	}
+}
+
+// testPodAdmitHandler is a lifecycle.PodAdmitHandler for testing.
+type testPodAdmitHandler struct {
+	// list of pods to reject.
+	podsToReject []*api.Pod
+}
+
+// Admit rejects all pods in the podsToReject list with a matching UID.
+func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	for _, podToReject := range a.podsToReject {
+		if podToReject.UID == attrs.Pod.UID {
+			return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "Pod is rejected"}
+		}
+	}
+	return lifecycle.PodAdmitResult{Admit: true}
+}
+
+// Test verifies that the kubelet invokes an admission handler during HandlePodAdditions.
+func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []api.Node{
+		{
+			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
+			Status: api.NodeStatus{
+				Allocatable: api.ResourceList{
+					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
+		{
+			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
+			Status: api.NodeStatus{
+				Allocatable: api.ResourceList{
+					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
+	pods := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "123456789",
+				Name:      "podA",
+				Namespace: "foo",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "987654321",
+				Name:      "podB",
+				Namespace: "foo",
+			},
+		},
+	}
+	podToReject := pods[0]
+	podToAdmit := pods[1]
+	podsToReject := []*api.Pod{podToReject}
+
+	kl.AddPodAdmitHandler(&testPodAdmitHandler{podsToReject: podsToReject})
+
+	kl.HandlePodAdditions(pods)
+	// Check pod status stored in the status map.
+	// podToReject should be Failed
+	status, found := kl.statusManager.GetPodStatus(podToReject.UID)
+	if !found {
+		t.Fatalf("status of pod %q is not found in the status map", podToReject.UID)
+	}
+	if status.Phase != api.PodFailed {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+	}
+	// podToAdmit should be Pending
+	status, found = kl.statusManager.GetPodStatus(podToAdmit.UID)
+	if !found {
+		t.Fatalf("status of pod %q is not found in the status map", podToAdmit.UID)
+	}
+	if status.Phase != api.PodPending {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
+	}
+}
+
+// testPodSyncLoopHandler is a lifecycle.PodSyncLoopHandler that is used for testing.
+type testPodSyncLoopHandler struct {
+	// list of pods to sync
+	podsToSync []*api.Pod
+}
+
+// ShouldSync evaluates if the pod should be synced from the kubelet.
+func (a *testPodSyncLoopHandler) ShouldSync(pod *api.Pod) bool {
+	for _, podToSync := range a.podsToSync {
+		if podToSync.UID == pod.UID {
+			return true
+		}
+	}
+	return false
+}
+
+// TestGetPodsToSyncInvokesPodSyncLoopHandlers ensures that the get pods to sync routine invokes the handler.
+func TestGetPodsToSyncInvokesPodSyncLoopHandlers(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	pods := newTestPods(5)
+	podUIDs := []types.UID{}
+	for _, pod := range pods {
+		podUIDs = append(podUIDs, pod.UID)
+	}
+	podsToSync := []*api.Pod{pods[0]}
+	kubelet.AddPodSyncLoopHandler(&testPodSyncLoopHandler{podsToSync})
+
+	kubelet.podManager.SetPods(pods)
+
+	expectedPodsUID := []types.UID{pods[0].UID}
+
+	podsToSync = kubelet.getPodsToSync()
+
+	if len(podsToSync) == len(expectedPodsUID) {
+		var rightNum int
+		for _, podUID := range expectedPodsUID {
+			for _, podToSync := range podsToSync {
+				if podToSync.UID == podUID {
+					rightNum++
+					break
+				}
+			}
+		}
+		if rightNum != len(expectedPodsUID) {
+			// Just for report error
+			podsToSyncUID := []types.UID{}
+			for _, podToSync := range podsToSync {
+				podsToSyncUID = append(podsToSyncUID, podToSync.UID)
+			}
+			t.Errorf("expected pods %v to sync, got %v", expectedPodsUID, podsToSyncUID)
+		}
+
+	} else {
+		t.Errorf("expected %d pods to sync, got %d", 3, len(podsToSync))
+	}
+}
+
+// testPodSyncHandler is a lifecycle.PodSyncHandler that is used for testing.
+type testPodSyncHandler struct {
+	// list of pods to evict.
+	podsToEvict []*api.Pod
+	// the reason for the eviction
+	reason string
+	// the mesage for the eviction
+	message string
+}
+
+// ShouldEvict evaluates if the pod should be evicted from the kubelet.
+func (a *testPodSyncHandler) ShouldEvict(pod *api.Pod) lifecycle.ShouldEvictResponse {
+	for _, podToEvict := range a.podsToEvict {
+		if podToEvict.UID == pod.UID {
+			return lifecycle.ShouldEvictResponse{Evict: true, Reason: a.reason, Message: a.message}
+		}
+	}
+	return lifecycle.ShouldEvictResponse{Evict: false}
+}
+
+// TestGenerateAPIPodStatusInvokesPodSyncHandlers invokes the handlers and reports the proper status
+func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	pod := newTestPods(1)[0]
+	podsToEvict := []*api.Pod{pod}
+	kubelet.AddPodSyncHandler(&testPodSyncHandler{podsToEvict, "Evicted", "because"})
+	status := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+	}
+	apiStatus := kubelet.generateAPIPodStatus(pod, status)
+	if apiStatus.Phase != api.PodFailed {
+		t.Fatalf("Expected phase %v, but got %v", api.PodFailed, apiStatus.Phase)
+	}
+	if apiStatus.Reason != "Evicted" {
+		t.Fatalf("Expected reason %v, but got %v", "Evicted", apiStatus.Reason)
+	}
+	if apiStatus.Message != "because" {
+		t.Fatalf("Expected message %v, but got %v", "because", apiStatus.Message)
 	}
 }
