@@ -31,7 +31,7 @@ import (
 	"text/template"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/authorization.k8s.io/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"

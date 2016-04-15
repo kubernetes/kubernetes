@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization.k8s.io"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 )

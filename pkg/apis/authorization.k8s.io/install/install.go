@@ -28,13 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/authorization"
-	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/authorization.k8s.io"
+	"k8s.io/kubernetes/pkg/apis/authorization.k8s.io/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/authorization"
+const importPrefix = "k8s.io/kubernetes/pkg/apis/authorization.k8s.io"
 
 var accessor = meta.NewAccessor()
 

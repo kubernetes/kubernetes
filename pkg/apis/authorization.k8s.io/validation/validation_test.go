@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization.k8s.io"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 

@@ -85,8 +85,8 @@ import (
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
-	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization.k8s.io"
+	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization.k8s.io/v1beta1"
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
 
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"

@@ -21,8 +21,8 @@ import (
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	kapierrors "k8s.io/kubernetes/pkg/api/errors"
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
-	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization.k8s.io"
+	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization.k8s.io/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
