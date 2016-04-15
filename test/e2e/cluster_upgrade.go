@@ -304,25 +304,17 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringU
 		// Continuous validation
 		wait.Until(func() {
 			By("hitting the pod through the service's LoadBalancer")
-			// TODO this is way too long of a timeout; make it shorter since we've already
-			// validated it's working.
-			jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeoutDefault)
-		}, 3*time.Second, sem.StopCh)
+			jig.TestReachableHTTP(tcpIngressIP, svcPort, framework.Poll)
+		}, framework.Poll, sem.StopCh)
 	} else {
 		// Block until chaosmonkey is done
 		By("waiting for upgrade to finish without checking if service remains up")
 		<-sem.StopCh
 	}
 
-	// TODO(ihmccreery) We maybe shouldn't have to wait for the pods to be running again.  I
-	// pulled this over from the NodeUpgrade test, but I'm not sure what the need for it there
-	// was.
-	//
-	// Also 1 is a magic number from newRCTemplate.
-	framework.Logf("Waiting up to %v for all pods to be running and ready after the upgrade", restartPodReadyAgainTimeout)
-	framework.ExpectNoError(framework.WaitForPodsRunningReady(f.Namespace.Name, 1, restartPodReadyAgainTimeout))
-
-	// Validation
+	// Sanity check and hit it once more
+	By("hitting the pod through the service's LoadBalancer")
+	jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeoutDefault)
 	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 }
 
