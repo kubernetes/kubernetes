@@ -18,7 +18,6 @@ package etcd3
 
 import (
 	"testing"
-	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
@@ -26,21 +25,21 @@ import (
 	"golang.org/x/net/context"
 )
 
-func TestCompactor(t *testing.T) {
+func TestCompact(t *testing.T) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
 	client := cluster.RandClient()
 	ctx := context.Background()
-	cancelableCtx, cancel := context.WithCancel(ctx)
 
 	putResp, err := client.Put(ctx, "/somekey", "data")
 	if err != nil {
 		t.Fatalf("Put failed: %v", err)
 	}
 
-	go compactor(cancelableCtx, client, 500*time.Millisecond)
-	time.Sleep(2 * time.Second)
-	cancel()
+	_, err = compact(ctx, client, putResp.Header.Revision)
+	if err != nil {
+		t.Fatalf("compact failed: %v", err)
+	}
 
 	_, err = client.Get(ctx, "/somekey", clientv3.WithRev(putResp.Header.Revision))
 	if err != etcdrpc.ErrCompacted {
