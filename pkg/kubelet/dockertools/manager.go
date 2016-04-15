@@ -1270,28 +1270,15 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 	for containerResult := range containerResults {
 		result.AddSyncResult(containerResult)
 	}
+
+	// Tear down the network
 	if networkContainer != nil {
-		ins, err := dm.client.InspectContainer(networkContainer.ID.ID)
+		teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
+		result.AddSyncResult(teardownNetworkResult)
+		err := dm.tearDownPodNetwork(pod, &runningPod, networkSpec, networkContainer)
 		if err != nil {
-			err = fmt.Errorf("Error inspecting container %v: %v", networkContainer.ID.ID, err)
-			glog.Error(err)
-			result.Fail(err)
-			return
-		}
-		if getDockerNetworkMode(ins) != namespaceModeHost {
-			teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
-			result.AddSyncResult(teardownNetworkResult)
-			if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.DockerID(networkContainer.ID.ID)); err != nil {
-				message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v", runningPod.ID, dm.networkPlugin.Name(), err)
-				teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
-				glog.Error(message)
-			}
-		}
-		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, networkContainer.Name)
-		result.AddSyncResult(killContainerResult)
-		if err := dm.KillContainerInPod(networkContainer.ID, networkSpec, pod, "Need to kill pod."); err != nil {
-			killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-			glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, runningPod.ID)
+			teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, err.Error())
+			glog.Errorf("Failed tearing down the network for pod %q: %v", err)
 		}
 	}
 	return
@@ -1814,6 +1801,73 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 	}, nil
 }
 
+// tearDownPodNetwork calls the network plugin to tear down the pod (if
+// applicable) and delete the infra container.
+func (dm *DockerManager) tearDownPodNetwork(pod *api.Pod, runningPod *kubecontainer.Pod, networkSpec *api.Container, container *kubecontainer.Container) error {
+	ins, err := dm.client.InspectContainer(container.ID.ID)
+	if err != nil {
+		return fmt.Errorf("Error inspecting container %v: %v", container.ID.ID, err)
+	}
+	if getDockerNetworkMode(ins) != namespaceModeHost {
+		// pod could be nil, so we use the runningPod for name and namespace.
+		if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.DockerID(container.ID.ID)); err != nil {
+			return fmt.Errorf("Failed to teardown network for pod %q using network plugins %q: %v", pod.UID, dm.networkPlugin.Name(), err)
+		}
+	}
+	if err := dm.KillContainerInPod(container.ID, networkSpec, pod, "Need to kill pod."); err != nil {
+		return err
+	}
+	return nil
+}
+
+// setUpPodNetwork creates an infra container and calls the network plugin to
+// join the network if necessary. It returns the container ID of the infra
+// container and the pod IP.
+func (dm *DockerManager) setUpPodNetwork(pod *api.Pod) (kubecontainer.DockerID, string, error) {
+	glog.V(4).Infof("Creating pod infra container for %q", format.Pod(pod))
+	containerID, err, _ := dm.createPodInfraContainer(pod)
+	if err != nil {
+		glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, format.Pod(pod))
+		return containerID, "", err
+	}
+
+	if usesHostNetwork(pod) {
+		return containerID, "", nil
+	}
+
+	// Call the networking plugin
+	err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, containerID)
+	if err != nil {
+		// TODO: (random-liu) There shouldn't be "Skipping pod" in sync result message
+		message := fmt.Sprintf("Failed to setup network for pod %q using network plugins %q: %v; Skipping pod", format.Pod(pod), dm.networkPlugin.Name(), err)
+		glog.Error(message)
+
+		// Delete the infra container we just created.
+		if delErr := dm.KillContainerInPod(kubecontainer.ContainerID{
+			ID:   string(containerID),
+			Type: "docker"}, nil, pod, message); delErr != nil {
+			glog.Warningf("Clear infra container failed for pod %q: %v", format.Pod(pod), delErr)
+			err = fmt.Errorf("%v; failed to delete the infra container %v", err, delErr)
+		}
+		return containerID, "", err
+	}
+
+	// Setup the host interface unless the pod is on the host's network (FIXME: move to networkPlugin when ready)
+	var podInfraContainer *docker.Container
+	podInfraContainer, err = dm.client.InspectContainer(string(containerID))
+	if err != nil {
+		return containerID, "", fmt.Errorf("Failed to inspect pod infra container %v: %v", containerID, err)
+	}
+
+	if dm.configureHairpinMode {
+		if err := hairpin.SetUpContainer(podInfraContainer.State.Pid, network.DefaultInterfaceName); err != nil {
+			glog.Warningf("Hairpin setup failed for pod %q: %v", format.Pod(pod), err)
+		}
+	}
+	podIP := dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+	return containerID, podIP, nil
+}
+
 // Sync the running pod to match the specified desired pod.
 func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	start := time.Now()
@@ -1889,64 +1943,21 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 	if podStatus != nil {
 		podIP = podStatus.IP
 	}
+	podInfraContainerID := containerChanges.InfraContainerId
 
 	// If we should create infra container then we do it first.
-	podInfraContainerID := containerChanges.InfraContainerId
 	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
-		glog.V(4).Infof("Creating pod infra container for %q", format.Pod(pod))
-		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, PodInfraContainerName)
-		result.AddSyncResult(startContainerResult)
-		var msg string
-		podInfraContainerID, err, msg = dm.createPodInfraContainer(pod)
-		if err != nil {
-			startContainerResult.Fail(err, msg)
-			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, format.Pod(pod))
-			return
-		}
-
 		setupNetworkResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod))
 		result.AddSyncResult(setupNetworkResult)
-		if !usesHostNetwork(pod) {
-			// Call the networking plugin
-			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
-			if err != nil {
-				// TODO: (random-liu) There shouldn't be "Skipping pod" in sync result message
-				message := fmt.Sprintf("Failed to setup network for pod %q using network plugins %q: %v; Skipping pod", format.Pod(pod), dm.networkPlugin.Name(), err)
-				setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, message)
-				glog.Error(message)
-
-				// Delete infra container
-				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, PodInfraContainerName)
-				result.AddSyncResult(killContainerResult)
-				if delErr := dm.KillContainerInPod(kubecontainer.ContainerID{
-					ID:   string(podInfraContainerID),
-					Type: "docker"}, nil, pod, message); delErr != nil {
-					killContainerResult.Fail(kubecontainer.ErrKillContainer, delErr.Error())
-					glog.Warningf("Clear infra container failed for pod %q: %v", format.Pod(pod), delErr)
-				}
-				return
-			}
-
-			// Setup the host interface unless the pod is on the host's network (FIXME: move to networkPlugin when ready)
-			var podInfraContainer *docker.Container
-			podInfraContainer, err = dm.client.InspectContainer(string(podInfraContainerID))
-			if err != nil {
-				glog.Errorf("Failed to inspect pod infra container: %v; Skipping pod %q", err, format.Pod(pod))
-				result.Fail(err)
-				return
-			}
-
-			if dm.configureHairpinMode {
-				if err = hairpin.SetUpContainer(podInfraContainer.State.Pid, network.DefaultInterfaceName); err != nil {
-					glog.Warningf("Hairpin setup failed for pod %q: %v", format.Pod(pod), err)
-				}
-			}
-
-			// Overwrite the podIP passed in the pod status, since we just started the infra container.
-			podIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+		newInfraContainerID, newPodIP, err := dm.setUpPodNetwork(pod)
+		if err != nil {
+			setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, err.Error())
+			glog.Errorf("Error setting up network for pod %q: %v", format.Pod(pod), err)
+			return
 		}
+		// Overwrite the podIP passed in the pod status, since we just started the infra container.
+		podIP, podInfraContainerID = newPodIP, newInfraContainerID
 	}
-
 	// Start everything
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]

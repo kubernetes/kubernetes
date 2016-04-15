@@ -1657,8 +1657,6 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 	}
 
 	expectedResults := []*kubecontainer.SyncResult{
-		//Sync result for infra container
-		{kubecontainer.StartContainer, PodInfraContainerName, nil, ""},
 		{kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod), nil, ""},
 		//Sync result for user containers
 		{kubecontainer.StartContainer, "bar", nil, ""},
