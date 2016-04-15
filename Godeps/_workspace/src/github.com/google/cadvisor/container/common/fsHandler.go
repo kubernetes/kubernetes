@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Handler for Docker containers.
-package docker
+package common
 
 import (
 	"sync"
@@ -24,10 +24,10 @@ import (
 	"github.com/golang/glog"
 )
 
-type fsHandler interface {
-	start()
-	usage() (uint64, uint64)
-	stop()
+type FsHandler interface {
+	Start()
+	Usage() (baseUsageBytes uint64, totalUsageBytes uint64)
+	Stop()
 }
 
 type realFsHandler struct {
@@ -50,9 +50,9 @@ const (
 	maxDuBackoffFactor = 20
 )
 
-var _ fsHandler = &realFsHandler{}
+var _ FsHandler = &realFsHandler{}
 
-func newFsHandler(period time.Duration, rootfs, extraDir string, fsInfo fs.FsInfo) fsHandler {
+func NewFsHandler(period time.Duration, rootfs, extraDir string, fsInfo fs.FsInfo) FsHandler {
 	return &realFsHandler{
 		lastUpdate:     time.Time{},
 		usageBytes:     0,
@@ -119,15 +119,15 @@ func (fh *realFsHandler) trackUsage() {
 	}
 }
 
-func (fh *realFsHandler) start() {
+func (fh *realFsHandler) Start() {
 	go fh.trackUsage()
 }
 
-func (fh *realFsHandler) stop() {
+func (fh *realFsHandler) Stop() {
 	close(fh.stopChan)
 }
 
-func (fh *realFsHandler) usage() (baseUsageBytes, totalUsageBytes uint64) {
+func (fh *realFsHandler) Usage() (baseUsageBytes, totalUsageBytes uint64) {
 	fh.RLock()
 	defer fh.RUnlock()
 	return fh.baseUsageBytes, fh.usageBytes

@@ -16,7 +16,7 @@
 // an array of ContainerHint structs, each with a container's id and networkInterface
 // This allows collecting stats about network interfaces configured outside docker
 // and lxc
-package raw
+package common
 
 import (
 	"encoding/json"
@@ -25,7 +25,7 @@ import (
 	"os"
 )
 
-var argContainerHints = flag.String("container_hints", "/etc/cadvisor/container_hints.json", "location of the container hints file")
+var ArgContainerHints = flag.String("container_hints", "/etc/cadvisor/container_hints.json", "location of the container hints file")
 
 type containerHints struct {
 	AllHosts []containerHint `json:"all_hosts,omitempty"`
@@ -34,10 +34,10 @@ type containerHints struct {
 type containerHint struct {
 	FullName         string            `json:"full_path,omitempty"`
 	NetworkInterface *networkInterface `json:"network_interface,omitempty"`
-	Mounts           []mount           `json:"mounts,omitempty"`
+	Mounts           []Mount           `json:"mounts,omitempty"`
 }
 
-type mount struct {
+type Mount struct {
 	HostDir      string `json:"host_dir,omitempty"`
 	ContainerDir string `json:"container_dir,omitempty"`
 }
@@ -47,7 +47,7 @@ type networkInterface struct {
 	VethChild string `json:"veth_child,omitempty"`
 }
 
-func getContainerHintsFromFile(containerHintsFile string) (containerHints, error) {
+func GetContainerHintsFromFile(containerHintsFile string) (containerHints, error) {
 	dat, err := ioutil.ReadFile(containerHintsFile)
 	if os.IsNotExist(err) {
 		return containerHints{}, nil
