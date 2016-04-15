@@ -170,7 +170,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should create and stop a working application [Conformance]", func() {
-			framework.SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
+			framework.SkipUnlessServerVersionGTE(deploymentsVersion, c)
 
 			defer framework.Cleanup(guestbookPath, ns, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
