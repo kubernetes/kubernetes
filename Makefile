@@ -128,7 +128,7 @@ clean:
 #   make vet
 #   make vet WHAT=pkg/kubelet
 vet:
-	hack/vet-go.sh $(WHAT) $(TESTS)
+	hack/verify-govet.sh $(WHAT) $(TESTS)
 .PHONY: vet
 
 # Build a release

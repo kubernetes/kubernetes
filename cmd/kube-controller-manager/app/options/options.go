@@ -84,7 +84,7 @@ func NewCMServer() *CMServer {
 			KubeAPIQPS:              20.0,
 			KubeAPIBurst:            30,
 			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval: unversioned.Duration{0 * time.Second},
+			ControllerStartInterval: unversioned.Duration{Duration: 0 * time.Second},
 		},
 	}
 	return &s
