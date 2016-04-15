@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 
 	"github.com/coreos/go-systemd/dbus"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
@@ -165,4 +166,8 @@ func (f *fakeRuntimeHelper) GetClusterDNS(pod *api.Pod) ([]string, []string, err
 
 func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
 	return f.hostName, f.hostDomain
+}
+
+func (f *fakeRuntimeHelper) GetPodDir(podUID types.UID) string {
+	return "/poddir/" + string(podUID)
 }
