@@ -138,8 +138,8 @@
         exit ${{rc}}
     branch: 'master'
     job-env: ''
-    runner: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh")
-    dockerized-runner: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/dockerized-e2e-runner.sh")
+    runner: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/dockerized-e2e-runner.sh")
+    legacy-runner: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh")
     old-runner-1-1: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh")
     # XXX This is a hack to run only the tests we care about, without importing all of the skip list vars from the v1.1 e2e.sh.
     default-skip-list-1-1: Autoscaling\sSuite|resource\susage\stracking|Nodes|Etcd\sFailure|MasterCerts|experimental\sresource\susage\stracking|ServiceLoadBalancer|Shell|Daemon\sset|Deployment|Skipped|Restart\sshould\srestart\sall\snodes|Example|Reboot|ServiceLoadBalancer|DaemonRestart\sController\sManager|Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon|Resource\susage\sof\ssystem\scontainers|allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster
