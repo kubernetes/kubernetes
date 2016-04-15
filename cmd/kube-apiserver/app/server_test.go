@@ -208,7 +208,9 @@ func TestParseRuntimeConfig(t *testing.T) {
 	}
 	for _, test := range testCases {
 		s := &options.APIServer{
-			RuntimeConfig: test.runtimeConfig,
+			ServerRunOptions: &genericapiserver.ServerRunOptions{
+				RuntimeConfig: test.runtimeConfig,
+			},
 		}
 		actualDisablers, err := parseRuntimeConfig(s)
 
