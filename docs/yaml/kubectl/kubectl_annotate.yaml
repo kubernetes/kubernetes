@@ -1,6 +1,6 @@
 name: annotate
 synopsis: Update the annotations on a resource
-description: |-
+description: |
   Update the annotations on one or more resources.
 
   An annotation is a key/value pair that can hold larger (compared to a label), and possibly not human-readable, data.
@@ -8,10 +8,11 @@ description: |-
   If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
   If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
-  Possible resources include (case insensitive): pods (po), services (svc),
-  replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
-  limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-  horizontalpodautoscalers (hpa), resourcequotas (quota) or secrets.
+  Possible resources include (case insensitive):
+    pod (po), service (svc), replicationcontroller (rc),
+    node (no), event (ev), componentstatuse (cs),
+    limitrange (limits), persistentvolume (pv), persistentvolumeclaim (pvc),
+    horizontalpodautoscaler (hpa), resourcequota (quota), secret
 options:
 - name: all
   default_value: "false"
@@ -75,6 +76,8 @@ inherited_options:
 - name: api-version
   usage: |
     DEPRECATED: The API version to use when talking to the server
+- name: as
+  usage: Username to impersonate for the operation.
 - name: certificate-authority
   usage: Path to a cert. file for the certificate authority.
 - name: client-certificate
