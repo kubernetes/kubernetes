@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/golang/expansion"
 
@@ -42,6 +43,7 @@ type RuntimeHelper interface {
 	GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*RunContainerOptions, error)
 	GetClusterDNS(pod *api.Pod) (dnsServers []string, dnsSearches []string, err error)
 	GeneratePodHostNameAndDomain(pod *api.Pod) (hostname string, hostDomain string)
+	GetPodDir(podUID types.UID) string
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
