@@ -16,11 +16,9 @@
 
 # A library of helper functions and constant for ubuntu os distro
 
-# The code and configuration is for running node instances on Ubuntu images.
-# The master is still on Debian. In addition, the configuration is based on
-# upstart, which is in Ubuntu up to 14.04 LTS (Trusty). Ubuntu 15.04 and above
-# replaced upstart with systemd as the init system. Consequently, the
-# configuration cannot work on these images.
+# The configuration is based on upstart, which is in Ubuntu up to 14.04 LTS (Trusty).
+# Ubuntu 15.04 and above replaced upstart with systemd as the init system.
+# Consequently, the configuration cannot work on these images.
 
 
 # $1: template name (required)

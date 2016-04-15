@@ -60,7 +60,10 @@ script
 	echo "Creating kubernetes master auth file"
 	create_master_auth
 	echo "Creating master instance kubelet auth file"
-  create_master_kubelet_auth
+	create_master_kubelet_auth
+	echo "Assemble kubelet command line"
+	# Kubelet command flags will be written in /etc/default/kubelet
+	assemble_kubelet_flags
 end script
 
 --====================================
@@ -122,12 +125,8 @@ script
 	set -o nounset
 
 	echo "Start kubelet upstart job"
-	. /etc/kube-configure-helper.sh
-	. /etc/kube-env
-	# Assemble command line flags based on env variables, which will put the string
-	# of flags in variable KUBELET_CMD_FLAGS
-	assemble_kubelet_flags
-	/usr/bin/kubelet ${KUBELET_CMD_FLAGS} 1>>/var/log/kubelet.log 2>&1
+	. /etc/default/kubelet
+	/usr/bin/kubelet ${KUBELET_OPTS} 1>>/var/log/kubelet.log 2>&1
 end script
 
 # Wait for 10s to start kubelet again.
