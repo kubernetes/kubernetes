@@ -1079,14 +1079,6 @@
 			"Rev": "833a04a10549a95dc34458c195cbad61bbb6cb4d"
 		},
 		{
-			"ImportPath": "golang.org/x/tools/go/ast/astutil",
-			"Rev": "4f50f44d7a3206e9e28b984e023efce2a4a75369"
-		},
-		{
-			"ImportPath": "golang.org/x/tools/imports",
-			"Rev": "4f50f44d7a3206e9e28b984e023efce2a4a75369"
-		},
-		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
 			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
 		},
