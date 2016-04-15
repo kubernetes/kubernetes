@@ -167,7 +167,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		It("should create and stop a working application [Conformance]", func() {
-			SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
+			SkipUnlessServerVersionGTE(deploymentsVersion, c)
 
 			defer cleanup(guestbookPath, ns, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
