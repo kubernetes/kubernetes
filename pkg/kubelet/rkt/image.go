@@ -178,7 +178,7 @@ func (r *Runtime) getImageManifest(image string) (*appcschema.ImageManifest, err
 
 // TODO(yifan): This is very racy, unefficient, and unsafe, we need to provide
 // different namespaces. See: https://github.com/coreos/rkt/issues/836.
-func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []docker.AuthConfiguration) error {
+func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []credentialprovider.LazyAuthConfiguration) error {
 	if len(credsSlice) == 0 {
 		return nil
 	}
@@ -186,7 +186,7 @@ func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []docker.AuthCo
 	creds := docker.AuthConfiguration{}
 	// TODO handle multiple creds
 	if len(credsSlice) >= 1 {
-		creds = credsSlice[0]
+		creds = credentialprovider.LazyProvide(credsSlice[0])
 	}
 
 	registry := "index.docker.io"
