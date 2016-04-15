@@ -68,7 +68,7 @@ func (c *VersionCache) Get(key string) (kubecontainer.Version, kubecontainer.Ver
 	defer c.lock.RUnlock()
 	value, ok := c.cache[key]
 	if !ok {
-		return nil, nil, fmt.Errorf("Failed to get version info from cache by key: ", key)
+		return nil, nil, fmt.Errorf("Failed to get version info from cache by key: %v", key)
 	}
 	return value.apiVersion, value.version, nil
 }

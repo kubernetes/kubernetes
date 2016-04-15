@@ -136,7 +136,7 @@ type Clientset struct {
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
-	return &fakediscovery.FakeDiscovery{&c.Fake}
+	return &fakediscovery.FakeDiscovery{Fake: &c.Fake}
 }
 `
 
@@ -147,6 +147,6 @@ var _ clientset.Interface = &Clientset{}
 var clientsetInterfaceImplTemplate = `
 // $.Group$ retrieves the $.Group$Client
 func (c *Clientset) $.Group$() $.PackageName$.$.Group$Interface {
-	return &fake$.PackageName$.Fake$.Group${&c.Fake}
+	return &fake$.PackageName$.Fake$.Group${Fake: &c.Fake}
 }
 `
