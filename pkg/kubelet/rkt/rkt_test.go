@@ -27,11 +27,14 @@ import (
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_os"
 	"k8s.io/kubernetes/pkg/util/errors"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
@@ -62,9 +65,10 @@ func mustRktHash(hash string) *appctypes.Hash {
 
 func makeRktPod(rktPodState rktapi.PodState,
 	rktPodID, podUID, podName, podNamespace,
-	podIP, podCreationTs, podRestartCount string,
-	appNames, imgIDs, imgNames, containerHashes []string,
-	appStates []rktapi.AppState, exitcodes []int32) *rktapi.Pod {
+	podIP string, podCreatedAt, podStartedAt int64,
+	podRestartCount string, appNames, imgIDs, imgNames,
+	containerHashes []string, appStates []rktapi.AppState,
+	exitcodes []int32) *rktapi.Pod {
 
 	podManifest := &appcschema.PodManifest{
 		ACKind:    appcschema.PodManifestKind,
@@ -85,10 +89,6 @@ func makeRktPod(rktPodState rktapi.PodState,
 			appctypes.Annotation{
 				Name:  *appctypes.MustACIdentifier(k8sRktNamespaceAnno),
 				Value: podNamespace,
-			},
-			appctypes.Annotation{
-				Name:  *appctypes.MustACIdentifier(k8sRktCreationTimeAnno),
-				Value: podCreationTs,
 			},
 			appctypes.Annotation{
 				Name:  *appctypes.MustACIdentifier(k8sRktRestartCountAnno),
@@ -143,11 +143,13 @@ func makeRktPod(rktPodState rktapi.PodState,
 	}
 
 	return &rktapi.Pod{
-		Id:       rktPodID,
-		State:    rktPodState,
-		Networks: []*rktapi.Network{{Name: defaultNetworkName, Ipv4: podIP}},
-		Apps:     apps,
-		Manifest: mustMarshalPodManifest(podManifest),
+		Id:        rktPodID,
+		State:     rktPodState,
+		Networks:  []*rktapi.Network{{Name: defaultNetworkName, Ipv4: podIP}},
+		Apps:      apps,
+		Manifest:  mustMarshalPodManifest(podManifest),
+		StartedAt: podStartedAt,
+		CreatedAt: podCreatedAt,
 	}
 }
 
@@ -346,6 +348,10 @@ func TestGetPods(t *testing.T) {
 	fs := newFakeSystemd()
 	r := &Runtime{apisvc: fr, systemd: fs}
 
+	ns := func(seconds int64) int64 {
+		return seconds * 1e9
+	}
+
 	tests := []struct {
 		pods   []*rktapi.Pod
 		result []*kubecontainer.Pod
@@ -357,7 +363,7 @@ func TestGetPods(t *testing.T) {
 			[]*rktapi.Pod{
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING,
 					"uuid-4002", "42", "guestbook", "default",
-					"10.10.10.42", "100000", "7",
+					"10.10.10.42", ns(10), ns(10), "7",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -377,7 +383,7 @@ func TestGetPods(t *testing.T) {
 							Name:    "app-1",
 							Image:   "img-name-1:latest",
 							Hash:    1001,
-							Created: 100000,
+							Created: 10,
 							State:   "running",
 						},
 						{
@@ -385,7 +391,7 @@ func TestGetPods(t *testing.T) {
 							Name:    "app-2",
 							Image:   "img-name-2:latest",
 							Hash:    1002,
-							Created: 100000,
+							Created: 10,
 							State:   "exited",
 						},
 					},
@@ -397,7 +403,7 @@ func TestGetPods(t *testing.T) {
 			[]*rktapi.Pod{
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING,
 					"uuid-4002", "42", "guestbook", "default",
-					"10.10.10.42", "100000", "7",
+					"10.10.10.42", ns(10), ns(20), "7",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -407,7 +413,7 @@ func TestGetPods(t *testing.T) {
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
 					"uuid-4003", "43", "guestbook", "default",
-					"10.10.10.43", "90000", "7",
+					"10.10.10.43", ns(30), ns(40), "7",
 					[]string{"app-11", "app-22"},
 					[]string{"img-id-11", "img-id-22"},
 					[]string{"img-name-11", "img-name-22"},
@@ -417,7 +423,7 @@ func TestGetPods(t *testing.T) {
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
 					"uuid-4004", "43", "guestbook", "default",
-					"10.10.10.44", "100000", "8",
+					"10.10.10.44", ns(50), ns(60), "8",
 					[]string{"app-11", "app-22"},
 					[]string{"img-id-11", "img-id-22"},
 					[]string{"img-name-11", "img-name-22"},
@@ -437,7 +443,7 @@ func TestGetPods(t *testing.T) {
 							Name:    "app-1",
 							Image:   "img-name-1:latest",
 							Hash:    1001,
-							Created: 100000,
+							Created: 10,
 							State:   "running",
 						},
 						{
@@ -445,7 +451,7 @@ func TestGetPods(t *testing.T) {
 							Name:    "app-2",
 							Image:   "img-name-2:latest",
 							Hash:    1002,
-							Created: 100000,
+							Created: 10,
 							State:   "exited",
 						},
 					},
@@ -460,7 +466,7 @@ func TestGetPods(t *testing.T) {
 							Name:    "app-11",
 							Image:   "img-name-11:latest",
 							Hash:    10011,
-							Created: 90000,
+							Created: 30,
 							State:   "exited",
 						},
 						{
@@ -468,7 +474,7 @@ func TestGetPods(t *testing.T) {
 							Name:    "app-22",
 							Image:   "img-name-22:latest",
 							Hash:    10022,
-							Created: 90000,
+							Created: 30,
 							State:   "exited",
 						},
 						{
@@ -476,7 +482,7 @@ func TestGetPods(t *testing.T) {
 							Name:    "app-11",
 							Image:   "img-name-11:latest",
 							Hash:    10011,
-							Created: 100000,
+							Created: 50,
 							State:   "running",
 						},
 						{
@@ -484,7 +490,7 @@ func TestGetPods(t *testing.T) {
 							Name:    "app-22",
 							Image:   "img-name-22:latest",
 							Hash:    10022,
-							Created: 100000,
+							Created: 50,
 							State:   "running",
 						},
 					},
@@ -557,7 +563,18 @@ func TestGetPodsFilters(t *testing.T) {
 func TestGetPodStatus(t *testing.T) {
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
-	r := &Runtime{apisvc: fr, systemd: fs}
+	fos := &containertesting.FakeOS{}
+	frh := &fakeRuntimeHelper{}
+	r := &Runtime{
+		apisvc:        fr,
+		systemd:       fs,
+		runtimeHelper: frh,
+		os:            fos,
+	}
+
+	ns := func(seconds int64) int64 {
+		return seconds * 1e9
+	}
 
 	tests := []struct {
 		pods   []*rktapi.Pod
@@ -573,7 +590,7 @@ func TestGetPodStatus(t *testing.T) {
 			[]*rktapi.Pod{
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING,
 					"uuid-4002", "42", "guestbook", "default",
-					"10.10.10.42", "100000", "7",
+					"10.10.10.42", ns(10), ns(20), "7",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -592,8 +609,9 @@ func TestGetPodStatus(t *testing.T) {
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4002:app-1"),
 						Name:         "app-1",
 						State:        kubecontainer.ContainerStateRunning,
-						CreatedAt:    time.Unix(100000, 0),
-						StartedAt:    time.Unix(100000, 0),
+						CreatedAt:    time.Unix(10, 0),
+						StartedAt:    time.Unix(20, 0),
+						FinishedAt:   time.Unix(0, 30),
 						Image:        "img-name-1:latest",
 						ImageID:      "rkt://img-id-1",
 						Hash:         1001,
@@ -603,8 +621,9 @@ func TestGetPodStatus(t *testing.T) {
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4002:app-2"),
 						Name:         "app-2",
 						State:        kubecontainer.ContainerStateExited,
-						CreatedAt:    time.Unix(100000, 0),
-						StartedAt:    time.Unix(100000, 0),
+						CreatedAt:    time.Unix(10, 0),
+						StartedAt:    time.Unix(20, 0),
+						FinishedAt:   time.Unix(0, 30),
 						Image:        "img-name-2:latest",
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
@@ -619,7 +638,7 @@ func TestGetPodStatus(t *testing.T) {
 			[]*rktapi.Pod{
 				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
 					"uuid-4002", "42", "guestbook", "default",
-					"10.10.10.42", "90000", "7",
+					"10.10.10.42", ns(10), ns(20), "7",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -629,7 +648,7 @@ func TestGetPodStatus(t *testing.T) {
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING, // The latest pod is running.
 					"uuid-4003", "42", "guestbook", "default",
-					"10.10.10.42", "100000", "10",
+					"10.10.10.42", ns(10), ns(20), "10",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -649,8 +668,9 @@ func TestGetPodStatus(t *testing.T) {
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4002:app-1"),
 						Name:         "app-1",
 						State:        kubecontainer.ContainerStateRunning,
-						CreatedAt:    time.Unix(90000, 0),
-						StartedAt:    time.Unix(90000, 0),
+						CreatedAt:    time.Unix(10, 0),
+						StartedAt:    time.Unix(20, 0),
+						FinishedAt:   time.Unix(0, 30),
 						Image:        "img-name-1:latest",
 						ImageID:      "rkt://img-id-1",
 						Hash:         1001,
@@ -660,8 +680,9 @@ func TestGetPodStatus(t *testing.T) {
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4002:app-2"),
 						Name:         "app-2",
 						State:        kubecontainer.ContainerStateExited,
-						CreatedAt:    time.Unix(90000, 0),
-						StartedAt:    time.Unix(90000, 0),
+						CreatedAt:    time.Unix(10, 0),
+						StartedAt:    time.Unix(20, 0),
+						FinishedAt:   time.Unix(0, 30),
 						Image:        "img-name-2:latest",
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
@@ -672,8 +693,9 @@ func TestGetPodStatus(t *testing.T) {
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4003:app-1"),
 						Name:         "app-1",
 						State:        kubecontainer.ContainerStateRunning,
-						CreatedAt:    time.Unix(100000, 0),
-						StartedAt:    time.Unix(100000, 0),
+						CreatedAt:    time.Unix(10, 0),
+						StartedAt:    time.Unix(20, 0),
+						FinishedAt:   time.Unix(0, 30),
 						Image:        "img-name-1:latest",
 						ImageID:      "rkt://img-id-1",
 						Hash:         1001,
@@ -683,8 +705,9 @@ func TestGetPodStatus(t *testing.T) {
 						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4003:app-2"),
 						Name:         "app-2",
 						State:        kubecontainer.ContainerStateExited,
-						CreatedAt:    time.Unix(100000, 0),
-						StartedAt:    time.Unix(100000, 0),
+						CreatedAt:    time.Unix(10, 0),
+						StartedAt:    time.Unix(20, 0),
+						FinishedAt:   time.Unix(0, 30),
 						Image:        "img-name-2:latest",
 						ImageID:      "rkt://img-id-2",
 						Hash:         1002,
@@ -697,9 +720,27 @@ func TestGetPodStatus(t *testing.T) {
 		},
 	}
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
 		fr.pods = tt.pods
+
+		podTimes := map[string]time.Time{}
+		for _, pod := range tt.pods {
+			podTimes[podFinishedMarkerPath(r.runtimeHelper.GetPodDir(tt.result.ID), pod.Id)] = tt.result.ContainerStatuses[0].FinishedAt
+		}
+
+		r.os.(*containertesting.FakeOS).StatFn = func(name string) (os.FileInfo, error) {
+			podTime, ok := podTimes[name]
+			if !ok {
+				t.Errorf("osStat called with %v, but only knew about %#v", name, podTimes)
+			}
+			mockFI := mock_os.NewMockFileInfo(ctrl)
+			mockFI.EXPECT().ModTime().Return(podTime)
+			return mockFI, nil
+		}
 
 		status, err := r.GetPodStatus("42", "guestbook", "default")
 		if err != nil {
