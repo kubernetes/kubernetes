@@ -62,6 +62,7 @@
     provider-env: '{gce-provider-env}'
     suffix:
         - 'gce':
+            cron-string: '{sq-cron-string}'
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel.'
             timeout: 50  # See #21138
             job-env: |
@@ -72,6 +73,7 @@
                 export GINKGO_PARALLEL="y"
                 export PROJECT="k8s-jkns-e2e-gce"
         - 'gce-slow':
+            cron-string: '{sq-cron-string}'
             description: 'Runs slow tests on GCE, sequentially.'
             timeout: 150  #  See #24072
             job-env: |
@@ -115,6 +117,7 @@
                                          --ginkgo.skip=\[Feature:.+\]"
                 export PROJECT="k8s-jkns-e2e-gce-flaky"
         - 'gce-scalability':
+            cron-string: '{sq-cron-string}'
             description: 'Run the performance/scalability tests on GCE. A larger cluster is used.'
             timeout: 120
             # TODO: Run this twice a day after we make kubemark-500 a blocking suite.
@@ -181,6 +184,7 @@
     provider-env: '{gke-provider-env}'
     suffix:
         - 'gke':
+            cron-string: '{sq-cron-string}'
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel (against GKE test endpoint)'
             timeout: 50  # See #21138
             job-env: |
@@ -188,6 +192,7 @@
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
         - 'gke-slow':
+            cron-string: '{sq-cron-string}'
             description: 'Run slow E2E tests on GKE using the latest successful build.'
             timeout: 150  #  See #24072
             job-env: |
