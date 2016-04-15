@@ -61,9 +61,17 @@ fi
 
 write-salt-config kubernetes-pool
 
-create-salt-kubelet-auth
-create-salt-kubeproxy-auth
+# Generate kubelet and kube-proxy auth file(kubeconfig) if there is not an existing one
+known_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+if [[ ! -f "${known_kubeconfig_file}" ]]; then
+  create-salt-kubelet-auth
+  create-salt-kubeproxy-auth
+else
+  # stop kubelet, let salt start it later
+  systemctl stop kubelet
+fi
 
 install-salt
 
 run-salt
+
