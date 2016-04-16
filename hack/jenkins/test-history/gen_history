@@ -24,10 +24,12 @@ readonly jenkins="$1"
 readonly datestr=$(date +"%Y-%m-%d")
 
 # Create JSON report
-time python gen_json.py "${jenkins}" kubernetes
+time python gen_json.py \
+  "--server=${jenkins}" \
+  "--match=^kubernetes|kubernetes-build|kubelet-gce-e2e-ci"
 
 # Create static HTML reports out of the JSON
-python gen_html.py --suites --prefixes ,e2e,soak,e2e-gce,e2e-gke,upgrade --output-dir static --input tests.json
+python gen_html.py --output-dir=static --input=tests.json
 
 # Upload to GCS
 readonly bucket="kubernetes-test-history"
