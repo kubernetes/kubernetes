@@ -57,7 +57,7 @@ kubectl run nginx --image=nginx --dry-run
 kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
 # Start a single instance of busybox and keep it in the foreground, don't restart it if it exits.
-kubectl run -i --tty busybox --image=busybox --restart=Never
+kubectl run -i -t busybox --image=busybox --restart=Never
 
 # Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
 kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
@@ -104,7 +104,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
 	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
-	cmd.Flags().Bool("tty", false, "Allocated a TTY for each container in the pod.  Because -t is currently shorthand for --template, -t is not supported for --tty. This shorthand is deprecated and we expect to adopt -t for --tty soon.")
+	cmd.Flags().BoolP("tty", "t", false, "Allocated a TTY for each container in the pod.")
 	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--interactive' is set, in which case the default is true.")
 	cmd.Flags().Bool("leave-stdin-open", false, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
 	cmd.Flags().String("restart", "Always", "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created for this pod, if set to OnFailure or Never, a job is created for this pod and --replicas must be 1.  Default 'Always'")
@@ -129,7 +129,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	interactive := cmdutil.GetFlagBool(cmd, "stdin")
 	tty := cmdutil.GetFlagBool(cmd, "tty")
 	if tty && !interactive {
-		return cmdutil.UsageError(cmd, "-i/--stdin is required for containers with --tty=true")
+		return cmdutil.UsageError(cmd, "-i/--stdin is required for containers with -t/--tty=true")
 	}
 	replicas := cmdutil.GetFlagInt(cmd, "replicas")
 	if interactive && replicas != 1 {

@@ -114,9 +114,9 @@ options:
   usage: |
     Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
 - name: tty
+  shorthand: t
   default_value: "false"
-  usage: |
-    Allocated a TTY for each container in the pod.  Because -t is currently shorthand for --template, -t is not supported for --tty. This shorthand is deprecated and we expect to adopt -t for --tty soon.
+  usage: Allocated a TTY for each container in the pod.
 inherited_options:
 - name: alsologtostderr
   default_value: "false"
@@ -198,7 +198,7 @@ example: |-
   kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
   # Start a single instance of busybox and keep it in the foreground, don't restart it if it exits.
-  kubectl run -i --tty busybox --image=busybox --restart=Never
+  kubectl run -i -t busybox --image=busybox --restart=Never
 
   # Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
   kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
