@@ -268,10 +268,8 @@ kube::golang::setup_env() {
 
   if [[ -z "$(which go)" ]]; then
     kube::log::usage_from_stdin <<EOF
-
 Can't find 'go' in PATH, please fix and retry.
 See http://golang.org/doc/install for installation instructions.
-
 EOF
     exit 2
   fi
@@ -284,11 +282,9 @@ EOF
     go_version=($(go version))
     if [[ "${go_version[2]}" < "go1.4" ]]; then
       kube::log::usage_from_stdin <<EOF
-
 Detected go version: ${go_version[*]}.
 Kubernetes requires go version 1.4 or greater.
 Please install Go version 1.4 or later.
-
 EOF
       exit 2
     fi
