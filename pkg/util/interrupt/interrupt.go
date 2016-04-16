@@ -22,12 +22,19 @@ import (
 	"sync"
 )
 
+// Handler guarantees execution of notifications after a critical section (the function passed
+// to a Run method), even in the presence of process termination. It guarantees exactly once
+// invocation of the provided notify functions.
 type Handler struct {
 	notify []func()
 	final  func(os.Signal)
 	once   sync.Once
 }
 
+// Chain creates a new handler that invokes all notify functions when the critical section exits
+// and then invokes the optional handler's notifications. This allows critical sections to be
+// nested without losing exactly once invocations. Notify functions can invoke any cleanup needed
+// but should not exit (which is the responsibility of the parent handler).
 func Chain(handler *Handler, notify ...func()) *Handler {
 	if handler == nil {
 		return New(nil, notify...)
@@ -35,6 +42,10 @@ func Chain(handler *Handler, notify ...func()) *Handler {
 	return New(handler.Signal, append(notify, handler.Close)...)
 }
 
+// New creates a new handler that guarantees all notify functions are run after the critical
+// section exits (or is interrupted by the OS), then invokes the final handler. If no final
+// handler is specified, the default final is `os.Exit(0)`. A handler can only be used for
+// one critical section.
 func New(final func(os.Signal), notify ...func()) *Handler {
 	return &Handler{
 		final:  final,
@@ -42,6 +53,7 @@ func New(final func(os.Signal), notify ...func()) *Handler {
 	}
 }
 
+// Close executes all the notification handlers if they have not yet been executed.
 func (h *Handler) Close() {
 	h.once.Do(func() {
 		for _, fn := range h.notify {
@@ -50,6 +62,9 @@ func (h *Handler) Close() {
 	})
 }
 
+// Signal is called when an os.Signal is received, and guarantees that all notifications
+// are executed, then the final handler is executed. This function should only be called once
+// per Handler instance.
 func (h *Handler) Signal(s os.Signal) {
 	h.once.Do(func() {
 		for _, fn := range h.notify {
@@ -62,10 +77,16 @@ func (h *Handler) Signal(s os.Signal) {
 	})
 }
 
+// Run ensures that any notifications are invoked after the provided fn exits (even if the
+// process is interrupted by an OS termination signal). Notifications are only invoked once
+// per Handler instance, so calling Run more than once will not behave as the user expects.
 func (h *Handler) Run(fn func() error) error {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, childSignals...)
-	defer signal.Stop(ch)
+	defer func() {
+		signal.Stop(ch)
+		close(ch)
+	}()
 	go func() {
 		sig, ok := <-ch
 		if !ok {
