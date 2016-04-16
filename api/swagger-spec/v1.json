@@ -48,7 +48,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -124,7 +125,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -168,7 +170,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -252,7 +255,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -298,7 +302,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -376,7 +381,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -459,7 +465,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -527,7 +534,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -581,7 +589,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -635,7 +644,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -691,7 +701,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -782,7 +793,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -858,7 +870,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -933,7 +946,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1017,7 +1031,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1063,7 +1078,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1141,7 +1157,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1224,7 +1241,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1292,7 +1310,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1346,7 +1365,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1400,7 +1420,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -1456,7 +1477,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1547,7 +1569,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1623,7 +1646,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1698,7 +1722,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1782,7 +1807,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1828,7 +1854,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1906,7 +1933,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -1989,7 +2017,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2057,7 +2086,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2111,7 +2141,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2165,7 +2196,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -2221,7 +2253,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2312,7 +2345,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2388,7 +2422,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2463,7 +2498,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2547,7 +2583,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2593,7 +2630,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2671,7 +2709,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2754,7 +2793,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2822,7 +2862,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2876,7 +2917,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -2930,7 +2972,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -2986,7 +3029,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3077,7 +3121,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3153,7 +3198,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3228,7 +3274,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3304,7 +3351,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3342,7 +3390,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3412,7 +3461,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3487,7 +3537,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3547,7 +3598,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3593,7 +3645,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3639,7 +3692,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -3687,7 +3741,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3770,7 +3825,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3822,7 +3878,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3874,7 +3931,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3950,7 +4008,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -3988,7 +4047,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -4058,7 +4118,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -4133,7 +4194,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -4193,7 +4255,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -4239,7 +4302,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -4285,7 +4349,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -4333,7 +4398,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -4416,7 +4482,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5212,7 +5279,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5296,7 +5364,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5342,7 +5411,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5420,7 +5490,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5503,7 +5574,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5571,7 +5643,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5625,7 +5698,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5679,7 +5753,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -5735,7 +5810,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5826,7 +5902,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5902,7 +5979,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -5977,7 +6055,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6037,7 +6116,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6113,7 +6193,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6151,7 +6232,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6221,7 +6303,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6296,7 +6379,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6356,7 +6440,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6402,7 +6487,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6448,7 +6534,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -6496,7 +6583,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6579,7 +6667,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6631,7 +6720,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6715,7 +6805,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6761,7 +6852,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6839,7 +6931,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6922,7 +7015,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -6990,7 +7084,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -7044,7 +7139,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -7098,7 +7194,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -7154,7 +7251,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -7245,7 +7343,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -7741,7 +7840,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -7816,7 +7916,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -8022,7 +8123,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -8300,7 +8402,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -8942,7 +9045,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9026,7 +9130,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9072,7 +9177,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9150,7 +9256,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9233,7 +9340,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9301,7 +9409,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9355,7 +9464,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9409,7 +9519,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -9465,7 +9576,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9556,7 +9668,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9632,7 +9745,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9707,7 +9821,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9791,7 +9906,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9837,7 +9953,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9915,7 +10032,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -9998,7 +10116,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10066,7 +10185,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10120,7 +10240,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10174,7 +10295,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -10230,7 +10352,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10321,7 +10444,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10397,7 +10521,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10472,7 +10597,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10524,7 +10650,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10578,7 +10705,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10632,7 +10760,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -10694,7 +10823,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10778,7 +10908,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10824,7 +10955,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10902,7 +11034,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -10985,7 +11118,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11053,7 +11187,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11107,7 +11242,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11161,7 +11297,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -11217,7 +11354,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11308,7 +11446,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11384,7 +11523,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11459,7 +11599,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11519,7 +11660,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11603,7 +11745,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11649,7 +11792,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11727,7 +11871,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11810,7 +11955,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11878,7 +12024,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11932,7 +12079,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -11986,7 +12134,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -12042,7 +12191,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12133,7 +12283,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12209,7 +12360,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12284,7 +12436,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12368,7 +12521,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12414,7 +12568,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12492,7 +12647,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12575,7 +12731,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12643,7 +12800,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12697,7 +12855,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12751,7 +12910,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -12807,7 +12967,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12898,7 +13059,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -12974,7 +13136,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -13049,7 +13212,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -13133,7 +13297,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -13179,7 +13344,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -13262,7 +13428,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -13330,7 +13497,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -13384,7 +13552,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -13438,7 +13607,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -13486,7 +13656,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -13577,7 +13748,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -14073,7 +14245,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -14148,7 +14321,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -14724,7 +14898,8 @@
       ],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "*/*"
@@ -14744,11 +14919,13 @@
       "parameters": [],
       "produces": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ],
       "consumes": [
        "application/json",
-       "application/yaml"
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
       ]
      }
     ]
