@@ -40,3 +40,16 @@ func DeepCopy_resource_Quantity(in Quantity, out *Quantity, c *conversion.Cloner
 	out.Format = in.Format
 	return nil
 }
+
+func DeepCopy_resource_QuantityProto(in QuantityProto, out *QuantityProto, c *conversion.Cloner) error {
+	out.Format = in.Format
+	out.Scale = in.Scale
+	if in.Bigint != nil {
+		in, out := in.Bigint, &out.Bigint
+		*out = make([]byte, len(in))
+		copy(*out, in)
+	} else {
+		out.Bigint = nil
+	}
+	return nil
+}
