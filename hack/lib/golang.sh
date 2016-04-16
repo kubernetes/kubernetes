@@ -34,7 +34,6 @@ kube::golang::server_targets() {
     cmd/kubelet
     cmd/kubemark
     cmd/hyperkube
-    cmd/linkcheck
     plugin/cmd/kube-scheduler
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
@@ -109,6 +108,7 @@ kube::golang::test_targets() {
     cmd/mungedocs
     cmd/genbashcomp
     cmd/genswaggertypedocs
+    cmd/linkcheck
     examples/k8petstore/web-server/src
     github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
