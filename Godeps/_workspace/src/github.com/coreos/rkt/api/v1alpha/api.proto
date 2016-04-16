@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// To compile, run 'protoc -I api/v1alpha api/v1alpha/api.proto --go_out=plugins=grpc:api/v1alpha' in rkt root directory.
-// The protoc version must be 3.0.0.
-
 // *************************************************** //
 // ************ WARNING - HERE BE DRAGONS ************ //
 //                                                     //
@@ -172,6 +169,22 @@ message Pod {
 
         // Annotations on this pod.
         repeated KeyValue annotations = 7;
+
+        // Cgroup of the pod, empty if the pod is not running.
+        string cgroup = 8;
+
+        // Timestamp of when the pod is created, nanoseconds since epoch.
+        // Zero if the pod is not created.
+        int64 created_at = 9;
+
+        // Timestamp of when the pod is started, nanoseconds since epoch.
+        // Zero if the pod is not started.
+        int64 started_at = 10;
+
+        // Timestamp of when the pod is moved to exited-garbage/garbage,
+        // in nanoseconds since epoch.
+        // Zero if the pod is not moved to exited-garbage/garbage yet.
+        int64 gc_marked_at = 11;
 }
 
 message KeyValue {
@@ -201,6 +214,9 @@ message PodFilter {
 
         // If not empty, the pods that have all of the annotations will be returned.
         repeated KeyValue annotations = 6;
+
+        // If not empty, the pods whose cgroup are listed will be returned.
+        repeated string cgroups = 7;
 }
 
 // ImageFilter defines the condition that the returned images need to satisfy in ListImages().
