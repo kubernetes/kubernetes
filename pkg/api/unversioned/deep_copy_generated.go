@@ -114,6 +114,12 @@ func DeepCopy_unversioned_Time(in Time, out *Time, c *conversion.Cloner) error {
 	return nil
 }
 
+func DeepCopy_unversioned_Timestamp(in Timestamp, out *Timestamp, c *conversion.Cloner) error {
+	out.Seconds = in.Seconds
+	out.Nanos = in.Nanos
+	return nil
+}
+
 func DeepCopy_unversioned_TypeMeta(in TypeMeta, out *TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
