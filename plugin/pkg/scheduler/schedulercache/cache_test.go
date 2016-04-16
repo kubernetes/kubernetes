@@ -87,8 +87,8 @@ func TestAssumePodScheduled(t *testing.T) {
 	for i, tt := range tests {
 		cache := newSchedulerCache(time.Second, time.Second, nil)
 		for _, pod := range tt.pods {
-			if err := cache.AssumePodIfBindSucceed(pod, alwaysTrue); err != nil {
-				t.Fatalf("AssumePodScheduled failed: %v", err)
+			if err := cache.AssumePod(pod); err != nil {
+				t.Fatalf("AssumePod failed: %v", err)
 			}
 		}
 		n := cache.nodes[nodeName]
@@ -147,7 +147,7 @@ func TestExpirePod(t *testing.T) {
 		cache := newSchedulerCache(ttl, time.Second, nil)
 
 		for _, pod := range tt.pods {
-			if err := cache.assumePodIfBindSucceed(pod.pod, alwaysTrue, pod.assumedTime); err != nil {
+			if err := cache.assumePod(pod.pod, pod.assumedTime); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
 		}
@@ -195,7 +195,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 	for i, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
 		for _, podToAssume := range tt.podsToAssume {
-			if err := cache.assumePodIfBindSucceed(podToAssume, alwaysTrue, now); err != nil {
+			if err := cache.assumePod(podToAssume, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
 		}
@@ -240,7 +240,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 	now := time.Now()
 	for i, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
-		if err := cache.assumePodIfBindSucceed(tt.pod, alwaysTrue, now); err != nil {
+		if err := cache.assumePod(tt.pod, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
 		cache.cleanupAssumedPods(now.Add(2 * ttl))
@@ -369,7 +369,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 	for _, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
 		for _, podToAssume := range tt.podsToAssume {
-			if err := cache.assumePodIfBindSucceed(podToAssume, alwaysTrue, now); err != nil {
+			if err := cache.assumePod(podToAssume, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
 		}
@@ -527,14 +527,10 @@ func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) 
 		objName := fmt.Sprintf("%s-pod-%d", nodeName, i%10)
 		pod := makeBasePod(nodeName, objName, "0", "0", nil)
 
-		err := cache.assumePodIfBindSucceed(pod, alwaysTrue, assumedTime)
+		err := cache.assumePod(pod, assumedTime)
 		if err != nil {
-			b.Fatalf("assumePodIfBindSucceed failed: %v", err)
+			b.Fatalf("assumePod failed: %v", err)
 		}
 	}
 	return cache
-}
-
-func alwaysTrue() bool {
-	return true
 }

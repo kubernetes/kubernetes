@@ -106,7 +106,7 @@ func (s *Scheduler) scheduleOne() {
 	// will self-repair.
 	assumed := *pod
 	assumed.Spec.NodeName = dest
-	s.config.SchedulerCache.AssumePodIfBindSucceed(&assumed, func() bool { return true })
+	s.config.SchedulerCache.AssumePod(&assumed)
 
 	go func() {
 		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
