@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"reflect"
 	"sync"
 	"time"
 
@@ -296,7 +297,7 @@ func NewIndexerInformer(
 			for _, d := range obj.(cache.Deltas) {
 				switch d.Type {
 				case cache.Sync, cache.Added, cache.Updated:
-					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
+					if old, exists, err := clientState.Get(d.Object); err == nil && exists && !reflect.DeepEqual(old, d.Object) {
 						if err := clientState.Update(d.Object); err != nil {
 							return err
 						}
