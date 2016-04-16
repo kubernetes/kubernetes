@@ -72,7 +72,7 @@ VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 kube::log::status "Updating " ${SWAGGER_ROOT_DIR}
 
 for ver in ${VERSIONS}; do
-  # fetch the swagger spec for each group version. 
+  # fetch the swagger spec for each group version.
   if [[ ${ver} == "v1" ]]; then
     SUBPATH="api"
   else
@@ -80,22 +80,22 @@ for ver in ${VERSIONS}; do
   fi
   SUBPATH="${SUBPATH}/${ver}"
   SWAGGER_JSON_NAME="$(kube::util::gv-to-swagger-name ${ver}).json"
-  curl -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
-  
+  curl -w "\n" -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
+
   # fetch the swagger spec for the discovery mechanism at group level.
   if [[ ${ver} == "v1" ]]; then
-    continue 
+    continue
   fi
   SUBPATH="apis/"${ver%/*}
   SWAGGER_JSON_NAME="${ver%/*}.json"
-  curl -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
+  curl -w "\n" -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
 done
 
 # fetch swagger specs for other discovery mechanism.
-curl -fs "${SWAGGER_API_PATH}" > "${SWAGGER_ROOT_DIR}/resourceListing.json"
-curl -fs "${SWAGGER_API_PATH}version" > "${SWAGGER_ROOT_DIR}/version.json"
-curl -fs "${SWAGGER_API_PATH}api" > "${SWAGGER_ROOT_DIR}/api.json"
-curl -fs "${SWAGGER_API_PATH}apis" > "${SWAGGER_ROOT_DIR}/apis.json"
+curl -w "\n" -fs "${SWAGGER_API_PATH}" > "${SWAGGER_ROOT_DIR}/resourceListing.json"
+curl -w "\n" -fs "${SWAGGER_API_PATH}version" > "${SWAGGER_ROOT_DIR}/version.json"
+curl -w "\n" -fs "${SWAGGER_API_PATH}api" > "${SWAGGER_ROOT_DIR}/api.json"
+curl -w "\n" -fs "${SWAGGER_API_PATH}apis" > "${SWAGGER_ROOT_DIR}/apis.json"
 kube::log::status "SUCCESS"
 
 # ex: ts=2 sw=2 et filetype=sh
