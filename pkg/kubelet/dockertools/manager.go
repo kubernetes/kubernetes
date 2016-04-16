@@ -87,6 +87,9 @@ const (
 	// Remote API version for docker daemon version v1.10
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
 	dockerV110APIVersion = "1.22"
+
+	// The expiration time of version cache.
+	versionCacheTTL = 60 * time.Second
 )
 
 var (
@@ -161,11 +164,11 @@ type DockerManager struct {
 	// it might already be true.
 	configureHairpinMode bool
 
-	// The api version cache of docker daemon.
-	versionCache *cache.VersionCache
-
 	// Provides image stats
 	*imageStatsProvider
+
+	// The version cache of docker daemon.
+	versionCache *cache.ObjectCache
 }
 
 // A subset of the pod.Manager interface extracted for testing purposes.
@@ -252,6 +255,13 @@ func NewDockerManager(
 		dm.imagePuller = kubecontainer.NewImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
 	}
 	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
+
+	dm.versionCache = cache.NewObjectCache(
+		func() (interface{}, error) {
+			return dm.getVersionInfo()
+		},
+		versionCacheTTL,
+	)
 
 	// apply optional settings..
 	for _, optf := range options {
@@ -1554,16 +1564,24 @@ func (dm *DockerManager) calculateOomScoreAdj(container *api.Container) int {
 	return oomScoreAdj
 }
 
+// versionInfo wraps api version and daemon version.
+type versionInfo struct {
+	apiVersion    kubecontainer.Version
+	daemonVersion kubecontainer.Version
+}
+
 // checkDockerAPIVersion checks current docker API version against expected version.
 // Return:
 // 1 : newer than expected version
 // -1: older than expected version
 // 0 : same version
 func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) (int, error) {
-	apiVersion, _, err := dm.getVersionInfo()
+
+	value, err := dm.versionCache.Get(dm.machineInfo.MachineID)
 	if err != nil {
 		return 0, err
 	}
+	apiVersion := value.(versionInfo).apiVersion
 	result, err := apiVersion.Compare(expectedVersion)
 	if err != nil {
 		return 0, fmt.Errorf("Failed to compare current docker api version %v with OOMScoreAdj supported Docker version %q - %v",
@@ -2156,15 +2174,17 @@ func (dm *DockerManager) GetPodStatus(uid types.UID, name, namespace string) (*k
 }
 
 // getVersionInfo returns apiVersion & daemonVersion of docker runtime
-func (dm *DockerManager) getVersionInfo() (kubecontainer.Version, kubecontainer.Version, error) {
+func (dm *DockerManager) getVersionInfo() (versionInfo, error) {
 	apiVersion, err := dm.APIVersion()
 	if err != nil {
-		return nil, nil, err
+		return versionInfo{}, err
 	}
 	daemonVersion, err := dm.Version()
 	if err != nil {
-		return nil, nil, err
+		return versionInfo{}, err
 	}
-
-	return apiVersion, daemonVersion, nil
+	return versionInfo{
+		apiVersion:    apiVersion,
+		daemonVersion: daemonVersion,
+	}, nil
 }
