@@ -68,7 +68,11 @@
 "kind": "Pod",
 "metadata": {
   "name":"kube-controller-manager",
-  "namespace": "kube-system"
+  "namespace": "kube-system",
+  "labels": {
+    "tier": "control-plane",
+    "component": "kube-controller-manager"
+  }
 },
 "spec":{
 "hostNetwork": true,
