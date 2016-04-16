@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -103,7 +104,7 @@ func (plugin *flexVolumePlugin) getVolumeSource(spec *volume.Spec) *api.FlexVolu
 // NewMounter is the mounter routine to build the volume.
 func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	fv := plugin.getVolumeSource(spec)
-	secret := ""
+	secrets := make(map[string]string)
 	if fv.SecretRef != nil {
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
@@ -116,15 +117,15 @@ func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ vo
 			return nil, err
 		}
 		for name, data := range secretName.Data {
-			secret = string(data)
+			secrets[name] = base64.StdEncoding.EncodeToString(data)
 			glog.V(1).Infof("found flex volume secret info: %s", name)
 		}
 	}
-	return plugin.newMounterInternal(spec, pod, &flexVolumeUtil{}, plugin.host.GetMounter(), exec.New(), secret)
+	return plugin.newMounterInternal(spec, pod, &flexVolumeUtil{}, plugin.host.GetMounter(), exec.New(), secrets)
 }
 
 // newMounterInternal is the internal mounter routine to build the volume.
-func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, manager flexVolumeManager, mounter mount.Interface, runner exec.Interface, secret string) (volume.Mounter, error) {
+func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, manager flexVolumeManager, mounter mount.Interface, runner exec.Interface, secrets map[string]string) (volume.Mounter, error) {
 	source := plugin.getVolumeSource(spec)
 	return &flexVolumeMounter{
 		flexVolumeDisk: &flexVolumeDisk{
@@ -136,7 +137,7 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 			execPath:     plugin.getExecutable(),
 			mounter:      mounter,
 			plugin:       plugin,
-			secret:       secret,
+			secrets:      secrets,
 		},
 		fsType:             source.FSType,
 		readOnly:           source.ReadOnly,
@@ -186,8 +187,8 @@ type flexVolumeDisk struct {
 	// block device.
 	mounter mount.Interface
 	// secret for the volume.
-	secret string
-	plugin *flexVolumePlugin
+	secrets map[string]string
+	plugin  *flexVolumePlugin
 }
 
 // FlexVolumeUnmounter is the disk that will be cleaned by this plugin.
@@ -275,8 +276,8 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// Extract secret and pass it as options.
-	if f.secret != "" {
-		f.options[optionKeySecret] = f.secret
+	for name, secret := range f.secrets {
+		f.options[optionKeySecret+"/"+name] = secret
 	}
 
 	device, err := f.manager.attach(f)
@@ -301,8 +302,8 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 			options = append(options, "rw")
 		}
 		// Extract secret and pass it as options.
-		if f.secret != "" {
-			options = append(options, "secret="+f.secret)
+		for name, secret := range f.secrets {
+			f.options[optionKeySecret+"/"+name] = secret
 		}
 
 		os.MkdirAll(dir, 0750)
