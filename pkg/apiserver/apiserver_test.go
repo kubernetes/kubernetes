@@ -1233,11 +1233,11 @@ func TestMetadata(t *testing.T) {
 			matches[s] = i + 1
 		}
 	}
-	if matches["text/plain,application/json,application/yaml"] == 0 ||
-		matches["application/json,application/yaml"] == 0 ||
-		matches["application/json"] == 0 ||
+	if matches["text/plain,application/json,application/yaml,application/vnd.kubernetes.protobuf"] == 0 ||
+		matches["application/json,application/yaml,application/vnd.kubernetes.protobuf"] == 0 ||
+		matches["application/json,application/vnd.kubernetes.protobuf"] == 0 ||
 		matches["*/*"] == 0 ||
-		len(matches) != 4 {
+		len(matches) != 5 {
 		t.Errorf("unexpected mime types: %v", matches)
 	}
 }
