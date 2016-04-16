@@ -29,11 +29,11 @@ import (
 // +protobuf=true
 type QuantityProto struct {
 	// The format of the quantity
-	Format Format
+	Format Format `protobuf:"bytes,1,opt,name=format,casttype=Format"`
 	// The scale dimension of the value
-	Scale int32
+	Scale int32 `protobuf:"varint,2,opt,name=scale"`
 	// Bigint is serialized as a raw bytes array
-	Bigint []byte
+	Bigint []byte `protobuf:"bytes,3,opt,name=bigint"`
 }
 
 // ProtoTime returns the Time as a new ProtoTime value.
