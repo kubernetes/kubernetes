@@ -98,18 +98,14 @@ func (cache *schedulerCache) List(selector labels.Selector) ([]*api.Pod, error) 
 	return pods, nil
 }
 
-func (cache *schedulerCache) AssumePodIfBindSucceed(pod *api.Pod, bind func() bool) error {
-	return cache.assumePodIfBindSucceed(pod, bind, time.Now())
+func (cache *schedulerCache) AssumePod(pod *api.Pod) error {
+	return cache.assumePod(pod, time.Now())
 }
 
-// assumePodScheduled exists for making test deterministic by taking time as input argument.
-func (cache *schedulerCache) assumePodIfBindSucceed(pod *api.Pod, bind func() bool, now time.Time) error {
+// assumePod exists for making test deterministic by taking time as input argument.
+func (cache *schedulerCache) assumePod(pod *api.Pod, now time.Time) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
-
-	if !bind() {
-		return nil
-	}
 
 	key, err := getPodKey(pod)
 	if err != nil {

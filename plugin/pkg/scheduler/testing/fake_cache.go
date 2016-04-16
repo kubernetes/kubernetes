@@ -27,10 +27,7 @@ type FakeCache struct {
 	AssumeFunc func(*api.Pod)
 }
 
-func (f *FakeCache) AssumePodIfBindSucceed(pod *api.Pod, bind func() bool) error {
-	if !bind() {
-		return nil
-	}
+func (f *FakeCache) AssumePod(pod *api.Pod) error {
 	f.AssumeFunc(pod)
 	return nil
 }
