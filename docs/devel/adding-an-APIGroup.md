@@ -56,7 +56,8 @@ Step 2 and 3 are mechanical, we plan on autogenerate these using the cmd/libs/go
 1. Generate conversions and deep-copies:
 
     1. Add your "group/" or "group/version" into hack/after-build/{update-generated-conversions.sh, update-generated-deep-copies.sh, verify-generated-conversions.sh, verify-generated-deep-copies.sh};
-    2. Run hack/update-generated-conversions.sh, hack/update-generated-deep-copies.sh.
+    2. Make sure your pkg/apis/`<group>`/`<version>` directory has a doc.go file with the comment `// +genconversion=true`, to catch the attention of our gen-conversion script.
+    3. Run hack/update-all.sh.
 
 2. Generate files for Ugorji codec:
 
@@ -79,6 +80,7 @@ We are overhauling pkg/client, so this section might be outdated; see [#15730](h
 
 2. Add your "group/version" to `KUBE_API_VERSIONS` and `KUBE_TEST_API_VERSIONS` in hack/test-go.sh.
 
+TODO: Add a troubleshooting section.
 
 
 
