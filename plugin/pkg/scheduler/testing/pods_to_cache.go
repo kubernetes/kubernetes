@@ -25,10 +25,7 @@ import (
 // PodsToCache is used for testing
 type PodsToCache []*api.Pod
 
-func (p PodsToCache) AssumePodIfBindSucceed(pod *api.Pod, bind func() bool) error {
-	if !bind() {
-		return nil
-	}
+func (p PodsToCache) AssumePod(pod *api.Pod) error {
 	return nil
 }
 

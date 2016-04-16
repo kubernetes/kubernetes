@@ -56,14 +56,10 @@ import (
 // - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
 //   a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
 type Cache interface {
-	// AssumePodIfBindSucceed assumes a pod to be scheduled if binding the pod succeeded.
-	// If binding return true, the pod's information is aggregated into designated node.
-	// Note that both binding and assuming are done as one atomic operation from cache's view.
-	// No other events like Add would happen in between binding and assuming.
-	// We are passing the binding function and let implementation take care of concurrency control details.
+	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
 	// After expiration, its information would be subtracted.
-	AssumePodIfBindSucceed(pod *api.Pod, bind func() bool) error
+	AssumePod(pod *api.Pod) error
 
 	// AddPod either confirms a pod if it's assumed, or adds it back if it's expired.
 	// If added back, the pod's information would be added again.
