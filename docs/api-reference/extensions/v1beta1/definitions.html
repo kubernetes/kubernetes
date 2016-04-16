@@ -2373,7 +2373,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretRef is reference to the authentication secret for User, default is empty.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5872,7 +5872,7 @@ Both these may change in the future. Incoming requests are matched against the h
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-04-15 01:05:35 UTC
+Last updated 2016-04-15 09:26:56 UTC
 </div>
 </div>
 </body>
