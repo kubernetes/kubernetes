@@ -216,6 +216,9 @@ var _ = framework.KubeDescribe("Addon update", func() {
 			sshExecAndVerify(sshClient, "sudo TEST_ADDON_CHECK_INTERVAL_SEC=1 /etc/init.d/kube-addons restart")
 		case "trusty":
 			sshExecAndVerify(sshClient, "sudo initctl restart kube-addons TEST_ADDON_CHECK_INTERVAL_SEC=1")
+		case "coreos":
+			sshExecAndVerify(sshClient, "sudo systemctl set-environment TEST_ADDON_CHECK_INTERVAL_SEC=1")
+			sshExecAndVerify(sshClient, "sudo systemctl restart kubernetes-addons")
 		default:
 			framework.Failf("Unsupported OS distro type %s", framework.TestContext.OSDistro)
 		}
@@ -229,6 +232,9 @@ var _ = framework.KubeDescribe("Addon update", func() {
 				sshExec(sshClient, "sudo /etc/init.d/kube-addons restart")
 			case "trusty":
 				sshExec(sshClient, "sudo initctl restart kube-addons")
+			case "coreos":
+				sshExec(sshClient, "sudo systemctl unset-environment TEST_ADDON_CHECK_INTERVAL_SEC")
+				sshExec(sshClient, "sudo systemctl restart kubernetes-addons")
 			default:
 				framework.Failf("Unsupported OS distro type %s", framework.TestContext.OSDistro)
 			}
