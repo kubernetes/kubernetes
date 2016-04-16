@@ -1,5 +1,3 @@
-// +build proto
-
 /*
 Copyright 2014 The Kubernetes Authors All rights reserved.
 
