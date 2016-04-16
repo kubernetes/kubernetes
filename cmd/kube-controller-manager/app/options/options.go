@@ -81,9 +81,10 @@ func NewCMServer() *CMServer {
 					IncrementTimeoutHostPath: 30,
 				},
 			},
-			KubeAPIQPS:     20.0,
-			KubeAPIBurst:   30,
-			LeaderElection: leaderelection.DefaultLeaderElectionConfiguration(),
+			KubeAPIQPS:              20.0,
+			KubeAPIBurst:            30,
+			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval: unversioned.Duration{0 * time.Second},
 		},
 	}
 	return &s
@@ -146,5 +147,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.DurationVar(&s.ControllerStartInterval.Duration, "controller-start-interval", s.ControllerStartInterval.Duration, "Interval between starting controller managers.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }

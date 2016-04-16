@@ -65,6 +65,7 @@ conntrack-tcp-timeout-established
 contain-pod-resources
 container-port
 container-runtime
+controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota
 cpu-percent
