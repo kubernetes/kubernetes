@@ -166,8 +166,8 @@ func pathExists(path string) (bool, error) {
 }
 
 // Return cloud provider
-func getCloudProvider(cloudProvider cloudprovider.Interface) (*aws.AWSCloud, error) {
-	awsCloudProvider, ok := cloudProvider.(*aws.AWSCloud)
+func getCloudProvider(cloudProvider cloudprovider.Interface) (*aws.Cloud, error) {
+	awsCloudProvider, ok := cloudProvider.(*aws.Cloud)
 	if !ok || awsCloudProvider == nil {
 		return nil, fmt.Errorf("Failed to get AWS Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}

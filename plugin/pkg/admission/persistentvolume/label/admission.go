@@ -136,7 +136,7 @@ func (l *persistentVolumeLabel) getEBSVolumes() (aws.Volumes, error) {
 		if err != nil || cloudProvider == nil {
 			return nil, err
 		}
-		awsCloudProvider, ok := cloudProvider.(*aws.AWSCloud)
+		awsCloudProvider, ok := cloudProvider.(*aws.Cloud)
 		if !ok {
 			// GetCloudProvider has gone very wrong
 			return nil, fmt.Errorf("error retrieving AWS cloud provider")
