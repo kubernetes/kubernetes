@@ -71,9 +71,9 @@ type DockerInterface interface {
 	Logs(opts docker.LogsOptions) error
 	Version() (*docker.Env, error)
 	Info() (*docker.Env, error)
-	CreateExec(docker.CreateExecOptions) (*docker.Exec, error)
-	StartExec(string, docker.StartExecOptions) error
-	InspectExec(id string) (*docker.ExecInspect, error)
+	CreateExec(string, dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error)
+	StartExec(string, dockertypes.ExecStartCheck, StreamOptions) error
+	InspectExec(id string) (*dockertypes.ContainerExecInspect, error)
 	AttachToContainer(opts docker.AttachToContainerOptions) error
 }
 

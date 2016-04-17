@@ -243,28 +243,19 @@ func (d *kubeDockerClient) Info() (*docker.Env, error) {
 	return convertEnv(resp)
 }
 
-func (d *kubeDockerClient) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
-	cfg := dockertypes.ExecConfig{}
-	if err := convertType(&opts, &cfg); err != nil {
-		return nil, err
-	}
-	resp, err := d.client.ContainerExecCreate(getDefaultContext(), cfg)
+// TODO(random-liu): Add unit test for exec and attach functions, just like what go-dockerclient did.
+func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
+	opts.Container = id
+	resp, err := d.client.ContainerExecCreate(getDefaultContext(), opts)
 	if err != nil {
 		return nil, err
 	}
-	exec := &docker.Exec{}
-	if err := convertType(&resp, exec); err != nil {
-		return nil, err
-	}
-	return exec, nil
+	return &resp, nil
 }
 
-func (d *kubeDockerClient) StartExec(startExec string, opts docker.StartExecOptions) error {
+func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
 	if opts.Detach {
-		return d.client.ContainerExecStart(getDefaultContext(), startExec, dockertypes.ExecStartCheck{
-			Detach: opts.Detach,
-			Tty:    opts.Tty,
-		})
+		return d.client.ContainerExecStart(getDefaultContext(), startExec, opts)
 	}
 	resp, err := d.client.ContainerExecAttach(getDefaultContext(), startExec, dockertypes.ExecConfig{
 		Detach: opts.Detach,
@@ -274,23 +265,15 @@ func (d *kubeDockerClient) StartExec(startExec string, opts docker.StartExecOpti
 		return err
 	}
 	defer resp.Close()
-	if opts.Success != nil {
-		opts.Success <- struct{}{}
-		<-opts.Success
-	}
-	return d.holdHijackedConnection(opts.RawTerminal || opts.Tty, opts.InputStream, opts.OutputStream, opts.ErrorStream, resp)
+	return d.holdHijackedConnection(sopts.RawTerminal || opts.Tty, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
-func (d *kubeDockerClient) InspectExec(id string) (*docker.ExecInspect, error) {
+func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
 	resp, err := d.client.ContainerExecInspect(getDefaultContext(), id)
 	if err != nil {
 		return nil, err
 	}
-	exec := &docker.ExecInspect{}
-	if err := convertType(&resp, exec); err != nil {
-		return nil, err
-	}
-	return exec, nil
+	return &resp, nil
 }
 
 func (d *kubeDockerClient) AttachToContainer(opts docker.AttachToContainerOptions) error {
@@ -365,6 +348,14 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 func parseDockerTimestamp(s string) (time.Time, error) {
 	// Timestamp returned by Docker is in time.RFC3339Nano format.
 	return time.Parse(time.RFC3339Nano, s)
+}
+
+// StreamOptions are the options used to configure the stream redirection
+type StreamOptions struct {
+	RawTerminal  bool
+	InputStream  io.Reader
+	OutputStream io.Writer
+	ErrorStream  io.Writer
 }
 
 // containerNotFoundError is the error returned by InspectContainer when container not found. We
