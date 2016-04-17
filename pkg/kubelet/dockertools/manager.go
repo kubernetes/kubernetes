@@ -274,23 +274,22 @@ func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 	if logOptions.SinceTime != nil {
 		since = logOptions.SinceTime.Unix()
 	}
-	opts := docker.LogsOptions{
-		Container:    containerID.ID,
-		Stdout:       true,
-		Stderr:       true,
-		OutputStream: stdout,
-		ErrorStream:  stderr,
-		Timestamps:   logOptions.Timestamps,
-		Since:        since,
-		Follow:       logOptions.Follow,
-		RawTerminal:  false,
+	opts := dockertypes.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Since:      strconv.FormatInt(since, 10),
+		Timestamps: logOptions.Timestamps,
+		Follow:     logOptions.Follow,
 	}
-
 	if logOptions.TailLines != nil {
 		opts.Tail = strconv.FormatInt(*logOptions.TailLines, 10)
 	}
-
-	err = dm.client.Logs(opts)
+	sopts := StreamOptions{
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		RawTerminal:  false,
+	}
+	err = dm.client.Logs(containerID.ID, opts, sopts)
 	return
 }
 
@@ -1096,19 +1095,20 @@ func (dm *DockerManager) ExecInContainer(containerID kubecontainer.ContainerID, 
 }
 
 func (dm *DockerManager) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	opts := docker.AttachToContainerOptions{
-		Container:    containerID.ID,
+	// TODO(random-liu): Do we really use the *Logs* field here?
+	opts := dockertypes.ContainerAttachOptions{
+		Stream: true,
+		Stdin:  stdin != nil,
+		Stdout: stdout != nil,
+		Stderr: stderr != nil,
+	}
+	sopts := StreamOptions{
 		InputStream:  stdin,
 		OutputStream: stdout,
 		ErrorStream:  stderr,
-		Stream:       true,
-		Logs:         true,
-		Stdin:        stdin != nil,
-		Stdout:       stdout != nil,
-		Stderr:       stderr != nil,
 		RawTerminal:  tty,
 	}
-	return dm.client.AttachToContainer(opts)
+	return dm.client.AttachToContainer(containerID.ID, opts, sopts)
 }
 
 func noPodInfraContainerError(podName, podNamespace string) error {

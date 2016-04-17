@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"strconv"
 	"time"
 
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
@@ -232,21 +231,14 @@ func (d *kubeDockerClient) RemoveImage(image string) error {
 	return err
 }
 
-func (d *kubeDockerClient) Logs(opts docker.LogsOptions) error {
-	resp, err := d.client.ContainerLogs(getDefaultContext(), dockertypes.ContainerLogsOptions{
-		ContainerID: opts.Container,
-		ShowStdout:  opts.Stdout,
-		ShowStderr:  opts.Stderr,
-		Since:       strconv.FormatInt(opts.Since, 10),
-		Timestamps:  opts.Timestamps,
-		Follow:      opts.Follow,
-		Tail:        opts.Tail,
-	})
+func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
+	opts.ContainerID = id
+	resp, err := d.client.ContainerLogs(getDefaultContext(), opts)
 	if err != nil {
 		return err
 	}
 	defer resp.Close()
-	return d.redirectResponseToOutputStream(opts.RawTerminal, opts.OutputStream, opts.ErrorStream, resp)
+	return d.redirectResponseToOutputStream(sopts.RawTerminal, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
 func (d *kubeDockerClient) Version() (*docker.Env, error) {
@@ -298,24 +290,14 @@ func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 	return &resp, nil
 }
 
-func (d *kubeDockerClient) AttachToContainer(opts docker.AttachToContainerOptions) error {
-	resp, err := d.client.ContainerAttach(getDefaultContext(), dockertypes.ContainerAttachOptions{
-		ContainerID: opts.Container,
-		Stream:      opts.Stream,
-		Stdin:       opts.Stdin,
-		Stdout:      opts.Stdout,
-		Stderr:      opts.Stderr,
-		// TODO: How to deal with the *Logs* here? There is no *Logs* field in the engine-api.
-	})
+func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
+	opts.ContainerID = id
+	resp, err := d.client.ContainerAttach(getDefaultContext(), opts)
 	if err != nil {
 		return err
 	}
 	defer resp.Close()
-	if opts.Success != nil {
-		opts.Success <- struct{}{}
-		<-opts.Success
-	}
-	return d.holdHijackedConnection(opts.RawTerminal, opts.InputStream, opts.OutputStream, opts.ErrorStream, resp)
+	return d.holdHijackedConnection(sopts.RawTerminal, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
 // redirectResponseToOutputStream redirect the response stream to stdout and stderr. When tty is true, all stream will
