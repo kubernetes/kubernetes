@@ -257,15 +257,6 @@ func NewDockerManager(
 		optf(dm)
 	}
 
-	// initialize versionCache with a updater
-	dm.versionCache = cache.NewVersionCache(func() (kubecontainer.Version, kubecontainer.Version, error) {
-		return dm.getVersionInfo()
-	})
-	// update version cache periodically.
-	if dm.machineInfo != nil {
-		dm.versionCache.UpdateCachePeriodly(dm.machineInfo.MachineID)
-	}
-
 	return dm
 }
 
@@ -1592,26 +1583,13 @@ func (dm *DockerManager) calculateOomScoreAdj(container *api.Container) int {
 	return oomScoreAdj
 }
 
-// getCachedVersionInfo gets cached version info of docker runtime.
-func (dm *DockerManager) getCachedVersionInfo() (kubecontainer.Version, kubecontainer.Version, error) {
-	apiVersion, daemonVersion, err := dm.versionCache.Get(dm.machineInfo.MachineID)
-	if err != nil {
-		glog.Errorf("Failed to get cached docker api version %v ", err)
-	}
-	// If we got nil versions, try to update version info.
-	if apiVersion == nil || daemonVersion == nil {
-		dm.versionCache.Update(dm.machineInfo.MachineID)
-	}
-	return apiVersion, daemonVersion, err
-}
-
 // checkDockerAPIVersion checks current docker API version against expected version.
 // Return:
 // 1 : newer than expected version
 // -1: older than expected version
 // 0 : same version
 func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) (int, error) {
-	apiVersion, _, err := dm.getCachedVersionInfo()
+	apiVersion, _, err := dm.getVersionInfo()
 	if err != nil {
 		return 0, err
 	}
