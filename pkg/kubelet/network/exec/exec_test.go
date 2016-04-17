@@ -29,6 +29,7 @@ import (
 	"testing"
 	"text/template"
 
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -224,7 +225,7 @@ func TestPluginSetupHook(t *testing.T) {
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, nettest.NewFakeHost(nil))
 
-	err = plug.SetUpPod("podNamespace", "podName", "dockerid2345")
+	err = plug.SetUpPod("podNamespace", "podName", kubecontainer.ContainerID{"docker", "dockerid2345"})
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -252,7 +253,7 @@ func TestPluginTearDownHook(t *testing.T) {
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, nettest.NewFakeHost(nil))
 
-	err = plug.TearDownPod("podNamespace", "podName", "dockerid2345")
+	err = plug.TearDownPod("podNamespace", "podName", kubecontainer.ContainerID{"docker", "dockerid2345"})
 	if err != nil {
 		t.Errorf("Expected nil")
 	}
@@ -280,7 +281,7 @@ func TestPluginStatusHook(t *testing.T) {
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, nettest.NewFakeHost(nil))
 
-	ip, err := plug.Status("namespace", "name", "dockerid2345")
+	ip, err := plug.Status("namespace", "name", kubecontainer.ContainerID{"docker", "dockerid2345"})
 	if err != nil {
 		t.Errorf("Expected nil got %v", err)
 	}
@@ -319,7 +320,7 @@ func TestPluginStatusHookIPv6(t *testing.T) {
 		t.Errorf("InitNetworkPlugin() failed: %v", err)
 	}
 
-	ip, err := plug.Status("namespace", "name", "dockerid2345")
+	ip, err := plug.Status("namespace", "name", kubecontainer.ContainerID{"docker", "dockerid2345"})
 	if err != nil {
 		t.Errorf("Status() failed: %v", err)
 	}
