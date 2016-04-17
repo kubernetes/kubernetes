@@ -59,8 +59,9 @@ import (
 )
 
 const (
-	DefaultEtcdPathPrefix = "/registry"
-	globalTimeout         = time.Minute
+	DefaultEtcdPathPrefix           = "/registry"
+	DefaultDeserializationCacheSize = 50000
+	globalTimeout                   = time.Minute
 )
 
 // StorageDestinations is a mapping from API group & resource to

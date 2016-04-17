@@ -151,7 +151,7 @@ func NewMasterConfig() *master.Config {
 	etcdClient := NewEtcdClient()
 	storageVersions := make(map[string]string)
 
-	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(), etcdtest.PathPrefix(), false)
+	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
 	autoscalingEtcdStorage := NewAutoscalingEtcdStorage(etcdClient)
 	storageVersions[autoscaling.GroupName] = testapi.Autoscaling.GroupVersion().String()
