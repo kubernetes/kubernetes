@@ -52,7 +52,7 @@ type FakeDockerClient struct {
 	RemovedImages sets.String
 	VersionInfo   docker.Env
 	Information   docker.Env
-	ExecInspect   *docker.ExecInspect
+	ExecInspect   *dockertypes.ContainerExecInspect
 	execCmd       []string
 	EnableSleep   bool
 }
@@ -447,15 +447,15 @@ func (f *FakeDockerClient) Info() (*docker.Env, error) {
 	return &f.Information, nil
 }
 
-func (f *FakeDockerClient) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
+func (f *FakeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.execCmd = opts.Cmd
 	f.called = append(f.called, "create_exec")
-	return &docker.Exec{ID: "12345678"}, nil
+	return &dockertypes.ContainerExecCreateResponse{ID: "12345678"}, nil
 }
 
-func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error {
+func (f *FakeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start_exec")
@@ -469,7 +469,7 @@ func (f *FakeDockerClient) AttachToContainer(opts docker.AttachToContainerOption
 	return nil
 }
 
-func (f *FakeDockerClient) InspectExec(id string) (*docker.ExecInspect, error) {
+func (f *FakeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
 	return f.ExecInspect, f.popError("inspect_exec")
 }
 
