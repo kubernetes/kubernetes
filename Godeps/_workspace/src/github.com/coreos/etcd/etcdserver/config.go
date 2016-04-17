@@ -50,8 +50,8 @@ type ServerConfig struct {
 	ElectionTicks    int
 	BootstrapTimeout time.Duration
 
-	V3demo                  bool
 	AutoCompactionRetention int
+	QuotaBackendBytes       int64
 
 	StrictReconfigCheck bool
 

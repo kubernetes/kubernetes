@@ -24,7 +24,7 @@ import (
 )
 
 type (
-	LeaseCreateResponse    pb.LeaseCreateResponse
+	LeaseGrantResponse     pb.LeaseGrantResponse
 	LeaseRevokeResponse    pb.LeaseRevokeResponse
 	LeaseKeepAliveResponse pb.LeaseKeepAliveResponse
 	LeaseID                int64
@@ -38,8 +38,8 @@ const (
 )
 
 type Lease interface {
-	// Create creates a new lease.
-	Create(ctx context.Context, ttl int64) (*LeaseCreateResponse, error)
+	// Grant creates a new lease.
+	Grant(ctx context.Context, ttl int64) (*LeaseGrantResponse, error)
 
 	// Revoke revokes the given lease.
 	Revoke(ctx context.Context, id LeaseID) (*LeaseRevokeResponse, error)
@@ -103,16 +103,16 @@ func NewLease(c *Client) Lease {
 	return l
 }
 
-func (l *lessor) Create(ctx context.Context, ttl int64) (*LeaseCreateResponse, error) {
+func (l *lessor) Grant(ctx context.Context, ttl int64) (*LeaseGrantResponse, error) {
 	cctx, cancel := context.WithCancel(ctx)
 	done := cancelWhenStop(cancel, l.stopCtx.Done())
 	defer close(done)
 
 	for {
-		r := &pb.LeaseCreateRequest{TTL: ttl}
-		resp, err := l.getRemote().LeaseCreate(cctx, r)
+		r := &pb.LeaseGrantRequest{TTL: ttl}
+		resp, err := l.getRemote().LeaseGrant(cctx, r)
 		if err == nil {
-			return (*LeaseCreateResponse)(resp), nil
+			return (*LeaseGrantResponse)(resp), nil
 		}
 		if isHalted(cctx, err) {
 			return nil, err

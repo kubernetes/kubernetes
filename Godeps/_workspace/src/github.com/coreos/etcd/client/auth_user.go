@@ -41,10 +41,6 @@ type UserRoles struct {
 	Roles []Role `json:"roles"`
 }
 
-type userName struct {
-	User string `json:"user"`
-}
-
 func v2AuthURL(ep url.URL, action string, name string) *url.URL {
 	if name != "" {
 		ep.Path = path.Join(ep.Path, defaultV2AuthPrefix, action, name)

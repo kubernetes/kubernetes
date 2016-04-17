@@ -17,49 +17,33 @@
 package fileutil
 
 import (
-	"errors"
 	"os"
 	"syscall"
 )
 
-var (
-	ErrLocked = errors.New("file already locked")
-)
-
-type lock struct {
-	fd   int
-	file *os.File
-}
-
-func (l *lock) Name() string {
-	return l.file.Name()
-}
-
-func (l *lock) TryLock() error {
-	err := syscall.Flock(l.fd, syscall.LOCK_EX|syscall.LOCK_NB)
-	if err != nil && err == syscall.EWOULDBLOCK {
-		return ErrLocked
-	}
-	return err
-}
-
-func (l *lock) Lock() error {
-	return syscall.Flock(l.fd, syscall.LOCK_EX)
-}
-
-func (l *lock) Unlock() error {
-	return syscall.Flock(l.fd, syscall.LOCK_UN)
-}
-
-func (l *lock) Destroy() error {
-	return l.file.Close()
-}
-
-func NewLock(file string) (Lock, error) {
-	f, err := os.Open(file)
+func TryLockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
+	f, err := os.OpenFile(path, flag, perm)
 	if err != nil {
 		return nil, err
 	}
-	l := &lock{int(f.Fd()), f}
-	return l, nil
+	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		f.Close()
+		if err == syscall.EWOULDBLOCK {
+			err = ErrLocked
+		}
+		return nil, err
+	}
+	return &LockedFile{f}, nil
+}
+
+func LockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
+	f, err := os.OpenFile(path, flag, perm)
+	if err != nil {
+		return nil, err
+	}
+	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		f.Close()
+		return nil, err
+	}
+	return &LockedFile{f}, err
 }

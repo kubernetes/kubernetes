@@ -35,8 +35,8 @@
 		WatchCreateRequest
 		WatchCancelRequest
 		WatchResponse
-		LeaseCreateRequest
-		LeaseCreateResponse
+		LeaseGrantRequest
+		LeaseGrantResponse
 		LeaseRevokeRequest
 		LeaseRevokeResponse
 		LeaseKeepAliveRequest
@@ -52,34 +52,39 @@
 		MemberListResponse
 		DefragmentRequest
 		DefragmentResponse
+		AlarmRequest
+		AlarmMember
+		AlarmResponse
+		StatusRequest
+		StatusResponse
 		AuthEnableRequest
 		AuthDisableRequest
 		AuthenticateRequest
-		UserAddRequest
-		UserGetRequest
-		UserDeleteRequest
-		UserChangePasswordRequest
-		UserGrantRequest
-		UserRevokeRequest
-		RoleAddRequest
-		RoleGetRequest
-		RoleDeleteRequest
-		RoleGrantRequest
-		RoleRevokeRequest
+		AuthUserAddRequest
+		AuthUserGetRequest
+		AuthUserDeleteRequest
+		AuthUserChangePasswordRequest
+		AuthUserGrantRequest
+		AuthUserRevokeRequest
+		AuthRoleAddRequest
+		AuthRoleGetRequest
+		AuthRoleDeleteRequest
+		AuthRoleGrantRequest
+		AuthRoleRevokeRequest
 		AuthEnableResponse
 		AuthDisableResponse
 		AuthenticateResponse
-		UserAddResponse
-		UserGetResponse
-		UserDeleteResponse
-		UserChangePasswordResponse
-		UserGrantResponse
-		UserRevokeResponse
-		RoleAddResponse
-		RoleGetResponse
-		RoleDeleteResponse
-		RoleGrantResponse
-		RoleRevokeResponse
+		AuthUserAddResponse
+		AuthUserGetResponse
+		AuthUserDeleteResponse
+		AuthUserChangePasswordResponse
+		AuthUserGrantResponse
+		AuthUserRevokeResponse
+		AuthRoleAddResponse
+		AuthRoleGetResponse
+		AuthRoleDeleteResponse
+		AuthRoleGrantResponse
+		AuthRoleRevokeResponse
 */
 package etcdserverpb
 
@@ -87,9 +92,9 @@ import (
 	"fmt"
 
 	proto "github.com/gogo/protobuf/proto"
-)
 
-import math "math"
+	math "math"
+)
 
 import io "io"
 

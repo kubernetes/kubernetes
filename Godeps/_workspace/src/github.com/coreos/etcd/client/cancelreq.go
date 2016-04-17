@@ -4,8 +4,6 @@
 
 // borrowed from golang/net/context/ctxhttp/cancelreq.go
 
-// +build go1.5
-
 package client
 
 import "net/http"

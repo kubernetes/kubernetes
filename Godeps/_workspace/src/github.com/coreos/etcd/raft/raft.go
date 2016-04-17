@@ -29,8 +29,6 @@ import (
 const None uint64 = 0
 const noLimit = math.MaxUint64
 
-var errNoLeader = errors.New("no leader")
-
 var ErrSnapshotTemporarilyUnavailable = errors.New("snapshot is temporarily unavailable")
 
 // Possible values for StateType.
@@ -176,9 +174,14 @@ type raft struct {
 
 	heartbeatTimeout int
 	electionTimeout  int
-	rand             *rand.Rand
-	tick             func()
-	step             stepFunc
+	// randomizedElectionTimeout is a random number between
+	// [electiontimeout, 2 * electiontimeout - 1]. It gets reset
+	// when raft changes its state to follower or candidate.
+	randomizedElectionTimeout int
+
+	rand *rand.Rand
+	tick func()
+	step stepFunc
 
 	logger Logger
 }
@@ -392,6 +395,7 @@ func (r *raft) reset(term uint64) {
 
 	r.electionElapsed = 0
 	r.heartbeatElapsed = 0
+	r.resetRandomizedElectionTimeout()
 
 	r.votes = make(map[uint64]bool)
 	for id := range r.prs {
@@ -422,7 +426,7 @@ func (r *raft) tickElection() {
 		return
 	}
 	r.electionElapsed++
-	if r.isElectionTimeout() {
+	if r.pastElectionTimeout() {
 		r.electionElapsed = 0
 		r.Step(pb.Message{From: r.id, Type: pb.MsgHup})
 	}
@@ -863,15 +867,15 @@ func (r *raft) loadState(state pb.HardState) {
 	r.Vote = state.Vote
 }
 
-// isElectionTimeout returns true if r.electionElapsed is greater than the
-// randomized election timeout in (electiontimeout, 2 * electiontimeout - 1).
-// Otherwise, it returns false.
-func (r *raft) isElectionTimeout() bool {
-	d := r.electionElapsed - r.electionTimeout
-	if d < 0 {
-		return false
-	}
-	return d > r.rand.Int()%r.electionTimeout
+// pastElectionTimeout returns true iff r.electionElapsed is greater
+// than or equal to the randomized election timeout in
+// [electiontimeout, 2 * electiontimeout - 1].
+func (r *raft) pastElectionTimeout() bool {
+	return r.electionElapsed >= r.randomizedElectionTimeout
+}
+
+func (r *raft) resetRandomizedElectionTimeout() {
+	r.randomizedElectionTimeout = r.electionTimeout + r.rand.Intn(r.electionTimeout)
 }
 
 // checkQuorumActive returns true if the quorum is active from

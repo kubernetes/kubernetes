@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// error package describes errors in etcd project. When any change happens,
+// Package error describes errors in etcd project. When any change happens,
 // Documentation/errorcode.md needs to be updated correspondingly.
 package error
 

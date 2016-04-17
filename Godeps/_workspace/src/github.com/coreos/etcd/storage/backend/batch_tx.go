@@ -31,6 +31,7 @@ type BatchTx interface {
 	UnsafeSeqPut(bucketName []byte, key []byte, value []byte)
 	UnsafeRange(bucketName []byte, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte)
 	UnsafeDelete(bucketName []byte, key []byte)
+	UnsafeForEach(bucketName []byte, visitor func(k, v []byte) error) error
 	Commit()
 	CommitAndStop()
 }
@@ -120,6 +121,11 @@ func (t *batchTx) UnsafeDelete(bucketName []byte, key []byte) {
 		log.Fatalf("storage: cannot delete key from bucket (%v)", err)
 	}
 	t.pending++
+}
+
+// UnsafeForEach must be called holding the lock on the tx.
+func (t *batchTx) UnsafeForEach(bucketName []byte, visitor func(k, v []byte) error) error {
+	return t.tx.Bucket(bucketName).ForEach(visitor)
 }
 
 // Commit commits a previous tx and begins a new writable one.

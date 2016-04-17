@@ -17,25 +17,11 @@
 package fileutil
 
 import (
-	"errors"
 	"os"
 	"syscall"
 )
 
-var (
-	ErrLocked = errors.New("file already locked")
-)
-
-type lock struct {
-	fd   int
-	file *os.File
-}
-
-func (l *lock) Name() string {
-	return l.file.Name()
-}
-
-func (l *lock) TryLock() error {
+func TryLockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
 	var lock syscall.Flock_t
 	lock.Start = 0
 	lock.Len = 0
@@ -43,45 +29,34 @@ func (l *lock) TryLock() error {
 	lock.Type = syscall.F_WRLCK
 	lock.Whence = 0
 	lock.Pid = 0
-	err := syscall.FcntlFlock(uintptr(l.fd), syscall.F_SETLK, &lock)
-	if err != nil && err == syscall.EAGAIN {
-		return ErrLocked
-	}
-	return err
-}
-
-func (l *lock) Lock() error {
-	var lock syscall.Flock_t
-	lock.Start = 0
-	lock.Len = 0
-	lock.Type = syscall.F_WRLCK
-	lock.Whence = 0
-	lock.Pid = 0
-	return syscall.FcntlFlock(uintptr(l.fd), syscall.F_SETLK, &lock)
-}
-
-func (l *lock) Unlock() error {
-	var lock syscall.Flock_t
-	lock.Start = 0
-	lock.Len = 0
-	lock.Type = syscall.F_UNLCK
-	lock.Whence = 0
-	err := syscall.FcntlFlock(uintptr(l.fd), syscall.F_SETLK, &lock)
-	if err != nil && err == syscall.EAGAIN {
-		return ErrLocked
-	}
-	return err
-}
-
-func (l *lock) Destroy() error {
-	return l.file.Close()
-}
-
-func NewLock(file string) (Lock, error) {
-	f, err := os.OpenFile(file, os.O_WRONLY, 0600)
+	f, err := os.OpenFile(path, flag, perm)
 	if err != nil {
 		return nil, err
 	}
-	l := &lock{int(f.Fd()), f}
-	return l, nil
+	if err := syscall.FcntlFlock(f.Fd(), syscall.F_SETLK, &lock); err != nil {
+		f.Close()
+		if err == syscall.EAGAIN {
+			err = ErrLocked
+		}
+		return nil, err
+	}
+	return &LockedFile{f}, nil
+}
+
+func LockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
+	var lock syscall.Flock_t
+	lock.Start = 0
+	lock.Len = 0
+	lock.Pid = 0
+	lock.Type = syscall.F_WRLCK
+	lock.Whence = 0
+	f, err := os.OpenFile(path, flag, perm)
+	if err != nil {
+		return nil, err
+	}
+	if err = syscall.FcntlFlock(f.Fd(), syscall.F_SETLKW, &lock); err != nil {
+		f.Close()
+		return nil, err
+	}
+	return &LockedFile{f}, nil
 }
