@@ -72,6 +72,18 @@ type EtcdConfig struct {
 	CertFile   string
 	CAFile     string
 	Quorum     bool
+	Username   string
+	Password   string
+}
+
+func (c *EtcdConfig) newClientConfig(transport *http.Transport) etcd.Config {
+	config := etcd.Config{
+		Endpoints: c.ServerList,
+		Transport: transport,
+		Username:  c.Username,
+		Password:  c.Password,
+	}
+	return config
 }
 
 func (c *EtcdConfig) newEtcdClient() (etcd.Client, error) {
@@ -80,10 +92,8 @@ func (c *EtcdConfig) newEtcdClient() (etcd.Client, error) {
 		return nil, err
 	}
 
-	cli, err := etcd.New(etcd.Config{
-		Endpoints: c.ServerList,
-		Transport: t,
-	})
+	clientConfig := c.newClientConfig(t)
+	cli, err := etcd.New(clientConfig)
 	if err != nil {
 		return nil, err
 	}
