@@ -48,13 +48,13 @@ type kubenetNetworkPlugin struct {
 	cniConfig *libcni.CNIConfig
 	shaper    bandwidth.BandwidthShaper
 
-	podCIDRs map[kubecontainer.DockerID]string
+	podCIDRs map[kubecontainer.ContainerID]string
 	MTU      int
 }
 
 func NewPlugin() network.NetworkPlugin {
 	return &kubenetNetworkPlugin{
-		podCIDRs: make(map[kubecontainer.DockerID]string),
+		podCIDRs: make(map[kubecontainer.ContainerID]string),
 		MTU:      1460,
 	}
 }
@@ -180,7 +180,7 @@ func (plugin *kubenetNetworkPlugin) Name() string {
 	return KubenetPluginName
 }
 
-func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.DockerID) error {
+func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	// Can't set up pods if we don't have a PodCIDR yet
 	if plugin.netConfig == nil {
 		return fmt.Errorf("Kubenet needs a PodCIDR to set up pods")
@@ -190,12 +190,12 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	if !ok {
 		return fmt.Errorf("Kubenet execution called on non-docker runtime")
 	}
-	netnsPath, err := runtime.GetNetNS(id.ContainerID())
+	netnsPath, err := runtime.GetNetNS(id)
 	if err != nil {
 		return err
 	}
 
-	rt := buildCNIRuntimeConf(name, namespace, id.ContainerID(), netnsPath)
+	rt := buildCNIRuntimeConf(name, namespace, id, netnsPath)
 	if err != nil {
 		return fmt.Errorf("Error building CNI config: %v", err)
 	}
@@ -225,7 +225,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	return nil
 }
 
-func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.DockerID) error {
+func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	if plugin.netConfig == nil {
 		return fmt.Errorf("Kubenet needs a PodCIDR to tear down pods")
 	}
@@ -234,12 +234,12 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	if !ok {
 		return fmt.Errorf("Kubenet execution called on non-docker runtime")
 	}
-	netnsPath, err := runtime.GetNetNS(id.ContainerID())
+	netnsPath, err := runtime.GetNetNS(id)
 	if err != nil {
 		return err
 	}
 
-	rt := buildCNIRuntimeConf(name, namespace, id.ContainerID(), netnsPath)
+	rt := buildCNIRuntimeConf(name, namespace, id, netnsPath)
 	if err != nil {
 		return fmt.Errorf("Error building CNI config: %v", err)
 	}
@@ -266,7 +266,7 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
-func (plugin *kubenetNetworkPlugin) Status(namespace string, name string, id kubecontainer.DockerID) (*network.PodNetworkStatus, error) {
+func (plugin *kubenetNetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
 	cidr, ok := plugin.podCIDRs[id]
 	if !ok {
 		return nil, fmt.Errorf("No IP address found for pod %v", id)
