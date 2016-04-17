@@ -126,7 +126,9 @@ func (es *e2eService) startApiServer() (*exec.Cmd, error) {
 		"--etcd-servers", "http://127.0.0.1:4001",
 		"--insecure-bind-address", "0.0.0.0",
 		"--service-cluster-ip-range", "10.0.0.1/24",
-		"--kubelet-port", "10250")
+		"--kubelet-port", "10250",
+		"--allow-privileged", "true",
+	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:8080/healthz",
 		cmd,
@@ -142,6 +144,7 @@ func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
 		"--port", "10250",
 		"--hostname-override", es.nodeName, // Required because hostname is inconsistent across hosts
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
+		"--allow-privileged", "true",
 	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:10255/healthz",
