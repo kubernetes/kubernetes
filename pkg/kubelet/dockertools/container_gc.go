@@ -24,7 +24,7 @@ import (
 	"sort"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
@@ -111,7 +111,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	for i := numToKeep; i < len(containers); i++ {
-		err := cgc.client.RemoveContainer(docker.RemoveContainerOptions{ID: containers[i].id, RemoveVolumes: true})
+		err := cgc.client.RemoveContainer(containers[i].id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
 		if err != nil {
 			glog.Warningf("Failed to remove dead container %q: %v", containers[i].name, err)
 		}
@@ -145,14 +145,20 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			continue
 		} else if data.State.Running {
 			continue
-		} else if newestGCTime.Before(data.Created) {
+		}
+
+		created, err := parseDockerTimestamp(data.Created)
+		if err != nil {
+			glog.Errorf("Failed to parse Created timestamp %q for container %q", data.Created, container.ID)
+		}
+		if newestGCTime.Before(created) {
 			continue
 		}
 
 		containerInfo := containerGCInfo{
 			id:         container.ID,
 			name:       container.Names[0],
-			createTime: data.Created,
+			createTime: created,
 		}
 
 		containerName, _, err := ParseDockerName(container.Names[0])
@@ -189,7 +195,7 @@ func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy)
 	// Remove unidentified containers.
 	for _, container := range unidentifiedContainers {
 		glog.Infof("Removing unidentified dead container %q with ID %q", container.name, container.id)
-		err = cgc.client.RemoveContainer(docker.RemoveContainerOptions{ID: container.id, RemoveVolumes: true})
+		err = cgc.client.RemoveContainer(container.id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
 		if err != nil {
 			glog.Warningf("Failed to remove unidentified dead container %q: %v", container.name, err)
 		}
