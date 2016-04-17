@@ -1,3 +1,5 @@
+// +build fixtures
+
 package databases
 
 import (
