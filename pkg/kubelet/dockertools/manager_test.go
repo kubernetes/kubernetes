@@ -438,7 +438,7 @@ func TestKillContainerInPod(t *testing.T) {
 
 func TestKillContainerInPodWithPreStop(t *testing.T) {
 	manager, fakeDocker := newTestDockerManager()
-	fakeDocker.ExecInspect = &docker.ExecInspect{
+	fakeDocker.ExecInspect = &dockertypes.ContainerExecInspect{
 		Running:  false,
 		ExitCode: 0,
 	}

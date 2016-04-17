@@ -166,25 +166,25 @@ func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
 	return out, err
 }
 
-func (in instrumentedDockerInterface) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
+func (in instrumentedDockerInterface) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
 	const operation = "create_exec"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.client.CreateExec(opts)
+	out, err := in.client.CreateExec(id, opts)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedDockerInterface) StartExec(startExec string, opts docker.StartExecOptions) error {
+func (in instrumentedDockerInterface) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
 	const operation = "start_exec"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.StartExec(startExec, opts)
+	err := in.client.StartExec(startExec, opts, sopts)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedDockerInterface) InspectExec(id string) (*docker.ExecInspect, error) {
+func (in instrumentedDockerInterface) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
 	const operation = "inspect_exec"
 	defer recordOperation(operation, time.Now())
 
