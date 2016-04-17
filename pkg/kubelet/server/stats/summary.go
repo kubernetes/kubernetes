@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 
 	"github.com/golang/glog"
+
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 )
@@ -284,10 +285,25 @@ func (sb *summaryBuilder) containerInfoV2ToStats(
 			PageFaults:      &pageFaults,
 			MajorPageFaults: &majorPageFaults,
 		}
+		// availableBytes = memory  limit (if known) - workingset
+		if !isMemoryUnlimited(info.Spec.Memory.Limit) {
+			availableBytes := info.Spec.Memory.Limit - cstat.Memory.WorkingSet
+			cStats.Memory.AvailableBytes = &availableBytes
+		}
 	}
+
 	sb.containerInfoV2FsStats(info, &cStats)
 	cStats.UserDefinedMetrics = sb.containerInfoV2ToUserDefinedMetrics(info)
 	return cStats
+}
+
+// Size after which we consider memory to be "unlimited". This is not
+// MaxInt64 due to rounding by the kernel.
+// TODO: cadvisor should export this https://github.com/google/cadvisor/blob/master/metrics/prometheus.go#L596
+const maxMemorySize = uint64(1 << 62)
+
+func isMemoryUnlimited(v uint64) bool {
+	return v > maxMemorySize
 }
 
 func (sb *summaryBuilder) containerInfoV2ToNetworkStats(name string, info *cadvisorapiv2.ContainerInfo) *stats.NetworkStats {
