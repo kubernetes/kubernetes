@@ -175,10 +175,17 @@ func New(c *Config) (*Master, error) {
 	return m, nil
 }
 
-func resetMetrics(w http.ResponseWriter, req *http.Request) {
-	apiservermetrics.Reset()
-	etcdmetrics.Reset()
-	io.WriteString(w, "metrics reset\n")
+var defaultMetricsHandler = prometheus.Handler().ServeHTTP
+
+// MetricsWithReset is a handler that resets metrics when DELETE is passed to the endpoint.
+func MetricsWithReset(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "DELETE" {
+		apiservermetrics.Reset()
+		etcdmetrics.Reset()
+		io.WriteString(w, "metrics reset\n")
+		return
+	}
+	defaultMetricsHandler(w, req)
 }
 
 func (m *Master) InstallAPIs(c *Config) {
@@ -220,8 +227,11 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
 	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, healthzChecks...)
+
 	if c.EnableProfiling {
-		m.MuxHelper.HandleFunc("/resetMetrics", resetMetrics)
+		m.MuxHelper.HandleFunc("/metrics", MetricsWithReset)
+	} else {
+		m.MuxHelper.HandleFunc("/metrics", defaultMetricsHandler)
 	}
 
 	// Install root web services
