@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws_credentials
+package credentials
 
 import (
 	"encoding/base64"
@@ -84,6 +84,8 @@ type lazyEcrProvider struct {
 	actualProvider *credentialprovider.CachingDockerConfigProvider
 }
 
+var _ credentialprovider.DockerConfigProvider = &lazyEcrProvider{}
+
 // ecrProvider is a DockerConfigProvider that gets and refreshes 12-hour tokens
 // from AWS to access ECR.
 type ecrProvider struct {
@@ -91,6 +93,8 @@ type ecrProvider struct {
 	regionURL string
 	getter    tokenGetter
 }
+
+var _ credentialprovider.DockerConfigProvider = &ecrProvider{}
 
 // Init creates a lazy provider for each AWS region, in order to support
 // cross-region ECR access. They have to be lazy because it's unlikely, but not
@@ -101,20 +105,17 @@ type ecrProvider struct {
 func Init() {
 	for _, region := range AWSRegions {
 		credentialprovider.RegisterCredentialProvider("aws-ecr-"+region,
-			&credentialprovider.CachingDockerConfigProvider{
-				Provider: &lazyEcrProvider{
-					region:    region,
-					regionURL: fmt.Sprintf(registryURLTemplate, region),
-				},
-				// This is going to be just a lazy proxy to the real ecrProvider.
-				// It holds no real credentials, so refresh practically never.
-				Lifetime: 365 * 24 * time.Hour,
+			&lazyEcrProvider{
+				region:    region,
+				regionURL: fmt.Sprintf(registryURLTemplate, region),
 			})
 	}
 
 }
 
 // Enabled implements DockerConfigProvider.Enabled for the lazy provider.
+// Since we perform no checks/work of our own and actualProvider is only created
+// later at image pulling time (if ever), always return true.
 func (p *lazyEcrProvider) Enabled() bool {
 	return true
 }
@@ -126,15 +127,11 @@ func (p *lazyEcrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
 	if p.actualProvider == nil {
 		glog.V(2).Infof("Creating ecrProvider for %s", p.region)
 		p.actualProvider = &credentialprovider.CachingDockerConfigProvider{
-			Provider: &ecrProvider{
-				region: p.region,
-				regionURL: p.regionURL,
-			},
+			Provider: newEcrProvider(p.region, nil),
 			// Refresh credentials a little earlier than expiration time
 			Lifetime: 11*time.Hour + 55*time.Minute,
 		}
 		if !p.actualProvider.Enabled() {
-
 			return nil
 		}
 	}
@@ -151,6 +148,14 @@ func (p *lazyEcrProvider) Provide() credentialprovider.DockerConfig {
 	cfg := credentialprovider.DockerConfig{}
 	cfg[p.regionURL] = entry
 	return cfg
+}
+
+func newEcrProvider(region string, getter tokenGetter) *ecrProvider {
+	return &ecrProvider{
+		region:    region,
+		regionURL: fmt.Sprintf(registryURLTemplate, region),
+		getter:    getter,
+	}
 }
 
 // Enabled implements DockerConfigProvider.Enabled for the AWS token-based implementation.
