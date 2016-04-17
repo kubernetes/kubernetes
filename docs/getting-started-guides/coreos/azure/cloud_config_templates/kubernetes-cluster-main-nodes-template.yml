@@ -216,6 +216,7 @@ coreos:
         [Service]
         ExecStart=/opt/kubernetes/server/bin/kube-apiserver \
             --insecure-bind-address=0.0.0.0 \
+            --bind-address=0.0.0.0 \
             --advertise-address=$public_ipv4 \
             --port=8080 \
             $ETCD_SERVERS \
