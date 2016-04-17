@@ -439,6 +439,46 @@ runTests() {
   # Post-condition: no POD exists
   kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{$id_field}}:{{end}}' ''
 
+  # Detailed tests for describe pod output
+    ### Create a new namespace
+  # Pre-condition: the test-secrets namespace does not exist
+  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-kubectl-describe-pod\" }}found{{end}}{{end}}:' ':'
+  # Command
+  kubectl create namespace test-kubectl-describe-pod
+  # Post-condition: namespace 'test-secrets' is created.
+  kube::test::get_object_assert 'namespaces/test-kubectl-describe-pod' "{{$id_field}}" 'test-kubectl-describe-pod'
+
+  ### Create a generic secret
+  # Pre-condition: no SECRET exists
+  kube::test::get_object_assert 'secrets --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create secret generic test-secret --from-literal=key-1=value1 --type=test-type --namespace=test-kubectl-describe-pod
+  # Post-condition: secret exists and has expected values
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-kubectl-describe-pod' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-kubectl-describe-pod' "{{$secret_type}}" 'test-type'
+
+  ### Create a generic configmap
+  # Pre-condition: no CONFIGMAP exists
+  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create configmap test-configmap --from-literal=key-2=value2 --namespace=test-kubectl-describe-pod
+  # Post-condition: configmap exists and has expected values
+  kube::test::get_object_assert 'configmap/test-configmap --namespace=test-kubectl-describe-pod' "{{$id_field}}" 'test-configmap'
+
+  # Create a pod that consumes secret, configmap, and downward API keys as envs
+  kube::test::get_object_assert 'pods --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
+  kubectl create -f hack/testdata/pod-with-api-env.yaml --namespace=test-kubectl-describe-pod
+
+  kube::test::describe_object_assert 'pods --namespace=test-kubectl-describe-pod' 'env-test-pod' "TEST_CMD_1" "<set to the key 'key-1' in secret 'test-secret'>" "TEST_CMD_2" "<set to the key 'key-2' of config map 'test-configmap'>" "TEST_CMD_3" "env-test-pod (v1:metadata.name)"
+  # Describe command (resource only) should print detailed information about environment variables
+  kube::test::describe_resource_assert 'pods --namespace=test-kubectl-describe-pod' "TEST_CMD_1" "<set to the key 'key-1' in secret 'test-secret'>" "TEST_CMD_2" "<set to the key 'key-2' of config map 'test-configmap'>" "TEST_CMD_3" "env-test-pod (v1:metadata.name)"
+
+  # Clean-up
+  kubectl delete pod env-test-pod --namespace=test-kubectl-describe-pod
+  kubectl delete secret test-secret --namespace=test-kubectl-describe-pod
+  kubectl delete configmap test-configmap --namespace=test-kubectl-describe-pod
+  kubectl delete namespace test-kubectl-describe-pod
+
   ### Create two PODs
   # Pre-condition: no POD exists
   create_and_use_new_namespace
