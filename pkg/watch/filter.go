@@ -16,6 +16,10 @@ limitations under the License.
 
 package watch
 
+import (
+	"sync"
+)
+
 // FilterFunc should take an event, possibly modify it in some way, and return
 // the modified event. If the event should be ignored, then return keep=false.
 type FilterFunc func(in Event) (out Event, keep bool)
@@ -68,4 +72,38 @@ func (fw *filteredWatch) loop() {
 			fw.result <- filtered
 		}
 	}
+}
+
+// Recorder records all events that are sent from the watch until it is closed.
+type Recorder struct {
+	Interface
+
+	lock   sync.Mutex
+	events []Event
+}
+
+var _ Interface = &Recorder{}
+
+// NewRecorder wraps an Interface and records any changes sent across it.
+func NewRecorder(w Interface) *Recorder {
+	r := &Recorder{}
+	r.Interface = Filter(w, r.record)
+	return r
+}
+
+// record is a FilterFunc and tracks each received event.
+func (r *Recorder) record(in Event) (Event, bool) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.events = append(r.events, in)
+	return in, true
+}
+
+// Events returns a copy of the events sent across this recorder.
+func (r *Recorder) Events() []Event {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	copied := make([]Event, len(r.events))
+	copy(copied, r.events)
+	return copied
 }

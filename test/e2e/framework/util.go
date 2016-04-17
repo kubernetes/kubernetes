@@ -68,7 +68,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/blang/semver"
-	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
 
@@ -329,6 +328,7 @@ var providersWithMasterSSH = []string{"gce", "gke", "kubemark", "aws"}
 type podCondition func(pod *api.Pod) (bool, error)
 
 // podReady returns whether pod has a condition of Ready with a status of true.
+// TODO: should be replaced with api.IsPodReady
 func podReady(pod *api.Pod) bool {
 	for _, cond := range pod.Status.Conditions {
 		if cond.Type == api.PodReady && cond.Status == api.ConditionTrue {
@@ -628,25 +628,12 @@ func WaitForNamespacesDeleted(c *client.Client, namespaces []string, timeout tim
 }
 
 func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName string, timeout time.Duration) error {
-	Logf("Waiting up to %v for service account %s to be provisioned in ns %s", timeout, serviceAccountName, ns)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		sa, err := c.ServiceAccounts(ns).Get(serviceAccountName)
-		if apierrs.IsNotFound(err) {
-			Logf("Get service account %s in ns %s failed, ignoring for %v: %v", serviceAccountName, ns, Poll, err)
-			continue
-		}
-		if err != nil {
-			Logf("Get service account %s in ns %s failed: %v", serviceAccountName, ns, err)
-			return err
-		}
-		if len(sa.Secrets) == 0 {
-			Logf("Service account %s in ns %s had 0 secrets, ignoring for %v: %v", serviceAccountName, ns, Poll, err)
-			continue
-		}
-		Logf("Service account %s in ns %s with secrets found. (%v)", serviceAccountName, ns, time.Since(start))
-		return nil
+	w, err := c.ServiceAccounts(ns).Watch(api.SingleObject(api.ObjectMeta{Name: serviceAccountName}))
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("Service account %s in namespace %s not ready within %v", serviceAccountName, ns, timeout)
+	_, err = watch.Until(timeout, w, client.ServiceAccountHasSecrets)
+	return err
 }
 
 func waitForPodCondition(c *client.Client, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
@@ -902,16 +889,12 @@ func waitForPodRunningInNamespaceSlow(c *client.Client, podName string, namespac
 }
 
 func waitTimeoutForPodRunningInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
-	return waitForPodCondition(c, namespace, podName, "running", timeout, func(pod *api.Pod) (bool, error) {
-		if pod.Status.Phase == api.PodRunning {
-			Logf("Found pod '%s' on node '%s'", podName, pod.Spec.NodeName)
-			return true, nil
-		}
-		if pod.Status.Phase == api.PodFailed {
-			return true, fmt.Errorf("Giving up; pod went into failed status: \n%s", spew.Sprintf("%#v", pod))
-		}
-		return false, nil
-	})
+	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
+	if err != nil {
+		return err
+	}
+	_, err = watch.Until(timeout, w, client.PodRunning)
+	return err
 }
 
 // Waits default amount of time (podNoLongerRunningTimeout) for the specified pod to stop running.
@@ -921,37 +904,31 @@ func WaitForPodNoLongerRunningInNamespace(c *client.Client, podName string, name
 }
 
 func waitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
-	return waitForPodCondition(c, namespace, podName, "no longer running", timeout, func(pod *api.Pod) (bool, error) {
-		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-			Logf("Found pod '%s' with status '%s' on node '%s'", podName, pod.Status.Phase, pod.Spec.NodeName)
-			return true, nil
-		}
-		return false, nil
-	})
+	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
+	if err != nil {
+		return err
+	}
+	_, err = watch.Until(timeout, w, client.PodCompleted)
+	return err
 }
 
 func waitTimeoutForPodReadyInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
-	return waitForPodCondition(c, namespace, podName, "running", timeout, func(pod *api.Pod) (bool, error) {
-		if pod.Status.Phase == api.PodRunning {
-			Logf("Found pod '%s' on node '%s'", podName, pod.Spec.NodeName)
-			return true, nil
-		}
-		if pod.Status.Phase == api.PodFailed {
-			return true, fmt.Errorf("Giving up; pod went into failed status: \n%s", spew.Sprintf("%#v", pod))
-		}
-		return podReady(pod), nil
-	})
+	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
+	if err != nil {
+		return err
+	}
+	_, err = watch.Until(timeout, w, client.PodRunningAndReady)
+	return err
 }
 
 // WaitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
 func WaitForPodNotPending(c *client.Client, ns, podName string) error {
-	return waitForPodCondition(c, ns, podName, "!pending", PodStartTimeout, func(pod *api.Pod) (bool, error) {
-		if pod.Status.Phase != api.PodPending {
-			Logf("Saw pod '%s' in namespace '%s' out of pending state (found '%q')", podName, ns, pod.Status.Phase)
-			return true, nil
-		}
-		return false, nil
-	})
+	w, err := c.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
+	if err != nil {
+		return err
+	}
+	_, err = watch.Until(PodStartTimeout, w, client.PodNotPending)
+	return err
 }
 
 // waitForPodTerminatedInNamespace returns an error if it took too long for the pod
