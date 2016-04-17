@@ -29,6 +29,7 @@ import (
 
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func TestCreate(t *testing.T) {
@@ -69,6 +70,25 @@ func TestCreate(t *testing.T) {
 	if len(getResp.Kvs) == 0 {
 		t.Fatalf("expecting non empty result on key: %s", key)
 	}
+}
+
+func TestCreateWithTTL(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	input := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	key := "/somekey"
+
+	out := &api.Pod{}
+	if err := store.Create(ctx, key, input, out, 1); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	w, err := store.Watch(ctx, key, out.ResourceVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckResult(t, 0, watch.Deleted, w, nil)
 }
 
 func TestCreateWithKeyExist(t *testing.T) {
@@ -353,6 +373,30 @@ func TestGuaranteedUpdate(t *testing.T) {
 		}
 		storeObj = out
 	}
+}
+
+func TestGuaranteedUpdateWithTTL(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	input := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	key := "/somekey"
+
+	out := &api.Pod{}
+	err := store.GuaranteedUpdate(ctx, key, out, true, nil,
+		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			ttl := uint64(1)
+			return input, &ttl, nil
+		})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	w, err := store.Watch(ctx, key, out.ResourceVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckResult(t, 0, watch.Deleted, w, nil)
 }
 
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
