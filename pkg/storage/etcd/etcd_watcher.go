@@ -317,7 +317,7 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 	}
 
 	// ensure resource version is set on the object we load from etcd
-	if err := w.versioner.UpdateObject(obj, node.Expiration, node.ModifiedIndex); err != nil {
+	if err := w.versioner.UpdateObject(obj, node.ModifiedIndex); err != nil {
 		utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", node.ModifiedIndex, obj, err))
 	}
 

@@ -354,7 +354,7 @@ func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtim
 	}
 	if version != 0 {
 		// We cannot store object with resourceVersion in etcd. We need to reset it.
-		if err := s.versioner.UpdateObject(ret, nil, 0); err != nil {
+		if err := s.versioner.UpdateObject(ret, 0); err != nil {
 			return nil, fmt.Errorf("UpdateObject failed: %v", err)
 		}
 	}
@@ -379,7 +379,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 		return err
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	versioner.UpdateObject(objPtr, nil, uint64(rev))
+	versioner.UpdateObject(objPtr, uint64(rev))
 	return nil
 }
 
@@ -396,7 +396,7 @@ func decodeList(elems []*elemForDecode, filter storage.FilterFunc, ListPtr inter
 			return err
 		}
 		// being unable to set the version does not prevent the object from being extracted
-		versioner.UpdateObject(obj, nil, elem.rev)
+		versioner.UpdateObject(obj, elem.rev)
 		if filter(obj) {
 			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 		}
