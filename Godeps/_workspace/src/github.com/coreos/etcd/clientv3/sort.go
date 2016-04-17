@@ -26,8 +26,8 @@ const (
 const (
 	SortByKey SortTarget = iota
 	SortByVersion
-	SortByCreatedRev
-	SortByModifiedRev
+	SortByCreateRevision
+	SortByModRevision
 	SortByValue
 )
 

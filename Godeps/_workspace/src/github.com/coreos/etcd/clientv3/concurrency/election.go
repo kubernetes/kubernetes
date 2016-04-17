@@ -74,7 +74,7 @@ func (e *Election) Proclaim(ctx context.Context, val string) error {
 	if e.leaderSession == nil {
 		return ErrElectionNotLeader
 	}
-	cmp := v3.Compare(v3.CreatedRevision(e.leaderKey), "=", e.leaderRev)
+	cmp := v3.Compare(v3.CreateRevision(e.leaderKey), "=", e.leaderRev)
 	txn := e.client.Txn(ctx).If(cmp)
 	txn = txn.Then(v3.OpPut(e.leaderKey, val, v3.WithLease(e.leaderSession.Lease())))
 	tresp, terr := txn.Commit()

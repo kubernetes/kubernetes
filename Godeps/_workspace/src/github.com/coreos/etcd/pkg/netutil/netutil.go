@@ -116,3 +116,8 @@ func URLStringsEqual(a []string, b []string) bool {
 
 	return urlsEqual(urlsA, urlsB)
 }
+
+func IsNetworkTimeoutError(err error) bool {
+	nerr, ok := err.(net.Error)
+	return ok && nerr.Timeout()
+}

@@ -40,29 +40,16 @@ func PurgeFile(dirname string, suffix string, max uint, interval time.Duration, 
 			sort.Strings(newfnames)
 			for len(newfnames) > int(max) {
 				f := path.Join(dirname, newfnames[0])
-				l, err := NewLock(f)
-				if err != nil {
-					errC <- err
-					return
-				}
-				err = l.TryLock()
+				l, err := TryLockFile(f, os.O_WRONLY, 0600)
 				if err != nil {
 					break
 				}
-				err = os.Remove(f)
-				if err != nil {
+				if err = os.Remove(f); err != nil {
 					errC <- err
 					return
 				}
-				err = l.Unlock()
-				if err != nil {
+				if err = l.Close(); err != nil {
 					plog.Errorf("error unlocking %s when purging file (%v)", l.Name(), err)
-					errC <- err
-					return
-				}
-				err = l.Destroy()
-				if err != nil {
-					plog.Errorf("error destroying lock %s when purging file (%v)", l.Name(), err)
 					errC <- err
 					return
 				}

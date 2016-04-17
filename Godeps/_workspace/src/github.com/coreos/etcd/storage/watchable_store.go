@@ -58,9 +58,13 @@ type watchableStore struct {
 // cancel operations.
 type cancelFunc func()
 
-func newWatchableStore(b backend.Backend, le lease.Lessor) *watchableStore {
+func New(b backend.Backend, le lease.Lessor, ig ConsistentIndexGetter) ConsistentWatchableKV {
+	return newWatchableStore(b, le, ig)
+}
+
+func newWatchableStore(b backend.Backend, le lease.Lessor, ig ConsistentIndexGetter) *watchableStore {
 	s := &watchableStore{
-		store:    NewStore(b, le),
+		store:    NewStore(b, le, ig),
 		unsynced: newWatcherGroup(),
 		synced:   newWatcherGroup(),
 		stopc:    make(chan struct{}),

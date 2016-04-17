@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-func (s *store) scheduleCompaction(compactMainRev int64, keep map[revision]struct{}) {
+func (s *store) scheduleCompaction(compactMainRev int64, keep map[revision]struct{}) bool {
 	totalStart := time.Now()
 	defer dbCompactionTotalDurations.Observe(float64(time.Now().Sub(totalStart) / time.Millisecond))
 
@@ -48,7 +48,7 @@ func (s *store) scheduleCompaction(compactMainRev int64, keep map[revision]struc
 			revToBytes(revision{main: compactMainRev}, rbytes)
 			tx.UnsafePut(metaBucketName, finishedCompactKeyName, rbytes)
 			tx.Unlock()
-			return
+			return true
 		}
 
 		// update last
@@ -59,7 +59,7 @@ func (s *store) scheduleCompaction(compactMainRev int64, keep map[revision]struc
 		select {
 		case <-time.After(100 * time.Millisecond):
 		case <-s.stopc:
-			return
+			return false
 		}
 	}
 }

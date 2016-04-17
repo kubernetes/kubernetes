@@ -18,8 +18,10 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/etcdserver"
+	"github.com/coreos/etcd/etcdserver/api"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+	"github.com/coreos/etcd/etcdserver/membership"
 	"github.com/coreos/etcd/pkg/types"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -27,7 +29,7 @@ import (
 )
 
 type ClusterServer struct {
-	cluster   etcdserver.Cluster
+	cluster   api.Cluster
 	server    etcdserver.Server
 	raftTimer etcdserver.RaftTimer
 }
@@ -47,12 +49,12 @@ func (cs *ClusterServer) MemberAdd(ctx context.Context, r *pb.MemberAddRequest) 
 	}
 
 	now := time.Now()
-	m := etcdserver.NewMember("", urls, "", &now)
+	m := membership.NewMember("", urls, "", &now)
 	err = cs.server.AddMember(ctx, *m)
 	switch {
-	case err == etcdserver.ErrIDExists:
+	case err == membership.ErrIDExists:
 		return nil, rpctypes.ErrMemberExist
-	case err == etcdserver.ErrPeerURLexists:
+	case err == membership.ErrPeerURLexists:
 		return nil, rpctypes.ErrPeerURLExist
 	case err != nil:
 		return nil, grpc.Errorf(codes.Internal, err.Error())
@@ -67,9 +69,9 @@ func (cs *ClusterServer) MemberAdd(ctx context.Context, r *pb.MemberAddRequest) 
 func (cs *ClusterServer) MemberRemove(ctx context.Context, r *pb.MemberRemoveRequest) (*pb.MemberRemoveResponse, error) {
 	err := cs.server.RemoveMember(ctx, r.ID)
 	switch {
-	case err == etcdserver.ErrIDRemoved:
+	case err == membership.ErrIDRemoved:
 		fallthrough
-	case err == etcdserver.ErrIDNotFound:
+	case err == membership.ErrIDNotFound:
 		return nil, rpctypes.ErrMemberNotFound
 	case err != nil:
 		return nil, grpc.Errorf(codes.Internal, err.Error())
@@ -79,15 +81,15 @@ func (cs *ClusterServer) MemberRemove(ctx context.Context, r *pb.MemberRemoveReq
 }
 
 func (cs *ClusterServer) MemberUpdate(ctx context.Context, r *pb.MemberUpdateRequest) (*pb.MemberUpdateResponse, error) {
-	m := etcdserver.Member{
+	m := membership.Member{
 		ID:             types.ID(r.ID),
-		RaftAttributes: etcdserver.RaftAttributes{PeerURLs: r.PeerURLs},
+		RaftAttributes: membership.RaftAttributes{PeerURLs: r.PeerURLs},
 	}
 	err := cs.server.UpdateMember(ctx, m)
 	switch {
-	case err == etcdserver.ErrPeerURLexists:
+	case err == membership.ErrPeerURLexists:
 		return nil, rpctypes.ErrPeerURLExist
-	case err == etcdserver.ErrIDNotFound:
+	case err == membership.ErrIDNotFound:
 		return nil, rpctypes.ErrMemberNotFound
 	case err != nil:
 		return nil, grpc.Errorf(codes.Internal, err.Error())
