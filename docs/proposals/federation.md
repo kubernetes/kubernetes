@@ -78,7 +78,7 @@ The above use cases are by necessity left imprecisely defined.  The
 rest of this document explores these use cases and their implications
 in further detail, and compares a few alternative high level
 approaches to addressing them.  The idea of cluster federation has
-informally become known as_ "Ubernetes"_.
+informally become known as _"Ubernetes"_.
 
 ## Summary/TL;DR
 
