@@ -139,11 +139,11 @@ func (in instrumentedDockerInterface) RemoveImage(image string) error {
 	return err
 }
 
-func (in instrumentedDockerInterface) Logs(opts docker.LogsOptions) error {
+func (in instrumentedDockerInterface) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
 	const operation = "logs"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.Logs(opts)
+	err := in.client.Logs(id, opts, sopts)
 	recordError(operation, err)
 	return err
 }
@@ -193,11 +193,11 @@ func (in instrumentedDockerInterface) InspectExec(id string) (*dockertypes.Conta
 	return out, err
 }
 
-func (in instrumentedDockerInterface) AttachToContainer(opts docker.AttachToContainerOptions) error {
+func (in instrumentedDockerInterface) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
 	const operation = "attach"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.AttachToContainer(opts)
+	err := in.client.AttachToContainer(id, opts, sopts)
 	recordError(operation, err)
 	return err
 }

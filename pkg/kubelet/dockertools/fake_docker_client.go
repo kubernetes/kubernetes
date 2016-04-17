@@ -412,7 +412,7 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 
 // Logs is a test-spy implementation of DockerInterface.Logs.
 // It adds an entry "logs" to the internal method call record.
-func (f *FakeDockerClient) Logs(opts docker.LogsOptions) error {
+func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "logs")
@@ -462,7 +462,7 @@ func (f *FakeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 	return nil
 }
 
-func (f *FakeDockerClient) AttachToContainer(opts docker.AttachToContainerOptions) error {
+func (f *FakeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "attach")
