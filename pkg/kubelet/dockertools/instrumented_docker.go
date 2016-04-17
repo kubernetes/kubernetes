@@ -19,6 +19,7 @@ package dockertools
 import (
 	"time"
 
+	dockertypes "github.com/docker/engine-api/types"
 	docker "github.com/fsouza/go-dockerclient"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -48,7 +49,7 @@ func recordError(operation string, err error) {
 	}
 }
 
-func (in instrumentedDockerInterface) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
+func (in instrumentedDockerInterface) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
 	const operation = "list_containers"
 	defer recordOperation(operation, time.Now())
 
@@ -57,7 +58,7 @@ func (in instrumentedDockerInterface) ListContainers(options docker.ListContaine
 	return out, err
 }
 
-func (in instrumentedDockerInterface) InspectContainer(id string) (*docker.Container, error) {
+func (in instrumentedDockerInterface) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
 	const operation = "inspect_container"
 	defer recordOperation(operation, time.Now())
 
@@ -66,7 +67,7 @@ func (in instrumentedDockerInterface) InspectContainer(id string) (*docker.Conta
 	return out, err
 }
 
-func (in instrumentedDockerInterface) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
+func (in instrumentedDockerInterface) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
 
@@ -75,16 +76,16 @@ func (in instrumentedDockerInterface) CreateContainer(opts docker.CreateContaine
 	return out, err
 }
 
-func (in instrumentedDockerInterface) StartContainer(id string, hostConfig *docker.HostConfig) error {
+func (in instrumentedDockerInterface) StartContainer(id string) error {
 	const operation = "start_container"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.StartContainer(id, hostConfig)
+	err := in.client.StartContainer(id)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedDockerInterface) StopContainer(id string, timeout uint) error {
+func (in instrumentedDockerInterface) StopContainer(id string, timeout int) error {
 	const operation = "stop_container"
 	defer recordOperation(operation, time.Now())
 
@@ -93,11 +94,11 @@ func (in instrumentedDockerInterface) StopContainer(id string, timeout uint) err
 	return err
 }
 
-func (in instrumentedDockerInterface) RemoveContainer(opts docker.RemoveContainerOptions) error {
+func (in instrumentedDockerInterface) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
 	const operation = "remove_container"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.RemoveContainer(opts)
+	err := in.client.RemoveContainer(id, opts)
 	recordError(operation, err)
 	return err
 }
