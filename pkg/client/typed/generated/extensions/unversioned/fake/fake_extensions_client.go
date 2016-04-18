@@ -41,10 +41,6 @@ func (c *FakeExtensions) Ingresses(namespace string) unversioned.IngressInterfac
 	return &FakeIngresses{c, namespace}
 }
 
-func (c *FakeExtensions) Jobs(namespace string) unversioned.JobInterface {
-	return &FakeJobs{c, namespace}
-}
-
 func (c *FakeExtensions) ReplicaSets(namespace string) unversioned.ReplicaSetInterface {
 	return &FakeReplicaSets{c, namespace}
 }

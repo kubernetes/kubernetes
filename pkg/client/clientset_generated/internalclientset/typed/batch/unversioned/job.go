@@ -43,12 +43,12 @@ type JobInterface interface {
 
 // jobs implements JobInterface
 type jobs struct {
-	client *ExtensionsClient
+	client *BatchClient
 	ns     string
 }
 
 // newJobs returns a Jobs
-func newJobs(c *ExtensionsClient, namespace string) *jobs {
+func newJobs(c *BatchClient, namespace string) *jobs {
 	return &jobs{
 		client: c,
 		ns:     namespace,

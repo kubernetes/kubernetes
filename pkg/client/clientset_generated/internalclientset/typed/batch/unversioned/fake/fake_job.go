@@ -19,7 +19,7 @@ package fake
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	batch "k8s.io/kubernetes/pkg/apis/batch"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -27,45 +27,45 @@ import (
 
 // FakeJobs implements JobInterface
 type FakeJobs struct {
-	Fake *FakeExtensions
+	Fake *FakeBatch
 	ns   string
 }
 
-var jobsResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "jobs"}
+var jobsResource = unversioned.GroupVersionResource{Group: "batch", Version: "", Resource: "jobs"}
 
-func (c *FakeJobs) Create(job *extensions.Job) (result *extensions.Job, err error) {
+func (c *FakeJobs) Create(job *batch.Job) (result *batch.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(jobsResource, c.ns, job), &extensions.Job{})
+		Invokes(core.NewCreateAction(jobsResource, c.ns, job), &batch.Job{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Job), err
+	return obj.(*batch.Job), err
 }
 
-func (c *FakeJobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
+func (c *FakeJobs) Update(job *batch.Job) (result *batch.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(jobsResource, c.ns, job), &extensions.Job{})
+		Invokes(core.NewUpdateAction(jobsResource, c.ns, job), &batch.Job{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Job), err
+	return obj.(*batch.Job), err
 }
 
-func (c *FakeJobs) UpdateStatus(job *extensions.Job) (*extensions.Job, error) {
+func (c *FakeJobs) UpdateStatus(job *batch.Job) (*batch.Job, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(jobsResource, "status", c.ns, job), &extensions.Job{})
+		Invokes(core.NewUpdateSubresourceAction(jobsResource, "status", c.ns, job), &batch.Job{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Job), err
+	return obj.(*batch.Job), err
 }
 
 func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(jobsResource, c.ns, name), &extensions.Job{})
+		Invokes(core.NewDeleteAction(jobsResource, c.ns, name), &batch.Job{})
 
 	return err
 }
@@ -73,23 +73,23 @@ func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
 func (c *FakeJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	action := core.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &extensions.JobList{})
+	_, err := c.Fake.Invokes(action, &batch.JobList{})
 	return err
 }
 
-func (c *FakeJobs) Get(name string) (result *extensions.Job, err error) {
+func (c *FakeJobs) Get(name string) (result *batch.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(jobsResource, c.ns, name), &extensions.Job{})
+		Invokes(core.NewGetAction(jobsResource, c.ns, name), &batch.Job{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Job), err
+	return obj.(*batch.Job), err
 }
 
-func (c *FakeJobs) List(opts api.ListOptions) (result *extensions.JobList, err error) {
+func (c *FakeJobs) List(opts api.ListOptions) (result *batch.JobList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(jobsResource, c.ns, opts), &extensions.JobList{})
+		Invokes(core.NewListAction(jobsResource, c.ns, opts), &batch.JobList{})
 
 	if obj == nil {
 		return nil, err
@@ -99,8 +99,8 @@ func (c *FakeJobs) List(opts api.ListOptions) (result *extensions.JobList, err e
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &extensions.JobList{}
-	for _, item := range obj.(*extensions.JobList).Items {
+	list := &batch.JobList{}
+	for _, item := range obj.(*batch.JobList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
