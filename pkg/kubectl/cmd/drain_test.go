@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
@@ -262,14 +263,14 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	job := extensions.Job{
+	job := batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "job",
 			Namespace:         "default",
 			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/jobs/job",
 		},
-		Spec: extensions.JobSpec{
+		Spec: batch.JobSpec{
 			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 		},
 	}

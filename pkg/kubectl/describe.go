@@ -1089,7 +1089,7 @@ func (d *JobDescriber) Describe(namespace, name string) (string, error) {
 	return describeJob(job, events)
 }
 
-func describeJob(job *extensions.Job, events *api.EventList) (string, error) {
+func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", job.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", job.Namespace)

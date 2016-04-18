@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -57,17 +57,17 @@ func TestJobStrategy(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	job := &extensions.Job{
+	job := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "myjob",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: extensions.JobSpec{
+		Spec: batch.JobSpec{
 			Selector:       validSelector,
 			Template:       validPodTemplateSpec,
 			ManualSelector: newBool(true),
 		},
-		Status: extensions.JobStatus{
+		Status: batch.JobStatus{
 			Active: 11,
 		},
 	}
@@ -81,12 +81,12 @@ func TestJobStrategy(t *testing.T) {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	parallelism := 10
-	updatedJob := &extensions.Job{
+	updatedJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
-		Spec: extensions.JobSpec{
+		Spec: batch.JobSpec{
 			Parallelism: &parallelism,
 		},
-		Status: extensions.JobStatus{
+		Status: batch.JobStatus{
 			Active: 11,
 		},
 	}
@@ -114,13 +114,13 @@ func TestJobStrategyWithGeneration(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	job := &extensions.Job{
+	job := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "myjob2",
 			Namespace: api.NamespaceDefault,
 			UID:       theUID,
 		},
-		Spec: extensions.JobSpec{
+		Spec: batch.JobSpec{
 			Selector: nil,
 			Template: validPodTemplateSpec,
 		},
@@ -175,33 +175,33 @@ func TestJobStatusStrategy(t *testing.T) {
 	}
 	oldParallelism := 10
 	newParallelism := 11
-	oldJob := &extensions.Job{
+	oldJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "myjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "10",
 		},
-		Spec: extensions.JobSpec{
+		Spec: batch.JobSpec{
 			Selector:    validSelector,
 			Template:    validPodTemplateSpec,
 			Parallelism: &oldParallelism,
 		},
-		Status: extensions.JobStatus{
+		Status: batch.JobStatus{
 			Active: 11,
 		},
 	}
-	newJob := &extensions.Job{
+	newJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "myjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "9",
 		},
-		Spec: extensions.JobSpec{
+		Spec: batch.JobSpec{
 			Selector:    validSelector,
 			Template:    validPodTemplateSpec,
 			Parallelism: &newParallelism,
 		},
-		Status: extensions.JobStatus{
+		Status: batch.JobStatus{
 			Active: 12,
 		},
 	}
@@ -226,7 +226,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Extensions.GroupVersion().String(),
 		"Job",
-		labels.Set(JobToSelectableFields(&extensions.Job{})),
+		labels.Set(JobToSelectableFields(&batch.Job{})),
 		nil,
 	)
 }
