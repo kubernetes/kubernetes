@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -58,7 +59,7 @@ var (
 )
 
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(client *clientset.Clientset, resyncPeriod controller.ResyncPeriodFunc) *EndpointController {
+func NewEndpointController(podInformer framework.SharedInformer, client *clientset.Clientset) *EndpointController {
 	e := &EndpointController{
 		client: client,
 		queue:  workqueue.New(),
@@ -85,24 +86,23 @@ func NewEndpointController(client *clientset.Clientset, resyncPeriod controller.
 		},
 	)
 
-	e.podStore.Store, e.podController = framework.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return e.client.Core().Pods(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return e.client.Core().Pods(api.NamespaceAll).Watch(options)
-			},
-		},
-		&api.Pod{},
-		resyncPeriod(),
-		framework.ResourceEventHandlerFuncs{
-			AddFunc:    e.addPod,
-			UpdateFunc: e.updatePod,
-			DeleteFunc: e.deletePod,
-		},
-	)
-	e.podStoreSynced = e.podController.HasSynced
+	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+		AddFunc:    e.addPod,
+		UpdateFunc: e.updatePod,
+		DeleteFunc: e.deletePod,
+	})
+	e.podStore.Store = podInformer.GetStore()
+	e.podController = podInformer.GetController()
+	e.podStoreSynced = podInformer.HasSynced
+
+	return e
+}
+
+// NewEndpointControllerFromClient returns a new *EndpointController that runs its own informer.
+func NewEndpointControllerFromClient(client *clientset.Clientset, resyncPeriod controller.ResyncPeriodFunc) *EndpointController {
+	podInformer := informers.CreateSharedPodInformer(client, resyncPeriod())
+	e := NewEndpointController(podInformer, client)
+	e.internalPodInformer = podInformer
 
 	return e
 }
@@ -114,6 +114,13 @@ type EndpointController struct {
 	serviceStore cache.StoreToServiceLister
 	podStore     cache.StoreToPodLister
 
+	// internalPodInformer is used to hold a personal informer.  If we're using
+	// a normal shared informer, then the informer will be started for us.  If
+	// we have a personal informer, we must start it ourselves.   If you start
+	// the controller using NewEndpointController(passing SharedInformer), this
+	// will be null
+	internalPodInformer framework.SharedInformer
+
 	// Services that need to be updated. A channel is inappropriate here,
 	// because it allows services with lots of pods to be serviced much
 	// more often than services with few pods; it also would cause a
@@ -124,7 +131,7 @@ type EndpointController struct {
 	// Since we join two objects, we'll watch both of them with
 	// controllers.
 	serviceController *framework.Controller
-	podController     *framework.Controller
+	podController     framework.ControllerInterface
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
@@ -144,6 +151,11 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 		time.Sleep(5 * time.Minute) // give time for our cache to fill
 		e.checkLeftoverEndpoints()
 	}()
+
+	if e.internalPodInformer != nil {
+		go e.internalPodInformer.Run(stopCh)
+	}
+
 	<-stopCh
 	e.queue.ShutDown()
 }
