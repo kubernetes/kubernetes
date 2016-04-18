@@ -42,6 +42,7 @@ type store struct {
 	codec      runtime.Codec
 	versioner  storage.Versioner
 	pathPrefix string
+	watcher    *watcher
 }
 
 type elemForDecode struct {
@@ -57,11 +58,13 @@ type objState struct {
 }
 
 func newStore(c *clientv3.Client, codec runtime.Codec, prefix string) *store {
+	versioner := etcd.APIObjectVersioner{}
 	return &store{
 		client:     c,
-		versioner:  etcd.APIObjectVersioner{},
+		versioner:  versioner,
 		codec:      codec,
 		pathPrefix: prefix,
+		watcher:    newWatcher(c, codec, versioner),
 	}
 }
 
@@ -315,12 +318,21 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, filter st
 
 // Watch implements storage.Interface.Watch.
 func (s *store) Watch(ctx context.Context, key string, resourceVersion string, filter storage.FilterFunc) (watch.Interface, error) {
-	panic("TODO: unimplemented")
+	return s.watch(ctx, key, resourceVersion, filter, false)
 }
 
 // WatchList implements storage.Interface.WatchList.
 func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, filter storage.FilterFunc) (watch.Interface, error) {
-	panic("TODO: unimplemented")
+	return s.watch(ctx, key, resourceVersion, filter, true)
+}
+
+func (s *store) watch(ctx context.Context, key string, rv string, filter storage.FilterFunc, recursive bool) (watch.Interface, error) {
+	rev, err := storage.ParseWatchResourceVersion(rv)
+	if err != nil {
+		return nil, err
+	}
+	key = keyWithPrefix(s.pathPrefix, key)
+	return s.watcher.Watch(ctx, key, int64(rev), recursive, filter)
 }
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
