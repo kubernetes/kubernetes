@@ -270,10 +270,11 @@ declare -r gcp_list_resources_script="./cluster/gce/list-resources.sh"
 declare -r gcp_resources_before="${ARTIFACTS}/gcp-resources-before.txt"
 declare -r gcp_resources_cluster_up="${ARTIFACTS}/gcp-resources-cluster-up.txt"
 declare -r gcp_resources_after="${ARTIFACTS}/gcp-resources-after.txt"
-# TODO(15492): figure out some way to run this script even if it doesn't exist
-# in the Kubernetes tarball.
 if [[ ( ${KUBERNETES_PROVIDER} == "gce" || ${KUBERNETES_PROVIDER} == "gke" ) && -x "${gcp_list_resources_script}" ]]; then
   gcp_list_resources="true"
+  # Always pull the script from HEAD, overwriting the local one if it exists.
+  # We do this to pick up fixes if we are running tests from a branch or tag.
+  curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/gce/list-resources.sh" > "${gcp_list_resources_script}"
 else
   gcp_list_resources="false"
 fi
