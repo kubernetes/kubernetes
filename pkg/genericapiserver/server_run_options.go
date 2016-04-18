@@ -49,6 +49,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		InsecurePort:         8080,
 		LongRunningRequestRE: defaultLongRunningRequestRE,
 		SecurePort:           6443,
+		MaxRequestsInFlight:  400,
 	}
 }
 
@@ -74,7 +75,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"port. This is performed by nginx in the default setup.")
 	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead")
 	fs.StringVar(&s.LongRunningRequestRE, "long-running-request-regexp", s.LongRunningRequestRE, "A regular expression matching long running requests which should be excluded from maximum inflight request handling.")
-	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", 400, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
+	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
 	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
 		"don't serve HTTPS at all.")
