@@ -228,7 +228,7 @@ func (p *prober) newExecInContainer(container api.Container, containerID kubecon
 	return execInContainer{func() ([]byte, error) {
 		var buffer bytes.Buffer
 		output := ioutils.WriteCloserWrapper(&buffer)
-		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false)
+		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false, nil)
 		if err != nil {
 			return nil, err
 		}
