@@ -87,19 +87,6 @@ func convertFilters(filters map[string][]string) dockerfilters.Args {
 	return args
 }
 
-// convertEnv converts data to a go-dockerclient Env
-func convertEnv(src interface{}) (*docker.Env, error) {
-	m := make(map[string]interface{})
-	if err := convertType(&src, &m); err != nil {
-		return nil, err
-	}
-	env := &docker.Env{}
-	for k, v := range m {
-		env.SetAuto(k, v)
-	}
-	return env, nil
-}
-
 func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
 	containers, err := k.client.ContainerList(getDefaultContext(), options)
 	if err != nil {
@@ -219,20 +206,20 @@ func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 	return d.redirectResponseToOutputStream(sopts.RawTerminal, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
-func (d *kubeDockerClient) Version() (*docker.Env, error) {
+func (d *kubeDockerClient) Version() (*dockertypes.Version, error) {
 	resp, err := d.client.ServerVersion(getDefaultContext())
 	if err != nil {
 		return nil, err
 	}
-	return convertEnv(resp)
+	return &resp, nil
 }
 
-func (d *kubeDockerClient) Info() (*docker.Env, error) {
+func (d *kubeDockerClient) Info() (*dockertypes.Info, error) {
 	resp, err := d.client.Info(getDefaultContext())
 	if err != nil {
 		return nil, err
 	}
-	return convertEnv(resp)
+	return &resp, nil
 }
 
 // TODO(random-liu): Add unit test for exec and attach functions, just like what go-dockerclient did.
