@@ -372,6 +372,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"secret-env-pod": &api.Pod{},
 		},
 		"../examples/spark": {
+			"namespace-spark-cluster": &api.Namespace{},
 			"spark-master-controller": &api.ReplicationController{},
 			"spark-master-service":    &api.Service{},
 			"spark-webui":             &api.Service{},
