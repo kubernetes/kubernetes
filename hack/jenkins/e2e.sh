@@ -473,28 +473,6 @@ case ${JOB_NAME} in
     NUM_MINIONS=${NUM_MINIONS_PARALLEL}
     ;;
 
-  # Runs the performance/scalability tests on GCE using the latest 1.1 ci
-  # release. A larger cluster is used.
-  kubernetes-e2e-gce-scalability-1.1)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-scalability-1.1"}
-    : ${E2E_NETWORK:="e2e-scalability-1-1"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Performance\ssuite"}
-    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability-1-1"}
-    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="scalability-1.1"}
-    : ${PROJECT:="k8s-e2e-gce-scalability-1-1"}
-    # Override GCE defaults.
-    E2E_ZONE="us-east1-b"
-    MASTER_SIZE="n1-standard-4"
-    MINION_SIZE="n1-standard-2"
-    MINION_DISK_SIZE="50GB"
-    NUM_MINIONS="100"
-    # Reduce logs verbosity
-    TEST_CLUSTER_LOG_LEVEL="--v=2"
-    # Increase resync period to simulate production
-    TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
-    ;;
-
   # Sets up the GCE soak cluster weekly using the latest 1.1 ci release.
   kubernetes-soak-weekly-deploy-gce-release-1.1)
     : ${E2E_CLUSTER_NAME:="gce-soak-weekly-1.1"}
