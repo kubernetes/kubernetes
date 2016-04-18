@@ -162,6 +162,7 @@ type Proxier struct {
 	masqueradeAll  bool
 	masqueradeMark string
 	exec           utilexec.Interface
+	clusterCIDR    string
 }
 
 type localPort struct {
@@ -187,7 +188,7 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := utilsysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
@@ -223,6 +224,7 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 		masqueradeAll:  masqueradeAll,
 		masqueradeMark: masqueradeMark,
 		exec:           exec,
+		clusterCIDR:    clusterCIDR,
 	}, nil
 }
 
@@ -791,6 +793,9 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		if proxier.masqueradeAll {
 			writeLine(natRules, append(args, "-j", string(kubeMarkMasqChain))...)
+		}
+		if len(proxier.clusterCIDR) > 0 {
+			writeLine(natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(kubeMarkMasqChain))...)
 		}
 		writeLine(natRules, append(args, "-j", string(svcChain))...)
 
