@@ -89,8 +89,9 @@ if ${SILENT} ; then
 fi
 
 ret=0
-run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
-run-checks "${KUBE_ROOT}/hack/verify-*.py" python
+#run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
+#run-checks "${KUBE_ROOT}/hack/verify-*.py" python
+run-checks "${KUBE_ROOT}/hack/verify-swagger-spec.sh" bash
 exit ${ret}
 
 # ex: ts=2 sw=2 et filetype=sh
