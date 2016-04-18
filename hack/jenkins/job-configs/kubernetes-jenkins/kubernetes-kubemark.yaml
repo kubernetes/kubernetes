@@ -3,13 +3,13 @@
     description: '{description} Test owner: gmarek'
     logrotate:
         daysToKeep: 7
-    node: 'e2e'
+    node: 'master'
     builders:
         - shell: |
             {provider-env}
             {job-env}
             {post-env}
-            timeout -k {kill-timeout}m {timeout}m {runner} && rc=$? || rc=$?
+            timeout -k {kill-timeout}m {timeout}m {legacy-runner} && rc=$? || rc=$?
             {report-rc}
     properties:
         - mail-watcher
