@@ -101,21 +101,21 @@ type NetworkPolicySpec struct {
   // or if network-isolation=true and the traffic matches at least 
   // one NetworkPolicyIngressRule across all of the NetworkPolicy 
   // objects whose podSelector matches the pod.  If this field is 
-  // omitted, this NetworkPolicy has no effect on selected pods.
+  // empty, this NetworkPolicy has no effect on selected pods.
   Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty"`
 
 type NetworkPolicyIngressRule struct {
   // List of ports which should be made accessible on the pods selected by PodSelector.  
   // Each item in this list is combined using a logical OR.  If this field
-  // is omitted, then traffic should not be restricted based on port.  If this 
-  // field is present, traffic must match at least one NetworkPolicyPort in the list
+  // is empty, then traffic should not be restricted based on port.  If this 
+  // field is not empty, traffic must match at least one NetworkPolicyPort in the list
   // or else it will be dropped.
   Ports []NetworkPolicyPort `json:"ports,omitempty"`
 
   // List of sources which should be able to access the pods selected by PodSelector.
   // Items in this list are combined using a logical OR operation.
-  // If this field is omitted, then traffic should not be restricted based on 
-  // source.  If this field is present, traffic must match at least one 
+  // If this field is empty, then traffic should not be restricted based on 
+  // source.  If this field is not empty, traffic must match at least one 
   // NetworkPolicySource in the list or else it will be dropped.
   From []NetworkPolicySource `json:"from,omitempty"`
 }
@@ -164,7 +164,7 @@ def is_traffic_allowed(traffic, pod):
   else:
     # If network-isolation is enabled, only allow traffic 
     # that matches a network policy which selects this pod.
-    for network_policy in all_network_policies:
+    for network_policy in network_policies(pod.namespace):
       if not network_policy.podSelector.selects(pod):
         # This policy doesn't select this pod. Try the next one. 
         continue
