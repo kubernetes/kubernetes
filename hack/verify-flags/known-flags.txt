@@ -144,6 +144,7 @@ gather-resource-usage
 gce-project
 gce-service-account
 gce-zone
+generated-assets
 gke-cluster
 go-header-file
 google-json-key

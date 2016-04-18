@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	framework.KubeDescribe("Update Demo", func() {
 		var updateDemoRoot, nautilusPath, kittenPath string
 		BeforeEach(func() {
-			updateDemoRoot = filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/update-demo")
+			updateDemoRoot = filepath.Join(framework.TestContext.GeneratedAssetsDir, framework.GENERATED_ASSETS, "docs/user-guide/update-demo")
 			nautilusPath = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
 			kittenPath = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 		})
@@ -166,7 +166,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		var guestbookPath string
 
 		BeforeEach(func() {
-			guestbookPath = filepath.Join(framework.TestContext.RepoRoot, "examples/guestbook")
+			guestbookPath = filepath.Join(framework.TestContext.GeneratedAssetsDir, framework.GENERATED_ASSETS, "examples/guestbook")
 		})
 
 		It("should create and stop a working application [Conformance]", func() {
@@ -579,7 +579,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
 
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(framework.TestContext.GeneratedAssetsDir, framework.GENERATED_ASSETS, "examples/guestbook-go", file)
 			}
 			controllerJson := mkpath("redis-master-controller.json")
 			serviceJson := mkpath("redis-master-service.json")
@@ -676,7 +676,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	framework.KubeDescribe("Kubectl expose", func() {
 		It("should create services for rc [Conformance]", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(framework.TestContext.GeneratedAssetsDir, framework.GENERATED_ASSETS, "examples/guestbook-go", file)
 			}
 			controllerJson := mkpath("redis-master-controller.json")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -747,7 +747,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		var podPath string
 		var nsFlag string
 		BeforeEach(func() {
-			podPath = filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/pod.yaml")
+			podPath = filepath.Join(framework.TestContext.GeneratedAssetsDir, framework.GENERATED_ASSETS, "docs/user-guide/pod.yaml")
 			By("creating the pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDie("create", "-f", podPath, nsFlag)
@@ -785,7 +785,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		containerName := "redis-master"
 		BeforeEach(func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(framework.TestContext.GeneratedAssetsDir, framework.GENERATED_ASSETS, "examples/guestbook-go", file)
 			}
 			rcPath = mkpath("redis-master-controller.json")
 			By("creating an rc")
@@ -843,7 +843,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	framework.KubeDescribe("Kubectl patch", func() {
 		It("should add annotations for pods in rc [Conformance]", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(framework.TestContext.GeneratedAssetsDir, framework.GENERATED_ASSETS, "examples/guestbook-go", file)
 			}
 			controllerJson := mkpath("redis-master-controller.json")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
