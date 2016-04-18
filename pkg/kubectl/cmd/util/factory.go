@@ -665,7 +665,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				pod, _, err := GetFirstPod(client, t.Namespace, selector)
 				return pod, err
-			case *extensions.Job:
+			case *batch.Job:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
 				if err != nil {
 					return nil, fmt.Errorf("invalid label selector: %v", err)

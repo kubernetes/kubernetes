@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -1343,34 +1344,34 @@ func TestPrintDaemonSet(t *testing.T) {
 func TestPrintJob(t *testing.T) {
 	completions := 2
 	tests := []struct {
-		job    extensions.Job
+		job    batch.Job
 		expect string
 	}{
 		{
-			extensions.Job{
+			batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "job1",
 					CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Completions: &completions,
 				},
-				Status: extensions.JobStatus{
+				Status: batch.JobStatus{
 					Succeeded: 1,
 				},
 			},
 			"job1\t2\t1\t0s\n",
 		},
 		{
-			extensions.Job{
+			batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "job2",
 					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Completions: nil,
 				},
-				Status: extensions.JobStatus{
+				Status: batch.JobStatus{
 					Succeeded: 0,
 				},
 			},

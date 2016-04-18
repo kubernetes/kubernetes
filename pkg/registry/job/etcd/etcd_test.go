@@ -21,9 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	// Ensure that extensions/v1beta1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -39,15 +38,15 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 	return jobStorage, statusStorage, server
 }
 
-func validNewJob() *extensions.Job {
+func validNewJob() *batch.Job {
 	completions := 1
 	parallelism := 1
-	return &extensions.Job{
+	return &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
 		},
-		Spec: extensions.JobSpec{
+		Spec: batch.JobSpec{
 			Completions: &completions,
 			Parallelism: &parallelism,
 			Selector: &unversioned.LabelSelector{
@@ -84,8 +83,8 @@ func TestCreate(t *testing.T) {
 		// valid
 		validJob,
 		// invalid (empty selector)
-		&extensions.Job{
-			Spec: extensions.JobSpec{
+		&batch.Job{
+			Spec: batch.JobSpec{
 				Completions: validJob.Spec.Completions,
 				Selector:    &unversioned.LabelSelector{},
 				Template:    validJob.Spec.Template,
@@ -104,18 +103,18 @@ func TestUpdate(t *testing.T) {
 		validNewJob(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Job)
+			object := obj.(*batch.Job)
 			object.Spec.Parallelism = &two
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Job)
+			object := obj.(*batch.Job)
 			object.Spec.Selector = &unversioned.LabelSelector{}
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Job)
+			object := obj.(*batch.Job)
 			object.Spec.Completions = &two
 			return object
 		},
