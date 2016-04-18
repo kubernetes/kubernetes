@@ -18,16 +18,39 @@ kube::util::sortable_date() {
   date "+%Y%m%d-%H%M%S"
 }
 
+kube::util::wait_for_cmd() {
+  local wait=$1
+  local times=$2
+  shift 2
+
+  local i
+  for i in $(seq 1 $times); do
+    local out
+    if out=$(eval "$* >/dev/null"); then
+      kube::log::status "On try ${i}, $*: ${out}"
+      return 0
+    fi
+    sleep ${wait}
+  done
+
+  kube::log::error "Timed out waiting for ${cmd}. Tried ${times} waiting ${wait} between each"
+  return 1
+}
+
+kube::util::fatal_check_path () {
+  which $1 >/dev/null || {
+    kube::log::usage "$1 must be installed"
+    exit 1
+  }
+}
+
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
   local wait=${3:-1}
   local times=${4:-30}
 
-  which curl >/dev/null || {
-    kube::log::usage "curl must be installed"
-    exit 1
-  }
+  kube::util::fatal_check_path curl
 
   local i
   for i in $(seq 1 $times); do

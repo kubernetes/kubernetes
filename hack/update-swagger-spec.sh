@@ -63,13 +63,17 @@ kube::etcd::start
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --insecure-bind-address="127.0.0.1" \
+  $(kube::etcd::kubesec) \
   --bind-address="127.0.0.1" \
   --insecure-port="${API_PORT}" \
-  --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
+  --etcd-servers="${ETCD_PROTO}://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-api-server.log 2>&1 &
+
 APISERVER_PID=$!
+
+echo $APISERVER_PID
 
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
 

@@ -38,8 +38,14 @@ DNS_REPLICAS=${KUBE_DNS_REPLICAS:-1}
 KUBECTL=${KUBECTL:-cluster/kubectl.sh}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-10}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
+SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-"10.0.0.0/24"}
 HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
+
+ETCD_PORT=${ETCD_PORT:-4001}
+ETCD_PROTO=${ETCD_PROTO:-"http"}
+
+cd "${KUBE_ROOT}"
 
 if [ "$(id -u)" != "0" ]; then
     echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
@@ -249,6 +255,7 @@ function set_service_accounts {
 }
 
 function start_apiserver {
+    echo "START API"
     # Admission Controllers to invoke prior to persisting objects in cluster
     if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
       ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
@@ -276,9 +283,18 @@ function start_apiserver {
         advertise_address="--advertise_address=${API_HOST}"
     fi
 
+    client_ca_config=""
+    if [[ -f "${CLIENT_CA_PATH:-}" ]]; then
+      client_ca_config="--client-ca-file='${CLIENT_CA_PATH}'"
+    fi
+
     APISERVER_LOG=/tmp/kube-apiserver.log
-    sudo -E "${GO_OUT}/hyperkube" apiserver ${priv_arg} ${runtime_config}\
+    sudo -E "${GO_OUT}/hyperkube" apiserver \
+      ${priv_arg} \
+      ${runtime_config} \
       ${advertise_address} \
+      $(kube::etcd::kubesec) \
+      ${client_ca_config} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -287,9 +303,10 @@ function start_apiserver {
       --bind-address="${API_BIND_ADDR}" \
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
-      --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="10.0.0.0/24" \
       --cloud-provider="${CLOUD_PROVIDER}" \
+      --etcd-servers="${ETCD_PROTO}://${ETCD_HOST}:${ETCD_PORT}" \
+      --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
@@ -374,7 +391,7 @@ function start_kubelet {
         ${net_plugin_dir_args} \
         ${net_plugin_args} \
         ${kubenet_plugin_args} \
-        --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
+        --port="$KUBELET_PORT" > "${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else
       # Docker won't run a container with a cidfile (container id file)
@@ -393,7 +410,7 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=3 --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" &> $KUBELET_LOG &
+        /kubelet --v=3 --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --address="$API_HOST" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" &> $KUBELET_LOG &
     fi
 }
 
