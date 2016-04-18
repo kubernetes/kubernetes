@@ -20,7 +20,7 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	batch "k8s.io/kubernetes/pkg/apis/batch"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,13 +32,13 @@ type JobsGetter interface {
 
 // JobInterface has methods to work with Job resources.
 type JobInterface interface {
-	Create(*extensions.Job) (*extensions.Job, error)
-	Update(*extensions.Job) (*extensions.Job, error)
-	UpdateStatus(*extensions.Job) (*extensions.Job, error)
+	Create(*batch.Job) (*batch.Job, error)
+	Update(*batch.Job) (*batch.Job, error)
+	UpdateStatus(*batch.Job) (*batch.Job, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*extensions.Job, error)
-	List(opts api.ListOptions) (*extensions.JobList, error)
+	Get(name string) (*batch.Job, error)
+	List(opts api.ListOptions) (*batch.JobList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
 	JobExpansion
 }
@@ -58,8 +58,8 @@ func newJobs(c *ExtensionsClient, namespace string) *jobs {
 }
 
 // Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
-func (c *jobs) Create(job *extensions.Job) (result *extensions.Job, err error) {
-	result = &extensions.Job{}
+func (c *jobs) Create(job *batch.Job) (result *batch.Job, err error) {
+	result = &batch.Job{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -70,8 +70,8 @@ func (c *jobs) Create(job *extensions.Job) (result *extensions.Job, err error) {
 }
 
 // Update takes the representation of a job and updates it. Returns the server's representation of the job, and an error, if there is any.
-func (c *jobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
-	result = &extensions.Job{}
+func (c *jobs) Update(job *batch.Job) (result *batch.Job, err error) {
+	result = &batch.Job{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -82,8 +82,8 @@ func (c *jobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
 	return
 }
 
-func (c *jobs) UpdateStatus(job *extensions.Job) (result *extensions.Job, err error) {
-	result = &extensions.Job{}
+func (c *jobs) UpdateStatus(job *batch.Job) (result *batch.Job, err error) {
+	result = &batch.Job{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -118,8 +118,8 @@ func (c *jobs) DeleteCollection(options *api.DeleteOptions, listOptions api.List
 }
 
 // Get takes name of the job, and returns the corresponding job object, and an error if there is any.
-func (c *jobs) Get(name string) (result *extensions.Job, err error) {
-	result = &extensions.Job{}
+func (c *jobs) Get(name string) (result *batch.Job, err error) {
+	result = &batch.Job{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -130,8 +130,8 @@ func (c *jobs) Get(name string) (result *extensions.Job, err error) {
 }
 
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *jobs) List(opts api.ListOptions) (result *extensions.JobList, err error) {
-	result = &extensions.JobList{}
+func (c *jobs) List(opts api.ListOptions) (result *batch.JobList, err error) {
+	result = &batch.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
