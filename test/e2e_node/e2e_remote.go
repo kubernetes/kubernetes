@@ -43,7 +43,7 @@ func init() {
 		glog.Fatal(err)
 	}
 	sshOptionsMap = map[string]string{
-		"gce": fmt.Sprintf("-i %s/.ssh/google_compute_engine -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no", usr.HomeDir),
+		"gce": fmt.Sprintf("-i %s/.ssh/google_compute_engine -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30", usr.HomeDir),
 	}
 }
 
@@ -118,14 +118,14 @@ func CreateTestArchive() string {
 }
 
 // RunRemote copies the archive file to a /tmp file on host, unpacks it, and runs the e2e_node.test
-func RunRemote(archive string, host string, deleteFiles bool) (string, error) {
+func RunRemote(archive string, host string, cleanup bool) (string, error) {
 	// Create the temp staging directory
 	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
 	_, err := RunSshCommand("ssh", host, "--", "mkdir", tmp)
 	if err != nil {
 		return "", err
 	}
-	if deleteFiles {
+	if cleanup {
 		defer func() {
 			output, err := RunSshCommand("ssh", host, "--", "rm", "-rf", tmp)
 			if err != nil {
@@ -155,7 +155,7 @@ func RunRemote(archive string, host string, deleteFiles bool) (string, error) {
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
-		fmt.Sprintf("./e2e_node.test --logtostderr --v 2 --build-services=false --node-name=%s", host),
+		fmt.Sprintf("./e2e_node.test --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s", cleanup, host),
 	)
 	output, err := RunSshCommand("ssh", host, "--", "sh", "-c", cmd)
 	if err != nil {

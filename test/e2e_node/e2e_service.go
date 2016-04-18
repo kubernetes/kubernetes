@@ -86,7 +86,7 @@ func (es *e2eService) stop() {
 	if es.apiServerCmd != nil {
 		err := es.apiServerCmd.Process.Kill()
 		if err != nil {
-			glog.Errorf("Failed to stop be-apiserver.\n%v", err)
+			glog.Errorf("Failed to stop kube-apiserver.\n%v", err)
 		}
 	}
 	if es.etcdCmd != nil {
