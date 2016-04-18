@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -48,6 +49,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
+	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/controller/gc"
 	"k8s.io/kubernetes/pkg/controller/job"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -189,11 +192,16 @@ func Run(s *options.CMServer) error {
 }
 
 func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig *restclient.Config, stop <-chan struct{}) error {
-	go endpointcontroller.NewEndpointController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "endpoint-controller")), ResyncPeriod(s)).
+	podInformer := informers.CreateSharedPodInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "pod-informer")), ResyncPeriod(s)())
+	informers := map[reflect.Type]framework.SharedInformer{}
+	informers[reflect.TypeOf(&api.Pod{})] = podInformer
+
+	go endpointcontroller.NewEndpointController(podInformer, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "endpoint-controller"))).
 		Run(s.ConcurrentEndpointSyncs, wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	go replicationcontroller.NewReplicationManager(
+		podInformer,
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replication-controller")),
 		ResyncPeriod(s),
 		replicationcontroller.BurstReplicas,
@@ -409,6 +417,11 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	// run the shared informers
+	for _, informer := range informers {
+		go informer.Run(wait.NeverStop)
+	}
 
 	select {}
 }
