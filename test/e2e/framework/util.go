@@ -242,6 +242,9 @@ type RCConfig struct {
 	// Maximum allowable container failures. If exceeded, RunRC returns an error.
 	// Defaults to replicas*0.1 if unspecified.
 	MaxContainerFailures *int
+
+	// If set to false starting RC will print progress, otherwise only errors will be printed.
+	Silent bool
 }
 
 type DeploymentConfig struct {
@@ -1934,6 +1937,70 @@ func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
 	}
 }
 
+type RCStartupStatus struct {
+	Expected              int
+	Terminating           int
+	Running               int
+	RunningButNotReady    int
+	Waiting               int
+	Pending               int
+	Unknown               int
+	Inactive              int
+	FailedContainers      int
+	Created               []*api.Pod
+	ContainerRestartNodes sets.String
+}
+
+func (s *RCStartupStatus) Print(name string) {
+	Logf("%v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown, %d runningButNotReady ",
+		name, len(s.Created), s.Expected, s.Running, s.Pending, s.Waiting, s.Inactive, s.Terminating, s.Unknown, s.RunningButNotReady)
+}
+
+func ComputeRCStartupStatus(pods []*api.Pod, expected int) RCStartupStatus {
+	startupStatus := RCStartupStatus{
+		Expected:              expected,
+		Created:               make([]*api.Pod, 0, expected),
+		ContainerRestartNodes: sets.NewString(),
+	}
+	for _, p := range pods {
+		if p.DeletionTimestamp != nil {
+			startupStatus.Terminating++
+			continue
+		}
+		startupStatus.Created = append(startupStatus.Created, p)
+		if p.Status.Phase == api.PodRunning {
+			ready := false
+			for _, c := range p.Status.Conditions {
+				if c.Type == api.PodReady && c.Status == api.ConditionTrue {
+					ready = true
+					break
+				}
+			}
+			if ready {
+				// Only count a pod is running when it is also ready.
+				startupStatus.Running++
+			} else {
+				startupStatus.RunningButNotReady++
+			}
+			for _, v := range FailedContainers(p) {
+				startupStatus.FailedContainers = startupStatus.FailedContainers + v.Restarts
+				startupStatus.ContainerRestartNodes.Insert(p.Spec.NodeName)
+			}
+		} else if p.Status.Phase == api.PodPending {
+			if p.Spec.NodeName == "" {
+				startupStatus.Waiting++
+			} else {
+				startupStatus.Pending++
+			}
+		} else if p.Status.Phase == api.PodSucceeded || p.Status.Phase == api.PodFailed {
+			startupStatus.Inactive++
+		} else if p.Status.Phase == api.PodUnknown {
+			startupStatus.Unknown++
+		}
+	}
+	return startupStatus
+}
+
 func (config *RCConfig) start() error {
 	// Don't force tests to fail if they don't care about containers restarting.
 	var maxContainerFailures int
@@ -1962,74 +2029,28 @@ func (config *RCConfig) start() error {
 	for oldRunning != config.Replicas {
 		time.Sleep(interval)
 
-		terminating := 0
-
-		running := 0
-		runningButNotReady := 0
-		waiting := 0
-		pending := 0
-		unknown := 0
-		inactive := 0
-		failedContainers := 0
-		containerRestartNodes := sets.NewString()
-
 		pods := PodStore.List()
-		created := []*api.Pod{}
-		for _, p := range pods {
-			if p.DeletionTimestamp != nil {
-				terminating++
-				continue
-			}
-			created = append(created, p)
-			if p.Status.Phase == api.PodRunning {
-				ready := false
-				for _, c := range p.Status.Conditions {
-					if c.Type == api.PodReady && c.Status == api.ConditionTrue {
-						ready = true
-						break
-					}
-				}
-				if ready {
-					// Only count a pod is running when it is also ready.
-					running++
-				} else {
-					runningButNotReady++
-				}
-				for _, v := range FailedContainers(p) {
-					failedContainers = failedContainers + v.Restarts
-					containerRestartNodes.Insert(p.Spec.NodeName)
-				}
-			} else if p.Status.Phase == api.PodPending {
-				if p.Spec.NodeName == "" {
-					waiting++
-				} else {
-					pending++
-				}
-			} else if p.Status.Phase == api.PodSucceeded || p.Status.Phase == api.PodFailed {
-				inactive++
-			} else if p.Status.Phase == api.PodUnknown {
-				unknown++
-			}
-		}
-		pods = created
+		startupStatus := ComputeRCStartupStatus(pods, config.Replicas)
+
+		pods = startupStatus.Created
 		if config.CreatedPods != nil {
 			*config.CreatedPods = pods
 		}
-
-		Logf("%v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown, %d runningButNotReady ",
-			config.Name, len(pods), config.Replicas, running, pending, waiting, inactive, terminating, unknown, runningButNotReady)
-
-		promPushRunningPending(running, pending)
-
-		if config.PodStatusFile != nil {
-			fmt.Fprintf(config.PodStatusFile, "%d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown, %d, runningButNotReady\n", running, pending, waiting, inactive, unknown, runningButNotReady)
+		if !config.Silent {
+			startupStatus.Print(config.Name)
 		}
 
-		if failedContainers > maxContainerFailures {
-			DumpNodeDebugInfo(config.Client, containerRestartNodes.List())
+		promPushRunningPending(startupStatus.Running, startupStatus.Pending)
+
+		if config.PodStatusFile != nil {
+			fmt.Fprintf(config.PodStatusFile, "%d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown, %d, runningButNotReady\n", startupStatus.Running, startupStatus.Pending, startupStatus.Waiting, startupStatus.Inactive, startupStatus.Unknown, startupStatus.RunningButNotReady)
+		}
+
+		if startupStatus.FailedContainers > maxContainerFailures {
+			DumpNodeDebugInfo(config.Client, startupStatus.ContainerRestartNodes.List())
 			// Get the logs from the failed containers to help diagnose what caused them to fail
 			LogFailedContainers(config.Namespace)
-			return fmt.Errorf("%d containers failed which is more than allowed %d", failedContainers, maxContainerFailures)
+			return fmt.Errorf("%d containers failed which is more than allowed %d", startupStatus.FailedContainers, maxContainerFailures)
 		}
 		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
 			// This failure mode includes:
@@ -2043,11 +2064,11 @@ func (config *RCConfig) start() error {
 			return fmt.Errorf(errorStr)
 		}
 
-		if len(pods) > len(oldPods) || running > oldRunning {
+		if len(pods) > len(oldPods) || startupStatus.Running > oldRunning {
 			lastChange = time.Now()
 		}
 		oldPods = pods
-		oldRunning = running
+		oldRunning = startupStatus.Running
 
 		if time.Since(lastChange) > timeout {
 			dumpPodDebugInfo(config.Client, pods)
