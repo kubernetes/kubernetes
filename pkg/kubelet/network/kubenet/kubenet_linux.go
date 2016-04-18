@@ -32,12 +32,16 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
 
 const (
 	KubenetPluginName = "kubenet"
 	BridgeName        = "cbr0"
 	DefaultCNIDir     = "/opt/cni/bin"
+
+	sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
 )
 
 type kubenetNetworkPlugin struct {
@@ -70,6 +74,17 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
 		glog.V(5).Infof("Using interface %s MTU %d as bridge MTU", link.Name, link.MTU)
 	} else {
 		glog.Warningf("Failed to find default bridge MTU: %v", err)
+	}
+
+	// Since this plugin uses a Linux bridge, set bridge-nf-call-iptables=1
+	// is necessary to ensure kube-proxy functions correctly.
+	//
+	// This will return an error on older kernel version (< 3.18) as the module
+	// was built-in, we simply ignore the error here. A better thing to do is
+	// to check the kernel version in the future.
+	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
+	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
+		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
 	}
 
 	return nil
