@@ -20,6 +20,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
+	fakeunversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned/fake"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	fakeunversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned/fake"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
@@ -69,4 +71,9 @@ func (c *Clientset) Core() unversionedcore.CoreInterface {
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
 	return &fakeunversionedextensions.FakeExtensions{Fake: &c.Fake}
+}
+
+// Batch retrieves the BatchClient
+func (c *Clientset) Batch() unversionedbatch.BatchInterface {
+	return &fakeunversionedbatch.FakeBatch{Fake: &c.Fake}
 }
