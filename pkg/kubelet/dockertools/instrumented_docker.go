@@ -148,7 +148,7 @@ func (in instrumentedDockerInterface) Logs(id string, opts dockertypes.Container
 	return err
 }
 
-func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
+func (in instrumentedDockerInterface) Version() (*dockertypes.Version, error) {
 	const operation = "version"
 	defer recordOperation(operation, time.Now())
 
@@ -157,7 +157,7 @@ func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
 	return out, err
 }
 
-func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
+func (in instrumentedDockerInterface) Info() (*dockertypes.Info, error) {
 	const operation = "info"
 	defer recordOperation(operation, time.Now())
 
