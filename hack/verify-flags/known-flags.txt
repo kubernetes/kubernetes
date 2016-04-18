@@ -322,6 +322,7 @@ replication-controller-lookup-cache-size
 replicaset-lookup-cache-size
 repo-root
 report-dir
+report-prefix
 required-contexts
 resolv-conf
 resource-container
