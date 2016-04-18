@@ -82,6 +82,7 @@ var _ = AfterSuite(func() {
 		glog.Infof("Stopping node services...")
 		e2es.stop()
 	}
+	glog.Infof("Tests Finished")
 })
 
 var _ Reporter = &LogReporter{}
@@ -91,7 +92,7 @@ type LogReporter struct{}
 func (lr *LogReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
 	b := &bytes.Buffer{}
 	b.WriteString("******************************************************\n")
-	glog.V(0).Infof(b.String())
+	glog.Infof(b.String())
 }
 
 func (lr *LogReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {}
@@ -115,5 +116,5 @@ func (lr *LogReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 		b.WriteString(fmt.Sprintf("etcd output:\n%s\n", e2es.etcdCombinedOut.String()))
 	}
 	b.WriteString("******************************************************\n")
-	glog.V(0).Infof(b.String())
+	glog.Infof(b.String())
 }
