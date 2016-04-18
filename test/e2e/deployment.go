@@ -175,25 +175,25 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
-	framework.Logf("deleting deployment %s", deploymentName)
+	framework.Logf("Deleting deployment %s", deploymentName)
 	reaper, err := kubectl.ReaperFor(extensions.Kind("Deployment"), oldC)
 	Expect(err).NotTo(HaveOccurred())
 	timeout := 1 * time.Minute
 	err = reaper.Stop(ns, deployment.Name, timeout, api.NewDeleteOptions(0))
 	Expect(err).NotTo(HaveOccurred())
 
-	framework.Logf("ensuring deployment %s was deleted", deploymentName)
+	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
 	_, err = c.Extensions().Deployments(ns).Get(deployment.Name)
 	Expect(err).To(HaveOccurred())
 	Expect(errors.IsNotFound(err)).To(BeTrue())
-	framework.Logf("ensuring deployment %s RSes were deleted", deploymentName)
+	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	Expect(err).NotTo(HaveOccurred())
 	options := api.ListOptions{LabelSelector: selector}
 	rss, err := c.Extensions().ReplicaSets(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(rss.Items).Should(HaveLen(0))
-	framework.Logf("ensuring deployment %s pods were deleted", deploymentName)
+	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *api.PodList
 	if err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 		pods, err = c.Core().Pods(ns).List(api.ListOptions{})
@@ -529,11 +529,11 @@ func testRolloverDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
-	// Verify that the pods were scaled up and down as expected. We use events to verify that.
+	// Verify that the pods were scaled up and down as expected.
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
-	// Make sure the deployment starts to scale up and down replica sets
-	framework.WaitForPartialEvents(unversionedClient, ns, deployment, 2)
+	// Make sure the deployment starts to scale up and down replica sets by checking if its updated replicas >= 1
+	err = framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, 1, deployment.Generation)
 	// Check if it's updated to revision 1 correctly
 	_, newRS := checkDeploymentRevision(c, ns, deploymentName, "1", deploymentImageName, deploymentImage)
 
