@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -474,7 +475,7 @@ type StoreToJobLister struct {
 }
 
 // Exists checks if the given job exists in the store.
-func (s *StoreToJobLister) Exists(job *extensions.Job) (bool, error) {
+func (s *StoreToJobLister) Exists(job *batch.Job) (bool, error) {
 	_, exists, err := s.Store.Get(job)
 	if err != nil {
 		return false, err
@@ -483,17 +484,17 @@ func (s *StoreToJobLister) Exists(job *extensions.Job) (bool, error) {
 }
 
 // StoreToJobLister lists all jobs in the store.
-func (s *StoreToJobLister) List() (jobs extensions.JobList, err error) {
+func (s *StoreToJobLister) List() (jobs batch.JobList, err error) {
 	for _, c := range s.Store.List() {
-		jobs.Items = append(jobs.Items, *(c.(*extensions.Job)))
+		jobs.Items = append(jobs.Items, *(c.(*batch.Job)))
 	}
 	return jobs, nil
 }
 
 // GetPodJobs returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
-func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err error) {
+func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []batch.Job, err error) {
 	var selector labels.Selector
-	var job extensions.Job
+	var job batch.Job
 
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no jobs found for pod %v because it has no labels", pod.Name)
@@ -501,7 +502,7 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 	}
 
 	for _, m := range s.Store.List() {
-		job = *m.(*extensions.Job)
+		job = *m.(*batch.Job)
 		if job.Namespace != pod.Namespace {
 			continue
 		}

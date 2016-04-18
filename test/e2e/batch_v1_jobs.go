@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
@@ -128,7 +128,7 @@ var _ = framework.KubeDescribe("V1Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job up")
-		scaler, err := kubectl.ScalerFor(extensions.Kind("Job"), f.Client)
+		scaler, err := kubectl.ScalerFor(batch.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -153,7 +153,7 @@ var _ = framework.KubeDescribe("V1Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job down")
-		scaler, err := kubectl.ScalerFor(extensions.Kind("Job"), f.Client)
+		scaler, err := kubectl.ScalerFor(batch.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -176,7 +176,7 @@ var _ = framework.KubeDescribe("V1Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("delete a job")
-		reaper, err := kubectl.ReaperFor(extensions.Kind("Job"), f.Client)
+		reaper, err := kubectl.ReaperFor(batch.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
 		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, api.NewDeleteOptions(0))
@@ -203,12 +203,12 @@ var _ = framework.KubeDescribe("V1Job", func() {
 })
 
 // newTestV1Job returns a job which does one of several testing behaviors.
-func newTestV1Job(behavior, name string, rPol api.RestartPolicy, parallelism, completions int) *extensions.Job {
-	job := &extensions.Job{
+func newTestV1Job(behavior, name string, rPol api.RestartPolicy, parallelism, completions int) *batch.Job {
+	job := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
-		Spec: extensions.JobSpec{
+		Spec: batch.JobSpec{
 			Parallelism: &parallelism,
 			Completions: &completions,
 			Template: api.PodTemplateSpec{
@@ -264,7 +264,7 @@ func newTestV1Job(behavior, name string, rPol api.RestartPolicy, parallelism, co
 	return job
 }
 
-func createV1Job(c *client.Client, ns string, job *extensions.Job) (*extensions.Job, error) {
+func createV1Job(c *client.Client, ns string, job *batch.Job) (*batch.Job, error) {
 	return c.Batch().Jobs(ns).Create(job)
 }
 
@@ -310,7 +310,7 @@ func waitForV1JobFail(c *client.Client, ns, jobName string) error {
 			return false, err
 		}
 		for _, c := range curr.Status.Conditions {
-			if c.Type == extensions.JobFailed && c.Status == api.ConditionTrue {
+			if c.Type == batch.JobFailed && c.Status == api.ConditionTrue {
 				return true, nil
 			}
 		}

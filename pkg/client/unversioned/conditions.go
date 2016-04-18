@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -129,7 +130,7 @@ func ReplicaSetHasDesiredReplicas(c ExtensionsInterface, replicaSet *extensions.
 
 // JobHasDesiredParallelism returns a condition that will be true if the desired parallelism count
 // for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
-func JobHasDesiredParallelism(c ExtensionsInterface, job *extensions.Job) wait.ConditionFunc {
+func JobHasDesiredParallelism(c BatchInterface, job *batch.Job) wait.ConditionFunc {
 
 	return func() (bool, error) {
 		job, err := c.Jobs(job.Namespace).Get(job.Name)

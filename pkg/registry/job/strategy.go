@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/batch/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -47,20 +47,20 @@ func (jobStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a job before creation.
 func (jobStrategy) PrepareForCreate(obj runtime.Object) {
-	job := obj.(*extensions.Job)
-	job.Status = extensions.JobStatus{}
+	job := obj.(*batch.Job)
+	job.Status = batch.JobStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (jobStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newJob := obj.(*extensions.Job)
-	oldJob := old.(*extensions.Job)
+	newJob := obj.(*batch.Job)
+	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 }
 
 // Validate validates a new job.
 func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
-	job := obj.(*extensions.Job)
+	job := obj.(*batch.Job)
 	// TODO: move UID generation earlier and do this in defaulting logic?
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
 		generateSelector(job)
@@ -71,7 +71,7 @@ func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList
 // generateSelector adds a selector to a job and labels to its template
 // which can be used to uniquely identify the pods created by that job,
 // if the user has requested this behavior.
-func generateSelector(obj *extensions.Job) {
+func generateSelector(obj *batch.Job) {
 	if obj.Spec.Template.Labels == nil {
 		obj.Spec.Template.Labels = make(map[string]string)
 	}
@@ -133,8 +133,8 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateJob(obj.(*extensions.Job))
-	updateErrorList := validation.ValidateJobUpdate(obj.(*extensions.Job), old.(*extensions.Job))
+	validationErrorList := validation.ValidateJob(obj.(*batch.Job))
+	updateErrorList := validation.ValidateJobUpdate(obj.(*batch.Job), old.(*batch.Job))
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -145,17 +145,17 @@ type jobStatusStrategy struct {
 var StatusStrategy = jobStatusStrategy{Strategy}
 
 func (jobStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newJob := obj.(*extensions.Job)
-	oldJob := old.(*extensions.Job)
+	newJob := obj.(*batch.Job)
+	oldJob := old.(*batch.Job)
 	newJob.Spec = oldJob.Spec
 }
 
 func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateJobUpdateStatus(obj.(*extensions.Job), old.(*extensions.Job))
+	return validation.ValidateJobUpdateStatus(obj.(*batch.Job), old.(*batch.Job))
 }
 
 // JobSelectableFields returns a field set that represents the object for matching purposes.
-func JobToSelectableFields(job *extensions.Job) fields.Set {
+func JobToSelectableFields(job *batch.Job) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(job.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
 		"status.successful": strconv.Itoa(job.Status.Succeeded),
@@ -171,7 +171,7 @@ func MatchJob(label labels.Selector, field fields.Selector) generic.Matcher {
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			job, ok := obj.(*extensions.Job)
+			job, ok := obj.(*batch.Job)
 			if !ok {
 				return nil, nil, fmt.Errorf("Given object is not a job.")
 			}
