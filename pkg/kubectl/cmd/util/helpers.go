@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -359,45 +358,6 @@ func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	}
 
 	return data, nil
-}
-
-// ReadConfigData reads the bytes from the specified filesystem or network
-// location or from stdin if location == "-".
-// TODO: replace with resource.Builder
-func ReadConfigData(location string) ([]byte, error) {
-	if len(location) == 0 {
-		return nil, fmt.Errorf("location given but empty")
-	}
-
-	if location == "-" {
-		// Read from stdin.
-		return ReadConfigDataFromReader(os.Stdin, "stdin ('-')")
-	}
-
-	// Use the location as a file path or URL.
-	return ReadConfigDataFromLocation(location)
-}
-
-// TODO: replace with resource.Builder
-func ReadConfigDataFromLocation(location string) ([]byte, error) {
-	// we look for http:// or https:// to determine if valid URL, otherwise do normal file IO
-	if strings.Index(location, "http://") == 0 || strings.Index(location, "https://") == 0 {
-		resp, err := http.Get(location)
-		if err != nil {
-			return nil, fmt.Errorf("unable to access URL %s: %v\n", location, err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("unable to read URL, server reported %d %s", resp.StatusCode, resp.Status)
-		}
-		return ReadConfigDataFromReader(resp.Body, location)
-	} else {
-		file, err := os.Open(location)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read %s: %v\n", location, err)
-		}
-		return ReadConfigDataFromReader(file, location)
-	}
 }
 
 // Merge requires JSON serialization
