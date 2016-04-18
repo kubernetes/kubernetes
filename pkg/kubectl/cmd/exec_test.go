@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
 type fakeRemoteExecutor struct {
@@ -40,7 +41,7 @@ type fakeRemoteExecutor struct {
 	execErr error
 }
 
-func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error {
 	f.method = method
 	f.url = url
 	return f.execErr

@@ -2751,6 +2751,8 @@ const (
 	StreamTypeData = "data"
 	// Value for streamType header for error stream
 	StreamTypeError = "error"
+	// Value for streamType header for terminal resize stream
+	StreamTypeResize = "resize"
 
 	// Name of header that specifies the port being forwarded
 	PortHeader = "port"

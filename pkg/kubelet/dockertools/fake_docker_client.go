@@ -500,6 +500,20 @@ func (f *FakeDockerClient) updateContainerStatus(id, status string) {
 	}
 }
 
+func (f *FakeDockerClient) ResizeExecTTY(id string, height, width int) error {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "resize_exec")
+	return nil
+}
+
+func (f *FakeDockerClient) ResizeContainerTTY(id string, height, width int) error {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "resize_container")
+	return nil
+}
+
 // FakeDockerPuller is a stub implementation of DockerPuller.
 type FakeDockerPuller struct {
 	sync.Mutex
