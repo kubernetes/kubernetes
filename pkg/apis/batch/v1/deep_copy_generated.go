@@ -34,8 +34,16 @@ func init() {
 		DeepCopy_v1_JobList,
 		DeepCopy_v1_JobSpec,
 		DeepCopy_v1_JobStatus,
+		DeepCopy_v1_JobTemplateSpec,
 		DeepCopy_v1_LabelSelector,
 		DeepCopy_v1_LabelSelectorRequirement,
+		DeepCopy_v1_Workflow,
+		DeepCopy_v1_WorkflowCondition,
+		DeepCopy_v1_WorkflowList,
+		DeepCopy_v1_WorkflowSpec,
+		DeepCopy_v1_WorkflowStatus,
+		DeepCopy_v1_WorkflowStep,
+		DeepCopy_v1_WorkflowStepStatus,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
@@ -173,6 +181,16 @@ func DeepCopy_v1_JobStatus(in JobStatus, out *JobStatus, c *conversion.Cloner) e
 	return nil
 }
 
+func DeepCopy_v1_JobTemplateSpec(in JobTemplateSpec, out *JobTemplateSpec, c *conversion.Cloner) error {
+	if err := api_v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v1_JobSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func DeepCopy_v1_LabelSelector(in LabelSelector, out *LabelSelector, c *conversion.Cloner) error {
 	if in.MatchLabels != nil {
 		in, out := in.MatchLabels, &out.MatchLabels
@@ -206,6 +224,176 @@ func DeepCopy_v1_LabelSelectorRequirement(in LabelSelectorRequirement, out *Labe
 		copy(*out, in)
 	} else {
 		out.Values = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_Workflow(in Workflow, out *Workflow, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := api_v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v1_WorkflowSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v1_WorkflowStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeepCopy_v1_WorkflowCondition(in WorkflowCondition, out *WorkflowCondition, c *conversion.Cloner) error {
+	out.Type = in.Type
+	out.Status = in.Status
+	if err := unversioned.DeepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func DeepCopy_v1_WorkflowList(in WorkflowList, out *WorkflowList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]Workflow, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_Workflow(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_WorkflowSpec(in WorkflowSpec, out *WorkflowSpec, c *conversion.Cloner) error {
+	if err := api_v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		*out = new(int64)
+		**out = *in
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	if in.Steps != nil {
+		in, out := in.Steps, &out.Steps
+		*out = make(map[string]WorkflowStep)
+		for key, val := range in {
+			newVal := new(WorkflowStep)
+			if err := DeepCopy_v1_WorkflowStep(val, newVal, c); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Steps = nil
+	}
+	if in.Selector != nil {
+		in, out := in.Selector, &out.Selector
+		*out = new(LabelSelector)
+		if err := DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_WorkflowStatus(in WorkflowStatus, out *WorkflowStatus, c *conversion.Cloner) error {
+	if in.Conditions != nil {
+		in, out := in.Conditions, &out.Conditions
+		*out = make([]WorkflowCondition, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_WorkflowCondition(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
+	if in.StartTime != nil {
+		in, out := in.StartTime, &out.StartTime
+		*out = new(unversioned.Time)
+		if err := unversioned.DeepCopy_unversioned_Time(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.StartTime = nil
+	}
+	if in.CompletionTime != nil {
+		in, out := in.CompletionTime, &out.CompletionTime
+		*out = new(unversioned.Time)
+		if err := unversioned.DeepCopy_unversioned_Time(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.CompletionTime = nil
+	}
+	if in.Statuses != nil {
+		in, out := in.Statuses, &out.Statuses
+		*out = make(map[string]WorkflowStepStatus)
+		for key, val := range in {
+			newVal := new(WorkflowStepStatus)
+			if err := DeepCopy_v1_WorkflowStepStatus(val, newVal, c); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Statuses = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_WorkflowStep(in WorkflowStep, out *WorkflowStep, c *conversion.Cloner) error {
+	if in.JobTemplate != nil {
+		in, out := in.JobTemplate, &out.JobTemplate
+		*out = new(JobTemplateSpec)
+		if err := DeepCopy_v1_JobTemplateSpec(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.JobTemplate = nil
+	}
+	if in.ExternalRef != nil {
+		in, out := in.ExternalRef, &out.ExternalRef
+		*out = new(api_v1.ObjectReference)
+		if err := api_v1.DeepCopy_v1_ObjectReference(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.ExternalRef = nil
+	}
+	if in.Dependencies != nil {
+		in, out := in.Dependencies, &out.Dependencies
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.Dependencies = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_WorkflowStepStatus(in WorkflowStepStatus, out *WorkflowStepStatus, c *conversion.Cloner) error {
+	out.Complete = in.Complete
+	if err := api_v1.DeepCopy_v1_ObjectReference(in.Reference, &out.Reference, c); err != nil {
+		return err
 	}
 	return nil
 }

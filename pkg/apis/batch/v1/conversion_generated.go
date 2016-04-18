@@ -41,10 +41,26 @@ func init() {
 		Convert_extensions_JobSpec_To_v1_JobSpec,
 		Convert_v1_JobStatus_To_extensions_JobStatus,
 		Convert_extensions_JobStatus_To_v1_JobStatus,
+		Convert_v1_JobTemplateSpec_To_extensions_JobTemplateSpec,
+		Convert_extensions_JobTemplateSpec_To_v1_JobTemplateSpec,
 		Convert_v1_LabelSelector_To_unversioned_LabelSelector,
 		Convert_unversioned_LabelSelector_To_v1_LabelSelector,
 		Convert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
 		Convert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement,
+		Convert_v1_Workflow_To_extensions_Workflow,
+		Convert_extensions_Workflow_To_v1_Workflow,
+		Convert_v1_WorkflowCondition_To_extensions_WorkflowCondition,
+		Convert_extensions_WorkflowCondition_To_v1_WorkflowCondition,
+		Convert_v1_WorkflowList_To_extensions_WorkflowList,
+		Convert_extensions_WorkflowList_To_v1_WorkflowList,
+		Convert_v1_WorkflowSpec_To_extensions_WorkflowSpec,
+		Convert_extensions_WorkflowSpec_To_v1_WorkflowSpec,
+		Convert_v1_WorkflowStatus_To_extensions_WorkflowStatus,
+		Convert_extensions_WorkflowStatus_To_v1_WorkflowStatus,
+		Convert_v1_WorkflowStep_To_extensions_WorkflowStep,
+		Convert_extensions_WorkflowStep_To_v1_WorkflowStep,
+		Convert_v1_WorkflowStepStatus_To_extensions_WorkflowStepStatus,
+		Convert_extensions_WorkflowStepStatus_To_v1_WorkflowStepStatus,
 	); err != nil {
 		// if one of the conversion functions is malformed, detect it immediately.
 		panic(err)
@@ -387,6 +403,42 @@ func Convert_extensions_JobStatus_To_v1_JobStatus(in *extensions.JobStatus, out 
 	return autoConvert_extensions_JobStatus_To_v1_JobStatus(in, out, s)
 }
 
+func autoConvert_v1_JobTemplateSpec_To_extensions_JobTemplateSpec(in *JobTemplateSpec, out *extensions.JobTemplateSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobTemplateSpec))(in)
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_v1_JobSpec_To_extensions_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_JobTemplateSpec_To_extensions_JobTemplateSpec(in *JobTemplateSpec, out *extensions.JobTemplateSpec, s conversion.Scope) error {
+	return autoConvert_v1_JobTemplateSpec_To_extensions_JobTemplateSpec(in, out, s)
+}
+
+func autoConvert_extensions_JobTemplateSpec_To_v1_JobTemplateSpec(in *extensions.JobTemplateSpec, out *JobTemplateSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.JobTemplateSpec))(in)
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_extensions_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_JobTemplateSpec_To_v1_JobTemplateSpec(in *extensions.JobTemplateSpec, out *JobTemplateSpec, s conversion.Scope) error {
+	return autoConvert_extensions_JobTemplateSpec_To_v1_JobTemplateSpec(in, out, s)
+}
+
 func autoConvert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LabelSelector))(in)
@@ -487,4 +539,450 @@ func autoConvert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequire
 
 func Convert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
 	return autoConvert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement(in, out, s)
+}
+
+func autoConvert_v1_Workflow_To_extensions_Workflow(in *Workflow, out *extensions.Workflow, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Workflow))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_v1_WorkflowSpec_To_extensions_WorkflowSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_WorkflowStatus_To_extensions_WorkflowStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_Workflow_To_extensions_Workflow(in *Workflow, out *extensions.Workflow, s conversion.Scope) error {
+	return autoConvert_v1_Workflow_To_extensions_Workflow(in, out, s)
+}
+
+func autoConvert_extensions_Workflow_To_v1_Workflow(in *extensions.Workflow, out *Workflow, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.Workflow))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_extensions_WorkflowSpec_To_v1_WorkflowSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_extensions_WorkflowStatus_To_v1_WorkflowStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_Workflow_To_v1_Workflow(in *extensions.Workflow, out *Workflow, s conversion.Scope) error {
+	return autoConvert_extensions_Workflow_To_v1_Workflow(in, out, s)
+}
+
+func autoConvert_v1_WorkflowCondition_To_extensions_WorkflowCondition(in *WorkflowCondition, out *extensions.WorkflowCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*WorkflowCondition))(in)
+	}
+	out.Type = extensions.WorkflowConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_v1_WorkflowCondition_To_extensions_WorkflowCondition(in *WorkflowCondition, out *extensions.WorkflowCondition, s conversion.Scope) error {
+	return autoConvert_v1_WorkflowCondition_To_extensions_WorkflowCondition(in, out, s)
+}
+
+func autoConvert_extensions_WorkflowCondition_To_v1_WorkflowCondition(in *extensions.WorkflowCondition, out *WorkflowCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.WorkflowCondition))(in)
+	}
+	out.Type = WorkflowConditionType(in.Type)
+	out.Status = api_v1.ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_extensions_WorkflowCondition_To_v1_WorkflowCondition(in *extensions.WorkflowCondition, out *WorkflowCondition, s conversion.Scope) error {
+	return autoConvert_extensions_WorkflowCondition_To_v1_WorkflowCondition(in, out, s)
+}
+
+func autoConvert_v1_WorkflowList_To_extensions_WorkflowList(in *WorkflowList, out *extensions.WorkflowList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*WorkflowList))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]extensions.Workflow, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Workflow_To_extensions_Workflow(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v1_WorkflowList_To_extensions_WorkflowList(in *WorkflowList, out *extensions.WorkflowList, s conversion.Scope) error {
+	return autoConvert_v1_WorkflowList_To_extensions_WorkflowList(in, out, s)
+}
+
+func autoConvert_extensions_WorkflowList_To_v1_WorkflowList(in *extensions.WorkflowList, out *WorkflowList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.WorkflowList))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Workflow, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_Workflow_To_v1_Workflow(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_extensions_WorkflowList_To_v1_WorkflowList(in *extensions.WorkflowList, out *WorkflowList, s conversion.Scope) error {
+	return autoConvert_extensions_WorkflowList_To_v1_WorkflowList(in, out, s)
+}
+
+func autoConvert_v1_WorkflowSpec_To_extensions_WorkflowSpec(in *WorkflowSpec, out *extensions.WorkflowSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*WorkflowSpec))(in)
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	if in.Steps != nil {
+		in, out := &in.Steps, &out.Steps
+		*out = make(map[string]extensions.WorkflowStep, len(*in))
+		for key, val := range *in {
+			newVal := new(extensions.WorkflowStep)
+			if err := Convert_v1_WorkflowStep_To_extensions_WorkflowStep(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Steps = nil
+	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := Convert_v1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+	return nil
+}
+
+func Convert_v1_WorkflowSpec_To_extensions_WorkflowSpec(in *WorkflowSpec, out *extensions.WorkflowSpec, s conversion.Scope) error {
+	return autoConvert_v1_WorkflowSpec_To_extensions_WorkflowSpec(in, out, s)
+}
+
+func autoConvert_extensions_WorkflowSpec_To_v1_WorkflowSpec(in *extensions.WorkflowSpec, out *WorkflowSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.WorkflowSpec))(in)
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	if in.Steps != nil {
+		in, out := &in.Steps, &out.Steps
+		*out = make(map[string]WorkflowStep, len(*in))
+		for key, val := range *in {
+			newVal := new(WorkflowStep)
+			if err := Convert_extensions_WorkflowStep_To_v1_WorkflowStep(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Steps = nil
+	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+	return nil
+}
+
+func Convert_extensions_WorkflowSpec_To_v1_WorkflowSpec(in *extensions.WorkflowSpec, out *WorkflowSpec, s conversion.Scope) error {
+	return autoConvert_extensions_WorkflowSpec_To_v1_WorkflowSpec(in, out, s)
+}
+
+func autoConvert_v1_WorkflowStatus_To_extensions_WorkflowStatus(in *WorkflowStatus, out *extensions.WorkflowStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*WorkflowStatus))(in)
+	}
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]extensions.WorkflowCondition, len(*in))
+		for i := range *in {
+			if err := Convert_v1_WorkflowCondition_To_extensions_WorkflowCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
+	if in.StartTime != nil {
+		in, out := &in.StartTime, &out.StartTime
+		*out = new(unversioned.Time)
+		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.StartTime = nil
+	}
+	if in.CompletionTime != nil {
+		in, out := &in.CompletionTime, &out.CompletionTime
+		*out = new(unversioned.Time)
+		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.CompletionTime = nil
+	}
+	if in.Statuses != nil {
+		in, out := &in.Statuses, &out.Statuses
+		*out = make(map[string]extensions.WorkflowStepStatus, len(*in))
+		for key, val := range *in {
+			newVal := new(extensions.WorkflowStepStatus)
+			if err := Convert_v1_WorkflowStepStatus_To_extensions_WorkflowStepStatus(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Statuses = nil
+	}
+	return nil
+}
+
+func Convert_v1_WorkflowStatus_To_extensions_WorkflowStatus(in *WorkflowStatus, out *extensions.WorkflowStatus, s conversion.Scope) error {
+	return autoConvert_v1_WorkflowStatus_To_extensions_WorkflowStatus(in, out, s)
+}
+
+func autoConvert_extensions_WorkflowStatus_To_v1_WorkflowStatus(in *extensions.WorkflowStatus, out *WorkflowStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.WorkflowStatus))(in)
+	}
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]WorkflowCondition, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_WorkflowCondition_To_v1_WorkflowCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
+	if in.StartTime != nil {
+		in, out := &in.StartTime, &out.StartTime
+		*out = new(unversioned.Time)
+		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.StartTime = nil
+	}
+	if in.CompletionTime != nil {
+		in, out := &in.CompletionTime, &out.CompletionTime
+		*out = new(unversioned.Time)
+		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.CompletionTime = nil
+	}
+	if in.Statuses != nil {
+		in, out := &in.Statuses, &out.Statuses
+		*out = make(map[string]WorkflowStepStatus, len(*in))
+		for key, val := range *in {
+			newVal := new(WorkflowStepStatus)
+			if err := Convert_extensions_WorkflowStepStatus_To_v1_WorkflowStepStatus(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Statuses = nil
+	}
+	return nil
+}
+
+func Convert_extensions_WorkflowStatus_To_v1_WorkflowStatus(in *extensions.WorkflowStatus, out *WorkflowStatus, s conversion.Scope) error {
+	return autoConvert_extensions_WorkflowStatus_To_v1_WorkflowStatus(in, out, s)
+}
+
+func autoConvert_v1_WorkflowStep_To_extensions_WorkflowStep(in *WorkflowStep, out *extensions.WorkflowStep, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*WorkflowStep))(in)
+	}
+	if in.JobTemplate != nil {
+		in, out := &in.JobTemplate, &out.JobTemplate
+		*out = new(extensions.JobTemplateSpec)
+		if err := Convert_v1_JobTemplateSpec_To_extensions_JobTemplateSpec(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.JobTemplate = nil
+	}
+	if in.ExternalRef != nil {
+		in, out := &in.ExternalRef, &out.ExternalRef
+		*out = new(api.ObjectReference)
+		// TODO: Inefficient conversion - can we improve it?
+		if err := s.Convert(*in, *out, 0); err != nil {
+			return err
+		}
+	} else {
+		out.ExternalRef = nil
+	}
+	if in.Dependencies != nil {
+		in, out := &in.Dependencies, &out.Dependencies
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Dependencies = nil
+	}
+	return nil
+}
+
+func Convert_v1_WorkflowStep_To_extensions_WorkflowStep(in *WorkflowStep, out *extensions.WorkflowStep, s conversion.Scope) error {
+	return autoConvert_v1_WorkflowStep_To_extensions_WorkflowStep(in, out, s)
+}
+
+func autoConvert_extensions_WorkflowStep_To_v1_WorkflowStep(in *extensions.WorkflowStep, out *WorkflowStep, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.WorkflowStep))(in)
+	}
+	if in.JobTemplate != nil {
+		in, out := &in.JobTemplate, &out.JobTemplate
+		*out = new(JobTemplateSpec)
+		if err := Convert_extensions_JobTemplateSpec_To_v1_JobTemplateSpec(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.JobTemplate = nil
+	}
+	if in.ExternalRef != nil {
+		in, out := &in.ExternalRef, &out.ExternalRef
+		*out = new(api_v1.ObjectReference)
+		// TODO: Inefficient conversion - can we improve it?
+		if err := s.Convert(*in, *out, 0); err != nil {
+			return err
+		}
+	} else {
+		out.ExternalRef = nil
+	}
+	if in.Dependencies != nil {
+		in, out := &in.Dependencies, &out.Dependencies
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Dependencies = nil
+	}
+	return nil
+}
+
+func Convert_extensions_WorkflowStep_To_v1_WorkflowStep(in *extensions.WorkflowStep, out *WorkflowStep, s conversion.Scope) error {
+	return autoConvert_extensions_WorkflowStep_To_v1_WorkflowStep(in, out, s)
+}
+
+func autoConvert_v1_WorkflowStepStatus_To_extensions_WorkflowStepStatus(in *WorkflowStepStatus, out *extensions.WorkflowStepStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*WorkflowStepStatus))(in)
+	}
+	out.Complete = in.Complete
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.Reference, &out.Reference, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_WorkflowStepStatus_To_extensions_WorkflowStepStatus(in *WorkflowStepStatus, out *extensions.WorkflowStepStatus, s conversion.Scope) error {
+	return autoConvert_v1_WorkflowStepStatus_To_extensions_WorkflowStepStatus(in, out, s)
+}
+
+func autoConvert_extensions_WorkflowStepStatus_To_v1_WorkflowStepStatus(in *extensions.WorkflowStepStatus, out *WorkflowStepStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.WorkflowStepStatus))(in)
+	}
+	out.Complete = in.Complete
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.Reference, &out.Reference, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_WorkflowStepStatus_To_v1_WorkflowStepStatus(in *extensions.WorkflowStepStatus, out *WorkflowStepStatus, s conversion.Scope) error {
+	return autoConvert_extensions_WorkflowStepStatus_To_v1_WorkflowStepStatus(in, out, s)
 }

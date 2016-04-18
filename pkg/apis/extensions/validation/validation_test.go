@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -1249,6 +1250,396 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 		}
 		if errs.ToAggregate().Error() != testName {
 			t.Errorf("expected '%s' got '%s'", errs.ToAggregate().Error(), testName)
+		}
+	}
+}
+
+func TestValidateWorkflowSpec(t *testing.T) {
+	successCases := map[string]extensions.Workflow{
+		"K1": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		"2K1": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {},
+					"two": {},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		"K2": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {},
+					"two": {
+						Dependencies: []string{"one"},
+					},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		"2K2": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {},
+					"two": {
+						Dependencies: []string{"one"},
+					},
+					"three": {},
+					"four": {
+						Dependencies: []string{"three"},
+					},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		"K3": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {},
+					"two": {
+						Dependencies: []string{"one"},
+					},
+					"three": {
+						Dependencies: []string{"one", "two"},
+					},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+	}
+	for k, v := range successCases {
+		errs := ValidateWorkflow(&v)
+		if len(errs) != 0 {
+			t.Errorf("%s unexpected error %v", k, errs)
+		}
+	}
+	negative64 := int64(-42)
+	errorCases := map[string]extensions.Workflow{
+		"spec.steps: Forbidden: detected cycle [one]": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {
+						Dependencies: []string{"one"},
+					},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		"spec.steps: Forbidden: detected cycle [two one]": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {
+						Dependencies: []string{"two"},
+					},
+					"two": {
+						Dependencies: []string{"one"},
+					},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		"spec.steps: Forbidden: detected cycle [three four five]": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {},
+					"two": {
+						Dependencies: []string{"one"},
+					},
+					"three": {
+						Dependencies: []string{"two", "five"},
+					},
+					"four": {
+						Dependencies: []string{"three"},
+					},
+					"five": {
+						Dependencies: []string{"four"},
+					},
+					"six": {
+						Dependencies: []string{"five"},
+					},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		"spec.steps: Not found: \"three\"": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {},
+					"two": {
+						Dependencies: []string{"three"},
+					},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		"spec.activeDeadlineSeconds: Invalid value: -42: must be greater than or equal to 0": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {},
+				},
+				ActiveDeadlineSeconds: &negative64,
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		"spec.selector: Required value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {},
+				},
+			},
+		},
+		"spec.steps: Invalid value: \"one\": jobTemplate and externalRef are mutually exclusive": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "mydag",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1uid1cafe"),
+			},
+			Spec: extensions.WorkflowSpec{
+				Steps: map[string]extensions.WorkflowStep{
+					"one": {
+						JobTemplate: &extensions.JobTemplateSpec{},
+						ExternalRef: &api.ObjectReference{},
+					},
+				},
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+			},
+		},
+	}
+
+	for k, v := range errorCases {
+		errs := ValidateWorkflow(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		} else {
+			s := strings.Split(k, ":")
+			err := errs[0]
+			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+				t.Errorf("unexpected error: %v, expected: %s", err, k)
+			}
+		}
+	}
+}
+
+func NewWorkflow() extensions.Workflow {
+	return extensions.Workflow{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "mydag",
+			Namespace:       api.NamespaceDefault,
+			UID:             types.UID("1uid1cafe"),
+			ResourceVersion: "42",
+		},
+		Spec: extensions.WorkflowSpec{
+			Steps: map[string]extensions.WorkflowStep{
+				"one": {
+					JobTemplate: &extensions.JobTemplateSpec{},
+				},
+				"two": {
+					JobTemplate: &extensions.JobTemplateSpec{},
+				},
+			},
+			Selector: &unversioned.LabelSelector{
+				MatchLabels: map[string]string{"a": "b"},
+			},
+		},
+		Status: extensions.WorkflowStatus{
+			StartTime: &unversioned.Time{time.Date(2009, time.January, 1, 27, 6, 25, 0, time.UTC)},
+			Statuses: map[string]extensions.WorkflowStepStatus{
+				"one": {
+					Complete: false,
+				},
+				"two": {
+					Complete: false,
+				},
+			},
+		},
+	}
+}
+
+func TestValidateWorkflowUpdate(t *testing.T) {
+
+	type WorkflowPair struct {
+		current      extensions.Workflow
+		patchCurrent func(*extensions.Workflow)
+		update       extensions.Workflow
+		patchUpdate  func(*extensions.Workflow)
+	}
+	errorCases := map[string]WorkflowPair{
+		"metadata.resourceVersion: Invalid value: \"\": must be specified for an update": {
+			current: NewWorkflow(),
+			update:  NewWorkflow(),
+			patchUpdate: func(w *extensions.Workflow) {
+				w.ObjectMeta.ResourceVersion = ""
+			},
+		},
+		"workflow: Forbidden: cannot update completed workflow": {
+			current: NewWorkflow(),
+			patchCurrent: func(w *extensions.Workflow) {
+				s1 := w.Status.Statuses["one"]
+				s1.Complete = true // one is complete
+				w.Status.Statuses["one"] = s1
+				s2 := w.Status.Statuses["two"]
+				s2.Complete = true // two is complete
+				w.Status.Statuses["two"] = s2
+			},
+			update: NewWorkflow(),
+		},
+		"spec.steps: Forbidden: cannot delete running step \"one\"": {
+			current: NewWorkflow(),
+			patchCurrent: func(w *extensions.Workflow) {
+				delete(w.Status.Statuses, "two") // one is running
+			},
+			update: NewWorkflow(),
+			patchUpdate: func(w *extensions.Workflow) {
+				// we delete "one"
+				delete(w.Spec.Steps, "one") // trying to remove a running step
+				delete(w.Status.Statuses, "two")
+			},
+		},
+		"spec.steps: Forbidden: cannot modify running step \"one\"": {
+			current: NewWorkflow(),
+			patchCurrent: func(w *extensions.Workflow) {
+				delete(w.Status.Statuses, "two") // one is running
+			},
+			update: NewWorkflow(),
+			patchUpdate: func(w *extensions.Workflow) {
+				// modify "one"
+				s := w.Spec.Steps["one"]
+				s.JobTemplate = nil
+				s.ExternalRef = &api.ObjectReference{}
+				w.Spec.Steps["one"] = s
+				delete(w.Status.Statuses, "two")
+			},
+		},
+		"spec.steps: Forbidden: cannot delete completed step \"one\"": {
+			current: NewWorkflow(),
+			patchCurrent: func(w *extensions.Workflow) {
+				s := w.Status.Statuses["one"]
+				s.Complete = true // one is complete
+				w.Status.Statuses["one"] = s
+				delete(w.Status.Statuses, "two") // two is running
+			},
+			update: NewWorkflow(),
+			patchUpdate: func(w *extensions.Workflow) {
+				delete(w.Spec.Steps, "one") // removing a complete step
+			},
+		},
+		"spec.steps: Forbidden: cannot modify completed step \"one\"": {
+			current: NewWorkflow(),
+			patchCurrent: func(w *extensions.Workflow) {
+				s := w.Status.Statuses["one"]
+				s.Complete = true // one is complete
+				w.Status.Statuses["one"] = s
+				delete(w.Status.Statuses, "two") // two is running
+			},
+			update: NewWorkflow(),
+			patchUpdate: func(w *extensions.Workflow) {
+				// modify "one"
+				s := w.Spec.Steps["one"]
+				s.JobTemplate = nil
+				s.ExternalRef = &api.ObjectReference{}
+				w.Spec.Steps["one"] = s
+				delete(w.Status.Statuses, "two") // two always running
+			},
+		},
+	}
+	for k, v := range errorCases {
+		if v.patchUpdate != nil {
+			v.patchUpdate(&v.update)
+		}
+		if v.patchCurrent != nil {
+			v.patchCurrent(&v.current)
+		}
+		errs := ValidateWorkflowUpdate(&v.update, &v.current)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+			continue
+		}
+		if errs.ToAggregate().Error() != k {
+			t.Errorf("unexpected error: %v, expected: %s", errs, k)
 		}
 	}
 }

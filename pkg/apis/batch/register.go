@@ -50,5 +50,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&extensions.Job{},
 		&extensions.JobList{},
 		&api.ListOptions{},
+		&extensions.Workflow{},
+		&extensions.WorkflowList{},
 	)
 }

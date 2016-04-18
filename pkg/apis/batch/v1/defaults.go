@@ -36,5 +36,18 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				*obj.Spec.Parallelism = 1
 			}
 		},
+		func(obj *Workflow) {
+			labels := obj.Spec.Labels
+			if labels != nil {
+				if obj.Spec.Selector == nil {
+					obj.Spec.Selector = &LabelSelector{
+						MatchLabels: labels,
+					}
+				}
+				if len(obj.Labels) == 0 {
+					obj.Labels = labels
+				}
+			}
+		},
 	)
 }

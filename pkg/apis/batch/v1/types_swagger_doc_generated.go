@@ -90,6 +90,16 @@ func (JobStatus) SwaggerDoc() map[string]string {
 	return map_JobStatus
 }
 
+var map_JobTemplateSpec = map[string]string{
+	"":         "JobTemplateSpec contains necessary information to create a JobSpec",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+}
+
+func (JobTemplateSpec) SwaggerDoc() map[string]string {
+	return map_JobTemplateSpec
+}
+
 var map_LabelSelector = map[string]string{
 	"":                 "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
 	"matchLabels":      "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
@@ -109,6 +119,82 @@ var map_LabelSelectorRequirement = map[string]string{
 
 func (LabelSelectorRequirement) SwaggerDoc() map[string]string {
 	return map_LabelSelectorRequirement
+}
+
+var map_Workflow = map[string]string{
+	"":         "Workflow implements",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec represents the desired behaviour of the Workflow.",
+	"status":   "Status contains the current status of the Workflow",
+}
+
+func (Workflow) SwaggerDoc() map[string]string {
+	return map_Workflow
+}
+
+var map_WorkflowCondition = map[string]string{
+	"type":               "Type of workflow condition, currently only Complete.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
+	"lastProbeTime":      "Last time the condition was checked.",
+	"lastTransitionTime": "Last time the condition transited from one status to another.",
+	"reason":             "(brief) reason for the condition's last transition.",
+	"message":            "Human readable message indicating details about last transition.",
+}
+
+func (WorkflowCondition) SwaggerDoc() map[string]string {
+	return map_WorkflowCondition
+}
+
+var map_WorkflowList = map[string]string{
+	"":         "WorkflowList implements list of Workflow.",
+	"metadata": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "Items is the list of Workflow",
+}
+
+func (WorkflowList) SwaggerDoc() map[string]string {
+	return map_WorkflowList
+}
+
+var map_WorkflowSpec = map[string]string{
+	"":         "WorkflowSpec contains Workflow specification",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"selector": "Selector for created jobs (if any)",
+}
+
+func (WorkflowSpec) SwaggerDoc() map[string]string {
+	return map_WorkflowSpec
+}
+
+var map_WorkflowStatus = map[string]string{
+	"conditions":     "Conditions represent the latest available observations of an object's current state.",
+	"startTime":      "StartTime represents time when the workflow was acknowledged by the Workflow controller It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC. StartTime doesn't consider startime of `ExternalReference`",
+	"completionTime": "CompletionTime represents time when the workflow was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+	"Statuses":       "Statuses represent status of different steps",
+}
+
+func (WorkflowStatus) SwaggerDoc() map[string]string {
+	return map_WorkflowStatus
+}
+
+var map_WorkflowStep = map[string]string{
+	"":             "WorkflowStep contains necessary information to identifiy the node of the workflow graph",
+	"jobTemplate":  "JobTemplate contains the job specificaton that should be run in this Workflow. Only one between externalRef and jobTemplate can be set.",
+	"externalRef":  "ExternalRef contains a reference to another schedulable resource. Only one between ExternalRef and JobTemplate can be set.",
+	"dependencies": "Dependecies represent dependecies of the current workflow step",
+}
+
+func (WorkflowStep) SwaggerDoc() map[string]string {
+	return map_WorkflowStep
+}
+
+var map_WorkflowStepStatus = map[string]string{
+	"":          "WorkflowStepStatus contains necessary information for the step status",
+	"complete":  "Complete reports the completion of status",
+	"reference": "Reference contains a reference to the WorkflowStep",
+}
+
+func (WorkflowStepStatus) SwaggerDoc() map[string]string {
+	return map_WorkflowStepStatus
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

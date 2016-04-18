@@ -18,8 +18,10 @@ package validation
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -847,5 +849,194 @@ func ValidatePodSecurityPolicyUpdate(old *extensions.PodSecurityPolicy, new *ext
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&old.ObjectMeta, &new.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateWorkflow validates a workflow
+func ValidateWorkflow(workflow *extensions.Workflow) field.ErrorList {
+	// Workflows and rcs have the same name validation
+	allErrs := apivalidation.ValidateObjectMeta(&workflow.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateWorkflowSpec(&workflow.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateWorkflowSpec(spec *extensions.WorkflowSpec, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if spec.ActiveDeadlineSeconds != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ActiveDeadlineSeconds), fieldPath.Child("activeDeadlineSeconds"))...)
+	}
+	if spec.Selector == nil {
+		allErrs = append(allErrs, field.Required(fieldPath.Child("selector"), ""))
+	} else {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fieldPath.Child("selector"))...)
+	}
+	allErrs = append(allErrs, ValidateWorkflowSteps(spec.Steps, fieldPath.Child("steps"))...)
+	return allErrs
+}
+
+func topologicalSort(steps map[string]extensions.WorkflowStep, fieldPath *field.Path) ([]string, *field.Error) {
+	sorted := make([]string, len(steps))
+	temporary := map[string]bool{}
+	permanent := map[string]bool{}
+	cycle := []string{}
+	isCyclic := false
+	cycleStart := ""
+	var visit func(string) *field.Error
+	visit = func(n string) *field.Error {
+		if _, found := steps[n]; !found {
+			return field.NotFound(fieldPath, n)
+		}
+		switch {
+		case temporary[n]:
+			isCyclic = true
+			cycleStart = n
+			return nil
+		case permanent[n]:
+			return nil
+		}
+		temporary[n] = true
+		for _, m := range steps[n].Dependencies {
+			if err := visit(m); err != nil {
+				return err
+			}
+			if isCyclic {
+				if len(cycleStart) != 0 {
+					cycle = append(cycle, n)
+					if n == cycleStart {
+						cycleStart = ""
+					}
+				}
+				return nil
+			}
+		}
+		delete(temporary, n)
+		permanent[n] = true
+		sorted = append(sorted, n)
+		return nil
+	}
+	var keys []string
+	for k := range steps {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if permanent[k] {
+			continue
+		}
+		if err := visit(k); err != nil {
+			return nil, err
+		}
+		if isCyclic {
+			return nil, field.Forbidden(fieldPath, fmt.Sprintf("detected cycle %s", cycle))
+		}
+	}
+	return sorted, nil
+}
+
+func ValidateWorkflowSteps(steps map[string]extensions.WorkflowStep, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if _, err := topologicalSort(steps, fieldPath); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	for k, v := range steps {
+		if v.JobTemplate != nil && v.ExternalRef != nil {
+			allErrs = append(allErrs, field.Invalid(fieldPath, k, "jobTemplate and externalRef are mutually exclusive"))
+		}
+	}
+	return allErrs
+}
+
+func ValidateWorkflowStatus(status *extensions.WorkflowStatus, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	return allErrs
+}
+
+func getWorkflowUnmodifiableSteps(workflow *extensions.Workflow) (running, completed map[string]bool) {
+	running = make(map[string]bool)
+	completed = make(map[string]bool)
+	if workflow.Status.Statuses == nil {
+		return
+	}
+	for key := range workflow.Spec.Steps {
+		if step, found := workflow.Status.Statuses[key]; found {
+			if step.Complete {
+				completed[key] = true
+			} else {
+				running[key] = true
+			}
+		}
+	}
+	return
+}
+
+func ValidateWorkflowUpdate(workflow, oldWorkflow *extensions.Workflow) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&workflow.ObjectMeta, &oldWorkflow.ObjectMeta, field.NewPath("metadata"))
+
+	runningSteps, completedSteps := getWorkflowUnmodifiableSteps(oldWorkflow)
+	allCompleted := true
+	for k := range oldWorkflow.Spec.Steps {
+		if !completedSteps[k] {
+			allCompleted = false
+			break
+		}
+	}
+	if allCompleted {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("workflow"), "cannot update completed workflow"))
+		return allErrs
+	}
+
+	allErrs = append(allErrs, ValidateWorkflowSpecUpdate(&workflow.Spec, &oldWorkflow.Spec, runningSteps, completedSteps, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateWorkflowUpdateStatus(workflow, oldWorkflow *extensions.Workflow) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&oldWorkflow.ObjectMeta, &workflow.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateWorkflowStatusUpdate(workflow.Status, oldWorkflow.Status)...)
+	return allErrs
+}
+
+func ValidateWorkflowSpecUpdate(spec, oldSpec *extensions.WorkflowSpec, running, completed map[string]bool, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateWorkflowSpec(spec, fieldPath)...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fieldPath.Child("selector"))...)
+
+	newSteps := sets.NewString()
+	for k := range spec.Steps {
+		newSteps.Insert(k)
+	}
+
+	oldSteps := sets.NewString()
+	for k := range oldSpec.Steps {
+		oldSteps.Insert(k)
+	}
+
+	removedSteps := oldSteps.Difference(newSteps)
+	for _, s := range removedSteps.List() {
+		if running[s] {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "steps"), "cannot delete running step \""+s+"\""))
+			return allErrs
+		}
+		if completed[s] {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "steps"), "cannot delete completed step \""+s+"\""))
+			return allErrs
+		}
+	}
+	for k, v := range spec.Steps {
+		if !api.Semantic.DeepEqual(v, oldSpec.Steps[k]) {
+			if running[k] {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "steps"), "cannot modify running step \""+k+"\""))
+			}
+			if completed[k] {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "steps"), "cannot modify completed step \""+k+"\""))
+			}
+		}
+	}
+	return allErrs
+}
+
+func ValidateWorkflowStatusUpdate(status, oldStatus extensions.WorkflowStatus) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateWorkflowStatus(&status, field.NewPath("status"))...)
 	return allErrs
 }
