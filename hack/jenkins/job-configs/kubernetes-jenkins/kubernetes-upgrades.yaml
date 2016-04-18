@@ -12,6 +12,7 @@
     project-type: multijob
     triggers:
         - timed: '@hourly'
+    node: 'master'
     builders:
         # TODO(ihmccreery) In theory, we could get ourselves into trouble by
         # editing these things in the middle of a run.  Jenkins Job Builder
@@ -61,6 +62,7 @@
     description: 'Deploy a cluster at {version-old} to be tested and upgraded to {version-new}. Test owner: ihmccreery.'
     logrotate:
         daysToKeep: 7
+    node: 'master'
     builders:
         - shell: |
             # per-provider variables
@@ -97,6 +99,7 @@
     workspace: /var/lib/jenkins/jobs/kubernetes-upgrade-{provider}-{version-old}-{version-new}-step1-deploy/workspace/
     logrotate:
         daysToKeep: 7
+    node: 'master'
     builders:
         - shell: |
             # per-provider variables
