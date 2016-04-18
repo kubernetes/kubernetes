@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package concurrency
 
 import (
@@ -48,7 +49,7 @@ func NewSession(client *v3.Client) (*Session, error) {
 		return s, nil
 	}
 
-	resp, err := client.Create(client.Ctx(), sessionTTL)
+	resp, err := client.Grant(client.Ctx(), sessionTTL)
 	if err != nil {
 		return nil, err
 	}

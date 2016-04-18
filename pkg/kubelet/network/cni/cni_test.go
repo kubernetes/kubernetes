@@ -30,7 +30,6 @@ import (
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
-	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -132,10 +131,10 @@ func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
 
 func (nh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
 	dm, fakeDockerClient := newTestDockerManager()
-	fakeDockerClient.SetFakeRunningContainers([]*docker.Container{
+	fakeDockerClient.SetFakeRunningContainers([]*dockertools.FakeContainer{
 		{
-			ID:    "test_infra_container",
-			State: docker.State{Pid: 12345},
+			ID:  "test_infra_container",
+			Pid: 12345,
 		},
 	})
 	return dm
@@ -180,7 +179,7 @@ func TestCNIPlugin(t *testing.T) {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}
 
-	err = plug.SetUpPod("podNamespace", "podName", "test_infra_container")
+	err = plug.SetUpPod("podNamespace", "podName", kubecontainer.ContainerID{"docker", "test_infra_container"})
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -195,7 +194,7 @@ func TestCNIPlugin(t *testing.T) {
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))
 	}
-	err = plug.TearDownPod("podNamespace", "podName", "test_infra_container")
+	err = plug.TearDownPod("podNamespace", "podName", kubecontainer.ContainerID{"docker", "test_infra_container"})
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}

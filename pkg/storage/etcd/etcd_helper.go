@@ -61,17 +61,18 @@ func (c *EtcdStorageConfig) NewStorage() (storage.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewEtcdStorage(etcdClient, c.Codec, c.Config.Prefix, c.Config.Quorum), nil
+	return NewEtcdStorage(etcdClient, c.Codec, c.Config.Prefix, c.Config.Quorum, c.Config.DeserializationCacheSize), nil
 }
 
 // Configuration object for constructing etcd.Config
 type EtcdConfig struct {
-	Prefix     string
-	ServerList []string
-	KeyFile    string
-	CertFile   string
-	CAFile     string
-	Quorum     bool
+	Prefix                   string
+	ServerList               []string
+	KeyFile                  string
+	CertFile                 string
+	CAFile                   string
+	Quorum                   bool
+	DeserializationCacheSize int
 }
 
 func (c *EtcdConfig) newEtcdClient() (etcd.Client, error) {
@@ -120,7 +121,7 @@ func (c *EtcdConfig) newHttpTransport() (*http.Transport, error) {
 
 // Creates a new storage interface from the client
 // TODO: deprecate in favor of storage.Config abstraction over time
-func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool) storage.Interface {
+func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, cacheSize int) storage.Interface {
 	return &etcdHelper{
 		etcdMembersAPI: etcd.NewMembersAPI(client),
 		etcdKeysAPI:    etcd.NewKeysAPI(client),
@@ -129,7 +130,7 @@ func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quor
 		copier:         api.Scheme,
 		pathPrefix:     path.Join("/", prefix),
 		quorum:         quorum,
-		cache:          utilcache.NewCache(maxEtcdCacheEntries),
+		cache:          utilcache.NewCache(cacheSize),
 	}
 }
 
@@ -391,7 +392,7 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 		return body, nil, fmt.Errorf("unable to decode object %s into %v", gvk.String(), reflect.TypeOf(objPtr))
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	_ = h.versioner.UpdateObject(objPtr, node.Expiration, node.ModifiedIndex)
+	_ = h.versioner.UpdateObject(objPtr, node.ModifiedIndex)
 	return body, node, err
 }
 
@@ -465,7 +466,7 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 				return err
 			}
 			// being unable to set the version does not prevent the object from being extracted
-			_ = h.versioner.UpdateObject(obj, node.Expiration, node.ModifiedIndex)
+			_ = h.versioner.UpdateObject(obj, node.ModifiedIndex)
 			if filter(obj) {
 				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 			}
@@ -556,9 +557,6 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 		meta := storage.ResponseMeta{}
 		if node != nil {
 			meta.TTL = node.TTL
-			if node.Expiration != nil {
-				meta.Expiration = node.Expiration
-			}
 			meta.ResourceVersion = node.ModifiedIndex
 		}
 		// Get the object to be written by calling tryUpdate.
@@ -590,7 +588,7 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 		}
 
 		// Since update object may have a resourceVersion set, we need to clear it here.
-		if err := h.versioner.UpdateObject(ret, meta.Expiration, 0); err != nil {
+		if err := h.versioner.UpdateObject(ret, 0); err != nil {
 			return errors.New("resourceVersion cannot be set on objects store in etcd")
 		}
 
@@ -654,8 +652,6 @@ type etcdCache interface {
 	getFromCache(index uint64, filter storage.FilterFunc) (runtime.Object, bool)
 	addToCache(index uint64, obj runtime.Object)
 }
-
-const maxEtcdCacheEntries int = 50000
 
 func getTypeName(obj interface{}) string {
 	return reflect.TypeOf(obj).String()

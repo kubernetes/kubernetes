@@ -238,6 +238,14 @@ func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
 }
 
+// SingleObject returns a ListOptions for watching a single object.
+func SingleObject(meta ObjectMeta) ListOptions {
+	return ListOptions{
+		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name),
+		ResourceVersion: meta.ResourceVersion,
+	}
+}
+
 // AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,
 // only if they do not already exist
 func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {

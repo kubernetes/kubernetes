@@ -2273,19 +2273,6 @@ func hasHostPortConflicts(pods []*api.Pod) bool {
 	return false
 }
 
-// hasInsufficientfFreeResources detects pods that exceeds node's cpu and memory resource.
-func (kl *Kubelet) hasInsufficientfFreeResources(pods []*api.Pod) (bool, bool) {
-	info, err := kl.GetCachedMachineInfo()
-	if err != nil {
-		glog.Errorf("error getting machine info: %v", err)
-		// TODO: Should we admit the pod when machine info is unavailable?
-		return false, false
-	}
-	capacity := cadvisor.CapacityFromMachineInfo(info)
-	_, notFittingCPU, notFittingMemory := predicates.CheckPodsExceedingFreeResources(pods, capacity)
-	return len(notFittingCPU) > 0, len(notFittingMemory) > 0
-}
-
 // handleOutOfDisk detects if pods can't fit due to lack of disk space.
 func (kl *Kubelet) isOutOfDisk() bool {
 	outOfDockerDisk := false

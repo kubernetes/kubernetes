@@ -32,12 +32,16 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
 
 const (
 	KubenetPluginName = "kubenet"
 	BridgeName        = "cbr0"
 	DefaultCNIDir     = "/opt/cni/bin"
+
+	sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
 )
 
 type kubenetNetworkPlugin struct {
@@ -48,13 +52,13 @@ type kubenetNetworkPlugin struct {
 	cniConfig *libcni.CNIConfig
 	shaper    bandwidth.BandwidthShaper
 
-	podCIDRs map[kubecontainer.DockerID]string
+	podCIDRs map[kubecontainer.ContainerID]string
 	MTU      int
 }
 
 func NewPlugin() network.NetworkPlugin {
 	return &kubenetNetworkPlugin{
-		podCIDRs: make(map[kubecontainer.DockerID]string),
+		podCIDRs: make(map[kubecontainer.ContainerID]string),
 		MTU:      1460,
 	}
 }
@@ -70,6 +74,17 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
 		glog.V(5).Infof("Using interface %s MTU %d as bridge MTU", link.Name, link.MTU)
 	} else {
 		glog.Warningf("Failed to find default bridge MTU: %v", err)
+	}
+
+	// Since this plugin uses a Linux bridge, set bridge-nf-call-iptables=1
+	// is necessary to ensure kube-proxy functions correctly.
+	//
+	// This will return an error on older kernel version (< 3.18) as the module
+	// was built-in, we simply ignore the error here. A better thing to do is
+	// to check the kernel version in the future.
+	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
+	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
+		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
 	}
 
 	return nil
@@ -180,7 +195,7 @@ func (plugin *kubenetNetworkPlugin) Name() string {
 	return KubenetPluginName
 }
 
-func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.DockerID) error {
+func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	// Can't set up pods if we don't have a PodCIDR yet
 	if plugin.netConfig == nil {
 		return fmt.Errorf("Kubenet needs a PodCIDR to set up pods")
@@ -190,12 +205,12 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	if !ok {
 		return fmt.Errorf("Kubenet execution called on non-docker runtime")
 	}
-	netnsPath, err := runtime.GetNetNS(id.ContainerID())
+	netnsPath, err := runtime.GetNetNS(id)
 	if err != nil {
 		return err
 	}
 
-	rt := buildCNIRuntimeConf(name, namespace, id.ContainerID(), netnsPath)
+	rt := buildCNIRuntimeConf(name, namespace, id, netnsPath)
 	if err != nil {
 		return fmt.Errorf("Error building CNI config: %v", err)
 	}
@@ -225,7 +240,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	return nil
 }
 
-func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.DockerID) error {
+func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	if plugin.netConfig == nil {
 		return fmt.Errorf("Kubenet needs a PodCIDR to tear down pods")
 	}
@@ -234,12 +249,12 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	if !ok {
 		return fmt.Errorf("Kubenet execution called on non-docker runtime")
 	}
-	netnsPath, err := runtime.GetNetNS(id.ContainerID())
+	netnsPath, err := runtime.GetNetNS(id)
 	if err != nil {
 		return err
 	}
 
-	rt := buildCNIRuntimeConf(name, namespace, id.ContainerID(), netnsPath)
+	rt := buildCNIRuntimeConf(name, namespace, id, netnsPath)
 	if err != nil {
 		return fmt.Errorf("Error building CNI config: %v", err)
 	}
@@ -266,7 +281,7 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
-func (plugin *kubenetNetworkPlugin) Status(namespace string, name string, id kubecontainer.DockerID) (*network.PodNetworkStatus, error) {
+func (plugin *kubenetNetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
 	cidr, ok := plugin.podCIDRs[id]
 	if !ok {
 		return nil, fmt.Errorf("No IP address found for pod %v", id)

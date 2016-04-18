@@ -143,13 +143,6 @@ func (w watcherSetByKey) delete(wa *watcher) bool {
 	return false
 }
 
-type interval struct {
-	begin string
-	end   string
-}
-
-type watcherSetByInterval map[interval]watcherSet
-
 // watcherGroup is a collection of watchers organized by their ranges
 type watcherGroup struct {
 	// keyWatchers has the watchers that watch on a single key

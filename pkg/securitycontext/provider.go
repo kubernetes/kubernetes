@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 
-	docker "github.com/fsouza/go-dockerclient"
+	dockercontainer "github.com/docker/engine-api/types/container"
 )
 
 // NewSimpleSecurityContextProvider creates a new SimpleSecurityContextProvider.
@@ -37,7 +37,7 @@ type SimpleSecurityContextProvider struct{}
 // ModifyContainerConfig is called before the Docker createContainer call.
 // The security context provider can make changes to the Config with which
 // the container is created.
-func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *docker.Config) {
+func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *dockercontainer.Config) {
 	effectiveSC := DetermineEffectiveSecurityContext(pod, container)
 	if effectiveSC == nil {
 		return
@@ -50,7 +50,7 @@ func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, conta
 // ModifyHostConfig is called before the Docker runContainer call.
 // The security context provider can make changes to the HostConfig, affecting
 // security options, whether the container is privileged, volume binds, etc.
-func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig) {
+func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig) {
 	// Apply pod security context
 	if container.Name != leaky.PodInfraContainerName && pod.Spec.SecurityContext != nil {
 		// TODO: We skip application of supplemental groups to the

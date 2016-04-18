@@ -42,6 +42,7 @@ type store struct {
 	codec      runtime.Codec
 	versioner  storage.Versioner
 	pathPrefix string
+	watcher    *watcher
 }
 
 type elemForDecode struct {
@@ -57,11 +58,13 @@ type objState struct {
 }
 
 func newStore(c *clientv3.Client, codec runtime.Codec, prefix string) *store {
+	versioner := etcd.APIObjectVersioner{}
 	return &store{
 		client:     c,
-		versioner:  etcd.APIObjectVersioner{},
+		versioner:  versioner,
 		codec:      codec,
 		pathPrefix: prefix,
+		watcher:    newWatcher(c, codec, versioner),
 	}
 }
 
@@ -183,7 +186,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 			return err
 		}
 		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModifiedRevision(key), "=", origState.rev),
+			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
 			clientv3.OpDelete(key),
 		).Else(
@@ -236,7 +239,7 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 		}
 
 		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModifiedRevision(key), "=", origState.rev),
+			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
 			clientv3.OpPut(key, string(data)),
 		).Else(
@@ -315,12 +318,21 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, filter st
 
 // Watch implements storage.Interface.Watch.
 func (s *store) Watch(ctx context.Context, key string, resourceVersion string, filter storage.FilterFunc) (watch.Interface, error) {
-	panic("TODO: unimplemented")
+	return s.watch(ctx, key, resourceVersion, filter, false)
 }
 
 // WatchList implements storage.Interface.WatchList.
 func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, filter storage.FilterFunc) (watch.Interface, error) {
-	panic("TODO: unimplemented")
+	return s.watch(ctx, key, resourceVersion, filter, true)
+}
+
+func (s *store) watch(ctx context.Context, key string, rv string, filter storage.FilterFunc, recursive bool) (watch.Interface, error) {
+	rev, err := storage.ParseWatchResourceVersion(rv)
+	if err != nil {
+		return nil, err
+	}
+	key = keyWithPrefix(s.pathPrefix, key)
+	return s.watcher.Watch(ctx, key, int64(rev), recursive, filter)
 }
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
@@ -354,7 +366,7 @@ func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtim
 	}
 	if version != 0 {
 		// We cannot store object with resourceVersion in etcd. We need to reset it.
-		if err := s.versioner.UpdateObject(ret, nil, 0); err != nil {
+		if err := s.versioner.UpdateObject(ret, 0); err != nil {
 			return nil, fmt.Errorf("UpdateObject failed: %v", err)
 		}
 	}
@@ -379,7 +391,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 		return err
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	versioner.UpdateObject(objPtr, nil, uint64(rev))
+	versioner.UpdateObject(objPtr, uint64(rev))
 	return nil
 }
 
@@ -396,7 +408,7 @@ func decodeList(elems []*elemForDecode, filter storage.FilterFunc, ListPtr inter
 			return err
 		}
 		// being unable to set the version does not prevent the object from being extracted
-		versioner.UpdateObject(obj, nil, elem.rev)
+		versioner.UpdateObject(obj, elem.rev)
 		if filter(obj) {
 			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 		}
@@ -420,5 +432,5 @@ func checkPreconditions(key string, preconditions *storage.Preconditions, out ru
 }
 
 func notFound(key string) clientv3.Cmp {
-	return clientv3.Compare(clientv3.ModifiedRevision(key), "=", 0)
+	return clientv3.Compare(clientv3.ModRevision(key), "=", 0)
 }

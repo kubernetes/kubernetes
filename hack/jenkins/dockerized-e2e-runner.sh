@@ -17,7 +17,19 @@
 # Save environment variables in $WORKSPACE/env.list and then run the Jenkins e2e
 # test runner inside the kubekins-test Docker image.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 env -u HOME -u PATH -u PWD -u WORKSPACE >${WORKSPACE}/env.list
+
+# Add all uncommented lines for metadata.google.internal in /etc/hosts to the
+# test container.
+readonly METADATA_SERVER_ADD_HOST_ARGS=($(
+  grep '^[0-9a-fA-F\.:]\+ \+metadata\.google\.internal' /etc/hosts |\
+  cut -f1 -d' ' |\
+  xargs -r printf -- '--add-host="metadata.google.internal:%s"\n'))
+
 docker run --rm=true -i \
   -v "${WORKSPACE}/_artifacts":/workspace/_artifacts \
   -v /etc/localtime:/etc/localtime:ro \
@@ -25,5 +37,6 @@ docker run --rm=true -i \
   --env-file "${WORKSPACE}/env.list" \
   -e "HOME=/workspace" \
   -e "WORKSPACE=/workspace" \
+  "${METADATA_SERVER_ADD_HOST_ARGS[@]:+${METADATA_SERVER_ADD_HOST_ARGS[@]}}" \
   gcr.io/google_containers/kubekins-test:0.9 \
   bash -c "bash <(curl -fsS --retry 3 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh')"

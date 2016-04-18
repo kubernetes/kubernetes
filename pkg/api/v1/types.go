@@ -675,7 +675,11 @@ type FlexVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". The default filesystem depends on FlexVolume script.
 	FSType string `json:"fsType,omitempty"`
-	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// Optional: SecretRef is reference to the secret object containing
+	// sensitive information to pass to the plugin scripts. This may be
+	// empty if no secret object is specified. If the secret object
+	// contains more than one secret, all secrets are passed to the plugin
+	// scripts.
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.

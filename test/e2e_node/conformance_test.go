@@ -51,7 +51,9 @@ var _ = Describe("Container Conformance Test", func() {
 				"gcr.io/google_containers/node-conformance:v3",
 				"gcr.io/google_containers/node-conformance:v4",
 			}
-			It("it should pull successfully [Conformance]", func() {
+			// TODO(random-liu): Each It should be independent, we should not let them depend on
+			// each other.
+			It("should pull successfully [Conformance]", func() {
 				for _, imageTag := range conformImageTags {
 					image, _ := NewConformanceImage("docker", imageTag)
 					conformImages = append(conformImages, image)
@@ -61,46 +63,62 @@ var _ = Describe("Container Conformance Test", func() {
 					Eventually(func() error {
 						return image.Pull()
 					}, imageRetryTimeout, imagePullInterval).ShouldNot(HaveOccurred())
+					present, err := image.Present()
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(present).Should(BeTrue())
 				}
 			})
-			It("it should list pulled images [Conformance]", func() {
+			It("should list pulled images [Conformance]", func() {
 				image, _ := NewConformanceImage("docker", "")
 				tags, _ := image.List()
 				for _, tag := range conformImageTags {
 					Expect(tags).To(ContainElement(tag))
 				}
 			})
-			It("it should remove successfully [Conformance]", func() {
+			It("should remove successfully [Conformance]", func() {
 				for _, image := range conformImages {
-					if err := image.Remove(); err != nil {
-						Expect(err).NotTo(HaveOccurred())
-						break
-					}
+					err := image.Remove()
+					Expect(err).NotTo(HaveOccurred())
+					present, err := image.Present()
+					Expect(err).NotTo(HaveOccurred())
+					Expect(present).To(BeFalse())
 				}
 			})
 		})
 		Context("when testing image that does not exist", func() {
-			var invalidImage ConformanceImage
-			var invalidImageTag string
-			It("it should not pull successfully [Conformance]", func() {
-				invalidImageTag = "foo.com/foo/foo"
-				invalidImage, _ = NewConformanceImage("docker", invalidImageTag)
-				err := invalidImage.Pull()
-				Expect(err).To(HaveOccurred())
-			})
-			It("it should not list pulled images [Conformance]", func() {
-				image, _ := NewConformanceImage("docker", "")
-				tags, _ := image.List()
-				Expect(tags).NotTo(ContainElement(invalidImageTag))
-			})
-			It("it should not remove successfully [Conformance]", func() {
-				err := invalidImage.Remove()
-				Expect(err).To(HaveOccurred())
+			It("should not pull successfully [Conformance]", func() {
+				invalidImageTags := []string{
+					// nonexistent image registry
+					"foo.com/foo/foo",
+					// nonexistent image
+					"gcr.io/google_containers/not_exist",
+					// TODO(random-liu): Add test for image pulling credential
+				}
+				for _, invalidImageTag := range invalidImageTags {
+					invalidImage, _ := NewConformanceImage("docker", invalidImageTag)
+					By("start pulling image")
+					err := invalidImage.Pull()
+					Expect(err).Should(HaveOccurred())
+
+					By("check image present")
+					present, err := invalidImage.Present()
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(present).To(BeFalse())
+
+					By("listing image")
+					tags, err := invalidImage.List()
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(tags).NotTo(ContainElement(invalidImage))
+
+					By("removing image")
+					err = invalidImage.Remove()
+					Expect(err).Should(HaveOccurred())
+				}
 			})
 		})
 		Context("when running a container that terminates", func() {
 			var terminateCase ConformanceContainer
-			It("it should run successfully to completion [Conformance]", func() {
+			It("should run successfully to completion [Conformance]", func() {
 				terminateCase = ConformanceContainer{
 					Container: api.Container{
 						Image:           "gcr.io/google_containers/busybox",
@@ -121,19 +139,19 @@ var _ = Describe("Container Conformance Test", func() {
 					return pod.Phase, err
 				}, retryTimeout, pollInterval).Should(Equal(terminateCase.Phase))
 			})
-			It("it should report its phase as 'succeeded' [Conformance]", func() {
+			It("should report its phase as 'succeeded' [Conformance]", func() {
 				ccontainer, err := terminateCase.Get()
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ccontainer).Should(CContainerEqual(terminateCase))
 			})
-			It("it should be possible to delete [Conformance]", func() {
+			It("should be possible to delete [Conformance]", func() {
 				err := terminateCase.Delete()
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 		Context("when running a container with invalid image", func() {
 			var invalidImageCase ConformanceContainer
-			It("it should not start successfully [Conformance]", func() {
+			It("should not start successfully [Conformance]", func() {
 				invalidImageCase = ConformanceContainer{
 					Container: api.Container{
 						Image:           "foo.com/foo/foo",
@@ -152,12 +170,12 @@ var _ = Describe("Container Conformance Test", func() {
 					return pod.Phase, err
 				}, retryTimeout, pollInterval).Should(Equal(invalidImageCase.Phase))
 			})
-			It("it should report its phase as 'pending' [Conformance]", func() {
+			It("should report its phase as 'pending' [Conformance]", func() {
 				ccontainer, err := invalidImageCase.Get()
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ccontainer).Should(CContainerEqual(invalidImageCase))
 			})
-			It("it should be possible to delete [Conformance]", func() {
+			It("should be possible to delete [Conformance]", func() {
 				err := invalidImageCase.Delete()
 				Expect(err).NotTo(HaveOccurred())
 			})

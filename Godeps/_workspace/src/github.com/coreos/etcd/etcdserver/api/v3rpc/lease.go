@@ -32,8 +32,8 @@ func NewLeaseServer(le etcdserver.Lessor) pb.LeaseServer {
 	return &LeaseServer{le: le}
 }
 
-func (ls *LeaseServer) LeaseCreate(ctx context.Context, cr *pb.LeaseCreateRequest) (*pb.LeaseCreateResponse, error) {
-	resp, err := ls.le.LeaseCreate(ctx, cr)
+func (ls *LeaseServer) LeaseGrant(ctx context.Context, cr *pb.LeaseGrantRequest) (*pb.LeaseGrantResponse, error) {
+	resp, err := ls.le.LeaseGrant(ctx, cr)
 	if err == lease.ErrLeaseExists {
 		return nil, rpctypes.ErrLeaseExist
 	}

@@ -90,39 +90,44 @@ func (s *Scheduler) scheduleOne() {
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister)
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %+v", pod)
-		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
 		s.config.Error(pod, err)
+		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
 		return
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 
-	b := &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
-		Target: api.ObjectReference{
-			Kind: "Node",
-			Name: dest,
-		},
-	}
+	// Optimistically assume that the binding will succeed and send it to apiserver
+	// in the background.
+	// The only risk in this approach is that if the binding fails because of some
+	// reason, scheduler will be assuming that it succeeded while scheduling next
+	// pods, until the assumption in the internal cache expire (expiration is
+	// defined as "didn't read the binding via watch within a given timeout",
+	// timeout is currently set to 30s). However, after this timeout, the situation
+	// will self-repair.
+	assumed := *pod
+	assumed.Spec.NodeName = dest
+	s.config.SchedulerCache.AssumePodIfBindSucceed(&assumed, func() bool { return true })
 
-	bindAction := func() bool {
+	go func() {
+		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+
+		b := &api.Binding{
+			ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+			Target: api.ObjectReference{
+				Kind: "Node",
+				Name: dest,
+			},
+		}
+
 		bindingStart := time.Now()
 		err := s.config.Binder.Bind(b)
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %+v", err)
-			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
 			s.config.Error(pod, err)
-			return false
+			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
+			return
 		}
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 		s.config.Recorder.Eventf(pod, api.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
-		return true
-	}
-
-	assumed := *pod
-	assumed.Spec.NodeName = dest
-	// We want to assume the pod if and only if the bind succeeds,
-	// but we don't want to race with any deletions, which happen asynchronously.
-	s.config.SchedulerCache.AssumePodIfBindSucceed(&assumed, bindAction)
-
-	metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+	}()
 }

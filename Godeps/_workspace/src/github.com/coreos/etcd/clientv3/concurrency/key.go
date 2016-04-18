@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package concurrency
 
 import (
@@ -32,7 +33,7 @@ func NewUniqueKV(ctx context.Context, kv v3.KV, pfx, val string, opts ...v3.OpOp
 	for {
 		newKey := fmt.Sprintf("%s/%v", pfx, time.Now().UnixNano())
 		put := v3.OpPut(newKey, val, opts...)
-		cmp := v3.Compare(v3.ModifiedRevision(newKey), "=", 0)
+		cmp := v3.Compare(v3.ModRevision(newKey), "=", 0)
 		resp, err := kv.Txn(ctx).If(cmp).Then(put).Commit()
 		if err != nil {
 			return "", 0, err
@@ -73,7 +74,7 @@ func waitDelete(ctx context.Context, client *v3.Client, key string, rev int64) e
 
 // waitDeletes efficiently waits until all keys matched by Get(key, opts...) are deleted
 func waitDeletes(ctx context.Context, client *v3.Client, key string, opts ...v3.OpOption) error {
-	getOpts := []v3.OpOption{v3.WithSort(v3.SortByCreatedRev, v3.SortAscend)}
+	getOpts := []v3.OpOption{v3.WithSort(v3.SortByCreateRevision, v3.SortAscend)}
 	getOpts = append(getOpts, opts...)
 	resp, err := client.Get(ctx, key, getOpts...)
 	maxRev := int64(math.MaxInt64)

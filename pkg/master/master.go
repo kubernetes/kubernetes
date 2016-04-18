@@ -175,10 +175,17 @@ func New(c *Config) (*Master, error) {
 	return m, nil
 }
 
-func resetMetrics(w http.ResponseWriter, req *http.Request) {
-	apiservermetrics.Reset()
-	etcdmetrics.Reset()
-	io.WriteString(w, "metrics reset\n")
+var defaultMetricsHandler = prometheus.Handler().ServeHTTP
+
+// MetricsWithReset is a handler that resets metrics when DELETE is passed to the endpoint.
+func MetricsWithReset(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "DELETE" {
+		apiservermetrics.Reset()
+		etcdmetrics.Reset()
+		io.WriteString(w, "metrics reset\n")
+		return
+	}
+	defaultMetricsHandler(w, req)
 }
 
 func (m *Master) InstallAPIs(c *Config) {
@@ -220,8 +227,11 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
 	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, healthzChecks...)
+
 	if c.EnableProfiling {
-		m.MuxHelper.HandleFunc("/resetMetrics", resetMetrics)
+		m.MuxHelper.HandleFunc("/metrics", MetricsWithReset)
+	} else {
+		m.MuxHelper.HandleFunc("/metrics", defaultMetricsHandler)
 	}
 
 	// Install root web services
@@ -517,7 +527,13 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 			port = 4001
 		}
 		// TODO: etcd health checking should be abstracted in the storage tier
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: etcdutil.EtcdHealthCheck}
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{
+			Addr:        addr,
+			EnableHTTPS: etcdUrl.Scheme == "https",
+			Port:        port,
+			Path:        "/health",
+			Validate:    etcdutil.EtcdHealthCheck,
+		}
 	}
 	return serversToValidate
 }
@@ -627,8 +643,9 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Version:      rsrc.Versions[0].Name,
 	}
 	apiGroup := unversioned.APIGroup{
-		Name:     group,
-		Versions: []unversioned.GroupVersionForDiscovery{groupVersion},
+		Name:             group,
+		Versions:         []unversioned.GroupVersionForDiscovery{groupVersion},
+		PreferredVersion: groupVersion,
 	}
 	apiserver.AddGroupWebService(api.Codecs, m.HandlerContainer, path, apiGroup)
 	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST), apiGroup)

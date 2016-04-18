@@ -18,10 +18,8 @@ package etcd
 
 import (
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
@@ -34,18 +32,10 @@ func TestObjectVersioner(t *testing.T) {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
 	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
-	if err := v.UpdateObject(obj, nil, 5); err != nil {
+	if err := v.UpdateObject(obj, 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if obj.ResourceVersion != "5" || obj.DeletionTimestamp != nil {
-		t.Errorf("unexpected resource version: %#v", obj)
-	}
-	now := unversioned.Time{Time: time.Now()}
-	obj = &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
-	if err := v.UpdateObject(obj, &now.Time, 5); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if obj.ResourceVersion != "5" || *obj.DeletionTimestamp != now {
 		t.Errorf("unexpected resource version: %#v", obj)
 	}
 }

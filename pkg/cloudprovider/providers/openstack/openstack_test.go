@@ -28,6 +28,38 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+const volumeAvailableStatus = "available"
+const volumeInUseStatus = "in-use"
+const volumeCreateTimeoutSeconds = 30
+
+func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string, timeoutSeconds int) {
+	timeout := timeoutSeconds
+	start := time.Now().Second()
+	for {
+		time.Sleep(1 * time.Second)
+
+		if timeout >= 0 && time.Now().Second()-start >= timeout {
+			t.Logf("Volume (%s) status did not change to %s after %s seconds\n",
+				volumeName,
+				status,
+				timeout)
+			return
+		}
+
+		getVol, err := os.getVolume(volumeName)
+		if err != nil {
+			t.Fatalf("Cannot get existing Cinder volume (%s): %v", volumeName, err)
+		}
+		if getVol.Status == status {
+			t.Logf("Volume (%s) status changed to %s after %s seconds\n",
+				volumeName,
+				status,
+				timeout)
+			return
+		}
+	}
+}
+
 func TestReadConfig(t *testing.T) {
 	_, err := readConfig(nil)
 	if err == nil {
@@ -232,10 +264,30 @@ func TestVolumes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot create a new Cinder volume: %v", err)
 	}
+	t.Logf("Volume (%s) created\n", vol)
+
+	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
+
+	diskId, err := os.AttachDisk(vol)
+	if err != nil {
+		t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
+	}
+	t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
+
+	WaitForVolumeStatus(t, os, vol, volumeInUseStatus, volumeCreateTimeoutSeconds)
+
+	err = os.DetachDisk(vol)
+	if err != nil {
+		t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
+	}
+	t.Logf("Volume (%s) detached\n", vol)
+
+	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
 
 	err = os.DeleteVolume(vol)
 	if err != nil {
 		t.Fatalf("Cannot delete Cinder volume %s: %v", vol, err)
 	}
+	t.Logf("Volume (%s) deleted\n", vol)
 
 }

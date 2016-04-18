@@ -47,6 +47,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -155,11 +156,12 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 }
 
 // Clean both server and client pods.
-func volumeTestCleanup(client *client.Client, config VolumeTestConfig) {
+func volumeTestCleanup(f *framework.Framework, config VolumeTestConfig) {
 	By(fmt.Sprint("cleaning the environment after ", config.prefix))
 
 	defer GinkgoRecover()
 
+	client := f.Client
 	podClient := client.Pods(config.namespace)
 
 	err := podClient.Delete(config.prefix+"-client", nil)
@@ -171,6 +173,14 @@ func volumeTestCleanup(client *client.Client, config VolumeTestConfig) {
 	}
 
 	if config.serverImage != "" {
+		if err := f.WaitForPodTerminated(config.prefix+"-client", ""); !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		}
+		// See issue #24100.
+		// Prevent umount errors by making sure making sure the client pod exits cleanly *before* the volume server pod exits.
+		By("sleeping a bit so client can stop and unmount")
+		time.Sleep(20 * time.Second)
+
 		err = podClient.Delete(config.prefix+"-server", nil)
 		if err != nil {
 			glog.Warningf("Failed to delete server pod: %v", err)
@@ -356,13 +366,13 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs:0.4",
+				serverImage: "gcr.io/google_containers/volume-nfs:0.6",
 				serverPorts: []int{2049},
 			}
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			pod := startVolumeServer(c, config)
@@ -396,7 +406,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			pod := startVolumeServer(c, config)
@@ -479,7 +489,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			pod := startVolumeServer(c, config)
@@ -522,7 +532,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			pod := startVolumeServer(c, config)
@@ -590,7 +600,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			pod := startVolumeServer(c, config)
@@ -652,6 +662,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 	framework.KubeDescribe("Cinder", func() {
 		It("should be mountable", func() {
+			framework.SkipUnlessProviderIs("openstack")
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
 				prefix:    "cinder",
@@ -694,7 +705,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			defer func() {
 				if clean {
 					framework.Logf("Running volumeTestCleanup")
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			volume := api.VolumeSource{

@@ -48,8 +48,8 @@ func MatchesNoScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) boo
 	return false
 }
 
-// ObjectCountConstraintsFunc returns true if the specified resource name is in
-// the required set of resource names
+// ObjectCountConstraintsFunc returns ConstraintsFunc that returns nil if the
+// specified resource name is in the required set of resource names
 func ObjectCountConstraintsFunc(resourceName api.ResourceName) ConstraintsFunc {
 	return func(required []api.ResourceName, item runtime.Object) error {
 		if !quota.Contains(required, resourceName) {
@@ -133,6 +133,7 @@ func (g *GenericEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtim
 	for resourceName := range resourceQuota.Status.Hard {
 		if g.MatchesResource(resourceName) {
 			matchResource = true
+			break
 		}
 	}
 	// by default, no scopes matches all

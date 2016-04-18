@@ -64,7 +64,7 @@ func (m *Mutex) Unlock() error {
 }
 
 func (m *Mutex) IsOwner() v3.Cmp {
-	return v3.Compare(v3.CreatedRevision(m.myKey), "=", m.myRev)
+	return v3.Compare(v3.CreateRevision(m.myKey), "=", m.myRev)
 }
 
 func (m *Mutex) Key() string { return m.myKey }

@@ -20,14 +20,16 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"strconv"
+	"time"
 
-	"github.com/docker/docker/pkg/stdcopy"
+	dockermessage "github.com/docker/docker/pkg/jsonmessage"
+	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
-	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerfilters "github.com/docker/engine-api/types/filters"
 	docker "github.com/fsouza/go-dockerclient"
 	"golang.org/x/net/context"
@@ -100,77 +102,49 @@ func convertEnv(src interface{}) (*docker.Env, error) {
 	return env, nil
 }
 
-func (k *kubeDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
-	containers, err := k.client.ContainerList(getDefaultContext(), dockertypes.ContainerListOptions{
-		Size:   options.Size,
-		All:    options.All,
-		Limit:  options.Limit,
-		Since:  options.Since,
-		Before: options.Before,
-		Filter: convertFilters(options.Filters),
-	})
+func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
+	containers, err := k.client.ContainerList(getDefaultContext(), options)
 	if err != nil {
 		return nil, err
 	}
-	apiContainers := []docker.APIContainers{}
-	if err := convertType(&containers, &apiContainers); err != nil {
-		return nil, err
+	apiContainers := []dockertypes.Container{}
+	for _, c := range containers {
+		apiContainers = append(apiContainers, dockertypes.Container(c))
 	}
 	return apiContainers, nil
 }
 
-func (d *kubeDockerClient) InspectContainer(id string) (*docker.Container, error) {
+func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
 	containerJSON, err := d.client.ContainerInspect(getDefaultContext(), id)
 	if err != nil {
-		// TODO(random-liu): Use IsErrContainerNotFound instead of NoSuchContainer error
 		if dockerapi.IsErrContainerNotFound(err) {
-			err = &docker.NoSuchContainer{ID: id, Err: err}
+			return nil, containerNotFoundError{ID: id}
 		}
 		return nil, err
 	}
-	container := &docker.Container{}
-	if err := convertType(&containerJSON, container); err != nil {
-		return nil, err
-	}
-	return container, nil
+	return &containerJSON, nil
 }
 
-func (d *kubeDockerClient) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
-	config := &dockercontainer.Config{}
-	if err := convertType(opts.Config, config); err != nil {
-		return nil, err
-	}
-	hostConfig := &dockercontainer.HostConfig{}
-	if err := convertType(opts.HostConfig, hostConfig); err != nil {
-		return nil, err
-	}
-	resp, err := d.client.ContainerCreate(getDefaultContext(), config, hostConfig, nil, opts.Name)
+func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
+	createResp, err := d.client.ContainerCreate(getDefaultContext(), opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
 	if err != nil {
 		return nil, err
 	}
-	container := &docker.Container{}
-	if err := convertType(&resp, container); err != nil {
-		return nil, err
-	}
-	return container, nil
+	return &createResp, nil
 }
 
-// TODO(random-liu): The HostConfig at container start is deprecated, will remove this in the following refactoring.
-func (d *kubeDockerClient) StartContainer(id string, _ *docker.HostConfig) error {
+func (d *kubeDockerClient) StartContainer(id string) error {
 	return d.client.ContainerStart(getDefaultContext(), id)
 }
 
 // Stopping an already stopped container will not cause an error in engine-api.
-func (d *kubeDockerClient) StopContainer(id string, timeout uint) error {
-	return d.client.ContainerStop(getDefaultContext(), id, int(timeout))
+func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
+	return d.client.ContainerStop(getDefaultContext(), id, timeout)
 }
 
-func (d *kubeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) error {
-	return d.client.ContainerRemove(getDefaultContext(), dockertypes.ContainerRemoveOptions{
-		ContainerID:   opts.ID,
-		RemoveVolumes: opts.RemoveVolumes,
-		Force:         opts.Force,
-	})
+func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
+	opts.ContainerID = id
+	return d.client.ContainerRemove(getDefaultContext(), opts)
 }
 
 func (d *kubeDockerClient) InspectImage(image string) (*docker.Image, error) {
@@ -228,8 +202,21 @@ func (d *kubeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 	}
 	defer resp.Close()
 	// TODO(random-liu): Use the image pulling progress information.
-	_, err = io.Copy(ioutil.Discard, resp)
-	return err
+	decoder := json.NewDecoder(resp)
+	for {
+		var msg dockermessage.JSONMessage
+		err := decoder.Decode(&msg)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if msg.Error != nil {
+			return msg.Error
+		}
+	}
+	return nil
 }
 
 func (d *kubeDockerClient) RemoveImage(image string) error {
@@ -353,7 +340,7 @@ func (d *kubeDockerClient) redirectResponseToOutputStream(tty bool, outputStream
 	if tty {
 		_, err = io.Copy(outputStream, resp)
 	} else {
-		_, err = stdcopy.StdCopy(outputStream, errorStream, resp)
+		_, err = dockerstdcopy.StdCopy(outputStream, errorStream, resp)
 	}
 	return err
 }
@@ -386,4 +373,21 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 		}
 	}
 	return nil
+}
+
+// parseDockerTimestamp parses the timestamp returned by DockerInterface from string to time.Time
+func parseDockerTimestamp(s string) (time.Time, error) {
+	// Timestamp returned by Docker is in time.RFC3339Nano format.
+	return time.Parse(time.RFC3339Nano, s)
+}
+
+// containerNotFoundError is the error returned by InspectContainer when container not found. We
+// add this error type for testability. We don't use the original error returned by engine-api
+// because dockertypes.containerNotFoundError is private, we can't create and inject it in our test.
+type containerNotFoundError struct {
+	ID string
+}
+
+func (e containerNotFoundError) Error() string {
+	return fmt.Sprintf("Error: No such container: %s", e.ID)
 }
