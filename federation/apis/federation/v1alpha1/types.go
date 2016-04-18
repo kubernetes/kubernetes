@@ -21,9 +21,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// ClusterSpec describes the attributes on a Cluster.
+// ClusterSpec describes the attributes of a kubernetes cluster.
 type ClusterSpec struct {
-	// a map of client CIDR to server address
+	// A map of client CIDR to server address.
+	// This is to help clients reach servers in the most network-efficient way possible.
+	// Clients can use the appropriate server address as per the CIDR that they match.
+	// In case of multiple matches, clients should use the longest matching CIDR.
 	ServerAddressByClientCIDRs []unversioned.ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" patchStrategy:"merge" patchMergeKey:"clientCIDR"`
 	// the type (e.g. bearer token, client certificate etc) and data of the credential used to access cluster.
 	// It’s used for system routines (not behalf of users)
@@ -46,11 +49,11 @@ const (
 
 // Cluster metadata
 type ClusterMeta struct {
-	// Version of the cluster
+	// Release version of the cluster.
 	Version string `json:"version,omitempty"`
 }
 
-// ClusterStatus is information about the current status of a cluster.
+// ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
 type ClusterStatus struct {
 	// Phase is the recently observed lifecycle phase of the cluster.
 	Phase ClusterPhase `json:"phase,omitempty"`
@@ -61,7 +64,7 @@ type ClusterStatus struct {
 	ClusterMeta `json:",inline"`
 }
 
-// Information about a cluster in a federated clusters setup
+// Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
 type Cluster struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -74,7 +77,7 @@ type Cluster struct {
 	Status ClusterStatus `json:"status,omitempty"`
 }
 
-// A list of Clusters
+// A list of all the kubernetes clusters registered to the federation
 type ClusterList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
