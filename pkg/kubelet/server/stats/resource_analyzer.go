@@ -23,18 +23,22 @@ type ResourceAnalyzer interface {
 	Start()
 
 	fsResourceAnalyzerInterface
+	SummaryProvider
 }
 
 // resourceAnalyzer implements ResourceAnalyzer
 type resourceAnalyzer struct {
 	*fsResourceAnalyzer
+	SummaryProvider
 }
 
 var _ ResourceAnalyzer = &resourceAnalyzer{}
 
 // NewResourceAnalyzer returns a new ResourceAnalyzer
 func NewResourceAnalyzer(statsProvider StatsProvider, calVolumeFrequency time.Duration) ResourceAnalyzer {
-	return &resourceAnalyzer{newFsResourceAnalyzer(statsProvider, calVolumeFrequency)}
+	fsAnalyzer := newFsResourceAnalyzer(statsProvider, calVolumeFrequency)
+	summaryProvider := NewSummaryProvider(statsProvider, fsAnalyzer)
+	return &resourceAnalyzer{fsAnalyzer, summaryProvider}
 }
 
 // Start starts background functions necessary for the ResourceAnalyzer to function
