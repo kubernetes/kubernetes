@@ -58,3 +58,12 @@ STACK_CREATE_TIMEOUT=${STACK_CREATE_TIMEOUT:-60}
 
 # Enable Proxy, if true kube-up will apply your current proxy settings(defined by *_PROXY environment variables) to the deployment.
 ENABLE_PROXY=${ENABLE_PROXY:-false}
+
+# Per-protocol proxy settings.
+FTP_PROXY=${FTP_PROXY:-}
+HTTP_PROXY=${HTTP_PROXY:-}
+HTTPS_PROXY=${HTTPS_PROXY:-}
+SOCKS_PROXY=${SOCKS_PROXY:-}
+
+# IPs and Domains that bypass the proxy.
+NO_PROXY=${NO_PROXY:-}
