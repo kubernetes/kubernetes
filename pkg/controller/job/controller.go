@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
@@ -53,7 +53,7 @@ type JobController struct {
 	internalPodInformer framework.SharedInformer
 
 	// To allow injection of updateJobStatus for testing.
-	updateHandler func(job *extensions.Job) error
+	updateHandler func(job *batch.Job) error
 	syncHandler   func(jobKey string) error
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
@@ -96,19 +96,19 @@ func NewJobController(podInformer framework.SharedInformer, kubeClient clientset
 	jm.jobStore.Store, jm.jobController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).List(options)
+				return jm.kubeClient.Batch().Jobs(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).Watch(options)
+				return jm.kubeClient.Batch().Jobs(api.NamespaceAll).Watch(options)
 			},
 		},
-		&extensions.Job{},
+		&batch.Job{},
 		// TODO: Can we have much longer period here?
 		replicationcontroller.FullControllerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: jm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
-				if job := cur.(*extensions.Job); !isJobFinished(job) {
+				if job := cur.(*batch.Job); !isJobFinished(job) {
 					jm.enqueueController(job)
 				}
 			},
@@ -155,7 +155,7 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 }
 
 // getPodJob returns the job managing the given pod.
-func (jm *JobController) getPodJob(pod *api.Pod) *extensions.Job {
+func (jm *JobController) getPodJob(pod *api.Pod) *batch.Job {
 	jobs, err := jm.jobStore.GetPodJobs(pod)
 	if err != nil {
 		glog.V(4).Infof("No jobs found for pod %v, job controller will avoid syncing", pod.Name)
@@ -251,7 +251,7 @@ func (jm *JobController) deletePod(obj interface{}) {
 	}
 }
 
-// obj could be an *extensions.Job, or a DeletionFinalStateUnknown marker item.
+// obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
 func (jm *JobController) enqueueController(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
@@ -314,7 +314,7 @@ func (jm *JobController) syncJob(key string) error {
 		jm.queue.Add(key)
 		return err
 	}
-	job := *obj.(*extensions.Job)
+	job := *obj.(*batch.Job)
 
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
@@ -366,7 +366,7 @@ func (jm *JobController) syncJob(key string) error {
 		// update status values accordingly
 		failed += active
 		active = 0
-		job.Status.Conditions = append(job.Status.Conditions, newCondition(extensions.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
+		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
 		jm.recorder.Event(&job, api.EventTypeNormal, "DeadlineExceeded", "Job was active longer than specified deadline")
 	} else {
 		if jobNeedsSync {
@@ -400,7 +400,7 @@ func (jm *JobController) syncJob(key string) error {
 			}
 		}
 		if complete {
-			job.Status.Conditions = append(job.Status.Conditions, newCondition(extensions.JobComplete, "", ""))
+			job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
 			now := unversioned.Now()
 			job.Status.CompletionTime = &now
 		}
@@ -421,7 +421,7 @@ func (jm *JobController) syncJob(key string) error {
 }
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
-func pastActiveDeadline(job *extensions.Job) bool {
+func pastActiveDeadline(job *batch.Job) bool {
 	if job.Spec.ActiveDeadlineSeconds == nil || job.Status.StartTime == nil {
 		return false
 	}
@@ -432,8 +432,8 @@ func pastActiveDeadline(job *extensions.Job) bool {
 	return duration >= allowedDuration
 }
 
-func newCondition(conditionType extensions.JobConditionType, reason, message string) extensions.JobCondition {
-	return extensions.JobCondition{
+func newCondition(conditionType batch.JobConditionType, reason, message string) batch.JobCondition {
+	return batch.JobCondition{
 		Type:               conditionType,
 		Status:             api.ConditionTrue,
 		LastProbeTime:      unversioned.Now(),
@@ -452,7 +452,7 @@ func getStatus(pods []api.Pod) (succeeded, failed int) {
 
 // manageJob is the core method responsible for managing the number of running
 // pods according to what is specified in the job.Spec.
-func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *extensions.Job) int {
+func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *batch.Job) int {
 	var activeLock sync.Mutex
 	active := len(activePods)
 	parallelism := *job.Spec.Parallelism
@@ -538,8 +538,8 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ex
 	return active
 }
 
-func (jm *JobController) updateJobStatus(job *extensions.Job) error {
-	_, err := jm.kubeClient.Extensions().Jobs(job.Namespace).UpdateStatus(job)
+func (jm *JobController) updateJobStatus(job *batch.Job) error {
+	_, err := jm.kubeClient.Batch().Jobs(job.Namespace).UpdateStatus(job)
 	return err
 }
 
@@ -554,9 +554,9 @@ func filterPods(pods []api.Pod, phase api.PodPhase) int {
 	return result
 }
 
-func isJobFinished(j *extensions.Job) bool {
+func isJobFinished(j *batch.Job) bool {
 	for _, c := range j.Status.Conditions {
-		if (c.Type == extensions.JobComplete || c.Type == extensions.JobFailed) && c.Status == api.ConditionTrue {
+		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == api.ConditionTrue {
 			return true
 		}
 	}
@@ -564,7 +564,7 @@ func isJobFinished(j *extensions.Job) bool {
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []extensions.Job
+type byCreationTimestamp []batch.Job
 
 func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

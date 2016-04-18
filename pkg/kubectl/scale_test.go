@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
@@ -252,17 +253,17 @@ type ErrorJobs struct {
 	invalid bool
 }
 
-func (c *ErrorJobs) Update(job *extensions.Job) (*extensions.Job, error) {
+func (c *ErrorJobs) Update(job *batch.Job) (*batch.Job, error) {
 	if c.invalid {
-		return nil, kerrors.NewInvalid(extensions.Kind(job.Kind), job.Name, nil)
+		return nil, kerrors.NewInvalid(batch.Kind(job.Kind), job.Name, nil)
 	}
 	return nil, errors.New("Job update failure")
 }
 
-func (c *ErrorJobs) Get(name string) (*extensions.Job, error) {
+func (c *ErrorJobs) Get(name string) (*batch.Job, error) {
 	zero := 0
-	return &extensions.Job{
-		Spec: extensions.JobSpec{
+	return &batch.Job{
+		Spec: batch.JobSpec{
 			Parallelism: &zero,
 		},
 	}, nil
@@ -316,7 +317,7 @@ func TestJobScale(t *testing.T) {
 	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "jobs" || action.GetName() != name {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
-	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "jobs" || *action.GetObject().(*extensions.Job).Spec.Parallelism != int(count) {
+	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "jobs" || *action.GetObject().(*batch.Job).Spec.Parallelism != int(count) {
 		t.Errorf("unexpected action %v, expected update-job with parallelism = %d", actions[1], count)
 	}
 }
@@ -342,8 +343,8 @@ func TestJobScaleInvalid(t *testing.T) {
 
 func TestJobScaleFailsPreconditions(t *testing.T) {
 	ten := 10
-	fake := testclient.NewSimpleFake(&extensions.Job{
-		Spec: extensions.JobSpec{
+	fake := testclient.NewSimpleFake(&batch.Job{
+		Spec: batch.JobSpec{
 			Parallelism: &ten,
 		},
 	})
@@ -366,7 +367,7 @@ func TestValidateJob(t *testing.T) {
 	zero, ten, twenty := 0, 10, 20
 	tests := []struct {
 		preconditions ScalePrecondition
-		job           extensions.Job
+		job           batch.Job
 		expectError   bool
 		test          string
 	}{
@@ -377,11 +378,11 @@ func TestValidateJob(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{-1, ""},
-			job: extensions.Job{
+			job: batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Parallelism: &ten,
 				},
 			},
@@ -390,11 +391,11 @@ func TestValidateJob(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{0, ""},
-			job: extensions.Job{
+			job: batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Parallelism: &zero,
 				},
 			},
@@ -403,11 +404,11 @@ func TestValidateJob(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{-1, "foo"},
-			job: extensions.Job{
+			job: batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Parallelism: &ten,
 				},
 			},
@@ -416,11 +417,11 @@ func TestValidateJob(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			job: extensions.Job{
+			job: batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Parallelism: &ten,
 				},
 			},
@@ -429,11 +430,11 @@ func TestValidateJob(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			job: extensions.Job{
+			job: batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Parallelism: &twenty,
 				},
 			},
@@ -442,7 +443,7 @@ func TestValidateJob(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			job: extensions.Job{
+			job: batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
@@ -452,11 +453,11 @@ func TestValidateJob(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			job: extensions.Job{
+			job: batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "bar",
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Parallelism: &ten,
 				},
 			},
@@ -465,11 +466,11 @@ func TestValidateJob(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			job: extensions.Job{
+			job: batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "bar",
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Parallelism: &twenty,
 				},
 			},
