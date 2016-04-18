@@ -37,6 +37,10 @@ type Binder interface {
 	Bind(binding *api.Binding) error
 }
 
+type PodConditionUpdater interface {
+	Update(pod *api.Pod, podCondition *api.PodCondition) error
+}
+
 // Scheduler watches for new unscheduled pods. It attempts to find
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
@@ -50,6 +54,10 @@ type Config struct {
 	NodeLister     algorithm.NodeLister
 	Algorithm      algorithm.ScheduleAlgorithm
 	Binder         Binder
+	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
+	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
+	// handler so that binding and setting PodCondition it is atomic.
+	PodConditionUpdater PodConditionUpdater
 
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
@@ -92,6 +100,12 @@ func (s *Scheduler) scheduleOne() {
 		glog.V(1).Infof("Failed to schedule: %+v", pod)
 		s.config.Error(pod, err)
 		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
+		s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
+			Type:    api.PodScheduled,
+			Status:  api.ConditionFalse,
+			Reason:  "Unschedulable",
+			Message: err.Error(),
+		})
 		return
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
@@ -120,11 +134,19 @@ func (s *Scheduler) scheduleOne() {
 		}
 
 		bindingStart := time.Now()
+		// If binding succeded then PodScheduled condition will be updated in apiserver so that
+		// it's atomic with setting host.
 		err := s.config.Binder.Bind(b)
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %+v", err)
 			s.config.Error(pod, err)
 			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
+			s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
+				Type:    api.PodScheduled,
+				Status:  api.ConditionFalse,
+				Reason:  "BindingRejected",
+				Message: err.Error(),
+			})
 			return
 		}
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
