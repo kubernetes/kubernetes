@@ -35,13 +35,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "Host and port of the kubelet")
-var apiServerAddress = flag.String("api-server-address", "http://127.0.0.1:8080", "Host and port of the api server")
-var nodeName = flag.String("node-name", "", "Name of the node")
-var buildServices = flag.Bool("build-services", true, "If true, build local executables")
-var startServices = flag.Bool("start-services", true, "If true, start local node services")
-var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
-
 var e2es *e2eService
 
 func TestE2eNode(t *testing.T) {
