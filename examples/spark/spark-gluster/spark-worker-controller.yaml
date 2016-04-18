@@ -2,6 +2,7 @@ kind: ReplicationController
 apiVersion: v1
 metadata:
   name: spark-gluster-worker-controller
+  namespace: spark-cluster
   labels:
     component: spark-worker
 spec:
