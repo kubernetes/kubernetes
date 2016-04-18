@@ -25,13 +25,11 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
@@ -220,7 +218,7 @@ func NewDockerManager(
 		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
 		glog.Warningf("Using fallback default of /var/lib/docker for location of Docker runtime")
 	} else {
-		dockerRoot = dockerInfo.Get("DockerRootDir")
+		dockerRoot = dockerInfo.DockerRootDir
 		glog.Infof("Setting dockerRoot to %s", dockerRoot)
 	}
 
@@ -873,67 +871,48 @@ func getDockerNetworkMode(container *dockertypes.ContainerJSON) string {
 }
 
 // dockerVersion implementes kubecontainer.Version interface by implementing
-// Compare() and String() (which is implemented by the underlying semver.Version)
-// TODO: this code is the same as rktVersion and may make sense to be moved to
-// somewhere shared.
-type dockerVersion struct {
-	*semver.Version
+// Compare() and String(). It could contain either server version or api version.
+type dockerVersion string
+
+func (v dockerVersion) String() string {
+	return string(v)
 }
 
-// Older versions of Docker could return non-semantically versioned values (distros like Fedora
-// included partial values such as 1.8.1.fc21 which is not semver). Force those values to be semver.
-var almostSemverRegexp = regexp.MustCompile(`^(\d+\.\d+\.\d+)\.(.*)$`)
+func (v dockerVersion) Compare(other string) (int, error) {
+	return compare(string(v), other), nil
+}
 
-// newDockerVersion returns a semantically versioned docker version value
-func newDockerVersion(version string) (dockerVersion, error) {
-	sem, err := semver.NewVersion(version)
-	if err != nil {
-		matches := almostSemverRegexp.FindStringSubmatch(version)
-		if matches == nil {
-			return dockerVersion{}, err
+// compare is copied from engine-api, it compares two version strings, returns -1 if
+// v1 < v2, 1 if v1 > v2, 0 otherwise.
+// TODO(random-liu): Leveraging the version comparison in engine-api after bumping up
+// the engine-api version. See #24076
+func compare(v1, v2 string) int {
+	var (
+		currTab  = strings.Split(v1, ".")
+		otherTab = strings.Split(v2, ".")
+	)
+
+	max := len(currTab)
+	if len(otherTab) > max {
+		max = len(otherTab)
+	}
+	for i := 0; i < max; i++ {
+		var currInt, otherInt int
+
+		if len(currTab) > i {
+			currInt, _ = strconv.Atoi(currTab[i])
 		}
-		sem, err = semver.NewVersion(strings.Join(matches[1:], "-"))
+		if len(otherTab) > i {
+			otherInt, _ = strconv.Atoi(otherTab[i])
+		}
+		if currInt > otherInt {
+			return 1
+		}
+		if otherInt > currInt {
+			return -1
+		}
 	}
-	return dockerVersion{sem}, err
-}
-
-func (r dockerVersion) Compare(other string) (int, error) {
-	v, err := newDockerVersion(other)
-	if err != nil {
-		return -1, err
-	}
-
-	if r.LessThan(*v.Version) {
-		return -1, nil
-	}
-	if v.Version.LessThan(*r.Version) {
-		return 1, nil
-	}
-	return 0, nil
-}
-
-// dockerVersion implementes kubecontainer.Version interface by implementing
-// Compare() and String() on top og go-dockerclient's APIVersion. This version
-// string doesn't conform to semantic versioning, as it is only "x.y"
-type dockerAPIVersion docker.APIVersion
-
-func (dv dockerAPIVersion) String() string {
-	return docker.APIVersion(dv).String()
-}
-
-func (dv dockerAPIVersion) Compare(other string) (int, error) {
-	a := docker.APIVersion(dv)
-	b, err := docker.NewAPIVersion(other)
-	if err != nil {
-		return 0, err
-	}
-	if a.LessThan(b) {
-		return -1, nil
-	}
-	if a.GreaterThan(b) {
-		return 1, nil
-	}
-	return 0, nil
+	return 0
 }
 
 func (dm *DockerManager) Type() string {
@@ -941,33 +920,21 @@ func (dm *DockerManager) Type() string {
 }
 
 func (dm *DockerManager) Version() (kubecontainer.Version, error) {
-	env, err := dm.client.Version()
+	v, err := dm.client.Version()
 	if err != nil {
 		return nil, fmt.Errorf("docker: failed to get docker version: %v", err)
 	}
 
-	engineVersion := env.Get("Version")
-	version, err := newDockerVersion(engineVersion)
-	if err != nil {
-		glog.Errorf("docker: failed to parse docker server version %q: %v", engineVersion, err)
-		return nil, fmt.Errorf("docker: failed to parse docker server version %q: %v", engineVersion, err)
-	}
-	return version, nil
+	return dockerVersion(v.Version), nil
 }
 
 func (dm *DockerManager) APIVersion() (kubecontainer.Version, error) {
-	env, err := dm.client.Version()
+	v, err := dm.client.Version()
 	if err != nil {
 		return nil, fmt.Errorf("docker: failed to get docker version: %v", err)
 	}
 
-	apiVersion := env.Get("ApiVersion")
-	version, err := docker.NewAPIVersion(apiVersion)
-	if err != nil {
-		glog.Errorf("docker: failed to parse docker api version %q: %v", apiVersion, err)
-		return nil, fmt.Errorf("docker: failed to parse docker api version %q: %v", apiVersion, err)
-	}
-	return dockerAPIVersion(version), nil
+	return dockerVersion(v.APIVersion), nil
 }
 
 // Status returns error if docker daemon is unhealthy, nil otherwise.
