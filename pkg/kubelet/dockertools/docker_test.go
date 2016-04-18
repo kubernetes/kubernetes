@@ -157,28 +157,6 @@ func TestContainerNaming(t *testing.T) {
 	}
 }
 
-func TestVersion(t *testing.T) {
-	fakeDocker := NewFakeDockerClientWithVersion("1.1.3", "1.15")
-	manager := &DockerManager{client: fakeDocker}
-	version, err := manager.Version()
-	if err != nil {
-		t.Errorf("got error while getting docker server version - %s", err)
-	}
-	expectedVersion, _ := docker.NewAPIVersion("1.1.3")
-	if e, a := expectedVersion.String(), version.String(); e != a {
-		t.Errorf("invalid docker server version. expected: %v, got: %v", e, a)
-	}
-
-	version, err = manager.APIVersion()
-	if err != nil {
-		t.Errorf("got error while getting docker server version - %s", err)
-	}
-	expectedVersion, _ = docker.NewAPIVersion("1.15")
-	if e, a := expectedVersion.String(), version.String(); e != a {
-		t.Errorf("invalid docker server version. expected: %v, got: %v", e, a)
-	}
-}
-
 func TestParseImageName(t *testing.T) {
 	tests := []struct {
 		imageName string

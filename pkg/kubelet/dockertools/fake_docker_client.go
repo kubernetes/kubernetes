@@ -50,8 +50,8 @@ type FakeDockerClient struct {
 	Stopped       []string
 	Removed       []string
 	RemovedImages sets.String
-	VersionInfo   docker.Env
-	Information   docker.Env
+	VersionInfo   dockertypes.Version
+	Information   dockertypes.Info
 	ExecInspect   *dockertypes.ContainerExecInspect
 	execCmd       []string
 	EnableSleep   bool
@@ -67,7 +67,7 @@ func NewFakeDockerClient() *FakeDockerClient {
 
 func NewFakeDockerClientWithVersion(version, apiVersion string) *FakeDockerClient {
 	return &FakeDockerClient{
-		VersionInfo:   docker.Env{fmt.Sprintf("Version=%s", version), fmt.Sprintf("ApiVersion=%s", apiVersion)},
+		VersionInfo:   dockertypes.Version{Version: version, APIVersion: apiVersion},
 		Errors:        make(map[string]error),
 		RemovedImages: sets.String{},
 		ContainerMap:  make(map[string]*dockertypes.ContainerJSON),
@@ -437,13 +437,13 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 	return err
 }
 
-func (f *FakeDockerClient) Version() (*docker.Env, error) {
+func (f *FakeDockerClient) Version() (*dockertypes.Version, error) {
 	f.Lock()
 	defer f.Unlock()
 	return &f.VersionInfo, f.popError("version")
 }
 
-func (f *FakeDockerClient) Info() (*docker.Env, error) {
+func (f *FakeDockerClient) Info() (*dockertypes.Info, error) {
 	return &f.Information, nil
 }
 
