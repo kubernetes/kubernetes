@@ -102,7 +102,7 @@ func main() {
 			ClientsetName:       "test_internalclientset",
 			ClientsetOutputPath: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
 			ClientsetOnly:       false,
-			FakeClient:          false,
+			FakeClient:          true,
 			CmdArgs:             cmdArgs,
 		}
 	} else {
