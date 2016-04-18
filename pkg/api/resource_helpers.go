@@ -18,6 +18,7 @@ package api
 
 import (
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // Returns string version of ResourceName.
@@ -80,12 +81,44 @@ func IsPodReadyConditionTrue(status PodStatus) bool {
 // Extracts the pod ready condition from the given status and returns that.
 // Returns nil if the condition is not present.
 func GetPodReadyCondition(status PodStatus) *PodCondition {
+	_, condition := GetPodCondition(&status, PodReady)
+	return condition
+}
+
+func GetPodCondition(status *PodStatus, conditionType PodConditionType) (int, *PodCondition) {
 	for i, c := range status.Conditions {
-		if c.Type == PodReady {
-			return &status.Conditions[i]
+		if c.Type == conditionType {
+			return i, &status.Conditions[i]
 		}
 	}
-	return nil
+	return -1, nil
+}
+
+// Updates existing pod condition or creates a new one. Sets LastTransitionTime to now if the
+// status has changed.
+// Returns true if pod condition has changed or has been added.
+func UpdatePodCondition(status *PodStatus, condition *PodCondition) bool {
+	condition.LastTransitionTime = unversioned.Now()
+	// Try to find this pod condition.
+	conditionIndex, oldCondition := GetPodCondition(status, condition.Type)
+
+	if oldCondition == nil {
+		// We are adding new pod condition.
+		status.Conditions = append(status.Conditions, *condition)
+		return true
+	} else {
+		// We are updating an existing condition, so we need to check if it has changed.
+		if condition.Status == oldCondition.Status {
+			condition.LastTransitionTime = oldCondition.LastTransitionTime
+		}
+		status.Conditions[conditionIndex] = *condition
+		// Return true if one of the fields have changed.
+		return condition.Status != oldCondition.Status ||
+			condition.Reason != oldCondition.Reason ||
+			condition.Message != oldCondition.Message ||
+			!condition.LastProbeTime.Equal(oldCondition.LastProbeTime) ||
+			!condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+	}
 }
 
 // IsNodeReady returns true if a node is ready; false otherwise.
