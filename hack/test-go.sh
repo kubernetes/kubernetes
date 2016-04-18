@@ -125,7 +125,7 @@ eval "goflags=(${KUBE_GOFLAGS:-})"
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # Used to filter verbose test output.
-go_test_grep_pattern=".*"
+go_test_grep_pattern="."
 
 # The go-junit-report tool needs full test case information to produce a
 # meaningful report.
@@ -256,18 +256,18 @@ runTests() {
   # must make sure the output from parallel runs is not mixed. To achieve this,
   # we spawn a subshell for each parallel process, redirecting the output to
   # separate files.
-  printf "%s\n" "${@}" | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
-    bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
-        go test ${goflags[@]:+${goflags[@]}} \
-          ${KUBE_RACE} \
-          ${KUBE_TIMEOUT} \
-          -cover -covermode=\"${KUBE_COVERMODE}\" \
-          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
-          ${testargs[@]:+${testargs[@]}} \
-        | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
-        | grep \"${go_test_grep_pattern}\"" \
-      && test_result=$? || test_result=$?
+  if [ "$(uname)" == "Darwin" ]; then
+    args=(-I{} -n1)
+  else
+    args=(-I{} -n1 -d " ")
+  fi
+
+  export goflags KUBE_GO_PACKAGE KUBE_RACE KUBE_TIMEOUT KUBE_COVERMODE cover_report_dir \
+  cover_profile testargs junit_filename_prefix go_test_grep_pattern
+
+  echo "${@}" | xargs "${args[@]}" -P${KUBE_COVERPROCS} \
+  bash -c "hack/run-go-test.sh {}" \
+    && test_result=$? || test_result=$?
 
   produceJUnitXMLReport "${junit_filename_prefix}"
 
