@@ -32,9 +32,7 @@ spec:
               memory: 500Mi
           ports: 
             - containerPort: 8083
-              hostPort: 8083
             - containerPort: 8086
-              hostPort: 8086
           volumeMounts:
           - name: influxdb-persistent-storage
             mountPath: /data
