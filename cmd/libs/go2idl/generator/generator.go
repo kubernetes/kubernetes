@@ -33,7 +33,7 @@ type Package interface {
 	Path() string
 
 	// Filter should return true if this package cares about this type.
-	// Otherwise, this type will be ommitted from the type ordering for
+	// Otherwise, this type will be omitted from the type ordering for
 	// this package.
 	Filter(*Context, *types.Type) bool
 

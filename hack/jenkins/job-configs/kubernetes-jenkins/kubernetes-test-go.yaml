@@ -46,7 +46,7 @@
     triggers:
         - pollscm:
             cron: 'H/2 * * * *'
-        - timed: 'H/30 * * * *'
+        - timed: '{cron-string}'
     wrappers:
         - ansicolor:
             colormap: xterm
@@ -74,12 +74,16 @@
         - 'go':
             branch: 'master'
             cron-string: '{sq-cron-string}'
-            timeout: 80
+            timeout: 100
         - 'go-release-1.2':
             branch: 'release-1.2'
-            timeout: 50
+            # Every 3 hours
+            cron-string: 'H H/3 * * *'
+            timeout: 100
         - 'go-release-1.1':
             branch: 'release-1.1'
-            timeout: 30
+            # Every 6 hours
+            cron-string: 'H H/12 * * *'
+            timeout: 60
     jobs:
         - 'kubernetes-test-{suffix}'
