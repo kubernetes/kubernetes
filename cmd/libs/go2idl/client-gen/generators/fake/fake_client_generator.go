@@ -62,7 +62,7 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 
 			generators = append(generators, &genFakeForGroup{
 				DefaultGen: generator.DefaultGen{
-					OptionalName: "fake_" + gv.Group + "_client",
+					OptionalName: "fake_" + normalization.BeforeFirstDot(gv.Group) + "_client",
 				},
 				outputPackage:  outputPackagePath,
 				realClientPath: realClientPath,
