@@ -19,9 +19,9 @@ img {
   width: 100px;
   float: right;
   background-size: 100px 100px;
-  background-color: black;
   margin-left: 10px;
   border: none;
+  border-radius: 50%;
 }
 
 ul {
@@ -33,8 +33,27 @@ ul {
   font-family: Roboto, Open Sans, arial;
   border: 1px solid black;
   border-radius: 5px;
+  border: 1px groove #DCDDDE;
   padding: 10px;
   margin: 10px;
   display: inline-block;
-  background-color: #D1D1D1;
+  box-shadow: 3px 3px 3px 1px #CFCFCF;
+  background-color: #FFFFFF;
+}
+
+body {
+  background-color: #E8E8E8;
+}
+
+.k8s-example-update-demo-card-section {
+  color: black;
+  font-size: 13px;
+}
+
+.k8s-example-update-demo-card-section .k8s-title {
+  color: #7D7D7D;
+}
+
+.k8s-example-update-demo-card-section .k8s-card-id {
+  font-size: bigger;
 }
