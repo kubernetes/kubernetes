@@ -118,7 +118,7 @@ func (a AllOrNothingProcurement) Procure(t *T, n *api.Node, ps *ProcureState) er
 // NewNodeProcurement returns a Procurement that checks whether the given pod task and offer
 // have valid node informations available and wehther the pod spec node selector matches
 // the pod labels.
-// If the check is successfull the slave ID and assigned slave is set in the given Spec.
+// If the check is successful the slave ID and assigned slave is set in the given Spec.
 func NewNodeProcurement() Procurement {
 	return ProcurementFunc(func(t *T, n *api.Node, ps *ProcureState) error {
 		// if the user has specified a target host, make sure this offer is for that host
