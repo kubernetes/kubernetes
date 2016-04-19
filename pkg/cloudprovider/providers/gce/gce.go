@@ -2220,6 +2220,11 @@ func (gce *GCECloud) getDiskByNameUnknownZone(diskName string) (*gceDisk, error)
 		if err != nil {
 			return nil, err
 		}
+		// findDiskByName returns (nil,nil) if the disk doesn't exist, so we can't
+		// assume that a disk was found unless disk is non-nil.
+		if disk == nil {
+			continue
+		}
 		if found != nil {
 			return nil, fmt.Errorf("GCE persistent disk name was found in multiple zones: %q", diskName)
 		}
