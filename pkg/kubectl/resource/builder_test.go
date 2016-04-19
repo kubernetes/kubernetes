@@ -37,6 +37,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -246,6 +247,27 @@ var aRC string = `
 }
 `
 
+var mixedVersionList string = `
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: extensions/v1beta1
+    kind: Deployment
+    metadata:
+      name: nginx
+      namespace: test
+    spec:
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            name: nginx
+        spec:
+          containers:
+            - name: nginx
+              image: nginx
+`
+
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, false, "../../../docs/user-guide/update-demo/kitten-rc.yaml")
@@ -322,9 +344,11 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "recursive/pod/pod_1"))
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "recursive/rc/rc_1"))
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "inode/hardlink"))
+	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "dpl"))
 	defer os.RemoveAll(tmpDir)
 
 	// create test files
+	writeTestFile(t, fmt.Sprintf("%s/dpl/nginx-dpl.yaml", tmpDir), mixedVersionList)
 	writeTestFile(t, fmt.Sprintf("%s/recursive/pod/busybox.json", tmpDir), strings.Replace(aPod, "{id}", "0", -1))
 	writeTestFile(t, fmt.Sprintf("%s/recursive/pod/pod_1/busybox.json", tmpDir), strings.Replace(aPod, "{id}", "1", -1))
 	writeTestFile(t, fmt.Sprintf("%s/recursive/rc/busybox.json", tmpDir), strings.Replace(aRC, "{id}", "0", -1))
@@ -341,6 +365,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 		directory     string
 		expectedNames []string
 	}{
+		{"list", &extensions.Deployment{}, false, fmt.Sprintf("%s/dpl/nginx-dpl.yaml", tmpDir), []string{"nginx"}},
 		{"pod", &api.Pod{}, false, "../../../examples/pod", []string{"nginx"}},
 		{"recursive-pod", &api.Pod{}, true, fmt.Sprintf("%s/recursive/pod", tmpDir), []string{"busybox0", "busybox1"}},
 		{"rc", &api.ReplicationController{}, false, "../../../examples/guestbook/legacy/redis-master-controller.yaml", []string{"redis-master"}},
@@ -349,9 +374,10 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 		{"hardlink", &api.Pod{}, true, fmt.Sprintf("%s/inode/hardlink/busybox-link.json", tmpDir), []string{"busybox0"}},
 	}
 
-	for _, test := range tests {
+	for testIndex, test := range tests {
 		b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 			FilenameParam(false, test.recursive, test.directory).
+			Flatten().
 			NamespaceParam("test").DefaultNamespace()
 
 		testVisitor := &testVisitor{}
@@ -365,6 +391,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 		info := testVisitor.Infos
 
 		for i, v := range info {
+			t.Logf("Checking %v-%v: %#v", testIndex, i, v)
 			switch test.object.(type) {
 			case *api.Pod:
 				if _, ok := v.Object.(*api.Pod); !ok || v.Name != test.expectedNames[i] || v.Namespace != "test" {
@@ -372,6 +399,10 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 				}
 			case *api.ReplicationController:
 				if _, ok := v.Object.(*api.ReplicationController); !ok || v.Name != test.expectedNames[i] || v.Namespace != "test" {
+					t.Errorf("unexpected info: %#v", v)
+				}
+			case *extensions.Deployment:
+				if _, ok := v.Object.(*extensions.Deployment); !ok || v.Name != test.expectedNames[i] || v.Namespace != "test" {
 					t.Errorf("unexpected info: %#v", v)
 				}
 			}
