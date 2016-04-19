@@ -233,7 +233,7 @@ func MakePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 func MakePrivateKeySignerFromBytes(buffer []byte) (ssh.Signer, error) {
 	signer, err := ssh.ParsePrivateKey(buffer)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", buffer, err)
+		return nil, fmt.Errorf("error parsing SSH key: '%v'", err)
 	}
 	return signer, nil
 }
