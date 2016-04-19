@@ -319,9 +319,10 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		}
 	}
 
-	ws := new(restful.WebService)
-	InstallSupport(mux, ws)
-	container.Add(ws)
+	webservices := InstallSupport(mux)
+	for i := range webservices {
+		container.Add(webservices[i])
+	}
 	return &defaultAPIServer{mux, container}
 }
 
@@ -3257,9 +3258,10 @@ func TestXGSubresource(t *testing.T) {
 		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 	}
 
-	ws := new(restful.WebService)
-	InstallSupport(mux, ws)
-	container.Add(ws)
+	webservices := InstallSupport(mux)
+	for i := range webservices {
+		container.Add(webservices[i])
+	}
 
 	handler := defaultAPIServer{mux, container}
 	server := httptest.NewServer(handler)

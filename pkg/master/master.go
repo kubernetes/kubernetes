@@ -226,7 +226,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 
 	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
-	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, healthzChecks...)
+	webservices := apiserver.InstallSupport(m.MuxHelper, healthzChecks...)
 
 	if c.EnableProfiling {
 		m.MuxHelper.HandleFunc("/metrics", MetricsWithReset)
@@ -234,8 +234,9 @@ func (m *Master) InstallAPIs(c *Config) {
 		m.MuxHelper.HandleFunc("/metrics", defaultMetricsHandler)
 	}
 
-	// Install root web services
-	m.HandlerContainer.Add(m.RootWebService)
+	for i := range webservices {
+		m.HandlerContainer.Add(webservices[i])
+	}
 
 	// allGroups records all supported groups at /apis
 	allGroups := []unversioned.APIGroup{}
