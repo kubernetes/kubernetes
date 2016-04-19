@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -86,43 +87,46 @@ func ObjectReplenishmentDeleteFunc(options *ReplenishmentControllerOptions) func
 
 // ReplenishmentControllerFactory knows how to build replenishment controllers
 type ReplenishmentControllerFactory interface {
-	// NewController returns a controller configured with the specified options
-	NewController(options *ReplenishmentControllerOptions) (*framework.Controller, error)
+	// NewController returns a controller configured with the specified options.
+	// This method is NOT thread-safe.
+	NewController(options *ReplenishmentControllerOptions) (framework.ControllerInterface, error)
 }
 
 // replenishmentControllerFactory implements ReplenishmentControllerFactory
 type replenishmentControllerFactory struct {
-	kubeClient clientset.Interface
+	kubeClient  clientset.Interface
+	podInformer framework.SharedInformer
 }
 
 // NewReplenishmentControllerFactory returns a factory that knows how to build controllers
 // to replenish resources when updated or deleted
-func NewReplenishmentControllerFactory(kubeClient clientset.Interface) ReplenishmentControllerFactory {
+func NewReplenishmentControllerFactory(podInformer framework.SharedInformer, kubeClient clientset.Interface) ReplenishmentControllerFactory {
 	return &replenishmentControllerFactory{
-		kubeClient: kubeClient,
+		kubeClient:  kubeClient,
+		podInformer: podInformer,
 	}
 }
 
-func (r *replenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (*framework.Controller, error) {
-	var result *framework.Controller
+func NewReplenishmentControllerFactoryFromClient(kubeClient clientset.Interface) ReplenishmentControllerFactory {
+	return NewReplenishmentControllerFactory(nil, kubeClient)
+}
+
+func (r *replenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (framework.ControllerInterface, error) {
+	var result framework.ControllerInterface
 	switch options.GroupKind {
 	case api.Kind("Pod"):
-		_, result = framework.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().Pods(api.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
-				},
-			},
-			&api.Pod{},
-			options.ResyncPeriod(),
-			framework.ResourceEventHandlerFuncs{
+		if r.podInformer != nil {
+			r.podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
 				UpdateFunc: PodReplenishmentUpdateFunc(options),
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			},
-		)
+			})
+			result = r.podInformer.GetController()
+			break
+		}
+
+		r.podInformer = informers.CreateSharedPodInformer(r.kubeClient, options.ResyncPeriod())
+		result = r.podInformer
+
 	case api.Kind("Service"):
 		_, result = framework.NewInformer(
 			&cache.ListWatch{

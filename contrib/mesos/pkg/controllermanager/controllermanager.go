@@ -193,7 +193,7 @@ func (s *CMServer) Run(_ []string) error {
 		Registry:                  resourceQuotaRegistry,
 		GroupKindsToReplenish:     groupKindsToReplenish,
 		ReplenishmentResyncPeriod: s.resyncPeriod,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(resourceQuotaControllerClient),
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactoryFromClient(resourceQuotaControllerClient),
 	}
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(s.ConcurrentResourceQuotaSyncs, wait.NeverStop)
 
