@@ -94,6 +94,7 @@ func DeepCopy_v1alpha1_KubeSchedulerConfiguration(in KubeSchedulerConfiguration,
 	} else {
 		out.EnableProfiling = nil
 	}
+	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = in.KubeAPIBurst
 	out.SchedulerName = in.SchedulerName

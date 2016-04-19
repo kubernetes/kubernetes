@@ -119,6 +119,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControll
 	out.ClusterCIDR = in.ClusterCIDR
 	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
 	out.RootCAFile = in.RootCAFile
+	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = in.KubeAPIBurst
 	if err := DeepCopy_componentconfig_LeaderElectionConfiguration(in.LeaderElection, &out.LeaderElection, c); err != nil {
@@ -184,6 +185,7 @@ func DeepCopy_componentconfig_KubeSchedulerConfiguration(in KubeSchedulerConfigu
 	out.AlgorithmProvider = in.AlgorithmProvider
 	out.PolicyConfigFile = in.PolicyConfigFile
 	out.EnableProfiling = in.EnableProfiling
+	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = in.KubeAPIBurst
 	out.SchedulerName = in.SchedulerName
@@ -280,6 +282,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.MaxOpenFiles = in.MaxOpenFiles
 	out.ReconcileCIDR = in.ReconcileCIDR
 	out.RegisterSchedulable = in.RegisterSchedulable
+	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = in.KubeAPIBurst
 	out.SerializeImagePulls = in.SerializeImagePulls
