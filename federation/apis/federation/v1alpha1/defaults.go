@@ -17,14 +17,22 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) {
 	scheme.AddDefaultingFuncs(
 		func(obj *Cluster) {
-			if obj.Status.Phase == "" {
-				obj.Status.Phase = ClusterPending
+			if len(obj.Status.Conditions) == 0 {
+				obj.Status.Conditions = []ClusterCondition{
+					{
+						Type:    ClusterReady,
+						Status:  v1.ConditionFalse,
+						Reason:  "Create",
+						Message: "Newly created cluster, waiting cluster controller to verify the spec and update the status",
+					},
+				}
 			}
 		},
 	)
