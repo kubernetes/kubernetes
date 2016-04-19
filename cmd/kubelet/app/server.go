@@ -470,6 +470,7 @@ func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, 
 		return nil, err
 	}
 
+	clientConfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	clientConfig.QPS = s.KubeAPIQPS
 	clientConfig.Burst = s.KubeAPIBurst
