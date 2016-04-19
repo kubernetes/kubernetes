@@ -362,8 +362,12 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	})
 	client := &http.Client{Transport: transport}
-	_, err := client.Get(l.healthCheckURL.String())
-	return err
+	resp, err := client.Get(l.healthCheckURL.String())
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
 }
 
 func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
