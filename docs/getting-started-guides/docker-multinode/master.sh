@@ -133,7 +133,7 @@ start_k8s(){
         --restart=on-failure \
         --net=host \
         -d \
-        gcr.io/google_containers/etcd-${ARCH}:${ETCD_VERSION} \
+        quay.io/coreos/etcd:v${ETCD_VERSION} \
         /usr/local/bin/etcd \
             --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 \
             --advertise-client-urls=http://${MASTER_IP}:4001 \
@@ -142,7 +142,7 @@ start_k8s(){
     sleep 5
     # Set flannel net config
     docker -H unix:///var/run/docker-bootstrap.sock run \
-        --net=host gcr.io/google_containers/etcd:${ETCD_VERSION} \
+        --net=host quay.io/coreos/etcd:v${ETCD_VERSION} \
         etcdctl \
         set /coreos.com/network/config \
             '{ "Network": "10.1.0.0/16", "Backend": {"Type": "vxlan"}}'
