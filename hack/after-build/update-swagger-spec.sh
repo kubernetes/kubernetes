@@ -21,6 +21,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "Note: This assumes that types_swagger_doc_generated.go has been updated for all API group versions. Please run hack/update-generated-swagger-docs.sh to ensure that."
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 SWAGGER_ROOT_DIR="${KUBE_ROOT}/api/swagger-spec"
 source "${KUBE_ROOT}/hack/lib/init.sh"

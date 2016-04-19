@@ -21,6 +21,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "Note: This assumes that swagger spec has been updated. Please run hack/update-swagger-spec.sh to ensure that."
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
