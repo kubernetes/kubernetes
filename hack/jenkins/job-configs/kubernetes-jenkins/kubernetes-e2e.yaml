@@ -950,7 +950,7 @@
                 export GINKGO_TEST_ARGS="--ginkgo.skip={default-skip-list-1-1}"
         - 'gke-1.1-1.2-upgrade-cluster-new':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.2 tests against it.'
-            timeout: 300
+            timeout: 600
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
                 export E2E_NAME="gke-1-1-1-2-upg-clu-new"
