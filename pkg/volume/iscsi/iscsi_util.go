@@ -136,6 +136,10 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 		return err
 	}
 
+	// check if the dev is using mpio and if so mount it via the dm-XX device
+	if mappedDevicePath := b.deviceUtil.FindMultipathDeviceForDevice(devicePath); mappedDevicePath != "" {
+		devicePath = mappedDevicePath
+	}
 	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
 	if err != nil {
 		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
