@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -43,6 +44,13 @@ import (
 type JobController struct {
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
+
+	// internalPodInformer is used to hold a personal informer.  If we're using
+	// a normal shared informer, then the informer will be started for us.  If
+	// we have a personal informer, we must start it ourselves.   If you start
+	// the controller using NewJobController(passing SharedInformer), this
+	// will be null
+	internalPodInformer framework.SharedInformer
 
 	// To allow injection of updateJobStatus for testing.
 	updateHandler func(job *extensions.Job) error
@@ -61,8 +69,6 @@ type JobController struct {
 
 	// A store of pods, populated by the podController
 	podStore cache.StoreToPodLister
-	// Watches changes to all pods
-	podController *framework.Controller
 
 	// Jobs that need to be updated
 	queue *workqueue.Type
@@ -70,7 +76,7 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
-func NewJobController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
+func NewJobController(podInformer framework.SharedInformer, kubeClient clientset.Interface) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -110,27 +116,24 @@ func NewJobController(kubeClient clientset.Interface, resyncPeriod controller.Re
 		},
 	)
 
-	jm.podStore.Store, jm.podController = framework.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return jm.kubeClient.Core().Pods(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return jm.kubeClient.Core().Pods(api.NamespaceAll).Watch(options)
-			},
-		},
-		&api.Pod{},
-		resyncPeriod(),
-		framework.ResourceEventHandlerFuncs{
-			AddFunc:    jm.addPod,
-			UpdateFunc: jm.updatePod,
-			DeleteFunc: jm.deletePod,
-		},
-	)
+	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+		AddFunc:    jm.addPod,
+		UpdateFunc: jm.updatePod,
+		DeleteFunc: jm.deletePod,
+	})
+	jm.podStore.Store = podInformer.GetStore()
+	jm.podStoreSynced = podInformer.HasSynced
 
 	jm.updateHandler = jm.updateJobStatus
 	jm.syncHandler = jm.syncJob
-	jm.podStoreSynced = jm.podController.HasSynced
+	return jm
+}
+
+func NewJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
+	podInformer := informers.CreateSharedPodInformer(kubeClient, resyncPeriod())
+	jm := NewJobController(podInformer, kubeClient)
+	jm.internalPodInformer = podInformer
+
 	return jm
 }
 
@@ -138,10 +141,14 @@ func NewJobController(kubeClient clientset.Interface, resyncPeriod controller.Re
 func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	go jm.jobController.Run(stopCh)
-	go jm.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
 		go wait.Until(jm.worker, time.Second, stopCh)
 	}
+
+	if jm.internalPodInformer != nil {
+		go jm.internalPodInformer.Run(stopCh)
+	}
+
 	<-stopCh
 	glog.Infof("Shutting down Job Manager")
 	jm.queue.ShutDown()
