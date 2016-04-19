@@ -838,7 +838,7 @@
                 export PROJECT="kubekins-e2e-gke-trusty-test"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
-                export E2E_NAME="jkns-gke-e2e-test-trusty"
+                export E2E_NAME="gke-e2e-test-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-subnet':
             description: 'Run E2E tests on GKE test endpoint in a subnet.'
@@ -850,7 +850,7 @@
                 export PROJECT="k8s-e2e-gke-trusty-subnet"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
-                export E2E_NAME="jkns-gke-e2e-subnet-trusty"
+                export E2E_NAME="gke-e2e-subnet-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-staging':
             description: 'Run E2E tests on GKE staging endpoint.'
@@ -860,7 +860,7 @@
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
                 export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
-                export E2E_NAME="jkns-gke-e2e-staging-trusty"
+                export E2E_NAME="gke-e2e-staging-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-staging-parallel':
             description: 'Run E2E tests on GKE staging endpoint in parallel.'
@@ -872,7 +872,7 @@
                 export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
-                export E2E_NAME="jkns-gke-e2e-staging-parallel-trusty"
+                export E2E_NAME="gke-e2e-staging-pa-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-prod':
             # Failing constantly due to a known issue (tracked internally).
@@ -884,7 +884,7 @@
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
                 export KUBE_GCE_ZONE="asia-east1-b"
-                export E2E_NAME="jkns-gke-e2e-prod-trusty"
+                export E2E_NAME="gke-e2e-prod-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-prod-parallel':
             # Failing constantly due to a known issue (tracked internally).
@@ -898,7 +898,7 @@
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export KUBE_GCE_ZONE="asia-east1-b"
-                export E2E_NAME="jkns-gke-e2e-prod-parallel-trusty"
+                export E2E_NAME="gke-e2e-prod-pa-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
     jobs:
         - 'kubernetes-e2e-{suffix}'
