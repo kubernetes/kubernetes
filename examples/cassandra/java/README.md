@@ -18,11 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/examples/README.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -39,6 +34,7 @@ Within any deployment of Cassandra a Seed Provider is used to for node discovery
 This Java project provides a custom Seed Provider which communicates with the Kubernetes API to discover the required information.  This provider is bundled with the Docker provided in this example.
 
 # Configuring the Seed Provider
+
 The following environment variables may be used to override the default configurations:
 
 | ENV VAR       | DEFAULT VALUE  | NOTES |
@@ -49,7 +45,7 @@ The following environment variables may be used to override the default configur
 | POD_NAMESPACE                  | default                               | Default pod service namespace    |
 
 # Using
-This seed provider is packaged with the Cassandra example docker.  See the [_Pods_](../../docs/../user-guide/pods.md) documentation on how to configure and or customize environment variables when deploying a new pod to K8s.  Also see the [_EXAMPLE_](../README.md) documentation  on how to configure and deploy the Cassandra demo.
+
 
 If no endpoints are discovered from the API the seeds configured in the cassandra.yaml file are used.
 
@@ -58,4 +54,9 @@ If no endpoints are discovered from the API the seeds configured in the cassandr
 This Cassandra Provider implements `SeedProvider`. and utilizes `SimpleSnitch`.  This limits a Cassandra Ring to a single Cassandra Datacenter and ignores Rack setup.  Datastax provides more documentation on the use of [_SNITCHES_](https://docs.datastax.com/en/cassandra/3.x/cassandra/architecture/archSnitchesAbout.html).  Further development is planned to
 expand this capability.
 
-This in affect makes every node a seed provider, which is not a recommended best practice.  This increases maintenance and reduces gossip performance.  
+This in affect makes every node a seed provider, which is not a recommended best practice.  This increases maintenance and reduces gossip performance.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cassandra/java/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
