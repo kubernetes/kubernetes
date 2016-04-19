@@ -31,7 +31,7 @@ type Config struct {
 	// DEPRECATED: APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
 	// Because a cluster can run multiple API groups and potentially multiple versions of each, it no longer makes sense to specify
 	// a single value for the cluster version.
-	// This field isnt really needed anyway, so we are deprecating it without replacement.
+	// This field isn't really needed anyway, so we are deprecating it without replacement.
 	// It will be ignored if it is present.
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
