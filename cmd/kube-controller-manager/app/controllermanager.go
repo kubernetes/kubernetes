@@ -264,7 +264,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		KubeClient:                resourceQuotaControllerClient,
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod.Duration),
 		Registry:                  resourceQuotaRegistry,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(resourceQuotaControllerClient),
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(podInformer, resourceQuotaControllerClient),
 		ReplenishmentResyncPeriod: ResyncPeriod(s),
 		GroupKindsToReplenish:     groupKindsToReplenish,
 	}
