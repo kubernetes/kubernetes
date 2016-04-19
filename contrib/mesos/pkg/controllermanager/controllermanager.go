@@ -248,7 +248,7 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), s.resyncPeriod, s.LookupCacheSizeForDaemonSet).
+			go daemon.NewDaemonSetsControllerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), s.resyncPeriod, s.LookupCacheSizeForDaemonSet).
 				Run(s.ConcurrentDaemonSetSyncs, wait.NeverStop)
 		}
 
