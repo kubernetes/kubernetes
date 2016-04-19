@@ -51,7 +51,6 @@ found at [API Conventions](api-conventions.md).
     - [Edit types.go](#edit-typesgo)
   - [Edit validation.go](#edit-validationgo)
   - [Edit version conversions](#edit-version-conversions)
-  - [Edit deep copy files](#edit-deep-copy-files)
   - [Edit json (un)marshaling code](#edit-json-unmarshaling-code)
   - [Making a new API Group](#making-a-new-api-group)
   - [Update the fuzzer](#update-the-fuzzer)
@@ -456,8 +455,13 @@ regenerate auto-generated ones. To regenerate them:
    - run
 
 ```sh
-hack/update-generated-conversions.sh
+hack/update-codegen.sh
 ```
+
+update-codegen will also generate code to handle deep copy of your versioned
+api objects. The deep copy code resides with each versioned API:
+   - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
+   - `pkg/apis/extensions/<version>/deep_copy_generated.go` containing auto-generated copy functions
 
 If running the above script is impossible due to compile errors, the easiest
 workaround is to comment out the code causing errors and let the script to
@@ -467,23 +471,6 @@ generator to create it from scratch.
 
 Unsurprisingly, adding manually written conversion also requires you to add tests to
 `pkg/api/<version>/conversion_test.go`.
-
-## Edit deep copy files
-
-At this point you have both the versioned API changes and the internal
-structure changes done.  You now need to generate code to handle deep copy
-of your versioned api objects.
-
-The deep copy code resides with each versioned API:
-   - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
-   - `pkg/apis/extensions/<version>/deep_copy_generated.go` containing auto-generated copy functions
-
-To regenerate them:
-   - run
-
-```sh
-hack/update-generated-deep-copies.sh
-```
 
 ## Edit json (un)marshaling code
 
