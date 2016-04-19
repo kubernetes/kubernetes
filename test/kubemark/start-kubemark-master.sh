@@ -51,6 +51,7 @@ kubernetes/server/bin/kube-apiserver \
 	--token-auth-file=/srv/kubernetes/known_tokens.csv \
 	--secure-port=443 \
 	--basic-auth-file=/srv/kubernetes/basic_auth.csv \
+	--service-cluster-ip-range=10.0.0.0/16 \
 	--delete-collection-workers=16 &> /var/log/kube-apiserver.log &
 
 # kube-contoller-manager now needs running kube-api server to actually start
