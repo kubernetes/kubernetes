@@ -233,7 +233,6 @@
                 export PROJECT="k8s-jkns-e2e-gke-multizone"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
-                export NUM_NODES="1"
                 export ZONE="us-central1-f"
                 export ADDITIONAL_ZONES="us-central1-a,us-central1-b"
     jobs:
