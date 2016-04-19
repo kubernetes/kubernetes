@@ -187,6 +187,7 @@ keep-gogoproto
 km-path
 kube-api-burst
 kube-api-qps
+kube-api-content-type
 kube-master
 kube-master
 kube-master-url
