@@ -23,8 +23,8 @@ DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
-readonly DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
-readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox"}
+DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
+readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox --virtualbox-memory 4096 --virtualbox-cpu-count -1"}
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
@@ -184,9 +184,9 @@ function kube::build::docker_available_on_osx() {
 
 function kube::build::prepare_docker_machine() {
   kube::log::status "docker-machine was found."
-  docker-machine inspect "${DOCKER_MACHINE_NAME}" >/dev/null || {
+  docker-machine inspect "${DOCKER_MACHINE_NAME}" &> /dev/null || {
     kube::log::status "Creating a machine to build Kubernetes"
-    docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" \
+    docker-machine create --driver ${DOCKER_MACHINE_DRIVER} \
       --engine-env HTTP_PROXY="${KUBERNETES_HTTP_PROXY:-}" \
       --engine-env HTTPS_PROXY="${KUBERNETES_HTTPS_PROXY:-}" \
       --engine-env NO_PROXY="${KUBERNETES_NO_PROXY:-127.0.0.1}" \
@@ -197,7 +197,7 @@ function kube::build::prepare_docker_machine() {
       return 1
     }
   }
-  docker-machine start "${DOCKER_MACHINE_NAME}" > /dev/null
+  docker-machine start "${DOCKER_MACHINE_NAME}" &> /dev/null
   # it takes `docker-machine env` a few seconds to work if the machine was just started
   while ! docker-machine env ${DOCKER_MACHINE_NAME} &> /dev/null; do
     sleep 1
