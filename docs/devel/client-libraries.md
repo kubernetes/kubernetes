@@ -40,7 +40,8 @@ Documentation for other releases can be found at
 
 ### User Contributed
 
-*Note: Libraries provided by outside parties are supported by their authors, not the core Kubernetes team*
+*Note: Libraries provided by outside parties are supported by their authors, not
+the core Kubernetes team*
 
    * [Clojure](https://github.com/yanatan16/clj-kubernetes-api)
    * [Java (OSGi)](https://bitbucket.org/amdatulabs/amdatu-kubernetes)
