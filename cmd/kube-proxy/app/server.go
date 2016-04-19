@@ -178,6 +178,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		return nil, err
 	}
 
+	kubeconfig.ContentType = config.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = config.KubeAPIQPS
 	kubeconfig.Burst = config.KubeAPIBurst
