@@ -207,7 +207,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	}
 	netnsPath, err := runtime.GetNetNS(id)
 	if err != nil {
-		return err
+		return fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
 	}
 
 	rt := buildCNIRuntimeConf(name, namespace, id, netnsPath)
