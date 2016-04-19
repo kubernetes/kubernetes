@@ -1283,6 +1283,7 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 		if getDockerNetworkMode(ins) != namespaceModeHost {
 			teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
 			result.AddSyncResult(teardownNetworkResult)
+			glog.V(3).Infof("Calling network plugin %s to tear down pod for %s", dm.networkPlugin.Name(), kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
 			if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, networkContainer.ID); err != nil {
 				message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v", runningPod.ID, dm.networkPlugin.Name(), err)
 				teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
@@ -1896,7 +1897,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		setupNetworkResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod))
 		result.AddSyncResult(setupNetworkResult)
 		if !kubecontainer.IsHostNetworkPod(pod) {
-			// Call the networking plugin
+			glog.V(3).Infof("Calling network plugin %s to setup pod for %s", dm.networkPlugin.Name(), format.Pod(pod))
 			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID.ContainerID())
 			if err != nil {
 				// TODO: (random-liu) There shouldn't be "Skipping pod" in sync result message
