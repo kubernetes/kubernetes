@@ -30,7 +30,7 @@ set -o pipefail
 # echo "-=-=-=-=-=-=-=-=-=-="
 
 
-KUBE_ROOT=${KUBE_ROOT:-dirname "${BASH_SOURCE}")/..}
+KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/..}
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 # Get the absolute path of the directory component of a file, i.e. the
