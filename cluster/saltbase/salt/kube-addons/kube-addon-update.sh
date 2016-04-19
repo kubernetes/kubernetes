@@ -262,7 +262,7 @@ function create-object() {
     log INFO "Creating new ${obj_type} from file ${file_path} in namespace ${namespace}, name: ${obj_name}"
     # this will keep on failing if the ${file_path} disappeared in the meantime.
     # Do not use too many retries.
-    run-until-success "${KUBECTL} create --namespace=${namespace} -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    run-until-success "${KUBECTL} create --namespace=${namespace} --validate=false -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
 }
 
 function update-object() {
