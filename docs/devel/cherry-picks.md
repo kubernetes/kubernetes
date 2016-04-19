@@ -40,46 +40,54 @@ depending on the point in the release cycle.
 
 ## Propose a Cherry Pick
 
-1. Cherrypicks are [managed with labels and milestones](pull-requests.md#release-notes)
-1. All label/milestone accounting happens on PRs on master.  There's nothing to do on PRs targeted to the release branches.
-1. When you want a PR to be merged to the release branch, make the following label changes to the **master** branch PR:
+1. Cherrypicks are [managed with labels and milestones]
+(pull-requests.md#release-notes)
+1. All label/milestone accounting happens on PRs on master. There's nothing to
+do on PRs targeted to the release branches.
+1. When you want a PR to be merged to the release branch, make the following
+label changes to the **master** branch PR:
   * Remove release-note-label-needed
   * Add an appropriate release-note-(!label-needed) label
   * Add an appropriate milestone
   * Add the `cherrypick-candidate` label
   * The PR title is the **release note** you want published at release time and
-    note that PR titles are mutable and should reflect a release note
-    friendly message for any `release-note-*` labeled PRs.
+note that PR titles are mutable and should reflect a release note
+friendly message for any `release-note-*` labeled PRs.
 
 ### How do cherrypick-candidates make it to the release branch?
 
 1. **BATCHING:** After a branch is first created and before the X.Y.0 release
   * Branch owners review the list of `cherrypick-candidate` labeled PRs.
-  * PRs batched up and merged to the release branch get a `cherrypick-approved` label and lose the `cherrypick-candidate` label.
-  * PRs that won't be merged to the release branch, lose the `cherrypick-candidate` label.
+  * PRs batched up and merged to the release branch get a `cherrypick-approved`
+label and lose the `cherrypick-candidate` label.
+  * PRs that won't be merged to the release branch, lose the
+`cherrypick-candidate` label.
 
 1. **INDIVIDUAL CHERRYPICKS:** After the first X.Y.0 on a branch
-  * Run the cherry pick script.  This example applies a master branch PR #98765 to the remote branch `upstream/release-3.14`:
-    `hack/cherry_pick_pull.sh upstream/release-3.14 98765`
+  * Run the cherry pick script. This example applies a master branch PR #98765
+to the remote branch `upstream/release-3.14`:
+`hack/cherry_pick_pull.sh upstream/release-3.14 98765`
   * Your cherrypick PR (targeted to the branch) will immediately get the
-    `do-not-merge` label.  The branch owner will triage PRs targeted to
-    the branch and label the ones to be merged by applying the `lgtm`
-    label.
+`do-not-merge` label. The branch owner will triage PRs targeted to
+the branch and label the ones to be merged by applying the `lgtm`
+label.
 
-There is an [issue](https://github.com/kubernetes/kubernetes/issues/23347) open tracking the tool to automate the batching procedure.
+There is an [issue](https://github.com/kubernetes/kubernetes/issues/23347) open
+tracking the tool to automate the batching procedure.
 
 #### Cherrypicking a doc change
 
 If you are cherrypicking a change which adds a doc, then you also need to run
 `build/versionize-docs.sh` in the release branch to versionize that doc.
-Ideally, just running `hack/cherry_pick_pull.sh` should be enough, but we are not there
-yet: [#18861](https://github.com/kubernetes/kubernetes/issues/18861)
+Ideally, just running `hack/cherry_pick_pull.sh` should be enough, but we are
+not there yet: [#18861](https://github.com/kubernetes/kubernetes/issues/18861)
 
-To cherrypick PR 123456 to release-3.14, run the following commands after running `hack/cherry_pick_pull.sh` and before merging the PR:
+To cherrypick PR 123456 to release-3.14, run the following commands after
+running `hack/cherry_pick_pull.sh` and before merging the PR:
 
 ```
 $ git checkout -b automated-cherry-pick-of-#123456-upstream-release-3.14
-  origin/automated-cherry-pick-of-#123456-upstream-release-3.14
+origin/automated-cherry-pick-of-#123456-upstream-release-3.14
 $ ./build/versionize-docs.sh release-3.14
 $ git commit -a -m "Running versionize docs"
 $ git push origin automated-cherry-pick-of-#123456-upstream-release-3.14
@@ -97,9 +105,9 @@ requested - this should not be the norm, but it may happen.
 See the [cherrypick queue dashboard](http://cherrypick.k8s.io/#/queue) for
 status of PRs labeled as `cherrypick-candidate`.
 
-[Contributor License Agreements](http://releases.k8s.io/HEAD/CONTRIBUTING.md) is considered implicit
-for all code within cherry-pick pull requests, ***unless there is a large
-conflict***.
+[Contributor License Agreements](http://releases.k8s.io/HEAD/CONTRIBUTING.md) is
+considered implicit for all code within cherry-pick pull requests, ***unless
+there is a large conflict***.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
