@@ -15,6 +15,7 @@
     description: '{description} Test owner: {test-owner}.'
     logrotate:
         daysToKeep: 7
+    jenkins_node: 'e2e'
     disabled: '{obj:disable_job}'
     builders:
         - shell: |
@@ -44,6 +45,7 @@
 - job-template:
     name: 'kubernetes-e2e-{suffix}'
     <<: *e2e_job_defaults
+    node: '{jenkins_node}'
     triggers:
         - reverse:
             jobs: '{trigger-job}'
@@ -60,8 +62,9 @@
     provider-env: '{gce-provider-env}'
     suffix:
         - 'gce':
+            cron-string: '{sq-cron-string}'
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel.'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 # This is the *only* job that should publish the last green version.
                 export E2E_PUBLISH_GREEN_VERSION="true"
@@ -70,8 +73,9 @@
                 export GINKGO_PARALLEL="y"
                 export PROJECT="k8s-jkns-e2e-gce"
         - 'gce-slow':
+            cron-string: '{sq-cron-string}'
             description: 'Runs slow tests on GCE, sequentially.'
-            timeout: 60
+            timeout: 150  #  See #24072
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
@@ -92,6 +96,8 @@
                 export PROJECT="k8s-jkns-e2e-gce-ci-reboot"
         - 'gce-autoscaling':
             description: 'Run autoscaling E2E tests on GCE.'
+            # Issue: #23716
+            disable_job: true
             timeout: 210
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterSizeAutoscaling\]|\[Feature:InitialResources\] \
@@ -109,6 +115,7 @@
                                          --ginkgo.skip=\[Feature:.+\]"
                 export PROJECT="k8s-jkns-e2e-gce-flaky"
         - 'gce-scalability':
+            cron-string: '{sq-cron-string}'
             description: 'Run the performance/scalability tests on GCE. A larger cluster is used.'
             timeout: 120
             # TODO: Run this twice a day after we make kubemark-500 a blocking suite.
@@ -155,26 +162,37 @@
                 export MULTIZONE="true"
                 export E2E_ZONES="us-central1-a us-central1-b us-central1-f" # Where the nodes reside.  Master is in the first one.
                 export KUBE_GCE_ZONE="us-central1-a" # Where the master resides - hangover due to legacy scripts.
+        - 'gce-kubenet':
+            description: 'Run all non-flaky, non-slow, non-disruptive, non-feature tests on GCE using kubenet as network provider'
+            timeout: 120
+            emails: 'mixia@google.com'
+            test-owner: 'mixia'
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gce-kubenet"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export NETWORK_PROVIDER="kubenet"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
 - project:
     name: kubernetes-e2e-gke-master
     trigger-job: 'kubernetes-build'
-    test-owner: 'GKE on-call'
-    emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
+    test-owner: 'Build Cop'
     provider-env: '{gke-provider-env}'
     suffix:
         - 'gke':
+            cron-string: '{sq-cron-string}'
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GKE in parallel (against GKE test endpoint)'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-ci"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
         - 'gke-slow':
+            cron-string: '{sq-cron-string}'
             description: 'Run slow E2E tests on GKE using the latest successful build.'
-            timeout: 60
+            timeout: 150  #  See #24072
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-slow"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Slow\] \
@@ -207,6 +225,16 @@
                 export PROJECT="k8s-jkns-e2e-gke-ci-flaky"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=\[Flaky\] \
                                          --ginkgo.skip=\[Feature:.+\]"
+        - 'gke-multizone':
+            description: 'Run all non-flaky, non-slow, non-disruptive, non-feature tests on GKE, in parallel, and in a multi-zone (Ubernetes-lite) cluster.'
+            timeout: 150
+            emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com, arob@google.com, quinton@google.com'
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-multizone"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export ZONE="us-central1-f"
+                export ADDITIONAL_ZONES="us-central1-a,us-central1-b"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
@@ -220,7 +248,7 @@
     suffix:
         - 'gce-release-1.2':
             description: 'Runs all non-slow, non-serial, non-flaky, tests on GCE in parallel on the release-1.2 branch.'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
@@ -293,14 +321,14 @@
 - project:
     name: kubernetes-e2e-gke-1-2
     trigger-job: 'kubernetes-build-1.2'
-    test-owner: 'GKE on-call'
+    test-owner: 'Build Cop'
     provider-env: |
         {gke-provider-env}
         export JENKINS_PUBLISHED_VERSION="ci/latest-1.2"
     suffix:
         - 'gke-release-1.2':
             description: 'Run E2E tests on GKE from the release-1.2 branch.'
-            timeout: 30
+            timeout: 50  # See #21138
             job-env: |
                 export PROJECT="k8s-jkns-e2e-gke-1-2"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
@@ -341,6 +369,13 @@
     provider-env: |
         {gke-provider-env}
     suffix:
+        - 'gke-pre-release':
+            description: 'Run E2E tests on GKE test endpoint against the latest prerelease (alpha/beta).'
+            timeout: 480
+            job-env: |
+                export PROJECT="k8s-jkns-e2e-gke-prerel"
+                export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
+                export JENKINS_PUBLISHED_VERSION="release/latest"
         - 'gke-test':
             description: 'Run E2E tests on GKE test endpoint.'
             timeout: 480
@@ -402,11 +437,11 @@
 - project:
     name: kubernetes-e2e-gke-1.1
     trigger-job: 'kubernetes-build-1.1'
-    test-owner: 'GKE on-call'
+    test-owner: 'Build Cop'
     branch: 'release-1.1'
+    jenkins_node: 'master'
     runner: '{old-runner-1-1}'
     post-env: ''
-    emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
     suffix:
         - 'gke-1.1':
             timeout: 150
@@ -421,6 +456,7 @@
     trigger-job: 'kubernetes-build-1.1'
     test-owner: 'Build Cop'
     branch: 'release-1.1'
+    jenkins_node: 'master'
     runner: '{old-runner-1-1}'
     post-env: ''
     cron-string: 'H */6 * * *'
@@ -428,9 +464,6 @@
         - 'gce-release-1.1':
             timeout: 175
             description: 'Run E2E tests on GCE from the current release branch.'
-        - 'gce-disruptive-1.1':
-            timeout: 180
-            description: 'Run disruptive E2E tests on GCE from the current release branch.'
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
@@ -439,6 +472,7 @@
     trigger-job: 'kubernetes-build-1.0'
     test-owner: 'Build Cop'
     branch: 'release-1.0'
+    jenkins_node: 'master'
     runner: '{old-runner-1-0}'
     post-env: ''
     cron-string: 'H */12 * * *'
@@ -510,6 +544,8 @@
     cron-string: '@daily'
     trigger-job: ''
     timeout: 240
+    jenkins_node: 'master'
+    runner: '{legacy-runner}'
     provider-env: |
         {aws-provider-env}
         export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
@@ -590,6 +626,7 @@
 - job-template:
     name: 'kubernetes-e2e-gce-trusty-ci-{suffix}'
     <<: *e2e_job_defaults
+    node: '{jenkins_node}'
     triggers:
         - reverse:
             jobs: '{trigger-job}'
@@ -633,6 +670,13 @@
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export PROJECT="e2e-gce-trusty-ci-master-slow"
+        - 'serial-master':
+            description: 'Run [Serial], [Disruptive], tests on GCE, with Trusty images.'
+            timeout: 300
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+                export PROJECT="e2e-gce-trusty-ci-serial"
     jobs:
         - 'kubernetes-e2e-gce-trusty-ci-{suffix}'
 
@@ -663,6 +707,13 @@
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export PROJECT="e2e-gce-trusty-ci-slow-1-2"
+        - 'serial-release-1.2':
+            description: 'Run [Serial], [Disruptive], tests on GCE, with Trusty images, on the release-1.2 branch.'
+            timeout: 300
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+                export PROJECT="e2e-gce-trusty-ci-serial-1-2"
     jobs:
         - 'kubernetes-e2e-gce-trusty-ci-{suffix}'
 
@@ -671,6 +722,7 @@
 - job-template:
     name: 'kubernetes-e2e-gce-trusty-dev-{suffix}'
     <<: *e2e_job_defaults
+    node: '{jenkins_node}'
     triggers:
         - timed: 'H H/8 * * *'
     publishers:
@@ -710,6 +762,13 @@
                                          --ginkgo.skip=\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export PROJECT="k8s-e2e-gce-trusty-dev-slow"
+        - 'serial':
+            description: 'Run [Serial], [Disruptive], tests on GCE, with Trusty dev images and the latest k8s 1.2 release.'
+            timeout: 300
+            job-env: |
+                export GINKGO_TEST_ARGS="--ginkgo.focus=\[Serial\]|\[Disruptive\] \
+                                         --ginkgo.skip=\[Flaky\]|\[Feature:.+\]"
+                export PROJECT="e2e-gce-trusty-dev-serial"
     jobs:
         - 'kubernetes-e2e-gce-trusty-dev-{suffix}'
 
@@ -718,6 +777,7 @@
 - job-template:
     name: 'kubernetes-e2e-gce-trusty-{suffix}'
     <<: *e2e_job_defaults
+    node: '{jenkins_node}'
     triggers:
         # Trusty beta and stable images are built once per day.
         - timed: '@daily'
@@ -739,6 +799,7 @@
     test-owner: 'wonderfly@google.com'
     branch: 'release-1.1'
     emails: 'wonderfly@google.com,qzheng@google.com'
+    jenkins_node: 'master'
     runner: '{old-runner-1-1}'
     post-env: ''
     suffix:
@@ -777,7 +838,7 @@
                 export PROJECT="kubekins-e2e-gke-trusty-test"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
-                export E2E_NAME="jkns-gke-e2e-test-trusty"
+                export E2E_NAME="gke-e2e-test-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-subnet':
             description: 'Run E2E tests on GKE test endpoint in a subnet.'
@@ -789,7 +850,7 @@
                 export PROJECT="k8s-e2e-gke-trusty-subnet"
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
-                export E2E_NAME="jkns-gke-e2e-subnet-trusty"
+                export E2E_NAME="gke-e2e-subnet-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-staging':
             description: 'Run E2E tests on GKE staging endpoint.'
@@ -799,7 +860,7 @@
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
                 export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
-                export E2E_NAME="jkns-gke-e2e-staging-trusty"
+                export E2E_NAME="gke-e2e-staging-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-staging-parallel':
             description: 'Run E2E tests on GKE staging endpoint in parallel.'
@@ -811,7 +872,7 @@
                 export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER="https://staging-container.sandbox.googleapis.com/"
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
-                export E2E_NAME="jkns-gke-e2e-staging-parallel-trusty"
+                export E2E_NAME="gke-e2e-staging-pa-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-prod':
             # Failing constantly due to a known issue (tracked internally).
@@ -823,7 +884,7 @@
                 export CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
                 export JENKINS_USE_SERVER_VERSION="y"
                 export KUBE_GCE_ZONE="asia-east1-b"
-                export E2E_NAME="jkns-gke-e2e-prod-trusty"
+                export E2E_NAME="gke-e2e-prod-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
         - 'gke-trusty-prod-parallel':
             # Failing constantly due to a known issue (tracked internally).
@@ -837,7 +898,7 @@
                 export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
                 export GINKGO_PARALLEL="y"
                 export KUBE_GCE_ZONE="asia-east1-b"
-                export E2E_NAME="jkns-gke-e2e-prod-parallel-trusty"
+                export E2E_NAME="gke-e2e-prod-pa-trusty"
                 export KUBE_OS_DISTRIBUTION="trusty"
     jobs:
         - 'kubernetes-e2e-{suffix}'
@@ -851,43 +912,81 @@
     emails: 'ihmccreery@google.com'
     provider-env: '{gke-provider-env}'
     suffix:
-        - 'gke-kubectl-skew-1.1-1.2':
+        - 'gke-1.1-1.2-kubectl-skew':
             description: 'Deploys a cluster at v1.1 and runs the v1.2 Kubectl tests.'
-            timeout: 30
+            timeout: 120
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-ctl-skew-1-1-1-2"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
+                export E2E_NAME="gke-1-1-1-2-ctl-skew"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=Kubectl"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_PARALLEL="y"
-        - 'gke-upgrade-master-1.1-1.2':
+                export E2E_OPT="--check_version_skew=false"
+                # In v1.1, NUM_MINIONS defaults to 2, so we have to override to 3 here.  NUM_MINIONS
+                # was changed to NUM_NODES in v1.2, but we don't need to override for v1.2+.
+                export NUM_MINIONS=3
+                # Similarly, in v1.1, MINION_SIZE defaults to 'n1-standard-1', so we need to
+                # override it here (specifically for HPA tests).  MINION_SIZE was changed to
+                # NODE_SIZE in v1.2, but we don't need to override for v1.2+.
+                export MINION_SIZE='n1-standard-2'
+        - 'gke-1.1-1.2-upgrade-master':
             description: 'Deploys a cluster at v1.1, upgrades its master to v1.2, and runs v1.1 tests against it.'
-            timeout: 30
+            timeout: 300
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-upg-mas-1-1-1-2"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
+                export E2E_NAME="gke-1-1-1-2-upg-mas"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
                 export E2E_UPGRADE_TEST="true"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
-        - 'gke-upgrade-cluster-1.1-1.2':
+                export E2E_OPT="--check_version_skew=false"
+                export GINKGO_TEST_ARGS="--ginkgo.skip={default-skip-list-1-1}"
+                # In v1.1, NUM_MINIONS defaults to 2, so we have to override to 3 here.  NUM_MINIONS
+                # was changed to NUM_NODES in v1.2, but we don't need to override for v1.2+.
+                export NUM_MINIONS=3
+                # Similarly, in v1.1, MINION_SIZE defaults to 'n1-standard-1', so we need to
+                # override it here (specifically for HPA tests).  MINION_SIZE was changed to
+                # NODE_SIZE in v1.2, but we don't need to override for v1.2+.
+                export MINION_SIZE='n1-standard-2'
+        - 'gke-1.1-1.2-upgrade-cluster':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.1 tests against it.'
-            timeout: 30
+            timeout: 300
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-upg-clu-1-1-1-2"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
+                export E2E_NAME="gke-1-1-1-2-upg-clu"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
                 export E2E_UPGRADE_TEST="true"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
                 export JENKINS_USE_OLD_TESTS="true"
-        - 'gke-upgrade-cluster-new-1.1-1.2':
+                export E2E_OPT="--check_version_skew=false"
+                export GINKGO_TEST_ARGS="--ginkgo.skip={default-skip-list-1-1}"
+                # In v1.1, NUM_MINIONS defaults to 2, so we have to override to 3 here.  NUM_MINIONS
+                # was changed to NUM_NODES in v1.2, but we don't need to override for v1.2+.
+                export NUM_MINIONS=3
+                # Similarly, in v1.1, MINION_SIZE defaults to 'n1-standard-1', so we need to
+                # override it here (specifically for HPA tests).  MINION_SIZE was changed to
+                # NODE_SIZE in v1.2, but we don't need to override for v1.2+.
+                export MINION_SIZE='n1-standard-2'
+        - 'gke-1.1-1.2-upgrade-cluster-new':
             description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.2 tests against it.'
-            timeout: 30
+            timeout: 600
             job-env: |
                 export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-upg-clu-new-1-1-1-2"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
+                export E2E_NAME="gke-1-1-1-2-upg-clu-new"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
                 export E2E_UPGRADE_TEST="true"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
                 export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
+                export E2E_OPT="--check_version_skew=false"
+                # In v1.1, NUM_MINIONS defaults to 2, so we have to override to 3 here.  NUM_MINIONS
+                # was changed to NUM_NODES in v1.2, but we don't need to override for v1.2+.
+                export NUM_MINIONS=3
+                # Similarly, in v1.1, MINION_SIZE defaults to 'n1-standard-1', so we need to
+                # override it here (specifically for HPA tests).  MINION_SIZE was changed to
+                # NODE_SIZE in v1.2, but we don't need to override for v1.2+.
+                export MINION_SIZE='n1-standard-2'
     jobs:
         - 'kubernetes-e2e-{suffix}'

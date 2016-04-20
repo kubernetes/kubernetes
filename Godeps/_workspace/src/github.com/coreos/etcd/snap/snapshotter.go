@@ -45,6 +45,11 @@ var (
 	ErrEmptySnapshot = errors.New("snap: empty snapshot")
 	ErrCRCMismatch   = errors.New("snap: crc mismatch")
 	crcTable         = crc32.MakeTable(crc32.Castagnoli)
+
+	// A map of valid files that can be present in the snap folder.
+	validFiles = map[string]bool{
+		"db": true,
+	}
 )
 
 type Snapshotter struct {
@@ -175,7 +180,11 @@ func checkSuffix(names []string) []string {
 		if strings.HasSuffix(names[i], snapSuffix) {
 			snaps = append(snaps, names[i])
 		} else {
-			plog.Warningf("skipped unexpected non snapshot file %v", names[i])
+			// If we find a file which is not a snapshot then check if it's
+			// a vaild file. If not throw out a warning.
+			if _, ok := validFiles[names[i]]; !ok {
+				plog.Warningf("skipped unexpected non snapshot file %v", names[i])
+			}
 		}
 	}
 	return snaps

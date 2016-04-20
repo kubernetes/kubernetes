@@ -17,8 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"time"
-
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -31,7 +29,7 @@ type Versioner interface {
 	// UpdateObject sets storage metadata into an API object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from database.
-	UpdateObject(obj runtime.Object, expiration *time.Time, resourceVersion uint64) error
+	UpdateObject(obj runtime.Object, resourceVersion uint64) error
 	// UpdateList sets the resource version into an API list object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from database.
@@ -49,9 +47,6 @@ type ResponseMeta struct {
 	// zero or negative in some cases (objects may be expired after the requested
 	// expiration time due to server lag).
 	TTL int64
-	// Expiration is the time at which the node that contained the returned object will expire and be deleted.
-	// This can be nil if there is no expiration time set for the node.
-	Expiration *time.Time
 	// The resource version of the node that contained the returned object.
 	ResourceVersion uint64
 }
@@ -97,11 +92,6 @@ type Interface interface {
 	// in seconds (0 means forever). If no error is returned and out is not nil, out will be
 	// set to the read value from database.
 	Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error
-
-	// Set marshals obj via json and stores in database under key. Will do an atomic update
-	// if obj's ResourceVersion field is set. 'ttl' is time-to-live in seconds (0 means forever).
-	// If no error is returned and out is not nil, out will be set to the read value from database.
-	Set(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error
 
 	// Delete removes the specified key and returns the value that existed at that spot.
 	// If key didn't exist, it will return NotFound storage error.

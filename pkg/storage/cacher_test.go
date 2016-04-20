@@ -19,6 +19,7 @@ package storage_test
 import (
 	"fmt"
 	"reflect"
+	goruntime "runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ import (
 
 func newEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
-	storage := etcdstorage.NewEtcdStorage(server.Client, codec, prefix, false)
+	storage := etcdstorage.NewEtcdStorage(server.Client, codec, prefix, false, etcdtest.DeserializationCacheSize)
 	return server, storage
 }
 
@@ -69,20 +70,22 @@ func makeTestPod(name string) *api.Pod {
 }
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
+	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		newObj, err := api.Scheme.DeepCopy(obj)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return nil, nil, err
+		}
+		return newObj.(*api.Pod), nil, nil
+	}
 	key := etcdtest.AddPrefix("pods/ns/" + obj.Name)
+	if err := s.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, old == nil, nil, updateFn); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	obj.ResourceVersion = ""
 	result := &api.Pod{}
-	if old == nil {
-		if err := s.Create(context.TODO(), key, obj, result, 0); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	} else {
-		// To force "update" behavior of Set() we need to set ResourceVersion of
-		// previous version of object.
-		obj.ResourceVersion = old.ResourceVersion
-		if err := s.Set(context.TODO(), key, obj, result, 0); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		obj.ResourceVersion = ""
+	if err := s.Get(context.TODO(), key, result, false); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 	return result
 }
@@ -159,15 +162,19 @@ func TestList(t *testing.T) {
 }
 
 func verifyWatchEvent(t *testing.T, w watch.Interface, eventType watch.EventType, eventObject runtime.Object) {
+	_, _, line, _ := goruntime.Caller(1)
 	select {
 	case event := <-w.ResultChan():
 		if e, a := eventType, event.Type; e != a {
+			t.Logf("(called from line %d)", line)
 			t.Errorf("Expected: %s, got: %s", eventType, event.Type)
 		}
 		if e, a := eventObject, event.Object; !api.Semantic.DeepDerivative(e, a) {
+			t.Logf("(called from line %d)", line)
 			t.Errorf("Expected (%s): %#v, got: %#v", eventType, e, a)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
+		t.Logf("(called from line %d)", line)
 		t.Errorf("Timed out waiting for an event")
 	}
 }
@@ -236,7 +243,6 @@ func TestWatch(t *testing.T) {
 	}
 	defer initialWatcher.Stop()
 
-	verifyWatchEvent(t, initialWatcher, watch.Added, podFoo)
 	verifyWatchEvent(t, initialWatcher, watch.Modified, podFooPrime)
 
 	// Now test watch from "now".
@@ -335,9 +341,56 @@ func TestFiltering(t *testing.T) {
 	}
 	defer watcher.Stop()
 
-	verifyWatchEvent(t, watcher, watch.Added, podFoo)
 	verifyWatchEvent(t, watcher, watch.Deleted, podFooFiltered)
 	verifyWatchEvent(t, watcher, watch.Added, podFoo)
 	verifyWatchEvent(t, watcher, watch.Modified, podFooPrime)
 	verifyWatchEvent(t, watcher, watch.Deleted, podFooPrime)
+}
+
+func TestStartingResourceVersion(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
+
+	// add 1 object
+	podFoo := makeTestPod("foo")
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
+
+	// Set up Watch starting at fooCreated.ResourceVersion + 10
+	rv, err := storage.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	rv += 10
+	startVersion := strconv.Itoa(int(rv))
+
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", startVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watcher.Stop()
+
+	lastFoo := fooCreated
+	for i := 0; i < 11; i++ {
+		podFooForUpdate := makeTestPod("foo")
+		podFooForUpdate.Labels = map[string]string{"foo": strconv.Itoa(i)}
+		lastFoo = updatePod(t, etcdStorage, podFooForUpdate, lastFoo)
+	}
+
+	select {
+	case e := <-watcher.ResultChan():
+		pod := e.Object.(*api.Pod)
+		podRV, err := storage.ParseWatchResourceVersion(pod.ResourceVersion)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// event should have at least rv + 1, since we're starting the watch at rv
+		if podRV <= rv {
+			t.Errorf("expected event with resourceVersion of at least %d, got %d", rv+1, podRV)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timed out waiting for event")
+	}
 }

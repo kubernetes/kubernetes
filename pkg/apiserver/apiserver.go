@@ -46,7 +46,6 @@ import (
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func init() {
@@ -84,8 +83,13 @@ type APIGroupVersion struct {
 
 	Mapper meta.RESTMapper
 
-	Serializer     runtime.NegotiatedSerializer
-	ParameterCodec runtime.ParameterCodec
+	// Serializer is used to determine how to convert responses from API methods into bytes to send over
+	// the wire.
+	Serializer runtime.NegotiatedSerializer
+	// StreamSerializer is used for sending a series of objects to the client over a single channel, where
+	// the underlying channel has no innate framing (such as an io.Writer)
+	StreamSerializer runtime.NegotiatedSerializer
+	ParameterCodec   runtime.ParameterCodec
 
 	Typer     runtime.ObjectTyper
 	Creater   runtime.ObjectCreater
@@ -166,7 +170,6 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 func InstallSupport(mux Mux, ws *restful.WebService, checks ...healthz.HealthzChecker) {
 	// TODO: convert healthz and metrics to restful and remove container arg
 	healthz.InstallHandler(mux, checks...)
-	mux.Handle("/metrics", prometheus.Handler())
 
 	// Set up a service to return the git code version.
 	ws.Path("/version")

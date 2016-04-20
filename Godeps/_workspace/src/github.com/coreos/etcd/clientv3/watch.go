@@ -25,6 +25,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	EventTypeDelete = storagepb.DELETE
+	EventTypePut    = storagepb.PUT
+)
+
+type Event storagepb.Event
+
 type WatchChan <-chan WatchResponse
 
 type Watcher interface {
@@ -41,7 +48,7 @@ type Watcher interface {
 
 type WatchResponse struct {
 	Header pb.ResponseHeader
-	Events []*storagepb.Event
+	Events []*Event
 
 	// CompactRevision is the minimum revision the watcher may receive.
 	CompactRevision int64
@@ -50,6 +57,16 @@ type WatchResponse struct {
 	// If the watch failed and the stream was about to close, before the channel is closed,
 	// the channel sends a final response that has Canceled set to true with a non-nil Err().
 	Canceled bool
+}
+
+// IsCreate returns true if the event tells that the key is newly created.
+func (e *Event) IsCreate() bool {
+	return e.Type == EventTypePut && e.Kv.CreateRevision == e.Kv.ModRevision
+}
+
+// IsModify returns true if the event tells that a new value is put on existing key.
+func (e *Event) IsModify() bool {
+	return e.Type == EventTypePut && e.Kv.CreateRevision != e.Kv.ModRevision
 }
 
 // Err is the error value if this WatchResponse holds an error.
@@ -240,11 +257,11 @@ func (w *watcher) addStream(resp *pb.WatchResponse, pendingReq *watchRequest) {
 	w.streams[ws.id] = ws
 	w.mu.Unlock()
 
-	// send messages to subscriber
-	go w.serveStream(ws)
-
 	// pass back the subscriber channel for the watcher
 	pendingReq.retc <- ret
+
+	// send messages to subscriber
+	go w.serveStream(ws)
 }
 
 // closeStream closes the watcher resources and removes it
@@ -352,10 +369,14 @@ func (w *watcher) dispatchEvent(pbresp *pb.WatchResponse) bool {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	ws, ok := w.streams[pbresp.WatchId]
+	events := make([]*Event, len(pbresp.Events))
+	for i, ev := range pbresp.Events {
+		events[i] = (*Event)(ev)
+	}
 	if ok {
 		wr := &WatchResponse{
 			Header:          *pbresp.Header,
-			Events:          pbresp.Events,
+			Events:          events,
 			CompactRevision: pbresp.CompactRevision,
 			Canceled:        pbresp.Canceled}
 		ws.recvc <- wr
@@ -436,11 +457,15 @@ func (w *watcher) serveStream(ws *watcherStream) {
 			// TODO don't keep buffering if subscriber stops reading
 			wrs = append(wrs, wr)
 		case resumeRev := <-ws.resumec:
+			wrs = nil
+			resuming = true
+			if resumeRev == -1 {
+				// pause serving stream while resume gets set up
+				break
+			}
 			if resumeRev != ws.lastRev {
 				panic("unexpected resume revision")
 			}
-			wrs = nil
-			resuming = true
 		case <-w.donec:
 			closing = true
 		case <-ws.initReq.ctx.Done():
@@ -502,6 +527,9 @@ func (w *watcher) resumeWatchers(wc pb.Watch_WatchClient) error {
 	w.mu.RUnlock()
 
 	for _, ws := range streams {
+		// pause serveStream
+		ws.resumec <- -1
+
 		// reconstruct watcher from initial request
 		if ws.lastRev != 0 {
 			ws.initReq.rev = ws.lastRev
@@ -514,7 +542,7 @@ func (w *watcher) resumeWatchers(wc pb.Watch_WatchClient) error {
 		resp, err := wc.Recv()
 		if err != nil {
 			return err
-		} else if len(resp.Events) != 0 || resp.Created != true {
+		} else if len(resp.Events) != 0 || !resp.Created {
 			return fmt.Errorf("watcher: unexpected response (%+v)", resp)
 		}
 
@@ -525,6 +553,7 @@ func (w *watcher) resumeWatchers(wc pb.Watch_WatchClient) error {
 		w.streams[ws.id] = ws
 		w.mu.Unlock()
 
+		// unpause serveStream
 		ws.resumec <- ws.lastRev
 	}
 	return nil

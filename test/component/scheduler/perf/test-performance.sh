@@ -18,13 +18,16 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-pushd "../../../.."
-source "./hack/lib/util.sh"
-source "./cluster/lib/logging.sh"
-source "./hack/lib/etcd.sh"
-popd
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../../..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
+kube::golang::setup_env
+
+DIR_BASENAME=$(dirname "${BASH_SOURCE}")
+pushd ${DIR_BASENAME}
 
 cleanup() {
+  popd 2> /dev/null
   kube::etcd::cleanup
   kube::log::status "performance test cleanup complete"
 }
@@ -34,13 +37,13 @@ trap cleanup EXIT
 kube::etcd::start
 kube::log::status "performance test start"
 
-# TODO: set log-dir and prof output dir.
-DIR_BASENAME=$(basename `pwd`)
-go test -c -o "${DIR_BASENAME}.test"
 # We are using the benchmark suite to do profiling. Because it only runs a few pods and
 # theoretically it has less variance.
-"./${DIR_BASENAME}.test" -test.bench=. -test.run=xxxx -test.cpuprofile=prof.out -logtostderr=false
-kube::log::status "benchmark tests finished"
+if ${RUN_BENCHMARK:-false}; then
+  go test -c -o "perf.test"
+  "./perf.test" -test.bench=. -test.run=xxxx -test.cpuprofile=prof.out
+  kube::log::status "benchmark tests finished"
+fi
 # Running density tests. It might take a long time.
-"./${DIR_BASENAME}.test" -test.run=. -test.timeout=60m
+go test -test.run=. -test.timeout=60m
 kube::log::status "density tests finished"

@@ -178,8 +178,8 @@ func (b modelBuilder) buildProperty(field reflect.StructField, model *Model, mod
 		return jsonName, modelDescription, prop
 	case fieldKind == reflect.Map:
 		// if it's a map, it's unstructured, and swagger 1.2 can't handle it
-		anyt := "any"
-		prop.Type = &anyt
+		objectType := "object"
+		prop.Type = &objectType
 		return jsonName, modelDescription, prop
 	}
 
@@ -277,9 +277,10 @@ func (b modelBuilder) buildArrayTypeProperty(field reflect.StructField, jsonName
 	fieldType := field.Type
 	var pType = "array"
 	prop.Type = &pType
+	isPrimitive := b.isPrimitiveType(fieldType.Elem().Name())
 	elemTypeName := b.getElementTypeName(modelName, jsonName, fieldType.Elem())
 	prop.Items = new(Item)
-	if b.isPrimitiveType(elemTypeName) {
+	if isPrimitive {
 		mapped := b.jsonSchemaType(elemTypeName)
 		prop.Items.Type = &mapped
 	} else {
@@ -289,7 +290,9 @@ func (b modelBuilder) buildArrayTypeProperty(field reflect.StructField, jsonName
 	if fieldType.Elem().Kind() == reflect.Ptr {
 		fieldType = fieldType.Elem()
 	}
-	b.addModel(fieldType.Elem(), elemTypeName)
+	if !isPrimitive {
+		b.addModel(fieldType.Elem(), elemTypeName)
+	}
 	return jsonName, prop
 }
 
@@ -305,10 +308,18 @@ func (b modelBuilder) buildPointerTypeProperty(field reflect.StructField, jsonNa
 	if fieldType.Elem().Kind() == reflect.Slice || fieldType.Elem().Kind() == reflect.Array {
 		var pType = "array"
 		prop.Type = &pType
+		isPrimitive := b.isPrimitiveType(fieldType.Elem().Elem().Name())
 		elemName := b.getElementTypeName(modelName, jsonName, fieldType.Elem().Elem())
-		prop.Items = &Item{Ref: &elemName}
-		// add|overwrite model for element type
-		b.addModel(fieldType.Elem().Elem(), elemName)
+		if isPrimitive {
+			primName := b.jsonSchemaType(elemName)
+			prop.Items = &Item{Ref: &primName}
+		} else {
+			prop.Items = &Item{Ref: &elemName}
+		}
+		if !isPrimitive {
+			// add|overwrite model for element type
+			b.addModel(fieldType.Elem().Elem(), elemName)
+		}
 	} else {
 		// non-array, pointer type
 		var pType = b.jsonSchemaType(fieldType.String()[1:]) // no star, include pkg path
@@ -335,9 +346,6 @@ func (b modelBuilder) getElementTypeName(modelName, jsonName string, t reflect.T
 	if t.Name() == "" {
 		return modelName + "." + jsonName
 	}
-	if b.isPrimitiveType(t.Name()) {
-		return b.jsonSchemaType(t.Name())
-	}
 	return b.keyFrom(t)
 }
 
@@ -352,6 +360,9 @@ func (b modelBuilder) keyFrom(st reflect.Type) string {
 
 // see also https://golang.org/ref/spec#Numeric_types
 func (b modelBuilder) isPrimitiveType(modelName string) bool {
+	if len(modelName) == 0 {
+		return false
+	}
 	return strings.Contains("uint uint8 uint16 uint32 uint64 int int8 int16 int32 int64 float32 float64 bool string byte rune time.Time", modelName)
 }
 

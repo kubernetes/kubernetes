@@ -38,7 +38,7 @@ func construct(t *testing.T, files map[string]string, testNamer namer.Namer) (*p
 	if err != nil {
 		t.Fatal(err)
 	}
-	orderer := namer.Orderer{testNamer}
+	orderer := namer.Orderer{Namer: testNamer}
 	o := orderer.OrderUniverse(u)
 	return b, u, o
 }
@@ -165,7 +165,7 @@ var FooAnotherVar proto.Frobber = proto.AnotherVar
 		t.Errorf("Wanted, got:\n%v\n-----\n%v\n", e, a)
 	}
 	if p := u.Package("base/foo/proto"); !p.HasImport("base/common/proto") {
-		t.Errorf("Unexpected lack of import line: %#s", p.Imports)
+		t.Errorf("Unexpected lack of import line: %s", p.Imports)
 	}
 }
 

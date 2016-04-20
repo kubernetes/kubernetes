@@ -26,16 +26,8 @@ readonly datestr=$(date +"%Y-%m-%d")
 # Create JSON report
 time python gen_json.py "${jenkins}" kubernetes
 
-# Create static HTML report out of the JSON
-python gen_html.py > static/tests.html
-python gen_html.py kubernetes-e2e > static/tests-e2e.html
-python gen_html.py kubernetes-soak > static/tests-soak.html
-python gen_html.py kubernetes-e2e-gce > static/tests-e2e-gce.html
-python gen_html.py kubernetes-e2e-gke > static/tests-e2e-gke.html
-python gen_html.py kubernetes-upgrade > static/tests-upgrade.html
-
-# Fill in the last updated time into the template.
-cat index_template.html | sed -e "s/TIME/Last updated: ${datestr}/" > static/index.html
+# Create static HTML reports out of the JSON
+python gen_html.py --suites --prefixes ,e2e,soak,e2e-gce,e2e-gke,upgrade --output-dir static --input tests.json
 
 # Upload to GCS
 readonly bucket="kubernetes-test-history"

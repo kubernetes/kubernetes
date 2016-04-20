@@ -42,6 +42,7 @@ type store struct {
 	codec      runtime.Codec
 	versioner  storage.Versioner
 	pathPrefix string
+	watcher    *watcher
 }
 
 type elemForDecode struct {
@@ -57,11 +58,13 @@ type objState struct {
 }
 
 func newStore(c *clientv3.Client, codec runtime.Codec, prefix string) *store {
+	versioner := etcd.APIObjectVersioner{}
 	return &store{
 		client:     c,
-		versioner:  etcd.APIObjectVersioner{},
+		versioner:  versioner,
 		codec:      codec,
 		pathPrefix: prefix,
+		watcher:    newWatcher(c, codec, versioner),
 	}
 }
 
@@ -118,10 +121,15 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	}
 	key = keyWithPrefix(s.pathPrefix, key)
 
+	opts, err := s.ttlOpts(ctx, int64(ttl))
+	if err != nil {
+		return err
+	}
+
 	txnResp, err := s.client.KV.Txn(ctx).If(
 		notFound(key),
 	).Then(
-		clientv3.OpPut(key, string(data)),
+		clientv3.OpPut(key, string(data), opts...),
 	).Commit()
 	if err != nil {
 		return err
@@ -183,7 +191,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 			return err
 		}
 		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModifiedRevision(key), "=", origState.rev),
+			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
 			clientv3.OpDelete(key),
 		).Else(
@@ -222,7 +230,7 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 			return err
 		}
 
-		ret, err := s.updateState(origState, tryUpdate)
+		ret, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
 			return err
 		}
@@ -235,10 +243,15 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
 		}
 
+		opts, err := s.ttlOpts(ctx, int64(ttl))
+		if err != nil {
+			return err
+		}
+
 		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModifiedRevision(key), "=", origState.rev),
+			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
-			clientv3.OpPut(key, string(data)),
+			clientv3.OpPut(key, string(data), opts...),
 		).Else(
 			clientv3.OpGet(key),
 		).Commit()
@@ -315,12 +328,21 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, filter st
 
 // Watch implements storage.Interface.Watch.
 func (s *store) Watch(ctx context.Context, key string, resourceVersion string, filter storage.FilterFunc) (watch.Interface, error) {
-	panic("TODO: unimplemented")
+	return s.watch(ctx, key, resourceVersion, filter, false)
 }
 
 // WatchList implements storage.Interface.WatchList.
 func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, filter storage.FilterFunc) (watch.Interface, error) {
-	panic("TODO: unimplemented")
+	return s.watch(ctx, key, resourceVersion, filter, true)
+}
+
+func (s *store) watch(ctx context.Context, key string, rv string, filter storage.FilterFunc, recursive bool) (watch.Interface, error) {
+	rev, err := storage.ParseWatchResourceVersion(rv)
+	if err != nil {
+		return nil, err
+	}
+	key = keyWithPrefix(s.pathPrefix, key)
+	return s.watcher.Watch(ctx, key, int64(rev), recursive, filter)
 }
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
@@ -346,19 +368,39 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 	return state, nil
 }
 
-func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, error) {
-	ret, _, err := userUpdate(st.obj, *st.meta)
+func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, uint64, error) {
+	ret, ttlPtr, err := userUpdate(st.obj, *st.meta)
+
 	version, err := s.versioner.ObjectResourceVersion(ret)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if version != 0 {
 		// We cannot store object with resourceVersion in etcd. We need to reset it.
-		if err := s.versioner.UpdateObject(ret, nil, 0); err != nil {
-			return nil, fmt.Errorf("UpdateObject failed: %v", err)
+		if err := s.versioner.UpdateObject(ret, 0); err != nil {
+			return nil, 0, fmt.Errorf("UpdateObject failed: %v", err)
 		}
 	}
-	return ret, nil
+	var ttl uint64
+	if ttlPtr != nil {
+		ttl = *ttlPtr
+	}
+	return ret, ttl, nil
+}
+
+// ttlOpts returns client options based on given ttl.
+// ttl: if ttl is non-zero, it will attach the key to a lease with ttl of roughly the same length
+func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, error) {
+	if ttl == 0 {
+		return nil, nil
+	}
+	// TODO: one lease per ttl key is expensive. Based on current use case, we can have a long window to
+	// put keys within into same lease. We shall benchmark this and optimize the performance.
+	lcr, err := s.client.Lease.Grant(ctx, ttl)
+	if err != nil {
+		return nil, err
+	}
+	return []clientv3.OpOption{clientv3.WithLease(clientv3.LeaseID(lcr.ID))}, nil
 }
 
 func keyWithPrefix(prefix, key string) string {
@@ -379,7 +421,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 		return err
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	versioner.UpdateObject(objPtr, nil, uint64(rev))
+	versioner.UpdateObject(objPtr, uint64(rev))
 	return nil
 }
 
@@ -396,7 +438,7 @@ func decodeList(elems []*elemForDecode, filter storage.FilterFunc, ListPtr inter
 			return err
 		}
 		// being unable to set the version does not prevent the object from being extracted
-		versioner.UpdateObject(obj, nil, elem.rev)
+		versioner.UpdateObject(obj, elem.rev)
 		if filter(obj) {
 			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 		}
@@ -420,5 +462,5 @@ func checkPreconditions(key string, preconditions *storage.Preconditions, out ru
 }
 
 func notFound(key string) clientv3.Cmp {
-	return clientv3.Compare(clientv3.ModifiedRevision(key), "=", 0)
+	return clientv3.Compare(clientv3.ModRevision(key), "=", 0)
 }

@@ -136,6 +136,11 @@ KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
 CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
+IMAGE_NGINX="gcr.io/google-containers/nginx:1.7.9"
+IMAGE_DEPLOYMENT_R1="gcr.io/google-containers/nginx:test-cmd"  # deployment-revision1.yaml
+IMAGE_DEPLOYMENT_R2="$IMAGE_NGINX"  # deployment-revision2.yaml
+IMAGE_PERL="gcr.io/google-containers/perl"
+
 # ensure ~/.kube/config isn't loaded by tests
 HOME="${KUBE_TEMP}"
 
@@ -236,7 +241,6 @@ runTests() {
     kube_flags=(
       -s "http://127.0.0.1:${API_PORT}"
       --match-server-version
-      --api-version="${version}"
     )
     [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
   fi
@@ -359,6 +363,15 @@ runTests() {
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ### Delete POD valid-pod by id with --now
+  # Pre-condition: valid-pod POD exists
+  kubectl create "${kube_flags[@]}" -f docs/admin/limitrange/valid-pod.yaml
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  # Command
+  kubectl delete pod valid-pod "${kube_flags[@]}" --now
+  # Post-condition: valid-pod POD doesn't exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
   ### Create POD valid-pod from dumped YAML
   # Pre-condition: no POD exists
   create_and_use_new_namespace
@@ -426,6 +439,46 @@ runTests() {
   # Post-condition: no POD exists
   kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{$id_field}}:{{end}}' ''
 
+  # Detailed tests for describe pod output
+    ### Create a new namespace
+  # Pre-condition: the test-secrets namespace does not exist
+  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-kubectl-describe-pod\" }}found{{end}}{{end}}:' ':'
+  # Command
+  kubectl create namespace test-kubectl-describe-pod
+  # Post-condition: namespace 'test-secrets' is created.
+  kube::test::get_object_assert 'namespaces/test-kubectl-describe-pod' "{{$id_field}}" 'test-kubectl-describe-pod'
+
+  ### Create a generic secret
+  # Pre-condition: no SECRET exists
+  kube::test::get_object_assert 'secrets --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create secret generic test-secret --from-literal=key-1=value1 --type=test-type --namespace=test-kubectl-describe-pod
+  # Post-condition: secret exists and has expected values
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-kubectl-describe-pod' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-kubectl-describe-pod' "{{$secret_type}}" 'test-type'
+
+  ### Create a generic configmap
+  # Pre-condition: no CONFIGMAP exists
+  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create configmap test-configmap --from-literal=key-2=value2 --namespace=test-kubectl-describe-pod
+  # Post-condition: configmap exists and has expected values
+  kube::test::get_object_assert 'configmap/test-configmap --namespace=test-kubectl-describe-pod' "{{$id_field}}" 'test-configmap'
+
+  # Create a pod that consumes secret, configmap, and downward API keys as envs
+  kube::test::get_object_assert 'pods --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
+  kubectl create -f hack/testdata/pod-with-api-env.yaml --namespace=test-kubectl-describe-pod
+
+  kube::test::describe_object_assert 'pods --namespace=test-kubectl-describe-pod' 'env-test-pod' "TEST_CMD_1" "<set to the key 'key-1' in secret 'test-secret'>" "TEST_CMD_2" "<set to the key 'key-2' of config map 'test-configmap'>" "TEST_CMD_3" "env-test-pod (v1:metadata.name)"
+  # Describe command (resource only) should print detailed information about environment variables
+  kube::test::describe_resource_assert 'pods --namespace=test-kubectl-describe-pod' "TEST_CMD_1" "<set to the key 'key-1' in secret 'test-secret'>" "TEST_CMD_2" "<set to the key 'key-2' of config map 'test-configmap'>" "TEST_CMD_3" "env-test-pod (v1:metadata.name)"
+
+  # Clean-up
+  kubectl delete pod env-test-pod --namespace=test-kubectl-describe-pod
+  kubectl delete secret test-secret --namespace=test-kubectl-describe-pod
+  kubectl delete configmap test-configmap --namespace=test-kubectl-describe-pod
+  kubectl delete namespace test-kubectl-describe-pod
+
   ### Create two PODs
   # Pre-condition: no POD exists
   create_and_use_new_namespace
@@ -468,6 +521,30 @@ runTests() {
   kubectl delete pods -lnew-name=new-valid-pod --grace-period=0 "${kube_flags[@]}"
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ### Create pod-with-precision POD
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f hack/testdata/pod-with-precision.json "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'pod-with-precision:'
+  
+  ## Patch preserves precision
+  # Command
+  kubectl patch "${kube_flags[@]}" pod pod-with-precision -p='{"metadata":{"annotations":{"patchkey": "patchvalue"}}}'
+  # Post-condition: pod-with-precision POD has patched annotation
+  kube::test::get_object_assert 'pod pod-with-precision' "{{${annotations_field}.patchkey}}" 'patchvalue'
+  # Command
+  kubectl label pods pod-with-precision labelkey=labelvalue "${kube_flags[@]}"
+  # Post-condition: pod-with-precision POD has label
+  kube::test::get_object_assert 'pod pod-with-precision' "{{${labels_field}.labelkey}}" 'labelvalue'
+  # Command
+  kubectl annotate pods pod-with-precision annotatekey=annotatevalue "${kube_flags[@]}"
+  # Post-condition: pod-with-precision POD has annotation
+  kube::test::get_object_assert 'pod pod-with-precision' "{{${annotations_field}.annotatekey}}" 'annotatevalue'
+  # Cleanup
+  kubectl delete pod pod-with-precision "${kube_flags[@]}" 
 
   ### Create valid-pod POD
   # Pre-condition: no POD exists
@@ -708,7 +785,7 @@ __EOF__
   # Pre-Condition: no RC exists
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: create the rc "nginx" with image nginx
-  kubectl run nginx --image=nginx --save-config --generator=run/v1 "${kube_flags[@]}"
+  kubectl run nginx "--image=$IMAGE_NGINX" --save-config --generator=run/v1 "${kube_flags[@]}"
   # Post-Condition: rc "nginx" has configuration annotation
   [[ "$(kubectl get rc nginx -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   ## 5. kubectl expose --save-config should generate configuration annotation
@@ -729,7 +806,7 @@ __EOF__
   kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
   [[ "$(kubectl get hpa.v1beta1.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
-  # Ensure we can interact with HPA objects in lists through both the extensions/v1beta1 and autoscaling/v1 APIs  
+  # Ensure we can interact with HPA objects in lists through both the extensions/v1beta1 and autoscaling/v1 APIs
   output_message=$(kubectl get hpa -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get hpa.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
@@ -757,13 +834,13 @@ __EOF__
   # Pre-Condition: no Job exists
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run pi --generator=job/v1beta1 --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  kubectl run pi --generator=job/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: Job "pi" is created
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
   kubectl delete jobs pi "${kube_flags[@]}"
   # Command
-  kubectl run pi --generator=job/v1 --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: Job "pi" is created
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
@@ -773,7 +850,7 @@ __EOF__
   # Pre-Condition: no Deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run nginx --image=nginx --generator=deployment/v1beta1 "${kube_flags[@]}"
+  kubectl run nginx "--image=$IMAGE_NGINX" --generator=deployment/v1beta1 "${kube_flags[@]}"
   # Post-Condition: Deployment "nginx" is created
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
   # Clean up
@@ -1267,26 +1344,26 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   # Create a deployment (revision 1)
-  kubectl create -f docs/user-guide/deployment.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/deployment-revision1.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
-  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to revision 1 - should be no-op
   kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
-  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Update the deployment (revision 2)
   kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
+  kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1
   kubectl rollout undo deployment nginx-deployment --to-revision=1 "${kube_flags[@]}"
   sleep 1
-  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to revision 1000000 - should be no-op
   kubectl rollout undo deployment nginx-deployment --to-revision=1000000 "${kube_flags[@]}"
-  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to last revision
   kubectl rollout undo deployment nginx-deployment "${kube_flags[@]}"
   sleep 1
-  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" 'nginx:latest:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Pause the deployment
   kubectl-with-retry rollout pause deployment nginx-deployment "${kube_flags[@]}"
   # A paused deployment cannot be rolled back
@@ -1645,9 +1722,9 @@ __EOF__
   #####################
 
   kube::log::status "Testing resource aliasing"
-  kubectl create -f examples/cassandra/cassandra.yaml "${kube_flags[@]}"
+  kubectl create -f examples/cassandra/cassandra-controller.yaml "${kube_flags[@]}"
   kubectl create -f examples/cassandra/cassandra-service.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert "all -l'app=cassandra'" "{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}" 'cassandra:cassandra:'
+  kube::test::get_object_assert "all -l'app=cassandra'" "{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}" 'cassandra:cassandra:cassandra:cassandra:'
   kubectl delete all -l app=cassandra "${kube_flags[@]}"
 
 
@@ -1715,12 +1792,6 @@ __EOF__
   kube::test::clear_all
 }
 
-kube_api_versions=(
-  ""
-  v1
-)
-for version in "${kube_api_versions[@]}"; do
-  KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" runTests "${version}"
-done
+KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" runTests "v1"
 
 kube::log::status "TEST PASSED"

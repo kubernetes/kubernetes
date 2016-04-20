@@ -1,7 +1,7 @@
 # GCE Load-Balancer Controller (GLBC) Cluster Addon
 
 This cluster addon is composed of:
-* A [Google L7 LoadBalancer Controller](https://github.com/kubernetes/contrib/tree/master/Ingress/controllers/gce)
+* A [Google L7 LoadBalancer Controller](https://github.com/kubernetes/contrib/tree/master/ingress/controllers/gce)
 * A [404 default backend](https://github.com/kubernetes/contrib/tree/master/404-server) Service + RC
 
 It relies on the [Ingress resource](../../../../docs/user-guide/ingress.md) only available in Kubernetes version 1.1 and beyond.

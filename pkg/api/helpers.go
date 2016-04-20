@@ -152,6 +152,7 @@ var standardQuotaResources = sets.NewString(
 	string(ResourceSecrets),
 	string(ResourcePersistentVolumeClaims),
 	string(ResourceConfigMaps),
+	string(ResourceServicesNodePorts),
 )
 
 // IsStandardQuotaResourceName returns true if the resource is known to
@@ -190,6 +191,7 @@ var integerResources = sets.NewString(
 	string(ResourceSecrets),
 	string(ResourceConfigMaps),
 	string(ResourcePersistentVolumeClaims),
+	string(ResourceServicesNodePorts),
 )
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
@@ -234,6 +236,14 @@ var standardFinalizers = sets.NewString(
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
+}
+
+// SingleObject returns a ListOptions for watching a single object.
+func SingleObject(meta ObjectMeta) ListOptions {
+	return ListOptions{
+		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name),
+		ResourceVersion: meta.ResourceVersion,
+	}
 }
 
 // AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,

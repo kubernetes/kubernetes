@@ -29,6 +29,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -53,48 +54,48 @@ const (
 )
 
 func resizeGroup(size int) error {
-	if testContext.ReportDir != "" {
-		CoreDump(testContext.ReportDir)
-		defer CoreDump(testContext.ReportDir)
+	if framework.TestContext.ReportDir != "" {
+		framework.CoreDump(framework.TestContext.ReportDir)
+		defer framework.CoreDump(framework.TestContext.ReportDir)
 	}
-	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
 		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "resize",
-			testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--size=%v", size),
-			"--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone).CombinedOutput()
+			framework.TestContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--size=%v", size),
+			"--project="+framework.TestContext.CloudConfig.ProjectID, "--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
-			Logf("Failed to resize node instance group: %v", string(output))
+			framework.Logf("Failed to resize node instance group: %v", string(output))
 		}
 		return err
-	} else if testContext.Provider == "aws" {
+	} else if framework.TestContext.Provider == "aws" {
 		client := autoscaling.New(session.New())
-		return awscloud.ResizeInstanceGroup(client, testContext.CloudConfig.NodeInstanceGroup, size)
+		return awscloud.ResizeInstanceGroup(client, framework.TestContext.CloudConfig.NodeInstanceGroup, size)
 	} else {
 		return fmt.Errorf("Provider does not support InstanceGroups")
 	}
 }
 
 func groupSize() (int, error) {
-	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
 		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
-			"list-instances", testContext.CloudConfig.NodeInstanceGroup, "--project="+testContext.CloudConfig.ProjectID,
-			"--zone="+testContext.CloudConfig.Zone).CombinedOutput()
+			"list-instances", framework.TestContext.CloudConfig.NodeInstanceGroup, "--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
 			return -1, err
 		}
 		re := regexp.MustCompile("RUNNING")
 		return len(re.FindAllString(string(output), -1)), nil
-	} else if testContext.Provider == "aws" {
+	} else if framework.TestContext.Provider == "aws" {
 		client := autoscaling.New(session.New())
-		instanceGroup, err := awscloud.DescribeInstanceGroup(client, testContext.CloudConfig.NodeInstanceGroup)
+		instanceGroup, err := awscloud.DescribeInstanceGroup(client, framework.TestContext.CloudConfig.NodeInstanceGroup)
 		if err != nil {
 			return -1, fmt.Errorf("error describing instance group: %v", err)
 		}
 		if instanceGroup == nil {
-			return -1, fmt.Errorf("instance group not found: %s", testContext.CloudConfig.NodeInstanceGroup)
+			return -1, fmt.Errorf("instance group not found: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		}
 		return instanceGroup.CurrentSize()
 	} else {
@@ -107,14 +108,14 @@ func waitForGroupSize(size int) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		currentSize, err := groupSize()
 		if err != nil {
-			Logf("Failed to get node instance group size: %v", err)
+			framework.Logf("Failed to get node instance group size: %v", err)
 			continue
 		}
 		if currentSize != size {
-			Logf("Waiting for node instance group size %d, current size %d", size, currentSize)
+			framework.Logf("Waiting for node instance group size %d, current size %d", size, currentSize)
 			continue
 		}
-		Logf("Node instance group has reached the desired size %d", size)
+		framework.Logf("Node instance group has reached the desired size %d", size)
 		return nil
 	}
 	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
@@ -168,9 +169,9 @@ func podOnNode(podName, nodeName string, image string) *api.Pod {
 func newPodOnNode(c *client.Client, namespace, podName, nodeName string) error {
 	pod, err := c.Pods(namespace).Create(podOnNode(podName, nodeName, serveHostnameImage))
 	if err == nil {
-		Logf("Created pod %s on node %s", pod.ObjectMeta.Name, nodeName)
+		framework.Logf("Created pod %s on node %s", pod.ObjectMeta.Name, nodeName)
 	} else {
-		Logf("Failed to create pod %s on node %s: %v", podName, nodeName, err)
+		framework.Logf("Failed to create pod %s on node %s: %v", podName, nodeName, err)
 	}
 	return err
 }
@@ -239,23 +240,23 @@ func resizeRC(c *client.Client, ns, name string, replicas int) error {
 
 func getMaster(c *client.Client) string {
 	master := ""
-	switch testContext.Provider {
+	switch framework.TestContext.Provider {
 	case "gce":
 		eps, err := c.Endpoints(api.NamespaceDefault).Get("kubernetes")
 		if err != nil {
-			Failf("Fail to get kubernetes endpoinds: %v", err)
+			framework.Failf("Fail to get kubernetes endpoinds: %v", err)
 		}
 		if len(eps.Subsets) != 1 || len(eps.Subsets[0].Addresses) != 1 {
-			Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
+			framework.Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
 		}
 		master = eps.Subsets[0].Addresses[0].IP
 	case "gke":
-		master = strings.TrimPrefix(testContext.Host, "https://")
+		master = strings.TrimPrefix(framework.TestContext.Host, "https://")
 	case "aws":
 		// TODO(justinsb): Avoid hardcoding this.
 		master = "172.20.0.9"
 	default:
-		Failf("This test is not supported for provider %s and should be disabled", testContext.Provider)
+		framework.Failf("This test is not supported for provider %s and should be disabled", framework.TestContext.Provider)
 	}
 	return master
 }
@@ -263,7 +264,7 @@ func getMaster(c *client.Client) string {
 // Return node external IP concatenated with port 22 for ssh
 // e.g. 1.2.3.4:22
 func getNodeExternalIP(node *api.Node) string {
-	Logf("Getting external IP address for %s", node.Name)
+	framework.Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == api.NodeExternalIP {
@@ -272,7 +273,7 @@ func getNodeExternalIP(node *api.Node) string {
 		}
 	}
 	if host == "" {
-		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
+		framework.Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host
 }
@@ -294,26 +295,26 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 		// had been inserted. (yes, we could look at the error code and ssh error
 		// separately, but I prefer to stay on the safe side).
 		By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
-		unblockNetwork(host, master)
+		framework.UnblockNetwork(host, master)
 	}()
 
-	Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !waitForNodeToBe(c, node.Name, api.NodeReady, true, resizeNodeReadyTimeout) {
-		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+	framework.Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
+	if !framework.WaitForNodeToBe(c, node.Name, api.NodeReady, true, resizeNodeReadyTimeout) {
+		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
-	blockNetwork(host, master)
+	framework.BlockNetwork(host, master)
 
-	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !waitForNodeToBe(c, node.Name, api.NodeReady, false, resizeNodeNotReadyTimeout) {
-		Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
+	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
+	if !framework.WaitForNodeToBe(c, node.Name, api.NodeReady, false, resizeNodeNotReadyTimeout) {
+		framework.Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
 	}
 
-	Logf("Waiting for pod %s to be removed", podNameToDisappear)
-	err := waitForRCPodToDisappear(c, ns, rcName, podNameToDisappear)
+	framework.Logf("Waiting for pod %s to be removed", podNameToDisappear)
+	err := framework.WaitForRCPodToDisappear(c, ns, rcName, podNameToDisappear)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("verifying whether the pod from the unreachable node is recreated")
-	err = verifyPods(c, ns, rcName, true, replicas)
+	err = framework.VerifyPods(c, ns, rcName, true, replicas)
 	Expect(err).NotTo(HaveOccurred())
 
 	// network traffic is unblocked in a deferred function
@@ -326,41 +327,41 @@ func expectNodeReadiness(isReady bool, newNode chan *api.Node) {
 	for !expected && !timeout {
 		select {
 		case n := <-newNode:
-			if isNodeConditionSetAsExpected(n, api.NodeReady, isReady) {
+			if framework.IsNodeConditionSetAsExpected(n, api.NodeReady, isReady) {
 				expected = true
 			} else {
-				Logf("Observed node ready status is NOT %v as expected", isReady)
+				framework.Logf("Observed node ready status is NOT %v as expected", isReady)
 			}
 		case <-timer:
 			timeout = true
 		}
 	}
 	if !expected {
-		Failf("Failed to observe node ready status change to %v", isReady)
+		framework.Failf("Failed to observe node ready status change to %v", isReady)
 	}
 }
 
-var _ = KubeDescribe("Nodes [Disruptive]", func() {
-	framework := NewDefaultFramework("resize-nodes")
+var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
+	f := framework.NewDefaultFramework("resize-nodes")
 	var systemPodsNo int
 	var c *client.Client
 	var ns string
 	BeforeEach(func() {
-		c = framework.Client
-		ns = framework.Namespace.Name
+		c = f.Client
+		ns = f.Namespace.Name
 		systemPods, err := c.Pods(api.NamespaceSystem).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = len(systemPods.Items)
 	})
 
 	// Slow issue #13323 (8 min)
-	KubeDescribe("Resize [Slow]", func() {
+	framework.KubeDescribe("Resize [Slow]", func() {
 		var skipped bool
 
 		BeforeEach(func() {
 			skipped = true
-			SkipUnlessProviderIs("gce", "gke", "aws")
-			SkipUnlessNodeCountIsAtLeast(2)
+			framework.SkipUnlessProviderIs("gce", "gke", "aws")
+			framework.SkipUnlessNodeCountIsAtLeast(2)
 			skipped = false
 		})
 
@@ -370,32 +371,32 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 			}
 
 			By("restoring the original node instance group size")
-			if err := resizeGroup(testContext.CloudConfig.NumNodes); err != nil {
-				Failf("Couldn't restore the original node instance group size: %v", err)
+			if err := resizeGroup(framework.TestContext.CloudConfig.NumNodes); err != nil {
+				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
 			// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.
 			// Most tests make use of some proxy feature to verify functionality. So, if a reboot test runs
 			// right before a test that tries to get logs, for example, we may get unlucky and try to use a
-			// closed tunnel to a node that was recently rebooted. There's no good way to poll for proxies
+			// closed tunnel to a node that was recently rebooted. There's no good way to framework.Poll for proxies
 			// being closed, so we sleep.
 			//
 			// TODO(cjcullen) reduce this sleep (#19314)
-			if providerIs("gke") {
+			if framework.ProviderIs("gke") {
 				By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
-			if err := waitForGroupSize(testContext.CloudConfig.NumNodes); err != nil {
-				Failf("Couldn't restore the original node instance group size: %v", err)
+			if err := waitForGroupSize(framework.TestContext.CloudConfig.NumNodes); err != nil {
+				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
-			if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
-				Failf("Couldn't restore the original cluster size: %v", err)
+			if err := framework.WaitForClusterSize(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
+				framework.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
 			By("waiting for system pods to successfully restart")
 
-			err := waitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, podReadyBeforeTimeout)
+			err := framework.WaitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -403,9 +404,9 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
-			replicas := testContext.CloudConfig.NumNodes
+			replicas := framework.TestContext.CloudConfig.NumNodes
 			newRCByName(c, ns, name, replicas)
-			err := verifyPods(c, ns, name, true, replicas)
+			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("decreasing cluster size to %d", replicas-1))
@@ -413,11 +414,11 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas - 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas-1, 10*time.Minute)
+			err = framework.WaitForClusterSize(c, replicas-1, 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying whether the pods from the removed node are recreated")
-			err = verifyPods(c, ns, name, true, replicas)
+			err = framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -427,9 +428,9 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
 			newSVCByName(c, ns, name)
-			replicas := testContext.CloudConfig.NumNodes
+			replicas := framework.TestContext.CloudConfig.NumNodes
 			newRCByName(c, ns, name, replicas)
-			err := verifyPods(c, ns, name, true, replicas)
+			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing cluster size to %d", replicas+1))
@@ -437,22 +438,22 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas + 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas+1, 10*time.Minute)
+			err = framework.WaitForClusterSize(c, replicas+1, 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))
 			err = resizeRC(c, ns, name, replicas+1)
 			Expect(err).NotTo(HaveOccurred())
-			err = verifyPods(c, ns, name, true, replicas+1)
+			err = framework.VerifyPods(c, ns, name, true, replicas+1)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
-	KubeDescribe("Network", func() {
+	framework.KubeDescribe("Network", func() {
 		Context("when a node becomes unreachable", func() {
 			BeforeEach(func() {
-				SkipUnlessProviderIs("gce", "gke", "aws")
-				SkipUnlessNodeCountIsAtLeast(2)
+				framework.SkipUnlessProviderIs("gce", "gke", "aws")
+				framework.SkipUnlessNodeCountIsAtLeast(2)
 			})
 
 			// TODO marekbiskup 2015-06-19 #10085
@@ -468,9 +469,9 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 				// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 				name := "my-hostname-net"
 				newSVCByName(c, ns, name)
-				replicas := testContext.CloudConfig.NumNodes
+				replicas := framework.TestContext.CloudConfig.NumNodes
 				newRCByName(c, ns, name, replicas)
-				err := verifyPods(c, ns, name, true, replicas)
+				err := framework.VerifyPods(c, ns, name, true, replicas)
 				Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
 				By("choose a node with at least one pod - we will block some network traffic on this node")
@@ -485,9 +486,9 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 
 				By(fmt.Sprintf("block network traffic from node %s", node.Name))
 				performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
-				Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
-				if !waitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
-					Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+				framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+				if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+					framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 				}
 
 				// sleep a bit, to allow Watch in NodeController to catch up.
@@ -499,7 +500,7 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 				additionalPod := "additionalpod"
 				err = newPodOnNode(c, ns, additionalPod, node.Name)
 				Expect(err).NotTo(HaveOccurred())
-				err = verifyPods(c, ns, additionalPod, true, 1)
+				err = framework.VerifyPods(c, ns, additionalPod, true, 1)
 				Expect(err).NotTo(HaveOccurred())
 
 				// verify that it is really on the requested node
@@ -507,7 +508,7 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 					pod, err := c.Pods(ns).Get(additionalPod)
 					Expect(err).NotTo(HaveOccurred())
 					if pod.Spec.NodeName != node.Name {
-						Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
+						framework.Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
 					}
 				}
 			})
@@ -525,8 +526,8 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 				nodeOpts := api.ListOptions{}
 				nodes, err := c.Nodes().List(nodeOpts)
 				Expect(err).NotTo(HaveOccurred())
-				filterNodes(nodes, func(node api.Node) bool {
-					if !isNodeConditionSetAsExpected(&node, api.NodeReady, true) {
+				framework.FilterNodes(nodes, func(node api.Node) bool {
+					if !framework.IsNodeConditionSetAsExpected(&node, api.NodeReady, true) {
 						return false
 					}
 					podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
@@ -537,12 +538,12 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 					return true
 				})
 				if len(nodes.Items) <= 0 {
-					Failf("No eligible node were found: %d", len(nodes.Items))
+					framework.Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
 				podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
-				if err = waitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, podRunningReady); err != nil {
-					Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
+				if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, framework.PodRunningReady); err != nil {
+					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}
 
 				By("Set up watch on node status")
@@ -554,11 +555,11 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 					&cache.ListWatch{
 						ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 							options.FieldSelector = nodeSelector
-							return framework.Client.Nodes().List(options)
+							return f.Client.Nodes().List(options)
 						},
 						WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 							options.FieldSelector = nodeSelector
-							return framework.Client.Nodes().Watch(options)
+							return f.Client.Nodes().Watch(options)
 						},
 					},
 					&api.Node{},
@@ -585,7 +586,7 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 				master := getMaster(c)
 				defer func() {
 					By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
-					unblockNetwork(host, master)
+					framework.UnblockNetwork(host, master)
 
 					if CurrentGinkgoTestDescription().Failed {
 						return
@@ -593,17 +594,17 @@ var _ = KubeDescribe("Nodes [Disruptive]", func() {
 
 					By("Expect to observe node and pod status change from NotReady to Ready after network connectivity recovers")
 					expectNodeReadiness(true, newNode)
-					if err = waitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, podRunningReady); err != nil {
-						Failf("Pods on node %s did not become ready and running within %v: %v", node.Name, podReadyTimeout, err)
+					if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, framework.PodRunningReady); err != nil {
+						framework.Failf("Pods on node %s did not become ready and running within %v: %v", node.Name, podReadyTimeout, err)
 					}
 				}()
 
-				blockNetwork(host, master)
+				framework.BlockNetwork(host, master)
 
 				By("Expect to observe node and pod status change from Ready to NotReady after network partition")
 				expectNodeReadiness(false, newNode)
-				if err = waitForMatchPodsCondition(c, podOpts, "NotReady", podNotReadyTimeout, podNotReady); err != nil {
-					Failf("Pods on node %s did not become NotReady within %v: %v", node.Name, podNotReadyTimeout, err)
+				if err = framework.WaitForMatchPodsCondition(c, podOpts, "NotReady", podNotReadyTimeout, framework.PodNotReady); err != nil {
+					framework.Failf("Pods on node %s did not become NotReady within %v: %v", node.Name, podNotReadyTimeout, err)
 				}
 			})
 		})

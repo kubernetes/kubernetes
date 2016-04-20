@@ -128,7 +128,8 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 		}
 		errors = expvalidation.ValidateDaemonSet(t)
 	default:
-		return field.ErrorList{field.InternalError(field.NewPath(""), fmt.Errorf("no validation defined for %#v", obj))}
+		errors = field.ErrorList{}
+		errors = append(errors, field.InternalError(field.NewPath(""), fmt.Errorf("no validation defined for %#v", obj)))
 	}
 	return errors
 }
@@ -261,7 +262,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"cassandra-daemonset":  &extensions.DaemonSet{},
 			"cassandra-controller": &api.ReplicationController{},
 			"cassandra-service":    &api.Service{},
-			"cassandra":            &api.Pod{},
 		},
 		"../examples/celery-rabbitmq": {
 			"celery-controller":   &api.ReplicationController{},
@@ -372,6 +372,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"secret-env-pod": &api.Pod{},
 		},
 		"../examples/spark": {
+			"namespace-spark-cluster": &api.Namespace{},
 			"spark-master-controller": &api.ReplicationController{},
 			"spark-master-service":    &api.Service{},
 			"spark-webui":             &api.Service{},

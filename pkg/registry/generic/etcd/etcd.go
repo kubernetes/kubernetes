@@ -274,7 +274,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		// function, we are resetting resourceVersion to the initial value here.
 		//
 		// TODO: In fact, we should probably return a DeepCopy of obj in all places.
-		err := e.Storage.Versioner().UpdateObject(obj, nil, resourceVersion)
+		err := e.Storage.Versioner().UpdateObject(obj, resourceVersion)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -301,7 +301,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		creating = false
 		if doUnconditionalUpdate {
 			// Update the object's resource version to match the latest etcd object's resource version.
-			err = e.Storage.Versioner().UpdateObject(obj, res.Expiration, res.ResourceVersion)
+			err = e.Storage.Versioner().UpdateObject(obj, res.ResourceVersion)
 			if err != nil {
 				return nil, nil, err
 			}

@@ -122,7 +122,7 @@ func main() {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
 			go func(host string) {
-				results <- testHost(host, archive)
+				results <- testHost(host, archive, *cleanup)
 			}(host)
 		}
 	}
@@ -150,8 +150,8 @@ func main() {
 }
 
 // Run tests in archive against host
-func testHost(host, archive string) *TestResult {
-	output, err := e2e_node.RunRemote(archive, host, *cleanup)
+func testHost(host, archive string, deleteFiles bool) *TestResult {
+	output, err := e2e_node.RunRemote(archive, host, deleteFiles)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -171,7 +171,7 @@ func testImage(image, archive string) *TestResult {
 			err: fmt.Errorf("Unable to create gce instance with running docker daemon for image %s.  %v", image, err),
 		}
 	}
-	return testHost(host, archive)
+	return testHost(host, archive, false)
 }
 
 // Provision a gce instance using image

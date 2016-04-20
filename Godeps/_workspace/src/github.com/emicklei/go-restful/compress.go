@@ -5,10 +5,12 @@ package restful
 // that can be found in the LICENSE file.
 
 import (
+	"bufio"
 	"compress/gzip"
 	"compress/zlib"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -67,6 +69,17 @@ func (c *CompressingResponseWriter) Close() error {
 
 func (c *CompressingResponseWriter) isCompressorClosed() bool {
 	return nil == c.compressor
+}
+
+// Hijack implements the Hijacker interface
+// This is especially useful when combining Container.EnabledContentEncoding
+// in combination with websockets (for instance gorilla/websocket)
+func (c *CompressingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := c.writer.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("ResponseWriter doesn't support Hijacker interface")
+	}
+	return hijacker.Hijack()
 }
 
 // WantsCompressedResponse reads the Accept-Encoding header to see if and which encoding is requested.

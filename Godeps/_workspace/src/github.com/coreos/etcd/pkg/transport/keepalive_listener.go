@@ -30,17 +30,12 @@ type keepAliveConn interface {
 // Be careful when wrap around KeepAliveListener with another Listener if TLSInfo is not nil.
 // Some pkgs (like go/http) might expect Listener to return TLSConn type to start TLS handshake.
 // http://tldp.org/HOWTO/TCP-Keepalive-HOWTO/overview.html
-func NewKeepAliveListener(l net.Listener, scheme string, info TLSInfo) (net.Listener, error) {
+func NewKeepAliveListener(l net.Listener, scheme string, tlscfg *tls.Config) (net.Listener, error) {
 	if scheme == "https" {
-		if info.Empty() {
+		if tlscfg == nil {
 			return nil, fmt.Errorf("cannot listen on TLS for given listener: KeyFile and CertFile are not presented")
 		}
-		cfg, err := info.ServerConfig()
-		if err != nil {
-			return nil, err
-		}
-
-		return newTLSKeepaliveListener(l, cfg), nil
+		return newTLSKeepaliveListener(l, tlscfg), nil
 	}
 
 	return &keepaliveListener{

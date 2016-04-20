@@ -5805,12 +5805,8 @@ func autoConvert_v1_RangeAllocation_To_api_RangeAllocation(in *RangeAllocation, 
 		return err
 	}
 	out.Range = in.Range
-	if in.Data != nil {
-		in, out := &in.Data, &out.Data
-		*out = make([]byte, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Data = nil
+	if err := conversion.Convert_Slice_byte_To_Slice_byte(&in.Data, &out.Data, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -5830,12 +5826,8 @@ func autoConvert_api_RangeAllocation_To_v1_RangeAllocation(in *api.RangeAllocati
 		return err
 	}
 	out.Range = in.Range
-	if in.Data != nil {
-		in, out := &in.Data, &out.Data
-		*out = make([]byte, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Data = nil
+	if err := conversion.Convert_Slice_byte_To_Slice_byte(&in.Data, &out.Data, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -6285,8 +6277,7 @@ func autoConvert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversi
 		*out = make(map[string][]byte, len(*in))
 		for key, val := range *in {
 			newVal := new([]byte)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
+			if err := conversion.Convert_Slice_byte_To_Slice_byte(&val, newVal, s); err != nil {
 				return err
 			}
 			(*out)[key] = *newVal
@@ -6317,8 +6308,7 @@ func autoConvert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversi
 		*out = make(map[string][]byte, len(*in))
 		for key, val := range *in {
 			newVal := new([]byte)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
+			if err := conversion.Convert_Slice_byte_To_Slice_byte(&val, newVal, s); err != nil {
 				return err
 			}
 			(*out)[key] = *newVal

@@ -152,10 +152,7 @@ func (l *raftLog) nextEnts() (ents []pb.Entry) {
 // is a fast check without heavy raftLog.slice() in raftLog.nextEnts().
 func (l *raftLog) hasNextEnts() bool {
 	off := max(l.applied+1, l.firstIndex())
-	if l.committed+1 > off {
-		return true
-	}
-	return false
+	return l.committed+1 > off
 }
 
 func (l *raftLog) snapshot() (pb.Snapshot, error) {

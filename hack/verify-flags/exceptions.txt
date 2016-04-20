@@ -33,6 +33,7 @@ cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = add
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
@@ -79,7 +80,7 @@ pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
 test/e2e/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
 test/e2e/downwardapi_volume.go:			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
-test/e2e/es_cluster_logging.go:		Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
+test/e2e/es_cluster_logging.go:		framework.Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
 test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
 test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
 test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),

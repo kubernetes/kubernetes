@@ -512,7 +512,11 @@ type FlexVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". The default filesystem depends on FlexVolume script.
 	FSType string `json:"fsType,omitempty"`
-	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// Optional: SecretRef is reference to the secret object containing
+	// sensitive information to pass to the plugin scripts. This may be
+	// empty if no secret object is specified. If the secret object
+	// contains more than one secret, all secrets are passed to the plugin
+	// scripts.
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -1671,8 +1675,14 @@ type NodeSpec struct {
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
 type DaemonEndpoint struct {
+	/*
+		The port tag was not properly in quotes in earlier releases, so it must be
+		uppercased for backwards compat (since it was falling back to var name of
+		'Port').
+	*/
+
 	// Port number of the given endpoint.
-	Port int `json:port`
+	Port int `json:"Port"`
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.
@@ -1718,7 +1728,7 @@ type NodeStatus struct {
 	// Set of ids/uuids to uniquely identify the node.
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 	// List of container images on this node
-	Images []ContainerImage `json:"images",omitempty`
+	Images []ContainerImage `json:"images,omitempty"`
 }
 
 // Describe a container image
@@ -2204,6 +2214,8 @@ const (
 	ResourceConfigMaps ResourceName = "configmaps"
 	// ResourcePersistentVolumeClaims, number
 	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
+	// ResourceServicesNodePorts, number
+	ResourceServicesNodePorts ResourceName = "services.nodeports"
 	// CPU request, in cores. (500m = .5 cores)
 	ResourceRequestsCPU ResourceName = "requests.cpu"
 	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)

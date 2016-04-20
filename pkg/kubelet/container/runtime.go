@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -55,8 +55,10 @@ type Runtime interface {
 
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
-	// APIVersion returns the API version information of the container
-	// runtime. This may be different from the runtime engine's version.
+
+	// APIVersion returns the cached API version information of the container
+	// runtime. Implementation is expected to update this cache periodically.
+	// This may be different from the runtime engine's version.
 	// TODO(random-liu): We should fold this into Version()
 	APIVersion() (Version, error)
 	// Status returns error if the runtime is unhealthy; nil otherwise.
@@ -68,7 +70,7 @@ type Runtime interface {
 	// GarbageCollect removes dead containers using the specified container gc policy
 	GarbageCollect(gcPolicy ContainerGCPolicy) error
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) PodSyncResult
+	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	KillPod(pod *api.Pod, runningPod Pod) error

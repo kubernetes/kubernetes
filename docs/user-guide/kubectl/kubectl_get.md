@@ -107,6 +107,7 @@ kubectl get rc/web service/frontend pods/web-pod-13je7
 
 ```
       --alsologtostderr[=false]: log to standard error as well as files
+      --as="": Username to impersonate for the operation.
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client certificate file for TLS.
       --client-key="": Path to a client key file for TLS.

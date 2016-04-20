@@ -65,6 +65,7 @@ conntrack-tcp-timeout-established
 contain-pod-resources
 container-port
 container-runtime
+controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota
 cpu-percent
@@ -81,6 +82,7 @@ deleting-pods-burst
 deleting-pods-qps
 deployment-controller-sync-period
 deployment-label-key
+deserialization-cache-size
 dest-file
 disable-filter
 docker-email

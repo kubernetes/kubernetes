@@ -21,33 +21,17 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-function check_dirty_workspace() {
-    if [[ "${JENKINS_TOLERATE_DIRTY_WORKSPACE:-}" =~ ^[yY]$ ]]; then
-        echo "Tolerating dirty workspace (because JENKINS_TOLERATE_DIRTY_WORKSPACE)."
-    else
-        echo "Checking dirty workspace."
-        # .config and its children are created by the gcloud call that we use to
-        # get the GCE service account.
-        #
-        # console-log.txt is created by Jenkins, but is usually not flushed out
-        # this early in this script.
-        if [[ $(find . -not -path "./.config*" -not -name "console-log.txt" | wc -l) != 1 ]]; then
-            echo "${PWD} not empty, bailing!"
-            find .
-            exit 1
-        fi
-    fi
+function running_in_docker() {
+    grep -q docker /proc/self/cgroup
 }
 
 function fetch_output_tars() {
-    clean_binaries
     echo "Using binaries from _output."
     cp _output/release-tars/kubernetes*.tar.gz .
     unpack_binaries
 }
 
 function fetch_server_version_tars() {
-    clean_binaries
     local -r msg=$(gcloud ${CMD_GROUP:-} container get-server-config --project=${PROJECT} --zone=${ZONE} | grep defaultClusterVersion)
     # msg will look like "defaultClusterVersion: 1.0.1". Strip
     # everything up to, including ": "
@@ -59,7 +43,6 @@ function fetch_server_version_tars() {
 # Use a published version like "ci/latest" (default), "release/latest",
 # "release/latest-1", or "release/stable"
 function fetch_published_version_tars() {
-    clean_binaries
     local -r published_version="${1}"
     IFS='/' read -a varr <<< "${published_version}"
     bucket="${varr[0]}"
@@ -143,6 +126,43 @@ function get_latest_trusty_image() {
     rm -rf .gsutil &> /dev/null
 }
 
+function install_google_cloud_sdk_tarball() {
+    local -r tarball=$1
+    local -r install_dir=$2
+    mkdir -p "${install_dir}"
+    tar xzf "${tarball}" -C "${install_dir}"
+
+    export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+    "${install_dir}/google-cloud-sdk/install.sh" --disable-installation-options --bash-completion=false --path-update=false --usage-reporting=false
+    export PATH=${install_dir}/google-cloud-sdk/bin:${PATH}
+}
+
+### Pre Set Up ###
+if running_in_docker; then
+    curl -fsSL --retry 3 -o "${WORKSPACE}/google-cloud-sdk.tar.gz" 'https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.tar.gz'
+    install_google_cloud_sdk_tarball "${WORKSPACE}/google-cloud-sdk.tar.gz" /
+fi
+
+# Install gcloud from a custom path if provided. Used to test GKE with gcloud
+# at HEAD, release candidate.
+# TODO: figure out how to avoid installing the cloud sdk twice if run inside Docker.
+if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
+    # Retry the download a few times to mitigate transient server errors and
+    # race conditions where the bucket contents change under us as we download.
+    for n in $(seq 3); do
+        gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~ && break || sleep 1
+        # Delete any temporary files from the download so that we start from
+        # scratch when we retry.
+        rm -rf ~/.gsutil
+    done
+    rm -rf ~/repo ~/cloudsdk
+    mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
+    export CLOUDSDK_COMPONENT_MANAGER_SNAPSHOT_URL=file://${HOME}/repo/components-2.json
+    install_google_cloud_sdk_tarball ~/repo/google-cloud-sdk.tar.gz ~/cloudsdk
+    # TODO: is this necessary? this won't work inside Docker currently.
+    export CLOUDSDK_CONFIG=/var/lib/jenkins/.config/gcloud
+fi
+
 # We get the image project and name for Trusty dynamically.
 if [[ "${JENKINS_USE_TRUSTY_IMAGES:-}" =~ ^[yY]$ ]]; then
   trusty_image_project="$(get_trusty_image_project)"
@@ -180,16 +200,17 @@ elif [[ "${KUBE_RUN_FROM_OUTPUT:-}" =~ ^[yY]$ ]]; then
     # TODO(spxtr) This should probably be JENKINS_USE_BINARIES_FROM_OUTPUT or
     # something, rather than being prepended with KUBE, since it's sort of a
     # meta-thing.
+    clean_binaries
     fetch_output_tars
 elif [[ "${JENKINS_USE_SERVER_VERSION:-}" =~ ^[yY]$ ]]; then
     # This is for test, staging, and prod jobs on GKE, where we want to
     # test what's running in GKE by default rather than some CI build.
-    check_dirty_workspace
+    clean_binaries
     fetch_server_version_tars
 else
     # use JENKINS_PUBLISHED_VERSION, default to 'ci/latest', since that's
     # usually what we're testing.
-    check_dirty_workspace
+    clean_binaries
     fetch_published_version_tars "${JENKINS_PUBLISHED_VERSION:-ci/latest}"
 fi
 
@@ -212,13 +233,23 @@ fi
 # # Move the permissions for the keys to Jenkins.
 # $ sudo chown -R jenkins /var/lib/jenkins/gce_keys/
 # $ sudo chgrp -R jenkins /var/lib/jenkins/gce_keys/
-if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-    echo "Skipping SSH key copying for AWS"
-else
-    mkdir -p ${WORKSPACE}/.ssh/
-    cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
-    cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
-fi
+case "${KUBERNETES_PROVIDER}" in
+    gce|gke|kubemark)
+        if ! running_in_docker; then
+            mkdir -p ${WORKSPACE}/.ssh/
+            cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
+            cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
+        fi
+        if [[ ! -f ${WORKSPACE}/.ssh/google_compute_engine ]]; then
+            echo "google_compute_engine ssh key missing!"
+            exit 1
+        fi
+        ;;
+
+    default)
+        echo "Not copying ssh keys for ${KUBERNETES_PROVIDER}"
+        ;;
+esac
 
 cd kubernetes
 
@@ -231,33 +262,21 @@ fi
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
 ARTIFACTS=${WORKSPACE}/_artifacts
 mkdir -p ${ARTIFACTS}
+# When run inside Docker, we need to make sure all files are world-readable
+# (since they will be owned by root on the host).
+trap "chmod -R o+r '${ARTIFACTS}'" EXIT SIGINT SIGTERM
 export E2E_REPORT_DIR=${ARTIFACTS}
 declare -r gcp_list_resources_script="./cluster/gce/list-resources.sh"
 declare -r gcp_resources_before="${ARTIFACTS}/gcp-resources-before.txt"
 declare -r gcp_resources_cluster_up="${ARTIFACTS}/gcp-resources-cluster-up.txt"
 declare -r gcp_resources_after="${ARTIFACTS}/gcp-resources-after.txt"
-# TODO(15492): figure out some way to run this script even if it doesn't exist
-# in the Kubernetes tarball.
 if [[ ( ${KUBERNETES_PROVIDER} == "gce" || ${KUBERNETES_PROVIDER} == "gke" ) && -x "${gcp_list_resources_script}" ]]; then
   gcp_list_resources="true"
+  # Always pull the script from HEAD, overwriting the local one if it exists.
+  # We do this to pick up fixes if we are running tests from a branch or tag.
+  curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/gce/list-resources.sh" > "${gcp_list_resources_script}"
 else
   gcp_list_resources="false"
-fi
-
-### Pre Set Up ###
-# Install gcloud from a custom path if provided. Used to test GKE with gcloud
-# at HEAD, release candidate.
-if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
-    gsutil -mq cp -r "${CLOUDSDK_BUCKET}" ~
-    rm -rf ~/repo ~/cloudsdk
-    mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
-    mkdir ~/cloudsdk
-    tar zxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
-    export CLOUDSDK_CORE_DISABLE_PROMPTS=1
-    export CLOUDSDK_COMPONENT_MANAGER_SNAPSHOT_URL=file://${HOME}/repo/components-2.json
-    ~/cloudsdk/google-cloud-sdk/install.sh --disable-installation-options --bash-completion=false --path-update=false --usage-reporting=false
-    export PATH=${HOME}/cloudsdk/google-cloud-sdk/bin:${PATH}
-    export CLOUDSDK_CONFIG=/var/lib/jenkins/.config/gcloud
 fi
 
 ### Set up ###
@@ -290,7 +309,7 @@ if [[ -n "${JENKINS_PUBLISHED_TEST_VERSION:-}" ]]; then
     fetch_published_version_tars "${JENKINS_PUBLISHED_TEST_VERSION}"
     cd kubernetes
     # Upgrade the cluster before running other tests
-    if [[ "${E2E_UPGRADE_TEST,,}" == "true" ]]; then
+    if [[ "${E2E_UPGRADE_TEST:-}" == "true" ]]; then
 	# Add a report prefix for the e2e tests so that the tests don't get overwritten when we run
 	# the rest of the e2es.
         E2E_REPORT_PREFIX='upgrade' e2e_test "${GINKGO_UPGRADE_TEST_ARGS:-}"

@@ -34,7 +34,6 @@ kube::golang::server_targets() {
     cmd/kubelet
     cmd/kubemark
     cmd/hyperkube
-    cmd/linkcheck
     plugin/cmd/kube-scheduler
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
@@ -64,6 +63,8 @@ else
   readonly KUBE_SERVER_PLATFORMS=(
     linux/amd64
     linux/arm
+    linux/arm64
+    linux/ppc64le
   )
 
   # If we update this we should also update the set of golang compilers we build
@@ -72,6 +73,8 @@ else
     linux/amd64
     linux/386
     linux/arm
+    linux/arm64
+    linux/ppc64le
     darwin/amd64
     darwin/386
     windows/amd64
@@ -101,10 +104,11 @@ kube::golang::test_targets() {
     cmd/gendocs
     cmd/genkubedocs
     cmd/genman
+    cmd/genyaml
     cmd/mungedocs
     cmd/genbashcomp
-    cmd/genconversion
     cmd/genswaggertypedocs
+    cmd/linkcheck
     examples/k8petstore/web-server/src
     github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
@@ -264,10 +268,8 @@ kube::golang::setup_env() {
 
   if [[ -z "$(which go)" ]]; then
     kube::log::usage_from_stdin <<EOF
-
 Can't find 'go' in PATH, please fix and retry.
 See http://golang.org/doc/install for installation instructions.
-
 EOF
     exit 2
   fi
@@ -280,11 +282,9 @@ EOF
     go_version=($(go version))
     if [[ "${go_version[2]}" < "go1.4" ]]; then
       kube::log::usage_from_stdin <<EOF
-
 Detected go version: ${go_version[*]}.
 Kubernetes requires go version 1.4 or greater.
 Please install Go version 1.4 or later.
-
 EOF
       exit 2
     fi

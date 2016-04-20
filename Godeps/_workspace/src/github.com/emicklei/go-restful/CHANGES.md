@@ -1,5 +1,9 @@
 Change history of go-restful
 =
+2016-02-14
+- take the qualify factor of the Accept header mediatype into account when deciding the contentype of the response
+- add constructors for custom entity accessors for xml and json 
+
 2015-09-27
 - rename new WriteStatusAnd... to WriteHeaderAnd... for consistency
 

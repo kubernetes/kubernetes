@@ -55,8 +55,8 @@ type handler struct {
 	summaryProvider SummaryProvider
 }
 
-func CreateHandlers(provider StatsProvider, resourceAnalyzer ResourceAnalyzer) *restful.WebService {
-	h := &handler{provider, NewSummaryProvider(provider, resourceAnalyzer)}
+func CreateHandlers(provider StatsProvider, summaryProvider SummaryProvider) *restful.WebService {
+	h := &handler{provider, summaryProvider}
 
 	ws := &restful.WebService{}
 	ws.Path("/stats/").

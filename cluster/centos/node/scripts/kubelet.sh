@@ -65,6 +65,7 @@ Requires=docker.service
 EnvironmentFile=-/opt/kubernetes/cfg/kubelet
 ExecStart=/opt/kubernetes/bin/kubelet ${KUBE_PROXY_OPTS}
 Restart=on-failure
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target

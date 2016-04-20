@@ -18,8 +18,9 @@ package apiserver
 
 import (
 	"fmt"
+	"net"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/v1"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -29,7 +30,7 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 
 	// Install the testgroup API
-	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/install"
+	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io/install"
 )
 
 const (
@@ -55,15 +56,26 @@ func newStorageDestinations(groupName string, groupMeta *apimachinery.GroupMeta)
 	return &storageDestinations, nil
 }
 
-func Run() error {
-	config := genericapiserver.Config{
+func NewServerRunOptions() *genericapiserver.ServerRunOptions {
+	serverOptions := genericapiserver.NewServerRunOptions()
+	serverOptions.InsecurePort = InsecurePort
+	serverOptions.SecurePort = SecurePort
+	return serverOptions
+}
+
+func Run(serverOptions *genericapiserver.ServerRunOptions) error {
+	// Set ServiceClusterIPRange
+	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
+	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
+	genericapiserver.ValidateRunOptions(serverOptions)
+	config := &genericapiserver.Config{
 		EnableIndex:          true,
 		EnableSwaggerSupport: true,
 		APIPrefix:            "/api",
 		APIGroupPrefix:       "/apis",
 		Serializer:           api.Codecs,
 	}
-	s, err := genericapiserver.New(&config)
+	s, err := genericapiserver.New(config)
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
 	}
@@ -86,15 +98,13 @@ func Run() error {
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			groupVersion.Version: restStorageMap,
 		},
-		Scheme:               api.Scheme,
-		NegotiatedSerializer: api.Codecs,
+		Scheme:                     api.Scheme,
+		NegotiatedSerializer:       api.Codecs,
+		NegotiatedStreamSerializer: api.StreamCodecs,
 	}
 	if err := s.InstallAPIGroups([]genericapiserver.APIGroupInfo{apiGroupInfo}); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
 	}
-	serverOptions := genericapiserver.NewServerRunOptions()
-	serverOptions.InsecurePort = InsecurePort
-	serverOptions.SecurePort = SecurePort
 	s.Run(serverOptions)
 	return nil
 }

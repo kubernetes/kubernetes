@@ -3,6 +3,7 @@ Description=Kubernetes Addon Object Manager
 Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
+Environment=HOME=/root
 ExecStart=/etc/kubernetes/kube-addons.sh
 
 [Install]

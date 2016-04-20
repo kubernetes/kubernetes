@@ -159,6 +159,7 @@ coreos:
         --v=2
         Restart=always
         RestartSec=5
+        KillMode=process
     - name: kube-proxy.service
       command: start
       content: |

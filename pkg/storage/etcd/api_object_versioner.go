@@ -18,11 +18,9 @@ package etcd
 
 import (
 	"strconv"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -32,13 +30,10 @@ import (
 type APIObjectVersioner struct{}
 
 // UpdateObject implements Versioner
-func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Time, resourceVersion uint64) error {
+func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
-	}
-	if expiration != nil {
-		accessor.SetDeletionTimestamp(&unversioned.Time{Time: *expiration})
 	}
 	versionString := ""
 	if resourceVersion != 0 {

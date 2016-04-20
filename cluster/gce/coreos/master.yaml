@@ -135,6 +135,7 @@ coreos:
         --reconcile-cidr=false
         Restart=always
         RestartSec=10
+        KillMode=process
         
     - name: docker.service
       drop-ins:

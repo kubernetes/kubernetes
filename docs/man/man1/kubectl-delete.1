@@ -53,6 +53,10 @@ will be lost along with the rest of the resource.
     If true, include definitions of new APIs via calls to the API server. [default true]
 
 .PP
+\fB\-\-now\fP=false
+    If true, resources are force terminated without graceful deletion (same as \-\-grace\-period=0).
+
+.PP
 \fB\-o\fP, \fB\-\-output\fP=""
     Output mode. Use "\-o name" for shorter output (resource/name).
 
@@ -77,6 +81,10 @@ will be lost along with the rest of the resource.
 .PP
 \fB\-\-api\-version\fP=""
     DEPRECATED: The API version to use when talking to the server
+
+.PP
+\fB\-\-as\fP=""
+    Username to impersonate for the operation.
 
 .PP
 \fB\-\-certificate\-authority\fP=""
@@ -179,6 +187,9 @@ kubectl delete pod,service baz foo
 
 # Delete pods and services with label name=myLabel.
 kubectl delete pods,services \-l name=myLabel
+
+# Delete a pod immediately (no graceful shutdown)
+kubectl delete pod foo \-\-now
 
 # Delete a pod with UID 1234\-56\-7890\-234234\-456456.
 kubectl delete pod 1234\-56\-7890\-234234\-456456

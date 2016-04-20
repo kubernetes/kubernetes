@@ -39,6 +39,7 @@ const (
 	offsetMemPageFaults
 	offsetMemMajorPageFaults
 	offsetMemUsageBytes
+	offsetMemRSSBytes
 	offsetMemWorkingSetBytes
 	offsetNetRxBytes
 	offsetNetRxErrors
@@ -99,7 +100,7 @@ func TestBuildSummary(t *testing.T) {
 		// Pod0 - Namespace0
 		"/pod0-i":  summaryTestContainerInfo(seedPod0Infra, pName0, namespace0, leaky.PodInfraContainerName),
 		"/pod0-c0": summaryTestContainerInfo(seedPod0Container0, pName0, namespace0, cName00),
-		"/pod0-c2": summaryTestContainerInfo(seedPod0Container1, pName0, namespace0, cName01),
+		"/pod0-c1": summaryTestContainerInfo(seedPod0Container1, pName0, namespace0, cName01),
 		// Pod1 - Namespace0
 		"/pod1-i":  summaryTestContainerInfo(seedPod1Infra, pName1, namespace0, leaky.PodInfraContainerName),
 		"/pod1-c0": summaryTestContainerInfo(seedPod1Container, pName1, namespace0, cName10),
@@ -111,6 +112,20 @@ func TestBuildSummary(t *testing.T) {
 	rootfs := v2.FsInfo{}
 	imagefs := v2.FsInfo{}
 
+	// memory limit overrides for each container (used to test available bytes if a memory limit is known)
+	memoryLimitOverrides := map[string]uint64{
+		"/":        uint64(1 << 30),
+		"/pod2-c0": uint64(1 << 15),
+	}
+	for name, memoryLimitOverride := range memoryLimitOverrides {
+		info, found := infos[name]
+		if !found {
+			t.Errorf("No container defined with name %v", name)
+		}
+		info.Spec.Memory.Limit = memoryLimitOverride
+		infos[name] = info
+	}
+
 	sb := &summaryBuilder{
 		newFsResourceAnalyzer(&MockStatsProvider{}, time.Minute*5), &node, nodeConfig, rootfs, imagefs, infos}
 	summary, err := sb.build()
@@ -120,7 +135,7 @@ func TestBuildSummary(t *testing.T) {
 	assert.Equal(t, "FooNode", nodeStats.NodeName)
 	assert.EqualValues(t, testTime(creationTime, seedRoot).Unix(), nodeStats.StartTime.Time.Unix())
 	checkCPUStats(t, "Node", seedRoot, nodeStats.CPU)
-	checkMemoryStats(t, "Node", seedRoot, nodeStats.Memory)
+	checkMemoryStats(t, "Node", seedRoot, infos["/"], nodeStats.Memory)
 	checkNetworkStats(t, "Node", seedRoot, nodeStats.Network)
 
 	systemSeeds := map[string]int{
@@ -128,15 +143,21 @@ func TestBuildSummary(t *testing.T) {
 		kubestats.SystemContainerKubelet: seedKubelet,
 		kubestats.SystemContainerMisc:    seedMisc,
 	}
+	systemContainerToNodeCgroup := map[string]string{
+		kubestats.SystemContainerRuntime: nodeConfig.RuntimeCgroupsName,
+		kubestats.SystemContainerKubelet: nodeConfig.KubeletCgroupsName,
+		kubestats.SystemContainerMisc:    nodeConfig.SystemCgroupsName,
+	}
 	for _, sys := range nodeStats.SystemContainers {
 		name := sys.Name
+		info := infos[systemContainerToNodeCgroup[name]]
 		seed, found := systemSeeds[name]
 		if !found {
 			t.Errorf("Unknown SystemContainer: %q", name)
 		}
 		assert.EqualValues(t, testTime(creationTime, seed).Unix(), sys.StartTime.Time.Unix(), name+".StartTime")
 		checkCPUStats(t, name, seed, sys.CPU)
-		checkMemoryStats(t, name, seed, sys.Memory)
+		checkMemoryStats(t, name, seed, info, sys.Memory)
 	}
 
 	assert.Equal(t, 3, len(summary.Pods))
@@ -155,16 +176,16 @@ func TestBuildSummary(t *testing.T) {
 	}
 	con := indexCon[cName00]
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container0).Unix(), con.StartTime.Time.Unix())
-	checkCPUStats(t, "container", seedPod0Container0, con.CPU)
-	checkMemoryStats(t, "container", seedPod0Container0, con.Memory)
+	checkCPUStats(t, "Pod0Container0", seedPod0Container0, con.CPU)
+	checkMemoryStats(t, "Pod0Conainer0", seedPod0Container0, infos["/pod0-c0"], con.Memory)
 
 	con = indexCon[cName01]
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container1).Unix(), con.StartTime.Time.Unix())
-	checkCPUStats(t, "container", seedPod0Container1, con.CPU)
-	checkMemoryStats(t, "container", seedPod0Container1, con.Memory)
+	checkCPUStats(t, "Pod0Container1", seedPod0Container1, con.CPU)
+	checkMemoryStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.Memory)
 
 	assert.EqualValues(t, testTime(creationTime, seedPod0Infra).Unix(), ps.StartTime.Time.Unix())
-	checkNetworkStats(t, "Pod", seedPod0Infra, ps.Network)
+	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
 
 	// Validate Pod1 Results
 	ps, found = indexPods[prf1]
@@ -172,9 +193,9 @@ func TestBuildSummary(t *testing.T) {
 	assert.Len(t, ps.Containers, 1)
 	con = ps.Containers[0]
 	assert.Equal(t, cName10, con.Name)
-	checkCPUStats(t, "container", seedPod1Container, con.CPU)
-	checkMemoryStats(t, "container", seedPod1Container, con.Memory)
-	checkNetworkStats(t, "Pod", seedPod1Infra, ps.Network)
+	checkCPUStats(t, "Pod1Container0", seedPod1Container, con.CPU)
+	checkMemoryStats(t, "Pod1Container0", seedPod1Container, infos["/pod1-c0"], con.Memory)
+	checkNetworkStats(t, "Pod1", seedPod1Infra, ps.Network)
 
 	// Validate Pod2 Results
 	ps, found = indexPods[prf2]
@@ -182,9 +203,9 @@ func TestBuildSummary(t *testing.T) {
 	assert.Len(t, ps.Containers, 1)
 	con = ps.Containers[0]
 	assert.Equal(t, cName20, con.Name)
-	checkCPUStats(t, "container", seedPod2Container, con.CPU)
-	checkMemoryStats(t, "container", seedPod2Container, con.Memory)
-	checkNetworkStats(t, "Pod", seedPod2Infra, ps.Network)
+	checkCPUStats(t, "Pod2Container0", seedPod2Container, con.CPU)
+	checkMemoryStats(t, "Pod2Container0", seedPod2Container, infos["/pod2-c0"], con.Memory)
+	checkNetworkStats(t, "Pod2", seedPod2Infra, ps.Network)
 }
 
 func generateCustomMetricSpec() []v1.MetricSpec {
@@ -242,12 +263,17 @@ func summaryTestContainerInfo(seed int, podName string, podNamespace string, con
 			"io.kubernetes.container.name": containerName,
 		}
 	}
+	// by default, kernel will set memory.limit_in_bytes to 1 << 63 if not bounded
+	unlimitedMemory := uint64(1 << 63)
 	spec := v2.ContainerSpec{
-		CreationTime:  testTime(creationTime, seed),
-		HasCpu:        true,
-		HasMemory:     true,
-		HasNetwork:    true,
-		Labels:        labels,
+		CreationTime: testTime(creationTime, seed),
+		HasCpu:       true,
+		HasMemory:    true,
+		HasNetwork:   true,
+		Labels:       labels,
+		Memory: v2.MemorySpec{
+			Limit: unlimitedMemory,
+		},
 		CustomMetrics: generateCustomMetricSpec(),
 	}
 
@@ -258,6 +284,7 @@ func summaryTestContainerInfo(seed int, podName string, podNamespace string, con
 		Memory: &v1.MemoryStats{
 			Usage:      uint64(seed + offsetMemUsageBytes),
 			WorkingSet: uint64(seed + offsetMemWorkingSetBytes),
+			RSS:        uint64(seed + offsetMemRSSBytes),
 			ContainerData: v1.MemoryStatsMemoryData{
 				Pgfault:    uint64(seed + offsetMemPageFaults),
 				Pgmajfault: uint64(seed + offsetMemMajorPageFaults),
@@ -306,12 +333,19 @@ func checkCPUStats(t *testing.T, label string, seed int, stats *kubestats.CPUSta
 	assert.EqualValues(t, seed+offsetCPUUsageCoreSeconds, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
 }
 
-func checkMemoryStats(t *testing.T, label string, seed int, stats *kubestats.MemoryStats) {
+func checkMemoryStats(t *testing.T, label string, seed int, info v2.ContainerInfo, stats *kubestats.MemoryStats) {
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
 	assert.EqualValues(t, seed+offsetMemUsageBytes, *stats.UsageBytes, label+".Mem.UsageBytes")
 	assert.EqualValues(t, seed+offsetMemWorkingSetBytes, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
+	assert.EqualValues(t, seed+offsetMemRSSBytes, *stats.RSSBytes, label+".Mem.RSSBytes")
 	assert.EqualValues(t, seed+offsetMemPageFaults, *stats.PageFaults, label+".Mem.PageFaults")
 	assert.EqualValues(t, seed+offsetMemMajorPageFaults, *stats.MajorPageFaults, label+".Mem.MajorPageFaults")
+	if !info.Spec.HasMemory || isMemoryUnlimited(info.Spec.Memory.Limit) {
+		assert.Nil(t, stats.AvailableBytes, label+".Mem.AvailableBytes")
+	} else {
+		expected := info.Spec.Memory.Limit - *stats.WorkingSetBytes
+		assert.EqualValues(t, expected, *stats.AvailableBytes, label+".Mem.AvailableBytes")
+	}
 }
 
 func TestCustomMetrics(t *testing.T) {

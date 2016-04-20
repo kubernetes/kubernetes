@@ -121,7 +121,8 @@
     name: global
     disable_job: false
     emails: '$DEFAULT_RECIPIENTS'
-    cron-string: 'H/30 * * * *'
+    cron-string: 'H/30 * * * *'  # Set a 30m floor to start jobs.
+    sq-cron-string: 'H/5 * * * *'  # Lower floor to 5m for blocking jobs.
     # How long to wait after sending TERM to send KILL (minutes)
     kill-timeout: 15
     # Just to be safe, use the Jenkins timeout after a long time.
@@ -137,15 +138,21 @@
         exit ${{rc}}
     branch: 'master'
     job-env: ''
-    runner: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh")
+    runner: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/dockerized-e2e-runner.sh")
+    legacy-runner: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh")
     old-runner-1-1: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.1/hack/jenkins/e2e.sh")
+    # XXX This is a hack to run only the tests we care about, without importing all of the skip list vars from the v1.1 e2e.sh.
+    default-skip-list-1-1: Autoscaling\sSuite|resource\susage\stracking|Nodes|Etcd\sFailure|MasterCerts|experimental\sresource\susage\stracking|ServiceLoadBalancer|Shell|Daemon\sset|Deployment|Skipped|Restart\sshould\srestart\sall\snodes|Example|Reboot|ServiceLoadBalancer|DaemonRestart\sController\sManager|Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon|Resource\susage\sof\ssystem\scontainers|allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster
     old-runner-1-0: bash <(curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/release-1.0/hack/jenkins/e2e.sh")
+    # XXX This is a hack to run only the tests we care about, without importing all of the skip list vars from the v1.0 e2e.sh.
+    default-skip-list-1-0: Skipped|Restart\sshould\srestart\sall\snodes|Example|Reboot|ServiceLoadBalancer|DaemonRestart\sController\sManager|Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon|Resource\susage\sof\ssystem\scontainers|allows\sscheduling\sof\spods\son\sa\sminion\safter\sit\srejoins\sthe\scluster
     provider-env: ''
     gce-provider-env: |
         export KUBERNETES_PROVIDER="gce"
         export E2E_MIN_STARTUP_PODS="1"
         export KUBE_GCE_ZONE="us-central1-f"
         export FAIL_ON_GCP_RESOURCE_LEAK="true"
+        export CLOUDSDK_CORE_PRINT_UNHANDLED_TRACEBACKS="1"
     gke-provider-env: |
         export KUBERNETES_PROVIDER="gke"
         export ZONE="us-central1-f"

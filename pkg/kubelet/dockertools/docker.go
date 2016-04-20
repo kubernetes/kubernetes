@@ -26,6 +26,7 @@ import (
 
 	"github.com/docker/docker/pkg/jsonmessage"
 	dockerapi "github.com/docker/engine-api/client"
+	dockertypes "github.com/docker/engine-api/types"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -57,12 +58,12 @@ const (
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
 type DockerInterface interface {
-	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
-	InspectContainer(id string) (*docker.Container, error)
-	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
-	StartContainer(id string, hostConfig *docker.HostConfig) error
-	StopContainer(id string, timeout uint) error
-	RemoveContainer(opts docker.RemoveContainerOptions) error
+	ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error)
+	InspectContainer(id string) (*dockertypes.ContainerJSON, error)
+	CreateContainer(dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error)
+	StartContainer(id string) error
+	StopContainer(id string, timeout int) error
+	RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error
 	InspectImage(image string) (*docker.Image, error)
 	ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
@@ -188,7 +189,7 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		err := p.client.PullImage(opts, currentCreds)
+		err := p.client.PullImage(opts, credentialprovider.LazyProvide(currentCreds))
 		// If there was no error, return success
 		if err == nil {
 			return nil
@@ -292,9 +293,7 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 // will be returned. The program exits if error occurs.
 func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 	if dockerEndpoint == "fake://" {
-		return &FakeDockerClient{
-			VersionInfo: docker.Env{"ApiVersion=1.18", "Version=1.6.0"},
-		}
+		return NewFakeDockerClient()
 	}
 	client, err := getDockerClient(dockerEndpoint)
 	if err != nil {
@@ -348,9 +347,9 @@ func milliCPUToShares(milliCPU int64) int64 {
 // GetKubeletDockerContainers lists all container or just the running ones.
 // Returns a list of docker containers that we manage
 // TODO: Move this function with dockerCache to DockerManager.
-func GetKubeletDockerContainers(client DockerInterface, allContainers bool) ([]*docker.APIContainers, error) {
-	result := []*docker.APIContainers{}
-	containers, err := client.ListContainers(docker.ListContainersOptions{All: allContainers})
+func GetKubeletDockerContainers(client DockerInterface, allContainers bool) ([]*dockertypes.Container, error) {
+	result := []*dockertypes.Container{}
+	containers, err := client.ListContainers(dockertypes.ContainerListOptions{All: allContainers})
 	if err != nil {
 		return nil, err
 	}

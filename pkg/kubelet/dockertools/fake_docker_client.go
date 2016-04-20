@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	dockertypes "github.com/docker/engine-api/types"
+	dockercontainer "github.com/docker/engine-api/types/container"
 	docker "github.com/fsouza/go-dockerclient"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -35,14 +37,14 @@ import (
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
 type FakeDockerClient struct {
 	sync.Mutex
-	ContainerList       []docker.APIContainers
-	ExitedContainerList []docker.APIContainers
-	ContainerMap        map[string]*docker.Container
-	Image               *docker.Image
-	Images              []docker.APIImages
-	Errors              map[string]error
-	called              []string
-	pulled              []string
+	RunningContainerList []dockertypes.Container
+	ExitedContainerList  []dockertypes.Container
+	ContainerMap         map[string]*dockertypes.ContainerJSON
+	Image                *docker.Image
+	Images               []docker.APIImages
+	Errors               map[string]error
+	called               []string
+	pulled               []string
 	// Created, Stopped and Removed all container docker ID
 	Created       []string
 	Stopped       []string
@@ -55,8 +57,12 @@ type FakeDockerClient struct {
 	EnableSleep   bool
 }
 
+// We don't check docker version now, just set the docker version of fake docker client to 1.8.1.
+// Notice that if someday we also have minimum docker version requirement, this should also be updated.
+const fakeDockerVersion = "1.8.1"
+
 func NewFakeDockerClient() *FakeDockerClient {
-	return NewFakeDockerClientWithVersion("1.8.1", "1.20")
+	return NewFakeDockerClientWithVersion(fakeDockerVersion, minimumDockerAPIVersion)
 }
 
 func NewFakeDockerClientWithVersion(version, apiVersion string) *FakeDockerClient {
@@ -64,7 +70,7 @@ func NewFakeDockerClientWithVersion(version, apiVersion string) *FakeDockerClien
 		VersionInfo:   docker.Env{fmt.Sprintf("Version=%s", version), fmt.Sprintf("ApiVersion=%s", apiVersion)},
 		Errors:        make(map[string]error),
 		RemovedImages: sets.String{},
-		ContainerMap:  make(map[string]*docker.Container),
+		ContainerMap:  make(map[string]*dockertypes.ContainerJSON),
 	}
 }
 
@@ -98,35 +104,74 @@ func (f *FakeDockerClient) ClearCalls() {
 	f.Removed = []string{}
 }
 
-func (f *FakeDockerClient) SetFakeContainers(containers []*docker.Container) {
+// Because the new data type returned by engine-api is too complex to manually initialize, we need a
+// fake container which is easier to initialize.
+type FakeContainer struct {
+	ID         string
+	Name       string
+	Running    bool
+	ExitCode   int
+	Pid        int
+	CreatedAt  time.Time
+	StartedAt  time.Time
+	FinishedAt time.Time
+	Config     *dockercontainer.Config
+	HostConfig *dockercontainer.HostConfig
+}
+
+// convertFakeContainer converts the fake container to real container
+func convertFakeContainer(f *FakeContainer) *dockertypes.ContainerJSON {
+	if f.Config == nil {
+		f.Config = &dockercontainer.Config{}
+	}
+	if f.HostConfig == nil {
+		f.HostConfig = &dockercontainer.HostConfig{}
+	}
+	return &dockertypes.ContainerJSON{
+		ContainerJSONBase: &dockertypes.ContainerJSONBase{
+			ID:   f.ID,
+			Name: f.Name,
+			State: &dockertypes.ContainerState{
+				Running:    f.Running,
+				ExitCode:   f.ExitCode,
+				Pid:        f.Pid,
+				StartedAt:  dockerTimestampToString(f.StartedAt),
+				FinishedAt: dockerTimestampToString(f.FinishedAt),
+			},
+			Created:    dockerTimestampToString(f.CreatedAt),
+			HostConfig: f.HostConfig,
+		},
+		Config:          f.Config,
+		NetworkSettings: &dockertypes.NetworkSettings{},
+	}
+}
+
+func (f *FakeDockerClient) SetFakeContainers(containers []*FakeContainer) {
 	f.Lock()
 	defer f.Unlock()
 	// Reset the lists and the map.
-	f.ContainerMap = map[string]*docker.Container{}
-	f.ContainerList = []docker.APIContainers{}
-	f.ExitedContainerList = []docker.APIContainers{}
+	f.ContainerMap = map[string]*dockertypes.ContainerJSON{}
+	f.RunningContainerList = []dockertypes.Container{}
+	f.ExitedContainerList = []dockertypes.Container{}
 
 	for i := range containers {
 		c := containers[i]
-		if c.Config == nil {
-			c.Config = &docker.Config{}
-		}
-		f.ContainerMap[c.ID] = c
-		apiContainer := docker.APIContainers{
+		f.ContainerMap[c.ID] = convertFakeContainer(c)
+		container := dockertypes.Container{
 			Names: []string{c.Name},
 			ID:    c.ID,
 		}
-		if c.State.Running {
-			f.ContainerList = append(f.ContainerList, apiContainer)
+		if c.Running {
+			f.RunningContainerList = append(f.RunningContainerList, container)
 		} else {
-			f.ExitedContainerList = append(f.ExitedContainerList, apiContainer)
+			f.ExitedContainerList = append(f.ExitedContainerList, container)
 		}
 	}
 }
 
-func (f *FakeDockerClient) SetFakeRunningContainers(containers []*docker.Container) {
+func (f *FakeDockerClient) SetFakeRunningContainers(containers []*FakeContainer) {
 	for _, c := range containers {
-		c.State.Running = true
+		c.Running = true
 	}
 	f.SetFakeContainers(containers)
 }
@@ -206,12 +251,12 @@ func (f *FakeDockerClient) popError(op string) error {
 
 // ListContainers is a test-spy implementation of DockerInterface.ListContainers.
 // It adds an entry "list" to the internal method call record.
-func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
+func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "list")
 	err := f.popError("list")
-	containerList := append([]docker.APIContainers{}, f.ContainerList...)
+	containerList := append([]dockertypes.Container{}, f.RunningContainerList...)
 	if options.All {
 		// Although the container is not sorted, but the container with the same name should be in order,
 		// that is enough for us now.
@@ -223,7 +268,7 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
 // It adds an entry "inspect" to the internal method call record.
-func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error) {
+func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "inspect_container")
@@ -260,7 +305,7 @@ func (f *FakeDockerClient) normalSleep(mean, stdDev, cutOffMillis int) {
 
 // CreateContainer is a test-spy implementation of DockerInterface.CreateContainer.
 // It adds an entry "create" to the internal method call record.
-func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*docker.Container, error) {
+func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "create")
@@ -270,25 +315,20 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	// This is not a very good fake. We'll just add this container's name to the list.
 	// Docker likes to add a '/', so copy that behavior.
 	name := "/" + c.Name
+	id := name
 	f.Created = append(f.Created, name)
 	// The newest container should be in front, because we assume so in GetPodStatus()
-	f.ContainerList = append([]docker.APIContainers{
+	f.RunningContainerList = append([]dockertypes.Container{
 		{ID: name, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
-	}, f.ContainerList...)
-	container := docker.Container{ID: name, Name: name, Config: c.Config, HostConfig: c.HostConfig}
-	containerCopy := container
-	f.ContainerMap[name] = &containerCopy
+	}, f.RunningContainerList...)
+	f.ContainerMap[name] = convertFakeContainer(&FakeContainer{ID: id, Name: name, Config: c.Config, HostConfig: c.HostConfig})
 	f.normalSleep(100, 25, 25)
-	return &container, nil
+	return &dockertypes.ContainerCreateResponse{ID: id}, nil
 }
 
 // StartContainer is a test-spy implementation of DockerInterface.StartContainer.
 // It adds an entry "start" to the internal method call record.
-// The HostConfig at StartContainer will be deprecated from docker 1.10. Now in
-// docker manager the HostConfig is set when CreateContainer().
-// TODO(random-liu): Remove the HostConfig here when it is completely removed in
-// docker 1.12.
-func (f *FakeDockerClient) StartContainer(id string, _ *docker.HostConfig) error {
+func (f *FakeDockerClient) StartContainer(id string) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start")
@@ -297,14 +337,12 @@ func (f *FakeDockerClient) StartContainer(id string, _ *docker.HostConfig) error
 	}
 	container, ok := f.ContainerMap[id]
 	if !ok {
-		container = &docker.Container{ID: id, Name: id}
+		container = convertFakeContainer(&FakeContainer{ID: id, Name: id})
 	}
-	container.State = docker.State{
-		Running:   true,
-		Pid:       os.Getpid(),
-		StartedAt: time.Now(),
-	}
-	container.NetworkSettings = &docker.NetworkSettings{IPAddress: "2.3.4.5"}
+	container.State.Running = true
+	container.State.Pid = os.Getpid()
+	container.State.StartedAt = dockerTimestampToString(time.Now())
+	container.NetworkSettings.IPAddress = "2.3.4.5"
 	f.ContainerMap[id] = container
 	f.updateContainerStatus(id, statusRunningPrefix)
 	f.normalSleep(200, 50, 50)
@@ -313,7 +351,7 @@ func (f *FakeDockerClient) StartContainer(id string, _ *docker.HostConfig) error
 
 // StopContainer is a test-spy implementation of DockerInterface.StopContainer.
 // It adds an entry "stop" to the internal method call record.
-func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
+func (f *FakeDockerClient) StopContainer(id string, timeout int) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "stop")
@@ -323,29 +361,27 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.Stopped = append(f.Stopped, id)
 	// Container status should be Updated before container moved to ExitedContainerList
 	f.updateContainerStatus(id, statusExitedPrefix)
-	var newList []docker.APIContainers
-	for _, container := range f.ContainerList {
+	var newList []dockertypes.Container
+	for _, container := range f.RunningContainerList {
 		if container.ID == id {
 			// The newest exited container should be in front. Because we assume so in GetPodStatus()
-			f.ExitedContainerList = append([]docker.APIContainers{container}, f.ExitedContainerList...)
+			f.ExitedContainerList = append([]dockertypes.Container{container}, f.ExitedContainerList...)
 			continue
 		}
 		newList = append(newList, container)
 	}
-	f.ContainerList = newList
+	f.RunningContainerList = newList
 	container, ok := f.ContainerMap[id]
 	if !ok {
-		container = &docker.Container{
-			ID:   id,
-			Name: id,
-			State: docker.State{
-				Running:    false,
-				StartedAt:  time.Now().Add(-time.Second),
-				FinishedAt: time.Now(),
-			},
-		}
+		container = convertFakeContainer(&FakeContainer{
+			ID:         id,
+			Name:       id,
+			Running:    false,
+			StartedAt:  time.Now().Add(-time.Second),
+			FinishedAt: time.Now(),
+		})
 	} else {
-		container.State.FinishedAt = time.Now()
+		container.State.FinishedAt = dockerTimestampToString(time.Now())
 		container.State.Running = false
 	}
 	f.ContainerMap[id] = container
@@ -353,7 +389,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	return nil
 }
 
-func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) error {
+func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "remove")
@@ -362,10 +398,10 @@ func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) e
 		return err
 	}
 	for i := range f.ExitedContainerList {
-		if f.ExitedContainerList[i].ID == opts.ID {
-			delete(f.ContainerMap, opts.ID)
+		if f.ExitedContainerList[i].ID == id {
+			delete(f.ContainerMap, id)
 			f.ExitedContainerList = append(f.ExitedContainerList[:i], f.ExitedContainerList[i+1:]...)
-			f.Removed = append(f.Removed, opts.ID)
+			f.Removed = append(f.Removed, id)
 			return nil
 		}
 
@@ -383,7 +419,7 @@ func (f *FakeDockerClient) Logs(opts docker.LogsOptions) error {
 	return f.popError("logs")
 }
 
-// PullImage is a test-spy implementation of DockerInterface.StopContainer.
+// PullImage is a test-spy implementation of DockerInterface.PullImage.
 // It adds an entry "pull" to the internal method call record.
 func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
 	f.Lock()
@@ -402,6 +438,8 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 }
 
 func (f *FakeDockerClient) Version() (*docker.Env, error) {
+	f.Lock()
+	defer f.Unlock()
 	return &f.VersionInfo, f.popError("version")
 }
 
@@ -449,9 +487,9 @@ func (f *FakeDockerClient) RemoveImage(image string) error {
 }
 
 func (f *FakeDockerClient) updateContainerStatus(id, status string) {
-	for i := range f.ContainerList {
-		if f.ContainerList[i].ID == id {
-			f.ContainerList[i].Status = status
+	for i := range f.RunningContainerList {
+		if f.RunningContainerList[i].ID == id {
+			f.RunningContainerList[i].Status = status
 		}
 	}
 }
@@ -493,4 +531,9 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// dockerTimestampToString converts the timestamp to string
+func dockerTimestampToString(t time.Time) string {
+	return t.Format(time.RFC3339Nano)
 }

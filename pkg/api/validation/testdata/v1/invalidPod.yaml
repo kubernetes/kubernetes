@@ -7,5 +7,5 @@ metadata:
 spec:
   containers:
   - args: "this is a bad command"
-    image: redis
+    image: gcr.io/fake_project/fake_image:fake_tag
     name: master

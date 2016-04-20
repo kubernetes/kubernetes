@@ -72,7 +72,7 @@ func TestWatchWebsocket(t *testing.T) {
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	try := func(action watch.EventType, object runtime.Object) {
@@ -89,7 +89,7 @@ func TestWatchWebsocket(t *testing.T) {
 		}
 		gotObj, err := runtime.Decode(codec, got.Object)
 		if err != nil {
-			t.Fatalf("Decode error: %v", err)
+			t.Fatalf("Decode error: %v\n%v", err, got)
 		}
 		if _, err := api.GetReference(gotObj); err != nil {
 			t.Errorf("Unable to construct reference: %v", err)
@@ -381,10 +381,14 @@ func TestWatchHTTPTimeout(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &WatchServer{
-		watcher,
-		newCodec,
-		func(obj runtime.Object) {},
-		&fakeTimeoutFactory{timeoutCh, done},
+		watching: watcher,
+
+		mediaType:       "testcase/json",
+		encoder:         newCodec,
+		embeddedEncoder: newCodec,
+
+		fixup: func(obj runtime.Object) {},
+		t:     &fakeTimeoutFactory{timeoutCh, done},
 	}
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -511,6 +515,55 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 	go func() {
 		defer ws.Close()
 		if _, err := io.Copy(ioutil.Discard, ws); err != nil {
+			b.Fatal(err)
+		}
+		wg.Done()
+	}()
+
+	actions := []watch.EventType{watch.Added, watch.Modified, watch.Deleted}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		simpleStorage.fakeWatch.Action(actions[i%len(actions)], &items[i%len(items)])
+	}
+	simpleStorage.fakeWatch.Stop()
+	wg.Wait()
+	b.StopTimer()
+}
+
+// BenchmarkWatchProtobuf measures the cost of serving a watch.
+func BenchmarkWatchProtobuf(b *testing.B) {
+	items := benchmarkItems()
+
+	simpleStorage := &SimpleRESTStorage{}
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/watch/simples"
+	dest.RawQuery = ""
+
+	request, err := http.NewRequest("GET", dest.String(), nil)
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+	request.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
+	response, err := client.Do(request)
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(response.Body)
+		b.Fatalf("Unexpected response %#v\n%s", response, body)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer response.Body.Close()
+		if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
 			b.Fatal(err)
 		}
 		wg.Done()

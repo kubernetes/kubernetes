@@ -47,11 +47,11 @@ type ResourceConsumerHandler struct {
 	metricsLock sync.Mutex
 }
 
-func NewResourceConsumerHandler() ResourceConsumerHandler {
-	return ResourceConsumerHandler{metrics: map[string]float64{}}
+func NewResourceConsumerHandler() *ResourceConsumerHandler {
+	return &ResourceConsumerHandler{metrics: map[string]float64{}}
 }
 
-func (handler ResourceConsumerHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (handler *ResourceConsumerHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// handle exposing metrics in Prometheus format (both GET & POST)
 	if req.URL.Path == metricsAddress {
 		handler.handleMetrics(w)
@@ -89,7 +89,7 @@ func (handler ResourceConsumerHandler) ServeHTTP(w http.ResponseWriter, req *htt
 	http.Error(w, unknownFunction, http.StatusNotFound)
 }
 
-func (handler ResourceConsumerHandler) handleConsumeCPU(w http.ResponseWriter, query url.Values) {
+func (handler *ResourceConsumerHandler) handleConsumeCPU(w http.ResponseWriter, query url.Values) {
 	// geting string data for consumeCPU
 	durationSecString := query.Get(durationSecQuery)
 	millicoresString := query.Get(millicoresQuery)
@@ -112,7 +112,7 @@ func (handler ResourceConsumerHandler) handleConsumeCPU(w http.ResponseWriter, q
 	fmt.Fprintln(w, durationSec, durationSecQuery)
 }
 
-func (handler ResourceConsumerHandler) handleConsumeMem(w http.ResponseWriter, query url.Values) {
+func (handler *ResourceConsumerHandler) handleConsumeMem(w http.ResponseWriter, query url.Values) {
 	// geting string data for consumeMem
 	durationSecString := query.Get(durationSecQuery)
 	megabytesString := query.Get(megabytesQuery)
@@ -135,13 +135,13 @@ func (handler ResourceConsumerHandler) handleConsumeMem(w http.ResponseWriter, q
 	fmt.Fprintln(w, durationSec, durationSecQuery)
 }
 
-func (handler ResourceConsumerHandler) handleGetCurrentStatus(w http.ResponseWriter) {
+func (handler *ResourceConsumerHandler) handleGetCurrentStatus(w http.ResponseWriter) {
 	GetCurrentStatus()
 	fmt.Fprintln(w, "Warning: not implemented!")
 	fmt.Fprint(w, getCurrentStatusAddress[1:])
 }
 
-func (handler ResourceConsumerHandler) handleMetrics(w http.ResponseWriter) {
+func (handler *ResourceConsumerHandler) handleMetrics(w http.ResponseWriter) {
 	handler.metricsLock.Lock()
 	defer handler.metricsLock.Unlock()
 	for k, v := range handler.metrics {
@@ -151,7 +151,7 @@ func (handler ResourceConsumerHandler) handleMetrics(w http.ResponseWriter) {
 	}
 }
 
-func (handler ResourceConsumerHandler) bumpMetric(metric string, delta float64, duration time.Duration) {
+func (handler *ResourceConsumerHandler) bumpMetric(metric string, delta float64, duration time.Duration) {
 	handler.metricsLock.Lock()
 	if _, ok := handler.metrics[metric]; ok {
 		handler.metrics[metric] += delta
@@ -167,7 +167,7 @@ func (handler ResourceConsumerHandler) bumpMetric(metric string, delta float64, 
 	handler.metricsLock.Unlock()
 }
 
-func (handler ResourceConsumerHandler) handleBumpMetric(w http.ResponseWriter, query url.Values) {
+func (handler *ResourceConsumerHandler) handleBumpMetric(w http.ResponseWriter, query url.Values) {
 	// geting string data for handleBumpMetric
 	metric := query.Get(metricNameQuery)
 	deltaString := query.Get(deltaQuery)

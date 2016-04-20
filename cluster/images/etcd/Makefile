@@ -17,45 +17,57 @@
 # Usage:
 # 	[TAG=2.2.1] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
-TAG?=2.2.1
+TAG?=2.2.5
 ARCH?=amd64
 REGISTRY?=gcr.io/google_containers
+GOLANG_VERSION?=1.6.0
+GOARM=6
 TEMP_DIR:=$(shell mktemp -d)
 
-# Default base images for different architectures
-# '/' in images has to be written as '\\/'
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=busybox
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=hypriot\\/armhf-busybox
+	BASEIMAGE?=armel/busybox
+endif
+ifeq ($(ARCH),arm64)
+	BASEIMAGE?=aarch64/busybox
+endif
+ifeq ($(ARCH),ppc64le)
+	BASEIMAGE?=ppc64le/busybox
 endif
 
 build:
-	# Download etcd source in a golang container and cross-compile it statically
-	# or download official binaries if the ARCH is amd64
-	./build-etcd.sh ${TAG} ${ARCH} ${TEMP_DIR}
-
 	# Copy the content in this dir to the temp dir
-	cp ./* ${TEMP_DIR}
-
-	# Replace BASEIMAGE with the real base image
-	cd ${TEMP_DIR} && sed -i "s/BASEIMAGE/${BASEIMAGE}/g" Dockerfile
-
-	# And build the image
-	docker build -t ${REGISTRY}/etcd-${ARCH}:${TAG} ${TEMP_DIR}
+	cp ./* $(TEMP_DIR)
 
 ifeq ($(ARCH),amd64)
-	# Backward compatibility. TODO: deprecate this image tag
-	docker tag -f ${REGISTRY}/etcd-${ARCH}:${TAG} ${REGISTRY}/etcd:${TAG}
+
+	# Do not compile if we should make an image for amd64, use the official etcd binaries instead
+	curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$(TAG)/etcd-v$(TAG)-linux-amd64.tar.gz | tar -xz -C $(TEMP_DIR) --strip-components=1
+else
+	
+	# Download etcd in a golang container and cross-compile it statically
+	docker run -it -v $(TEMP_DIR):/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
+		"git clone https://github.com/coreos/etcd \
+		&& cd etcd && git checkout v$(TAG) \
+		&& GOARM=$(GOARM) GOARCH=$(ARCH) ./build \
+		&& cp bin/* /etcdbin"
 endif
 
-push: build
-	gcloud docker push ${REGISTRY}/etcd-${ARCH}:${TAG}
+	# Replace BASEIMAGE with the real base image
+	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
 
-	# Backward compatibility. TODO: deprecate this image tag
+	# And build the image
+	docker build -t $(REGISTRY)/etcd-$(ARCH):$(TAG) $(TEMP_DIR)
+
+push: build
+	gcloud docker push $(REGISTRY)/etcd-$(ARCH):$(TAG)
+
 ifeq ($(ARCH),amd64)
-	gcloud docker push ${REGISTRY}/etcd:${TAG}
+	# Backward compatibility. TODO: deprecate this image tag
+	docker tag -f $(REGISTRY)/etcd-$(ARCH):$(TAG) $(REGISTRY)/etcd:$(TAG)
+	gcloud docker push $(REGISTRY)/etcd:$(TAG)
 endif
 
 all: build

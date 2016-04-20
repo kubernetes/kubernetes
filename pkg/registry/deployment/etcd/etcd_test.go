@@ -185,7 +185,7 @@ func TestScaleGet(t *testing.T) {
 	var deployment extensions.Deployment
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, &deployment, 0); err != nil {
+	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
 	}
 
@@ -222,7 +222,7 @@ func TestScaleUpdate(t *testing.T) {
 	var deployment extensions.Deployment
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, &deployment, 0); err != nil {
+	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
 	}
 	replicas := 12
@@ -259,7 +259,7 @@ func TestStatusUpdate(t *testing.T) {
 
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
-	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, nil, 0); err != nil {
+	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	update := extensions.Deployment{

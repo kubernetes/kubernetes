@@ -42,9 +42,10 @@ const (
 // the previous value of the object to enable proper filtering in the
 // upper layers.
 type watchCacheEvent struct {
-	Type       watch.EventType
-	Object     runtime.Object
-	PrevObject runtime.Object
+	Type            watch.EventType
+	Object          runtime.Object
+	PrevObject      runtime.Object
+	ResourceVersion uint64
 }
 
 // watchCacheElement is a single "watch event" stored in a cache.
@@ -179,7 +180,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if exists {
 		prevObject = previous.(runtime.Object)
 	}
-	watchCacheEvent := watchCacheEvent{event.Type, event.Object, prevObject}
+	watchCacheEvent := watchCacheEvent{event.Type, event.Object, prevObject, resourceVersion}
 	if w.onEvent != nil {
 		w.onEvent(watchCacheEvent)
 	}
@@ -302,14 +303,13 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 		}
 		return result, nil
 	}
-	if resourceVersion < oldest {
-		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest))
+	if resourceVersion < oldest-1 {
+		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
 	}
 
-	// Binary search the smallest index at which resourceVersion is not smaller than
-	// the given one.
+	// Binary search the smallest index at which resourceVersion is greater than the given one.
 	f := func(i int) bool {
-		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion >= resourceVersion
+		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion > resourceVersion
 	}
 	first := sort.Search(size, f)
 	result := make([]watchCacheEvent, size-first)

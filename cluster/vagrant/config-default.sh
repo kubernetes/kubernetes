@@ -55,7 +55,8 @@ MASTER_USER=vagrant
 MASTER_PASSWD=vagrant
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+# If we included ResourceQuota, we should keep it at the end of the list to prevent incremeting quota usage prematurely.
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false

@@ -92,18 +92,18 @@ func main() {
 
 	if *test {
 		arguments.InputDirs = append(dependencies, []string{
-			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
+			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io",
 		}...)
 		arguments.CustomArgs = clientgenargs.Args{
-			[]unversioned.GroupVersion{{Group: "testgroup", Version: ""}},
-			map[unversioned.GroupVersion]string{
-				unversioned.GroupVersion{Group: "testgroup", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
+			GroupVersions: []unversioned.GroupVersion{{Group: "testgroup.k8s.io", Version: ""}},
+			GroupVersionToInputPath: map[unversioned.GroupVersion]string{
+				unversioned.GroupVersion{Group: "testgroup.k8s.io", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io",
 			},
-			"test_internalclientset",
-			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
-			false,
-			false,
-			cmdArgs,
+			ClientsetName:       "test_internalclientset",
+			ClientsetOutputPath: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
+			ClientsetOnly:       false,
+			FakeClient:          true,
+			CmdArgs:             cmdArgs,
 		}
 	} else {
 		inputPath, groupVersions, gvToPath, err := parseInputVersions()
@@ -114,13 +114,13 @@ func main() {
 		arguments.InputDirs = append(inputPath, dependencies...)
 
 		arguments.CustomArgs = clientgenargs.Args{
-			groupVersions,
-			gvToPath,
-			*clientsetName,
-			*clientsetPath,
-			*clientsetOnly,
-			*fakeClient,
-			cmdArgs,
+			GroupVersions:           groupVersions,
+			GroupVersionToInputPath: gvToPath,
+			ClientsetName:           *clientsetName,
+			ClientsetOutputPath:     *clientsetPath,
+			ClientsetOnly:           *clientsetOnly,
+			FakeClient:              *fakeClient,
+			CmdArgs:                 cmdArgs,
 		}
 	}
 

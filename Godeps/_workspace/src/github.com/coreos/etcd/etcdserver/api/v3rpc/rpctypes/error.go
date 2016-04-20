@@ -25,6 +25,7 @@ var (
 	ErrDuplicateKey = grpc.Errorf(codes.InvalidArgument, "etcdserver: duplicate key given in txn request")
 	ErrCompacted    = grpc.Errorf(codes.OutOfRange, "etcdserver: storage: required revision has been compacted")
 	ErrFutureRev    = grpc.Errorf(codes.OutOfRange, "etcdserver: storage: required revision is a future revision")
+	ErrNoSpace      = grpc.Errorf(codes.ResourceExhausted, "etcdserver: storage: database space exceeded")
 
 	ErrLeaseNotFound = grpc.Errorf(codes.NotFound, "etcdserver: requested lease not found")
 	ErrLeaseExist    = grpc.Errorf(codes.FailedPrecondition, "etcdserver: lease already exists")
@@ -35,4 +36,8 @@ var (
 	ErrMemberNotFound = grpc.Errorf(codes.NotFound, "etcdserver: member not found")
 
 	ErrRequestTooLarge = grpc.Errorf(codes.InvalidArgument, "etcdserver: request is too large")
+
+	ErrUserAlreadyExist = grpc.Errorf(codes.FailedPrecondition, "etcdserver: user name already exists")
+	ErrUserNotFound     = grpc.Errorf(codes.FailedPrecondition, "etcdserver: user name not found")
+	ErrRoleAlreadyExist = grpc.Errorf(codes.FailedPrecondition, "etcdserver: role name already exists")
 )

@@ -118,7 +118,7 @@ func NewRegistry(client *clientset.Clientset) Registry {
 	return r
 }
 
-func (r registryImpl) watch() <-chan *PodEvent {
+func (r *registryImpl) watch() <-chan *PodEvent {
 	return r.updates
 }
 
@@ -130,26 +130,26 @@ func taskIDFor(pod *api.Pod) (taskID string, err error) {
 	return
 }
 
-func (r registryImpl) shutdown() {
+func (r *registryImpl) shutdown() {
 	//TODO(jdef) flesh this out
 	r.m.Lock()
 	defer r.m.Unlock()
 	r.boundTasks = map[string]*api.Pod{}
 }
 
-func (r registryImpl) empty() bool {
+func (r *registryImpl) empty() bool {
 	r.m.RLock()
 	defer r.m.RUnlock()
 	return len(r.boundTasks) == 0
 }
 
-func (r registryImpl) pod(taskID string) *api.Pod {
+func (r *registryImpl) pod(taskID string) *api.Pod {
 	r.m.RLock()
 	defer r.m.RUnlock()
 	return r.boundTasks[taskID]
 }
 
-func (r registryImpl) Remove(taskID string) error {
+func (r *registryImpl) Remove(taskID string) error {
 	r.m.Lock()
 	defer r.m.Unlock()
 	pod, ok := r.boundTasks[taskID]
@@ -169,7 +169,7 @@ func (r registryImpl) Remove(taskID string) error {
 	return nil
 }
 
-func (r registryImpl) Update(pod *api.Pod) (*PodEvent, error) {
+func (r *registryImpl) Update(pod *api.Pod) (*PodEvent, error) {
 	// Don't do anything for pods without task anotation which means:
 	// - "pre-scheduled" pods which have a NodeName set to this node without being scheduled already.
 	// - static/mirror pods: they'll never have a TaskID annotation, and we don't expect them to ever change.
@@ -254,8 +254,7 @@ func copyPorts(dest, src *api.Pod) bool {
 	return true
 }
 
-func (r registryImpl) bind(taskID string, pod *api.Pod) error {
-
+func (r *registryImpl) bind(taskID string, pod *api.Pod) error {
 	// validate taskID matches that of the annotation
 	annotatedTaskID, err := taskIDFor(pod)
 	if err != nil {

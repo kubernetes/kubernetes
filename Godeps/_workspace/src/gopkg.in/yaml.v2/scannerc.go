@@ -961,7 +961,7 @@ func yaml_parser_roll_indent(parser *yaml_parser_t, column, number int, typ yaml
 }
 
 // Pop indentation levels from the indents stack until the current level
-// becomes less or equal to the column.  For each intendation level, append
+// becomes less or equal to the column.  For each indentation level, append
 // the BLOCK-END token.
 func yaml_parser_unroll_indent(parser *yaml_parser_t, column int) bool {
 	// In the flow context, do nothing.
@@ -969,7 +969,7 @@ func yaml_parser_unroll_indent(parser *yaml_parser_t, column int) bool {
 		return true
 	}
 
-	// Loop through the intendation levels in the stack.
+	// Loop through the indentation levels in the stack.
 	for parser.indent > column {
 		// Create a token and append it to the queue.
 		token := yaml_token_t{
@@ -1546,7 +1546,7 @@ func yaml_parser_scan_directive(parser *yaml_parser_t, token *yaml_token_t) bool
 		// Unknown directive.
 	} else {
 		yaml_parser_set_scanner_error(parser, "while scanning a directive",
-			start_mark, "found uknown directive name")
+			start_mark, "found unknown directive name")
 		return false
 	}
 
@@ -2085,14 +2085,14 @@ func yaml_parser_scan_block_scalar(parser *yaml_parser_t, token *yaml_token_t, l
 			return false
 		}
 		if is_digit(parser.buffer, parser.buffer_pos) {
-			// Check that the intendation is greater than 0.
+			// Check that the indentation is greater than 0.
 			if parser.buffer[parser.buffer_pos] == '0' {
 				yaml_parser_set_scanner_error(parser, "while scanning a block scalar",
-					start_mark, "found an intendation indicator equal to 0")
+					start_mark, "found an indentation indicator equal to 0")
 				return false
 			}
 
-			// Get the intendation level and eat the indicator.
+			// Get the indentation level and eat the indicator.
 			increment = as_digit(parser.buffer, parser.buffer_pos)
 			skip(parser)
 		}
@@ -2102,7 +2102,7 @@ func yaml_parser_scan_block_scalar(parser *yaml_parser_t, token *yaml_token_t, l
 
 		if parser.buffer[parser.buffer_pos] == '0' {
 			yaml_parser_set_scanner_error(parser, "while scanning a block scalar",
-				start_mark, "found an intendation indicator equal to 0")
+				start_mark, "found an indentation indicator equal to 0")
 			return false
 		}
 		increment = as_digit(parser.buffer, parser.buffer_pos)
@@ -2157,7 +2157,7 @@ func yaml_parser_scan_block_scalar(parser *yaml_parser_t, token *yaml_token_t, l
 
 	end_mark := parser.mark
 
-	// Set the intendation level if it was specified.
+	// Set the indentation level if it was specified.
 	var indent int
 	if increment > 0 {
 		if parser.indent >= 0 {
@@ -2217,7 +2217,7 @@ func yaml_parser_scan_block_scalar(parser *yaml_parser_t, token *yaml_token_t, l
 
 		leading_break = read_line(parser, leading_break)
 
-		// Eat the following intendation spaces and line breaks.
+		// Eat the following indentation spaces and line breaks.
 		if !yaml_parser_scan_block_scalar_breaks(parser, &indent, &trailing_breaks, start_mark, &end_mark) {
 			return false
 		}
@@ -2245,15 +2245,15 @@ func yaml_parser_scan_block_scalar(parser *yaml_parser_t, token *yaml_token_t, l
 	return true
 }
 
-// Scan intendation spaces and line breaks for a block scalar.  Determine the
-// intendation level if needed.
+// Scan indentation spaces and line breaks for a block scalar.  Determine the
+// indentation level if needed.
 func yaml_parser_scan_block_scalar_breaks(parser *yaml_parser_t, indent *int, breaks *[]byte, start_mark yaml_mark_t, end_mark *yaml_mark_t) bool {
 	*end_mark = parser.mark
 
-	// Eat the intendation spaces and line breaks.
+	// Eat the indentation spaces and line breaks.
 	max_indent := 0
 	for {
-		// Eat the intendation spaces.
+		// Eat the indentation spaces.
 		if parser.unread < 1 && !yaml_parser_update_buffer(parser, 1) {
 			return false
 		}
@@ -2267,10 +2267,10 @@ func yaml_parser_scan_block_scalar_breaks(parser *yaml_parser_t, indent *int, br
 			max_indent = parser.mark.column
 		}
 
-		// Check for a tab character messing the intendation.
+		// Check for a tab character messing the indentation.
 		if (*indent == 0 || parser.mark.column < *indent) && is_tab(parser.buffer, parser.buffer_pos) {
 			return yaml_parser_set_scanner_error(parser, "while scanning a block scalar",
-				start_mark, "found a tab character where an intendation space is expected")
+				start_mark, "found a tab character where an indentation space is expected")
 		}
 
 		// Have we found a non-empty line?
@@ -2655,10 +2655,10 @@ func yaml_parser_scan_plain_scalar(parser *yaml_parser_t, token *yaml_token_t) b
 		for is_blank(parser.buffer, parser.buffer_pos) || is_break(parser.buffer, parser.buffer_pos) {
 			if is_blank(parser.buffer, parser.buffer_pos) {
 
-				// Check for tab character that abuse intendation.
+				// Check for tab character that abuse indentation.
 				if leading_blanks && parser.mark.column < indent && is_tab(parser.buffer, parser.buffer_pos) {
 					yaml_parser_set_scanner_error(parser, "while scanning a plain scalar",
-						start_mark, "found a tab character that violate intendation")
+						start_mark, "found a tab character that violate indentation")
 					return false
 				}
 
@@ -2687,7 +2687,7 @@ func yaml_parser_scan_plain_scalar(parser *yaml_parser_t, token *yaml_token_t) b
 			}
 		}
 
-		// Check intendation level.
+		// Check indentation level.
 		if parser.flow_level == 0 && parser.mark.column < indent {
 			break
 		}

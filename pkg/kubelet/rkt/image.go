@@ -178,7 +178,7 @@ func (r *Runtime) getImageManifest(image string) (*appcschema.ImageManifest, err
 
 // TODO(yifan): This is very racy, unefficient, and unsafe, we need to provide
 // different namespaces. See: https://github.com/coreos/rkt/issues/836.
-func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []docker.AuthConfiguration) error {
+func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []credentialprovider.LazyAuthConfiguration) error {
 	if len(credsSlice) == 0 {
 		return nil
 	}
@@ -186,7 +186,7 @@ func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []docker.AuthCo
 	creds := docker.AuthConfiguration{}
 	// TODO handle multiple creds
 	if len(credsSlice) >= 1 {
-		creds = credsSlice[0]
+		creds = credentialprovider.LazyProvide(credsSlice[0])
 	}
 
 	registry := "index.docker.io"
@@ -196,11 +196,15 @@ func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []docker.AuthCo
 		registry = strings.Split(image, "/")[0]
 	}
 
-	localConfigDir := rktLocalConfigDir
-	if r.config.LocalConfigDir != "" {
-		localConfigDir = r.config.LocalConfigDir
+	configDir := r.config.UserConfigDir
+	if configDir == "" {
+		configDir = r.config.LocalConfigDir
 	}
-	authDir := path.Join(localConfigDir, "auth.d")
+	if configDir == "" {
+		return fmt.Errorf("No user or local config dir is specified")
+	}
+
+	authDir := path.Join(configDir, "auth.d")
 	if _, err := os.Stat(authDir); os.IsNotExist(err) {
 		if err := os.Mkdir(authDir, 0600); err != nil {
 			glog.Errorf("rkt: Cannot create auth dir: %v", err)

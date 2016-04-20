@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // TODO: These should really just use the GCE API client library or at least use
@@ -36,12 +38,12 @@ func createGCEStaticIP(name string) (string, error) {
 	// NAME           REGION      ADDRESS       STATUS
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
-	glog.Infof("Creating static IP with name %q in project %q", name, testContext.CloudConfig.ProjectID)
+	glog.Infof("Creating static IP with name %q in project %q", name, framework.TestContext.CloudConfig.ProjectID)
 	var outputBytes []byte
 	var err error
 	for attempts := 0; attempts < 4; attempts++ {
 		outputBytes, err = exec.Command("gcloud", "compute", "addresses", "create",
-			name, "--project", testContext.CloudConfig.ProjectID,
+			name, "--project", framework.TestContext.CloudConfig.ProjectID,
 			"--region", "us-central1", "-q").CombinedOutput()
 		if err == nil {
 			break
@@ -76,7 +78,7 @@ func deleteGCEStaticIP(name string) error {
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
 	outputBytes, err := exec.Command("gcloud", "compute", "addresses", "delete",
-		name, "--project", testContext.CloudConfig.ProjectID,
+		name, "--project", framework.TestContext.CloudConfig.ProjectID,
 		"--region", "us-central1", "-q").CombinedOutput()
 	if err != nil {
 		// Ditch the error, since the stderr in the output is what actually contains

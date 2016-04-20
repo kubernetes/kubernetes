@@ -36,9 +36,14 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	apiutil "k8s.io/kubernetes/pkg/api/util"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
@@ -56,10 +61,10 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 
-	master := Master{
+	master := &Master{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
 	config := Config{
@@ -68,13 +73,13 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 	storageVersions := make(map[string]string)
 	storageDestinations := genericapiserver.NewStorageDestinations()
 	storageDestinations.AddAPIGroup(
-		api.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix(), false))
+		api.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
 	storageDestinations.AddAPIGroup(
-		autoscaling.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Autoscaling.Codec(), etcdtest.PathPrefix(), false))
+		autoscaling.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Autoscaling.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
 	storageDestinations.AddAPIGroup(
-		batch.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false))
+		batch.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Batch.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
 	storageDestinations.AddAPIGroup(
-		extensions.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false))
+		extensions.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize))
 
 	config.StorageDestinations = storageDestinations
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
@@ -83,20 +88,11 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
 	config.StorageVersions = storageVersions
 	config.PublicAddress = net.ParseIP("192.168.10.4")
-	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
-
-	return master, server, config, assert.New(t)
-}
-
-func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	_, etcdserver, config, assert := setUp(t)
-
 	config.Serializer = api.Codecs
 	config.KubeletClient = client.FakeKubeletClient{}
 	config.APIPrefix = "/api"
 	config.APIGroupPrefix = "/apis"
 	config.APIResourceConfigSource = DefaultAPIResourceConfigSource()
-
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
 
@@ -108,6 +104,33 @@ func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *ass
 	// run the sync routine and register types manually.
 	config.disableThirdPartyControllerForTesting = true
 
+	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
+
+	return master, server, config, assert.New(t)
+}
+
+func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+	_, etcdserver, config, assert := setUp(t)
+
+	master, err := New(&config)
+	if err != nil {
+		t.Fatalf("Error in bringing up the master: %v", err)
+	}
+
+	return master, etcdserver, config, assert
+}
+
+// limitedAPIResourceConfigSource only enables the core group, the extensions group, the batch group, and the autoscaling group.
+func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
+	ret := genericapiserver.NewResourceConfig()
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion)
+	return ret
+}
+
+// newLimitedMaster only enables the core group, the extensions group, the batch group, and the autoscaling group.
+func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+	_, etcdserver, config, assert := setUp(t)
+	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
 	master, err := New(&config)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
@@ -370,114 +393,98 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 }
 
 func TestDiscoveryAtAPIS(t *testing.T) {
-	// TODO(caesarxuchao): make this pass now that batch is added,
-	// and rewrite it so that the indexes do not need to change each time a new api group is added.
-	/*
-		master, etcdserver, config, assert := newMaster(t)
-		defer etcdserver.Terminate(t)
+	master, etcdserver, config, assert := newLimitedMaster(t)
+	defer etcdserver.Terminate(t)
 
-		server := httptest.NewServer(master.HandlerContainer.ServeMux)
-		resp, err := http.Get(server.URL + "/apis")
-		if !assert.NoError(err) {
-			t.Errorf("unexpected error: %v", err)
-		}
+	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	resp, err := http.Get(server.URL + "/apis")
+	if !assert.NoError(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
 
-		assert.Equal(http.StatusOK, resp.StatusCode)
+	assert.Equal(http.StatusOK, resp.StatusCode)
 
-		groupList := unversioned.APIGroupList{}
-		assert.NoError(decodeResponse(resp, &groupList))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+	groupList := unversioned.APIGroupList{}
+	assert.NoError(decodeResponse(resp, &groupList))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-		expectGroupNames := []string{autoscaling.GroupName, batch.GroupName, extensions.GroupName}
-		expectVersions := [][]unversioned.GroupVersionForDiscovery{
+	expectGroupNames := sets.NewString(autoscaling.GroupName, batch.GroupName, extensions.GroupName)
+	expectVersions := map[string][]unversioned.GroupVersionForDiscovery{
+		autoscaling.GroupName: {
 			{
-				{
-					GroupVersion: testapi.Autoscaling.GroupVersion().String(),
-					Version:      testapi.Autoscaling.GroupVersion().Version,
-				},
+				GroupVersion: testapi.Autoscaling.GroupVersion().String(),
+				Version:      testapi.Autoscaling.GroupVersion().Version,
 			},
+		},
+		batch.GroupName: {
 			{
-				{
-					GroupVersion: testapi.Batch.GroupVersion().String(),
-					Version:      testapi.Batch.GroupVersion().Version,
-				},
+				GroupVersion: testapi.Batch.GroupVersion().String(),
+				Version:      testapi.Batch.GroupVersion().Version,
 			},
+		},
+		extensions.GroupName: {
 			{
-				{
-					GroupVersion: testapi.Extensions.GroupVersion().String(),
-					Version:      testapi.Extensions.GroupVersion().Version,
-				},
+				GroupVersion: testapi.Extensions.GroupVersion().String(),
+				Version:      testapi.Extensions.GroupVersion().Version,
 			},
+		},
+	}
+	expectPreferredVersion := map[string]unversioned.GroupVersionForDiscovery{
+		autoscaling.GroupName: {
+			GroupVersion: config.StorageVersions[autoscaling.GroupName],
+			Version:      apiutil.GetVersion(config.StorageVersions[autoscaling.GroupName]),
+		},
+		batch.GroupName: {
+			GroupVersion: config.StorageVersions[batch.GroupName],
+			Version:      apiutil.GetVersion(config.StorageVersions[batch.GroupName]),
+		},
+		extensions.GroupName: {
+			GroupVersion: config.StorageVersions[extensions.GroupName],
+			Version:      apiutil.GetVersion(config.StorageVersions[extensions.GroupName]),
+		},
+	}
+
+	assert.Equal(3, len(groupList.Groups))
+	for _, group := range groupList.Groups {
+		if !expectGroupNames.Has(group.Name) {
+			t.Errorf("got unexpected group %s", group.Name)
 		}
-		expectPreferredVersion := []unversioned.GroupVersionForDiscovery{
-			{
-				GroupVersion: config.StorageVersions[autoscaling.GroupName],
-				Version:      apiutil.GetVersion(config.StorageVersions[autoscaling.GroupName]),
-			},
-			{
-				GroupVersion: config.StorageVersions[batch.GroupName],
-				Version:      apiutil.GetVersion(config.StorageVersions[batch.GroupName]),
-			},
-			{
-				GroupVersion: config.StorageVersions[extensions.GroupName],
-				Version:      apiutil.GetVersion(config.StorageVersions[extensions.GroupName]),
-			},
+		assert.Equal(expectVersions[group.Name], group.Versions)
+		assert.Equal(expectPreferredVersion[group.Name], group.PreferredVersion)
+	}
+
+	thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
+	master.addThirdPartyResourceStorage("/apis/company.com/v1", nil,
+		unversioned.APIGroup{
+			Name:             "company.com",
+			Versions:         []unversioned.GroupVersionForDiscovery{thirdPartyGV},
+			PreferredVersion: thirdPartyGV,
+		})
+
+	resp, err = http.Get(server.URL + "/apis")
+	if !assert.NoError(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	assert.Equal(http.StatusOK, resp.StatusCode)
+	assert.NoError(decodeResponse(resp, &groupList))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assert.Equal(4, len(groupList.Groups))
+
+	expectGroupNames.Insert("company.com")
+	expectVersions["company.com"] = []unversioned.GroupVersionForDiscovery{thirdPartyGV}
+	expectPreferredVersion["company.com"] = thirdPartyGV
+	for _, group := range groupList.Groups {
+		if !expectGroupNames.Has(group.Name) {
+			t.Errorf("got unexpected group %s", group.Name)
 		}
-
-
-		assert.Equal(2, len(groupList.Groups))
-		assert.Equal(expectGroupNames[0], groupList.Groups[0].Name)
-		assert.Equal(expectGroupNames[1], groupList.Groups[1].Name)
-
-		assert.Equal(expectVersions[0], groupList.Groups[0].Versions)
-		assert.Equal(expectVersions[1], groupList.Groups[1].Versions)
-
-		assert.Equal(expectPreferredVersion[0], groupList.Groups[0].PreferredVersion)
-		assert.Equal(expectPreferredVersion[1], groupList.Groups[1].PreferredVersion)
-
-		thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
-		master.addThirdPartyResourceStorage("/apis/company.com/v1", nil,
-			unversioned.APIGroup{
-				Name:             "company.com",
-				Versions:         []unversioned.GroupVersionForDiscovery{thirdPartyGV},
-				PreferredVersion: thirdPartyGV,
-			})
-
-		resp, err = http.Get(server.URL + "/apis")
-		if !assert.NoError(err) {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		assert.Equal(http.StatusOK, resp.StatusCode)
-
-		assert.NoError(decodeResponse(resp, &groupList))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		thirdPartyGroupName := "company.com"
-		thirdPartyExpectVersions := []unversioned.GroupVersionForDiscovery{thirdPartyGV}
-
-		assert.Equal(4, len(groupList.Groups))
-		// autoscaling group
-		assert.Equal(expectGroupNames[0], groupList.Groups[0].Name)
-		assert.Equal(expectVersions[0], groupList.Groups[0].Versions)
-		assert.Equal(expectPreferredVersion[0], groupList.Groups[0].PreferredVersion)
-		// batch group
-		assert.Equal(expectGroupNames[1], groupList.Groups[1].Name)
-		assert.Equal(expectVersions[1], groupList.Groups[1].Versions)
-		assert.Equal(expectPreferredVersion[1], groupList.Groups[1].PreferredVersion)
-		// third party
-		assert.Equal(thirdPartyGroupName, groupList.Groups[2].Name)
-		assert.Equal(thirdPartyExpectVersions, groupList.Groups[2].Versions)
-		assert.Equal(thirdPartyGV, groupList.Groups[2].PreferredVersion)
-		// extensions group
-		assert.Equal(expectGroupNames[2], groupList.Groups[3].Name)
-		assert.Equal(expectVersions[2], groupList.Groups[3].Versions)
-		assert.Equal(expectPreferredVersion[2], groupList.Groups[3].PreferredVersion)
-	*/
+		assert.Equal(expectVersions[group.Name], group.Versions)
+		assert.Equal(expectPreferredVersion[group.Name], group.PreferredVersion)
+	}
 }
 
 var versionsToTest = []string{"v1", "v3"}
@@ -569,7 +576,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 			defer etcdserver.Terminate(t)
 
 			if test.items != nil {
-				err := storeThirdPartyList(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default", test.items)
+				err := createThirdPartyList(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default", test.items)
 				if !assert.NoError(err) {
 					return
 				}
@@ -637,17 +644,17 @@ func encodeToThirdParty(name string, obj interface{}) (runtime.Object, error) {
 	return &thirdPartyData, nil
 }
 
-func storeThirdPartyObject(s storage.Interface, path, name string, obj interface{}) error {
+func createThirdPartyObject(s storage.Interface, path, name string, obj interface{}) error {
 	data, err := encodeToThirdParty(name, obj)
 	if err != nil {
 		return err
 	}
-	return s.Set(context.TODO(), etcdtest.AddPrefix(path), data, nil, 0)
+	return s.Create(context.TODO(), etcdtest.AddPrefix(path), data, nil, 0)
 }
 
-func storeThirdPartyList(s storage.Interface, path string, list []Foo) error {
+func createThirdPartyList(s storage.Interface, path string, list []Foo) error {
 	for _, obj := range list {
-		if err := storeThirdPartyObject(s, path+"/"+obj.Name, obj.Name, obj); err != nil {
+		if err := createThirdPartyObject(s, path+"/"+obj.Name, obj.Name, obj); err != nil {
 			return err
 		}
 	}
@@ -690,7 +697,7 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
+	if !assert.NoError(createThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
 	}
@@ -803,7 +810,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
+	if !assert.NoError(createThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
 	}
@@ -913,13 +920,13 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
+	if !assert.NoError(createThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
 	}
 	secondObj := expectedObj
 	secondObj.Name = "bar"
-	if !assert.NoError(storeThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/bar", "bar", secondObj)) {
+	if !assert.NoError(createThirdPartyObject(master.thirdPartyStorage, "/ThirdPartyResourceData/company.com/foos/default/bar", "bar", secondObj)) {
 		t.FailNow()
 		return
 	}
@@ -1004,13 +1011,13 @@ func testThirdPartyDiscovery(t *testing.T, version string) {
 	assert.Equal(group.APIVersion, "v1")
 	assert.Equal(group.Kind, "APIGroup")
 	assert.Equal(group.Name, "company.com")
-	assert.Equal(group.Versions, []unversioned.GroupVersionForDiscovery{
-		{
-			GroupVersion: "company.com/" + version,
-			Version:      version,
-		},
-	})
-	assert.Equal(group.PreferredVersion, unversioned.GroupVersionForDiscovery{})
+	expectedVersion := unversioned.GroupVersionForDiscovery{
+		GroupVersion: "company.com/" + version,
+		Version:      version,
+	}
+
+	assert.Equal(group.Versions, []unversioned.GroupVersionForDiscovery{expectedVersion})
+	assert.Equal(group.PreferredVersion, expectedVersion)
 
 	resp, err = http.Get(server.URL + "/apis/company.com/" + version)
 	if !assert.NoError(err) {

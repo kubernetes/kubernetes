@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1 
+apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: nginx-deployment
@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: nginx:latest
+        image: gcr.io/google-containers/nginx:1.7.9
         ports:
         - containerPort: 80

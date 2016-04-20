@@ -86,7 +86,7 @@ func (es *e2eService) stop() {
 	if es.apiServerCmd != nil {
 		err := es.apiServerCmd.Process.Kill()
 		if err != nil {
-			glog.Errorf("Failed to stop be-apiserver.\n%v", err)
+			glog.Errorf("Failed to stop kube-apiserver.\n%v", err)
 		}
 	}
 	if es.etcdCmd != nil {
@@ -126,7 +126,9 @@ func (es *e2eService) startApiServer() (*exec.Cmd, error) {
 		"--etcd-servers", "http://127.0.0.1:4001",
 		"--insecure-bind-address", "0.0.0.0",
 		"--service-cluster-ip-range", "10.0.0.1/24",
-		"--kubelet-port", "10250")
+		"--kubelet-port", "10250",
+		"--allow-privileged", "true",
+	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:8080/healthz",
 		cmd,
@@ -142,6 +144,7 @@ func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
 		"--port", "10250",
 		"--hostname-override", es.nodeName, // Required because hostname is inconsistent across hosts
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
+		"--allow-privileged", "true",
 	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:10255/healthz",
@@ -155,7 +158,7 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 	go func() {
 		err := cmd.Run()
 		if err != nil {
-			cmdErrorChan <- fmt.Errorf("%s Exited with status %v.  Output:\n%s", cmd, err, *cmd.OutputBuffer)
+			cmdErrorChan <- fmt.Errorf("%s Failed with error \"%v\".  Command output:\n%s", cmd, err, *cmd.OutputBuffer)
 		}
 		close(cmdErrorChan)
 	}()

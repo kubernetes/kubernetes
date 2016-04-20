@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -243,7 +244,7 @@ func deleteEachItem(
 }
 
 // deleteAllContentForGroupVersionResource will use the dynamic client to delete each resource identified in gvr.
-// It returns an estimate of the time remaining before the remaing resources are deleted.
+// It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
 func deleteAllContentForGroupVersionResource(
 	kubeClient clientset.Interface,
@@ -303,7 +304,7 @@ func deleteAllContentForGroupVersionResource(
 }
 
 // deleteAllContent will use the dynamic client to delete each resource identified in groupVersionResources.
-// It returns an estimate of the time remaining before the remaing resources are deleted.
+// It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
 func deleteAllContent(
 	kubeClient clientset.Interface,
@@ -459,11 +460,14 @@ func ServerPreferredNamespacedGroupVersionResources(discoveryClient discovery.Di
 	if err != nil {
 		return results, err
 	}
+
+	allErrs := []error{}
 	for _, apiGroup := range serverGroupList.Groups {
 		preferredVersion := apiGroup.PreferredVersion
 		apiResourceList, err := discoveryClient.ServerResourcesForGroupVersion(preferredVersion.GroupVersion)
 		if err != nil {
-			return results, err
+			allErrs = append(allErrs, err)
+			continue
 		}
 		groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
 		for _, apiResource := range apiResourceList.APIResources {
@@ -476,5 +480,5 @@ func ServerPreferredNamespacedGroupVersionResources(discoveryClient discovery.Di
 			results = append(results, groupVersion.WithResource(apiResource.Name))
 		}
 	}
-	return results, nil
+	return results, utilerrors.NewAggregate(allErrs)
 }

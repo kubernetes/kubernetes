@@ -64,5 +64,3 @@ done
 for group_version in "${GROUP_VERSIONS[@]}"; do
   generate_version "${group_version}"
 done
-
-"${KUBE_ROOT}/hack/update-swagger-spec.sh"

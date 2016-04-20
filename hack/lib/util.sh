@@ -19,7 +19,7 @@ kube::util::sortable_date() {
 }
 
 # this mimics the behavior of linux realpath which is not shipped by default with
-# mac OS X 
+# mac OS X
 kube::util::realpath() {
   [[ $1 = /* ]] && echo "$1" | sed 's/\/$//' || echo "$PWD/${1#./}"  | sed 's/\/$//'
 }
@@ -156,7 +156,7 @@ kube::util::host_platform() {
     ppc64le*)
       host_arch=ppc64le
       ;;
-    *)	
+    *)
       kube::log::error "Unsupported host arch. Must be x86_64, 386, arm, s390x or ppc64le."
       exit 1
       ;;
@@ -185,6 +185,7 @@ kube::util::gen-docs() {
   gendocs=$(kube::util::find-binary "gendocs")
   genkubedocs=$(kube::util::find-binary "genkubedocs")
   genman=$(kube::util::find-binary "genman")
+  genyaml=$(kube::util::find-binary "genyaml")
   genbashcomp=$(kube::util::find-binary "genbashcomp")
 
   mkdir -p "${dest}/docs/user-guide/kubectl/"
@@ -197,6 +198,8 @@ kube::util::gen-docs() {
   "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/"
+  mkdir -p "${dest}/docs/yaml/kubectl/"
+  "${genyaml}" "${dest}/docs/yaml/kubectl/"
   mkdir -p "${dest}/contrib/completions/bash/"
   "${genbashcomp}" "${dest}/contrib/completions/bash/"
 

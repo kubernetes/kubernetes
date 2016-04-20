@@ -118,7 +118,7 @@ func (n *NsenterMounter) doNsenterMount(source, target, fstype string, options [
 	exec := exec.New()
 	outputBytes, err := exec.Command(nsenterPath, args...).CombinedOutput()
 	if len(outputBytes) != 0 {
-		glog.V(5).Infof("Output from mount command: %v", string(outputBytes))
+		glog.V(5).Infof("Output of mounting %s to %s: %v", source, target, string(outputBytes))
 	}
 
 	return err
@@ -151,7 +151,7 @@ func (n *NsenterMounter) Unmount(target string) error {
 	exec := exec.New()
 	outputBytes, err := exec.Command(nsenterPath, args...).CombinedOutput()
 	if len(outputBytes) != 0 {
-		glog.V(5).Infof("Output from mount command: %v", string(outputBytes))
+		glog.V(5).Infof("Output of unmounting %s: %v", target, string(outputBytes))
 	}
 
 	return err
@@ -170,13 +170,19 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		return true, err
 	}
 
+	// Check the directory exists
+	if _, err = os.Stat(file); os.IsNotExist(err) {
+		glog.V(5).Infof("findmnt: directory %s does not exist", file)
+		return true, err
+	}
+
 	args := []string{"--mount=/rootfs/proc/1/ns/mnt", "--", n.absHostPath("findmnt"), "-o", "target", "--noheadings", "--target", file}
 	glog.V(5).Infof("findmnt command: %v %v", nsenterPath, args)
 
 	exec := exec.New()
 	out, err := exec.Command(nsenterPath, args...).CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed findmnt command: %v", err)
+		glog.V(2).Infof("Failed findmnt command for path %s: %v", file, err)
 		// Different operating systems behave differently for paths which are not mount points.
 		// On older versions (e.g. 2.20.1) we'd get error, on newer ones (e.g. 2.26.2) we'd get "/".
 		// It's safer to assume that it's not a mount point.
@@ -184,7 +190,7 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 	strOut := strings.TrimSuffix(string(out), "\n")
 
-	glog.V(5).Infof("IsLikelyNotMountPoint findmnt output: %v", strOut)
+	glog.V(5).Infof("IsLikelyNotMountPoint findmnt output for path %s: %v", file, strOut)
 	if strOut == file {
 		return false, nil
 	}

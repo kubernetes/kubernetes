@@ -240,6 +240,35 @@ func TestInsufficentCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
+func TestSufficentCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
+	podSpec := api.PodSpec{
+		NodeName: "too-much-mem",
+		Containers: []api.Container{{
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceMemory: resource.MustParse("75M"),
+					api.ResourceCPU:    resource.MustParse("75m"),
+				},
+			},
+		}},
+	}
+	manager, podControl := newTestController()
+	node := newNode("too-much-mem", nil)
+	node.Status.Allocatable = api.ResourceList{
+		api.ResourceMemory: resource.MustParse("100M"),
+		api.ResourceCPU:    resource.MustParse("200m"),
+	}
+	manager.nodeStore.Add(node)
+	manager.podStore.Add(&api.Pod{
+		Spec:   podSpec,
+		Status: api.PodStatus{Phase: api.PodSucceeded},
+	})
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
 // DaemonSets should place onto nodes with sufficient free resource
 func TestSufficentCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	podSpec := api.PodSpec{

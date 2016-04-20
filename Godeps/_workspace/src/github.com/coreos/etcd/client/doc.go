@@ -34,6 +34,8 @@ Create a Config and exchange it for a Client:
 		// handle error
 	}
 
+Clients are safe for concurrent use by multiple goroutines.
+
 Create a KeysAPI using the Client, then use it to interact with etcd:
 
 	kAPI := client.NewKeysAPI(c)

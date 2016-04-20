@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/v1"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io/v1"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -41,7 +41,7 @@ var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
 
 func TestRun(t *testing.T) {
 	go func() {
-		if err := Run(); err != nil {
+		if err := Run(NewServerRunOptions()); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
@@ -107,7 +107,7 @@ func testAPIGroupList(t *testing.T) {
 }
 
 func testAPIGroup(t *testing.T) {
-	serverURL := serverIP + "/apis/testgroup"
+	serverURL := serverIP + "/apis/testgroup.k8s.io"
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -126,7 +126,7 @@ func testAPIGroup(t *testing.T) {
 }
 
 func testAPIResourceList(t *testing.T) {
-	serverURL := serverIP + "/apis/testgroup/v1"
+	serverURL := serverIP + "/apis/testgroup.k8s.io/v1"
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)

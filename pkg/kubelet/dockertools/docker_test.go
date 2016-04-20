@@ -27,6 +27,8 @@ import (
 	"testing"
 
 	"github.com/docker/docker/pkg/jsonmessage"
+	dockertypes "github.com/docker/engine-api/types"
+	dockernat "github.com/docker/go-connections/nat"
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -62,7 +64,7 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 	}
 }
 
-func findPodContainer(dockerContainers []*docker.APIContainers, podFullName string, uid types.UID, containerName string) (*docker.APIContainers, bool, uint64) {
+func findPodContainer(dockerContainers []*dockertypes.Container, podFullName string, uid types.UID, containerName string) (*dockertypes.Container, bool, uint64) {
 	for _, dockerContainer := range dockerContainers {
 		if len(dockerContainer.Names) == 0 {
 			continue
@@ -81,8 +83,8 @@ func findPodContainer(dockerContainers []*docker.APIContainers, podFullName stri
 }
 
 func TestGetContainerID(t *testing.T) {
-	fakeDocker := &FakeDockerClient{}
-	fakeDocker.SetFakeRunningContainers([]*docker.Container{
+	fakeDocker := NewFakeDockerClient()
+	fakeDocker.SetFakeRunningContainers([]*FakeContainer{
 		{
 			ID:   "foobar",
 			Name: "/k8s_foo_qux_ns_1234_42",
@@ -98,7 +100,7 @@ func TestGetContainerID(t *testing.T) {
 		t.Errorf("Expected no error, Got %#v", err)
 	}
 	if len(dockerContainers) != 2 {
-		t.Errorf("Expected %#v, Got %#v", fakeDocker.ContainerList, dockerContainers)
+		t.Errorf("Expected %#v, Got %#v", fakeDocker.RunningContainerList, dockerContainers)
 	}
 	verifyCalls(t, fakeDocker, []string{"list"})
 
@@ -156,7 +158,7 @@ func TestContainerNaming(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.3", "ApiVersion=1.15"}}
+	fakeDocker := NewFakeDockerClientWithVersion("1.1.3", "1.15")
 	manager := &DockerManager{client: fakeDocker}
 	version, err := manager.Version()
 	if err != nil {
@@ -214,7 +216,7 @@ func TestPullWithNoSecrets(t *testing.T) {
 	}
 	for _, test := range tests {
 		fakeKeyring := &credentialprovider.FakeKeyring{}
-		fakeClient := &FakeDockerClient{}
+		fakeClient := NewFakeDockerClient()
 
 		dp := dockerPuller{
 			client:  fakeClient,
@@ -257,9 +259,9 @@ func TestPullWithJSONError(t *testing.T) {
 	}
 	for i, test := range tests {
 		fakeKeyring := &credentialprovider.FakeKeyring{}
-		fakeClient := &FakeDockerClient{
-			Errors: map[string]error{"pull": test.err},
-		}
+		fakeClient := NewFakeDockerClient()
+		fakeClient.InjectError("pull", test.err)
+
 		puller := &dockerPuller{
 			client:  fakeClient,
 			keyring: fakeKeyring,
@@ -301,25 +303,25 @@ func TestPullWithSecrets(t *testing.T) {
 		"default keyring secrets": {
 			"ubuntu",
 			[]api.Secret{},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email", nil}}),
 			[]string{`ubuntu:latest using {"username":"built-in","password":"password","email":"email"}`},
 		},
 		"default keyring secrets unused": {
 			"ubuntu",
 			[]api.Secret{},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"extraneous": {"built-in", "password", "email"}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"extraneous": {"built-in", "password", "email", nil}}),
 			[]string{`ubuntu:latest using {}`},
 		},
 		"builtin keyring secrets, but use passed": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email", nil}}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
 		"builtin keyring secrets, but use passed with new docker config": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockerConfigJson, Data: map[string][]byte{api.DockerConfigJsonKey: dockerConfigJsonContent}}},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email", nil}}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
 	}
@@ -327,7 +329,7 @@ func TestPullWithSecrets(t *testing.T) {
 		builtInKeyRing := &credentialprovider.BasicDockerKeyring{}
 		builtInKeyRing.Add(test.builtInDockerConfig)
 
-		fakeClient := &FakeDockerClient{}
+		fakeClient := NewFakeDockerClient()
 
 		dp := dockerPuller{
 			client:  fakeClient,
@@ -353,9 +355,8 @@ func TestPullWithSecrets(t *testing.T) {
 
 func TestDockerKeyringLookupFails(t *testing.T) {
 	fakeKeyring := &credentialprovider.FakeKeyring{}
-	fakeClient := &FakeDockerClient{
-		Errors: map[string]error{"pull": fmt.Errorf("test error")},
-	}
+	fakeClient := NewFakeDockerClient()
+	fakeClient.InjectError("pull", fmt.Errorf("test error"))
 
 	dp := dockerPuller{
 		client:  fakeClient,
@@ -374,16 +375,20 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 
 func TestDockerKeyringLookup(t *testing.T) {
 
-	ada := docker.AuthConfiguration{
-		Username: "ada",
-		Password: "smash",
-		Email:    "ada@example.com",
+	ada := credentialprovider.LazyAuthConfiguration{
+		AuthConfiguration: docker.AuthConfiguration{
+			Username: "ada",
+			Password: "smash",
+			Email:    "ada@example.com",
+		},
 	}
 
-	grace := docker.AuthConfiguration{
-		Username: "grace",
-		Password: "squash",
-		Email:    "grace@example.com",
+	grace := credentialprovider.LazyAuthConfiguration{
+		AuthConfiguration: docker.AuthConfiguration{
+			Username: "grace",
+			Password: "squash",
+			Email:    "grace@example.com",
+		},
 	}
 
 	dk := &credentialprovider.BasicDockerKeyring{}
@@ -402,27 +407,27 @@ func TestDockerKeyringLookup(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match []docker.AuthConfiguration
+		match []credentialprovider.LazyAuthConfiguration
 		ok    bool
 	}{
 		// direct match
-		{"bar.example.com", []docker.AuthConfiguration{ada}, true},
+		{"bar.example.com", []credentialprovider.LazyAuthConfiguration{ada}, true},
 
 		// direct match deeper than other possible matches
-		{"bar.example.com/pong", []docker.AuthConfiguration{grace, ada}, true},
+		{"bar.example.com/pong", []credentialprovider.LazyAuthConfiguration{grace, ada}, true},
 
 		// no direct match, deeper path ignored
-		{"bar.example.com/ping", []docker.AuthConfiguration{ada}, true},
+		{"bar.example.com/ping", []credentialprovider.LazyAuthConfiguration{ada}, true},
 
 		// match first part of path token
-		{"bar.example.com/pongz", []docker.AuthConfiguration{grace, ada}, true},
+		{"bar.example.com/pongz", []credentialprovider.LazyAuthConfiguration{grace, ada}, true},
 
 		// match regardless of sub-path
-		{"bar.example.com/pong/pang", []docker.AuthConfiguration{grace, ada}, true},
+		{"bar.example.com/pong/pang", []credentialprovider.LazyAuthConfiguration{grace, ada}, true},
 
 		// no host match
-		{"example.com", []docker.AuthConfiguration{}, false},
-		{"foo.example.com", []docker.AuthConfiguration{}, false},
+		{"example.com", []credentialprovider.LazyAuthConfiguration{}, false},
+		{"foo.example.com", []credentialprovider.LazyAuthConfiguration{}, false},
 	}
 
 	for i, tt := range tests {
@@ -441,10 +446,12 @@ func TestDockerKeyringLookup(t *testing.T) {
 // by images that only match the hostname.
 // NOTE: the above covers the case of a more specific match trumping just hostname.
 func TestIssue3797(t *testing.T) {
-	rex := docker.AuthConfiguration{
-		Username: "rex",
-		Password: "tiny arms",
-		Email:    "rex@example.com",
+	rex := credentialprovider.LazyAuthConfiguration{
+		AuthConfiguration: docker.AuthConfiguration{
+			Username: "rex",
+			Password: "tiny arms",
+			Email:    "rex@example.com",
+		},
 	}
 
 	dk := &credentialprovider.BasicDockerKeyring{}
@@ -458,15 +465,15 @@ func TestIssue3797(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match []docker.AuthConfiguration
+		match []credentialprovider.LazyAuthConfiguration
 		ok    bool
 	}{
 		// direct match
-		{"quay.io", []docker.AuthConfiguration{rex}, true},
+		{"quay.io", []credentialprovider.LazyAuthConfiguration{rex}, true},
 
 		// partial matches
-		{"quay.io/foo", []docker.AuthConfiguration{rex}, true},
-		{"quay.io/foo/bar", []docker.AuthConfiguration{rex}, true},
+		{"quay.io/foo", []credentialprovider.LazyAuthConfiguration{rex}, true},
+		{"quay.io/foo/bar", []credentialprovider.LazyAuthConfiguration{rex}, true},
 	}
 
 	for i, tt := range tests {
@@ -493,7 +500,7 @@ func (f *imageTrackingDockerClient) InspectImage(name string) (image *docker.Ima
 }
 
 func TestIsImagePresent(t *testing.T) {
-	cl := &imageTrackingDockerClient{&FakeDockerClient{}, ""}
+	cl := &imageTrackingDockerClient{NewFakeDockerClient(), ""}
 	puller := &dockerPuller{
 		client: cl,
 	}
@@ -517,14 +524,14 @@ func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
 
 func TestFindContainersByPod(t *testing.T) {
 	tests := []struct {
-		containerList       []docker.APIContainers
-		exitedContainerList []docker.APIContainers
-		all                 bool
-		expectedPods        []*kubecontainer.Pod
+		runningContainerList []dockertypes.Container
+		exitedContainerList  []dockertypes.Container
+		all                  bool
+		expectedPods         []*kubecontainer.Pod
 	}{
 
 		{
-			[]docker.APIContainers{
+			[]dockertypes.Container{
 				{
 					ID:    "foobar",
 					Names: []string{"/k8s_foobar.1234_qux_ns_1234_42"},
@@ -538,7 +545,7 @@ func TestFindContainersByPod(t *testing.T) {
 					Names: []string{"/k8s_baz.1234_qux_ns_1234_42"},
 				},
 			},
-			[]docker.APIContainers{
+			[]dockertypes.Container{
 				{
 					ID:    "barfoo",
 					Names: []string{"/k8s_barfoo.1234_qux_ns_1234_42"},
@@ -585,7 +592,7 @@ func TestFindContainersByPod(t *testing.T) {
 			},
 		},
 		{
-			[]docker.APIContainers{
+			[]dockertypes.Container{
 				{
 					ID:    "foobar",
 					Names: []string{"/k8s_foobar.1234_qux_ns_1234_42"},
@@ -599,7 +606,7 @@ func TestFindContainersByPod(t *testing.T) {
 					Names: []string{"/k8s_baz.1234_qux_ns_1234_42"},
 				},
 			},
-			[]docker.APIContainers{
+			[]dockertypes.Container{
 				{
 					ID:    "barfoo",
 					Names: []string{"/k8s_barfoo.1234_qux_ns_1234_42"},
@@ -665,18 +672,18 @@ func TestFindContainersByPod(t *testing.T) {
 			},
 		},
 		{
-			[]docker.APIContainers{},
-			[]docker.APIContainers{},
+			[]dockertypes.Container{},
+			[]dockertypes.Container{},
 			true,
 			nil,
 		},
 	}
-	fakeClient := &FakeDockerClient{}
+	fakeClient := NewFakeDockerClient()
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
 	// image back-off is set to nil, this test should not pull images
 	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, options.GetDefaultPodInfraContainerImage(), 0, 0, "", containertest.FakeOS{}, np, nil, nil, nil)
 	for i, test := range tests {
-		fakeClient.ContainerList = test.containerList
+		fakeClient.RunningContainerList = test.runningContainerList
 		fakeClient.ExitedContainerList = test.exitedContainerList
 
 		result, _ := containerManager.GetPods(test.all)
@@ -744,37 +751,37 @@ func TestMakePortsAndBindings(t *testing.T) {
 	}
 
 	// Construct expected bindings
-	expectPortBindings := map[string][]docker.PortBinding{
+	expectPortBindings := map[string][]dockernat.PortBinding{
 		"80/tcp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "8080",
 				HostIP:   "127.0.0.1",
 			},
 		},
 		"443/tcp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "443",
 				HostIP:   "",
 			},
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "446",
 				HostIP:   "",
 			},
 		},
 		"443/udp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "446",
 				HostIP:   "",
 			},
 		},
 		"444/udp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "444",
 				HostIP:   "",
 			},
 		},
 		"445/tcp": {
-			docker.PortBinding{
+			dockernat.PortBinding{
 				HostPort: "445",
 				HostIP:   "",
 			},

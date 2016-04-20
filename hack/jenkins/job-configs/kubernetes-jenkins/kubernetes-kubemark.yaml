@@ -3,12 +3,13 @@
     description: '{description} Test owner: gmarek'
     logrotate:
         daysToKeep: 7
+    node: 'master'
     builders:
         - shell: |
             {provider-env}
             {job-env}
             {post-env}
-            timeout -k {kill-timeout}m {timeout}m {runner} && rc=$? || rc=$?
+            timeout -k {kill-timeout}m {timeout}m {legacy-runner} && rc=$? || rc=$?
             {report-rc}
     properties:
         - mail-watcher
@@ -39,8 +40,8 @@
     suffix:
         - '5-gce':
             description: 'Run minimal Kubemark to make sure it is not broken.'
-            timeout: 30
-            cron-string: 'H/30 * * * *'
+            timeout: 60
+            cron-string: '{sq-cron-string}'
             job-env: |
                 export E2E_NAME="kubemark-5"
                 export PROJECT="k8s-jenkins-kubemark"

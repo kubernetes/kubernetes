@@ -135,8 +135,9 @@ func (g *genProtoIDL) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	b := bodyGen{
 		locator: &protobufLocator{
-			namer:   c.Namers["proto"].(ProtobufFromGoNamer),
-			tracker: g.imports,
+			namer:    c.Namers["proto"].(ProtobufFromGoNamer),
+			tracker:  g.imports,
+			universe: c.Universe,
 
 			localGoPackage: g.localGoPackage.Package,
 		},
@@ -153,7 +154,6 @@ func (g *genProtoIDL) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	default:
 		return b.unknown(sw)
 	}
-	return sw.Error()
 }
 
 // ProtobufFromGoNamer finds the protobuf name of a type (and its package, and
@@ -164,12 +164,14 @@ type ProtobufFromGoNamer interface {
 
 type ProtobufLocator interface {
 	ProtoTypeFor(t *types.Type) (*types.Type, error)
+	GoTypeForName(name types.Name) *types.Type
 	CastTypeName(name types.Name) string
 }
 
 type protobufLocator struct {
-	namer   ProtobufFromGoNamer
-	tracker namer.ImportTracker
+	namer    ProtobufFromGoNamer
+	tracker  namer.ImportTracker
+	universe types.Universe
 
 	localGoPackage string
 }
@@ -181,6 +183,13 @@ func (p protobufLocator) CastTypeName(name types.Name) string {
 		return name.Name
 	}
 	return name.String()
+}
+
+func (p protobufLocator) GoTypeForName(name types.Name) *types.Type {
+	if len(name.Package) == 0 {
+		name.Package = p.localGoPackage
+	}
+	return p.universe.Type(name)
 }
 
 // ProtoTypeFor locates a Protobuf type for the provided Go type (if possible).
@@ -231,6 +240,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 		return nil
 	}
 
+	var alias *types.Type
 	var fields []protoField
 	options := []string{}
 	allOptions := types.ExtractCommentTags("+", b.t.CommentLines)
@@ -254,6 +264,14 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 					options = append(options, fmt.Sprintf("%s = %s", key, v))
 				}
 			}
+		// protobuf.as allows a type to have the same message contents as another Go type
+		case k == "protobuf.as":
+			fields = nil
+			if alias = b.locator.GoTypeForName(types.Name{Name: v}); alias == nil {
+				return fmt.Errorf("type %v references alias %q which does not exist", b.t, v)
+			}
+		// protobuf.embed instructs the generator to use the named type in this package
+		// as an embedded message.
 		case k == "protobuf.embed":
 			fields = []protoField{
 				{
@@ -270,10 +288,13 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 			}
 		}
 	}
+	if alias == nil {
+		alias = b.t
+	}
 
 	// If we don't explicitly embed anything, generate fields by traversing fields.
 	if fields == nil {
-		memberFields, err := membersToFields(b.locator, b.t, b.localPackage, b.omitFieldTypes)
+		memberFields, err := membersToFields(b.locator, alias, b.localPackage, b.omitFieldTypes)
 		if err != nil {
 			return fmt.Errorf("type %v cannot be converted to protobuf: %v", b.t, err)
 		}
@@ -424,7 +445,7 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 		field.Nullable = true
 	case types.Alias:
 		if err := memberTypeToProtobufField(locator, field, t.Underlying); err != nil {
-			log.Printf("failed to alias: %s %s: err", t.Name, t.Underlying.Name, err)
+			log.Printf("failed to alias: %s %s: err %v", t.Name, t.Underlying.Name, err)
 			return err
 		}
 		if field.Extras == nil {
@@ -454,7 +475,7 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 
 // protobufTagToField extracts information from an existing protobuf tag
 func protobufTagToField(tag string, field *protoField, m types.Member, t *types.Type, localPackage types.Name) error {
-	if len(tag) == 0 {
+	if len(tag) == 0 || tag == "-" {
 		return nil
 	}
 
@@ -594,7 +615,7 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 		tag := field.Tag
 		if tag != -1 {
 			if existing, ok := byTag[tag]; ok {
-				return nil, fmt.Errorf("field %q and %q in %q both have tag %d", field.Name, existing.Name, tag)
+				return nil, fmt.Errorf("field %q and %q both have tag %d", field.Name, existing.Name, tag)
 			}
 			byTag[tag] = field
 		}

@@ -58,7 +58,7 @@ func TestEmpty(t *testing.T) {
 func TestStore(t *testing.T) {
 	storage, server, backing := newStorage(t)
 	defer server.Terminate(t)
-	if err := storage.storage.Set(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
+	if err := storage.storage.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

@@ -180,7 +180,7 @@ right thing.
 
 Here are a few pointers:
 
-+ [E2e Framework](../../test/e2e/framework.go):
++ [E2e Framework](../../test/e2e/framework/framework.go):
    Familiarise yourself with this test framework and how to use it.
    Amongst others, it automatically creates uniquely named namespaces
    within which your tests can run to avoid name clashes, and reliably
@@ -194,7 +194,7 @@ Here are a few pointers:
    should always use this framework.  Trying other home-grown
    approaches to avoiding name clashes and resource leaks has proven
    to be a very bad idea.
-+ [E2e utils library](../../test/e2e/util.go):
++ [E2e utils library](../../test/e2e/framework/util.go):
    This handy library provides tons of reusable code for a host of
    commonly needed test functionality, including waiting for resources
    to enter specified states, safely and consistently retrying failed

@@ -20,6 +20,8 @@ set -o pipefail
 set -o xtrace
 
 export REPO_DIR=${REPO_DIR:-$(pwd)}
+export HOST_ARTIFACTS_DIR=${WORKSPACE}/_artifacts
+mkdir -p "${HOST_ARTIFACTS_DIR}"
 
 # Run the kubekins container, mapping in docker (so we can launch containers),
 # the repo directory, and the artifacts output directory.
@@ -42,5 +44,6 @@ docker run --rm=true \
   -e "KUBE_FORCE_VERIFY_CHECKS=${KUBE_FORCE_VERIFY_CHECKS:-}" \
   -e "KUBE_VERIFY_GIT_BRANCH=${KUBE_VERIFY_GIT_BRANCH:-}" \
   -e "REPO_DIR=${REPO_DIR}" \
+  -e "HOST_ARTIFACTS_DIR=${HOST_ARTIFACTS_DIR}" \
   -i gcr.io/google_containers/kubekins-test:0.9 \
   bash -c "cd kubernetes && ./hack/jenkins/test-dockerized.sh"

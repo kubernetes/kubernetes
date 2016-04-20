@@ -127,6 +127,9 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in KubeControll
 	if err := DeepCopy_componentconfig_VolumeConfiguration(in.VolumeConfiguration, &out.VolumeConfiguration, c); err != nil {
 		return err
 	}
+	if err := unversioned.DeepCopy_unversioned_Duration(in.ControllerStartInterval, &out.ControllerStartInterval, c); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -135,6 +138,7 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in KubeProxyConfiguration, 
 		return err
 	}
 	out.BindAddress = in.BindAddress
+	out.ClusterCIDR = in.ClusterCIDR
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = in.HealthzPort
 	out.HostnameOverride = in.HostnameOverride

@@ -675,7 +675,11 @@ type FlexVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". The default filesystem depends on FlexVolume script.
 	FSType string `json:"fsType,omitempty"`
-	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// Optional: SecretRef is reference to the secret object containing
+	// sensitive information to pass to the plugin scripts. This may be
+	// empty if no secret object is specified. If the secret object
+	// contains more than one secret, all secrets are passed to the plugin
+	// scripts.
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -1780,7 +1784,7 @@ type LoadBalancerIngress struct {
 type ServiceSpec struct {
 	// The list of ports that are exposed by this service.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
-	Ports []ServicePort `json:"ports"`
+	Ports []ServicePort `json:"ports" patchStrategy:"merge" patchMergeKey:"port"`
 
 	// This service will route traffic to pods having labels matching this selector.
 	// Label keys and values that must match in order to receive traffic for this service.
@@ -2048,8 +2052,14 @@ type NodeSpec struct {
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
 type DaemonEndpoint struct {
+	/*
+		The port tag was not properly in quotes in earlier releases, so it must be
+		uppercased for backwards compat (since it was falling back to var name of
+		'Port').
+	*/
+
 	// Port number of the given endpoint.
-	Port int32 `json:port`
+	Port int32 `json:"Port"`
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.
@@ -2102,7 +2112,7 @@ type NodeStatus struct {
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 	// List of container images on this node
-	Images []ContainerImage `json:"images",omitempty`
+	Images []ContainerImage `json:"images,omitempty"`
 }
 
 // Describe a container image
@@ -2662,6 +2672,8 @@ const (
 	ResourceConfigMaps ResourceName = "configmaps"
 	// ResourcePersistentVolumeClaims, number
 	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
+	// ResourceServicesNodePorts, number
+	ResourceServicesNodePorts ResourceName = "services.nodeports"
 	// CPU request, in cores. (500m = .5 cores)
 	ResourceCPURequest ResourceName = "cpu.request"
 	// CPU limit, in cores. (500m = .5 cores)

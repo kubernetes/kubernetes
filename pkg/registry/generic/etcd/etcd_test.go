@@ -90,7 +90,7 @@ func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
 func NewTestGenericEtcdRegistry(t *testing.T) (*etcdtesting.EtcdTestServer, *Etcd) {
 	podPrefix := "/pods"
 	server := etcdtesting.NewEtcdTestClientServer(t)
-	s := etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix(), false)
+	s := etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 
 	return server, &Etcd{

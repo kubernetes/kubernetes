@@ -48,7 +48,7 @@ readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.6.0-1"
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.6.0-2"
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>"
 
 # Here we map the output directories across both the local and remote _output
@@ -103,39 +103,33 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v2
+          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v3
         );;
     "arm")
         local targets=(
           kube-apiserver,armel/busybox
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v2
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v3
         );;
     "arm64")
         local targets=(
           kube-apiserver,aarch64/busybox
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v2
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v3
         );;
     "ppc64le")
         local targets=(
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v2
+          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v3
         );;
   esac
 
   echo "${targets[@]}"
 }
-
-# The set of addons images that should be prepopulated on linux/amd64
-readonly KUBE_ADDON_PATHS=(
-  gcr.io/google_containers/pause:2.0
-  gcr.io/google_containers/kube-registry-proxy:0.3
-)
 
 # ---------------------------------------------------------------------------
 # Basic setup functions
@@ -423,17 +417,17 @@ function kube::release::parse_and_validate_release_version() {
 #   version
 # Returns:
 #   If version is a valid ci version
-# Sets:                    (e.g. for '1.2.3-alpha.4.56+abcd789-dirty')
+# Sets:                    (e.g. for '1.2.3-alpha.4.56+abcdef12345678')
 #   VERSION_MAJOR          (e.g. '1')
 #   VERSION_MINOR          (e.g. '2')
 #   VERSION_PATCH          (e.g. '3')
 #   VERSION_PRERELEASE     (e.g. 'alpha')
 #   VERSION_PRERELEASE_REV (e.g. '4')
-#   VERSION_BUILD_INFO     (e.g. '.56+abcd789-dirty')
+#   VERSION_BUILD_INFO     (e.g. '.56+abcdef12345678')
 #   VERSION_COMMITS        (e.g. '56')
 function kube::release::parse_and_validate_ci_version() {
-  # Accept things like "v1.2.3-alpha.4.56+abcd789-dirty" or "v1.2.3-beta.4.56"
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+  # Accept things like "v1.2.3-alpha.4.56+abcdef12345678" or "v1.2.3-beta.4"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[0-9a-f]{7,40})?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
     kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
@@ -672,9 +666,8 @@ function kube::release::clean_cruft() {
 function kube::release::package_hyperkube() {
   # If we have these variables set then we want to build all docker images.
   if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-    for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
+    for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
 
-      local arch=${platform##*/}
       kube::log::status "Building hyperkube image for arch: ${arch}"
       REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
     done
@@ -760,11 +753,6 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
 
     kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
-
-    # Only release addon images for linux/amd64. These addon images aren't necessary for other architectures
-    if [[ ${platform} == "linux/amd64" ]]; then
-      kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
-    fi
 
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
@@ -868,40 +856,6 @@ function kube::release::create_docker_images_for_server() {
     kube::log::status "Docker builds done"
   )
 
-}
-
-# This will pull and save docker images for addons which need to placed
-# on the nodes directly.
-function kube::release::write_addon_docker_images_for_server() {
-  # Create a sub-shell so that we don't pollute the outer environment
-  (
-    local addon_path
-    for addon_path in "${KUBE_ADDON_PATHS[@]}"; do
-      (
-        kube::log::status "Pulling and writing Docker image for addon: ${addon_path}"
-
-        local dest_name="${addon_path//\//\~}"
-        if [[ -z $("${DOCKER[@]}" images | awk '{print ($1":"$2)}' | grep "${addon_path}") ]]; then
-          kube::log::status "Addon image ${addon_path} does not exist, pulling it..."
-          "${DOCKER[@]}" pull "${addon_path}"
-        fi
-        "${DOCKER[@]}" save "${addon_path}" > "${1}/${dest_name}.tar"
-      ) &
-    done
-
-    if [[ ! -z "${BUILD_PYTHON_IMAGE:-}" ]]; then
-      (
-        kube::log::status "Building Docker python image"
-
-        local img_name=python:2.7-slim-pyyaml
-        "${DOCKER[@]}" build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
-        "${DOCKER[@]}" save "${img_name}" > "${1}/${img_name}.tar"
-      ) &
-    fi
-
-    kube::util::wait-for-jobs || { kube::log::error "unable to pull or write addon image"; return 1; }
-    kube::log::status "Addon images done"
-  )
 }
 
 # Package up the salt configuration tree.  This is an optional helper to getting
@@ -1515,6 +1469,7 @@ function kube::release::gcs::publish() {
 # Globals:
 #   KUBE_DOCKER_REGISTRY
 #   KUBE_DOCKER_IMAGE_TAG
+#   KUBE_SERVER_PLATFORMS
 # Returns:
 #   If new pushing docker images was successful.
 function kube::release::docker::release() {
@@ -1526,11 +1481,6 @@ function kube::release::docker::release() {
     "hyperkube"
   )
 
-  local archs=(
-    "amd64"
-    "arm"
-  )
-
   local docker_push_cmd=("${DOCKER[@]}")
   if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
     docker_push_cmd=("gcloud" "docker")
@@ -1540,7 +1490,8 @@ function kube::release::docker::release() {
     # Activate credentials for the k8s.production.user@gmail.com
     gcloud config set account k8s.production.user@gmail.com
   fi
-  for arch in "${archs[@]}"; do
+      
+  for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
     for binary in "${binaries[@]}"; do
 
       local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"

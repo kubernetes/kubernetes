@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -125,7 +126,7 @@ func createSecret(kubeClient *client.Client, ing *extensions.Ingress) (host stri
 	var k, c bytes.Buffer
 	tls := ing.Spec.TLS[0]
 	host = strings.Join(tls.Hosts, ",")
-	Logf("Generating RSA cert for host %v", host)
+	framework.Logf("Generating RSA cert for host %v", host)
 
 	if err = generateRSACerts(host, true, &k, &c); err != nil {
 		return
@@ -141,7 +142,7 @@ func createSecret(kubeClient *client.Client, ing *extensions.Ingress) (host stri
 			api.TLSPrivateKeyKey: key,
 		},
 	}
-	Logf("Creating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
+	framework.Logf("Creating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
 	_, err = kubeClient.Secrets(ing.Namespace).Create(secret)
 	return host, cert, key, err
 }

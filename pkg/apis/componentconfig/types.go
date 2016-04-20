@@ -24,6 +24,10 @@ type KubeProxyConfiguration struct {
 	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
 	// for all interfaces)
 	BindAddress string `json:"bindAddress"`
+	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
+	// bridge traffic coming from outside of the cluster. If not provided,
+	// no off-cluster bridging will be performed.
+	ClusterCIDR string `json:"clusterCIDR"`
 	// healthzBindAddress is the IP address for the health check server to serve on,
 	// defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
 	HealthzBindAddress string `json:"healthzBindAddress"`
@@ -230,7 +234,7 @@ type KubeletConfiguration struct {
 	// be rejected.
 	LowDiskSpaceThresholdMB int `json:"lowDiskSpaceThresholdMB"`
 	// How frequently to calculate and cache volume disk usage for all pods
-	VolumeStatsAggPeriod unversioned.Duration `json:volumeStatsAggPeriod`
+	VolumeStatsAggPeriod unversioned.Duration `json:"volumeStatsAggPeriod"`
 	// networkPluginName is the name of the network plugin to be invoked for
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
@@ -510,6 +514,8 @@ type KubeControllerManagerConfiguration struct {
 	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
 	// vloumeConfiguration holds configuration for volume related features.
 	VolumeConfiguration VolumeConfiguration `json:"volumeConfiguration"`
+	// How long to wait between starting controller managers
+	ControllerStartInterval unversioned.Duration `json:"controllerStartInterval"`
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

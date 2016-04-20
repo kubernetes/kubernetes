@@ -53,6 +53,14 @@ func NewURLs(strs []string) (URLs, error) {
 	return us, nil
 }
 
+func MustNewURLs(strs []string) URLs {
+	urls, err := NewURLs(strs)
+	if err != nil {
+		panic(err)
+	}
+	return urls
+}
+
 func (us URLs) String() string {
 	return strings.Join(us.StringSlice(), ",")
 }
