@@ -10,6 +10,7 @@
 # dockerfilePath: workspace relative path to the 'Dockerfile' to build
 - job-template:
     name: '{gitproject}-dockercanarybuild-ci'
+    disabled: '{obj:disable_job}'
     description: 'Build and push {gitproject} docker image.<br>Test Owner: {owner}.'
     node: 'node'
     logrotate:
@@ -60,6 +61,7 @@
 - job-template:
     name: '{gitproject}-gce-e2e-ci'
     description: '{gitproject} continuous e2e tests.<br>Test Owner: {owner}.'
+    disabled: '{obj:disable_job}'
     node: 'node'
     logrotate:
         numToKeep: 200
@@ -147,6 +149,7 @@
             gitbasedir: 'k8s.io/heapster'
             owner: 'pszczesniak@google.com'
             shell: 'make test-unit test-integration'
+            disable_job: true  # Issue #23538
         - 'kubelet':
             cron-string: '{sq-cron-string}'
             repoName: 'kubernetes/kubernetes'
