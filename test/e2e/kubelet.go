@@ -128,7 +128,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 					Client:    f.Client,
 					Name:      rcName,
 					Namespace: f.Namespace.Name,
-					Image:     "gcr.io/google_containers/pause:2.0",
+					Image:     "gcr.io/google_containers/pause-amd64:3.0",
 					Replicas:  totalPods,
 				})).NotTo(HaveOccurred())
 				// Perform a sanity check so that we know all desired pods are
