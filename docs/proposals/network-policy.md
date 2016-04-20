@@ -130,7 +130,7 @@ type NetworkPolicyPort struct {
   // this NetworkPolicyPort does not restrict based on port number.
   // If defined, only traffic on the specified protocol AND port
   // will be matched by this NetworkPolicyPort.
-  Port IntOrString `json:"port,omitempty"`
+  Port *intstr.IntOrString `json:"port,omitempty"`
 }
 
 type NetworkPolicySource struct {
@@ -139,7 +139,7 @@ type NetworkPolicySource struct {
   // This NetworkPolicySource matches any pods selected by this selector.
   Pods *unversioned.LabelSelector `json:"pods,omitempty"`
 
-  // If 'Pods' is defined, 'Namespces' must not be.
+  // If 'Pods' is defined, 'Namespaces' must not be.
   // Selects Kubernetes Namespaces.  This NetworkPolicySource matches 
   // all pods in all namespaces selected by this label selector. 
   Namespaces *unversioned.LabelSelector `json:"namespaces,omitempty"`
