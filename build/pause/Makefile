@@ -12,42 +12,85 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	build push
+.PHONY: all push push-legacy container clean
 
-TAG=2.0
-REGISTRY?="gcr.io/google_containers"
+REGISTRY ?= gcr.io/google_containers
+IMAGE = $(REGISTRY)/pause-$(ARCH)
+LEGACY_AMD64_IMAGE = $(REGISTRY)/pause
+
+TAG = 3.0
 
 # Architectures supported: amd64, arm, arm64 and ppc64le
-ARCH?=amd64
-GOLANG_VERSION=1.6
-TEMP_DIR:=$(shell mktemp -d)
+ARCH ?= amd64
 
-all: push-legacy-too
+ALL_ARCH = amd64 arm arm64 ppc64le
 
-build:
-	cp pause.go Dockerfile $(TEMP_DIR)
+CFLAGS = -Os -Wall -static
+KUBE_CROSS_IMAGE ?= gcr.io/google_containers/kube-cross
+KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
-	docker run -it -v $(TEMP_DIR):/build golang:$(GOLANG_VERSION) /bin/bash -c \
-		"cd /build && CGO_ENABLED=0 GOARM=6 GOARCH=$(ARCH) go build -a -installsuffix cgo -ldflags '-w' ./pause.go"
-
-ifeq ($(ARCH),$(filter $(ARCH),amd64 arm))
-# Run goupx for amd64 and arm. The condition above is equal to 'if [[ $ARCH == "amd64" || $ARCH == "arm" ]]' in bash
-	docker run -it -v $(TEMP_DIR):/build golang:$(GOLANG_VERSION) /bin/bash -c \
-		"cd /build && apt-get update && apt-get install -y upx \
-		&& go get github.com/pwaller/goupx && goupx pause"
-endif
-
-	# And build the image
-	docker build -t $(REGISTRY)/pause-$(ARCH):$(TAG) $(TEMP_DIR)
+BIN = pause
+SRCS = pause.c
 
 ifeq ($(ARCH),amd64)
-	docker tag -f $(REGISTRY)/pause-$(ARCH):$(TAG) $(REGISTRY)/pause:$(TAG)
+	TRIPLE ?= x86_64-linux-gnu
 endif
 
-push: build
-	gcloud docker --server=gcr.io push $(REGISTRY)/pause-$(ARCH):$(TAG)
+ifeq ($(ARCH),arm)
+	TRIPLE ?= arm-linux-gnueabi
+endif
 
-push-legacy-too: push
+ifeq ($(ARCH),arm64)
+	TRIPLE ?= aarch64-linux-gnu
+endif
+
+ifeq ($(ARCH),ppc64le)
+	TRIPLE ?= powerpc64le-linux-gnu
+endif
+
+# If you want to build AND push all containers, see the 'all-push' rule.
+all: all-container
+
+sub-container-%:
+	$(MAKE) ARCH=$* container
+
+sub-push-%:
+	$(MAKE) ARCH=$* push
+
+all-container: $(addprefix sub-container-,$(ALL_ARCH))
+
+all-push: $(addprefix sub-push-,$(ALL_ARCH))
+
+build: bin/$(BIN)-$(ARCH)
+
+bin/$(BIN)-$(ARCH): $(SRCS)
+	mkdir -p bin
+	docker run -u $$(id -u):$$(id -g) -v $$(pwd):/build \
+		$(KUBE_CROSS_IMAGE):$(KUBE_CROSS_VERSION) \
+		/bin/bash -c "\
+			cd /build && \
+			$(TRIPLE)-gcc $(CFLAGS) -o $@ $^ && \
+			$(TRIPLE)-strip $@"
+
+container: .container-$(ARCH)
+.container-$(ARCH): bin/$(BIN)-$(ARCH)
+	docker build -t $(IMAGE):$(TAG) --build-arg ARCH=$(ARCH) .
 ifeq ($(ARCH),amd64)
-	gcloud docker push $(REGISTRY)/pause:$(TAG)
+	docker tag -f $(IMAGE):$(TAG) $(LEGACY_AMD64_IMAGE):$(TAG)
 endif
+	touch $@
+
+push: .push-$(ARCH)
+.push-$(ARCH): .container-$(ARCH)
+	gcloud docker push $(IMAGE):$(TAG)
+	touch $@
+
+push-legacy: .push-legacy-$(ARCH)
+.push-legacy-$(ARCH): .container-$(ARCH)
+ifeq ($(ARCH),amd64)
+	gcloud docker push $(LEGACY_AMD64_IMAGE):$(TAG)
+endif
+	touch $@
+
+clean:
+	rm -rf .container-* .push-* bin/

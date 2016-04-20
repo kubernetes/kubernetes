@@ -232,7 +232,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{Name: "node-scheduling-test-pod"},
 			Spec: api.PodSpec{
-				Containers: []api.Container{{Name: "container", Image: "kubernetes/pause:go"}},
+				Containers: []api.Container{{Name: "container", Image: "gcr.io/google_containers/pause-amd64:3.0"}},
 			},
 		}
 		myPod, err := restClient.Pods(api.NamespaceDefault).Create(pod)
@@ -460,7 +460,7 @@ func createPod(name string, annotation map[string]string) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: name, Annotations: annotation},
 		Spec: api.PodSpec{
-			Containers: []api.Container{{Name: "container", Image: "kubernetes/pause:go"}},
+			Containers: []api.Container{{Name: "container", Image: "gcr.io/google_containers/pause-amd64:3.0"}},
 		},
 	}
 }
@@ -521,7 +521,7 @@ func TestAllocatable(t *testing.T) {
 			Containers: []api.Container{
 				{
 					Name:  "container",
-					Image: "kubernetes/pause:go",
+					Image: "gcr.io/google_containers/pause-amd64:3.0",
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceCPU:    *resource.NewMilliQuantity(20, resource.DecimalSI),

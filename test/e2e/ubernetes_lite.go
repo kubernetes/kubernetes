@@ -88,7 +88,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			Containers: []api.Container{
 				{
 					Name:  "test",
-					Image: "gcr.io/google_containers/pause:2.0",
+					Image: "gcr.io/google_containers/pause-amd64:3.0",
 				},
 			},
 		},
