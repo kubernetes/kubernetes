@@ -39,7 +39,7 @@ func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status 
 		time.Sleep(1 * time.Second)
 
 		if timeout >= 0 && time.Now().Second()-start >= timeout {
-			t.Logf("Volume (%s) status did not change to %s after %s seconds\n",
+			t.Logf("Volume (%s) status did not change to %s after %v seconds\n",
 				volumeName,
 				status,
 				timeout)
@@ -51,7 +51,7 @@ func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status 
 			t.Fatalf("Cannot get existing Cinder volume (%s): %v", volumeName, err)
 		}
 		if getVol.Status == status {
-			t.Logf("Volume (%s) status changed to %s after %s seconds\n",
+			t.Logf("Volume (%s) status changed to %s after %v seconds\n",
 				volumeName,
 				status,
 				timeout)
