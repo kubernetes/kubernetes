@@ -458,6 +458,7 @@ function kube::build::source_targets() {
     cmd
     docs
     examples
+    federation
     Godeps/_workspace/src
     Godeps/Godeps.json
     hack
