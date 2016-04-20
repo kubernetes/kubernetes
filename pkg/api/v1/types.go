@@ -1784,7 +1784,7 @@ type LoadBalancerIngress struct {
 type ServiceSpec struct {
 	// The list of ports that are exposed by this service.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
-	Ports []ServicePort `json:"ports"`
+	Ports []ServicePort `json:"ports" patchStrategy:"merge" patchMergeKey:"port"`
 
 	// This service will route traffic to pods having labels matching this selector.
 	// Label keys and values that must match in order to receive traffic for this service.
