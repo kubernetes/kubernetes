@@ -1,7 +1,7 @@
 #!/bin/bash
 
 readonly reset=$(tput sgr0)
-readonly   red=$(tput bold; tput setaf 1)
+readonly red=$(tput bold; tput setaf 1)
 readonly green=$(tput bold; tput setaf 2)
 
 exit_code=0
