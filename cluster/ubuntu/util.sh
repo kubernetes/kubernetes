@@ -121,6 +121,14 @@ function verify-prereqs() {
   fi
 }
 
+# Check if /tmp is mounted noexec
+function check-tmp-noexec() {
+  if ssh $SSH_OPTS "$MASTER" "grep '/tmp' /proc/mounts | grep -q 'noexec'" >/dev/null 2>&1; then
+    echo "/tmp is mounted noexec on $MASTER_IP, deploying master failed"
+    exit 1
+  fi
+}
+
 # Install handler for signal trap
 function trap-add() {
   local handler="$1"
@@ -411,6 +419,8 @@ function kube-up() {
 function provision-master() {
 
   echo -e "\nDeploying master on machine ${MASTER_IP}"
+
+  check-tmp-noexec
 
   ssh $SSH_OPTS "$MASTER" "mkdir -p ~/kube/default"
 
