@@ -669,7 +669,7 @@ func (r *ResourceMonitor) GetMasterNodeLatest(usagePerNode ResourceUsagePerNode)
 				nodeAvgUsage[c] = &ContainerResourceUsage{Name: usage.Name}
 			}
 			nodeAvgUsage[c].CPUUsageInCores += usage.CPUUsageInCores
-			nodeAvgUsage[c].MemoryRSSInBytes += usage.MemoryRSSInBytes
+			nodeAvgUsage[c].MemoryUsageInBytes += usage.MemoryUsageInBytes
 			nodeAvgUsage[c].MemoryWorkingSetInBytes += usage.MemoryWorkingSetInBytes
 			nodeAvgUsage[c].MemoryRSSInBytes += usage.MemoryRSSInBytes
 		}
