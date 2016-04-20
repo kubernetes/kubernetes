@@ -185,6 +185,7 @@ type TestContextType struct {
 	KubectlPath           string
 	OutputDir             string
 	ReportDir             string
+	ReportPrefix          string
 	prefix                string
 	MinStartupPods        int
 	UpgradeTarget         string
