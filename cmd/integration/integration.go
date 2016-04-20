@@ -51,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -380,73 +379,6 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 			return false, nil
 		}
 		return true, nil
-	}
-}
-
-// runStaticPodTest is disabled until #6651 is resolved.
-func runStaticPodTest(c *client.Client, configFilePath string) {
-	var testCases = []struct {
-		desc         string
-		fileContents string
-	}{
-		{
-			desc: "static-pod-from-manifest",
-			fileContents: `version: v1beta2
-id: static-pod-from-manifest
-containers:
-  - name: static-container
-    image: gcr.io/google_containers/pause:2.0`,
-		},
-		{
-			desc: "static-pod-from-spec",
-			fileContents: `{
-				"kind": "Pod",
-				"apiVersion": "v1",
-				"metadata": {
-					"name": "static-pod-from-spec"
-				},
-				"spec": {
-					"containers": [{
-						"name": "static-container",
-						"image": "gcr.io/google_containers/pause:2.0"
-					}]
-				}
-			}`,
-		},
-	}
-
-	for _, testCase := range testCases {
-		func() {
-			desc := testCase.desc
-			manifestFile, err := ioutil.TempFile(configFilePath, "")
-			defer os.Remove(manifestFile.Name())
-			ioutil.WriteFile(manifestFile.Name(), []byte(testCase.fileContents), 0600)
-
-			// Wait for the mirror pod to be created.
-			podName := fmt.Sprintf("%s-localhost", desc)
-			namespace := kubetypes.NamespaceDefault
-			if err := wait.Poll(time.Second, longTestTimeout,
-				podRunning(c, namespace, podName)); err != nil {
-				if pods, err := c.Pods(namespace).List(api.ListOptions{}); err == nil {
-					for _, pod := range pods.Items {
-						glog.Infof("pod found: %s/%s", namespace, pod.Name)
-					}
-				}
-				glog.Fatalf("%s FAILED: mirror pod has not been created or is not running: %v", desc, err)
-			}
-			// Delete the mirror pod, and wait for it to be recreated.
-			c.Pods(namespace).Delete(podName, nil)
-			if err = wait.Poll(time.Second, longTestTimeout,
-				podRunning(c, namespace, podName)); err != nil {
-				glog.Fatalf("%s FAILED: mirror pod has not been re-created or is not running: %v", desc, err)
-			}
-			// Remove the manifest file, and wait for the mirror pod to be deleted.
-			os.Remove(manifestFile.Name())
-			if err = wait.Poll(time.Second, longTestTimeout,
-				podNotFound(c, namespace, podName)); err != nil {
-				glog.Fatalf("%s FAILED: mirror pod has not been deleted: %v", desc, err)
-			}
-		}()
 	}
 }
 
