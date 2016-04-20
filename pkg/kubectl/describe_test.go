@@ -49,7 +49,7 @@ func TestDescribePod(t *testing.T) {
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar")
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestDescribeService(t *testing.T) {
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ServiceDescriber{c}
-	out, err := d.Describe("foo", "bar")
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 	d := PodDescriber{c}
 
 	// Act
-	out, err := d.Describe("foo", "bar")
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 
 	// Assert
 	if err != nil {
@@ -492,7 +492,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 	for name, pv := range tests {
 		fake := testclient.NewSimpleFake(pv)
 		c := PersistentVolumeDescriber{fake}
-		str, err := c.Describe("foo", "bar")
+		str, err := c.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 		if err != nil {
 			t.Errorf("Unexpected error for test %s: %v", name, err)
 		}
@@ -513,11 +513,124 @@ func TestDescribeDeployment(t *testing.T) {
 		},
 	})
 	d := DeploymentDescriber{fake}
-	out, err := d.Describe("foo", "bar")
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribeEvents(t *testing.T) {
+
+	events := &api.EventList{
+		Items: []api.Event{
+			{
+				Source:         api.EventSource{Component: "kubelet"},
+				Message:        "Item 1",
+				FirstTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
+				Type:           api.EventTypeNormal,
+			},
+		},
+	}
+
+	m := map[string]Describer{
+		"DaemonSetDescriber": &DaemonSetDescriber{
+			testclient.NewSimpleFake(&extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
+		"DeploymentDescriber": &DeploymentDescriber{
+			fake.NewSimpleClientset(&extensions.Deployment{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
+		"EndpointsDescriber": &EndpointsDescriber{
+			testclient.NewSimpleFake(&api.Endpoints{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
+		// TODO(jchaloup): add tests for:
+		// - HorizontalPodAutoscalerDescriber
+		// - IngressDescriber
+		// - JobDescriber
+		"NodeDescriber": &NodeDescriber{
+			testclient.NewSimpleFake(&api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+					SelfLink:  "url/url/url",
+				},
+			}, events),
+		},
+		"PodDescriber": &PodDescriber{
+			testclient.NewSimpleFake(&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+					SelfLink:  "url/url/url",
+				},
+			}, events),
+		},
+		"ReplicaSetDescriber": &ReplicaSetDescriber{
+			testclient.NewSimpleFake(&extensions.ReplicaSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
+		"ReplicationControllerDescriber": &ReplicationControllerDescriber{
+			testclient.NewSimpleFake(&api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
+		"Service": &ServiceDescriber{
+			testclient.NewSimpleFake(&api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
+	}
+
+	for name, d := range m {
+		out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+		if err != nil {
+			t.Errorf("unexpected error for %q: %v", name, err)
+		}
+		if !strings.Contains(out, "bar") {
+			t.Errorf("unexpected out for %q: %s", name, out)
+		}
+		if !strings.Contains(out, "Events:") {
+			t.Errorf("events not found for %q when ShowEvents=true: %s", name, out)
+		}
+
+		out, err = d.Describe("foo", "bar", DescriberSettings{ShowEvents: false})
+		if err != nil {
+			t.Errorf("unexpected error for %q: %s", name, err)
+		}
+		if !strings.Contains(out, "bar") {
+			t.Errorf("unexpected out for %q: %s", name, out)
+		}
+		if strings.Contains(out, "Events:") {
+			t.Errorf("events found for %q when ShowEvents=false: %s", name, out)
+		}
 	}
 }

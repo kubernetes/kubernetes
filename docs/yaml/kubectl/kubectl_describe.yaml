@@ -33,6 +33,9 @@ options:
 - name: selector
   shorthand: l
   usage: Selector (label query) to filter on
+- name: show-events
+  default_value: "true"
+  usage: If true, display events related to the described object.
 inherited_options:
 - name: alsologtostderr
   default_value: "false"

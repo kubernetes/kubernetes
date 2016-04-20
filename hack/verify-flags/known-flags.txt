@@ -378,6 +378,7 @@ service-overrides
 service-sync-period
 session-affinity
 show-all
+show-events
 show-labels
 shutdown-fd
 shutdown-fifo
