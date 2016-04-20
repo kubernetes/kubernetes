@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
+	genericapiservercfg "k8s.io/kubernetes/pkg/genericapiserver/config"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericetcd "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
@@ -199,33 +200,17 @@ type APIGroupInfo struct {
 
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
+	genericapiservercfg.APIServerConfig
+	InternalConfig
+}
+
+type InternalConfig struct {
 	StorageDestinations StorageDestinations
-	// StorageVersions is a map between groups and their storage versions
-	StorageVersions map[string]string
-	// allow downstream consumers to disable the core controller loops
-	EnableLogsSupport bool
-	EnableUISupport   bool
-	// Allow downstream consumers to disable swagger.
-	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
-	EnableSwaggerSupport bool
-	// Allow downstream consumers to disable swagger ui.
-	// Note that this is ignored if either EnableSwaggerSupport or EnableUISupport is false.
-	EnableSwaggerUI bool
 	// Allows api group versions or specific resources to be conditionally enabled/disabled.
 	APIResourceConfigSource APIResourceConfigSource
-	// allow downstream consumers to disable the index route
-	EnableIndex           bool
-	EnableProfiling       bool
-	EnableWatchCache      bool
-	APIPrefix             string
-	APIGroupPrefix        string
-	CorsAllowedOriginList []string
-	Authenticator         authenticator.Request
-	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
-	SupportsBasicAuth      bool
-	Authorizer             authorizer.Authorizer
-	AdmissionControl       admission.Interface
-	MasterServiceNamespace string
+	Authenticator           authenticator.Request
+	Authorizer              authorizer.Authorizer
+	AdmissionControl        admission.Interface
 
 	// Map requests to contexts. Exported so downstream consumers can provider their own mappers
 	RequestContextMapper api.RequestContextMapper
@@ -235,21 +220,6 @@ type Config struct {
 
 	// If specified, all web services will be registered into this container
 	RestfulContainer *restful.Container
-
-	// If specified, requests will be allocated a random timeout between this value, and twice this value.
-	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
-	MinRequestTimeout int
-
-	// Number of masters running; all masters must be started with the
-	// same value for this field. (Numbers > 1 currently untested.)
-	MasterCount int
-
-	// The port on PublicAddress where a read-write server will be installed.
-	// Defaults to 6443 if not set.
-	ReadWritePort int
-
-	// ExternalHost is the host name to use for external (public internet) facing URLs (e.g. Swagger)
-	ExternalHost string
 
 	// PublicAddress is the IP address where members of the cluster (kubelet,
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
@@ -266,29 +236,12 @@ type Config struct {
 	// The IP address for the GenericAPIServer service (must be inside ServiceClusterIPRange)
 	ServiceReadWriteIP net.IP
 
-	// Port for the apiserver service.
-	ServiceReadWritePort int
-
 	// The range of ports to be assigned to services with type=NodePort or greater
 	ServiceNodePortRange utilnet.PortRange
 
 	// Used to customize default proxy dial/tls options
 	ProxyDialer          apiserver.ProxyDialerFunc
 	ProxyTLSClientConfig *tls.Config
-
-	// Additional ports to be exposed on the GenericAPIServer service
-	// extraServicePorts is injectable in the event that more ports
-	// (other than the default 443/tcp) are exposed on the GenericAPIServer
-	// and those ports need to be load balanced by the GenericAPIServer
-	// service because this pkg is linked by out-of-tree projects
-	// like openshift which want to use the GenericAPIServer but also do
-	// more stuff.
-	ExtraServicePorts []api.ServicePort
-	// Additional ports to be exposed on the GenericAPIServer endpoints
-	// Port names should align with ports defined in ExtraServicePorts
-	ExtraEndpointPorts []api.EndpointPort
-
-	KubernetesServiceNodePort int
 }
 
 // GenericAPIServer contains state for a Kubernetes cluster api server.
