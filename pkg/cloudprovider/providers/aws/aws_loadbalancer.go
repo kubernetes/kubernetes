@@ -28,7 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB bool) (*elb.LoadBalancerDescription, error) {
+const ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
+
+func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB, proxyProtocol bool) (*elb.LoadBalancerDescription, error) {
 	loadBalancer, err := s.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return nil, err
@@ -62,6 +64,22 @@ func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadB
 		if err != nil {
 			return nil, err
 		}
+
+		if proxyProtocol {
+			err = s.createProxyProtocolPolicy(loadBalancerName)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, listener := range listeners {
+				glog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to true", *listener.InstancePort)
+				err := s.setBackendPolicies(loadBalancerName, *listener.InstancePort, []*string{aws.String(ProxyProtocolPolicyName)})
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
 		dirty = true
 	} else {
 		// TODO: Sync internal vs non-internal
@@ -189,6 +207,73 @@ func (s *AWSCloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadB
 				dirty = true
 			}
 		}
+
+		{
+			// Sync proxy protocol state for new and existing listeners
+
+			proxyPolicies := make([]*string, 0)
+			if proxyProtocol {
+				// Ensure the backend policy exists
+
+				// NOTE The documentation for the AWS API indicates we could get an HTTP 400
+				// back if a policy of the same name already exists. However, the aws-sdk does not
+				// seem to return an error to us in these cases. Therefore this will issue an API
+				// request everytime.
+				err := s.createProxyProtocolPolicy(loadBalancerName)
+				if err != nil {
+					return nil, err
+				}
+
+				proxyPolicies = append(proxyPolicies, aws.String(ProxyProtocolPolicyName))
+			}
+
+			foundBackends := make(map[int64]bool)
+			proxyProtocolBackends := make(map[int64]bool)
+			for _, backendListener := range loadBalancer.BackendServerDescriptions {
+				foundBackends[*backendListener.InstancePort] = false
+				proxyProtocolBackends[*backendListener.InstancePort] = proxyProtocolEnabled(backendListener)
+			}
+
+			for _, listener := range listeners {
+				setPolicy := false
+				instancePort := *listener.InstancePort
+
+				if currentState, ok := proxyProtocolBackends[instancePort]; !ok {
+					// This is a new ELB backend so we only need to worry about
+					// potentientally adding a policy and not removing an
+					// existing one
+					setPolicy = proxyProtocol
+				} else {
+					foundBackends[instancePort] = true
+					// This is an existing ELB backend so we need to determine
+					// if the state changed
+					setPolicy = (currentState != proxyProtocol)
+				}
+
+				if setPolicy {
+					glog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to %t", instancePort, proxyProtocol)
+					err := s.setBackendPolicies(loadBalancerName, instancePort, proxyPolicies)
+					if err != nil {
+						return nil, err
+					}
+					dirty = true
+				}
+			}
+
+			// We now need to figure out if any backend policies need removed
+			// because these old policies will stick around even if there is no
+			// corresponding listener anymore
+			for instancePort, found := range foundBackends {
+				if !found {
+					glog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to false", instancePort)
+					err := s.setBackendPolicies(loadBalancerName, instancePort, []*string{})
+					if err != nil {
+						return nil, err
+					}
+					dirty = true
+				}
+			}
+		}
 	}
 
 	if dirty {
@@ -307,4 +392,54 @@ func (s *AWSCloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstan
 	}
 
 	return nil
+}
+
+func (s *AWSCloud) createProxyProtocolPolicy(loadBalancerName string) error {
+	request := &elb.CreateLoadBalancerPolicyInput{
+		LoadBalancerName: aws.String(loadBalancerName),
+		PolicyName:       aws.String(ProxyProtocolPolicyName),
+		PolicyTypeName:   aws.String("ProxyProtocolPolicyType"),
+		PolicyAttributes: []*elb.PolicyAttribute{
+			{
+				AttributeName:  aws.String("ProxyProtocol"),
+				AttributeValue: aws.String("true"),
+			},
+		},
+	}
+	glog.V(2).Info("Creating proxy protocol policy on load balancer")
+	_, err := s.elb.CreateLoadBalancerPolicy(request)
+	if err != nil {
+		return fmt.Errorf("error creating proxy protocol policy on load balancer: %v", err)
+	}
+
+	return nil
+}
+
+func (s *AWSCloud) setBackendPolicies(loadBalancerName string, instancePort int64, policies []*string) error {
+	request := &elb.SetLoadBalancerPoliciesForBackendServerInput{
+		InstancePort:     aws.Int64(instancePort),
+		LoadBalancerName: aws.String(loadBalancerName),
+		PolicyNames:      policies,
+	}
+	if len(policies) > 0 {
+		glog.V(2).Infof("Adding AWS loadbalancer backend policies on node port %d", instancePort)
+	} else {
+		glog.V(2).Infof("Removing AWS loadbalancer backend policies on node port %d", instancePort)
+	}
+	_, err := s.elb.SetLoadBalancerPoliciesForBackendServer(request)
+	if err != nil {
+		return fmt.Errorf("error adjusting AWS loadbalancer backend policies: %v", err)
+	}
+
+	return nil
+}
+
+func proxyProtocolEnabled(backend *elb.BackendServerDescription) bool {
+	for _, policy := range backend.PolicyNames {
+		if aws.StringValue(policy) == ProxyProtocolPolicyName {
+			return true
+		}
+	}
+
+	return false
 }
