@@ -1163,7 +1163,7 @@ func TestGenerateRunCommand(t *testing.T) {
 	}
 }
 
-func TestPreStopHooks(t *testing.T) {
+func TestLifeCycleHooks(t *testing.T) {
 	runner := lifecycle.NewFakeHandlerRunner()
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
@@ -1176,10 +1176,11 @@ func TestPreStopHooks(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod         *api.Pod
-		runtimePod  *kubecontainer.Pod
-		preStopRuns []string
-		err         error
+		pod           *api.Pod
+		runtimePod    *kubecontainer.Pod
+		postStartRuns []string
+		preStopRuns   []string
+		err           error
 	}{
 		{
 			// Case 0, container without any hooks.
@@ -1201,10 +1202,11 @@ func TestPreStopHooks(t *testing.T) {
 				},
 			},
 			[]string{},
+			[]string{},
 			nil,
 		},
 		{
-			// Case 1, containers with pre-stop hook.
+			// Case 1, containers with post-start and pre-stop hooks.
 			&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "pod-1",
@@ -1216,13 +1218,29 @@ func TestPreStopHooks(t *testing.T) {
 						{
 							Name: "container-name-1",
 							Lifecycle: &api.Lifecycle{
-								PreStop: &api.Handler{
+								PostStart: &api.Handler{
 									Exec: &api.ExecAction{},
 								},
 							},
 						},
 						{
 							Name: "container-name-2",
+							Lifecycle: &api.Lifecycle{
+								PostStart: &api.Handler{
+									HTTPGet: &api.HTTPGetAction{},
+								},
+							},
+						},
+						{
+							Name: "container-name-3",
+							Lifecycle: &api.Lifecycle{
+								PreStop: &api.Handler{
+									Exec: &api.ExecAction{},
+								},
+							},
+						},
+						{
+							Name: "container-name-4",
 							Lifecycle: &api.Lifecycle{
 								PreStop: &api.Handler{
 									HTTPGet: &api.HTTPGetAction{},
@@ -1234,13 +1252,31 @@ func TestPreStopHooks(t *testing.T) {
 			},
 			&kubecontainer.Pod{
 				Containers: []*kubecontainer.Container{
-					{ID: kubecontainer.BuildContainerID("rkt", "id-1")},
-					{ID: kubecontainer.BuildContainerID("rkt", "id-2")},
+					{
+						ID:   kubecontainer.ParseContainerID("rkt://uuid:container-name-4"),
+						Name: "container-name-4",
+					},
+					{
+						ID:   kubecontainer.ParseContainerID("rkt://uuid:container-name-3"),
+						Name: "container-name-3",
+					},
+					{
+						ID:   kubecontainer.ParseContainerID("rkt://uuid:container-name-2"),
+						Name: "container-name-2",
+					},
+					{
+						ID:   kubecontainer.ParseContainerID("rkt://uuid:container-name-1"),
+						Name: "container-name-1",
+					},
 				},
 			},
 			[]string{
-				"exec on pod: pod-1_ns-1(uid-1), container: container-name-1: rkt://id-1",
-				"http-get on pod: pod-1_ns-1(uid-1), container: container-name-2: rkt://id-2",
+				"exec on pod: pod-1_ns-1(uid-1), container: container-name-1: rkt://uuid:container-name-1",
+				"http-get on pod: pod-1_ns-1(uid-1), container: container-name-2: rkt://uuid:container-name-2",
+			},
+			[]string{
+				"exec on pod: pod-1_ns-1(uid-1), container: container-name-3: rkt://uuid:container-name-3",
+				"http-get on pod: pod-1_ns-1(uid-1), container: container-name-4: rkt://uuid:container-name-4",
 			},
 			nil,
 		},
@@ -1257,7 +1293,8 @@ func TestPreStopHooks(t *testing.T) {
 						{
 							Name: "container-name-1",
 							Lifecycle: &api.Lifecycle{
-								PreStop: &api.Handler{},
+								PostStart: &api.Handler{},
+								PreStop:   &api.Handler{},
 							},
 						},
 					},
@@ -1265,9 +1302,13 @@ func TestPreStopHooks(t *testing.T) {
 			},
 			&kubecontainer.Pod{
 				Containers: []*kubecontainer.Container{
-					{ID: kubecontainer.BuildContainerID("rkt", "id-1")},
+					{
+						ID:   kubecontainer.ParseContainerID("rkt://uuid:container-name-1"),
+						Name: "container-name-1",
+					},
 				},
 			},
+			[]string{},
 			[]string{},
 			errors.NewAggregate([]error{fmt.Errorf("Invalid handler: %v", &api.Handler{})}),
 		},
@@ -1276,8 +1317,28 @@ func TestPreStopHooks(t *testing.T) {
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
 
+		pod := &rktapi.Pod{Id: "uuid"}
+		for _, c := range tt.runtimePod.Containers {
+			pod.Apps = append(pod.Apps, &rktapi.App{
+				Name:  c.Name,
+				State: rktapi.AppState_APP_STATE_RUNNING,
+			})
+		}
+		fr.pods = []*rktapi.Pod{pod}
+
+		// Run post-start hooks
+		err := rkt.runLifecycleHooks(tt.pod, tt.runtimePod, lifecyclePostStartHook)
+		assert.Equal(t, tt.err, err, testCaseHint)
+
+		sort.Sort(sortedStringList(tt.postStartRuns))
+		sort.Sort(sortedStringList(runner.HandlerRuns))
+
+		assert.Equal(t, tt.postStartRuns, runner.HandlerRuns, testCaseHint)
+
+		runner.Reset()
+
 		// Run pre-stop hooks.
-		err := rkt.runPreStopHook(tt.pod, tt.runtimePod)
+		err = rkt.runLifecycleHooks(tt.pod, tt.runtimePod, lifecyclePreStopHook)
 		assert.Equal(t, tt.err, err, testCaseHint)
 
 		sort.Sort(sortedStringList(tt.preStopRuns))
