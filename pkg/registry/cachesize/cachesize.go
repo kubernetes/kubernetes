@@ -48,6 +48,7 @@ const (
 	Secrets                  Resource = "secrets"
 	ServiceAccounts          Resource = "serviceaccounts"
 	Services                 Resource = "services"
+	Workflows                Resource = "workflows"
 )
 
 var watchCacheSizes map[Resource]int
@@ -74,6 +75,7 @@ func init() {
 	watchCacheSizes[Secrets] = 100
 	watchCacheSizes[ServiceAccounts] = 100
 	watchCacheSizes[Services] = 100
+	watchCacheSizes[Workflows] = 100
 }
 
 func SetWatchCacheSizes(cacheSizes []string) {

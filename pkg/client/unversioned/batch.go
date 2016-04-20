@@ -25,6 +25,7 @@ import (
 
 type BatchInterface interface {
 	JobsNamespacer
+	WorkflowsNamespacer
 }
 
 // BatchClient is used to interact with Kubernetes batch features.
@@ -80,4 +81,8 @@ func setBatchDefaults(config *restclient.Config) error {
 		config.Burst = 10
 	}
 	return nil
+}
+
+func (c *BatchClient) Workflows(namespace string) WorkflowInterface {
+	return newWorkflows(c, namespace)
 }

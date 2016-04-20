@@ -490,6 +490,30 @@ func (s *StoreToJobLister) List() (jobs extensions.JobList, err error) {
 	return jobs, nil
 }
 
+// Jobs will look like the api pkg/client
+func (s *StoreToJobLister) Jobs(namespace string) storeJobsNamespacer {
+	return storeJobsNamespacer{s.Store, namespace}
+}
+
+type storeJobsNamespacer struct {
+	store     Store
+	namespace string
+}
+
+// List returns a list of jobs fromt he store
+func (s storeJobsNamespacer) List(selector labels.Selector) (jobs extensions.JobList, err error) {
+	list := extensions.JobList{}
+	for _, m := range s.store.List() {
+		job := m.(*extensions.Job)
+		if s.namespace == api.NamespaceAll || s.namespace == job.Namespace {
+			if selector.Matches(labels.Set(job.Labels)) {
+				list.Items = append(list.Items, *job)
+			}
+		}
+	}
+	return list, nil
+}
+
 // GetPodJobs returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
 func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err error) {
 	var selector labels.Selector
@@ -555,4 +579,51 @@ func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id st
 	}
 
 	return o.(*api.PersistentVolumeClaim), nil
+}
+
+// StoreToWorkflowLister gives a store List and Exists methods. The store must contain only Workflows.
+type StoreToWorkflowLister struct {
+	Store
+}
+
+func (s *StoreToWorkflowLister) Exists(workflow *extensions.Workflow) (bool, error) {
+	_, exists, err := s.Store.Get(workflow)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToWorkflowLister lists all workflows in the store.
+func (s *StoreToWorkflowLister) List() (workflows extensions.WorkflowList, err error) {
+	for _, c := range s.Store.List() {
+		workflows.Items = append(workflows.Items, *(c.(*extensions.Workflow)))
+	}
+	return workflows, nil
+}
+
+// GetJobWorkflow
+func (s *StoreToWorkflowLister) GetJobWorkflows(job *extensions.Job) (workflows []extensions.Workflow, err error) {
+	var selector labels.Selector
+	var workflow extensions.Workflow
+
+	if len(job.Labels) == 0 {
+		err = fmt.Errorf("no workflows found for job %v because it has no labels", job.Name)
+		return
+	}
+	for _, m := range s.Store.List() {
+		workflow = *m.(*extensions.Workflow)
+		glog.V(4).Infof("Found workflow %v retrieving from job %v", workflow.Name, job.Name)
+		if workflow.Namespace != job.Namespace {
+			continue
+		}
+		selector, _ = unversioned.LabelSelectorAsSelector(job.Spec.Selector)
+		if selector.Matches(labels.Set(job.Labels)) {
+			workflows = append(workflows, workflow)
+		}
+	}
+	if len(workflows) == 0 {
+		err = fmt.Errorf("could not find workflows for job %s in namespace %s with labels: %v", job.Name, job.Namespace, job.Labels)
+	}
+	return
 }
