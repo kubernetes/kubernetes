@@ -29,9 +29,6 @@ var Scheme = runtime.NewScheme()
 // Codecs provides access to encoding and decoding for the scheme
 var Codecs = serializer.NewCodecFactory(Scheme)
 
-// StreamCodecs provides access to streaming encoding and decoding for the scheme
-var StreamCodecs = serializer.NewStreamingCodecFactory(Scheme)
-
 // GroupName is the group name use in this package
 const GroupName = ""
 

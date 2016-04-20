@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 )
 
 type thirdPartyObjectConverter struct {
@@ -203,10 +202,7 @@ type thirdPartyResourceDataCodec struct {
 	kind     string
 }
 
-var (
-	_ runtime.Codec    = &thirdPartyResourceDataCodec{}
-	_ streaming.Framer = &thirdPartyResourceDataCodec{}
-)
+var _ runtime.Codec = &thirdPartyResourceDataCodec{}
 
 func NewCodec(codec runtime.Codec, kind string) runtime.Codec {
 	return &thirdPartyResourceDataCodec{codec, kind}
@@ -414,24 +410,6 @@ func (t *thirdPartyResourceDataCodec) EncodeToStream(obj runtime.Object, stream 
 	default:
 		return fmt.Errorf("unexpected object to encode: %#v", obj)
 	}
-}
-
-// NewFrameWriter calls into the nested encoder to expose its framing
-func (c *thirdPartyResourceDataCodec) NewFrameWriter(w io.Writer) io.Writer {
-	f, ok := c.delegate.(streaming.Framer)
-	if !ok {
-		return nil
-	}
-	return f.NewFrameWriter(w)
-}
-
-// NewFrameReader calls into the nested decoder to expose its framing
-func (c *thirdPartyResourceDataCodec) NewFrameReader(r io.Reader) io.Reader {
-	f, ok := c.delegate.(streaming.Framer)
-	if !ok {
-		return nil
-	}
-	return f.NewFrameReader(r)
 }
 
 func NewObjectCreator(group, version string, delegate runtime.ObjectCreater) runtime.ObjectCreater {

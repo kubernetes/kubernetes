@@ -99,6 +99,14 @@ func (f *FakeWatcher) Stop() {
 	}
 }
 
+// Reset prepares the watcher to be reused.
+func (f *FakeWatcher) Reset() {
+	f.Lock()
+	defer f.Unlock()
+	f.Stopped = false
+	f.result = make(chan Event)
+}
+
 func (f *FakeWatcher) ResultChan() <-chan Event {
 	return f.result
 }

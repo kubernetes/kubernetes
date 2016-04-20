@@ -203,11 +203,10 @@ func (m *Master) InstallAPIs(c *Config) {
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				"v1": m.v1ResourcesStorage,
 			},
-			IsLegacyGroup:              true,
-			Scheme:                     api.Scheme,
-			ParameterCodec:             api.ParameterCodec,
-			NegotiatedSerializer:       api.Codecs,
-			NegotiatedStreamSerializer: api.StreamCodecs,
+			IsLegacyGroup:        true,
+			Scheme:               api.Scheme,
+			ParameterCodec:       api.ParameterCodec,
+			NegotiatedSerializer: api.Codecs,
 		}
 		if autoscalingGroupVersion := (unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}); registered.IsEnabledVersion(autoscalingGroupVersion) {
 			apiGroupInfo.SubresourceGroupVersionKind = map[string]unversioned.GroupVersionKind{
@@ -261,11 +260,10 @@ func (m *Master) InstallAPIs(c *Config) {
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				"v1beta1": extensionResources,
 			},
-			OptionsExternalVersion:     &registered.GroupOrDie(api.GroupName).GroupVersion,
-			Scheme:                     api.Scheme,
-			ParameterCodec:             api.ParameterCodec,
-			NegotiatedSerializer:       api.Codecs,
-			NegotiatedStreamSerializer: api.StreamCodecs,
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 
@@ -294,11 +292,10 @@ func (m *Master) InstallAPIs(c *Config) {
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				"v1": autoscalingResources,
 			},
-			OptionsExternalVersion:     &registered.GroupOrDie(api.GroupName).GroupVersion,
-			Scheme:                     api.Scheme,
-			ParameterCodec:             api.ParameterCodec,
-			NegotiatedSerializer:       api.Codecs,
-			NegotiatedStreamSerializer: api.StreamCodecs,
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 
@@ -327,11 +324,10 @@ func (m *Master) InstallAPIs(c *Config) {
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				"v1": batchResources,
 			},
-			OptionsExternalVersion:     &registered.GroupOrDie(api.GroupName).GroupVersion,
-			Scheme:                     api.Scheme,
-			ParameterCodec:             api.ParameterCodec,
-			NegotiatedSerializer:       api.Codecs,
-			NegotiatedStreamSerializer: api.StreamCodecs,
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 
@@ -359,11 +355,10 @@ func (m *Master) InstallAPIs(c *Config) {
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				"v1alpha1": appsResources,
 			},
-			OptionsExternalVersion:     &registered.GroupOrDie(api.GroupName).GroupVersion,
-			Scheme:                     api.Scheme,
-			ParameterCodec:             api.ParameterCodec,
-			NegotiatedSerializer:       api.Codecs,
-			NegotiatedStreamSerializer: api.StreamCodecs,
+			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			Scheme:                 api.Scheme,
+			ParameterCodec:         api.ParameterCodec,
+			NegotiatedSerializer:   api.Codecs,
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 
@@ -714,9 +709,8 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Storage:                storage,
 		OptionsExternalVersion: &optionsExternalVersion,
 
-		Serializer:       thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, kind, externalVersion, internalVersion),
-		StreamSerializer: thirdpartyresourcedata.NewNegotiatedSerializer(api.StreamCodecs, kind, externalVersion, internalVersion),
-		ParameterCodec:   thirdpartyresourcedata.NewThirdPartyParameterCodec(api.ParameterCodec),
+		Serializer:     thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, kind, externalVersion, internalVersion),
+		ParameterCodec: thirdpartyresourcedata.NewThirdPartyParameterCodec(api.ParameterCodec),
 
 		Context: m.RequestContextMapper,
 

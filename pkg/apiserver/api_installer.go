@@ -457,12 +457,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
 	reqScope := RequestScope{
-		ContextFunc:      ctxFn,
-		Serializer:       a.group.Serializer,
-		StreamSerializer: a.group.StreamSerializer,
-		ParameterCodec:   a.group.ParameterCodec,
-		Creater:          a.group.Creater,
-		Convertor:        a.group.Convertor,
+		ContextFunc:    ctxFn,
+		Serializer:     a.group.Serializer,
+		ParameterCodec: a.group.ParameterCodec,
+		Creater:        a.group.Creater,
+		Convertor:      a.group.Convertor,
 
 		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
 		Resource:    a.group.GroupVersion.WithResource(resource),
@@ -641,7 +640,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)).
-				Produces(a.group.StreamSerializer.SupportedMediaTypes()...).
+				Produces(a.group.Serializer.SupportedStreamingMediaTypes()...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).
 				Writes(versionedWatchEvent)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
@@ -660,7 +659,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List").
-				Produces(a.group.StreamSerializer.SupportedMediaTypes()...).
+				Produces(a.group.Serializer.SupportedStreamingMediaTypes()...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).
 				Writes(versionedWatchEvent)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {

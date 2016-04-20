@@ -27,12 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// Framer is a factory for creating readers and writers that obey a particular framing pattern.
-type Framer interface {
-	NewFrameReader(r io.Reader) io.Reader
-	NewFrameWriter(w io.Writer) io.Writer
-}
-
 // Encoder is a runtime.Encoder on a stream.
 type Encoder interface {
 	// Encode will write the provided object to the stream or return an error. It obeys the same
