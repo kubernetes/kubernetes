@@ -28,6 +28,8 @@ EVENT_STORE_NAME="${INSTANCE_PREFIX}-event-store"
 RETRIES=3
 
 export KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+export KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
+export RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 
 # Runs gcloud compute command with the given parameters. Up to $RETRIES will be made
 # to execute the command.
