@@ -105,7 +105,7 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 			if config.PolicyFile == "" {
 				return nil, errors.New("ABAC's authorization policy file not passed")
 			}
-			abacAuthorizer, err := abac.NewFromFile(config.PolicyFile)
+			abacAuthorizer, err := abac.New(config.PolicyFile)
 			if err != nil {
 				return nil, err
 			}
