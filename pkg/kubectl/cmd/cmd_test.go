@@ -151,12 +151,14 @@ func (t *testPrinter) HandledResources() []string {
 
 type testDescriber struct {
 	Name, Namespace string
+	Settings        kubectl.DescriberSettings
 	Output          string
 	Err             error
 }
 
-func (t *testDescriber) Describe(namespace, name string) (output string, err error) {
+func (t *testDescriber) Describe(namespace, name string, describerSettings kubectl.DescriberSettings) (output string, err error) {
 	t.Namespace, t.Name = namespace, name
+	t.Settings = describerSettings
 	return t.Output, t.Err
 }
 
