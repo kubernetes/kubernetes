@@ -530,6 +530,13 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				},
 			},
 		},
+		"quobyte": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Quobyte: &api.QuobyteVolumeSource{},
+				},
+			},
+		},
 	}
 
 	for name, pv := range tests {
