@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -44,9 +44,9 @@ type StorageFactory interface {
 // 2. Resource encodings for storage: group,version,kind to store as
 // 3. Cohabitating default: some resources like hpa are exposed through multiple APIs.  They must agree on 1 and 2
 type DefaultStorageFactory struct {
-	// DefaultEtcdConfig describes how to connect to etcd in general.  It's authentication information will be used for
-	// every storage.Interface returned.
-	DefaultEtcdConfig etcdstorage.EtcdConfig
+	// StorageConfig describes how to create a storage backend in general.
+	// Its authentication information will be used for every storage.Interface returned.
+	StorageConfig storagebackend.Config
 
 	Overrides map[unversioned.GroupResource]groupResourceOverrides
 
@@ -62,12 +62,12 @@ type DefaultStorageFactory struct {
 	APIResourceConfigSource APIResourceConfigSource
 
 	// newEtcdFn exists to be overwritten for unit testing.  You should never set this in a normal world.
-	newEtcdFn func(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unversioned.GroupVersion, etcdConfig etcdstorage.EtcdConfig) (etcdStorage storage.Interface, err error)
+	newEtcdFn func(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (etcdStorage storage.Interface, err error)
 }
 
 type groupResourceOverrides struct {
 	// etcdLocation contains the list of "special" locations that are used for particular GroupResources
-	// These are merged on top of the default DefaultEtcdConfig when requesting the storage.Interface for a given GroupResource
+	// These are merged on top of the StorageConfig when requesting the storage.Interface for a given GroupResource
 	etcdLocation []string
 	// etcdPrefix contains the list of "special" prefixes for a GroupResource.  Resource=* means for the entire group
 	etcdPrefix string
@@ -83,9 +83,9 @@ var _ StorageFactory = &DefaultStorageFactory{}
 
 const AllResources = "*"
 
-func NewDefaultStorageFactory(defaultEtcdConfig etcdstorage.EtcdConfig, defaultSerializer runtime.NegotiatedSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
+func NewDefaultStorageFactory(config storagebackend.Config, defaultSerializer runtime.NegotiatedSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
 	return &DefaultStorageFactory{
-		DefaultEtcdConfig:       defaultEtcdConfig,
+		StorageConfig:           config,
 		Overrides:               map[unversioned.GroupResource]groupResourceOverrides{},
 		DefaultSerializer:       defaultSerializer,
 		ResourceEncodingConfig:  resourceEncodingConfig,
@@ -152,7 +152,7 @@ func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (st
 		overriddenEtcdLocations = exactResourceOverride.etcdLocation
 	}
 
-	etcdPrefix := s.DefaultEtcdConfig.Prefix
+	etcdPrefix := s.StorageConfig.Prefix
 	if len(groupOverride.etcdPrefix) > 0 {
 		etcdPrefix = groupOverride.etcdPrefix
 	}
@@ -168,10 +168,10 @@ func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (st
 		etcdSerializer = exactResourceOverride.serializer
 	}
 	// operate on copy
-	etcdConfig := s.DefaultEtcdConfig
-	etcdConfig.Prefix = etcdPrefix
+	config := s.StorageConfig
+	config.Prefix = etcdPrefix
 	if len(overriddenEtcdLocations) > 0 {
-		etcdConfig.ServerList = overriddenEtcdLocations
+		config.ServerList = overriddenEtcdLocations
 	}
 
 	storageEncodingVersion, err := s.ResourceEncodingConfig.StoragageEncodingFor(chosenStorageResource)
@@ -183,13 +183,11 @@ func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (st
 		return nil, err
 	}
 
-	glog.V(3).Infof("storing %v in %v, reading as %v from %v", groupResource, storageEncodingVersion, internalVersion, etcdConfig)
-	return s.newEtcdFn(etcdSerializer, storageEncodingVersion, internalVersion, etcdConfig)
+	glog.V(3).Infof("storing %v in %v, reading as %v from %v", groupResource, storageEncodingVersion, internalVersion, config)
+	return s.newEtcdFn(etcdSerializer, storageEncodingVersion, internalVersion, config)
 }
 
-func newEtcd(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unversioned.GroupVersion, etcdConfig etcdstorage.EtcdConfig) (etcdStorage storage.Interface, err error) {
-	var storageConfig etcdstorage.EtcdStorageConfig
-	storageConfig.Config = etcdConfig
+func newEtcd(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (etcdStorage storage.Interface, err error) {
 	s, ok := ns.SerializerForMediaType("application/json", nil)
 	if !ok {
 		return nil, fmt.Errorf("unable to find serializer for JSON")
@@ -205,14 +203,14 @@ func newEtcd(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unve
 			return nil, fmt.Errorf("error setting up decoder from %v to %v: %v", storageVersion, memoryVersion, err)
 		}
 	}
-	storageConfig.Codec = runtime.NewCodec(encoder, decoder)
-	return storageConfig.NewStorage()
+	config.Codec = runtime.NewCodec(encoder, decoder)
+	return storagebackend.Create(config)
 }
 
 // Get all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
 func (s *DefaultStorageFactory) Backends() []string {
-	backends := sets.NewString(s.DefaultEtcdConfig.ServerList...)
+	backends := sets.NewString(s.StorageConfig.ServerList...)
 
 	for _, overrides := range s.Overrides {
 		backends.Insert(overrides.etcdLocation...)

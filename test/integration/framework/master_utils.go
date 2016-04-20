@@ -47,8 +47,8 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 )
 
@@ -150,14 +150,14 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
-	etcdConfig := etcdstorage.EtcdConfig{
+	config := storagebackend.Config{
 		ServerList: []string{"http://127.0.0.1:4001"},
 		Prefix:     etcdtest.PathPrefix(),
 	}
 
 	negotiatedSerializer := NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), "application/json")
 
-	storageFactory := genericapiserver.NewDefaultStorageFactory(etcdConfig, negotiatedSerializer, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, negotiatedSerializer, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: api.GroupName, Resource: genericapiserver.AllResources},
 		NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), "application/json"))
