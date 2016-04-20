@@ -36,9 +36,16 @@ type DataItem struct {
 
 // PerfData contains all data items generated in current test.
 type PerfData struct {
+	// Version is the version of the metrics. The metrics consumer could use the version
+	// to detect metrics version change and decide what version to support.
+	Version   string     `json:"version"`
 	DataItems []DataItem `json:"dataItems"`
 }
 
 // PerfResultTag is the prefix of generated perfdata. Analyzing tools can find the perf result
 // with this tag.
 const PerfResultTag = "[Result:Performance]"
+
+// PerfResultEnd is the end of generated perfdata. Analyzing tools can find the end of the perf
+// result with this tag.
+const PerfResultEnd = "[Finish:Performance]"
