@@ -19,8 +19,10 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 source "${KUBE_ROOT}/test/kubemark/common.sh"
 
-"${KUBECTL}" delete -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json &> /dev/null || true
-"${KUBECTL}" delete -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json &> /dev/null || true
+"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-kubelet.json" &> /dev/null || true
+"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/addons" &> /dev/null || true
+"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/kubemark-ns.json" &> /dev/null || true
+rm -rf "${RESOURCE_DIRECTORY}/addons"
 
 GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
 
@@ -42,5 +44,5 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
     	${GCLOUD_COMMON_ARGS} || true
 fi
 
-rm -rf "${KUBE_ROOT}/test/kubemark/kubeconfig.loc" &> /dev/null || true
-rm "ca.crt" "kubecfg.crt" "kubecfg.key" "${KUBE_ROOT}/test/kubemark/hollow-node.json" &> /dev/null || true
+rm -rf "${RESOURCE_DIRECTORY}/addons" "${RESOURCE_DIRECTORY}/kubeconfig.loc" &> /dev/null || true
+rm "${RESOURCE_DIRECTORY}/ca.crt" "${RESOURCE_DIRECTORY}/kubecfg.crt" "${RESOURCE_DIRECTORY}/kubecfg.key" "${RESOURCE_DIRECTORY}/hollow-node.json" &> /dev/null || true
