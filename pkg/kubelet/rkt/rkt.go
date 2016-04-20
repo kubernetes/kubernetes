@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	utilwait "k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -1030,10 +1031,63 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 	}
 
 	r.generateEvents(runtimePod, "Started", nil)
+
+	// This is a temporary solution until we have a clean design on how
+	// kubelet handles events. See https://github.com/kubernetes/kubernetes/issues/23084.
+	if err := r.runLifecycleHooks(pod, runtimePod, lifecyclePostStartHook); err != nil {
+		if errKill := r.KillPod(pod, *runtimePod); errKill != nil {
+			return errors.NewAggregate([]error{err, errKill})
+		}
+		return err
+	}
+
 	return nil
 }
 
-func (r *Runtime) runPreStopHook(pod *api.Pod, runtimePod *kubecontainer.Pod) error {
+func (r *Runtime) runPreStopHook(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container) error {
+	glog.V(4).Infof("rkt: Running pre-stop hook for container %q of pod %q", container.Name, format.Pod(pod))
+	return r.runner.Run(containerID, pod, container, container.Lifecycle.PreStop)
+}
+
+func (r *Runtime) runPostStartHook(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container) error {
+	glog.V(4).Infof("rkt: Running post-start hook for container %q of pod %q", container.Name, format.Pod(pod))
+	cid, err := parseContainerID(containerID)
+	if err != nil {
+		return fmt.Errorf("cannot parse container ID %v", containerID)
+	}
+
+	isContainerRunning := func() (done bool, err error) {
+		resp, err := r.apisvc.InspectPod(context.Background(), &rktapi.InspectPodRequest{Id: cid.uuid})
+		if err != nil {
+			return false, fmt.Errorf("failed to inspect rkt pod %q for pod %q", cid.uuid, format.Pod(pod))
+		}
+
+		for _, app := range resp.Pod.Apps {
+			if app.Name == cid.appName {
+				return app.State == rktapi.AppState_APP_STATE_RUNNING, nil
+			}
+		}
+		return false, fmt.Errorf("failed to find container %q in rkt pod %q", cid.appName, cid.uuid)
+	}
+
+	// TODO(yifan): Polling the pod's state for now.
+	timeout := time.Second * 5
+	pollInterval := time.Millisecond * 500
+	if err := utilwait.Poll(pollInterval, timeout, isContainerRunning); err != nil {
+		return fmt.Errorf("rkt: Pod %q doesn't become running in %v: %v", format.Pod(pod), timeout, err)
+	}
+
+	return r.runner.Run(containerID, pod, container, container.Lifecycle.PostStart)
+}
+
+type lifecycleHookType string
+
+const (
+	lifecyclePostStartHook lifecycleHookType = "post-start"
+	lifecyclePreStopHook   lifecycleHookType = "pre-stop"
+)
+
+func (r *Runtime) runLifecycleHooks(pod *api.Pod, runtimePod *kubecontainer.Pod, typ lifecycleHookType) error {
 	var wg sync.WaitGroup
 	var errlist []error
 	errCh := make(chan error, len(pod.Spec.Containers))
@@ -1041,21 +1095,43 @@ func (r *Runtime) runPreStopHook(pod *api.Pod, runtimePod *kubecontainer.Pod) er
 	wg.Add(len(pod.Spec.Containers))
 
 	for i, c := range pod.Spec.Containers {
-		if c.Lifecycle == nil || c.Lifecycle.PreStop == nil {
+		var hookFunc func(kubecontainer.ContainerID, *api.Pod, *api.Container) error
+
+		switch typ {
+		case lifecyclePostStartHook:
+			if c.Lifecycle != nil && c.Lifecycle.PostStart != nil {
+				hookFunc = r.runPostStartHook
+			}
+		case lifecyclePreStopHook:
+			if c.Lifecycle != nil && c.Lifecycle.PreStop != nil {
+				hookFunc = r.runPreStopHook
+			}
+		default:
+			errCh <- fmt.Errorf("Unrecognized lifecycle hook type %q for container %q in pod %q", typ, c.Name, format.Pod(pod))
+		}
+
+		if hookFunc == nil {
 			wg.Done()
 			continue
 		}
 
-		hook := c.Lifecycle.PreStop
-		containerID := runtimePod.Containers[i].ID
 		container := &pod.Spec.Containers[i]
+		runtimeContainer := runtimePod.FindContainerByName(container.Name)
+		if runtimeContainer == nil {
+			// Container already gone.
+			wg.Done()
+			continue
+		}
+		containerID := runtimeContainer.ID
 
 		go func() {
-			if err := r.runner.Run(containerID, pod, container, hook); err != nil {
-				glog.Errorf("rkt: Failed to run pre-stop hook for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
+			defer wg.Done()
+			if err := hookFunc(containerID, pod, container); err != nil {
+				glog.Errorf("rkt: Failed to run %s hook for container %q of pod %q: %v", typ, container.Name, format.Pod(pod), err)
 				errCh <- err
+			} else {
+				glog.V(4).Infof("rkt: %s hook completed successfully for container %q of pod %q", typ, container.Name, format.Pod(pod))
 			}
-			wg.Done()
 		}()
 	}
 
@@ -1187,23 +1263,18 @@ func (r *Runtime) waitPreStopHooks(pod *api.Pod, runningPod *kubecontainer.Pod) 
 		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
 	}
 
-	errCh := make(chan error, 1)
+	done := make(chan struct{})
 	go func() {
-		if err := r.runPreStopHook(pod, runningPod); err != nil {
-			errCh <- err
+		if err := r.runLifecycleHooks(pod, runningPod, lifecyclePreStopHook); err != nil {
+			glog.Errorf("rkt: Some pre-stop hooks failed for pod %q: %v", format.Pod(pod), err)
 		}
-		close(errCh)
+		close(done)
 	}()
 
 	select {
 	case <-time.After(time.Duration(gracePeriod) * time.Second):
-		glog.V(2).Infof("rkt: Some pre-stop hooks did not complete in %d seconds for pod %v", gracePeriod, format.Pod(pod))
-	case err := <-errCh:
-		if err != nil {
-			glog.Errorf("rkt: Some pre-stop hooks failed for pod %v: %v", format.Pod(pod), err)
-		} else {
-			glog.V(4).Infof("rkt: pre-stop hooks for pod %v completed", format.Pod(pod))
-		}
+		glog.V(2).Infof("rkt: Some pre-stop hooks did not complete in %d seconds for pod %q", gracePeriod, format.Pod(pod))
+	case <-done:
 	}
 }
 
