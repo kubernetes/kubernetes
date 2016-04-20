@@ -199,9 +199,16 @@ func testCheckResult(t *testing.T, i int, expectEventType watch.EventType, w wat
 
 func testCheckStop(t *testing.T, i int, w watch.Interface) {
 	select {
-	case _, ok := <-w.ResultChan():
+	case e, ok := <-w.ResultChan():
 		if ok {
-			t.Errorf("#%d: ResultChan should have been closed", i)
+			var obj string
+			switch e.Object.(type) {
+			case *api.Pod:
+				obj = e.Object.(*api.Pod).Name
+			case *unversioned.Status:
+				obj = e.Object.(*unversioned.Status).Message
+			}
+			t.Errorf("#%d: ResultChan should have been closed. Event: %s. Object: %s", i, e.Type, obj)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("#%d: time out after waiting 1s on ResultChan", i)
