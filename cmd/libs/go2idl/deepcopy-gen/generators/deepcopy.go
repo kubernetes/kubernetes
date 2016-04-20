@@ -84,7 +84,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			path := p.Path
 			packages = append(packages,
 				&generator.DefaultPackage{
-					PackageName: filepath.Base(path),
+					PackageName: strings.Split(filepath.Base(path), ".")[0],
 					PackagePath: path,
 					HeaderText:  header,
 					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
