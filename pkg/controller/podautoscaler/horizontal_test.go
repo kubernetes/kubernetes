@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -83,6 +84,7 @@ type testCase struct {
 	verifyEvents        bool
 	// Channel with names of HPA objects which we have reconciled.
 	processed chan string
+	tcLock    sync.RWMutex
 
 	// Target resource information.
 	resource *fakeResource
@@ -269,7 +271,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		obj := action.(testclient.UpdateAction).GetObject().(*extensions.Scale)
 		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
 		assert.Equal(t, tc.desiredReplicas, replicas)
+		tc.tcLock.Lock()
 		tc.scaleUpdated = true
+		tc.tcLock.Unlock()
 		return true, obj, nil
 	})
 
@@ -277,7 +281,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		obj := action.(testclient.UpdateAction).GetObject().(*extensions.Scale)
 		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
 		assert.Equal(t, tc.desiredReplicas, replicas)
+		tc.tcLock.Lock()
 		tc.scaleUpdated = true
+		tc.tcLock.Unlock()
 		return true, obj, nil
 	})
 
@@ -285,7 +291,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		obj := action.(testclient.UpdateAction).GetObject().(*extensions.Scale)
 		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
 		assert.Equal(t, tc.desiredReplicas, replicas)
+		tc.tcLock.Lock()
 		tc.scaleUpdated = true
+		tc.tcLock.Unlock()
 		return true, obj, nil
 	})
 
@@ -298,7 +306,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			assert.NotNil(t, obj.Status.CurrentCPUUtilizationPercentage)
 			assert.Equal(t, tc.CPUCurrent, *obj.Status.CurrentCPUUtilizationPercentage)
 		}
+		tc.tcLock.Lock()
 		tc.statusUpdated = true
+		tc.tcLock.Unlock()
 		// Every time we reconcile HPA object we are updating status.
 		tc.processed <- obj.Name
 		return true, obj, nil
@@ -310,7 +320,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			assert.Equal(t, "SuccessfulRescale", obj.Reason)
 			assert.Equal(t, fmt.Sprintf("New size: %d; reason: CPU utilization above target", tc.desiredReplicas), obj.Message)
 		}
+		tc.tcLock.Lock()
 		tc.eventCreated = true
+		tc.tcLock.Unlock()
 		return true, obj, nil
 	})
 
@@ -321,6 +333,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 }
 
 func (tc *testCase) verifyResults(t *testing.T) {
+	tc.tcLock.RLock()
+	defer tc.tcLock.RUnlock()
 	assert.Equal(t, tc.initialReplicas != tc.desiredReplicas, tc.scaleUpdated)
 	assert.True(t, tc.statusUpdated)
 	if tc.verifyEvents {
