@@ -129,7 +129,6 @@ func TestInstallAPIGroups(t *testing.T) {
 			IsLegacyGroup:                true,
 			ParameterCodec:               api.ParameterCodec,
 			NegotiatedSerializer:         api.Codecs,
-			NegotiatedStreamSerializer:   api.StreamCodecs,
 		},
 		{
 			// extensions group version
@@ -138,7 +137,6 @@ func TestInstallAPIGroups(t *testing.T) {
 			OptionsExternalVersion:       &apiGroupMeta.GroupVersion,
 			ParameterCodec:               api.ParameterCodec,
 			NegotiatedSerializer:         api.Codecs,
-			NegotiatedStreamSerializer:   api.StreamCodecs,
 		},
 	}
 	s.InstallAPIGroups(apiGroupsInfo)
