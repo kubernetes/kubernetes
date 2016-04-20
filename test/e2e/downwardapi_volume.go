@@ -192,7 +192,7 @@ func downwardAPIVolumeBasePod(name string, labels, annotations map[string]string
 							Items: []api.DownwardAPIVolumeFile{
 								{
 									Path: "podname",
-									FieldRef: api.ObjectFieldSelector{
+									FieldRef: &api.ObjectFieldSelector{
 										APIVersion: "v1",
 										FieldPath:  "metadata.name",
 									},
@@ -213,7 +213,7 @@ func applyLabelsAndAnnotationsToDownwardAPIPod(labels, annotations map[string]st
 	if len(labels) > 0 {
 		pod.Spec.Volumes[0].DownwardAPI.Items = append(pod.Spec.Volumes[0].DownwardAPI.Items, api.DownwardAPIVolumeFile{
 			Path: "labels",
-			FieldRef: api.ObjectFieldSelector{
+			FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.labels",
 			},
@@ -223,7 +223,7 @@ func applyLabelsAndAnnotationsToDownwardAPIPod(labels, annotations map[string]st
 	if len(annotations) > 0 {
 		pod.Spec.Volumes[0].DownwardAPI.Items = append(pod.Spec.Volumes[0].DownwardAPI.Items, api.DownwardAPIVolumeFile{
 			Path: "annotations",
-			FieldRef: api.ObjectFieldSelector{
+			FieldRef: &api.ObjectFieldSelector{
 				APIVersion: "v1",
 				FieldPath:  "metadata.annotations",
 			},

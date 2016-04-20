@@ -17,6 +17,7 @@ limitations under the License.
 package downwardapi
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -71,13 +72,10 @@ func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName: spec.Name(),
+		items:   spec.Volume.DownwardAPI.Items,
 		pod:     pod,
 		podUID:  pod.UID,
 		plugin:  plugin,
-	}
-	v.fieldReferenceFileNames = make(map[string]string)
-	for _, fileInfo := range spec.Volume.DownwardAPI.Items {
-		v.fieldReferenceFileNames[fileInfo.FieldRef.FieldPath] = path.Clean(fileInfo.Path)
 	}
 	return &downwardAPIVolumeMounter{
 		downwardAPIVolume: v,
@@ -97,11 +95,11 @@ func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) 
 
 // downwardAPIVolume retrieves downward API data and placing them into the volume on the host.
 type downwardAPIVolume struct {
-	volName                 string
-	fieldReferenceFileNames map[string]string
-	pod                     *api.Pod
-	podUID                  types.UID // TODO: remove this redundancy as soon NewUnmounter func will have *api.POD and not only types.UID
-	plugin                  *downwardAPIPlugin
+	volName string
+	items   []api.DownwardAPIVolumeFile
+	pod     *api.Pod
+	podUID  types.UID // TODO: remove this redundancy as soon NewUnmounter func will have *api.POD and not only types.UID
+	plugin  *downwardAPIPlugin
 	volume.MetricsNil
 }
 
@@ -174,12 +172,29 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 func (d *downwardAPIVolume) collectData() (map[string]string, error) {
 	errlist := []error{}
 	data := make(map[string]string)
-	for fieldReference, fileName := range d.fieldReferenceFileNames {
-		if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fieldReference); err != nil {
-			glog.Errorf("Unable to extract field %s: %s", fieldReference, err.Error())
-			errlist = append(errlist, err)
-		} else {
-			data[fileName] = sortLines(values)
+	for _, fileInfo := range d.items {
+		if fileInfo.FieldRef != nil && fileInfo.ResourceFieldRef != nil {
+			return data, fmt.Errorf("both fieldRef and resourceFieldRef can not be specified simultaneously")
+		}
+		if fileInfo.FieldRef != nil {
+			if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fileInfo.FieldRef.FieldPath); err != nil {
+				glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
+				errlist = append(errlist, err)
+			} else {
+				data[path.Clean(fileInfo.Path)] = sortLines(values)
+			}
+		} else if fileInfo.ResourceFieldRef != nil {
+			filename := strings.Split(path.Clean(fileInfo.Path), "/")
+			if len(filename) < 2 {
+				return data, fmt.Errorf("resourceFieldRef format is incorrect, should be container_name/path")
+			}
+			containerName := filename[0]
+			if values, err := fieldpath.ExtractResourceValueForContainer(fileInfo.ResourceFieldRef, d.pod, containerName); err != nil {
+				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.FieldPath, err.Error())
+				errlist = append(errlist, err)
+			} else {
+				data[path.Clean(fileInfo.Path)] = sortLines(values)
+			}
 		}
 	}
 	return data, utilerrors.NewAggregate(errlist)
@@ -311,7 +326,8 @@ func (d *downwardAPIVolume) writeDataInTimestampDir(data map[string]string) (str
 // foo/bar      -> ../..downwardapi/foo/bar
 // foo/baz/blah -> ../../..downwardapi/foo/baz/blah
 func (d *downwardAPIVolume) updateSymlinksToCurrentDir() error {
-	for _, f := range d.fieldReferenceFileNames {
+	for _, fileInfo := range d.items {
+		f := path.Clean(fileInfo.Path)
 		dir, _ := filepath.Split(f)
 		nbOfSubdir := 0
 		if len(dir) > 0 {

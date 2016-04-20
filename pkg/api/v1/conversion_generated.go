@@ -1521,8 +1521,23 @@ func autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *Downw
 		defaulting.(func(*DownwardAPIVolumeFile))(in)
 	}
 	out.Path = in.Path
-	if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(&in.FieldRef, &out.FieldRef, s); err != nil {
-		return err
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(api.ObjectFieldSelector)
+		if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(api.ObjectFieldSelector)
+		if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	return nil
 }
@@ -1536,8 +1551,23 @@ func autoConvert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *api.D
 		defaulting.(func(*api.DownwardAPIVolumeFile))(in)
 	}
 	out.Path = in.Path
-	if err := Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(&in.FieldRef, &out.FieldRef, s); err != nil {
-		return err
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		if err := Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ObjectFieldSelector)
+		if err := Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	return nil
 }
@@ -1941,6 +1971,15 @@ func autoConvert_v1_EnvVarSource_To_api_EnvVarSource(in *EnvVarSource, out *api.
 	} else {
 		out.FieldRef = nil
 	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(api.ObjectFieldSelector)
+		if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
+	}
 	if in.ConfigMapKeyRef != nil {
 		in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef
 		*out = new(api.ConfigMapKeySelector)
@@ -1978,6 +2017,15 @@ func autoConvert_api_EnvVarSource_To_v1_EnvVarSource(in *api.EnvVarSource, out *
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ObjectFieldSelector)
+		if err := Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	if in.ConfigMapKeyRef != nil {
 		in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef

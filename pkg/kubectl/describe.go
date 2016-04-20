@@ -682,7 +682,12 @@ func printRBDVolumeSource(rbd *api.RBDVolumeSource, out io.Writer) {
 func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, out io.Writer) {
 	fmt.Fprintf(out, "    Type:\tDownwardAPI (a volume populated by information about the pod)\n    Items:\n")
 	for _, mapping := range d.Items {
-		fmt.Fprintf(out, "      %v -> %v\n", mapping.FieldRef.FieldPath, mapping.Path)
+		if mapping.FieldRef != nil {
+			fmt.Fprintf(out, "      %v -> %v\n", mapping.FieldRef.FieldPath, mapping.Path)
+		}
+		if mapping.ResourceFieldRef != nil {
+			fmt.Fprintf(out, "      %v -> %v\n", mapping.ResourceFieldRef.FieldPath, mapping.Path)
+		}
 	}
 }
 

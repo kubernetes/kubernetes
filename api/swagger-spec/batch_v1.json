@@ -1615,8 +1615,7 @@
     "id": "v1.DownwardAPIVolumeFile",
     "description": "DownwardAPIVolumeFile represents information to create the file containing the pod field",
     "required": [
-     "path",
-     "fieldRef"
+     "path"
     ],
     "properties": {
      "path": {
@@ -1626,6 +1625,9 @@
      "fieldRef": {
       "$ref": "v1.ObjectFieldSelector",
       "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
+     },
+     "resourceFieldRef": {
+      "$ref": "v1.ObjectFieldSelector"
      }
     }
    },
@@ -1888,6 +1890,9 @@
      "fieldRef": {
       "$ref": "v1.ObjectFieldSelector",
       "description": "Selects a field of the pod; only name and namespace are supported."
+     },
+     "resourceFieldRef": {
+      "$ref": "v1.ObjectFieldSelector"
      },
      "configMapKeyRef": {
       "$ref": "v1.ConfigMapKeySelector",

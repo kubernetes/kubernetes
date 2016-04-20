@@ -698,7 +698,9 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 			allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 		}
 		allErrs = append(allErrs, validateVolumeSourcePath(downwardAPIVolumeFile.Path, fldPath.Child("path"))...)
-		allErrs = append(allErrs, validateObjectFieldSelector(&downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
+		if downwardAPIVolumeFile.FieldRef != nil {
+			allErrs = append(allErrs, validateObjectFieldSelector(downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
+		}
 	}
 	return allErrs
 }
@@ -1022,6 +1024,7 @@ func validateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 }
 
 var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "status.podIP")
+var validResourceFieldPathExpressionsEnv = sets.NewString("resources.limits.cpu", "resources.limits.memory", "resources.requests.cpu", "resources.requests.memory")
 
 func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1035,6 +1038,10 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 	if ev.ValueFrom.FieldRef != nil {
 		numSources++
 		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv, fldPath.Child("fieldRef"))...)
+	}
+	if ev.ValueFrom.ResourceFieldRef != nil {
+		numSources++
+		allErrs = append(allErrs, validateResourceObjectFieldSelector(ev.ValueFrom.ResourceFieldRef, &validResourceFieldPathExpressionsEnv, fldPath.Child("containerFieldRef"))...)
 	}
 	if ev.ValueFrom.ConfigMapKeyRef != nil {
 		numSources++
@@ -1070,6 +1077,20 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 		} else if !expressions.Has(internalFieldPath) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), internalFieldPath, expressions.List()))
 		}
+	}
+
+	return allErrs
+}
+
+func validateResourceObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(fs.APIVersion) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("apiVersion"), ""))
+	} else if len(fs.FieldPath) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("fieldPath"), ""))
+	} else if !expressions.Has(fs.FieldPath) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), fs.FieldPath, expressions.List()))
 	}
 
 	return allErrs

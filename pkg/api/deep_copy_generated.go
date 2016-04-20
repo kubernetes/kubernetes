@@ -633,8 +633,23 @@ func DeepCopy_api_DeleteOptions(in DeleteOptions, out *DeleteOptions, c *convers
 
 func DeepCopy_api_DownwardAPIVolumeFile(in DownwardAPIVolumeFile, out *DownwardAPIVolumeFile, c *conversion.Cloner) error {
 	out.Path = in.Path
-	if err := DeepCopy_api_ObjectFieldSelector(in.FieldRef, &out.FieldRef, c); err != nil {
-		return err
+	if in.FieldRef != nil {
+		in, out := in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		if err := DeepCopy_api_ObjectFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ObjectFieldSelector)
+		if err := DeepCopy_api_ObjectFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	return nil
 }
@@ -783,6 +798,15 @@ func DeepCopy_api_EnvVarSource(in EnvVarSource, out *EnvVarSource, c *conversion
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = new(ObjectFieldSelector)
+		if err := DeepCopy_api_ObjectFieldSelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceFieldRef = nil
 	}
 	if in.ConfigMapKeyRef != nil {
 		in, out := in.ConfigMapKeyRef, &out.ConfigMapKeyRef

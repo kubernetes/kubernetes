@@ -1519,6 +1519,11 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 				if err != nil {
 					return result, err
 				}
+			case envVar.ValueFrom.ResourceFieldRef != nil:
+				runtimeVal, err = fieldpath.ExtractResourceValueForContainer(envVar.ValueFrom.ResourceFieldRef, pod, container.Name)
+				if err != nil {
+					return result, err
+				}
 			case envVar.ValueFrom.ConfigMapKeyRef != nil:
 				name := envVar.ValueFrom.ConfigMapKeyRef.Name
 				key := envVar.ValueFrom.ConfigMapKeyRef.Key

@@ -19,6 +19,7 @@ package fieldpath
 import (
 	"fmt"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 )
 
@@ -57,4 +58,33 @@ func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 	}
 
 	return "", fmt.Errorf("Unsupported fieldPath: %v", fieldPath)
+}
+
+func ExtractResourceValueForContainer(fs *api.ObjectFieldSelector, internalPod *api.Pod, containerName string) (string, error) {
+	container, err := FindContainerInPod(internalPod, containerName)
+	if err != nil {
+		return "", err
+	}
+
+	switch fs.FieldPath {
+	case "resources.limits.cpu":
+		return fmt.Sprintf("%s", container.Resources.Limits[api.ResourceCPU]), nil
+	case "resources.limits.memory":
+		return fmt.Sprintf("%s", container.Resources.Limits[api.ResourceMemory]), nil
+	case "resources.requests.cpu":
+		return fmt.Sprintf("%s", container.Resources.Requests[api.ResourceCPU]), nil
+	case "resources.requests.memory":
+		return fmt.Sprintf("%s", container.Resources.Requests[api.ResourceMemory]), nil
+	}
+
+	return "", fmt.Errorf("Unsupported resource field path: %v", fs.FieldPath)
+}
+
+func FindContainerInPod(internalPod *api.Pod, containerName string) (*api.Container, error) {
+	for _, container := range internalPod.Spec.Containers {
+		if container.Name == containerName {
+			return &container, nil
+		}
+	}
+	return nil, fmt.Errorf("container %s not found", containerName)
 }
