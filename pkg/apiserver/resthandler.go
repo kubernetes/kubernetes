@@ -71,8 +71,7 @@ type RequestScope struct {
 	Namer ScopeNamer
 	ContextFunc
 
-	Serializer       runtime.NegotiatedSerializer
-	StreamSerializer runtime.NegotiatedSerializer
+	Serializer runtime.NegotiatedSerializer
 	runtime.ParameterCodec
 
 	Creater   runtime.ObjectCreater

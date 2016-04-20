@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -179,3 +180,12 @@ func SetZeroValue(objPtr Object) error {
 	v.Set(reflect.Zero(v.Type()))
 	return nil
 }
+
+// DefaultFramer is valid for any stream that can read objects serially without
+// any separation in the stream.
+var DefaultFramer = defaultFramer{}
+
+type defaultFramer struct{}
+
+func (defaultFramer) NewFrameReader(r io.Reader) io.Reader { return r }
+func (defaultFramer) NewFrameWriter(w io.Writer) io.Writer { return w }

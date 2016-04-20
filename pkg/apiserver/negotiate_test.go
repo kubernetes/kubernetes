@@ -27,14 +27,18 @@ import (
 )
 
 type fakeNegotiater struct {
-	serializer runtime.Serializer
-	types      []string
-	mediaType  string
-	options    map[string]string
+	serializer, streamSerializer runtime.Serializer
+	framer                       runtime.Framer
+	types, streamTypes           []string
+	mediaType, streamMediaType   string
+	options, streamOptions       map[string]string
 }
 
 func (n *fakeNegotiater) SupportedMediaTypes() []string {
 	return n.types
+}
+func (n *fakeNegotiater) SupportedStreamingMediaTypes() []string {
+	return n.streamTypes
 }
 
 func (n *fakeNegotiater) SerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, bool) {
@@ -43,6 +47,14 @@ func (n *fakeNegotiater) SerializerForMediaType(mediaType string, options map[st
 		n.options = options
 	}
 	return n.serializer, n.serializer != nil
+}
+
+func (n *fakeNegotiater) StreamingSerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, runtime.Framer, string, bool) {
+	n.streamMediaType = mediaType
+	if len(options) > 0 {
+		n.streamOptions = options
+	}
+	return n.streamSerializer, n.framer, mediaType, n.streamSerializer != nil
 }
 
 func (n *fakeNegotiater) EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
