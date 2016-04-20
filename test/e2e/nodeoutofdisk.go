@@ -179,7 +179,7 @@ func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
 			Containers: []api.Container{
 				{
 					Name:  "pause",
-					Image: "beta.gcr.io/google_containers/pause:2.0",
+					Image: "beta.gcr.io/google_containers/pause-amd64:3.0",
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							// Request enough CPU to fit only two pods on a given node.
