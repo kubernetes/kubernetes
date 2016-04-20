@@ -341,6 +341,12 @@ type KubeletConfiguration struct {
 	NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
 	// enable gathering custom metrics.
 	EnableCustomMetrics bool `json:"enableCustomMetrics"`
+	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
+	EvictionHard string `json:"evictionHard,omitempty"`
+	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
+	EvictionSoft string `json:"evictionSoft,omitempty"`
+	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
+	EvictionSoftGracePeriod string `json:"evictionSoftGracePeriod,omitempty"`
 }
 
 type KubeSchedulerConfiguration struct {
