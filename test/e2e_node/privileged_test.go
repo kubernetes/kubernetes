@@ -22,7 +22,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -151,7 +150,6 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 	var output map[string]string
 	err = json.Unmarshal([]byte(stdout), &output)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Could not unmarshal curl response: %s", stdout))
-	glog.Infof("Deserialized output is %v", output)
 	return output
 }
 
