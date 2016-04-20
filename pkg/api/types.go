@@ -209,6 +209,10 @@ type VolumeSource struct {
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
+
+	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty"`
+
 	// FlexVolume represents a generic volume resource that is
 	// provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
 	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty"`
@@ -254,6 +258,8 @@ type PersistentVolumeSource struct {
 	NFS *NFSVolumeSource `json:"nfs,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
+	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty"`
 	// ISCSIVolumeSource represents an ISCSI resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
@@ -626,6 +632,30 @@ type NFSVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the NFS export to be mounted with read-only permissions
 	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// Represents a Quobyte mount that lasts the lifetime of a pod.
+// Quobyte volumes do not support ownership management or SELinux relabeling.
+type QuobyteVolumeSource struct {
+	// Registry represents a single or multiple Quobyte Registry services
+	// specified as a string as host:port pair (multiple entries are separated with commas)
+	// which acts as the central registry for volumes
+	Registry string `json:"registry"`
+
+	// Volume is a string that references an already created Quobyte volume by name.
+	Volume string `json:"volume"`
+
+	// Defaults to false (read/write). ReadOnly here will force
+	// the Quobyte to be mounted with read-only permissions
+	ReadOnly bool `json:"readOnly,omitempty"`
+
+	// User to map volume access to
+	// Defaults to the root user
+	User string `json:"user,omitempty"`
+
+	// Group to map volume access to
+	// Default is no group
+	Group string `json:"group,omitempty"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.

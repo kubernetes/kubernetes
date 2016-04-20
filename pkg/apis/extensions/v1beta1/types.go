@@ -992,6 +992,7 @@ var (
 	DownwardAPI           FSType = "downwardAPI"
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
+	Quobyte               FSType = "quobyte"
 	All                   FSType = "*"
 )
 

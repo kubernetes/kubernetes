@@ -270,6 +270,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PreferredSchedulingTerm_To_v1_PreferredSchedulingTerm,
 		Convert_v1_Probe_To_api_Probe,
 		Convert_api_Probe_To_v1_Probe,
+		Convert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource,
+		Convert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource,
 		Convert_v1_RBDVolumeSource_To_api_RBDVolumeSource,
 		Convert_api_RBDVolumeSource_To_v1_RBDVolumeSource,
 		Convert_v1_RangeAllocation_To_api_RangeAllocation,
@@ -4197,6 +4199,15 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	} else {
 		out.VsphereVolume = nil
 	}
+	if in.Quobyte != nil {
+		in, out := &in.Quobyte, &out.Quobyte
+		*out = new(api.QuobyteVolumeSource)
+		if err := Convert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Quobyte = nil
+	}
 	return nil
 }
 
@@ -4258,6 +4269,15 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 		}
 	} else {
 		out.RBD = nil
+	}
+	if in.Quobyte != nil {
+		in, out := &in.Quobyte, &out.Quobyte
+		*out = new(QuobyteVolumeSource)
+		if err := Convert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Quobyte = nil
 	}
 	if in.ISCSI != nil {
 		in, out := &in.ISCSI, &out.ISCSI
@@ -5357,6 +5377,32 @@ func autoConvert_api_Probe_To_v1_Probe(in *api.Probe, out *Probe, s conversion.S
 
 func Convert_api_Probe_To_v1_Probe(in *api.Probe, out *Probe, s conversion.Scope) error {
 	return autoConvert_api_Probe_To_v1_Probe(in, out, s)
+}
+
+func autoConvert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource(in *QuobyteVolumeSource, out *api.QuobyteVolumeSource, s conversion.Scope) error {
+	out.Registry = in.Registry
+	out.Volume = in.Volume
+	out.ReadOnly = in.ReadOnly
+	out.User = in.User
+	out.Group = in.Group
+	return nil
+}
+
+func Convert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource(in *QuobyteVolumeSource, out *api.QuobyteVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource(in, out, s)
+}
+
+func autoConvert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource(in *api.QuobyteVolumeSource, out *QuobyteVolumeSource, s conversion.Scope) error {
+	out.Registry = in.Registry
+	out.Volume = in.Volume
+	out.ReadOnly = in.ReadOnly
+	out.User = in.User
+	out.Group = in.Group
+	return nil
+}
+
+func Convert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource(in *api.QuobyteVolumeSource, out *QuobyteVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_RBDVolumeSource_To_api_RBDVolumeSource(in *RBDVolumeSource, out *api.RBDVolumeSource, s conversion.Scope) error {
@@ -6742,6 +6788,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	} else {
 		out.VsphereVolume = nil
 	}
+	if in.Quobyte != nil {
+		in, out := &in.Quobyte, &out.Quobyte
+		*out = new(api.QuobyteVolumeSource)
+		if err := Convert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Quobyte = nil
+	}
 	return nil
 }
 
@@ -6848,6 +6903,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 		}
 	} else {
 		out.RBD = nil
+	}
+	if in.Quobyte != nil {
+		in, out := &in.Quobyte, &out.Quobyte
+		*out = new(QuobyteVolumeSource)
+		if err := Convert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Quobyte = nil
 	}
 	if in.FlexVolume != nil {
 		in, out := &in.FlexVolume, &out.FlexVolume

@@ -259,13 +259,10 @@ type VolumeSource struct {
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	Cinder *CinderVolumeSource `json:"cinder,omitempty" protobuf:"bytes,13,opt,name=cinder"`
-
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	CephFS *CephFSVolumeSource `json:"cephfs,omitempty" protobuf:"bytes,14,opt,name=cephfs"`
-
 	// Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running
 	Flocker *FlockerVolumeSource `json:"flocker,omitempty" protobuf:"bytes,15,opt,name=flocker"`
-
 	// DownwardAPI represents downward API about the pod that should populate this volume
 	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty" protobuf:"bytes,16,opt,name=downwardAPI"`
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
@@ -276,6 +273,8 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty" protobuf:"bytes,19,opt,name=configMap"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,20,opt,name=vsphereVolume"`
+	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,21,opt,name=quobyte"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -338,6 +337,8 @@ type PersistentVolumeSource struct {
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty" protobuf:"bytes,13,opt,name=azureFile"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,14,opt,name=vsphereVolume"`
+	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,15,opt,name=quobyte"`
 }
 
 // +genclient=true
@@ -686,6 +687,30 @@ type GCEPersistentDiskVolumeSource struct {
 	// Defaults to false.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
+}
+
+// Represents a Quobyte mount that lasts the lifetime of a pod.
+// Quobyte volumes do not support ownership management or SELinux relabeling.
+type QuobyteVolumeSource struct {
+	// Registry represents a single or multiple Quobyte Registry services
+	// specified as a string as host:port pair (multiple entries are separated with commas)
+	// which acts as the central registry for volumes
+	Registry string `json:"registry" protobuf:"bytes,1,opt,name=registry"`
+
+	// Volume is a string that references an already created Quobyte volume by name.
+	Volume string `json:"volume" protobuf:"bytes,2,opt,name=volume"`
+
+	// ReadOnly here will force the Quobyte volume to be mounted with read-only permissions.
+	// Defaults to false.
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+
+	// User to map volume access to
+	// Defaults to serivceaccount user
+	User string `json:"user,omitempty" protobuf:"bytes,4,opt,name=user"`
+
+	// Group to map volume access to
+	// Default is no group
+	Group string `json:"group,omitempty" protobuf:"bytes,5,opt,name=group"`
 }
 
 // FlexVolume represents a generic volume resource that is
