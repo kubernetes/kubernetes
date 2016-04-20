@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"fmt"
+	"net"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
@@ -63,14 +64,18 @@ func NewServerRunOptions() *genericapiserver.ServerRunOptions {
 }
 
 func Run(serverOptions *genericapiserver.ServerRunOptions) error {
-	config := genericapiserver.Config{
+	// Set ServiceClusterIPRange
+	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
+	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
+	genericapiserver.ValidateRunOptions(serverOptions)
+	config := &genericapiserver.Config{
 		EnableIndex:          true,
 		EnableSwaggerSupport: true,
 		APIPrefix:            "/api",
 		APIGroupPrefix:       "/apis",
 		Serializer:           api.Codecs,
 	}
-	s, err := genericapiserver.New(&config)
+	s, err := genericapiserver.New(config)
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
 	}

@@ -60,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -78,17 +77,6 @@ cluster's shared state through which all other components interact.`,
 	}
 
 	return cmd
-}
-
-// TODO: Longer term we should read this from some config store, rather than a flag.
-func verifyClusterIPFlags(s *options.APIServer) {
-	if s.ServiceClusterIPRange.IP == nil {
-		glog.Fatal("No --service-cluster-ip-range specified")
-	}
-	var ones, bits = s.ServiceClusterIPRange.Mask.Size()
-	if bits-ones > 20 {
-		glog.Fatal("Specified --service-cluster-ip-range is too large")
-	}
 }
 
 // For testing.
@@ -176,27 +164,10 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.APIServer) error {
-	verifyClusterIPFlags(s)
-
-	// If advertise-address is not specified, use bind-address. If bind-address
-	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
-	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
-	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
-		hostIP, err := utilnet.ChooseBindAddress(s.BindAddress)
-		if err != nil {
-			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
-				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
-		}
-		s.AdvertiseAddress = hostIP
-	}
-	glog.Infof("Will report %v as public IP address.", s.AdvertiseAddress)
+	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
 
 	if len(s.EtcdConfig.ServerList) == 0 {
 		glog.Fatalf("--etcd-servers must be specified")
-	}
-
-	if s.KubernetesServiceNodePort > 0 && !s.ServiceNodePortRange.Contains(s.KubernetesServiceNodePort) {
-		glog.Fatalf("Kubernetes service port range %v doesn't contain %v", s.ServiceNodePortRange, (s.KubernetesServiceNodePort))
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
@@ -377,8 +348,6 @@ func Run(s *options.APIServer) error {
 
 	updateEtcdOverrides(s.EtcdServersOverrides, storageVersions, s.EtcdConfig, &storageDestinations, newEtcd)
 
-	n := s.ServiceClusterIPRange
-
 	// Default to the private server key for service account token signing
 	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
 		if authenticator.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
@@ -447,38 +416,22 @@ func Run(s *options.APIServer) error {
 		}
 	}
 
+	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
+	// TODO: Move the following to generic api server as well.
+	genericConfig.StorageDestinations = storageDestinations
+	genericConfig.StorageVersions = storageVersions
+	genericConfig.Authenticator = authenticator
+	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
+	genericConfig.Authorizer = authorizer
+	genericConfig.AdmissionControl = admissionController
+	genericConfig.APIResourceConfigSource = apiResourceConfigSource
+	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
+	genericConfig.ProxyDialer = proxyDialerFn
+	genericConfig.ProxyTLSClientConfig = proxyTLSClientConfig
+	genericConfig.Serializer = api.Codecs
+
 	config := &master.Config{
-		Config: &genericapiserver.Config{
-			StorageDestinations:       storageDestinations,
-			StorageVersions:           storageVersions,
-			ServiceClusterIPRange:     &n,
-			EnableLogsSupport:         s.EnableLogsSupport,
-			EnableUISupport:           true,
-			EnableSwaggerSupport:      true,
-			EnableSwaggerUI:           s.EnableSwaggerUI,
-			EnableProfiling:           s.EnableProfiling,
-			EnableWatchCache:          s.EnableWatchCache,
-			EnableIndex:               true,
-			APIPrefix:                 s.APIPrefix,
-			APIGroupPrefix:            s.APIGroupPrefix,
-			CorsAllowedOriginList:     s.CorsAllowedOriginList,
-			ReadWritePort:             s.SecurePort,
-			PublicAddress:             s.AdvertiseAddress,
-			Authenticator:             authenticator,
-			SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
-			Authorizer:                authorizer,
-			AdmissionControl:          admissionController,
-			APIResourceConfigSource:   apiResourceConfigSource,
-			MasterServiceNamespace:    s.MasterServiceNamespace,
-			MasterCount:               s.MasterCount,
-			ExternalHost:              s.ExternalHost,
-			MinRequestTimeout:         s.MinRequestTimeout,
-			ProxyDialer:               proxyDialerFn,
-			ProxyTLSClientConfig:      proxyTLSClientConfig,
-			ServiceNodePortRange:      s.ServiceNodePortRange,
-			KubernetesServiceNodePort: s.KubernetesServiceNodePort,
-			Serializer:                api.Codecs,
-		},
+		Config:                  genericConfig,
 		EnableCoreControllers:   true,
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,

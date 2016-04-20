@@ -641,6 +641,67 @@ func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
 	})
 }
 
+// TODO: Longer term we should read this from some config store, rather than a flag.
+func verifyClusterIPFlags(options *ServerRunOptions) {
+	if options.ServiceClusterIPRange.IP == nil {
+		glog.Fatal("No --service-cluster-ip-range specified")
+	}
+	var ones, bits = options.ServiceClusterIPRange.Mask.Size()
+	if bits-ones > 20 {
+		glog.Fatal("Specified --service-cluster-ip-range is too large")
+	}
+}
+
+func NewConfig(options *ServerRunOptions) *Config {
+	return &Config{
+		APIGroupPrefix:            options.APIGroupPrefix,
+		APIPrefix:                 options.APIPrefix,
+		CorsAllowedOriginList:     options.CorsAllowedOriginList,
+		EnableIndex:               true,
+		EnableLogsSupport:         options.EnableLogsSupport,
+		EnableProfiling:           options.EnableProfiling,
+		EnableSwaggerSupport:      true,
+		EnableSwaggerUI:           options.EnableSwaggerUI,
+		EnableUISupport:           true,
+		EnableWatchCache:          options.EnableWatchCache,
+		ExternalHost:              options.ExternalHost,
+		KubernetesServiceNodePort: options.KubernetesServiceNodePort,
+		MasterCount:               options.MasterCount,
+		MinRequestTimeout:         options.MinRequestTimeout,
+		PublicAddress:             options.AdvertiseAddress,
+		ReadWritePort:             options.SecurePort,
+		ServiceClusterIPRange:     &options.ServiceClusterIPRange,
+		ServiceNodePortRange:      options.ServiceNodePortRange,
+	}
+}
+
+func verifyServiceNodePort(options *ServerRunOptions) {
+	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
+		glog.Fatalf("Kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort))
+	}
+}
+
+func ValidateRunOptions(options *ServerRunOptions) {
+	verifyClusterIPFlags(options)
+	verifyServiceNodePort(options)
+}
+
+func DefaultAndValidateRunOptions(options *ServerRunOptions) {
+	ValidateRunOptions(options)
+	// If advertise-address is not specified, use bind-address. If bind-address
+	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
+	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
+	if options.AdvertiseAddress == nil || options.AdvertiseAddress.IsUnspecified() {
+		hostIP, err := utilnet.ChooseBindAddress(options.BindAddress)
+		if err != nil {
+			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
+				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
+		}
+		options.AdvertiseAddress = hostIP
+	}
+	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
+}
+
 func (s *GenericAPIServer) Run(options *ServerRunOptions) {
 	if s.enableSwaggerSupport {
 		s.InstallSwaggerAPI()
