@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
 func TestUpdateEtcdOverrides(t *testing.T) {
@@ -49,17 +49,17 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 
 	defaultEtcdLocation := []string{"http://127.0.0.1"}
 	for i, test := range testCases {
-		actualEtcdConfig := etcdstorage.EtcdConfig{}
-		newEtcdFn := func(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unversioned.GroupVersion, etcdConfig etcdstorage.EtcdConfig) (etcdStorage storage.Interface, err error) {
-			actualEtcdConfig = etcdConfig
+		actualConfig := storagebackend.Config{}
+		newEtcdFn := func(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (etcdStorage storage.Interface, err error) {
+			actualConfig = config
 			return nil, nil
 		}
 
-		defaultEtcdConfig := etcdstorage.EtcdConfig{
+		defaultConfig := storagebackend.Config{
 			Prefix:     DefaultEtcdPathPrefix,
 			ServerList: defaultEtcdLocation,
 		}
-		storageFactory := NewDefaultStorageFactory(defaultEtcdConfig, api.Codecs, NewDefaultResourceEncodingConfig(), NewResourceConfig())
+		storageFactory := NewDefaultStorageFactory(defaultConfig, api.Codecs, NewDefaultResourceEncodingConfig(), NewResourceConfig())
 		storageFactory.newEtcdFn = newEtcdFn
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
 
@@ -69,8 +69,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(actualEtcdConfig.ServerList, test.servers) {
-			t.Errorf("%d: expected %v, got %v", i, test.servers, actualEtcdConfig.ServerList)
+		if !reflect.DeepEqual(actualConfig.ServerList, test.servers) {
+			t.Errorf("%d: expected %v, got %v", i, test.servers, actualConfig.ServerList)
 			continue
 		}
 
@@ -79,8 +79,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(actualEtcdConfig.ServerList, defaultEtcdLocation) {
-			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, actualEtcdConfig.ServerList)
+		if !reflect.DeepEqual(actualConfig.ServerList, defaultEtcdLocation) {
+			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, actualConfig.ServerList)
 			continue
 		}
 

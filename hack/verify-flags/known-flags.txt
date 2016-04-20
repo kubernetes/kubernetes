@@ -391,6 +391,7 @@ start-services
 static-pods-config
 stats-port
 stop-services
+storage-backend
 storage-version
 storage-versions
 streaming-connection-idle-timeout
