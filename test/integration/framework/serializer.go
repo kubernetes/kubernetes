@@ -49,6 +49,12 @@ func (s *wrappedSerializer) SerializerForMediaType(mediaType string, options map
 
 	return s.serializer, true
 }
+func (s *wrappedSerializer) SupportedStreamingMediaTypes() []string {
+	return nil
+}
+func (s *wrappedSerializer) StreamingSerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, runtime.Framer, string, bool) {
+	return nil, nil, "", false
+}
 
 func (s *wrappedSerializer) EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
 	return versioning.NewCodec(s.serializer, s.serializer, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), []unversioned.GroupVersion{gv}, nil)

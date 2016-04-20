@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 )
 
 // EnableCrossGroupDecoding modifies the given decoder in place, if it is a codec
@@ -276,24 +275,6 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 	}
 
 	return c.encoder.EncodeToStream(obj, w, overrides...)
-}
-
-// NewFrameWriter calls into the nested encoder to expose its framing
-func (c *codec) NewFrameWriter(w io.Writer) io.Writer {
-	f, ok := c.encoder.(streaming.Framer)
-	if !ok {
-		return nil
-	}
-	return f.NewFrameWriter(w)
-}
-
-// NewFrameReader calls into the nested decoder to expose its framing
-func (c *codec) NewFrameReader(r io.Reader) io.Reader {
-	f, ok := c.decoder.(streaming.Framer)
-	if !ok {
-		return nil
-	}
-	return f.NewFrameReader(r)
 }
 
 // promoteOrPrependGroupVersion finds the group version in the provided group versions that has the same group as target.

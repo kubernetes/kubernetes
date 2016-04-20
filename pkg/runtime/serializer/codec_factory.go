@@ -17,13 +17,10 @@ limitations under the License.
 package serializer
 
 import (
-	"io/ioutil"
-
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
-	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 )
 
@@ -44,17 +41,25 @@ type serializerType struct {
 	// be expected to pass into or a gvk to Decode, since no type information will be available on
 	// the object itself.
 	RawSerializer runtime.Serializer
-
 	// Specialize gives the type the opportunity to return a different serializer implementation if
 	// the content type contains alternate operations. Here it is used to implement "pretty" as an
 	// option to application/json, but could also be used to allow serializers to perform type
 	// defaulting or alter output.
 	Specialize func(map[string]string) (runtime.Serializer, bool)
+
+	AcceptStreamContentTypes []string
+	StreamContentType        string
+
+	Framer           runtime.Framer
+	StreamSerializer runtime.Serializer
+	StreamSpecialize func(map[string]string) (runtime.Serializer, bool)
 }
 
 func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []serializerType {
 	jsonSerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), false)
 	jsonPrettySerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), true)
+	yamlSerializer := json.NewYAMLSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme))
+
 	serializers := []serializerType{
 		{
 			AcceptContentTypes: []string{"application/json"},
@@ -62,15 +67,26 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 			FileExtensions:     []string{"json"},
 			Serializer:         jsonSerializer,
 			PrettySerializer:   jsonPrettySerializer,
+
+			AcceptStreamContentTypes: []string{"application/json", "application/json;stream=watch"},
+			StreamContentType:        "application/json",
+			Framer:                   json.Framer,
+			StreamSerializer:         jsonSerializer,
+		},
+		{
+			AcceptContentTypes: []string{"application/yaml"},
+			ContentType:        "application/yaml",
+			FileExtensions:     []string{"yaml"},
+			Serializer:         yamlSerializer,
+
+			// TODO: requires runtime.RawExtension to properly distinguish when the nested content is
+			// yaml, because the yaml encoder invokes MarshalJSON first
+			//AcceptStreamContentTypes: []string{"application/yaml", "application/yaml;stream=watch"},
+			//StreamContentType:        "application/yaml;stream=watch",
+			//Framer:                   json.YAMLFramer,
+			//StreamSerializer:         yamlSerializer,
 		},
 	}
-	yamlSerializer := json.NewYAMLSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme))
-	serializers = append(serializers, serializerType{
-		AcceptContentTypes: []string{"application/yaml"},
-		ContentType:        "application/yaml",
-		FileExtensions:     []string{"yaml"},
-		Serializer:         yamlSerializer,
-	})
 
 	for _, fn := range serializerExtensions {
 		if serializer, ok := fn(scheme); ok {
@@ -83,10 +99,11 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 // CodecFactory provides methods for retrieving codecs and serializers for specific
 // versions and content types.
 type CodecFactory struct {
-	scheme      *runtime.Scheme
-	serializers []serializerType
-	universal   runtime.Decoder
-	accepts     []string
+	scheme           *runtime.Scheme
+	serializers      []serializerType
+	universal        runtime.Decoder
+	accepts          []string
+	streamingAccepts []string
 
 	legacySerializer runtime.Serializer
 }
@@ -102,40 +119,12 @@ func NewCodecFactory(scheme *runtime.Scheme) CodecFactory {
 	return newCodecFactory(scheme, serializers)
 }
 
-// NewStreamingCodecFactory returns serializers that support the streaming.Serializer interface.
-// TODO: determine whether this returns a streaming.Serializer AND runtime.Serializer, or whether
-// streaming should be added to the CodecFactory interface.
-func NewStreamingCodecFactory(scheme *runtime.Scheme) CodecFactory {
-	return newStreamingCodecFactory(scheme, json.DefaultMetaFactory)
-}
-
-// newStreamingCodecFactory handles providing streaming codecs
-func newStreamingCodecFactory(scheme *runtime.Scheme, mf json.MetaFactory) CodecFactory {
-	serializers := newSerializersForScheme(scheme, mf)
-	streamers := []serializerType{}
-	for i := range serializers {
-		if serializers[i].RawSerializer != nil {
-			serializers[i].Serializer = serializers[i].RawSerializer
-		}
-		if s, ok := serializers[i].Serializer.(streaming.Framer); ok {
-			// TODO: more elegant option?
-			// TODO: add tests and assertions for which serializers should
-			//   have framers. We need to answer whether all Serializers
-			//   are streaming serializers or not.
-			if s.NewFrameWriter(ioutil.Discard) == nil {
-				continue
-			}
-			streamers = append(streamers, serializers[i])
-		}
-	}
-	return newCodecFactory(scheme, streamers)
-}
-
 // newCodecFactory is a helper for testing that allows a different metafactory to be specified.
 func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) CodecFactory {
 	decoders := make([]runtime.Decoder, 0, len(serializers))
 	accepts := []string{}
 	alreadyAccepted := make(map[string]struct{})
+
 	var legacySerializer runtime.Serializer
 	for _, d := range serializers {
 		decoders = append(decoders, d.Serializer)
@@ -153,11 +142,29 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 	if legacySerializer == nil {
 		legacySerializer = serializers[0].Serializer
 	}
+
+	streamAccepts := []string{}
+	alreadyAccepted = make(map[string]struct{})
+	for _, d := range serializers {
+		if len(d.StreamContentType) == 0 {
+			continue
+		}
+		for _, mediaType := range d.AcceptStreamContentTypes {
+			if _, ok := alreadyAccepted[mediaType]; ok {
+				continue
+			}
+			alreadyAccepted[mediaType] = struct{}{}
+			streamAccepts = append(streamAccepts, mediaType)
+		}
+	}
+
 	return CodecFactory{
 		scheme:      scheme,
 		serializers: serializers,
 		universal:   recognizer.NewDecoder(decoders...),
-		accepts:     accepts,
+
+		accepts:          accepts,
+		streamingAccepts: streamAccepts,
 
 		legacySerializer: legacySerializer,
 	}
@@ -168,6 +175,11 @@ var _ runtime.NegotiatedSerializer = &CodecFactory{}
 // SupportedMediaTypes returns the RFC2046 media types that this factory has serializers for.
 func (f CodecFactory) SupportedMediaTypes() []string {
 	return f.accepts
+}
+
+// SupportedStreamingMediaTypes returns the RFC2046 media types that this factory has stream serializers for.
+func (f CodecFactory) SupportedStreamingMediaTypes() []string {
+	return f.streamingAccepts
 }
 
 // LegacyCodec encodes output to a given API version, and decodes output into the internal form from
@@ -232,6 +244,24 @@ func (f CodecFactory) SerializerForMediaType(mediaType string, options map[strin
 		}
 	}
 	return nil, false
+}
+
+// StreamingSerializerForMediaType returns a serializer that matches the provided RFC2046 mediaType, or false if no such
+// serializer exists
+func (f CodecFactory) StreamingSerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, runtime.Framer, string, bool) {
+	for _, s := range f.serializers {
+		for _, accepted := range s.AcceptStreamContentTypes {
+			if accepted == mediaType {
+				if s.StreamSpecialize != nil && len(options) > 0 {
+					serializer, ok := s.StreamSpecialize(options)
+					// TODO: have StreamSpecialize return exact content type
+					return serializer, s.Framer, s.StreamContentType, ok
+				}
+				return s.StreamSerializer, s.Framer, s.StreamContentType, true
+			}
+		}
+	}
+	return nil, nil, "", false
 }
 
 // SerializerForFileExtension returns a serializer for the provided extension, or false if no serializer matches.

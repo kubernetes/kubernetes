@@ -75,6 +75,58 @@ func (d *YAMLToJSONDecoder) Decode(into interface{}) error {
 	return err
 }
 
+// YAMLDecoder reads chunks of objects and returns ErrShortBuffer if
+// the data is not sufficient.
+type YAMLDecoder struct {
+	scanner   *bufio.Scanner
+	remaining []byte
+}
+
+// NewDocumentDecoder decodes YAML documents from the provided
+// stream in chunks by converting each document (as defined by
+// the YAML spec) into its own chunk. io.ErrShortBuffer will be
+// returned if the entire buffer could not be read to assist
+// the caller in framing the chunk.
+func NewDocumentDecoder(r io.Reader) io.Reader {
+	scanner := bufio.NewScanner(r)
+	scanner.Split(splitYAMLDocument)
+	return &YAMLDecoder{
+		scanner: scanner,
+	}
+}
+
+// Read reads the previous slice into the buffer, or attempts to read
+// the next chunk.
+// TODO: switch to readline approach.
+func (d *YAMLDecoder) Read(data []byte) (n int, err error) {
+	left := len(d.remaining)
+	if left == 0 {
+		// return the next chunk from the stream
+		if !d.scanner.Scan() {
+			err := d.scanner.Err()
+			if err == nil {
+				err = io.EOF
+			}
+			return 0, err
+		}
+		out := d.scanner.Bytes()
+		d.remaining = out
+		left = len(out)
+	}
+
+	// fits within data
+	if left <= len(data) {
+		copy(data, d.remaining)
+		d.remaining = nil
+		return len(d.remaining), nil
+	}
+
+	// caller will need to reread
+	copy(data, d.remaining[:left])
+	d.remaining = d.remaining[left:]
+	return len(data), io.ErrShortBuffer
+}
+
 const yamlSeparator = "\n---"
 
 // splitYAMLDocument is a bufio.SplitFunc for splitting YAML streams into individual documents.

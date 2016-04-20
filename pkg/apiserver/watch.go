@@ -69,15 +69,19 @@ type textEncodable interface {
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
 func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Request, res *restful.Response, timeout time.Duration) {
 	// negotiate for the stream serializer
-	serializer, mediaType, err := negotiateOutputSerializer(req.Request, scope.StreamSerializer)
+	serializer, framer, mediaType, exactMediaType, err := negotiateOutputStreamSerializer(req.Request, scope.Serializer)
 	if err != nil {
 		scope.err(err, res.ResponseWriter, req.Request)
 		return
 	}
-	encoder := scope.StreamSerializer.EncoderForVersion(serializer, scope.Kind.GroupVersion())
+	if framer == nil {
+		scope.err(fmt.Errorf("no framer defined for %q available for embedded encoding", mediaType), res.ResponseWriter, req.Request)
+		return
+	}
+	encoder := scope.Serializer.EncoderForVersion(serializer, scope.Kind.GroupVersion())
 
 	useTextFraming := false
-	if encodable, ok := encoder.(textEncodable); ok && encodable.EncodesAsText() {
+	if encodable, ok := serializer.(textEncodable); ok && encodable.EncodesAsText() {
 		useTextFraming = true
 	}
 
@@ -94,7 +98,8 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Reques
 		scope:    scope,
 
 		useTextFraming:  useTextFraming,
-		mediaType:       mediaType,
+		mediaType:       exactMediaType,
+		framer:          framer,
 		encoder:         encoder,
 		embeddedEncoder: embeddedEncoder,
 		fixup: func(obj runtime.Object) {
@@ -118,6 +123,8 @@ type WatchServer struct {
 	useTextFraming bool
 	// the media type this watch is being served with
 	mediaType string
+	// used to frame the watch stream
+	framer runtime.Framer
 	// used to encode the watch stream event itself
 	encoder runtime.Encoder
 	// used to encode the nested object in the watch stream
@@ -153,16 +160,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// get a framed encoder
-	f, ok := s.encoder.(streaming.Framer)
-	if !ok {
-		// programmer error
-		err := fmt.Errorf("no streaming support is available for media type %q", s.mediaType)
-		utilruntime.HandleError(err)
-		s.scope.err(errors.NewBadRequest(err.Error()), w, req)
-		return
-	}
-	framer := f.NewFrameWriter(w)
+	framer := s.framer.NewFrameWriter(w)
 	if framer == nil {
 		// programmer error
 		err := fmt.Errorf("no stream framing support is available for media type %q", s.mediaType)
@@ -208,7 +206,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// type
 			}
 			if err := e.Encode((*versioned.InternalEvent)(&event)); err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v (%#v)", err, e))
 				// client disconnect.
 				return
 			}
