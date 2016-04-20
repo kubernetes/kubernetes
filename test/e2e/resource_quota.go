@@ -241,6 +241,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		pod := newTestPodForQuota(podName, requests, api.ResourceList{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
+		podToUpdate := pod
 
 		By("Ensuring ResourceQuota status captures the pod usage")
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
@@ -257,6 +258,19 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		pod = newTestPodForQuota("fail-pod", requests, api.ResourceList{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
+
+		By("Ensuring a pod cannot update its resource requirements")
+		// a pod cannot dynamically update its resource requirements.
+		requests = api.ResourceList{}
+		requests[api.ResourceCPU] = resource.MustParse("100m")
+		requests[api.ResourceMemory] = resource.MustParse("100Mi")
+		podToUpdate.Spec.Containers[0].Resources.Requests = requests
+		_, err = f.Client.Pods(f.Namespace.Name).Update(podToUpdate)
+		Expect(err).To(HaveOccurred())
+
+		By("Ensuring attempts to update pod resource requirements did not change quota usage")
+		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
 		err = f.Client.Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0))

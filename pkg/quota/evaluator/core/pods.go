@@ -47,7 +47,8 @@ func NewPodEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		InternalGroupKind: api.Kind("Pod"),
 		InternalOperationResources: map[admission.Operation][]api.ResourceName{
 			admission.Create: allResources,
-			admission.Update: computeResources,
+			// TODO: the quota system can only charge for deltas on compute resources when pods support updates.
+			// admission.Update: computeResources,
 		},
 		GetFuncByNamespace: func(namespace, name string) (runtime.Object, error) {
 			return kubeClient.Core().Pods(namespace).Get(name)
