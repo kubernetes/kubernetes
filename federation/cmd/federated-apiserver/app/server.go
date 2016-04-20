@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -118,8 +117,6 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
-	// Setup tunneler if needed
-	var tunneler master.Tunneler
 	var proxyDialerFn apiserver.ProxyDialerFunc
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
@@ -140,7 +137,7 @@ func Run(s *options.APIServer) error {
 			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.Port), 10)),
 			Path:   "healthz",
 		}
-		tunneler = master.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
+		tunneler := master.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
 
 		// Use the tunneler's dialer to connect to the kubelet
 		s.KubeletConfig.Dial = tunneler.Dial
@@ -150,11 +147,6 @@ func Run(s *options.APIServer) error {
 
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
-
-	kubeletClient, err := kubeletclient.NewStaticKubeletClient(&s.KubeletConfig)
-	if err != nil {
-		glog.Fatalf("Failure to start kubelet client: %v", err)
-	}
 
 	apiResourceConfigSource, err := parseRuntimeConfig(s)
 	if err != nil {
@@ -264,50 +256,42 @@ func Run(s *options.APIServer) error {
 		}
 	}
 
-	config := &master.Config{
-		Config: &genericapiserver.Config{
-			StorageFactory:            storageFactory,
-			ServiceClusterIPRange:     &n,
-			EnableLogsSupport:         s.EnableLogsSupport,
-			EnableUISupport:           true,
-			EnableSwaggerSupport:      true,
-			EnableSwaggerUI:           s.EnableSwaggerUI,
-			EnableProfiling:           s.EnableProfiling,
-			EnableWatchCache:          s.EnableWatchCache,
-			EnableIndex:               true,
-			APIPrefix:                 s.APIPrefix,
-			APIGroupPrefix:            s.APIGroupPrefix,
-			CorsAllowedOriginList:     s.CorsAllowedOriginList,
-			ReadWritePort:             s.SecurePort,
-			PublicAddress:             s.AdvertiseAddress,
-			Authenticator:             authenticator,
-			SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
-			Authorizer:                authorizer,
-			AdmissionControl:          admissionController,
-			APIResourceConfigSource:   apiResourceConfigSource,
-			MasterServiceNamespace:    s.MasterServiceNamespace,
-			MasterCount:               s.MasterCount,
-			ExternalHost:              s.ExternalHost,
-			MinRequestTimeout:         s.MinRequestTimeout,
-			ProxyDialer:               proxyDialerFn,
-			ProxyTLSClientConfig:      proxyTLSClientConfig,
-			ServiceNodePortRange:      s.ServiceNodePortRange,
-			KubernetesServiceNodePort: s.KubernetesServiceNodePort,
-			Serializer:                api.Codecs,
-		},
-		EnableCoreControllers:   true,
-		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
-		EventTTL:                s.EventTTL,
-		KubeletClient:           kubeletClient,
-
-		Tunneler: tunneler,
+	config := &genericapiserver.Config{
+		StorageFactory:            storageFactory,
+		ServiceClusterIPRange:     &n,
+		EnableLogsSupport:         s.EnableLogsSupport,
+		EnableUISupport:           true,
+		EnableSwaggerSupport:      true,
+		EnableSwaggerUI:           s.EnableSwaggerUI,
+		EnableProfiling:           s.EnableProfiling,
+		EnableWatchCache:          s.EnableWatchCache,
+		EnableIndex:               true,
+		APIPrefix:                 s.APIPrefix,
+		APIGroupPrefix:            s.APIGroupPrefix,
+		CorsAllowedOriginList:     s.CorsAllowedOriginList,
+		ReadWritePort:             s.SecurePort,
+		PublicAddress:             s.AdvertiseAddress,
+		Authenticator:             authenticator,
+		SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
+		Authorizer:                authorizer,
+		AdmissionControl:          admissionController,
+		APIResourceConfigSource:   apiResourceConfigSource,
+		MasterServiceNamespace:    s.MasterServiceNamespace,
+		MasterCount:               s.MasterCount,
+		ExternalHost:              s.ExternalHost,
+		MinRequestTimeout:         s.MinRequestTimeout,
+		ProxyDialer:               proxyDialerFn,
+		ProxyTLSClientConfig:      proxyTLSClientConfig,
+		ServiceNodePortRange:      s.ServiceNodePortRange,
+		KubernetesServiceNodePort: s.KubernetesServiceNodePort,
+		Serializer:                api.Codecs,
 	}
-
+	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.EnableWatchCache {
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}
 
-	m, err := master.New(config)
+	m, err := genericapiserver.New(config)
 	if err != nil {
 		return err
 	}
