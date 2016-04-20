@@ -72,6 +72,4 @@ for p in $pids; do
   wait $p || let "failedfiles+=1"
 done
 
-# hardcode a healthy exit until all vet errors can be fixed
-#exit $failedfiles
-exit 0
+exit $failedfiles
