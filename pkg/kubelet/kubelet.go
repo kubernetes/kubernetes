@@ -1731,6 +1731,8 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 	}
 
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
+	// The pod IP may be changed by api pod status if the pod is using host network. (See #24576)
+	podStatus.IP = apiPodStatus.PodIP
 	// Record the time it takes for the pod to become running.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok || existingStatus.Phase == api.PodPending && apiPodStatus.Phase == api.PodRunning &&
