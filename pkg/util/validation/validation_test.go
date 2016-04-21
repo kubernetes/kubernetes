@@ -281,6 +281,11 @@ func TestIsValidLabelValue(t *testing.T) {
 
 func TestIsValidIP(t *testing.T) {
 	goodValues := []string{
+		"::1",
+		"2a00:79e0:2:0:f1c3:e797:93c1:df80",
+		"::",
+		"2001:4860:4860::8888",
+		"::fff:1.1.1.1",
 		"1.1.1.1",
 		"1.1.1.01",
 		"255.0.0.1",
@@ -288,22 +293,20 @@ func TestIsValidIP(t *testing.T) {
 		"0.0.0.0",
 	}
 	for _, val := range goodValues {
-		if !IsValidIPv4(val) {
+		if !IsValidIP(val) {
 			t.Errorf("expected true for %q", val)
 		}
 	}
 
 	badValues := []string{
-		"2a00:79e0:2:0:f1c3:e797:93c1:df80", // This is valid IPv6
-		"a",
+		"[2001:db8:0:1]:80",
 		"myhost.mydomain",
 		"-1.0.0.0",
-		"1.0.0.256",
-		"1.0.0.1.1",
-		"1.0.0.1.",
+		"[2001:db8:0:1]",
+		"a",
 	}
 	for _, val := range badValues {
-		if IsValidIPv4(val) {
+		if IsValidIP(val) {
 			t.Errorf("expected false for %q", val)
 		}
 	}

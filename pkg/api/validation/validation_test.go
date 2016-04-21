@@ -4909,13 +4909,13 @@ func TestValidateEndpoints(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
-						Addresses: []api.EndpointAddress{{IP: "2001:0db8:85a3:0042:1000:8a2e:0370:7334"}},
+						Addresses: []api.EndpointAddress{{IP: "[2001:0db8:85a3:0042:1000:8a2e:0370:7334]"}},
 						Ports:     []api.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
 					},
 				},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "must be a valid IPv4 address",
+			errorDetail: "must be a valid IP address",
 		},
 		"Multiple ports, one without name": {
 			endpoints: api.Endpoints{
@@ -4965,7 +4965,7 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "must be a valid IPv4 address",
+			errorDetail: "must be a valid IP address",
 		},
 		"Port missing number": {
 			endpoints: api.Endpoints{
