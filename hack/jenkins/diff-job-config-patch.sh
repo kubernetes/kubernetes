@@ -68,5 +68,8 @@ docker run --rm=true -i \
   bash -c "${common_commands}"
 
 diff -ruN "${output_dir}/upstream" "${output_dir}/patch" >"${diff_file}" || true
+if [[ -t 1 ]]; then  # Attached to a terminal?
+  less "${diff_file}"
+fi
 echo
 echo "  *** Diff saved in ${diff_file} ***"
