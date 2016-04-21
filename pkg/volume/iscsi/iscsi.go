@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	ioutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -103,9 +104,10 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 			iface:   iface,
 			manager: manager,
 			plugin:  plugin},
-		fsType:   iscsi.FSType,
-		readOnly: readOnly,
-		mounter:  &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+		fsType:     iscsi.FSType,
+		readOnly:   readOnly,
+		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
 	}, nil
 }
 
@@ -152,9 +154,10 @@ func (iscsi *iscsiDisk) GetPath() string {
 
 type iscsiDiskMounter struct {
 	*iscsiDisk
-	readOnly bool
-	fsType   string
-	mounter  *mount.SafeFormatAndMount
+	readOnly   bool
+	fsType     string
+	mounter    *mount.SafeFormatAndMount
+	deviceUtil ioutil.DeviceUtil
 }
 
 var _ volume.Mounter = &iscsiDiskMounter{}
