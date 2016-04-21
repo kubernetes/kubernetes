@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -53,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/util/sets"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 )
 
@@ -121,6 +121,7 @@ type Runtime struct {
 	dockerKeyring credentialprovider.DockerKeyring
 
 	containerRefManager *kubecontainer.RefManager
+	podGetter           podGetter
 	runtimeHelper       kubecontainer.RuntimeHelper
 	recorder            record.EventRecorder
 	livenessManager     proberesults.Manager
@@ -143,6 +144,18 @@ type volumeGetter interface {
 	GetVolumes(podUID types.UID) (kubecontainer.VolumeMap, bool)
 }
 
+// TODO(yifan): This duplicates the podGetter in dockertools.
+type podGetter interface {
+	GetPodByUID(types.UID) (*api.Pod, bool)
+}
+
+// cliInterface wrapps the command line calls for testing purpose.
+type cliInterface interface {
+	// args are the arguments given to the 'rkt' command,
+	// e.g. args can be 'rm ${UUID}'.
+	RunCommand(args ...string) (result []string, err error)
+}
+
 // New creates the rkt container runtime which implements the container runtime interface.
 // It will test if the rkt binary is in the $PATH, and whether we can get the
 // version of it. If so, creates the rkt container runtime, otherwise returns an error.
@@ -152,6 +165,7 @@ func New(
 	runtimeHelper kubecontainer.RuntimeHelper,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
+	podGetter podGetter,
 	livenessManager proberesults.Manager,
 	volumeGetter volumeGetter,
 	httpClient kubetypes.HttpGetter,
@@ -194,6 +208,7 @@ func New(
 		config:              config,
 		dockerKeyring:       credentialprovider.NewDockerKeyring(),
 		containerRefManager: containerRefManager,
+		podGetter:           podGetter,
 		runtimeHelper:       runtimeHelper,
 		recorder:            recorder,
 		livenessManager:     livenessManager,
@@ -793,6 +808,19 @@ func kubernetesPodFilters(uid types.UID) []*rktapi.PodFilter {
 	}
 }
 
+func kubernetesPodsFilters() []*rktapi.PodFilter {
+	return []*rktapi.PodFilter{
+		{
+			Annotations: []*rktapi.KeyValue{
+				{
+					Key:   k8sRktKubeletAnno,
+					Value: k8sRktKubeletAnnoValue,
+				},
+			},
+		},
+	}
+}
+
 func newUnitOption(section, name, value string) *unit.UnitOption {
 	return &unit.UnitOption{Section: section, Name: name, Value: value}
 }
@@ -1350,45 +1378,112 @@ func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStat
 	return
 }
 
+// Sort rkt pods by creation time.
+type podsByCreatedAt []*rktapi.Pod
+
+func (s podsByCreatedAt) Len() int           { return len(s) }
+func (s podsByCreatedAt) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s podsByCreatedAt) Less(i, j int) bool { return s[i].CreatedAt < s[j].CreatedAt }
+
+// getPodUID returns the pod's API UID, it returns
+// empty UID if the UID cannot be determined.
+func getPodUID(pod *rktapi.Pod) types.UID {
+	for _, anno := range pod.Annotations {
+		if anno.Key == k8sRktUIDAnno {
+			return types.UID(anno.Value)
+		}
+	}
+	return types.UID("")
+}
+
 // GarbageCollect collects the pods/containers.
-// TODO(yifan): Enforce the gc policy, also, it would be better if we can
-// just GC kubernetes pods.
+// After one GC iteration:
+// - The deleted pods will be removed.
+// - If the number of containers exceeds gcPolicy.MaxContainers,
+//   then containers whose ages are older than gcPolicy.minAge will
+//   be removed.
 func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error {
+	glog.V(4).Infof("rkt: Garbage collecting triggered with policy %v", gcPolicy)
+
 	if err := exec.Command("systemctl", "reset-failed").Run(); err != nil {
 		glog.Errorf("rkt: Failed to reset failed systemd services: %v, continue to gc anyway...", err)
 	}
 
-	if _, err := r.runCommand("gc", "--grace-period="+gcPolicy.MinAge.String(), "--expire-prepared="+gcPolicy.MinAge.String()); err != nil {
-		glog.Errorf("rkt: Failed to gc: %v", err)
+	resp, err := r.apisvc.ListPods(context.Background(), &rktapi.ListPodsRequest{
+		Detail:  false,
+		Filters: kubernetesPodsFilters(),
+	})
+	if err != nil {
+		return fmt.Errorf("rkt: Failed to get dead pods list: %v", err)
 	}
 
-	// GC all inactive systemd service files.
-	units, err := r.systemd.ListUnits()
-	if err != nil {
-		glog.Errorf("rkt: Failed to list units: %v", err)
-		return err
-	}
-	runningKubernetesUnits := sets.NewString()
-	for _, u := range units {
-		if strings.HasPrefix(u.Name, kubernetesUnitPrefix) && u.SubState == "running" {
-			runningKubernetesUnits.Insert(u.Name)
-		}
-	}
+	var totalContainers int
+	var inactivePods []*rktapi.Pod
+	var removeCandidates []*rktapi.Pod
 
-	files, err := ioutil.ReadDir(systemdServiceDir)
-	if err != nil {
-		glog.Errorf("rkt: Failed to read the systemd service directory: %v", err)
-		return err
-	}
-	for _, f := range files {
-		if strings.HasPrefix(f.Name(), kubernetesUnitPrefix) && !runningKubernetesUnits.Has(f.Name()) && f.ModTime().Before(time.Now().Add(-gcPolicy.MinAge)) {
-			glog.V(4).Infof("rkt: Removing inactive systemd service file: %v", f.Name())
-			if err := os.Remove(serviceFilePath(f.Name())); err != nil {
-				glog.Warningf("rkt: Failed to remove inactive systemd service file %v: %v", f.Name(), err)
+	// Deleted pods will be GC'd anyway.
+	for _, pod := range resp.Pods {
+		if pod.State != rktapi.PodState_POD_STATE_RUNNING {
+			uid := getPodUID(pod)
+			if uid == types.UID("") {
+				glog.Errorf("rkt: Cannot get the UID of pod %q, pod is broken, will remove it", pod.Id)
+				removeCandidates = append(removeCandidates, pod)
+				continue
 			}
+			_, found := r.podGetter.GetPodByUID(uid)
+			if !found {
+				removeCandidates = append(removeCandidates, pod)
+				continue
+			}
+
+			inactivePods = append(inactivePods, pod)
+			totalContainers = totalContainers + len(pod.Apps)
 		}
 	}
-	return nil
+
+	sort.Sort(podsByCreatedAt(inactivePods))
+
+	// Enforce GCPolicy.MaxContainers.
+	for _, pod := range inactivePods {
+		if totalContainers <= gcPolicy.MaxContainers {
+			break
+		}
+		creationTime := time.Unix(0, pod.CreatedAt)
+		if creationTime.Add(gcPolicy.MinAge).Before(time.Now()) {
+			// The pod is old and we are exceeding the MaxContainers limit.
+			// Delete the pod.
+			removeCandidates = append(removeCandidates, pod)
+			totalContainers = totalContainers - len(pod.Apps)
+		}
+	}
+
+	// Remove pods.
+	var errlist []error
+	for _, pod := range removeCandidates {
+		if err := r.removePod(pod.Id); err != nil {
+			errlist = append(errlist, fmt.Errorf("rkt: Failed to clean up rkt pod %q: %v", pod.Id, err))
+		}
+	}
+
+	return errors.NewAggregate(errlist)
+}
+
+// removePod calls 'rkt rm $UUID' to delete a rkt pod, it also remove the systemd service file
+// related to the pod.
+func (r *Runtime) removePod(uuid string) error {
+	var errlist []error
+	glog.V(4).Infof("rkt: GC is removing pod %q", uuid)
+	if _, err := r.cli.RunCommand("rm", uuid); err != nil {
+		errlist = append(errlist, fmt.Errorf("rkt: Failed to remove pod %q: %v", uuid, err))
+	}
+
+	// GC systemd service files as well.
+	serviceName := makePodServiceFileName(uuid)
+	if err := r.os.Remove(serviceFilePath(serviceName)); err != nil {
+		errlist = append(errlist, fmt.Errorf("rkt: Failed to remove service file %q for pod %q: %v", serviceName, uuid, err))
+	}
+
+	return errors.NewAggregate(errlist)
 }
 
 // Note: In rkt, the container ID is in the form of "UUID:appName", where
