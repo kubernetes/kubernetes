@@ -233,6 +233,13 @@ function configure-kubectl() {
   export KUBE_MASTER_IP=$(nova show "${STACK_NAME}"-master | awk '$3=="network" {print $6}')
   export CONTEXT="openstack-${STACK_NAME}"
   export KUBE_BEARER_TOKEN="TokenKubelet"
+
+  if [[ "${ENABLE_PROXY:-}" == "true" ]]; then
+    echo 'export NO_PROXY=$NO_PROXY,'"${KUBE_MASTER_IP}" > /tmp/kube-proxy-env
+    echo 'export no_proxy=$NO_PROXY,'"${KUBE_MASTER_IP}" >> /tmp/kube-proxy-env
+    . /tmp/kube-proxy-env
+  fi
+
   create-kubeconfig
 }
 

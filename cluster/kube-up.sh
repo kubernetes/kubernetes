@@ -64,6 +64,15 @@ elif [[ "${validate_result}" == "2" ]]; then
 	echo "...ignoring non-fatal errors in validate-cluster" >&2
 fi
 
+if [[ "${ENABLE_PROXY:-}" == "true" ]]; then
+  . /tmp/kube-proxy-env
+  echo ""
+  echo "*** Please run the following to add the kube-apiserver endpoint to your proxy white-list ***"
+  cat /tmp/kube-proxy-env
+  echo "***                                                                                      ***"
+  echo ""
+fi
+
 echo -e "Done, listing cluster services:\n" >&2
 "${KUBE_ROOT}/cluster/kubectl.sh" cluster-info
 echo
