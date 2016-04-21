@@ -100,11 +100,11 @@ func TestReadPrivateKey(t *testing.T) {
 	defer os.Remove(f.Name())
 
 	if err := ioutil.WriteFile(f.Name(), []byte(privateKey), os.FileMode(0600)); err != nil {
-		t.Fatalf("error creating tmpfile: %v", err)
+		t.Fatalf("error writing private key to tmpfile: %v", err)
 	}
 
 	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err != nil {
-		t.Fatalf("error reading key: %v", err)
+		t.Fatalf("error reading private key: %v", err)
 	}
 }
 
@@ -116,11 +116,11 @@ func TestReadPublicKey(t *testing.T) {
 	defer os.Remove(f.Name())
 
 	if err := ioutil.WriteFile(f.Name(), []byte(publicKey), os.FileMode(0600)); err != nil {
-		t.Fatalf("error creating tmpfile: %v", err)
+		t.Fatalf("error writing public key to tmpfile: %v", err)
 	}
 
 	if _, err := serviceaccount.ReadPublicKey(f.Name()); err != nil {
-		t.Fatalf("error reading key: %v", err)
+		t.Fatalf("error reading public key: %v", err)
 	}
 }
 
