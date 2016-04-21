@@ -2411,7 +2411,7 @@ type ConfigMapList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of ConfigMaps.
-	Items []ConfigMap `json:"items,omitempty"`
+	Items []ConfigMap `json:"items"`
 }
 
 // These constants are for remote command execution and port forwarding and are

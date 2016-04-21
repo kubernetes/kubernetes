@@ -2860,7 +2860,7 @@ type ConfigMapList struct {
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of ConfigMaps.
-	Items []ConfigMap `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+	Items []ConfigMap `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // Type and constants for component health validation.
