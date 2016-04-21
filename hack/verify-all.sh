@@ -26,7 +26,6 @@ SILENT=true
 # Excluded checks are always skipped.
 EXCLUDED_CHECKS=(
   "verify-linkcheck.sh"  # runs in separate Jenkins job once per day due to high network usage
-  "verify-generated-protobuf.sh"  # TODO(smarterclayton) add when protobuf is part of direct generation
   )
 
 function is-excluded {

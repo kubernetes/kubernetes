@@ -36,13 +36,13 @@ type TypeMeta struct {
 	// Cannot be updated.
 	// In CamelCase.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	Kind string `json:"kind,omitempty"`
+	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
 
 	// APIVersion defines the versioned schema of this representation of an object.
 	// Servers should convert recognized schemas to the latest internal value, and
 	// may reject unrecognized values.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
-	APIVersion string `json:"apiVersion,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
 }
 
 // ListMeta describes metadata that synthetic resources must have, including lists and
@@ -51,7 +51,7 @@ type ListMeta struct {
 	// SelfLink is a URL representing this object.
 	// Populated by the system.
 	// Read-only.
-	SelfLink string `json:"selfLink,omitempty"`
+	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,1,opt,name=selfLink"`
 
 	// String that identifies the server's internal version of this object that
 	// can be used by clients to determine when objects have changed.
@@ -59,16 +59,16 @@ type ListMeta struct {
 	// Populated by the system.
 	// Read-only.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency
-	ResourceVersion string `json:"resourceVersion,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 }
 
 // ExportOptions is the query options to the standard REST get call.
 type ExportOptions struct {
 	TypeMeta `json:",inline"`
 	// Should this value be exported.  Export strips fields that a user can not specify.`
-	Export bool `json:"export"`
+	Export bool `json:"export" protobuf:"varint,1,opt,name=export"`
 	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
-	Exact bool `json:"exact"`
+	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
 }
 
 // Status is a return value for calls that don't return other objects.
@@ -76,26 +76,26 @@ type Status struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	ListMeta `json:"metadata,omitempty"`
+	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Status of the operation.
 	// One of: "Success" or "Failure".
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	Status string `json:"status,omitempty"`
+	Status string `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 	// A human-readable description of the status of this operation.
-	Message string `json:"message,omitempty"`
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 	// A machine-readable description of why this operation is in the
 	// "Failure" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
-	Reason StatusReason `json:"reason,omitempty"`
+	Reason StatusReason `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason,casttype=StatusReason"`
 	// Extended data associated with the reason.  Each reason may define its
 	// own extended details. This field is optional and the data returned
 	// is not guaranteed to conform to any schema except that defined by
 	// the reason type.
-	Details *StatusDetails `json:"details,omitempty"`
+	Details *StatusDetails `json:"details,omitempty" protobuf:"bytes,5,opt,name=details"`
 	// Suggested HTTP return code for this status, 0 if not set.
-	Code int32 `json:"code,omitempty"`
+	Code int32 `json:"code,omitempty" protobuf:"varint,6,opt,name=code"`
 }
 
 // StatusDetails is a set of additional properties that MAY be set by the
@@ -107,18 +107,18 @@ type Status struct {
 type StatusDetails struct {
 	// The name attribute of the resource associated with the status StatusReason
 	// (when there is a single name which can be described).
-	Name string `json:"name,omitempty"`
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	// The group attribute of the resource associated with the status StatusReason.
-	Group string `json:"group,omitempty"`
+	Group string `json:"group,omitempty" protobuf:"bytes,2,opt,name=group"`
 	// The kind attribute of the resource associated with the status StatusReason.
 	// On some operations may differ from the requested resource Kind.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	Kind string `json:"kind,omitempty"`
+	Kind string `json:"kind,omitempty" protobuf:"bytes,3,opt,name=kind"`
 	// The Causes array includes more details associated with the StatusReason
 	// failure. Not all StatusReasons may provide detailed causes.
-	Causes []StatusCause `json:"causes,omitempty"`
+	Causes []StatusCause `json:"causes,omitempty" protobuf:"bytes,4,rep,name=causes"`
 	// If specified, the time in seconds before the operation should be retried.
-	RetryAfterSeconds int32 `json:"retryAfterSeconds,omitempty"`
+	RetryAfterSeconds int32 `json:"retryAfterSeconds,omitempty" protobuf:"varint,5,opt,name=retryAfterSeconds"`
 }
 
 // Values of Status.Status
@@ -257,10 +257,10 @@ const (
 type StatusCause struct {
 	// A machine-readable description of the cause of the error. If this value is
 	// empty there is no information available.
-	Type CauseType `json:"reason,omitempty"`
+	Type CauseType `json:"reason,omitempty" protobuf:"bytes,1,opt,name=reason,casttype=CauseType"`
 	// A human-readable description of the cause of the error.  This field may be
 	// presented as-is to a reader.
-	Message string `json:"message,omitempty"`
+	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 	// The field of the resource that has caused this error, as named by its JSON
 	// serialization. May include dot and postfix notation for nested attributes.
 	// Arrays are zero-indexed.  Fields may appear more than once in an array of
@@ -270,7 +270,7 @@ type StatusCause struct {
 	// Examples:
 	//   "name" - the field "name" on the current resource
 	//   "items[0].name" - the field "name" on the first array entry in "items"
-	Field string `json:"field,omitempty"`
+	Field string `json:"field,omitempty" protobuf:"bytes,3,opt,name=field"`
 }
 
 // CauseType is a machine readable value providing more detail about what
@@ -307,7 +307,7 @@ const (
 type APIVersions struct {
 	TypeMeta `json:",inline"`
 	// versions are the api versions that are available.
-	Versions []string `json:"versions"`
+	Versions []string `json:"versions" protobuf:"bytes,1,rep,name=versions"`
 	// a map of client CIDR to server address that is serving this group.
 	// This is to help clients reach servers in the most network-efficient way possible.
 	// Clients can use the appropriate server address as per the CIDR that they match.
@@ -315,7 +315,7 @@ type APIVersions struct {
 	// The server returns only those CIDRs that it thinks that the client can match.
 	// For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
 	// Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
-	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs"`
+	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" protobuf:"bytes,2,rep,name=serverAddressByClientCIDRs"`
 }
 
 // APIGroupList is a list of APIGroup, to allow clients to discover the API at
@@ -323,7 +323,7 @@ type APIVersions struct {
 type APIGroupList struct {
 	TypeMeta `json:",inline"`
 	// groups is a list of APIGroup.
-	Groups []APIGroup `json:"groups"`
+	Groups []APIGroup `json:"groups" protobuf:"bytes,1,rep,name=groups"`
 }
 
 // APIGroup contains the name, the supported versions, and the preferred version
@@ -331,12 +331,12 @@ type APIGroupList struct {
 type APIGroup struct {
 	TypeMeta `json:",inline"`
 	// name is the name of the group.
-	Name string `json:"name"`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// versions are the versions supported in this group.
-	Versions []GroupVersionForDiscovery `json:"versions"`
+	Versions []GroupVersionForDiscovery `json:"versions" protobuf:"bytes,2,rep,name=versions"`
 	// preferredVersion is the version preferred by the API server, which
 	// probably is the storage version.
-	PreferredVersion GroupVersionForDiscovery `json:"preferredVersion,omitempty"`
+	PreferredVersion GroupVersionForDiscovery `json:"preferredVersion,omitempty" protobuf:"bytes,3,opt,name=preferredVersion"`
 	// a map of client CIDR to server address that is serving this group.
 	// This is to help clients reach servers in the most network-efficient way possible.
 	// Clients can use the appropriate server address as per the CIDR that they match.
@@ -344,36 +344,36 @@ type APIGroup struct {
 	// The server returns only those CIDRs that it thinks that the client can match.
 	// For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
 	// Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
-	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs"`
+	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" protobuf:"bytes,4,rep,name=serverAddressByClientCIDRs"`
 }
 
 // ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
 type ServerAddressByClientCIDR struct {
 	// The CIDR with which clients can match their IP to figure out the server address that they should use.
-	ClientCIDR string `json:"clientCIDR"`
+	ClientCIDR string `json:"clientCIDR" protobuf:"bytes,1,opt,name=clientCIDR"`
 	// Address of this server, suitable for a client that matches the above CIDR.
 	// This can be a hostname, hostname:port, IP or IP:port.
-	ServerAddress string `json:"serverAddress"`
+	ServerAddress string `json:"serverAddress" protobuf:"bytes,2,opt,name=serverAddress"`
 }
 
 // GroupVersion contains the "group/version" and "version" string of a version.
 // It is made a struct to keep extensiblity.
 type GroupVersionForDiscovery struct {
 	// groupVersion specifies the API group and version in the form "group/version"
-	GroupVersion string `json:"groupVersion"`
+	GroupVersion string `json:"groupVersion" protobuf:"bytes,1,opt,name=groupVersion"`
 	// version specifies the version in the form of "version". This is to save
 	// the clients the trouble of splitting the GroupVersion.
-	Version string `json:"version"`
+	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
 }
 
 // APIResource specifies the name of a resource and whether it is namespaced.
 type APIResource struct {
 	// name is the name of the resource.
-	Name string `json:"name"`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// namespaced indicates if a resource is namespaced or not.
-	Namespaced bool `json:"namespaced"`
+	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
 	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
-	Kind string `json:"kind"`
+	Kind string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the
@@ -382,16 +382,16 @@ type APIResource struct {
 type APIResourceList struct {
 	TypeMeta `json:",inline"`
 	// groupVersion is the group and version this APIResourceList is for.
-	GroupVersion string `json:"groupVersion"`
+	GroupVersion string `json:"groupVersion" protobuf:"bytes,1,opt,name=groupVersion"`
 	// resources contains the name of the resources and if they are namespaced.
-	APIResources []APIResource `json:"resources"`
+	APIResources []APIResource `json:"resources" protobuf:"bytes,2,rep,name=resources"`
 }
 
 // RootPaths lists the paths available at root.
 // For example: "/healthz", "/apis".
 type RootPaths struct {
 	// paths are the paths available at root.
-	Paths []string `json:"paths"`
+	Paths []string `json:"paths" protobuf:"bytes,1,rep,name=paths"`
 }
 
 // TODO: remove me when watch is refactored
@@ -429,24 +429,24 @@ type LabelSelector struct {
 	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
 	// map is equivalent to an element of matchExpressions, whose key field is "key", the
 	// operator is "In", and the values array contains only "value". The requirements are ANDed.
-	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+	MatchLabels map[string]string `json:"matchLabels,omitempty" protobuf:"bytes,1,rep,name=matchLabels"`
 	// matchExpressions is a list of label selector requirements. The requirements are ANDed.
-	MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty"`
+	MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,2,rep,name=matchExpressions"`
 }
 
 // A label selector requirement is a selector that contains values, a key, and an operator that
 // relates the key and values.
 type LabelSelectorRequirement struct {
 	// key is the label key that the selector applies to.
-	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key"`
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
 	// operator represents a key's relationship to a set of values.
 	// Valid operators ard In, NotIn, Exists and DoesNotExist.
-	Operator LabelSelectorOperator `json:"operator"`
+	Operator LabelSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=LabelSelectorOperator"`
 	// values is an array of string values. If the operator is In or NotIn,
 	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
 	// the values array must be empty. This array is replaced during a strategic
 	// merge patch.
-	Values []string `json:"values,omitempty"`
+	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
 // A label selector operator is the set of operators that can be used in a selector requirement.
