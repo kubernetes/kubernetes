@@ -82,7 +82,7 @@ func TestAdmission(t *testing.T) {
 		pod.Spec.SecurityContext = tc.podSc
 		pod.Spec.Containers[0].SecurityContext = tc.sc
 
-		err := handler.Admit(admission.NewAttributesRecord(pod, api.Kind("Pod"), "foo", "name", api.Resource("pods"), "", "ignored", nil))
+		err := handler.Admit(admission.NewAttributesRecord(pod, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 		if err != nil && !tc.expectError {
 			t.Errorf("%v: unexpected error: %v", tc.name, err)
 		} else if err == nil && tc.expectError {
@@ -126,7 +126,7 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		pod.Spec.SecurityContext = &test.securityContext
-		err := handler.Admit(admission.NewAttributesRecord(&pod, api.Kind("Pod"), "foo", "name", api.Resource("pods"), "", "ignored", nil))
+		err := handler.Admit(admission.NewAttributesRecord(&pod, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 
 		if test.errorExpected && err == nil {
 			t.Errorf("Expected error for security context %+v but did not get an error", test.securityContext)

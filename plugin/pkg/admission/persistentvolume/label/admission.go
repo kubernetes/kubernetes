@@ -59,7 +59,7 @@ func NewPersistentVolumeLabel() *persistentVolumeLabel {
 }
 
 func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
-	if a.GetResource() != api.Resource("persistentvolumes") {
+	if a.GetResource().GroupResource() != api.Resource("persistentvolumes") {
 		return nil
 	}
 	obj := a.GetObject()
