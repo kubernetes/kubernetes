@@ -235,6 +235,18 @@
                 export GINKGO_PARALLEL="y"
                 export ZONE="us-central1-f"
                 export ADDITIONAL_ZONES="us-central1-a,us-central1-b"
+        - 'gke-large-cluster':
+            description: 'Run all non-flaky, non-slow, non-disruptive, non-feature tests on GKE, in parallel on a large (1000 node) GKE cluster'
+            timeout: 300
+            emails: 'zml@google.com'
+            cron-string: ''
+            trigger-job: ''
+            job-env: |
+                export PROJECT="gke-large-cluster-jenkins"
+                export GINKGO_TEST_ARGS="--ginkgo.skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Feature:.+\]"
+                export GINKGO_PARALLEL="y"
+                export ZONE="us-central1-b"
+                export NUM_NODES=1000
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
