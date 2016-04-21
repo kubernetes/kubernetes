@@ -91,6 +91,9 @@ func (cm *chaosmonkey) Do() {
 
 	By("Waiting for all async tests to be ready")
 	for _, sem := range sems {
+		// Wait for test to be ready.  We have to wait for ready *or done* because a test
+		// may panic before signaling that its ready, and we shouldn't block.  Since we
+		// defered sem.done() above, if a test panics, it's marked as done.
 		sem.waitForReadyOrDone()
 	}
 
@@ -115,7 +118,7 @@ type Semaphore struct {
 
 func newSemaphore(stopCh <-chan struct{}) *Semaphore {
 	// We don't want to block on Ready() or done()
-	return &Semaphore {
+	return &Semaphore{
 		make(chan struct{}, 1),
 		stopCh,
 		make(chan struct{}, 1),
