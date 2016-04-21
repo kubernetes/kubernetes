@@ -97,6 +97,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
 	cmd.Flags().String("container", "", "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod")
+	cmd.Flags().String("image-pull-policy", "", "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.")
 	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
 	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
 	cmdutil.AddValidateFlags(cmd)
@@ -150,6 +151,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	deploymentKey := cmdutil.GetFlagString(cmd, "deployment-label-key")
 	filename := ""
 	image := cmdutil.GetFlagString(cmd, "image")
+	pullPolicy := cmdutil.GetFlagString(cmd, "image-pull-policy")
 	oldName := args[0]
 	rollback := cmdutil.GetFlagBool(cmd, "rollback")
 	period := cmdutil.GetFlagDuration(cmd, "update-period")
@@ -233,8 +235,8 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		}
 	}
 	// If the --image option is specified, we need to create a new rc with at least one different selector
-	// than the old rc. This selector is the hash of the rc, which will differ because the new rc has a
-	// different image.
+	// than the old rc. This selector is the hash of the rc, with a suffix to provide uniqueness for
+	// same-image updates.
 	if len(image) != 0 {
 		codec := api.Codecs.LegacyCodec(client.APIVersion())
 		keepOldName = len(args) == 1
@@ -248,10 +250,21 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			}
 			fmt.Fprintf(out, "Found existing update in progress (%s), resuming.\n", newRc.Name)
 		} else {
-			if oldRc.Spec.Template.Spec.Containers[0].Image == image {
-				return cmdutil.UsageError(cmd, "Specified --image must be distinct from existing container image")
+			config := &kubectl.NewControllerConfig{
+				Namespace:     cmdNamespace,
+				OldName:       oldName,
+				NewName:       newName,
+				Image:         image,
+				Container:     container,
+				DeploymentKey: deploymentKey,
 			}
-			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, codec, cmdNamespace, oldName, newName, image, container, deploymentKey)
+			if oldRc.Spec.Template.Spec.Containers[0].Image == image {
+				if len(pullPolicy) == 0 {
+					return cmdutil.UsageError(cmd, "--image-pull-policy (Always|Never|IfNotPresent) must be provided when --image is the same as existing container image")
+				}
+				config.PullPolicy = api.PullPolicy(pullPolicy)
+			}
+			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, codec, config)
 			if err != nil {
 				return err
 			}
@@ -262,6 +275,8 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		if err != nil {
 			return err
 		}
+		// If new image is same as old, the hash may not be distinct, so add a suffix.
+		oldHash += "-orig"
 		oldRc, err = kubectl.UpdateExistingReplicationController(client, oldRc, cmdNamespace, newRc.Name, deploymentKey, oldHash, out)
 		if err != nil {
 			return err
