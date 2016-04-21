@@ -226,8 +226,8 @@ func verifyDNSPodIsRunning(f *framework.Framework) {
 	if err != nil {
 		framework.Failf("Failed to list all dns service pods")
 	}
-	if len(dnsPods.Items) != 1 {
-		framework.Failf("Unexpected number of pods (%d) matches the label selector %v", len(dnsPods.Items), dnsServiceLabelSelector.String())
+	if len(dnsPods.Items) < 1 {
+		framework.Failf("No pods match the label selector %v", dnsServiceLabelSelector.String())
 	}
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, dnsPods.Items[0].Name, api.NamespaceSystem))
 }

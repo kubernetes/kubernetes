@@ -36,6 +36,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -422,4 +424,175 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 // TODO: Support type safe tagging as well https://github.com/kubernetes/kubernetes/pull/22401.
 func KubeDescribe(text string, body func()) bool {
 	return Describe("[k8s.io] "+text, body)
+}
+
+// PodStateVerification represents a verification of pod state.
+// Any time you have a set of pods that you want to operate against or query,
+// this struct can be used to declaratively identify those pods.
+type PodStateVerification struct {
+	// Optional: only pods that have k=v labels will pass this filter.
+	Selectors map[string]string
+
+	// Required: The phases which are valid for your pod.
+	ValidPhases []api.PodPhase
+
+	// Optional: only pods passing this function will pass the filter
+	// Verify a pod.
+	// As an optimization, in addition to specfying filter (boolean),
+	// this function allows specifying an error as well.
+	// The error indicates that the polling of the pod spectrum should stop.
+	Verify func(api.Pod) (bool, error)
+
+	// Optional: only pods with this name will pass the filter.
+	PodName string
+}
+
+type ClusterVerification struct {
+	client    *client.Client
+	namespace *api.Namespace // pointer rather than string, since ns isn't created until before each.
+	podState  PodStateVerification
+}
+
+func (f *Framework) NewClusterVerification(filter PodStateVerification) *ClusterVerification {
+	return &ClusterVerification{
+		f.Client,
+		f.Namespace,
+		filter,
+	}
+}
+
+func passesPodNameFilter(pod api.Pod, name string) bool {
+	return name == "" || strings.Contains(pod.Name, name)
+}
+
+func passesVerifyFilter(pod api.Pod, verify func(p api.Pod) (bool, error)) (bool, error) {
+	if verify == nil {
+		return true, nil
+	} else {
+		verified, err := verify(pod)
+		// If an error is returned, by definition, pod verification fails
+		if err != nil {
+			return false, err
+		} else {
+			return verified, nil
+		}
+	}
+}
+
+func passesPhasesFilter(pod api.Pod, validPhases []api.PodPhase) bool {
+	passesPhaseFilter := false
+	for _, phase := range validPhases {
+		if pod.Status.Phase == phase {
+			passesPhaseFilter = true
+		}
+	}
+	return passesPhaseFilter
+}
+
+// filterLabels returns a list of pods which have labels.
+func filterLabels(selectors map[string]string, cli *client.Client, ns string) (*api.PodList, error) {
+	var err error
+	var selector labels.Selector
+	var pl *api.PodList
+	// List pods based on selectors.  This might be a tiny optimization rather then filtering
+	// everything manually.
+	if len(selectors) > 0 {
+		selector = labels.SelectorFromSet(labels.Set(selectors))
+		options := api.ListOptions{LabelSelector: selector}
+		pl, err = cli.Pods(ns).List(options)
+	} else {
+		pl, err = cli.Pods(ns).List(api.ListOptions{})
+	}
+	return pl, err
+}
+
+// filter filters pods which pass a filter.  It can be used to compose
+// the more useful abstractions like ForEach, WaitFor, and so on, which
+// can be used directly by tests.
+func (p *PodStateVerification) filter(c *client.Client, namespace *api.Namespace) ([]api.Pod, error) {
+	if len(p.ValidPhases) == 0 || namespace == nil {
+		panic(fmt.Errorf("Need to specify a valid pod phases (%v) and namespace (%v). ", p.ValidPhases, namespace))
+	}
+
+	ns := namespace.Name
+	pl, err := filterLabels(p.Selectors, c, ns) // Build an api.PodList to operate against.
+	Logf("Selector matched %v pods for %v", len(pl.Items), p.Selectors)
+	if len(pl.Items) == 0 || err != nil {
+		return pl.Items, err
+	}
+
+	unfilteredPods := pl.Items
+	filteredPods := []api.Pod{}
+ReturnPodsSoFar:
+	// Next: Pod must match at least one of the states that the user specified
+	for _, pod := range unfilteredPods {
+		if !(passesPhasesFilter(pod, p.ValidPhases) && passesPodNameFilter(pod, p.PodName)) {
+			continue
+		}
+		passesVerify, err := passesVerifyFilter(pod, p.Verify)
+		if err != nil {
+			Logf("Error detected on %v : %v !", pod.Name, err)
+			break ReturnPodsSoFar
+		}
+		if passesVerify {
+			filteredPods = append(filteredPods, pod)
+		}
+	}
+	return filteredPods, err
+}
+
+// WaitFor waits for some minimum number of pods to be verified, according to the PodStateVerification
+// definition.
+func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]api.Pod, error) {
+	pods := []api.Pod{}
+	var returnedErr error
+
+	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
+		pods, returnedErr = cl.podState.filter(cl.client, cl.namespace)
+
+		// Failure
+		if returnedErr != nil {
+			Logf("Cutting polling short: We got an error from the pod filtering layer.")
+			// stop polling if the pod filtering returns an error.  that should never happen.
+			// it indicates, for example, that the client is broken or something non-pod related.
+			return false, returnedErr
+		}
+		Logf("Found %v / %v", len(pods), atLeast)
+
+		// Success
+		if len(pods) >= atLeast {
+			return true, nil
+		}
+		// Keep trying...
+		return false, nil
+	})
+	Logf("WaitFor completed with timeout %v.  Pods found = %v out of %v", timeout, len(pods), atLeast)
+	return pods, err
+}
+
+// WaitForOrFail provides a shorthand WaitFor with failure as an option if anything goes wrong.
+func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration) {
+	pods, err := cl.WaitFor(atLeast, timeout)
+	if err != nil || len(pods) < atLeast {
+		Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
+	}
+}
+
+// ForEach runs a function against every verifiable pod.  Be warned that this doesn't wait for "n" pods to verifiy,
+// so it may return very quickly if you have strict pod state requirements.
+//
+// For example, if you require at least 5 pods to be running before your test will pass,
+// its smart to first call "clusterVerification.WaitFor(5)" before you call clusterVerification.ForEach.
+func (cl *ClusterVerification) ForEach(podFunc func(api.Pod)) error {
+	pods, err := cl.podState.filter(cl.client, cl.namespace)
+	if err == nil {
+		Logf("ForEach: Found %v pods from the filter.  Now looping through them.", len(pods))
+		for _, p := range pods {
+			podFunc(p)
+		}
+	} else {
+		Logf("ForEach: Something went wrong when filtering pods to execute against: %v", err)
+	}
+
+	return err
 }

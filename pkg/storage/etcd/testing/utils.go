@@ -231,6 +231,7 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 		t.Fatalf("Failed to start etcd server error=%v", err)
 		return nil
 	}
+
 	cfg := etcd.Config{
 		Endpoints: server.ClientURLs.StringSlice(),
 		Transport: newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile),

@@ -57,7 +57,13 @@ type ObjectScheme interface {
 // TODO: add support for sub resources
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 	return func(action Action) (bool, runtime.Object, error) {
-		kind, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
+		resource := action.GetResource()
+		kind, err := mapper.KindFor(resource)
+		// This is a temporary fix. Because there is no internal resource, so
+		// the caller has no way to express that it expects to get an internal
+		// kind back. A more proper fix will be directly specify the Kind when
+		// build the action.
+		kind.Version = resource.Version
 		if err != nil {
 			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
 		}
@@ -149,7 +155,9 @@ func NewObjects(scheme ObjectScheme, decoder runtime.Decoder) ObjectRetriever {
 }
 
 func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.Object, error) {
-	kind.Version = runtime.APIVersionInternal
+	if len(kind.Version) == 0 {
+		kind.Version = runtime.APIVersionInternal
+	}
 	empty, err := o.scheme.New(kind)
 	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)
 
@@ -256,7 +264,7 @@ func (r *SimpleReactor) Handles(action Action) bool {
 	if !verbCovers {
 		return false
 	}
-	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource()
+	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource().Resource
 	if !resourceCovers {
 		return false
 	}
@@ -277,7 +285,7 @@ type SimpleWatchReactor struct {
 }
 
 func (r *SimpleWatchReactor) Handles(action Action) bool {
-	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource()
+	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource().Resource
 	if !resourceCovers {
 		return false
 	}
@@ -298,7 +306,7 @@ type SimpleProxyReactor struct {
 }
 
 func (r *SimpleProxyReactor) Handles(action Action) bool {
-	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource()
+	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource().Resource
 	if !resourceCovers {
 		return false
 	}

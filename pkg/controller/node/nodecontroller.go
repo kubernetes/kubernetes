@@ -469,18 +469,18 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if lastReadyCondition.Status == api.ConditionFalse &&
 				decisionTimestamp.After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
 				if nc.evictPods(node.Name) {
-					glog.Infof("Evicting pods on node %s: %v is later than %v + %v", node.Name, decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
+					glog.V(4).Infof("Evicting pods on node %s: %v is later than %v + %v", node.Name, decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
 				}
 			}
 			if lastReadyCondition.Status == api.ConditionUnknown &&
 				decisionTimestamp.After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout)) {
 				if nc.evictPods(node.Name) {
-					glog.Infof("Evicting pods on node %s: %v is later than %v + %v", node.Name, decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
+					glog.V(4).Infof("Evicting pods on node %s: %v is later than %v + %v", node.Name, decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
 				}
 			}
 			if lastReadyCondition.Status == api.ConditionTrue {
 				if nc.cancelPodEviction(node.Name) {
-					glog.Infof("Node %s is ready again, cancelled pod eviction", node.Name)
+					glog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
 				}
 			}
 
@@ -729,7 +729,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 				LastTransitionTime: nc.now(),
 			})
 		} else {
-			glog.V(2).Infof("node %v hasn't been updated for %+v. Last ready condition is: %+v",
+			glog.V(4).Infof("node %v hasn't been updated for %+v. Last ready condition is: %+v",
 				node.Name, nc.now().Time.Sub(savedNodeStatus.probeTimestamp.Time), lastReadyCondition)
 			if lastReadyCondition.Status != api.ConditionUnknown {
 				readyCondition.Status = api.ConditionUnknown
@@ -756,7 +756,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 				LastTransitionTime: nc.now(),
 			})
 		} else {
-			glog.V(2).Infof("node %v hasn't been updated for %+v. Last out of disk condition is: %+v",
+			glog.V(4).Infof("node %v hasn't been updated for %+v. Last out of disk condition is: %+v",
 				node.Name, nc.now().Time.Sub(savedNodeStatus.probeTimestamp.Time), oodCondition)
 			if oodCondition.Status != api.ConditionUnknown {
 				oodCondition.Status = api.ConditionUnknown

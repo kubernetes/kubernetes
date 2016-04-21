@@ -21,6 +21,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "Note: This assumes that swagger spec has been updated. Please run hack/update-swagger-spec.sh to ensure that."
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
@@ -54,7 +56,7 @@ user_flags="-u $(id -u)"
 if [[ $(uname) == "Darwin" ]]; then
   # mapping in a uid from OS X doesn't make any sense
   user_flags=""
-fi 
+fi
 
 for ver in $VERSIONS; do
   TMP_IN_HOST="${OUTPUT_TMP_IN_HOST}/${ver}"
@@ -92,7 +94,7 @@ while read file; do
     generated=$(echo "${generated}" | grep -v "Last updated" || :)
 
     # By now, the contents should be normalized and stripped of any
-    # auto-managed content.  
+    # auto-managed content.
     if diff -Bw >/dev/null <(echo "${original}") <(echo "${generated}"); then
       # actual contents same, overwrite generated with original.
       cp "${OUTPUT}/${file}" "${OUTPUT_TMP}/${file}"

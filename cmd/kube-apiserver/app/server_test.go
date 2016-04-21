@@ -19,18 +19,12 @@ package app
 import (
 	"reflect"
 	"regexp"
-	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
@@ -70,64 +64,6 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 	for _, path := range doMatch {
 		if !regexp.MatchString(path) {
 			t.Errorf("path should have match regexp did not: %s", path)
-		}
-	}
-}
-
-func TestUpdateEtcdOverrides(t *testing.T) {
-	storageVersions := map[string]string{
-		"":           "v1",
-		"extensions": "extensions/v1beta1",
-	}
-
-	testCases := []struct {
-		apigroup string
-		resource string
-		servers  []string
-	}{
-		{
-			apigroup: api.GroupName,
-			resource: "resource",
-			servers:  []string{"http://127.0.0.1:10000"},
-		},
-		{
-			apigroup: api.GroupName,
-			resource: "resource",
-			servers:  []string{"http://127.0.0.1:10000", "http://127.0.0.1:20000"},
-		},
-		{
-			apigroup: extensions.GroupName,
-			resource: "resource",
-			servers:  []string{"http://127.0.0.1:10000"},
-		},
-	}
-
-	for _, test := range testCases {
-		newEtcd := func(_ runtime.NegotiatedSerializer, _, _ string, etcdConfig etcdstorage.EtcdConfig) (storage.Interface, error) {
-			if !reflect.DeepEqual(test.servers, etcdConfig.ServerList) {
-				t.Errorf("unexpected server list, expected: %#v, got: %#v", test.servers, etcdConfig.ServerList)
-			}
-			return nil, nil
-		}
-		storageDestinations := genericapiserver.NewStorageDestinations()
-		override := test.apigroup + "/" + test.resource + "#" + strings.Join(test.servers, ";")
-		defaultEtcdConfig := etcdstorage.EtcdConfig{
-			Prefix:     genericapiserver.DefaultEtcdPathPrefix,
-			ServerList: []string{"http://127.0.0.1"},
-		}
-		updateEtcdOverrides([]string{override}, storageVersions, defaultEtcdConfig, &storageDestinations, newEtcd)
-		apigroup, ok := storageDestinations.APIGroups[test.apigroup]
-		if !ok {
-			t.Errorf("apigroup: %s not created", test.apigroup)
-			continue
-		}
-		if apigroup.Overrides == nil {
-			t.Errorf("Overrides not created for: %s", test.apigroup)
-			continue
-		}
-		if _, ok := apigroup.Overrides[test.resource]; !ok {
-			t.Errorf("override not created for: %s", test.resource)
-			continue
 		}
 	}
 }
@@ -208,7 +144,9 @@ func TestParseRuntimeConfig(t *testing.T) {
 	}
 	for _, test := range testCases {
 		s := &options.APIServer{
-			RuntimeConfig: test.runtimeConfig,
+			ServerRunOptions: &genericapiserver.ServerRunOptions{
+				RuntimeConfig: test.runtimeConfig,
+			},
 		}
 		actualDisablers, err := parseRuntimeConfig(s)
 

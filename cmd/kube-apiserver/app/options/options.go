@@ -18,12 +18,12 @@ limitations under the License.
 package options
 
 import (
-	"net"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -32,8 +32,6 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/util/config"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/spf13/pflag"
 )
@@ -41,47 +39,32 @@ import (
 // APIServer runs a kubernetes api server.
 type APIServer struct {
 	*genericapiserver.ServerRunOptions
-	APIGroupPrefix             string
-	APIPrefix                  string
 	AdmissionControl           string
 	AdmissionControlConfigFile string
-	AdvertiseAddress           net.IP
 	AllowPrivileged            bool
 	AuthorizationMode          string
 	AuthorizationConfig        apiserver.AuthorizationConfig
 	BasicAuthFile              string
 	CloudConfigFile            string
 	CloudProvider              string
-	CorsAllowedOriginList      []string
 	DeleteCollectionWorkers    int
 	DeprecatedStorageVersion   string
-	EnableLogsSupport          bool
-	EnableProfiling            bool
-	EnableWatchCache           bool
-	EnableSwaggerUI            bool
 	EtcdServersOverrides       []string
 	EtcdConfig                 etcdstorage.EtcdConfig
 	EventTTL                   time.Duration
-	ExternalHost               string
 	KeystoneURL                string
 	KubeletConfig              kubeletclient.KubeletClientConfig
-	KubernetesServiceNodePort  int
-	MasterCount                int
 	MasterServiceNamespace     string
 	MaxConnectionBytesPerSec   int64
-	MinRequestTimeout          int
 	OIDCCAFile                 string
 	OIDCClientID               string
 	OIDCIssuerURL              string
 	OIDCUsernameClaim          string
 	OIDCGroupsClaim            string
-	RuntimeConfig              config.ConfigurationMap
 	SSHKeyfile                 string
 	SSHUser                    string
 	ServiceAccountKeyFile      string
 	ServiceAccountLookup       bool
-	ServiceClusterIPRange      net.IPNet // TODO: make this a list
-	ServiceNodePortRange       utilnet.PortRange
 	StorageVersions            string
 	// The default values for StorageVersions. StorageVersions overrides
 	// these; you can change this if you want to change the defaults (e.g.,
@@ -95,23 +78,15 @@ type APIServer struct {
 func NewAPIServer() *APIServer {
 	s := APIServer{
 		ServerRunOptions:        genericapiserver.NewServerRunOptions(),
-		APIGroupPrefix:          "/apis",
-		APIPrefix:               "/api",
 		AdmissionControl:        "AlwaysAdmit",
 		AuthorizationMode:       "AlwaysAllow",
 		DeleteCollectionWorkers: 1,
-		EnableLogsSupport:       true,
-		EnableProfiling:         true,
-		EnableWatchCache:        true,
 		EtcdConfig: etcdstorage.EtcdConfig{
 			Prefix: genericapiserver.DefaultEtcdPathPrefix,
 			DeserializationCacheSize: genericapiserver.DefaultDeserializationCacheSize,
 		},
 		EventTTL:               1 * time.Hour,
-		MasterCount:            1,
 		MasterServiceNamespace: api.NamespaceDefault,
-		MinRequestTimeout:      1800,
-		RuntimeConfig:          make(config.ConfigurationMap),
 		StorageVersions:        registered.AllPreferredGroupVersions(),
 		DefaultStorageVersions: registered.AllPreferredGroupVersions(),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
@@ -120,44 +95,57 @@ func NewAPIServer() *APIServer {
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
 	}
-
 	return &s
 }
 
 // dest must be a map of group to groupVersion.
-func gvToMap(gvList string, dest map[string]string) {
-	for _, gv := range strings.Split(gvList, ",") {
-		if gv == "" {
+func mergeGroupVersionIntoMap(gvList string, dest map[string]unversioned.GroupVersion) error {
+	for _, gvString := range strings.Split(gvList, ",") {
+		if gvString == "" {
 			continue
 		}
 		// We accept two formats. "group/version" OR
 		// "group=group/version". The latter is used when types
 		// move between groups.
-		if !strings.Contains(gv, "=") {
-			dest[apiutil.GetGroup(gv)] = gv
+		if !strings.Contains(gvString, "=") {
+			gv, err := unversioned.ParseGroupVersion(gvString)
+			if err != nil {
+				return err
+			}
+			dest[gv.Group] = gv
+
 		} else {
-			parts := strings.SplitN(gv, "=", 2)
-			// TODO: error checking.
-			dest[parts[0]] = parts[1]
+			parts := strings.SplitN(gvString, "=", 2)
+			gv, err := unversioned.ParseGroupVersion(parts[1])
+			if err != nil {
+				return err
+			}
+			dest[parts[0]] = gv
 		}
 	}
+
+	return nil
 }
 
-// StorageGroupsToGroupVersions returns a map from group name to group version,
+// StorageGroupsToEncodingVersion returns a map from group name to group version,
 // computed from the s.DeprecatedStorageVersion and s.StorageVersions flags.
 // TODO: can we move the whole storage version concept to the generic apiserver?
-func (s *APIServer) StorageGroupsToGroupVersions() map[string]string {
-	storageVersionMap := map[string]string{}
+func (s *APIServer) StorageGroupsToEncodingVersion() (map[string]unversioned.GroupVersion, error) {
+	storageVersionMap := map[string]unversioned.GroupVersion{}
 	if s.DeprecatedStorageVersion != "" {
-		storageVersionMap[""] = s.DeprecatedStorageVersion
+		storageVersionMap[""] = unversioned.GroupVersion{Group: apiutil.GetGroup(s.DeprecatedStorageVersion), Version: apiutil.GetVersion(s.DeprecatedStorageVersion)}
 	}
 
 	// First, get the defaults.
-	gvToMap(s.DefaultStorageVersions, storageVersionMap)
+	if err := mergeGroupVersionIntoMap(s.DefaultStorageVersions, storageVersionMap); err != nil {
+		return nil, err
+	}
 	// Override any defaults with the user settings.
-	gvToMap(s.StorageVersions, storageVersionMap)
+	if err := mergeGroupVersionIntoMap(s.StorageVersions, storageVersionMap); err != nil {
+		return nil, err
+	}
 
-	return storageVersionMap
+	return storageVersionMap, nil
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
@@ -166,15 +154,6 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	s.ServerRunOptions.AddFlags(fs)
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-	fs.MarkDeprecated("port", "see --insecure-port instead")
-	fs.MarkDeprecated("address", "see --insecure-bind-address instead")
-	fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
-		"The IP address on which to advertise the apiserver to members of the cluster. This "+
-		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
-		"will be used. If --bind-address is unspecified, the host's default interface will "+
-		"be used.")
-	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress, "DEPRECATED: see --bind-address instead")
-	fs.MarkDeprecated("public-address-override", "see --bind-address instead")
 	fs.StringVar(&s.APIPrefix, "api-prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
 	fs.MarkDeprecated("api-prefix", "--api-prefix is deprecated and will be removed when the v1 API is retired.")
 	fs.StringVar(&s.DeprecatedStorageVersion, "storage-version", s.DeprecatedStorageVersion, "The version to store the legacy v1 resources with. Defaults to server preferred")
@@ -212,24 +191,9 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.EtcdConfig.CAFile, "etcd-cafile", s.EtcdConfig.CAFile, "SSL Certificate Authority file used to secure etcd communication")
 	fs.BoolVar(&s.EtcdConfig.Quorum, "etcd-quorum-read", s.EtcdConfig.Quorum, "If true, enable quorum read")
 	fs.IntVar(&s.EtcdConfig.DeserializationCacheSize, "deserialization-cache-size", s.EtcdConfig.DeserializationCacheSize, "Number of deserialized json objects to cache in memory.")
-	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
-	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, "A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
-	fs.IPNetVar(&s.ServiceClusterIPRange, "portal-net", s.ServiceClusterIPRange, "Deprecated: see --service-cluster-ip-range instead.")
-	fs.MarkDeprecated("portal-net", "see --service-cluster-ip-range instead.")
-	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", "A port range to reserve for services with NodePort visibility.  Example: '30000-32767'.  Inclusive at both ends of the range.")
-	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "Deprecated: see --service-node-port-range instead.")
-	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead.")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
-	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount, "The number of apiservers running in the cluster")
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers, "Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
-	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
-	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
-	// TODO: enable cache in integration tests.
-	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache, "Enable watch caching in the apiserver")
-	fs.BoolVar(&s.EnableSwaggerUI, "enable-swagger-ui", s.EnableSwaggerUI, "Enables swagger ui on the apiserver at /swagger-ui")
-	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost, "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
-	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", s.MinRequestTimeout, "An optional field indicating the minimum number of seconds a handler must keep a request open before timing it out. Currently only honored by the watch request handler, which picks a randomized value above this number as the connection timeout, to spread out load.")
 	fs.StringVar(&s.SSHUser, "ssh-user", s.SSHUser, "If non-empty, use secure SSH proxy to the nodes, using this user name")
 	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", s.SSHKeyfile, "If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, "If non-zero, throttle each user connection to this number of bytes/sec.  Currently only applies to long-running requests")
@@ -241,8 +205,6 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.KubeletConfig.CertFile, "kubelet-client-certificate", s.KubeletConfig.CertFile, "Path to a client cert file for TLS.")
 	fs.StringVar(&s.KubeletConfig.KeyFile, "kubelet-client-key", s.KubeletConfig.KeyFile, "Path to a client key file for TLS.")
 	fs.StringVar(&s.KubeletConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.CAFile, "Path to a cert. file for the certificate authority.")
-	// See #14282 for details on how to test/try this option out.  TODO remove this comment once this option is tested in CI.
-	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", s.KubernetesServiceNodePort, "If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be of type NodePort, using this as the value of the port. If zero, the Kubernetes master service will be of type ClusterIP.")
 	// TODO: delete this flag as soon as we identify and fix all clients that send malformed updates, like #14126.
 	fs.BoolVar(&validation.RepairMalformedUpdates, "repair-malformed-updates", validation.RepairMalformedUpdates, "If true, server will do its best to fix the update request to pass the validation, e.g., setting empty UID in update request to its existing value. This flag can be turned off after we fix all the clients that send malformed updates.")
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, "List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. The individual override format: resource#size, where size is a number. It takes effect when watch-cache is enabled.")

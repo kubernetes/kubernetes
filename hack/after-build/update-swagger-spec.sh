@@ -21,6 +21,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "Note: This assumes that types_swagger_doc_generated.go has been updated for all API group versions. Please run hack/update-generated-swagger-docs.sh to ensure that."
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 SWAGGER_ROOT_DIR="${KUBE_ROOT}/api/swagger-spec"
 source "${KUBE_ROOT}/hack/lib/init.sh"
@@ -51,7 +53,7 @@ kube::etcd::start
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
-KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --insecure-bind-address="127.0.0.1" \
   --bind-address="127.0.0.1" \
   --insecure-port="${API_PORT}" \
@@ -64,13 +66,13 @@ APISERVER_PID=$!
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
 
 SWAGGER_API_PATH="http://127.0.0.1:${API_PORT}/swaggerapi/"
-DEFAULT_GROUP_VERSIONS="v1 autoscaling/v1 batch/v1 extensions/v1beta1"
+DEFAULT_GROUP_VERSIONS="v1 autoscaling/v1 batch/v1 extensions/v1beta1 apps/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 
 kube::log::status "Updating " ${SWAGGER_ROOT_DIR}
 
 for ver in ${VERSIONS}; do
-  # fetch the swagger spec for each group version. 
+  # fetch the swagger spec for each group version.
   if [[ ${ver} == "v1" ]]; then
     SUBPATH="api"
   else
@@ -78,22 +80,22 @@ for ver in ${VERSIONS}; do
   fi
   SUBPATH="${SUBPATH}/${ver}"
   SWAGGER_JSON_NAME="$(kube::util::gv-to-swagger-name ${ver}).json"
-  curl -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
-  
+  curl -w "\n" -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
+
   # fetch the swagger spec for the discovery mechanism at group level.
   if [[ ${ver} == "v1" ]]; then
-    continue 
+    continue
   fi
   SUBPATH="apis/"${ver%/*}
   SWAGGER_JSON_NAME="${ver%/*}.json"
-  curl -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
+  curl -w "\n" -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
 done
 
 # fetch swagger specs for other discovery mechanism.
-curl -fs "${SWAGGER_API_PATH}" > "${SWAGGER_ROOT_DIR}/resourceListing.json"
-curl -fs "${SWAGGER_API_PATH}version" > "${SWAGGER_ROOT_DIR}/version.json"
-curl -fs "${SWAGGER_API_PATH}api" > "${SWAGGER_ROOT_DIR}/api.json"
-curl -fs "${SWAGGER_API_PATH}apis" > "${SWAGGER_ROOT_DIR}/apis.json"
+curl -w "\n" -fs "${SWAGGER_API_PATH}" > "${SWAGGER_ROOT_DIR}/resourceListing.json"
+curl -w "\n" -fs "${SWAGGER_API_PATH}version" > "${SWAGGER_ROOT_DIR}/version.json"
+curl -w "\n" -fs "${SWAGGER_API_PATH}api" > "${SWAGGER_ROOT_DIR}/api.json"
+curl -w "\n" -fs "${SWAGGER_API_PATH}apis" > "${SWAGGER_ROOT_DIR}/apis.json"
 kube::log::status "SUCCESS"
 
 # ex: ts=2 sw=2 et filetype=sh

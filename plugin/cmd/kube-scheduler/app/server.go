@@ -79,6 +79,7 @@ func Run(s *options.SchedulerServer) error {
 		return err
 	}
 
+	kubeconfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = s.KubeAPIBurst

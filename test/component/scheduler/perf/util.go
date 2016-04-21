@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -92,7 +93,7 @@ func makeNodes(c client.Interface, nodeCount int) {
 		},
 		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
-				api.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+				api.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
 				api.ResourceCPU:    resource.MustParse("4"),
 				api.ResourceMemory: resource.MustParse("32Gi"),
 			},
@@ -109,54 +110,61 @@ func makeNodes(c client.Interface, nodeCount int) {
 	}
 }
 
-// makePods will setup specified number of scheduled pods.
-// Currently it goes through scheduling path and it's very slow to setup large number of pods.
-// TODO: Setup pods evenly on all nodes and quickly/non-linearly.
-func makePods(c client.Interface, podCount int) {
-	glog.Infof("making %d pods", podCount)
+func makePodSpec() api.PodSpec {
+	return api.PodSpec{
+		Containers: []api.Container{{
+			Name:  "pause",
+			Image: "gcr.io/google_containers/pause:1.0",
+			Ports: []api.ContainerPort{{ContainerPort: 80}},
+			Resources: api.ResourceRequirements{
+				Limits: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100m"),
+					api.ResourceMemory: resource.MustParse("500Mi"),
+				},
+				Requests: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100m"),
+					api.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			},
+		}},
+	}
+}
+
+// makePodsFromRC will create a ReplicationController object and
+// a given number of pods (imitating the controller).
+func makePodsFromRC(c client.Interface, name string, podCount int) {
+	rc := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: podCount,
+			Selector: map[string]string{"name": name},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"name": name},
+				},
+				Spec: makePodSpec(),
+			},
+		},
+	}
+	if _, err := c.ReplicationControllers("default").Create(rc); err != nil {
+		glog.Fatalf("unexpected error: %v", err)
+	}
+
 	basePod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "scheduler-test-pod-",
+			Labels:       map[string]string{"name": name},
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{{
-				Name:  "pause",
-				Image: "gcr.io/google_containers/pause:1.0",
-				Resources: api.ResourceRequirements{
-					Limits: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("100m"),
-						api.ResourceMemory: resource.MustParse("500Mi"),
-					},
-					Requests: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("100m"),
-						api.ResourceMemory: resource.MustParse("500Mi"),
-					},
-				},
-			}},
-		},
+		Spec: makePodSpec(),
 	}
-	threads := 30
-	remaining := make(chan int, 1000)
-	go func() {
-		for i := 0; i < podCount; i++ {
-			remaining <- i
-		}
-		close(remaining)
-	}()
-	for i := 0; i < threads; i++ {
-		go func() {
-			for {
-				_, ok := <-remaining
-				if !ok {
-					return
-				}
-				for {
-					_, err := c.Pods("default").Create(basePod)
-					if err == nil {
-						break
-					}
-				}
+	createPod := func(i int) {
+		for {
+			if _, err := c.Pods("default").Create(basePod); err == nil {
+				break
 			}
-		}()
+		}
 	}
+	workqueue.Parallelize(30, podCount, createPod)
 }

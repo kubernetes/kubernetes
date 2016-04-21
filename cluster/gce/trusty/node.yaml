@@ -195,14 +195,17 @@ script
 	if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
 		log_level="${KUBEPROXY_TEST_LOG_LEVEL}"
 	fi
-	api_servers="--master=https:\/\/${KUBERNETES_MASTER_NAME}"
-	sed -i -e "s/{{kubeconfig}}/${kubeconfig}/g" ${tmp_file}
-	sed -i -e "s/{{pillar\['kube_docker_registry'\]}}/${kube_docker_registry}/g" ${tmp_file}
-	sed -i -e "s/{{pillar\['kube-proxy_docker_tag'\]}}/${kube_proxy_docker_tag}/g" ${tmp_file}
-	sed -i -e "s/{{test_args}}/${test_args}/g" ${tmp_file}
-	sed -i -e "s/{{ cpurequest }}/20m/g" ${tmp_file}
-	sed -i -e "s/{{log_level}}/${log_level}/g" ${tmp_file}
-	sed -i -e "s/{{api_servers_with_port}}/${api_servers}/g" ${tmp_file}
+	api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+	sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${tmp_file}
+	sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${tmp_file}
+	sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" ${tmp_file}
+	sed -i -e "s@{{test_args}}@${test_args}@g" ${tmp_file}
+	sed -i -e "s@{{ cpurequest }}@20m@g" ${tmp_file}
+	sed -i -e "s@{{log_level}}@${log_level}@g" ${tmp_file}
+	sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${tmp_file}
+	if [ -n "${CLUSTER_IP_RANGE:-}" ]; then
+		sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" ${tmp_file}
+	fi
 
 	mv -f ${tmp_file} /etc/kubernetes/manifests/
 end script

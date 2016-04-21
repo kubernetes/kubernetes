@@ -25,7 +25,7 @@ import (
 func (c *FakePods) Bind(binding *api.Binding) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
-	action.Resource = "pods"
+	action.Resource = podsResource
 	action.Subresource = "bindings"
 	action.Object = binding
 
@@ -37,7 +37,7 @@ func (c *FakePods) GetLogs(name string, opts *api.PodLogOptions) *restclient.Req
 	action := core.GenericActionImpl{}
 	action.Verb = "get"
 	action.Namespace = c.ns
-	action.Resource = "pod"
+	action.Resource = podsResource
 	action.Subresource = "logs"
 	action.Value = opts
 

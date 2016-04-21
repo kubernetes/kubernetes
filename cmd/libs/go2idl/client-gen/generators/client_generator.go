@@ -100,6 +100,7 @@ func packageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 				},
 				outputPackage: outputPackagePath,
 				group:         gv.Group,
+				version:       gv.Version,
 				types:         typeList,
 				imports:       generator.NewImportTracker(),
 			})

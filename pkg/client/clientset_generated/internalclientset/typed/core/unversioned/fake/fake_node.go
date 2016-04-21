@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -28,9 +29,11 @@ type FakeNodes struct {
 	Fake *FakeCore
 }
 
+var nodesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "nodes"}
+
 func (c *FakeNodes) Create(node *api.Node) (result *api.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction("nodes", node), &api.Node{})
+		Invokes(core.NewRootCreateAction(nodesResource, node), &api.Node{})
 	if obj == nil {
 		return nil, err
 	}
@@ -39,7 +42,7 @@ func (c *FakeNodes) Create(node *api.Node) (result *api.Node, err error) {
 
 func (c *FakeNodes) Update(node *api.Node) (result *api.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction("nodes", node), &api.Node{})
+		Invokes(core.NewRootUpdateAction(nodesResource, node), &api.Node{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,7 +51,7 @@ func (c *FakeNodes) Update(node *api.Node) (result *api.Node, err error) {
 
 func (c *FakeNodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction("nodes", "status", node), &api.Node{})
+		Invokes(core.NewRootUpdateSubresourceAction(nodesResource, "status", node), &api.Node{})
 	if obj == nil {
 		return nil, err
 	}
@@ -57,12 +60,12 @@ func (c *FakeNodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 
 func (c *FakeNodes) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction("nodes", name), &api.Node{})
+		Invokes(core.NewRootDeleteAction(nodesResource, name), &api.Node{})
 	return err
 }
 
 func (c *FakeNodes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction("nodes", listOptions)
+	action := core.NewRootDeleteCollectionAction(nodesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.NodeList{})
 	return err
@@ -70,7 +73,7 @@ func (c *FakeNodes) DeleteCollection(options *api.DeleteOptions, listOptions api
 
 func (c *FakeNodes) Get(name string) (result *api.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction("nodes", name), &api.Node{})
+		Invokes(core.NewRootGetAction(nodesResource, name), &api.Node{})
 	if obj == nil {
 		return nil, err
 	}
@@ -79,7 +82,7 @@ func (c *FakeNodes) Get(name string) (result *api.Node, err error) {
 
 func (c *FakeNodes) List(opts api.ListOptions) (result *api.NodeList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction("nodes", opts), &api.NodeList{})
+		Invokes(core.NewRootListAction(nodesResource, opts), &api.NodeList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -100,5 +103,5 @@ func (c *FakeNodes) List(opts api.ListOptions) (result *api.NodeList, err error)
 // Watch returns a watch.Interface that watches the requested nodes.
 func (c *FakeNodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction("nodes", opts))
+		InvokesWatch(core.NewRootWatchAction(nodesResource, opts))
 }

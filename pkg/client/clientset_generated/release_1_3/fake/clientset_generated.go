@@ -56,17 +56,17 @@ type Clientset struct {
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
-	return &fakediscovery.FakeDiscovery{&c.Fake}
+	return &fakediscovery.FakeDiscovery{Fake: &c.Fake}
 }
 
 var _ clientset.Interface = &Clientset{}
 
 // Core retrieves the CoreClient
 func (c *Clientset) Core() v1core.CoreInterface {
-	return &fakev1core.FakeCore{&c.Fake}
+	return &fakev1core.FakeCore{Fake: &c.Fake}
 }
 
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
-	return &fakev1beta1extensions.FakeExtensions{&c.Fake}
+	return &fakev1beta1extensions.FakeExtensions{Fake: &c.Fake}
 }

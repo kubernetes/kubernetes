@@ -448,7 +448,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		})
 		podEvicted := false
 		for _, action := range item.fakeNodeHandler.Actions() {
-			if action.GetVerb() == "delete" && action.GetResource() == "pods" {
+			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
 				podEvicted = true
 			}
 		}
@@ -886,7 +886,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 
 		podStatusUpdated := false
 		for _, action := range item.fakeNodeHandler.Actions() {
-			if action.GetVerb() == "update" && action.GetResource() == "pods" && action.GetSubresource() == "status" {
+			if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
 				podStatusUpdated = true
 			}
 		}
@@ -968,7 +968,7 @@ func TestNodeDeletion(t *testing.T) {
 	})
 	podEvicted := false
 	for _, action := range fakeNodeHandler.Actions() {
-		if action.GetVerb() == "delete" && action.GetResource() == "pods" {
+		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
 			podEvicted = true
 		}
 	}

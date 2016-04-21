@@ -86,7 +86,7 @@ func (es *e2eService) stop() {
 	if es.apiServerCmd != nil {
 		err := es.apiServerCmd.Process.Kill()
 		if err != nil {
-			glog.Errorf("Failed to stop be-apiserver.\n%v", err)
+			glog.Errorf("Failed to stop kube-apiserver.\n%v", err)
 		}
 	}
 	if es.etcdCmd != nil {
@@ -158,7 +158,7 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 	go func() {
 		err := cmd.Run()
 		if err != nil {
-			cmdErrorChan <- fmt.Errorf("%s Failed with error \"%v\".  Command output:\n%s", cmd, err, *cmd.OutputBuffer)
+			cmdErrorChan <- fmt.Errorf("%s Failed with error \"%v\".  Command output:\n%v", cmd, err, *cmd.OutputBuffer)
 		}
 		close(cmdErrorChan)
 	}()
