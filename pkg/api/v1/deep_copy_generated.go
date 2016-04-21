@@ -34,6 +34,7 @@ func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_v1_AWSElasticBlockStoreVolumeSource,
 		DeepCopy_v1_Affinity,
+		DeepCopy_v1_AvoidPods,
 		DeepCopy_v1_AzureFileVolumeSource,
 		DeepCopy_v1_Binding,
 		DeepCopy_v1_Capabilities,
@@ -131,11 +132,13 @@ func init() {
 		DeepCopy_v1_PodAntiAffinity,
 		DeepCopy_v1_PodAttachOptions,
 		DeepCopy_v1_PodCondition,
+		DeepCopy_v1_PodController,
 		DeepCopy_v1_PodExecOptions,
 		DeepCopy_v1_PodList,
 		DeepCopy_v1_PodLogOptions,
 		DeepCopy_v1_PodProxyOptions,
 		DeepCopy_v1_PodSecurityContext,
+		DeepCopy_v1_PodSignature,
 		DeepCopy_v1_PodSpec,
 		DeepCopy_v1_PodStatus,
 		DeepCopy_v1_PodStatusResult,
@@ -143,6 +146,7 @@ func init() {
 		DeepCopy_v1_PodTemplateList,
 		DeepCopy_v1_PodTemplateSpec,
 		DeepCopy_v1_Preconditions,
+		DeepCopy_v1_PreferAvoidPodsEntry,
 		DeepCopy_v1_PreferredSchedulingTerm,
 		DeepCopy_v1_Probe,
 		DeepCopy_v1_RBDVolumeSource,
@@ -217,6 +221,21 @@ func DeepCopy_v1_Affinity(in Affinity, out *Affinity, c *conversion.Cloner) erro
 		}
 	} else {
 		out.PodAntiAffinity = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_AvoidPods(in AvoidPods, out *AvoidPods, c *conversion.Cloner) error {
+	if in.PreferAvoidPods != nil {
+		in, out := in.PreferAvoidPods, &out.PreferAvoidPods
+		*out = make([]PreferAvoidPodsEntry, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_PreferAvoidPodsEntry(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferAvoidPods = nil
 	}
 	return nil
 }
@@ -2032,6 +2051,14 @@ func DeepCopy_v1_PodCondition(in PodCondition, out *PodCondition, c *conversion.
 	return nil
 }
 
+func DeepCopy_v1_PodController(in PodController, out *PodController, c *conversion.Cloner) error {
+	out.Kind = in.Kind
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	out.APIVersion = in.APIVersion
+	return nil
+}
+
 func DeepCopy_v1_PodExecOptions(in PodExecOptions, out *PodExecOptions, c *conversion.Cloner) error {
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -2158,6 +2185,19 @@ func DeepCopy_v1_PodSecurityContext(in PodSecurityContext, out *PodSecurityConte
 		**out = *in
 	} else {
 		out.FSGroup = nil
+	}
+	return nil
+}
+
+func DeepCopy_v1_PodSignature(in PodSignature, out *PodSignature, c *conversion.Cloner) error {
+	if in.PodController != nil {
+		in, out := in.PodController, &out.PodController
+		*out = new(PodController)
+		if err := DeepCopy_v1_PodController(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.PodController = nil
 	}
 	return nil
 }
@@ -2350,6 +2390,18 @@ func DeepCopy_v1_Preconditions(in Preconditions, out *Preconditions, c *conversi
 	} else {
 		out.UID = nil
 	}
+	return nil
+}
+
+func DeepCopy_v1_PreferAvoidPodsEntry(in PreferAvoidPodsEntry, out *PreferAvoidPodsEntry, c *conversion.Cloner) error {
+	if err := DeepCopy_v1_PodSignature(in.PodSignature, &out.PodSignature, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_Time(in.EvictionTime, &out.EvictionTime, c); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
 	return nil
 }
 

@@ -27,6 +27,7 @@ limitations under the License.
 	It has these top-level messages:
 		AWSElasticBlockStoreVolumeSource
 		Affinity
+		AvoidPods
 		AzureFileVolumeSource
 		Binding
 		Capabilities
@@ -124,11 +125,13 @@ limitations under the License.
 		PodAntiAffinity
 		PodAttachOptions
 		PodCondition
+		PodController
 		PodExecOptions
 		PodList
 		PodLogOptions
 		PodProxyOptions
 		PodSecurityContext
+		PodSignature
 		PodSpec
 		PodStatus
 		PodStatusResult
@@ -136,6 +139,7 @@ limitations under the License.
 		PodTemplateList
 		PodTemplateSpec
 		Preconditions
+		PreferAvoidPodsEntry
 		PreferredSchedulingTerm
 		Probe
 		RBDVolumeSource
@@ -196,6 +200,10 @@ func (*AWSElasticBlockStoreVolumeSource) ProtoMessage()    {}
 func (m *Affinity) Reset()         { *m = Affinity{} }
 func (m *Affinity) String() string { return proto.CompactTextString(m) }
 func (*Affinity) ProtoMessage()    {}
+
+func (m *AvoidPods) Reset()         { *m = AvoidPods{} }
+func (m *AvoidPods) String() string { return proto.CompactTextString(m) }
+func (*AvoidPods) ProtoMessage()    {}
 
 func (m *AzureFileVolumeSource) Reset()         { *m = AzureFileVolumeSource{} }
 func (m *AzureFileVolumeSource) String() string { return proto.CompactTextString(m) }
@@ -585,6 +593,10 @@ func (m *PodCondition) Reset()         { *m = PodCondition{} }
 func (m *PodCondition) String() string { return proto.CompactTextString(m) }
 func (*PodCondition) ProtoMessage()    {}
 
+func (m *PodController) Reset()         { *m = PodController{} }
+func (m *PodController) String() string { return proto.CompactTextString(m) }
+func (*PodController) ProtoMessage()    {}
+
 func (m *PodExecOptions) Reset()         { *m = PodExecOptions{} }
 func (m *PodExecOptions) String() string { return proto.CompactTextString(m) }
 func (*PodExecOptions) ProtoMessage()    {}
@@ -604,6 +616,10 @@ func (*PodProxyOptions) ProtoMessage()    {}
 func (m *PodSecurityContext) Reset()         { *m = PodSecurityContext{} }
 func (m *PodSecurityContext) String() string { return proto.CompactTextString(m) }
 func (*PodSecurityContext) ProtoMessage()    {}
+
+func (m *PodSignature) Reset()         { *m = PodSignature{} }
+func (m *PodSignature) String() string { return proto.CompactTextString(m) }
+func (*PodSignature) ProtoMessage()    {}
 
 func (m *PodSpec) Reset()         { *m = PodSpec{} }
 func (m *PodSpec) String() string { return proto.CompactTextString(m) }
@@ -632,6 +648,10 @@ func (*PodTemplateSpec) ProtoMessage()    {}
 func (m *Preconditions) Reset()         { *m = Preconditions{} }
 func (m *Preconditions) String() string { return proto.CompactTextString(m) }
 func (*Preconditions) ProtoMessage()    {}
+
+func (m *PreferAvoidPodsEntry) Reset()         { *m = PreferAvoidPodsEntry{} }
+func (m *PreferAvoidPodsEntry) String() string { return proto.CompactTextString(m) }
+func (*PreferAvoidPodsEntry) ProtoMessage()    {}
 
 func (m *PreferredSchedulingTerm) Reset()         { *m = PreferredSchedulingTerm{} }
 func (m *PreferredSchedulingTerm) String() string { return proto.CompactTextString(m) }
@@ -768,6 +788,7 @@ func (*WeightedPodAffinityTerm) ProtoMessage()    {}
 func init() {
 	proto.RegisterType((*AWSElasticBlockStoreVolumeSource)(nil), "k8s.io.kubernetes.pkg.api.v1.AWSElasticBlockStoreVolumeSource")
 	proto.RegisterType((*Affinity)(nil), "k8s.io.kubernetes.pkg.api.v1.Affinity")
+	proto.RegisterType((*AvoidPods)(nil), "k8s.io.kubernetes.pkg.api.v1.AvoidPods")
 	proto.RegisterType((*AzureFileVolumeSource)(nil), "k8s.io.kubernetes.pkg.api.v1.AzureFileVolumeSource")
 	proto.RegisterType((*Binding)(nil), "k8s.io.kubernetes.pkg.api.v1.Binding")
 	proto.RegisterType((*Capabilities)(nil), "k8s.io.kubernetes.pkg.api.v1.Capabilities")
@@ -865,11 +886,13 @@ func init() {
 	proto.RegisterType((*PodAntiAffinity)(nil), "k8s.io.kubernetes.pkg.api.v1.PodAntiAffinity")
 	proto.RegisterType((*PodAttachOptions)(nil), "k8s.io.kubernetes.pkg.api.v1.PodAttachOptions")
 	proto.RegisterType((*PodCondition)(nil), "k8s.io.kubernetes.pkg.api.v1.PodCondition")
+	proto.RegisterType((*PodController)(nil), "k8s.io.kubernetes.pkg.api.v1.PodController")
 	proto.RegisterType((*PodExecOptions)(nil), "k8s.io.kubernetes.pkg.api.v1.PodExecOptions")
 	proto.RegisterType((*PodList)(nil), "k8s.io.kubernetes.pkg.api.v1.PodList")
 	proto.RegisterType((*PodLogOptions)(nil), "k8s.io.kubernetes.pkg.api.v1.PodLogOptions")
 	proto.RegisterType((*PodProxyOptions)(nil), "k8s.io.kubernetes.pkg.api.v1.PodProxyOptions")
 	proto.RegisterType((*PodSecurityContext)(nil), "k8s.io.kubernetes.pkg.api.v1.PodSecurityContext")
+	proto.RegisterType((*PodSignature)(nil), "k8s.io.kubernetes.pkg.api.v1.PodSignature")
 	proto.RegisterType((*PodSpec)(nil), "k8s.io.kubernetes.pkg.api.v1.PodSpec")
 	proto.RegisterType((*PodStatus)(nil), "k8s.io.kubernetes.pkg.api.v1.PodStatus")
 	proto.RegisterType((*PodStatusResult)(nil), "k8s.io.kubernetes.pkg.api.v1.PodStatusResult")
@@ -877,6 +900,7 @@ func init() {
 	proto.RegisterType((*PodTemplateList)(nil), "k8s.io.kubernetes.pkg.api.v1.PodTemplateList")
 	proto.RegisterType((*PodTemplateSpec)(nil), "k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec")
 	proto.RegisterType((*Preconditions)(nil), "k8s.io.kubernetes.pkg.api.v1.Preconditions")
+	proto.RegisterType((*PreferAvoidPodsEntry)(nil), "k8s.io.kubernetes.pkg.api.v1.PreferAvoidPodsEntry")
 	proto.RegisterType((*PreferredSchedulingTerm)(nil), "k8s.io.kubernetes.pkg.api.v1.PreferredSchedulingTerm")
 	proto.RegisterType((*Probe)(nil), "k8s.io.kubernetes.pkg.api.v1.Probe")
 	proto.RegisterType((*RBDVolumeSource)(nil), "k8s.io.kubernetes.pkg.api.v1.RBDVolumeSource")
@@ -992,6 +1016,36 @@ func (m *Affinity) MarshalTo(data []byte) (int, error) {
 			return 0, err
 		}
 		i += n3
+	}
+	return i, nil
+}
+
+func (m *AvoidPods) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *AvoidPods) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.PreferAvoidPods) > 0 {
+		for _, msg := range m.PreferAvoidPods {
+			data[i] = 0xa
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
 	}
 	return i, nil
 }
@@ -5227,6 +5281,40 @@ func (m *PodCondition) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *PodController) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *PodController) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Kind)))
+	i += copy(data[i:], m.Kind)
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Namespace)))
+	i += copy(data[i:], m.Namespace)
+	data[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Name)))
+	i += copy(data[i:], m.Name)
+	data[i] = 0x22
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.APIVersion)))
+	i += copy(data[i:], m.APIVersion)
+	return i, nil
+}
+
 func (m *PodExecOptions) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -5482,6 +5570,34 @@ func (m *PodSecurityContext) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *PodSignature) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *PodSignature) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.PodController != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.PodController.Size()))
+		n110, err := m.PodController.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n110
+	}
+	return i, nil
+}
+
 func (m *PodSpec) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -5596,11 +5712,11 @@ func (m *PodSpec) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x72
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.SecurityContext.Size()))
-		n110, err := m.SecurityContext.MarshalTo(data[i:])
+		n111, err := m.SecurityContext.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n110
+		i += n111
 	}
 	if len(m.ImagePullSecrets) > 0 {
 		for _, msg := range m.ImagePullSecrets {
@@ -5680,11 +5796,11 @@ func (m *PodStatus) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x3a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.StartTime.Size()))
-		n111, err := m.StartTime.MarshalTo(data[i:])
+		n112, err := m.StartTime.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n111
+		i += n112
 	}
 	if len(m.ContainerStatuses) > 0 {
 		for _, msg := range m.ContainerStatuses {
@@ -5719,19 +5835,19 @@ func (m *PodStatusResult) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n112, err := m.ObjectMeta.MarshalTo(data[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n112
-	data[i] = 0x12
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n113, err := m.Status.MarshalTo(data[i:])
+	n113, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n113
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
+	n114, err := m.Status.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n114
 	return i, nil
 }
 
@@ -5753,19 +5869,19 @@ func (m *PodTemplate) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n114, err := m.ObjectMeta.MarshalTo(data[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n114
-	data[i] = 0x12
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Template.Size()))
-	n115, err := m.Template.MarshalTo(data[i:])
+	n115, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n115
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.Template.Size()))
+	n116, err := m.Template.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n116
 	return i, nil
 }
 
@@ -5787,11 +5903,11 @@ func (m *PodTemplateList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n116, err := m.ListMeta.MarshalTo(data[i:])
+	n117, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n116
+	i += n117
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -5825,19 +5941,19 @@ func (m *PodTemplateSpec) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n117, err := m.ObjectMeta.MarshalTo(data[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n117
-	data[i] = 0x12
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n118, err := m.Spec.MarshalTo(data[i:])
+	n118, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n118
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
+	n119, err := m.Spec.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n119
 	return i, nil
 }
 
@@ -5865,6 +5981,48 @@ func (m *Preconditions) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *PreferAvoidPodsEntry) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *PreferAvoidPodsEntry) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.PodSignature.Size()))
+	n120, err := m.PodSignature.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n120
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.EvictionTime.Size()))
+	n121, err := m.EvictionTime.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n121
+	data[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Reason)))
+	i += copy(data[i:], m.Reason)
+	data[i] = 0x22
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Message)))
+	i += copy(data[i:], m.Message)
+	return i, nil
+}
+
 func (m *PreferredSchedulingTerm) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -5886,11 +6044,11 @@ func (m *PreferredSchedulingTerm) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Preference.Size()))
-	n119, err := m.Preference.MarshalTo(data[i:])
+	n122, err := m.Preference.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n119
+	i += n122
 	return i, nil
 }
 
@@ -5912,11 +6070,11 @@ func (m *Probe) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Handler.Size()))
-	n120, err := m.Handler.MarshalTo(data[i:])
+	n123, err := m.Handler.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n120
+	i += n123
 	data[i] = 0x10
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.InitialDelaySeconds))
@@ -5989,11 +6147,11 @@ func (m *RBDVolumeSource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x3a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.SecretRef.Size()))
-		n121, err := m.SecretRef.MarshalTo(data[i:])
+		n124, err := m.SecretRef.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n121
+		i += n124
 	}
 	data[i] = 0x40
 	i++
@@ -6024,11 +6182,11 @@ func (m *RangeAllocation) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n122, err := m.ObjectMeta.MarshalTo(data[i:])
+	n125, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n122
+	i += n125
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.Range)))
@@ -6060,27 +6218,27 @@ func (m *ReplicationController) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n123, err := m.ObjectMeta.MarshalTo(data[i:])
+	n126, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n123
+	i += n126
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n124, err := m.Spec.MarshalTo(data[i:])
+	n127, err := m.Spec.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n124
+	i += n127
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n125, err := m.Status.MarshalTo(data[i:])
+	n128, err := m.Status.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n125
+	i += n128
 	return i, nil
 }
 
@@ -6102,11 +6260,11 @@ func (m *ReplicationControllerList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n126, err := m.ListMeta.MarshalTo(data[i:])
+	n129, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n126
+	i += n129
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -6163,11 +6321,11 @@ func (m *ReplicationControllerSpec) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Template.Size()))
-		n127, err := m.Template.MarshalTo(data[i:])
+		n130, err := m.Template.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n127
+		i += n130
 	}
 	return i, nil
 }
@@ -6217,27 +6375,27 @@ func (m *ResourceQuota) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n128, err := m.ObjectMeta.MarshalTo(data[i:])
+	n131, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n128
+	i += n131
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n129, err := m.Spec.MarshalTo(data[i:])
+	n132, err := m.Spec.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n129
+	i += n132
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n130, err := m.Status.MarshalTo(data[i:])
+	n133, err := m.Status.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n130
+	i += n133
 	return i, nil
 }
 
@@ -6259,11 +6417,11 @@ func (m *ResourceQuotaList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n131, err := m.ListMeta.MarshalTo(data[i:])
+	n134, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n131
+	i += n134
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -6309,11 +6467,11 @@ func (m *ResourceQuotaSpec) MarshalTo(data []byte) (int, error) {
 			data[i] = 0x12
 			i++
 			i = encodeVarintGenerated(data, i, uint64((&v).Size()))
-			n132, err := (&v).MarshalTo(data[i:])
+			n135, err := (&v).MarshalTo(data[i:])
 			if err != nil {
 				return 0, err
 			}
-			i += n132
+			i += n135
 		}
 	}
 	if len(m.Scopes) > 0 {
@@ -6364,11 +6522,11 @@ func (m *ResourceQuotaStatus) MarshalTo(data []byte) (int, error) {
 			data[i] = 0x12
 			i++
 			i = encodeVarintGenerated(data, i, uint64((&v).Size()))
-			n133, err := (&v).MarshalTo(data[i:])
+			n136, err := (&v).MarshalTo(data[i:])
 			if err != nil {
 				return 0, err
 			}
-			i += n133
+			i += n136
 		}
 	}
 	if len(m.Used) > 0 {
@@ -6386,11 +6544,11 @@ func (m *ResourceQuotaStatus) MarshalTo(data []byte) (int, error) {
 			data[i] = 0x12
 			i++
 			i = encodeVarintGenerated(data, i, uint64((&v).Size()))
-			n134, err := (&v).MarshalTo(data[i:])
+			n137, err := (&v).MarshalTo(data[i:])
 			if err != nil {
 				return 0, err
 			}
-			i += n134
+			i += n137
 		}
 	}
 	return i, nil
@@ -6426,11 +6584,11 @@ func (m *ResourceRequirements) MarshalTo(data []byte) (int, error) {
 			data[i] = 0x12
 			i++
 			i = encodeVarintGenerated(data, i, uint64((&v).Size()))
-			n135, err := (&v).MarshalTo(data[i:])
+			n138, err := (&v).MarshalTo(data[i:])
 			if err != nil {
 				return 0, err
 			}
-			i += n135
+			i += n138
 		}
 	}
 	if len(m.Requests) > 0 {
@@ -6448,11 +6606,11 @@ func (m *ResourceRequirements) MarshalTo(data []byte) (int, error) {
 			data[i] = 0x12
 			i++
 			i = encodeVarintGenerated(data, i, uint64((&v).Size()))
-			n136, err := (&v).MarshalTo(data[i:])
+			n139, err := (&v).MarshalTo(data[i:])
 			if err != nil {
 				return 0, err
 			}
-			i += n136
+			i += n139
 		}
 	}
 	return i, nil
@@ -6510,11 +6668,11 @@ func (m *Secret) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n137, err := m.ObjectMeta.MarshalTo(data[i:])
+	n140, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n137
+	i += n140
 	if len(m.Data) > 0 {
 		for k := range m.Data {
 			data[i] = 0x12
@@ -6557,11 +6715,11 @@ func (m *SecretKeySelector) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.LocalObjectReference.Size()))
-	n138, err := m.LocalObjectReference.MarshalTo(data[i:])
+	n141, err := m.LocalObjectReference.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n138
+	i += n141
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.Key)))
@@ -6587,11 +6745,11 @@ func (m *SecretList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n139, err := m.ListMeta.MarshalTo(data[i:])
+	n142, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n139
+	i += n142
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -6648,11 +6806,11 @@ func (m *SecurityContext) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Capabilities.Size()))
-		n140, err := m.Capabilities.MarshalTo(data[i:])
+		n143, err := m.Capabilities.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n140
+		i += n143
 	}
 	if m.Privileged != nil {
 		data[i] = 0x10
@@ -6668,11 +6826,11 @@ func (m *SecurityContext) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.SELinuxOptions.Size()))
-		n141, err := m.SELinuxOptions.MarshalTo(data[i:])
+		n144, err := m.SELinuxOptions.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n141
+		i += n144
 	}
 	if m.RunAsUser != nil {
 		data[i] = 0x20
@@ -6720,11 +6878,11 @@ func (m *SerializedReference) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Reference.Size()))
-	n142, err := m.Reference.MarshalTo(data[i:])
+	n145, err := m.Reference.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n142
+	i += n145
 	return i, nil
 }
 
@@ -6746,27 +6904,27 @@ func (m *Service) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n143, err := m.ObjectMeta.MarshalTo(data[i:])
+	n146, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n143
+	i += n146
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n144, err := m.Spec.MarshalTo(data[i:])
+	n147, err := m.Spec.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n144
+	i += n147
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n145, err := m.Status.MarshalTo(data[i:])
+	n148, err := m.Status.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n145
+	i += n148
 	return i, nil
 }
 
@@ -6788,11 +6946,11 @@ func (m *ServiceAccount) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n146, err := m.ObjectMeta.MarshalTo(data[i:])
+	n149, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n146
+	i += n149
 	if len(m.Secrets) > 0 {
 		for _, msg := range m.Secrets {
 			data[i] = 0x12
@@ -6838,11 +6996,11 @@ func (m *ServiceAccountList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n147, err := m.ListMeta.MarshalTo(data[i:])
+	n150, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n147
+	i += n150
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -6876,11 +7034,11 @@ func (m *ServiceList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n148, err := m.ListMeta.MarshalTo(data[i:])
+	n151, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n148
+	i += n151
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -6925,11 +7083,11 @@ func (m *ServicePort) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x22
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.TargetPort.Size()))
-	n149, err := m.TargetPort.MarshalTo(data[i:])
+	n152, err := m.TargetPort.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n149
+	i += n152
 	data[i] = 0x28
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.NodePort))
@@ -7069,11 +7227,11 @@ func (m *ServiceStatus) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.LoadBalancer.Size()))
-	n150, err := m.LoadBalancer.MarshalTo(data[i:])
+	n153, err := m.LoadBalancer.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n150
+	i += n153
 	return i, nil
 }
 
@@ -7095,11 +7253,11 @@ func (m *TCPSocketAction) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Port.Size()))
-	n151, err := m.Port.MarshalTo(data[i:])
+	n154, err := m.Port.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n151
+	i += n154
 	return i, nil
 }
 
@@ -7125,11 +7283,11 @@ func (m *Volume) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.VolumeSource.Size()))
-	n152, err := m.VolumeSource.MarshalTo(data[i:])
+	n155, err := m.VolumeSource.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n152
+	i += n155
 	return i, nil
 }
 
@@ -7190,151 +7348,151 @@ func (m *VolumeSource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0xa
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.HostPath.Size()))
-		n153, err := m.HostPath.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n153
-	}
-	if m.EmptyDir != nil {
-		data[i] = 0x12
-		i++
-		i = encodeVarintGenerated(data, i, uint64(m.EmptyDir.Size()))
-		n154, err := m.EmptyDir.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n154
-	}
-	if m.GCEPersistentDisk != nil {
-		data[i] = 0x1a
-		i++
-		i = encodeVarintGenerated(data, i, uint64(m.GCEPersistentDisk.Size()))
-		n155, err := m.GCEPersistentDisk.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n155
-	}
-	if m.AWSElasticBlockStore != nil {
-		data[i] = 0x22
-		i++
-		i = encodeVarintGenerated(data, i, uint64(m.AWSElasticBlockStore.Size()))
-		n156, err := m.AWSElasticBlockStore.MarshalTo(data[i:])
+		n156, err := m.HostPath.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n156
 	}
-	if m.GitRepo != nil {
-		data[i] = 0x2a
+	if m.EmptyDir != nil {
+		data[i] = 0x12
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.GitRepo.Size()))
-		n157, err := m.GitRepo.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.EmptyDir.Size()))
+		n157, err := m.EmptyDir.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n157
 	}
-	if m.Secret != nil {
-		data[i] = 0x32
+	if m.GCEPersistentDisk != nil {
+		data[i] = 0x1a
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Secret.Size()))
-		n158, err := m.Secret.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.GCEPersistentDisk.Size()))
+		n158, err := m.GCEPersistentDisk.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n158
 	}
-	if m.NFS != nil {
-		data[i] = 0x3a
+	if m.AWSElasticBlockStore != nil {
+		data[i] = 0x22
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.NFS.Size()))
-		n159, err := m.NFS.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.AWSElasticBlockStore.Size()))
+		n159, err := m.AWSElasticBlockStore.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n159
 	}
-	if m.ISCSI != nil {
-		data[i] = 0x42
+	if m.GitRepo != nil {
+		data[i] = 0x2a
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.ISCSI.Size()))
-		n160, err := m.ISCSI.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.GitRepo.Size()))
+		n160, err := m.GitRepo.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n160
 	}
-	if m.Glusterfs != nil {
-		data[i] = 0x4a
+	if m.Secret != nil {
+		data[i] = 0x32
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Glusterfs.Size()))
-		n161, err := m.Glusterfs.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.Secret.Size()))
+		n161, err := m.Secret.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n161
 	}
-	if m.PersistentVolumeClaim != nil {
-		data[i] = 0x52
+	if m.NFS != nil {
+		data[i] = 0x3a
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.PersistentVolumeClaim.Size()))
-		n162, err := m.PersistentVolumeClaim.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.NFS.Size()))
+		n162, err := m.NFS.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n162
 	}
-	if m.RBD != nil {
-		data[i] = 0x5a
+	if m.ISCSI != nil {
+		data[i] = 0x42
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.RBD.Size()))
-		n163, err := m.RBD.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.ISCSI.Size()))
+		n163, err := m.ISCSI.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n163
 	}
-	if m.FlexVolume != nil {
-		data[i] = 0x62
+	if m.Glusterfs != nil {
+		data[i] = 0x4a
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.FlexVolume.Size()))
-		n164, err := m.FlexVolume.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.Glusterfs.Size()))
+		n164, err := m.Glusterfs.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n164
 	}
-	if m.Cinder != nil {
-		data[i] = 0x6a
+	if m.PersistentVolumeClaim != nil {
+		data[i] = 0x52
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Cinder.Size()))
-		n165, err := m.Cinder.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.PersistentVolumeClaim.Size()))
+		n165, err := m.PersistentVolumeClaim.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n165
 	}
-	if m.CephFS != nil {
-		data[i] = 0x72
+	if m.RBD != nil {
+		data[i] = 0x5a
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.CephFS.Size()))
-		n166, err := m.CephFS.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.RBD.Size()))
+		n166, err := m.RBD.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n166
 	}
-	if m.Flocker != nil {
-		data[i] = 0x7a
+	if m.FlexVolume != nil {
+		data[i] = 0x62
 		i++
-		i = encodeVarintGenerated(data, i, uint64(m.Flocker.Size()))
-		n167, err := m.Flocker.MarshalTo(data[i:])
+		i = encodeVarintGenerated(data, i, uint64(m.FlexVolume.Size()))
+		n167, err := m.FlexVolume.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n167
+	}
+	if m.Cinder != nil {
+		data[i] = 0x6a
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.Cinder.Size()))
+		n168, err := m.Cinder.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n168
+	}
+	if m.CephFS != nil {
+		data[i] = 0x72
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.CephFS.Size()))
+		n169, err := m.CephFS.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n169
+	}
+	if m.Flocker != nil {
+		data[i] = 0x7a
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.Flocker.Size()))
+		n170, err := m.Flocker.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n170
 	}
 	if m.DownwardAPI != nil {
 		data[i] = 0x82
@@ -7342,11 +7500,11 @@ func (m *VolumeSource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.DownwardAPI.Size()))
-		n168, err := m.DownwardAPI.MarshalTo(data[i:])
+		n171, err := m.DownwardAPI.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n168
+		i += n171
 	}
 	if m.FC != nil {
 		data[i] = 0x8a
@@ -7354,11 +7512,11 @@ func (m *VolumeSource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.FC.Size()))
-		n169, err := m.FC.MarshalTo(data[i:])
+		n172, err := m.FC.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n169
+		i += n172
 	}
 	if m.AzureFile != nil {
 		data[i] = 0x92
@@ -7366,11 +7524,11 @@ func (m *VolumeSource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.AzureFile.Size()))
-		n170, err := m.AzureFile.MarshalTo(data[i:])
+		n173, err := m.AzureFile.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n170
+		i += n173
 	}
 	if m.ConfigMap != nil {
 		data[i] = 0x9a
@@ -7378,11 +7536,11 @@ func (m *VolumeSource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.ConfigMap.Size()))
-		n171, err := m.ConfigMap.MarshalTo(data[i:])
+		n174, err := m.ConfigMap.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n171
+		i += n174
 	}
 	return i, nil
 }
@@ -7408,11 +7566,11 @@ func (m *WeightedPodAffinityTerm) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.PodAffinityTerm.Size()))
-	n172, err := m.PodAffinityTerm.MarshalTo(data[i:])
+	n175, err := m.PodAffinityTerm.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n172
+	i += n175
 	return i, nil
 }
 
@@ -7469,6 +7627,18 @@ func (m *Affinity) Size() (n int) {
 	if m.PodAntiAffinity != nil {
 		l = m.PodAntiAffinity.Size()
 		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *AvoidPods) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.PreferAvoidPods) > 0 {
+		for _, e := range m.PreferAvoidPods {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
 	}
 	return n
 }
@@ -9029,6 +9199,20 @@ func (m *PodCondition) Size() (n int) {
 	return n
 }
 
+func (m *PodController) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Kind)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Namespace)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.APIVersion)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *PodExecOptions) Size() (n int) {
 	var l int
 	_ = l
@@ -9113,6 +9297,16 @@ func (m *PodSecurityContext) Size() (n int) {
 	}
 	if m.FSGroup != nil {
 		n += 1 + sovGenerated(uint64(*m.FSGroup))
+	}
+	return n
+}
+
+func (m *PodSignature) Size() (n int) {
+	var l int
+	_ = l
+	if m.PodController != nil {
+		l = m.PodController.Size()
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -9259,6 +9453,20 @@ func (m *Preconditions) Size() (n int) {
 		l = len(*m.UID)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	return n
+}
+
+func (m *PreferAvoidPodsEntry) Size() (n int) {
+	var l int
+	_ = l
+	l = m.PodSignature.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.EvictionTime.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Reason)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Message)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -10111,6 +10319,87 @@ func (m *Affinity) Unmarshal(data []byte) error {
 				m.PodAntiAffinity = &PodAntiAffinity{}
 			}
 			if err := m.PodAntiAffinity.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AvoidPods) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AvoidPods: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AvoidPods: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PreferAvoidPods", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PreferAvoidPods = append(m.PreferAvoidPods, PreferAvoidPodsEntry{})
+			if err := m.PreferAvoidPods[len(m.PreferAvoidPods)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -25374,6 +25663,172 @@ func (m *PodCondition) Unmarshal(data []byte) error {
 	}
 	return nil
 }
+func (m *PodController) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodController: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodController: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Kind", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Kind = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Namespace", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Namespace = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field APIVersion", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.APIVersion = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *PodExecOptions) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
@@ -26127,6 +26582,89 @@ func (m *PodSecurityContext) Unmarshal(data []byte) error {
 				}
 			}
 			m.FSGroup = &v
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PodSignature) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodSignature: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodSignature: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodController", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PodController == nil {
+				m.PodController = &PodController{}
+			}
+			if err := m.PodController.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
@@ -27527,6 +28065,174 @@ func (m *Preconditions) Unmarshal(data []byte) error {
 			}
 			s := k8s_io_kubernetes_pkg_types.UID(data[iNdEx:postIndex])
 			m.UID = &s
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PreferAvoidPodsEntry) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PreferAvoidPodsEntry: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PreferAvoidPodsEntry: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodSignature", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.PodSignature.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvictionTime", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.EvictionTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Reason = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Message = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

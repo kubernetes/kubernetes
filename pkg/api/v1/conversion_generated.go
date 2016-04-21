@@ -35,6 +35,8 @@ func init() {
 		Convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
 		Convert_v1_Affinity_To_api_Affinity,
 		Convert_api_Affinity_To_v1_Affinity,
+		Convert_v1_AvoidPods_To_api_AvoidPods,
+		Convert_api_AvoidPods_To_v1_AvoidPods,
 		Convert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource,
 		Convert_api_AzureFileVolumeSource_To_v1_AzureFileVolumeSource,
 		Convert_v1_Binding_To_api_Binding,
@@ -229,6 +231,8 @@ func init() {
 		Convert_api_PodAttachOptions_To_v1_PodAttachOptions,
 		Convert_v1_PodCondition_To_api_PodCondition,
 		Convert_api_PodCondition_To_v1_PodCondition,
+		Convert_v1_PodController_To_api_PodController,
+		Convert_api_PodController_To_v1_PodController,
 		Convert_v1_PodExecOptions_To_api_PodExecOptions,
 		Convert_api_PodExecOptions_To_v1_PodExecOptions,
 		Convert_v1_PodList_To_api_PodList,
@@ -239,6 +243,8 @@ func init() {
 		Convert_api_PodProxyOptions_To_v1_PodProxyOptions,
 		Convert_v1_PodSecurityContext_To_api_PodSecurityContext,
 		Convert_api_PodSecurityContext_To_v1_PodSecurityContext,
+		Convert_v1_PodSignature_To_api_PodSignature,
+		Convert_api_PodSignature_To_v1_PodSignature,
 		Convert_v1_PodSpec_To_api_PodSpec,
 		Convert_api_PodSpec_To_v1_PodSpec,
 		Convert_v1_PodStatus_To_api_PodStatus,
@@ -253,6 +259,8 @@ func init() {
 		Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec,
 		Convert_v1_Preconditions_To_api_Preconditions,
 		Convert_api_Preconditions_To_v1_Preconditions,
+		Convert_v1_PreferAvoidPodsEntry_To_api_PreferAvoidPodsEntry,
+		Convert_api_PreferAvoidPodsEntry_To_v1_PreferAvoidPodsEntry,
 		Convert_v1_PreferredSchedulingTerm_To_api_PreferredSchedulingTerm,
 		Convert_api_PreferredSchedulingTerm_To_v1_PreferredSchedulingTerm,
 		Convert_v1_Probe_To_api_Probe,
@@ -417,6 +425,44 @@ func autoConvert_api_Affinity_To_v1_Affinity(in *api.Affinity, out *Affinity, s 
 
 func Convert_api_Affinity_To_v1_Affinity(in *api.Affinity, out *Affinity, s conversion.Scope) error {
 	return autoConvert_api_Affinity_To_v1_Affinity(in, out, s)
+}
+
+func autoConvert_v1_AvoidPods_To_api_AvoidPods(in *AvoidPods, out *api.AvoidPods, s conversion.Scope) error {
+	if in.PreferAvoidPods != nil {
+		in, out := &in.PreferAvoidPods, &out.PreferAvoidPods
+		*out = make([]api.PreferAvoidPodsEntry, len(*in))
+		for i := range *in {
+			if err := Convert_v1_PreferAvoidPodsEntry_To_api_PreferAvoidPodsEntry(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferAvoidPods = nil
+	}
+	return nil
+}
+
+func Convert_v1_AvoidPods_To_api_AvoidPods(in *AvoidPods, out *api.AvoidPods, s conversion.Scope) error {
+	return autoConvert_v1_AvoidPods_To_api_AvoidPods(in, out, s)
+}
+
+func autoConvert_api_AvoidPods_To_v1_AvoidPods(in *api.AvoidPods, out *AvoidPods, s conversion.Scope) error {
+	if in.PreferAvoidPods != nil {
+		in, out := &in.PreferAvoidPods, &out.PreferAvoidPods
+		*out = make([]PreferAvoidPodsEntry, len(*in))
+		for i := range *in {
+			if err := Convert_api_PreferAvoidPodsEntry_To_v1_PreferAvoidPodsEntry(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferAvoidPods = nil
+	}
+	return nil
+}
+
+func Convert_api_AvoidPods_To_v1_AvoidPods(in *api.AvoidPods, out *AvoidPods, s conversion.Scope) error {
+	return autoConvert_api_AvoidPods_To_v1_AvoidPods(in, out, s)
 }
 
 func autoConvert_v1_AzureFileVolumeSource_To_api_AzureFileVolumeSource(in *AzureFileVolumeSource, out *api.AzureFileVolumeSource, s conversion.Scope) error {
@@ -4744,6 +4790,30 @@ func Convert_api_PodCondition_To_v1_PodCondition(in *api.PodCondition, out *PodC
 	return autoConvert_api_PodCondition_To_v1_PodCondition(in, out, s)
 }
 
+func autoConvert_v1_PodController_To_api_PodController(in *PodController, out *api.PodController, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	out.APIVersion = in.APIVersion
+	return nil
+}
+
+func Convert_v1_PodController_To_api_PodController(in *PodController, out *api.PodController, s conversion.Scope) error {
+	return autoConvert_v1_PodController_To_api_PodController(in, out, s)
+}
+
+func autoConvert_api_PodController_To_v1_PodController(in *api.PodController, out *PodController, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	out.APIVersion = in.APIVersion
+	return nil
+}
+
+func Convert_api_PodController_To_v1_PodController(in *api.PodController, out *PodController, s conversion.Scope) error {
+	return autoConvert_api_PodController_To_v1_PodController(in, out, s)
+}
+
 func autoConvert_v1_PodExecOptions_To_api_PodExecOptions(in *PodExecOptions, out *api.PodExecOptions, s conversion.Scope) error {
 	SetDefaults_PodExecOptions(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
@@ -4994,6 +5064,40 @@ func autoConvert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurity
 		out.FSGroup = nil
 	}
 	return nil
+}
+
+func autoConvert_v1_PodSignature_To_api_PodSignature(in *PodSignature, out *api.PodSignature, s conversion.Scope) error {
+	if in.PodController != nil {
+		in, out := &in.PodController, &out.PodController
+		*out = new(api.PodController)
+		if err := Convert_v1_PodController_To_api_PodController(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodController = nil
+	}
+	return nil
+}
+
+func Convert_v1_PodSignature_To_api_PodSignature(in *PodSignature, out *api.PodSignature, s conversion.Scope) error {
+	return autoConvert_v1_PodSignature_To_api_PodSignature(in, out, s)
+}
+
+func autoConvert_api_PodSignature_To_v1_PodSignature(in *api.PodSignature, out *PodSignature, s conversion.Scope) error {
+	if in.PodController != nil {
+		in, out := &in.PodController, &out.PodController
+		*out = new(PodController)
+		if err := Convert_api_PodController_To_v1_PodController(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodController = nil
+	}
+	return nil
+}
+
+func Convert_api_PodSignature_To_v1_PodSignature(in *api.PodSignature, out *PodSignature, s conversion.Scope) error {
+	return autoConvert_api_PodSignature_To_v1_PodSignature(in, out, s)
 }
 
 func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversion.Scope) error {
@@ -5333,6 +5437,38 @@ func autoConvert_api_Preconditions_To_v1_Preconditions(in *api.Preconditions, ou
 
 func Convert_api_Preconditions_To_v1_Preconditions(in *api.Preconditions, out *Preconditions, s conversion.Scope) error {
 	return autoConvert_api_Preconditions_To_v1_Preconditions(in, out, s)
+}
+
+func autoConvert_v1_PreferAvoidPodsEntry_To_api_PreferAvoidPodsEntry(in *PreferAvoidPodsEntry, out *api.PreferAvoidPodsEntry, s conversion.Scope) error {
+	if err := Convert_v1_PodSignature_To_api_PodSignature(&in.PodSignature, &out.PodSignature, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.EvictionTime, &out.EvictionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_v1_PreferAvoidPodsEntry_To_api_PreferAvoidPodsEntry(in *PreferAvoidPodsEntry, out *api.PreferAvoidPodsEntry, s conversion.Scope) error {
+	return autoConvert_v1_PreferAvoidPodsEntry_To_api_PreferAvoidPodsEntry(in, out, s)
+}
+
+func autoConvert_api_PreferAvoidPodsEntry_To_v1_PreferAvoidPodsEntry(in *api.PreferAvoidPodsEntry, out *PreferAvoidPodsEntry, s conversion.Scope) error {
+	if err := Convert_api_PodSignature_To_v1_PodSignature(&in.PodSignature, &out.PodSignature, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.EvictionTime, &out.EvictionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_api_PreferAvoidPodsEntry_To_v1_PreferAvoidPodsEntry(in *api.PreferAvoidPodsEntry, out *PreferAvoidPodsEntry, s conversion.Scope) error {
+	return autoConvert_api_PreferAvoidPodsEntry_To_v1_PreferAvoidPodsEntry(in, out, s)
 }
 
 func autoConvert_v1_PreferredSchedulingTerm_To_api_PreferredSchedulingTerm(in *PreferredSchedulingTerm, out *api.PreferredSchedulingTerm, s conversion.Scope) error {

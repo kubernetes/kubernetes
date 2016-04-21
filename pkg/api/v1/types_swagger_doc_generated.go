@@ -50,6 +50,15 @@ func (Affinity) SwaggerDoc() map[string]string {
 	return map_Affinity
 }
 
+var map_AvoidPods = map[string]string{
+	"":                "AvoidPods desribes pods that should avoid this node. This is the value for a Node annotation with key scheduler.alpha.kubernetes.io/preferAvoidPods and will eventually become a field of NodeStatus.",
+	"preferAvoidPods": "Bounded-sized list of signatures of pods that should avoid this node, sorted in timestamp order from oldest to newest. Size of the slice is unspecified.",
+}
+
+func (AvoidPods) SwaggerDoc() map[string]string {
+	return map_AvoidPods
+}
+
 var map_AzureFileVolumeSource = map[string]string{
 	"":           "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"secretName": "the name of secret that contains Azure Storage Account Name and Key",
@@ -1146,6 +1155,18 @@ func (PodCondition) SwaggerDoc() map[string]string {
 	return map_PodCondition
 }
 
+var map_PodController = map[string]string{
+	"":           "PodController contains enough information to let you inspect or modify the referred controller.",
+	"kind":       "Kind of the controller.",
+	"namespace":  "Namespace of the controller.",
+	"name":       "Name of the controller.",
+	"apiversion": "API version of the controller.",
+}
+
+func (PodController) SwaggerDoc() map[string]string {
+	return map_PodController
+}
+
 var map_PodExecOptions = map[string]string{
 	"":          "PodExecOptions is the query options to a Pod's remote exec call.",
 	"stdin":     "Redirect the standard input stream of the pod for this call. Defaults to false.",
@@ -1206,6 +1227,15 @@ var map_PodSecurityContext = map[string]string{
 
 func (PodSecurityContext) SwaggerDoc() map[string]string {
 	return map_PodSecurityContext
+}
+
+var map_PodSignature = map[string]string{
+	"":              "Describes the class of pods that should avoid this node. Exactly one field should be set.",
+	"podController": "Reference to controller whose pods should avoid this node.",
+}
+
+func (PodSignature) SwaggerDoc() map[string]string {
+	return map_PodSignature
 }
 
 var map_PodSpec = map[string]string{
@@ -1296,6 +1326,18 @@ var map_Preconditions = map[string]string{
 
 func (Preconditions) SwaggerDoc() map[string]string {
 	return map_Preconditions
+}
+
+var map_PreferAvoidPodsEntry = map[string]string{
+	"":             "Describes a class of pods that should avoid this node.",
+	"podSignature": "The class of pods.",
+	"evictionTime": "Time at which this entry was added to the list.",
+	"reason":       "(brief) reason why this entry was added to the list.",
+	"message":      "Human readable message indicating why this entry was added to the list.",
+}
+
+func (PreferAvoidPodsEntry) SwaggerDoc() map[string]string {
+	return map_PreferAvoidPodsEntry
 }
 
 var map_PreferredSchedulingTerm = map[string]string{

@@ -71,6 +71,15 @@ message Affinity {
   optional PodAntiAffinity podAntiAffinity = 3;
 }
 
+// AvoidPods desribes pods that should avoid this node. This is the value for a
+// Node annotation with key scheduler.alpha.kubernetes.io/preferAvoidPods and
+// will eventually become a field of NodeStatus.
+message AvoidPods {
+  // Bounded-sized list of signatures of pods that should avoid this node, sorted
+  // in timestamp order from oldest to newest. Size of the slice is unspecified.
+  repeated PreferAvoidPodsEntry preferAvoidPods = 1;
+}
+
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
   // the name of secret that contains Azure Storage Account Name and Key
@@ -1874,6 +1883,21 @@ message PodCondition {
   optional string message = 6;
 }
 
+// PodController contains enough information to let you inspect or modify the referred controller.
+message PodController {
+  // Kind of the controller.
+  optional string kind = 1;
+
+  // Namespace of the controller.
+  optional string namespace = 2;
+
+  // Name of the controller.
+  optional string name = 3;
+
+  // API version of the controller.
+  optional string apiversion = 4;
+}
+
 // PodExecOptions is the query options to a Pod's remote exec call.
 // ---
 // TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
@@ -1998,6 +2022,13 @@ message PodSecurityContext {
   // 
   // If unset, the Kubelet will not modify the ownership and permissions of any volume.
   optional int64 fsGroup = 5;
+}
+
+// Describes the class of pods that should avoid this node.
+// Exactly one field should be set.
+message PodSignature {
+  // Reference to controller whose pods should avoid this node.
+  optional PodController podController = 1;
 }
 
 // PodSpec is a description of a pod.
@@ -2173,6 +2204,21 @@ message PodTemplateSpec {
 message Preconditions {
   // Specifies the target UID.
   optional string uid = 1;
+}
+
+// Describes a class of pods that should avoid this node.
+message PreferAvoidPodsEntry {
+  // The class of pods.
+  optional PodSignature podSignature = 1;
+
+  // Time at which this entry was added to the list.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time evictionTime = 2;
+
+  // (brief) reason why this entry was added to the list.
+  optional string reason = 3;
+
+  // Human readable message indicating why this entry was added to the list.
+  optional string message = 4;
 }
 
 // An empty preferred scheduling term matches all objects with implicit weight 0
