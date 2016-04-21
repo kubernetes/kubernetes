@@ -973,13 +973,12 @@ func testThirdPartyDiscovery(t *testing.T, version string) {
 	assert.Equal(group.APIVersion, "v1")
 	assert.Equal(group.Kind, "APIGroup")
 	assert.Equal(group.Name, "company.com")
-	assert.Equal(group.Versions, []unversioned.GroupVersionForDiscovery{
-		{
-			GroupVersion: "company.com/" + version,
-			Version:      version,
-		},
-	})
-	assert.Equal(group.PreferredVersion, unversioned.GroupVersionForDiscovery{})
+	expectedVersion := unversioned.GroupVersionForDiscovery{
+		GroupVersion: "company.com/" + version,
+		Version:      version,
+	}
+	assert.Equal(group.Versions, []unversioned.GroupVersionForDiscovery{expectedVersion})
+	assert.Equal(group.PreferredVersion, expectedVersion)
 
 	resp, err = http.Get(server.URL + "/apis/company.com/" + version)
 	if !assert.NoError(err) {
