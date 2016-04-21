@@ -46567,14 +46567,13 @@ func (x *ConfigMapList) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[0] = true
-			yyq2[1] = len(x.Items) != 0
 			yyq2[2] = x.Kind != ""
 			yyq2[3] = x.APIVersion != ""
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn2 = 0
+				yynn2 = 1
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -46614,34 +46613,28 @@ func (x *ConfigMapList) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2[1] {
-					if x.Items == nil {
-						r.EncodeNil()
-					} else {
-						yym9 := z.EncBinary()
-						_ = yym9
-						if false {
-						} else {
-							h.encSliceConfigMap(([]ConfigMap)(x.Items), e)
-						}
-					}
-				} else {
+				if x.Items == nil {
 					r.EncodeNil()
+				} else {
+					yym9 := z.EncBinary()
+					_ = yym9
+					if false {
+					} else {
+						h.encSliceConfigMap(([]ConfigMap)(x.Items), e)
+					}
 				}
 			} else {
-				if yyq2[1] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("items"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.Items == nil {
-						r.EncodeNil()
+				z.EncSendContainerState(codecSelfer_containerMapKey1234)
+				r.EncodeString(codecSelferC_UTF81234, string("items"))
+				z.EncSendContainerState(codecSelfer_containerMapValue1234)
+				if x.Items == nil {
+					r.EncodeNil()
+				} else {
+					yym10 := z.EncBinary()
+					_ = yym10
+					if false {
 					} else {
-						yym10 := z.EncBinary()
-						_ = yym10
-						if false {
-						} else {
-							h.encSliceConfigMap(([]ConfigMap)(x.Items), e)
-						}
+						h.encSliceConfigMap(([]ConfigMap)(x.Items), e)
 					}
 				}
 			}
