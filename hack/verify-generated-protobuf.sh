@@ -19,11 +19,24 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/build/common.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/go-to-protobuf cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
+function prereqs() {
+  kube::build::ensure_docker_in_path || return 1
+  if kube::build::is_osx; then
+      kube::build::docker_available_on_osx || return 1
+  fi
+  kube::build::ensure_docker_daemon_connectivity || return 1
+}
+
+if ! prereqs; then
+  echo "Verifying protobuf requires a connection to a Docker daemon"
+  echo
+  echo "WARNING: Protobuf changes are not being verified"
+  exit 0
+fi
 
 "${KUBE_ROOT}/hack/after-build/verify-generated-protobuf.sh" "$@"
 
