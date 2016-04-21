@@ -19,14 +19,25 @@ package testing
 import (
 	"errors"
 	"os"
+	"time"
 )
 
 // FakeOS mocks out certain OS calls to avoid perturbing the filesystem
-// on the test machine.
 // If a member of the form `*Fn` is set, that function will be called in place
 // of the real call.
 type FakeOS struct {
-	StatFn func(string) (os.FileInfo, error)
+	StatFn    func(string) (os.FileInfo, error)
+	ReadDirFn func(string) ([]os.FileInfo, error)
+	HostName  string
+	Removes   []string
+	Files     map[string][]*os.FileInfo
+}
+
+func NewFakeOS() *FakeOS {
+	return &FakeOS{
+		Removes: []string{},
+		Files:   make(map[string][]*os.FileInfo),
+	}
 }
 
 // Mkdir is a fake call that just returns nil.
@@ -43,6 +54,40 @@ func (FakeOS) Symlink(oldname string, newname string) error {
 func (f FakeOS) Stat(path string) (os.FileInfo, error) {
 	if f.StatFn != nil {
 		return f.StatFn(path)
+	}
+	return nil, errors.New("unimplemented testing mock")
+}
+
+// Remove is a fake call that returns nil.
+func (f *FakeOS) Remove(path string) error {
+	f.Removes = append(f.Removes, path)
+	return nil
+}
+
+// Create is a fake call that returns nil.
+func (FakeOS) Create(path string) (*os.File, error) {
+	return nil, nil
+}
+
+// Hostname is a fake call that returns nil.
+func (f *FakeOS) Hostname() (name string, err error) {
+	return f.HostName, nil
+}
+
+// Chtimes is a fake call that returns nil.
+func (FakeOS) Chtimes(path string, atime time.Time, mtime time.Time) error {
+	return nil
+}
+
+// Pipe is a fake call that returns nil.
+func (FakeOS) Pipe() (r *os.File, w *os.File, err error) {
+	return nil, nil, nil
+}
+
+// ReadDir is a fake call that returns the files under the directory.
+func (f *FakeOS) ReadDir(dirname string) ([]os.FileInfo, error) {
+	if f.ReadDirFn != nil {
+		return f.ReadDirFn(dirname)
 	}
 	return nil, errors.New("unimplemented testing mock")
 }

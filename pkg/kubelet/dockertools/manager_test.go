@@ -115,7 +115,7 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 		&cadvisorapi.MachineInfo{},
 		options.GetDefaultPodInfraContainerImage(),
 		0, 0, "",
-		containertest.FakeOS{},
+		&containertest.FakeOS{},
 		networkPlugin,
 		&fakeRuntimeHelper{},
 		fakeHTTPClient,

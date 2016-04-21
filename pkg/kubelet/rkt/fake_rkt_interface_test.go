@@ -19,16 +19,16 @@ package rkt
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
-
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
 
 	"github.com/coreos/go-systemd/dbus"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // fakeRktInterface mocks the rktapi.PublicAPIClient interface for testing purpose.
@@ -147,6 +147,14 @@ func (f *fakeSystemd) Reload() error {
 	return fmt.Errorf("Not implemented")
 }
 
+func (f *fakeSystemd) ResetFailed() error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.called = append(f.called, "ResetFailed")
+	return f.err
+}
+
 // fakeRuntimeHelper implementes kubecontainer.RuntimeHelper interfaces for testing purpose.
 type fakeRuntimeHelper struct {
 	dnsServers  []string
@@ -170,4 +178,45 @@ func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, 
 
 func (f *fakeRuntimeHelper) GetPodDir(podUID types.UID) string {
 	return "/poddir/" + string(podUID)
+}
+
+type fakeRktCli struct {
+	sync.Mutex
+	cmds   []string
+	result []string
+	err    error
+}
+
+func newFakeRktCli() *fakeRktCli {
+	return &fakeRktCli{
+		cmds:   []string{},
+		result: []string{},
+	}
+}
+
+func (f *fakeRktCli) RunCommand(args ...string) (result []string, err error) {
+	f.Lock()
+	defer f.Unlock()
+	cmd := append([]string{"rkt"}, args...)
+	f.cmds = append(f.cmds, strings.Join(cmd, " "))
+	return f.result, f.err
+}
+
+func (f *fakeRktCli) Reset() {
+	f.cmds = []string{}
+	f.result = []string{}
+	f.err = nil
+}
+
+type fakePodGetter struct {
+	pods map[types.UID]*api.Pod
+}
+
+func newFakePodGetter() *fakePodGetter {
+	return &fakePodGetter{pods: make(map[types.UID]*api.Pod)}
+}
+
+func (f fakePodGetter) GetPodByUID(uid types.UID) (*api.Pod, bool) {
+	p, found := f.pods[uid]
+	return p, found
 }

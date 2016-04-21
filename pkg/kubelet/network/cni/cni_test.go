@@ -154,7 +154,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 		&cadvisorapi.MachineInfo{},
 		options.GetDefaultPodInfraContainerImage(),
 		0, 0, "",
-		containertest.FakeOS{},
+		&containertest.FakeOS{},
 		networkPlugin,
 		nil,
 		nil,
