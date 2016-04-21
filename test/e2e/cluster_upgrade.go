@@ -265,11 +265,11 @@ func testServiceRemainsUp(f *framework.Framework, sem *chaosmonkey.Semaphore) {
 	testService(f, sem, true)
 }
 
-// testService is a helper for testServiceUpBeforeAndAfter and testServiceRemainsUp with a flag for testDuringUpgrade
+// testService is a helper for testServiceUpBeforeAndAfter and testServiceRemainsUp with a flag for testDuringDisruption
 //
 // TODO(ihmccreery) remove this abstraction once testServiceUpBeforeAndAfter is no longer needed, because node upgrades
 // maintain a responsive service.
-func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringUpgrade bool) {
+func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisruption bool) {
 	// Setup
 	serviceName := "service-test"
 
@@ -300,7 +300,7 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringU
 
 	sem.Ready()
 
-	if testDuringUpgrade {
+	if testDuringDisruption {
 		// Continuous validation
 		wait.Until(func() {
 			By("hitting the pod through the service's LoadBalancer")
