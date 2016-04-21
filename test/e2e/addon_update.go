@@ -351,8 +351,8 @@ func waitForReplicationControllerInAddonTest(c *client.Client, addonNamespace, n
 	framework.ExpectNoError(framework.WaitForReplicationController(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
-// TODO marekbiskup 2015-06-11: merge the ssh code into pkg/util/ssh.go after
-// kubernetes v1.0 is released. In particular the code of sshExec.
+// TODO use the framework.SSH code, either adding an SCP to it or copying files
+// differently.
 func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
 	signer, err := framework.GetSigner(framework.TestContext.Provider)
@@ -360,8 +360,12 @@ func getMasterSSHClient() (*ssh.Client, error) {
 		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", framework.TestContext.Provider, err)
 	}
 
+	sshUser := os.Getenv("KUBE_SSH_USER")
+	if sshUser == "" {
+		sshUser = os.Getenv("USER")
+	}
 	config := &ssh.ClientConfig{
-		User: os.Getenv("USER"),
+		User: sshUser,
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 	}
 
