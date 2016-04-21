@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -29,9 +30,11 @@ type FakeLimitRanges struct {
 	ns   string
 }
 
+var limitrangesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "limitranges"}
+
 func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("limitranges", c.ns, limitRange), &api.LimitRange{})
+		Invokes(core.NewCreateAction(limitrangesResource, c.ns, limitRange), &api.LimitRange{})
 
 	if obj == nil {
 		return nil, err
@@ -41,7 +44,7 @@ func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (result *api.LimitR
 
 func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("limitranges", c.ns, limitRange), &api.LimitRange{})
+		Invokes(core.NewUpdateAction(limitrangesResource, c.ns, limitRange), &api.LimitRange{})
 
 	if obj == nil {
 		return nil, err
@@ -51,13 +54,13 @@ func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (result *api.LimitR
 
 func (c *FakeLimitRanges) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("limitranges", c.ns, name), &api.LimitRange{})
+		Invokes(core.NewDeleteAction(limitrangesResource, c.ns, name), &api.LimitRange{})
 
 	return err
 }
 
 func (c *FakeLimitRanges) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("limitranges", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(limitrangesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.LimitRangeList{})
 	return err
@@ -65,7 +68,7 @@ func (c *FakeLimitRanges) DeleteCollection(options *api.DeleteOptions, listOptio
 
 func (c *FakeLimitRanges) Get(name string) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("limitranges", c.ns, name), &api.LimitRange{})
+		Invokes(core.NewGetAction(limitrangesResource, c.ns, name), &api.LimitRange{})
 
 	if obj == nil {
 		return nil, err
@@ -75,7 +78,7 @@ func (c *FakeLimitRanges) Get(name string) (result *api.LimitRange, err error) {
 
 func (c *FakeLimitRanges) List(opts api.ListOptions) (result *api.LimitRangeList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("limitranges", c.ns, opts), &api.LimitRangeList{})
+		Invokes(core.NewListAction(limitrangesResource, c.ns, opts), &api.LimitRangeList{})
 
 	if obj == nil {
 		return nil, err
@@ -97,6 +100,6 @@ func (c *FakeLimitRanges) List(opts api.ListOptions) (result *api.LimitRangeList
 // Watch returns a watch.Interface that watches the requested limitRanges.
 func (c *FakeLimitRanges) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("limitranges", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(limitrangesResource, c.ns, opts))
 
 }

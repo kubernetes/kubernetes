@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -30,9 +31,11 @@ type FakeServices struct {
 	ns   string
 }
 
+var servicesResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
+
 func (c *FakeServices) Create(service *v1.Service) (result *v1.Service, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("services", c.ns, service), &v1.Service{})
+		Invokes(core.NewCreateAction(servicesResource, c.ns, service), &v1.Service{})
 
 	if obj == nil {
 		return nil, err
@@ -42,7 +45,7 @@ func (c *FakeServices) Create(service *v1.Service) (result *v1.Service, err erro
 
 func (c *FakeServices) Update(service *v1.Service) (result *v1.Service, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("services", c.ns, service), &v1.Service{})
+		Invokes(core.NewUpdateAction(servicesResource, c.ns, service), &v1.Service{})
 
 	if obj == nil {
 		return nil, err
@@ -52,7 +55,7 @@ func (c *FakeServices) Update(service *v1.Service) (result *v1.Service, err erro
 
 func (c *FakeServices) UpdateStatus(service *v1.Service) (*v1.Service, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("services", "status", c.ns, service), &v1.Service{})
+		Invokes(core.NewUpdateSubresourceAction(servicesResource, "status", c.ns, service), &v1.Service{})
 
 	if obj == nil {
 		return nil, err
@@ -62,13 +65,13 @@ func (c *FakeServices) UpdateStatus(service *v1.Service) (*v1.Service, error) {
 
 func (c *FakeServices) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("services", c.ns, name), &v1.Service{})
+		Invokes(core.NewDeleteAction(servicesResource, c.ns, name), &v1.Service{})
 
 	return err
 }
 
 func (c *FakeServices) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("services", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(servicesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ServiceList{})
 	return err
@@ -76,7 +79,7 @@ func (c *FakeServices) DeleteCollection(options *api.DeleteOptions, listOptions 
 
 func (c *FakeServices) Get(name string) (result *v1.Service, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("services", c.ns, name), &v1.Service{})
+		Invokes(core.NewGetAction(servicesResource, c.ns, name), &v1.Service{})
 
 	if obj == nil {
 		return nil, err
@@ -86,7 +89,7 @@ func (c *FakeServices) Get(name string) (result *v1.Service, err error) {
 
 func (c *FakeServices) List(opts api.ListOptions) (result *v1.ServiceList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("services", c.ns, opts), &v1.ServiceList{})
+		Invokes(core.NewListAction(servicesResource, c.ns, opts), &v1.ServiceList{})
 
 	if obj == nil {
 		return nil, err
@@ -108,6 +111,6 @@ func (c *FakeServices) List(opts api.ListOptions) (result *v1.ServiceList, err e
 // Watch returns a watch.Interface that watches the requested services.
 func (c *FakeServices) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("services", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(servicesResource, c.ns, opts))
 
 }

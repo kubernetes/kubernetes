@@ -614,7 +614,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	updateReplicaCount(fakeRCClient, *rc, numReplicas, 0)
 	updates, gets := 0, 0
 	for _, a := range c.Actions() {
-		if a.GetResource() != "replicationcontrollers" {
+		if a.GetResource().Resource != "replicationcontrollers" {
 			t.Errorf("Unexpected action %+v", a)
 			continue
 		}
