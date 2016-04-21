@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	scaleclient "k8s.io/kubernetes/pkg/client/typed/scale"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -234,6 +235,7 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "horizontalpodautoscalers") {
 			glog.Infof("Starting horizontal pod controller.")
+			scaleClient := scaleclient.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
 			hpaClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
 			metricsClient := metrics.NewHeapsterMetricsClient(
 				hpaClient,
@@ -242,7 +244,7 @@ func (s *CMServer) Run(_ []string) error {
 				metrics.DefaultHeapsterService,
 				metrics.DefaultHeapsterPort,
 			)
-			go podautoscaler.NewHorizontalController(hpaClient.Core(), hpaClient.Extensions(), hpaClient, metricsClient, s.HorizontalPodAutoscalerSyncPeriod.Duration).
+			go podautoscaler.NewHorizontalController(hpaClient.Core(), hpaClient, metricsClient, scaleClient, s.HorizontalPodAutoscalerSyncPeriod.Duration).
 				Run(wait.NeverStop)
 		}
 

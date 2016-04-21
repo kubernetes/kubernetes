@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	scaleclient "k8s.io/kubernetes/pkg/client/typed/scaler"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -308,6 +309,14 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "horizontalpodautoscalers") {
 			glog.Infof("Starting horizontal pod controller.")
+			// Make a copy of conf for scale client so that we don't accidentally set group version for other clients.
+			scaleConf := *(restclient.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
+			gv, err := unversioned.ParseGroupVersion(groupVersion)
+			if err != nil {
+				glog.Fatalf("Failed to parse group version %s: %v", groupVersion, err)
+			}
+			scaleConf.GroupVersion = &gv
+			scaleClient := scaleclient.NewForConfigOrDie(&scaleConf)
 			hpaClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "horizontal-pod-autoscaler"))
 			metricsClient := metrics.NewHeapsterMetricsClient(
 				hpaClient,
@@ -316,7 +325,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 				metrics.DefaultHeapsterService,
 				metrics.DefaultHeapsterPort,
 			)
-			go podautoscaler.NewHorizontalController(hpaClient.Core(), hpaClient.Extensions(), hpaClient, metricsClient, s.HorizontalPodAutoscalerSyncPeriod.Duration).
+			go podautoscaler.NewHorizontalController(hpaClient.Core(), hpaClient, metricsClient, scaleClient, s.HorizontalPodAutoscalerSyncPeriod.Duration).
 				Run(wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}

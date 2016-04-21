@@ -20,11 +20,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -65,6 +69,97 @@ type fakeResource struct {
 	kind       string
 }
 
+type fakeScale struct {
+	resourceName string
+	resourceGVK  unversioned.GroupVersionKind
+	path         string
+	obj          runtime.Object
+}
+
+func writeScale(w http.ResponseWriter, group string, obj runtime.Object) {
+	if err := testapi.Groups[group].Codec().EncodeToStream(obj, w); err != nil {
+		errMsg := fmt.Sprintf("server was unable to write a JSON response for group %s: %v", group, err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+	}
+}
+
+func (fs *fakeScale) handleScaleGet(w http.ResponseWriter, r *http.Request) {
+	if fs == nil || r.URL.Path != fs.path {
+		http.NotFound(w, r)
+		return
+	}
+	writeScale(w, fs.resourceGVK.Group, fs.obj)
+}
+
+func readScale(r *http.Request, gv unversioned.GroupVersion) (*extensions.Scale, error) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read request body: %v", err)
+	}
+
+	// We need internal version of Scale since that's the object that is manipulated on the
+	// server side, so explicitly ask for the internal type.
+	targetGVK := &unversioned.GroupVersionKind{
+		Group:   gv.Group,
+		Version: runtime.APIVersionInternal,
+		Kind:    "Scale",
+	}
+	obj, _, err := testapi.Extensions.Codec().Decode(body, targetGVK, nil)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't decode request body: %v", err)
+	}
+
+	// TODO(madhusudancs): make this work for autoscaling.Scale as well.
+	scale, ok := obj.(*extensions.Scale)
+	if !ok {
+		return nil, fmt.Errorf("expected object to be of type `Scale`, got `%T`", obj)
+	}
+	return scale, nil
+}
+
+func (fs *fakeScale) handleScalePut(w http.ResponseWriter, r *http.Request, t *testing.T, tc *testCase) {
+	if fs == nil || r.URL.Path != fs.path {
+		http.NotFound(w, r)
+		return
+	}
+
+	scale, err := readScale(r, fs.gv)
+	if err != nil {
+		errMsg := fmt.Sprintf("server was unable to read the JSON in the request body: %v", err)
+		http.Error(w, errMsg, http.StatusBadRequest)
+		return
+	}
+
+	assert.Equal(t, tc.desiredReplicas, scale.Spec.Replicas)
+	tc.scaleUpdated = true
+
+	writeScale(w, fs.gv, scale)
+}
+
+func (fs *fakeScale) clientServer(t *testing.T, tc *testCase) (*scaleclient.Client, *httptest.Server, error) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			fs.handleScaleGet(w, r)
+		case "PUT":
+			fs.handleScalePut(w, r, t, tc)
+		default:
+			errMsg := fmt.Sprintf("GET is the only supported method, got %v", r.Method)
+			http.Error(w, errMsg, http.StatusMethodNotAllowed)
+		}
+	}
+	srv := httptest.NewServer(http.HandlerFunc(handler))
+	cl, err := scaleclient.NewClient(&restclient.Config{
+		Host:          srv.URL,
+		ContentConfig: restclient.ContentConfig{GroupVersion: &fs.gv},
+	})
+	if err != nil {
+		srv.Close()
+		return nil, nil, err
+	}
+	return cl, srv, nil
+}
+
 type testCase struct {
 	minReplicas     int
 	maxReplicas     int
@@ -86,6 +181,8 @@ type testCase struct {
 
 	// Target resource information.
 	resource *fakeResource
+
+	scale *fakeScale
 }
 
 func (tc *testCase) computeCPUCurrent() {
@@ -103,12 +200,38 @@ func (tc *testCase) computeCPUCurrent() {
 	tc.CPUCurrent = 100 * reported / requested
 }
 
-func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
+func (tc *testCase) prepareTestClients(t *testing.T) (*fake.Clientset, *scaleclient.Client, *httptest.Server) {
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	podNamePrefix := "test-pod"
 	selector := &unversioned.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
+	}
+	if tc.scale == nil {
+		resourceName := "test-rc"
+		gvk := unversioned.GroupVersion{
+			Group:   "extensions",
+			Version: "v1beta1",
+			Kind:    "ReplicationController",
+		}
+		tc.scale = &fakeScale{
+			resourceName: resourceName,
+			resourceGVK:  gvk,
+			path:         fmt.Sprintf("/apis/%s/%s/namespaces/%s/replicationcontrollers/%s/scale", gv.Group, gv.Version, namespace, resourceName),
+			obj: &extensions.Scale{
+				ObjectMeta: api.ObjectMeta{
+					Name:      resourceName,
+					Namespace: namespace,
+				},
+				Spec: extensions.ScaleSpec{
+					Replicas: tc.initialReplicas,
+				},
+				Status: extensions.ScaleStatus{
+					Replicas: tc.initialReplicas,
+					Selector: selector,
+				},
+			},
+		}
 	}
 
 	tc.scaleUpdated = false
@@ -139,9 +262,13 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 					},
 					Spec: extensions.HorizontalPodAutoscalerSpec{
 						ScaleRef: extensions.SubresourceReference{
-							Kind:        tc.resource.kind,
-							Name:        tc.resource.name,
-							APIVersion:  tc.resource.apiVersion,
+							// DEBUG: Code before rebase. Remove before submission
+							// Kind:        tc.resource.kind,
+							// Name:        tc.resource.name,
+							// APIVersion:  tc.resource.apiVersion,
+							Kind:        tc.scale.resourceGVK.Kind,
+							Name:        tc.scale.resourceName,
+							APIVersion:  tc.scale.resourceGVK.GroupVersion(),
 							Subresource: "scale",
 						},
 						MinReplicas: &tc.minReplicas,
@@ -296,6 +423,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		assert.Equal(t, tc.desiredReplicas, obj.Status.DesiredReplicas)
 		if tc.verifyCPUCurrent {
 			assert.NotNil(t, obj.Status.CurrentCPUUtilizationPercentage)
+			// TODO: What happens if obj.Status.CurrentCPUUtilizationPercentage is nil? Smells
+			// like buggy code. These tests aren't exposing it yet because we don't have right
+			// tests perhaps?
 			assert.Equal(t, tc.CPUCurrent, *obj.Status.CurrentCPUUtilizationPercentage)
 		}
 		tc.statusUpdated = true
@@ -317,7 +447,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
-	return fakeClient
+	scaleClient, scaleSrvr, err := tc.scale.clientServer(t, tc)
+	assert.Equal(t, nil, err)
+
+	return fakeClient, scaleClient, scaleSrvr
 }
 
 func (tc *testCase) verifyResults(t *testing.T) {
@@ -329,7 +462,9 @@ func (tc *testCase) verifyResults(t *testing.T) {
 }
 
 func (tc *testCase) runTest(t *testing.T) {
-	testClient := tc.prepareTestClient(t)
+	testClient, scaleClient, scaleSrvr := tc.prepareTestClients(t)
+	defer scaleSrvr.Close()
+
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 
 	broadcaster := record.NewBroadcasterForTests(0)

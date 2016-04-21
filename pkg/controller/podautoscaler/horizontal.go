@@ -31,8 +31,10 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
+	scaleclient "k8s.io/kubernetes/pkg/client/typed/scaler"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -50,8 +52,8 @@ const (
 )
 
 type HorizontalController struct {
-	scaleNamespacer unversionedextensions.ScalesGetter
-	hpaNamespacer   unversionedextensions.HorizontalPodAutoscalersGetter
+	scaleClient   *scaleclient.Client
+	hpaNamespacer unversionedextensions.HorizontalPodAutoscalersGetter
 
 	metricsClient metrics.MetricsClient
 	eventRecorder record.EventRecorder
@@ -102,16 +104,16 @@ func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (
 	)
 }
 
-func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, scaleNamespacer unversionedextensions.ScalesGetter, hpaNamespacer unversionedextensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient, resyncPeriod time.Duration) *HorizontalController {
+func NewHorizontalController(evtNamespacer unversionedcore.EventsGetter, hpaNamespacer unversionedextensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient, scaleClient *scaleclient.Client, resyncPeriod time.Duration) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	controller := &HorizontalController{
-		metricsClient:   metricsClient,
-		eventRecorder:   recorder,
-		scaleNamespacer: scaleNamespacer,
-		hpaNamespacer:   hpaNamespacer,
+		metricsClient: metricsClient,
+		eventRecorder: recorder,
+		scaleClient:   scaleClient,
+		hpaNamespacer: hpaNamespacer,
 	}
 	store, frameworkController := newInformer(controller, resyncPeriod)
 	controller.store = store
@@ -128,24 +130,10 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Shutting down HPA Controller")
 }
 
-func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, time.Time, error) {
+func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.HorizontalPodAutoscaler, currentReplicas int, selector labels.Selector) (int, *int, time.Time, error) {
 	targetUtilization := defaultTargetCPUUtilizationPercentage
 	if hpa.Spec.CPUUtilization != nil {
 		targetUtilization = hpa.Spec.CPUUtilization.TargetPercentage
-	}
-	currentReplicas := scale.Status.Replicas
-
-	if scale.Status.Selector == nil {
-		errMsg := "selector is required"
-		a.eventRecorder.Event(hpa, api.EventTypeWarning, "SelectorRequired", errMsg)
-		return 0, nil, time.Time{}, fmt.Errorf(errMsg)
-	}
-
-	selector, err := unversioned.LabelSelectorAsSelector(scale.Status.Selector)
-	if err != nil {
-		errMsg := fmt.Sprintf("couldn't convert selector string to a corresponding selector object: %v", err)
-		a.eventRecorder.Event(hpa, api.EventTypeWarning, "InvalidSelector", errMsg)
-		return 0, nil, time.Time{}, fmt.Errorf(errMsg)
 	}
 	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, selector)
 
@@ -168,10 +156,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *extensions.
 // Returns number of replicas, metric which required highest number of replicas,
 // status string (also json-serialized extensions.CustomMetricsCurrentStatusList),
 // last timestamp of the metrics involved in computations or error, if occurred.
-func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.HorizontalPodAutoscaler, scale *extensions.Scale,
-	cmAnnotation string) (replicas int, metric string, status string, timestamp time.Time, err error) {
-
-	currentReplicas := scale.Status.Replicas
+func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.HorizontalPodAutoscaler, currentReplicas int, selector labels.Selector, cmAnnotation string) (replicas int, metric string, status string, timestamp time.Time, err error) {
 	replicas = 0
 	metric = ""
 	status = ""
@@ -195,18 +180,6 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.H
 	}
 
 	for _, customMetricTarget := range targetList.Items {
-		if scale.Status.Selector == nil {
-			errMsg := "selector is required"
-			a.eventRecorder.Event(hpa, api.EventTypeWarning, "SelectorRequired", errMsg)
-			return 0, "", "", time.Time{}, fmt.Errorf("selector is required")
-		}
-
-		selector, err := unversioned.LabelSelectorAsSelector(scale.Status.Selector)
-		if err != nil {
-			errMsg := fmt.Sprintf("couldn't convert selector string to a corresponding selector object: %v", err)
-			a.eventRecorder.Event(hpa, api.EventTypeWarning, "InvalidSelector", errMsg)
-			return 0, "", "", time.Time{}, fmt.Errorf("couldn't convert selector string to a corresponding selector object: %v", err)
-		}
 		value, currentTimestamp, err := a.metricsClient.GetCustomMetric(customMetricTarget.Name, hpa.Namespace, selector)
 		// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 		if err != nil {
@@ -247,12 +220,17 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.H
 func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPodAutoscaler) error {
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Namespace, hpa.Spec.ScaleRef.Name)
 
-	scale, err := a.scaleNamespacer.Scales(hpa.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
+	scale, err := a.scaleClient.Get(hpa.Spec.ScaleRef, hpa.Namespace)
 	if err != nil {
 		a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetScale", err.Error())
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
 	}
-	currentReplicas := scale.Status.Replicas
+
+	currentReplicas, err := scale.Replicas()
+	if err != nil {
+		a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetScaleReplicas", err.Error())
+		return fmt.Errorf("failed to obtain replicas from scale subresource for %s: %v", reference, err)
+	}
 
 	cpuDesiredReplicas := 0
 	var cpuCurrentUtilization *int = nil
@@ -280,8 +258,13 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPod
 		// All basic scenarios covered, the state should be sane, lets use metrics.
 		cmAnnotation, cmAnnotationFound := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]
 
+		selector, err := scale.Selector()
+		if err != nil {
+			a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetScaleSelector", err.Error())
+			return fmt.Errorf("failed to obtain selector from scale subresource for %s: %v", reference, err)
+		}
 		if hpa.Spec.CPUUtilization != nil || !cmAnnotationFound {
-			cpuDesiredReplicas, cpuCurrentUtilization, cpuTimestamp, err = a.computeReplicasForCPUUtilization(hpa, scale)
+			cpuDesiredReplicas, cpuCurrentUtilization, cpuTimestamp, err = a.computeReplicasForCPUUtilization(hpa, currentReplicas, selector)
 			if err != nil {
 				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
 				a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedComputeReplicas", err.Error())
@@ -290,7 +273,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPod
 		}
 
 		if cmAnnotationFound {
-			cmDesiredReplicas, cmMetric, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
+			cmDesiredReplicas, cmMetric, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, currentReplicas, selector, cmAnnotation)
 			if err != nil {
 				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
 				a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedComputeCMReplicas", err.Error())
@@ -331,8 +314,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *extensions.HorizontalPod
 
 	rescale := shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
 	if rescale {
-		scale.Spec.Replicas = desiredReplicas
-		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
+		scale.SetReplicas(desiredReplicas)
+		_, err = a.scaleClient.Update(hpa.Spec.ScaleRef, hpa.Namespace, scale)
 		if err != nil {
 			a.eventRecorder.Eventf(hpa, api.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
