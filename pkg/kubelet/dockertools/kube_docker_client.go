@@ -54,6 +54,9 @@ type kubeDockerClient struct {
 // Make sure that kubeDockerClient implemented the DockerInterface.
 var _ DockerInterface = &kubeDockerClient{}
 
+// the default ShmSize to use (in bytes) if not specified.
+const defaultShmSize = int64(1024 * 1024 * 64)
+
 // newKubeDockerClient creates an kubeDockerClient from an existing docker client.
 func newKubeDockerClient(dockerClient *dockerapi.Client) DockerInterface {
 	return &kubeDockerClient{
@@ -125,6 +128,11 @@ func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 }
 
 func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
+	// we provide an explicit default shm size as to not depend on docker daemon.
+	// TODO: evaluate exposing this as a knob in the API
+	if opts.HostConfig != nil && opts.HostConfig.ShmSize <= 0 {
+		opts.HostConfig.ShmSize = defaultShmSize
+	}
 	createResp, err := d.client.ContainerCreate(getDefaultContext(), opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
 	if err != nil {
 		return nil, err
