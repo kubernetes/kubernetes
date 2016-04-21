@@ -105,8 +105,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 				Ports:     []api.EndpointPort{{Port: 1000}},
 			}},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -139,8 +138,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 				}},
 			}},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -169,8 +167,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "TCP"}},
 			}},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -213,8 +210,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "UDP"}},
 			}},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -253,8 +249,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			},
 			Subsets: []api.EndpointSubset{},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -292,8 +287,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 			},
 			Subsets: []api.EndpointSubset{},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -331,8 +325,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 			},
 			Subsets: []api.EndpointSubset{},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -374,8 +367,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 				Ports:     []api.EndpointPort{{Port: 1000}},
 			}},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -416,8 +408,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 				Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 			}},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -437,8 +428,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
 		serverResponse{http.StatusOK, &api.Endpoints{}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -481,8 +471,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
 		serverResponse{http.StatusOK, &api.Endpoints{}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
@@ -543,8 +532,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 				Ports:     []api.EndpointPort{{Port: 1000}},
 			}},
 		}})
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady

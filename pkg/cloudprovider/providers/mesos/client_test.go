@@ -214,10 +214,8 @@ func Test_parseMesosState(t *testing.T) {
 func Test_listSlaves(t *testing.T) {
 	defer log.Flush()
 	md := FakeMasterDetector{}
-	// TODO: Uncomment next two lines and remove third line when fix #19254
-	// defer httpServer.Close()
-	// httpServer, httpClient, httpTransport := makeHttpMocks()
-	_, httpClient, httpTransport := makeHttpMocks()
+	httpServer, httpClient, httpTransport := makeHttpMocks()
+	defer httpServer.Close()
 
 	cacheTTL := 500 * time.Millisecond
 	mesosClient, err := createMesosClient(md, httpClient, httpTransport, cacheTTL)
@@ -255,10 +253,8 @@ func Test_listSlaves(t *testing.T) {
 func Test_clusterName(t *testing.T) {
 	defer log.Flush()
 	md := FakeMasterDetector{}
-	// TODO: Uncomment next two lines and remove third line when fix #19254
-	// defer httpServer.Close()
-	// httpServer, httpClient, httpTransport := makeHttpMocks()
-	_, httpClient, httpTransport := makeHttpMocks()
+	httpServer, httpClient, httpTransport := makeHttpMocks()
+	defer httpServer.Close()
 	cacheTTL := 500 * time.Millisecond
 	mesosClient, err := createMesosClient(md, httpClient, httpTransport, cacheTTL)
 

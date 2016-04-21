@@ -88,8 +88,7 @@ func TestWatchWebsocket(t *testing.T) {
 	_ = rest.Watcher(simpleStorage) // Give compile error if this doesn't work.
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
@@ -142,8 +141,7 @@ func TestWatchRead(t *testing.T) {
 	_ = rest.Watcher(simpleStorage) // Give compile error if this doesn't work.
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
@@ -328,8 +326,7 @@ func TestWatchParamParsing(t *testing.T) {
 		"simpleroots": simpleStorage,
 	})
 	server := httptest.NewServer(handler)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
 
@@ -436,8 +433,7 @@ func TestWatchProtocolSelection(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	defer server.CloseClientConnections()
 	client := http.Client{}
 
@@ -520,8 +516,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		watchServer.ServeHTTP(w, req)
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer s.Close()
+	defer s.Close()
 
 	// Setup a client
 	dest, _ := url.Parse(s.URL)

@@ -42,8 +42,7 @@ func TestChaos(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	client := http.Client{
 		Transport: NewChaosRoundTripper(http.DefaultTransport, TestLogChaos{t}, ErrSimulatedConnectionResetByPeer),
 	}
@@ -60,8 +59,7 @@ func TestPartialChaos(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	seed := NewSeed(1)
 	client := http.Client{
 		Transport: NewChaosRoundTripper(
