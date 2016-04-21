@@ -124,8 +124,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	got, err := restclient.ServerAPIVersions(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, Codec: testapi.Default.Codec()}})
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)

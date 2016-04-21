@@ -112,8 +112,7 @@ func TestMaxInFlight(t *testing.T) {
 			}),
 		),
 	)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 
 	// These should hang, but not affect accounting.  use a query param match
 	for i := 0; i < AllowedInflightRequestsNo; i++ {
@@ -175,8 +174,7 @@ func TestReadOnly(t *testing.T) {
 			}
 		},
 	)))
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	for _, verb := range []string{"GET", "POST", "PUT", "DELETE", "CREATE"} {
 		req, err := http.NewRequest(verb, server.URL, nil)
 		if err != nil {
@@ -202,8 +200,7 @@ func TestTimeout(t *testing.T) {
 		func(*http.Request) (<-chan time.Time, string) {
 			return timeout, timeoutResp
 		}))
-	// TODO: Uncomment when fix #19254
-	// defer ts.Close()
+	defer ts.Close()
 
 	// No timeouts
 	sendResponse <- struct{}{}

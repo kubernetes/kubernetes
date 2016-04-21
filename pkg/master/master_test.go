@@ -587,8 +587,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 	for _, test := range tests {
 		func() {
 			master, etcdserver, server, assert := initThirdParty(t, version)
-			// TODO: Uncomment when fix #19254
-			// defer server.Close()
+			defer server.Close()
 			defer etcdserver.Terminate(t)
 
 			if test.items != nil {
@@ -698,8 +697,7 @@ func TestInstallThirdPartyAPIGet(t *testing.T) {
 
 func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 	master, etcdserver, server, assert := initThirdParty(t, version)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	expectedObj := Foo{
@@ -746,8 +744,7 @@ func TestInstallThirdPartyAPIPost(t *testing.T) {
 
 func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 	master, etcdserver, server, assert := initThirdParty(t, version)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	inputObj := Foo{
@@ -811,8 +808,7 @@ func TestInstallThirdPartyAPIDelete(t *testing.T) {
 
 func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 	master, etcdserver, server, assert := initThirdParty(t, version)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	expectedObj := Foo{
@@ -889,8 +885,7 @@ func TestInstallThirdPartyAPIListOptions(t *testing.T) {
 
 func testInstallThirdPartyAPIListOptionsForVersion(t *testing.T, version string) {
 	_, etcdserver, server, assert := initThirdParty(t, version)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	// send a GET request with query parameter
@@ -922,8 +917,7 @@ func TestInstallThirdPartyResourceRemove(t *testing.T) {
 
 func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 	master, etcdserver, server, assert := initThirdParty(t, version)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	expectedObj := Foo{
@@ -1044,8 +1038,7 @@ func TestIsTunnelSyncHealthy(t *testing.T) {
 
 func testThirdPartyDiscovery(t *testing.T, version string) {
 	_, etcdserver, server, assert := initThirdParty(t, version)
-	// TODO: Uncomment when fix #19254
-	// defer server.Close()
+	defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	resp, err := http.Get(server.URL + "/apis/company.com/")
