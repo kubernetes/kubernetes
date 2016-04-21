@@ -257,15 +257,13 @@ func TestStream(t *testing.T) {
 					}
 				}
 
-				// TODO: Uncomment when fix #19254
-				// server.Close()
+				server.Close()
 				continue
 			}
 
 			if hasErr {
 				t.Errorf("%s: unexpected error: %v", name, err)
-				// TODO: Uncomment when fix #19254
-				// server.Close()
+				server.Close()
 				continue
 			}
 
@@ -281,8 +279,7 @@ func TestStream(t *testing.T) {
 				}
 			}
 
-			// TODO: Uncomment when fix #19254
-			// server.Close()
+			server.Close()
 		}
 	}
 }

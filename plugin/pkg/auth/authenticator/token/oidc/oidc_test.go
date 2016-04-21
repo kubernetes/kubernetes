@@ -227,8 +227,7 @@ func TestOIDCDiscoveryNoKeyEndpoint(t *testing.T) {
 		t.Fatalf("Cannot load cert/key pair: %v", err)
 	}
 	srv.StartTLS()
-	// TODO: Uncomment when fix #19254
-	// defer srv.Close()
+	defer srv.Close()
 
 	op.pcfg = oidc.ProviderConfig{
 		Issuer: mustParseURL(t, srv.URL), // An invalid ProviderConfig. Keys endpoint is required.
@@ -244,8 +243,7 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 	// Verify that plain HTTP issuer URL is forbidden.
 	op := newOIDCProvider(t)
 	srv := httptest.NewServer(op.mux)
-	// TODO: Uncomment when fix #19254
-	// defer srv.Close()
+	defer srv.Close()
 
 	op.pcfg = oidc.ProviderConfig{
 		Issuer:       mustParseURL(t, srv.URL),
@@ -281,8 +279,7 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 		t.Fatalf("Cannot load cert/key pair: %v", err)
 	}
 	tlsSrv.StartTLS()
-	// TODO: Uncomment when fix #19254
-	// defer tlsSrv.Close()
+	defer tlsSrv.Close()
 
 	op.pcfg = oidc.ProviderConfig{
 		Issuer:       mustParseURL(t, tlsSrv.URL),
@@ -317,8 +314,7 @@ func TestOIDCAuthentication(t *testing.T) {
 		t.Fatalf("Cannot load cert/key pair: %v", err)
 	}
 	srv.StartTLS()
-	// TODO: Uncomment when fix #19254
-	// defer srv.Close()
+	defer srv.Close()
 
 	// A provider config with all required fields.
 	op.pcfg = oidc.ProviderConfig{
