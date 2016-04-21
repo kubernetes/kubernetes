@@ -158,9 +158,9 @@ func TestPodFitsResources(t *testing.T) {
 
 	for _, test := range enoughPodsTests {
 		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}}
+		test.nodeInfo.SetNode(&node)
 
-		fit := NodeStatus{FakeNodeInfo(node)}
-		fits, err := fit.PodFitsResources(test.pod, "machine", test.nodeInfo)
+		fits, err := PodFitsResources(test.pod, "machine", test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -203,9 +203,9 @@ func TestPodFitsResources(t *testing.T) {
 	}
 	for _, test := range notEnoughPodsTests {
 		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1)}}
+		test.nodeInfo.SetNode(&node)
 
-		fit := NodeStatus{FakeNodeInfo(node)}
-		fits, err := fit.PodFitsResources(test.pod, "machine", test.nodeInfo)
+		fits, err := PodFitsResources(test.pod, "machine", test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -994,9 +994,10 @@ func TestPodFitsSelector(t *testing.T) {
 
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(&node)
 
-		fit := NodeStatus{FakeNodeInfo(node)}
-		fits, err := fit.PodSelectorMatches(test.pod, "machine", schedulercache.NewNodeInfo())
+		fits, err := PodSelectorMatches(test.pod, "machine", nodeInfo)
 		if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1057,8 +1058,11 @@ func TestNodeLabelPresence(t *testing.T) {
 	}
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: label}}
-		labelChecker := NodeLabelChecker{FakeNodeInfo(node), test.labels, test.presence}
-		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, "machine", schedulercache.NewNodeInfo())
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(&node)
+
+		labelChecker := NodeLabelChecker{test.labels, test.presence}
+		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, "machine", nodeInfo)
 		if !reflect.DeepEqual(err, ErrNodeLabelPresenceViolated) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1550,7 +1554,8 @@ func TestRunGeneralPredicates(t *testing.T) {
 		},
 	}
 	for _, test := range resourceTests {
-		fits, err := RunGeneralPredicates(test.pod, test.nodeName, test.nodeInfo, test.node)
+		test.nodeInfo.SetNode(test.node)
+		fits, err := GeneralPredicates(test.pod, test.nodeName, test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
