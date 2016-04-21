@@ -32,7 +32,7 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3.0."* ]]; the
   echo "  https://github.com/google/protobuf/releases"
   echo
   echo "WARNING: Protobuf changes are not being validated"
-  exit 0
+  exit 1
 fi
 
 gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
