@@ -399,7 +399,7 @@ func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) b
 		return false
 	}
 
-	return a.GetKind() == api.Kind("Pod")
+	return a.GetKind().GroupKind() == api.Kind("Pod")
 }
 
 // SupportsLimit always returns true.

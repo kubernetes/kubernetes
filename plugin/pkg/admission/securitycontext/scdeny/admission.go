@@ -49,7 +49,7 @@ func NewSecurityContextDeny(client clientset.Interface) admission.Interface {
 
 // Admit will deny any pod that defines SELinuxOptions or RunAsUser.
 func (p *plugin) Admit(a admission.Attributes) (err error) {
-	if a.GetResource() != api.Resource("pods") {
+	if a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 
@@ -59,28 +59,28 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 	}
 
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SupplementalGroups != nil {
-		return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("SecurityContext.SupplementalGroups is forbidden"))
+		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.SupplementalGroups is forbidden"))
 	}
 	if pod.Spec.SecurityContext != nil {
 		if pod.Spec.SecurityContext.SELinuxOptions != nil {
-			return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.SELinuxOptions is forbidden"))
+			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.SELinuxOptions is forbidden"))
 		}
 		if pod.Spec.SecurityContext.RunAsUser != nil {
-			return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.RunAsUser is forbidden"))
+			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.RunAsUser is forbidden"))
 		}
 	}
 
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
-		return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("SecurityContext.FSGroup is forbidden"))
+		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.FSGroup is forbidden"))
 	}
 
 	for _, v := range pod.Spec.Containers {
 		if v.SecurityContext != nil {
 			if v.SecurityContext.SELinuxOptions != nil {
-				return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("SecurityContext.SELinuxOptions is forbidden"))
+				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.SELinuxOptions is forbidden"))
 			}
 			if v.SecurityContext.RunAsUser != nil {
-				return apierrors.NewForbidden(a.GetResource(), pod.Name, fmt.Errorf("SecurityContext.RunAsUser is forbidden"))
+				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.RunAsUser is forbidden"))
 			}
 		}
 	}
