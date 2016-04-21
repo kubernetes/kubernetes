@@ -33,6 +33,8 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
+const downwardAPIDir = "..data"
+
 func formatMap(m map[string]string) (fmtstr string) {
 	for key, value := range m {
 		fmtstr += fmt.Sprintf("%v=%q\n", key, value)
@@ -407,7 +409,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	// get the link of the link
 	var currentTarget string
 	if currentTarget, err = os.Readlink(path.Join(volumePath, downwardAPIDir)); err != nil {
-		t.Errorf(".current should be a link... %s\n", err.Error())
+		t.Errorf(".data should be a link... %s\n", err.Error())
 	}
 
 	err = mounter.SetUp(nil) // now re-run Setup
@@ -418,7 +420,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	// get the link of the link
 	var currentTarget2 string
 	if currentTarget2, err = os.Readlink(path.Join(volumePath, downwardAPIDir)); err != nil {
-		t.Errorf(".current should be a link... %s\n", err.Error())
+		t.Errorf(".data should be a link... %s\n", err.Error())
 	}
 
 	if currentTarget2 != currentTarget {
