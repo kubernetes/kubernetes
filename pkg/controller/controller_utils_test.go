@@ -371,3 +371,11 @@ func TestSortingActivePods(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateJobs(t *testing.T) {
+	// @sdminonne: TODO
+}
+
+func TestDeleteJob(t *testing.T) {
+	// @sdminonne: TODO
+}

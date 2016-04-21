@@ -646,17 +646,17 @@ func TestIsJobFinished(t *testing.T) {
 		},
 	}
 
-	if !isJobFinished(job) {
+	if !IsJobFinished(job) {
 		t.Error("Job was expected to be finished")
 	}
 
 	job.Status.Conditions[0].Status = api.ConditionFalse
-	if isJobFinished(job) {
+	if IsJobFinished(job) {
 		t.Error("Job was not expected to be finished")
 	}
 
 	job.Status.Conditions[0].Status = api.ConditionUnknown
-	if isJobFinished(job) {
+	if IsJobFinished(job) {
 		t.Error("Job was not expected to be finished")
 	}
 }

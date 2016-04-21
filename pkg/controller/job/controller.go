@@ -108,7 +108,7 @@ func NewJobController(podInformer framework.SharedInformer, kubeClient clientset
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: jm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
-				if job := cur.(*extensions.Job); !isJobFinished(job) {
+				if job := cur.(*extensions.Job); !IsJobFinished(job) {
 					jm.enqueueController(job)
 				}
 			},
@@ -342,7 +342,7 @@ func (jm *JobController) syncJob(key string) error {
 		job.Status.StartTime = &now
 	}
 	// if job was finished previously, we don't want to redo the termination
-	if isJobFinished(&job) {
+	if IsJobFinished(&job) {
 		return nil
 	}
 	if pastActiveDeadline(&job) {
@@ -554,7 +554,7 @@ func filterPods(pods []api.Pod, phase api.PodPhase) int {
 	return result
 }
 
-func isJobFinished(j *extensions.Job) bool {
+func IsJobFinished(j *extensions.Job) bool {
 	for _, c := range j.Status.Conditions {
 		if (c.Type == extensions.JobComplete || c.Type == extensions.JobFailed) && c.Status == api.ConditionTrue {
 			return true

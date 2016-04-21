@@ -646,3 +646,111 @@ func (o ReplicaSetsByCreationTimestamp) Less(i, j int) bool {
 	}
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
+
+type JobControlInterface interface {
+	// CreateJob
+	CreateJob(namespace string, template *extensions.JobTemplateSpec, object runtime.Object, key string) error
+	// DeleteJob
+	DeleteJob(namespace, name string, object runtime.Object) error
+}
+
+// RealJobControl is the default implementation of JobControlInterface
+type WorkflowJobControl struct {
+	KubeClient clientset.Interface
+	Recorder   record.EventRecorder
+}
+
+var _ JobControlInterface = &WorkflowJobControl{}
+
+func getJobsPrefix(controllerName string) string {
+	prefix := fmt.Sprintf("%s-", controllerName)
+	if ok, _ := validation.ValidateReplicationControllerName(prefix, true); !ok {
+		prefix = controllerName
+	}
+	return prefix
+}
+
+func getJobsLabelSet(object runtime.Object) labels.Set {
+	workflow := *object.(*extensions.Workflow)
+	desiredLabels := make(labels.Set)
+	for k, v := range workflow.Labels {
+		desiredLabels[k] = v
+	}
+	return desiredLabels
+}
+
+func getJobsAnnotationSet(template *extensions.JobTemplateSpec, object runtime.Object) (labels.Set, error) {
+	workflow := *object.(*extensions.Workflow)
+	desiredAnnotations := make(labels.Set)
+	for k, v := range workflow.Annotations {
+		desiredAnnotations[k] = v
+	}
+	createdByRef, err := api.GetReference(object)
+	if err != nil {
+		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
+	}
+
+	//TODO: codec  hardcoded to v1 for the moment.
+	codec := api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"})
+
+	createdByRefJson, err := runtime.Encode(codec, &api.SerializedReference{
+		Reference: *createdByRef,
+	})
+	if err != nil {
+		return desiredAnnotations, fmt.Errorf("unable to serialize controller reference: %v", err)
+	}
+	desiredAnnotations[CreatedByAnnotation] = string(createdByRefJson)
+	return desiredAnnotations, nil
+}
+
+func (w WorkflowJobControl) CreateJob(namespace string, template *extensions.JobTemplateSpec, object runtime.Object, key string) error {
+	desiredLabels := getJobsLabelSet(object)
+	desiredLabels[key] = "" //  inserting step name as a key with empty value
+	desiredAnnotations, err := getJobsAnnotationSet(template, object)
+	if err != nil {
+		return err
+	}
+	meta, err := api.ObjectMetaFor(object)
+	if err != nil {
+		return fmt.Errorf("object does not have ObjectMeta, %v", err)
+	}
+	prefix := getJobsPrefix(meta.Name)
+	job := &extensions.Job{
+		ObjectMeta: api.ObjectMeta{
+			Labels:       desiredLabels,
+			Annotations:  desiredAnnotations,
+			GenerateName: prefix,
+		},
+	}
+
+	if err := api.Scheme.Convert(template, &job.Spec); err != nil {
+		return fmt.Errorf("unable to convert job template: %v", err)
+	}
+
+	if newJob, err := w.KubeClient.Extensions().Jobs(namespace).Create(job); err != nil {
+		w.Recorder.Eventf(object, api.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
+		return fmt.Errorf("unable to create job: %v", err)
+	} else {
+		glog.V(4).Infof("Controller %v created job %v", meta.Name, newJob.Name)
+	}
+	return nil
+}
+
+func (w WorkflowJobControl) DeleteJob(namespace, jobName string, object runtime.Object) error {
+	// @sdminonne: TODO once clientset is fixed implement DeleteJob
+	/*
+		accessor, err := meta.Accessor(object)
+		if err != nil {
+			return fmt.Errorf("object does not have ObjectMeta, %v", err)
+		}
+
+		if err := w.KubeClient.Batch().Jobs(namespace).Delete(jobName, nil); err != nil {
+			w.Recorder.Eventf(object, api.EventTypeWarning, "FailedDelete", "Error deleting: %v", err)
+			return fmt.Errorf("unable to delete job: %v", err)
+		} else {
+			glog.V(4).Infof("Controller %v deleted job %v", accessor.GetName(), jobName)
+			w.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulDelete", "Deleted job: %v", jobName)
+		}
+	*/
+	return nil
+}
