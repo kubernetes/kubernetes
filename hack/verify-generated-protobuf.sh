@@ -23,8 +23,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/go-to-protobuf cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
-
 "${KUBE_ROOT}/hack/after-build/verify-generated-protobuf.sh" "$@"
 
 # ex: ts=2 sw=2 et filetype=sh
