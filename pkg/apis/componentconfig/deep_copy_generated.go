@@ -302,6 +302,9 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	}
 	out.NonMasqueradeCIDR = in.NonMasqueradeCIDR
 	out.EnableCustomMetrics = in.EnableCustomMetrics
+	out.EvictionHard = in.EvictionHard
+	out.EvictionSoft = in.EvictionSoft
+	out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
 	return nil
 }
 
