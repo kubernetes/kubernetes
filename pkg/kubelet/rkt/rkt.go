@@ -812,11 +812,10 @@ func apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
 		p.Containers = append(p.Containers, &kubecontainer.Container{
-			ID:      buildContainerID(&containerID{uuid, c.Name}),
-			Name:    c.Name,
-			Image:   c.Image,
-			Hash:    kubecontainer.HashContainer(c),
-			Created: time.Now().Unix(),
+			ID:    buildContainerID(&containerID{uuid, c.Name}),
+			Name:  c.Name,
+			Image: c.Image,
+			Hash:  kubecontainer.HashContainer(c),
 		})
 	}
 	return p
@@ -1193,10 +1192,9 @@ func (r *Runtime) convertRktPod(rktpod *rktapi.Pod) (*kubecontainer.Pod, error) 
 			ID:   buildContainerID(&containerID{rktpod.Id, app.Name}),
 			Name: app.Name,
 			// By default, the version returned by rkt API service will be "latest" if not specified.
-			Image:   fmt.Sprintf("%s:%s", app.Image.Name, app.Image.Version),
-			Hash:    containerHash,
-			State:   appStateToContainerState(app.State),
-			Created: time.Unix(0, rktpod.CreatedAt).Unix(), // convert ns to s
+			Image: fmt.Sprintf("%s:%s", app.Image.Name, app.Image.Version),
+			Hash:  containerHash,
+			State: appStateToContainerState(app.State),
 		})
 	}
 
