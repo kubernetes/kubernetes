@@ -68,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/blang/semver"
+	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
 
@@ -263,13 +264,20 @@ func log(level string, format string, args ...interface{}) {
 	fmt.Fprintf(GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
+// Used for important logs, controlled by ginkgo, on by default
 func Logf(format string, args ...interface{}) {
 	log("INFO", format, args...)
 }
 
+// If you are debugging e2e tests, run with '-v 3' to see all logging statements.
+// -v is the
+func Debugf(format string, args ...interface{}) {
+	glog.V(3).Infof(format, args...)
+}
+
 func Failf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	log("INFO", msg)
+	log("FAILURE", msg)
 	Fail(nowStamp()+": "+msg, 1)
 }
 
