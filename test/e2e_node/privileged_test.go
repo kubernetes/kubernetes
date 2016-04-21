@@ -184,7 +184,7 @@ func newHostExecPodSpec(ns, name string) *api.Pod {
 func waitForPodRunning(c *client.Client, ns string, name string) error {
 	var pod *api.Pod
 	var err error
-	for t := time.Now(); time.Since(t) < time.Minute; time.Sleep(time.Second * 5) {
+	for t := time.Now(); time.Since(t) < time.Minute*2; time.Sleep(time.Second * 5) {
 		pod, err = c.Pods(ns).Get(name)
 		Expect(err).NotTo(HaveOccurred())
 		if pod == nil {
