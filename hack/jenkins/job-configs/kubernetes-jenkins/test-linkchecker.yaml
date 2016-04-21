@@ -3,6 +3,7 @@
     description: |
         Grab the latest from GitHub, then run hack/verify-linkcheck.sh.<br>
         Test Owner: Build Cop
+    disable_job: true # Issue #23162
     logrotate:
         numToKeep: 200
     builders:
