@@ -43,40 +43,81 @@ define how those pods should be allowed to communicate with each other.  The
 implementation of that policy at the network layer is left up to the
 chosen networking solution.
 
-> Note that this proposal does not yet include egress / cidr-based policy, which is still actively undergoing discussion in the SIG.  In general,
-egress is expected to augment this proposal rather than modify it, with one exception (noted below).
+> Note that this proposal does not yet include egress / cidr-based policy, which is still actively undergoing discussion in the SIG. These are expected to augment this proposal in a backwards compatible way. 
 
 ## Implementation
 
 The implmentation in Kubernetes consists of:
 - A v1beta NetworkPolicy API object
-- A field on the `Namespace` object to control isolation, to be developed as an annotation for now, called `net.beta.kubernetes.io/network-isolation`.
+- A structure on the `Namespace` object to control policy, to be developed as an annotation for now.
 
 ### Namespace changes
 
-> Note that this section is subject to some change with the addition of egress policy as mentioned above.
+The following objects will be defined on a Namespace Spec.
+>NOTE: In v1beta these objects will be implemented as an annotation.
 
-The `Namespace` object can be augmented with the annotation `net.beta.kubernetes.io/network-isolation` which will take one of the following values:
+```go
+type IngressIsolationPolicy string
 
-When `net.beta.kubernetes.io/network-isolation=true` is set on a namespace:
-- Pods in that Namespace will not be accessible from any other source, even sources within that namespace, unless explicitly allowed by a NetworkPolicy object.
-- Pods in that Namespace will be able to access any other destination.
+const (
+	// Deny all ingress traffic to pods in this namespace.
+	DefaultDeny IngressIsolationPolicy = "DefaultDeny"
+) 
 
-When `net.beta.kubernetes.io/network-isolation=false` is set on a namespace:
-- Pods in that Namespace will be accessible from any other source.
-- Pods in that Namespace will be able to access any other destination.
+// Standard NamespaceSpec object, modified to include a new
+// NamespaceNetworkPolicy field.
+type NamespaceSpec struct {
+	// This is a pointer so that it can be left undefined.
+	NetworkPolicy *NamespaceNetworkPolicy `json:"networkPolicy,omitempty"`
+}
 
-This field will default to `false` if not specified.
+type NamespaceNetworkPolicy struct {
+	// Ingress configuration for this namespace.  This config is 
+	// applied to all pods within this namespace. For now, only 
+	// ingress is supported.  This field is optional - if not 
+	// defined, then the cluster default for ingress is applied.
+	Ingress *NamespaceIngressPolicy `json:"ingress,omitempty"`
+}
+
+// Configuration for ingress to pods within this namespace.
+// For now, this only supports specifying an isolation policy.
+type NamespaceIngressPolicy struct {
+	// The isolation policy to apply to pods in this namespace.
+	// Currently this field only supports "DefaultDeny", but could 
+	// be extended to support other policies in the future.  When set to DefaultDeny,
+	// pods in this namespace are denied ingress traffic.  When not defined,
+	// the cluster default ingress policy is applied (currently allow all). 
+	Isolation *IngressIsolationPolicy `json:"isolation,omitempty"` 
+}
+```
+
+```yaml
+kind: Namespace
+apiVersion: v1
+spec:
+  networkPolicy:
+    ingress:
+      isolation: DefaultDeny
+```
+
+The above structures will be represented in v1beta as a json encoded annotation like so:
+```
+kind: Namespace
+apiVersion: v1
+metadata:
+  annotations:
+    net.beta.kubernetes.io/networkPolicy: "{\"ingress\": {\"isolation\": \"DefaultDeny\"}}" 
+```
 
 ### NetworkPolicy Go Definition 
 
-Once the namespace is isolated, a mechanism to selectively allow traffic into the namespace and between pods within
+Once a Namespace is isolated, a mechanism to selectively allow traffic into the namespace and between pods within
 the namespace is required.  That is accomplished through ingress rules on `NetworkPolicy`
 objects (of which there can be multiple in a single namespace).  Pods selected by
 one or more NetworkPolicy objects should allow any incoming connections that match any
 ingress rule on those NetworkPolicy objects, per the network plugin’s capabilities.
 
-If `net.beta.kubernetes.io/network-isolation=false` on a namespace, then all traffic is allowed to / from pods in that namespace whether or not any NetworkPolicy objects have been created in that namespace. 
+If `isolation` is not specified on a namespace, then all traffic is allowed to pods in that namespace. 
 
 ```go
 type NetworkPolicy struct {
@@ -96,9 +137,9 @@ type NetworkPolicySpec struct {
   PodSelector *unversioned.LabelSelector `json:"podSelector,omitempty"`
 
   // List of ingress rules to be applied to the selected pods.
-  // Traffic is allowed to a pod if network-isolation=false, 
-  // if the traffic source is the pod's host (for kubelet health checks), 
-  // or if network-isolation=true and the traffic matches at least 
+  // Traffic is allowed to a pod if Namespace.NetworkPolicy.Ingress.Isolation is undefined, 
+  // OR if the traffic source is the pod's host (for kubelet health checks), 
+  // OR if Namespace.NetworkPolicy.Ingress.Isolation=DefaultDeny and the traffic matches at least 
   // one NetworkPolicyIngressRule across all of the NetworkPolicy 
   // objects whose podSelector matches the pod.  If this field is 
   // empty, this NetworkPolicy has no effect on selected pods.
@@ -155,14 +196,14 @@ def is_traffic_allowed(traffic, pod):
   """
   Returns True if traffic is allowed to this pod, False otherwise.
   """
-  if namespace.network_isolation == False:
-    # If network-isolation is disabled, all traffic is allowed.
+  if not namespace.networkPolicy.ingress.isolation:
+    # If ingress isolation is disabled on the Namespace, all traffic is allowed.
     return True 
   elif traffic.source == pod.node:
     # Traffic is from the pod's host - this allows for kubelet health checks.
     return True
   else:
-    # If network-isolation is enabled, only allow traffic 
+    # If namespace ingress isolation is enabled, only allow traffic 
     # that matches a network policy which selects this pod.
     for network_policy in network_policies(pod.namespace):
       if not network_policy.podSelector.selects(pod):
@@ -176,13 +217,11 @@ def is_traffic_allowed(traffic, pod):
              ingress_rule.ports.matches(traffic):
           return True 
 
-  # network-isolation is True and no policies match the given pod and traffic.
+  # Ingress isolation is DefaultDeny and no policies match the given pod and traffic.
   return False
 ```
 
 ### Open Questions
-
-> The question then remains whether one NP object per "app" makes sense (in this case app={a,b,c}) or whether one NP object per selector
 
 - A single podSelector per NetworkPolicy may lead to managing a large number of NetworkPolicy objects, each of which is small and easy to understand on its own.  Allowing a podSelecor per ingress rule would allow for fewer, larger NetworkPolicy objects that may be easier to manage, but harder to understand individually.  This proposal has opted to favor a larger number of smaller objects that are easier to understand.  Is this the right decision? 
 
@@ -198,7 +237,7 @@ apiVersion: v1
 metadata:
   name: myns
   annotations:
-    net.beta.kubernetes.io/network-isolation=true
+    net.beta.kubernetes.io/networkPolicy: "{\"ingress\": {\"isolation\": \"DefaultDeny\"}"
 ---
 kind: NetworkPolicy
 apiVersion: v1beta 
