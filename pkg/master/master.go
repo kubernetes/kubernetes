@@ -432,6 +432,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"pods/proxy":       podStorage.Proxy,
 		"pods/binding":     podStorage.Binding,
 		"bindings":         podStorage.Binding,
+		"pods/evict":       podStorage.Evict,
 
 		"podTemplates": podTemplateStorage,
 

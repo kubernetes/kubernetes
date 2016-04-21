@@ -188,3 +188,35 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }
+
+// EvictREST implements the REST endpoint for evicting pod from node.
+type EvictREST struct {
+	Store *etcdgeneric.Etcd
+}
+
+// Implement GracefulDeleter
+var _ = rest.Deleter(&EvictREST{})
+
+// New returns an empty pod object
+func (r *EvictREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+func (e *EvictREST) Delete(ctx api.Context, name string) (runtime.Object, error) {
+	obj, err := e.Store.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	evictPod := obj.(*api.Pod)
+	if evictPod == nil {
+		return nil, fmt.Errorf("Unexpected object type: %#v", evictPod)
+	}
+	// TODO: Check DisruptionBudget
+
+	// TODO: Add PreferAvoidPods to Node
+
+	// TODO: Update DisruptionBudget
+
+	// TODO: Delete the pod
+	return e.Store.Delete(ctx, name, nil)
+}
