@@ -123,7 +123,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
 	kubelet.kubeClient = fakeKubeClient
-	kubelet.os = containertest.FakeOS{}
+	kubelet.os = &containertest.FakeOS{}
 
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = testKubeletHostname

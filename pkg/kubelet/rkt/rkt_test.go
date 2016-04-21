@@ -33,8 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	kubetesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_os"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/errors"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
@@ -1072,11 +1074,7 @@ func TestSetApp(t *testing.T) {
 }
 
 func TestGenerateRunCommand(t *testing.T) {
-	hostName, err := os.Hostname()
-	if err != nil {
-		t.Fatalf("Cannot get the hostname: %v", err)
-	}
-
+	hostName := "test-hostname"
 	tests := []struct {
 		pod  *api.Pod
 		uuid string
@@ -1177,6 +1175,7 @@ func TestGenerateRunCommand(t *testing.T) {
 	}
 
 	rkt := &Runtime{
+		os: &kubetesting.FakeOS{HostName: hostName},
 		config: &Config{
 			Path:            "/bin/rkt/rkt",
 			Stage1Image:     "/bin/rkt/stage1-coreos.aci",
@@ -1396,4 +1395,219 @@ func TestImageStats(t *testing.T) {
 	result, err := rkt.ImageStats()
 	assert.NoError(t, err)
 	assert.Equal(t, result, &kubecontainer.ImageStats{TotalStorageBytes: 600})
+}
+
+func TestGarbageCollect(t *testing.T) {
+	fr := newFakeRktInterface()
+	fs := newFakeSystemd()
+	cli := newFakeRktCli()
+	fakeOS := kubetesting.NewFakeOS()
+	getter := newFakePodGetter()
+
+	rkt := &Runtime{
+		os:                  fakeOS,
+		cli:                 cli,
+		apisvc:              fr,
+		podGetter:           getter,
+		systemd:             fs,
+		containerRefManager: kubecontainer.NewRefManager(),
+	}
+
+	fakeApp := &rktapi.App{Name: "app-foo"}
+
+	tests := []struct {
+		gcPolicy             kubecontainer.ContainerGCPolicy
+		apiPods              []*api.Pod
+		pods                 []*rktapi.Pod
+		serviceFilesOnDisk   []string
+		expectedCommands     []string
+		expectedServiceFiles []string
+	}{
+		// All running pods, should not be gc'd.
+		// Dead, new pods should not be gc'd.
+		// Dead, old pods should be gc'd.
+		// Deleted pods should be gc'd.
+		// Service files without corresponded pods should be removed.
+		{
+			kubecontainer.ContainerGCPolicy{
+				MinAge:        0,
+				MaxContainers: 0,
+			},
+			[]*api.Pod{
+				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-1"}},
+				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-2"}},
+				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-3"}},
+				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-4"}},
+			},
+			[]*rktapi.Pod{
+				{
+					Id:        "deleted-foo",
+					State:     rktapi.PodState_POD_STATE_EXITED,
+					CreatedAt: time.Now().Add(time.Hour).UnixNano(),
+					StartedAt: time.Now().Add(time.Hour).UnixNano(),
+					Apps:      []*rktapi.App{fakeApp},
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktUIDAnno,
+							Value: "pod-uid-0",
+						},
+					},
+				},
+				{
+					Id:        "running-foo",
+					State:     rktapi.PodState_POD_STATE_RUNNING,
+					CreatedAt: 0,
+					StartedAt: 0,
+					Apps:      []*rktapi.App{fakeApp},
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktUIDAnno,
+							Value: "pod-uid-1",
+						},
+					},
+				},
+				{
+					Id:        "running-bar",
+					State:     rktapi.PodState_POD_STATE_RUNNING,
+					CreatedAt: 0,
+					StartedAt: 0,
+					Apps:      []*rktapi.App{fakeApp},
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktUIDAnno,
+							Value: "pod-uid-2",
+						},
+					},
+				},
+				{
+					Id:        "dead-old",
+					State:     rktapi.PodState_POD_STATE_EXITED,
+					CreatedAt: 0,
+					StartedAt: 0,
+					Apps:      []*rktapi.App{fakeApp},
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktUIDAnno,
+							Value: "pod-uid-3",
+						},
+					},
+				},
+				{
+					Id:        "dead-new",
+					State:     rktapi.PodState_POD_STATE_EXITED,
+					CreatedAt: time.Now().Add(time.Hour).UnixNano(),
+					StartedAt: time.Now().Add(time.Hour).UnixNano(),
+					Apps:      []*rktapi.App{fakeApp},
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktUIDAnno,
+							Value: "pod-uid-4",
+						},
+					},
+				},
+			},
+			[]string{"k8s_dead-old.service", "k8s_deleted-foo.service", "k8s_non-existing-bar.service"},
+			[]string{"rkt rm dead-old", "rkt rm deleted-foo"},
+			[]string{"/run/systemd/system/k8s_dead-old.service", "/run/systemd/system/k8s_deleted-foo.service", "/run/systemd/system/k8s_non-existing-bar.service"},
+		},
+		// gcPolicy.MaxContainers should be enforced.
+		// Oldest ones are removed first.
+		{
+			kubecontainer.ContainerGCPolicy{
+				MinAge:        0,
+				MaxContainers: 1,
+			},
+			[]*api.Pod{
+				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-0"}},
+				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-1"}},
+				{ObjectMeta: api.ObjectMeta{UID: "pod-uid-2"}},
+			},
+			[]*rktapi.Pod{
+				{
+					Id:        "dead-2",
+					State:     rktapi.PodState_POD_STATE_EXITED,
+					CreatedAt: 2,
+					StartedAt: 2,
+					Apps:      []*rktapi.App{fakeApp},
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktUIDAnno,
+							Value: "pod-uid-2",
+						},
+					},
+				},
+				{
+					Id:        "dead-1",
+					State:     rktapi.PodState_POD_STATE_EXITED,
+					CreatedAt: 1,
+					StartedAt: 1,
+					Apps:      []*rktapi.App{fakeApp},
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktUIDAnno,
+							Value: "pod-uid-1",
+						},
+					},
+				},
+				{
+					Id:        "dead-0",
+					State:     rktapi.PodState_POD_STATE_EXITED,
+					CreatedAt: 0,
+					StartedAt: 0,
+					Apps:      []*rktapi.App{fakeApp},
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktUIDAnno,
+							Value: "pod-uid-0",
+						},
+					},
+				},
+			},
+			[]string{"k8s_dead-0.service", "k8s_dead-1.service", "k8s_dead-2.service"},
+			[]string{"rkt rm dead-0", "rkt rm dead-1"},
+			[]string{"/run/systemd/system/k8s_dead-0.service", "/run/systemd/system/k8s_dead-1.service"},
+		},
+	}
+
+	for i, tt := range tests {
+		testCaseHint := fmt.Sprintf("test case #%d", i)
+
+		ctrl := gomock.NewController(t)
+
+		fakeOS.ReadDirFn = func(dirname string) ([]os.FileInfo, error) {
+			serviceFileNames := tt.serviceFilesOnDisk
+			var fileInfos []os.FileInfo
+
+			for _, name := range serviceFileNames {
+				mockFI := mock_os.NewMockFileInfo(ctrl)
+				mockFI.EXPECT().Name().Return(name)
+				fileInfos = append(fileInfos, mockFI)
+			}
+			return fileInfos, nil
+		}
+
+		fr.pods = tt.pods
+		for _, p := range tt.apiPods {
+			getter.pods[p.UID] = p
+		}
+
+		err := rkt.GarbageCollect(tt.gcPolicy)
+		assert.NoError(t, err, testCaseHint)
+
+		sort.Sort(sortedStringList(tt.expectedCommands))
+		sort.Sort(sortedStringList(cli.cmds))
+
+		assert.Equal(t, tt.expectedCommands, cli.cmds, testCaseHint)
+
+		sort.Sort(sortedStringList(tt.expectedServiceFiles))
+		sort.Sort(sortedStringList(fakeOS.Removes))
+
+		assert.Equal(t, tt.expectedServiceFiles, fakeOS.Removes, testCaseHint)
+
+		// Cleanup after each test.
+		cli.Reset()
+		ctrl.Finish()
+		fakeOS.Removes = []string{}
+		getter.pods = make(map[types.UID]*api.Pod)
+	}
 }
