@@ -23,17 +23,17 @@ import (
 )
 
 type attributesRecord struct {
-	kind        unversioned.GroupKind
+	kind        unversioned.GroupVersionKind
 	namespace   string
 	name        string
-	resource    unversioned.GroupResource
+	resource    unversioned.GroupVersionResource
 	subresource string
 	operation   Operation
 	object      runtime.Object
 	userInfo    user.Info
 }
 
-func NewAttributesRecord(object runtime.Object, kind unversioned.GroupKind, namespace, name string, resource unversioned.GroupResource, subresource string, operation Operation, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, kind unversioned.GroupVersionKind, namespace, name string, resource unversioned.GroupVersionResource, subresource string, operation Operation, userInfo user.Info) Attributes {
 	return &attributesRecord{
 		kind:        kind,
 		namespace:   namespace,
@@ -46,7 +46,7 @@ func NewAttributesRecord(object runtime.Object, kind unversioned.GroupKind, name
 	}
 }
 
-func (record *attributesRecord) GetKind() unversioned.GroupKind {
+func (record *attributesRecord) GetKind() unversioned.GroupVersionKind {
 	return record.kind
 }
 
@@ -58,7 +58,7 @@ func (record *attributesRecord) GetName() string {
 	return record.name
 }
 
-func (record *attributesRecord) GetResource() unversioned.GroupResource {
+func (record *attributesRecord) GetResource() unversioned.GroupVersionResource {
 	return record.resource
 }
 
