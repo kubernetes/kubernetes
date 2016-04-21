@@ -2078,7 +2078,13 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 
 // printLabelsMultiline prints multiple labels with a proper alignment.
 func printLabelsMultiline(out io.Writer, title string, labels map[string]string) {
-	fmt.Fprintf(out, "%s:\t", title)
+	printLabelsMultilineWithIndent(out, "", title, "\t", labels)
+}
+
+// printLabelsMultiline prints multiple labels with a user-defined alignment.
+func printLabelsMultilineWithIndent(out io.Writer, initialIndent, title, innerIndent string, labels map[string]string) {
+
+	fmt.Fprintf(out, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if labels == nil || len(labels) == 0 {
 		fmt.Fprintln(out, "<none>")
@@ -2094,7 +2100,8 @@ func printLabelsMultiline(out io.Writer, title string, labels map[string]string)
 
 	for i, key := range keys {
 		if i != 0 {
-			fmt.Fprint(out, "\t")
+			fmt.Fprint(out, initialIndent)
+			fmt.Fprint(out, innerIndent)
 		}
 		fmt.Fprintf(out, "%s=%s\n", key, labels[key])
 		i++
