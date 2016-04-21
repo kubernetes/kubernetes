@@ -59,7 +59,7 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 	prototypePod := func() *api.Pod {
 		return &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "XXX",
+				Name: "xxx",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -87,7 +87,7 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 		{
 			name:     "no change, set",
 			original: &i30,
-			update:   &i60,
+			update:   &i30,
 			valid:    true,
 		},
 		{
@@ -120,17 +120,12 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 			update:   &iNeg,
 			valid:    false,
 		},
+		// zero is not allowed, must be a positive integer
 		{
 			name:     "change to zero from positive",
 			original: &i30,
 			update:   &iZero,
-			valid:    true,
-		},
-		{
-			name:     "change to zero from nil",
-			original: nil,
-			update:   &iZero,
-			valid:    true,
+			valid:    false,
 		},
 		{
 			name:     "change to nil from positive",
@@ -182,7 +177,7 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "XXX",
+			Name: "xxx",
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
