@@ -144,6 +144,7 @@ type NetworkPolicySpec struct {
   // objects whose podSelector matches the pod.  If this field is 
   // empty, this NetworkPolicy has no effect on selected pods.
   Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty"`
+}
 
 type NetworkPolicyIngressRule struct {
   // List of ports which should be made accessible on the pods selected by PodSelector.  
