@@ -3696,6 +3696,21 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, true},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				Untrusted: false,
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				Untrusted: true,
+			},
+		}, true},
 	}
 	for i, test := range tests {
 		test.oldNode.ObjectMeta.ResourceVersion = "1"

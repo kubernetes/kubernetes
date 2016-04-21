@@ -37,4 +37,5 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/tpm"
 )

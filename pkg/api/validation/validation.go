@@ -1987,6 +1987,8 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	oldNode.Status.Capacity = node.Status.Capacity
 	// Allow users to unschedule node
 	oldNode.Spec.Unschedulable = node.Spec.Unschedulable
+	// Allow users to define whether a node is trusted
+	oldNode.Spec.Untrusted = node.Spec.Untrusted
 	// Clear status
 	oldNode.Status = node.Status
 

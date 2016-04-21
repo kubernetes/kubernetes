@@ -108,6 +108,8 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 				return label, value, nil
 			case "spec.unschedulable":
 				return label, value, nil
+			case "spec.untrustable":
+				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}

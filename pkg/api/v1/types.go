@@ -2048,6 +2048,8 @@ type NodeSpec struct {
 	// Unschedulable controls node schedulability of new pods. By default, node is schedulable.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration"`
 	Unschedulable bool `json:"unschedulable,omitempty"`
+	// Untrusted indicates that the node is not trusted. By default node is trusted.
+	Untrusted bool `json:"untrusted,omitempty"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
