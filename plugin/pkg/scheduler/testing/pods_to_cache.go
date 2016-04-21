@@ -35,6 +35,12 @@ func (p PodsToCache) UpdatePod(oldPod, newPod *api.Pod) error { return nil }
 
 func (p PodsToCache) RemovePod(pod *api.Pod) error { return nil }
 
+func (p PodsToCache) AddNode(node *api.Node) error { return nil }
+
+func (p PodsToCache) UpdateNode(oldNode, newNode *api.Node) error { return nil }
+
+func (p PodsToCache) RemoveNode(node *api.Node) error { return nil }
+
 func (p PodsToCache) GetNodeNameToInfoMap() (map[string]*schedulercache.NodeInfo, error) {
 	return schedulercache.CreateNodeNameToInfoMap(p), nil
 }
