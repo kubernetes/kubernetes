@@ -77,8 +77,7 @@ func TestJwtProvider(t *testing.T) {
 			"expires_in": 3600
 		}`, token)))
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer ts.Close()
+	defer ts.Close()
 
 	file, err := ioutil.TempFile(os.TempDir(), "temp")
 	if err != nil {

@@ -75,8 +75,7 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 	destroyFunc = func() {
 		glog.Infof("destroying")
 		close(schedulerConfig.StopEverything)
-		// TODO: Uncomment when fix #19254
-		// s.Close()
+		s.Close()
 		glog.Infof("destroyed")
 	}
 	return

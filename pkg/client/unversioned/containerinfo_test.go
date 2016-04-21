@@ -70,8 +70,7 @@ func testHTTPContainerInfoGetter(
 			t.Fatal(err)
 		}
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer ts.Close()
+	defer ts.Close()
 	hostURL, err := url.Parse(ts.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -172,8 +171,7 @@ func TestHTTPGetMachineInfo(t *testing.T) {
 			t.Fatal(err)
 		}
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer ts.Close()
+	defer ts.Close()
 	hostURL, err := url.Parse(ts.URL)
 	if err != nil {
 		t.Fatal(err)
