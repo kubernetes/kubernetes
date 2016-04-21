@@ -36,10 +36,10 @@ write_files:
     content: |
       service_cluster_ip_range: 10.246.0.0/16
       cert_ip: 10.246.0.1
-      enable_cluster_monitoring: none
-      enable_cluster_logging: "false"
-      enable_cluster_ui: "false"
-      enable_node_logging: "false"
+      enable_cluster_monitoring: influxdb
+      enable_cluster_logging: "true"
+      enable_cluster_ui: "true"
+      enable_node_logging: "true"
       logging_destination: elasticsearch
       elasticsearch_replicas: "1"
       enable_cluster_dns: "true"
