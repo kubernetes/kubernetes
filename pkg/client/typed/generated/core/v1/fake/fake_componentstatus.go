@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -29,9 +30,11 @@ type FakeComponentStatuses struct {
 	Fake *FakeCore
 }
 
+var componentstatusesResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}
+
 func (c *FakeComponentStatuses) Create(componentStatus *v1.ComponentStatus) (result *v1.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction("componentstatuses", componentStatus), &v1.ComponentStatus{})
+		Invokes(core.NewRootCreateAction(componentstatusesResource, componentStatus), &v1.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
@@ -40,7 +43,7 @@ func (c *FakeComponentStatuses) Create(componentStatus *v1.ComponentStatus) (res
 
 func (c *FakeComponentStatuses) Update(componentStatus *v1.ComponentStatus) (result *v1.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction("componentstatuses", componentStatus), &v1.ComponentStatus{})
+		Invokes(core.NewRootUpdateAction(componentstatusesResource, componentStatus), &v1.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
@@ -49,12 +52,12 @@ func (c *FakeComponentStatuses) Update(componentStatus *v1.ComponentStatus) (res
 
 func (c *FakeComponentStatuses) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction("componentstatuses", name), &v1.ComponentStatus{})
+		Invokes(core.NewRootDeleteAction(componentstatusesResource, name), &v1.ComponentStatus{})
 	return err
 }
 
 func (c *FakeComponentStatuses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction("componentstatuses", listOptions)
+	action := core.NewRootDeleteCollectionAction(componentstatusesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ComponentStatusList{})
 	return err
@@ -62,7 +65,7 @@ func (c *FakeComponentStatuses) DeleteCollection(options *api.DeleteOptions, lis
 
 func (c *FakeComponentStatuses) Get(name string) (result *v1.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction("componentstatuses", name), &v1.ComponentStatus{})
+		Invokes(core.NewRootGetAction(componentstatusesResource, name), &v1.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}
@@ -71,7 +74,7 @@ func (c *FakeComponentStatuses) Get(name string) (result *v1.ComponentStatus, er
 
 func (c *FakeComponentStatuses) List(opts api.ListOptions) (result *v1.ComponentStatusList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction("componentstatuses", opts), &v1.ComponentStatusList{})
+		Invokes(core.NewRootListAction(componentstatusesResource, opts), &v1.ComponentStatusList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -92,5 +95,5 @@ func (c *FakeComponentStatuses) List(opts api.ListOptions) (result *v1.Component
 // Watch returns a watch.Interface that watches the requested componentStatuses.
 func (c *FakeComponentStatuses) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction("componentstatuses", opts))
+		InvokesWatch(core.NewRootWatchAction(componentstatusesResource, opts))
 }

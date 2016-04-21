@@ -18,6 +18,7 @@ package fake
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -30,9 +31,11 @@ type FakeReplicationControllers struct {
 	ns   string
 }
 
+var replicationcontrollersResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"}
+
 func (c *FakeReplicationControllers) Create(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("replicationcontrollers", c.ns, replicationController), &v1.ReplicationController{})
+		Invokes(core.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -42,7 +45,7 @@ func (c *FakeReplicationControllers) Create(replicationController *v1.Replicatio
 
 func (c *FakeReplicationControllers) Update(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("replicationcontrollers", c.ns, replicationController), &v1.ReplicationController{})
+		Invokes(core.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -52,7 +55,7 @@ func (c *FakeReplicationControllers) Update(replicationController *v1.Replicatio
 
 func (c *FakeReplicationControllers) UpdateStatus(replicationController *v1.ReplicationController) (*v1.ReplicationController, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("replicationcontrollers", "status", c.ns, replicationController), &v1.ReplicationController{})
+		Invokes(core.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -62,13 +65,13 @@ func (c *FakeReplicationControllers) UpdateStatus(replicationController *v1.Repl
 
 func (c *FakeReplicationControllers) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("replicationcontrollers", c.ns, name), &v1.ReplicationController{})
+		Invokes(core.NewDeleteAction(replicationcontrollersResource, c.ns, name), &v1.ReplicationController{})
 
 	return err
 }
 
 func (c *FakeReplicationControllers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("replicationcontrollers", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ReplicationControllerList{})
 	return err
@@ -76,7 +79,7 @@ func (c *FakeReplicationControllers) DeleteCollection(options *api.DeleteOptions
 
 func (c *FakeReplicationControllers) Get(name string) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("replicationcontrollers", c.ns, name), &v1.ReplicationController{})
+		Invokes(core.NewGetAction(replicationcontrollersResource, c.ns, name), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -86,7 +89,7 @@ func (c *FakeReplicationControllers) Get(name string) (result *v1.ReplicationCon
 
 func (c *FakeReplicationControllers) List(opts api.ListOptions) (result *v1.ReplicationControllerList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("replicationcontrollers", c.ns, opts), &v1.ReplicationControllerList{})
+		Invokes(core.NewListAction(replicationcontrollersResource, c.ns, opts), &v1.ReplicationControllerList{})
 
 	if obj == nil {
 		return nil, err
@@ -108,6 +111,6 @@ func (c *FakeReplicationControllers) List(opts api.ListOptions) (result *v1.Repl
 // Watch returns a watch.Interface that watches the requested replicationControllers.
 func (c *FakeReplicationControllers) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("replicationcontrollers", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(replicationcontrollersResource, c.ns, opts))
 
 }

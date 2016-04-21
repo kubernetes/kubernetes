@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -211,7 +210,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 			t.Errorf("expected 1 action during scale, got: %v", fake.Actions())
 			continue
 		}
-		updated := fake.Actions()[0].(testclient.UpdateAction).GetObject().(*exp.ReplicaSet)
+		updated := fake.Actions()[0].(core.UpdateAction).GetObject().(*exp.ReplicaSet)
 		if e, a := test.expectedNewReplicas, updated.Spec.Replicas; e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
@@ -583,10 +582,10 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		}
 		// There are both list and update actions logged, so extract the update
 		// action for verification.
-		var updateAction testclient.UpdateAction
+		var updateAction core.UpdateAction
 		for _, action := range fakeClientset.Actions() {
 			switch a := action.(type) {
-			case testclient.UpdateAction:
+			case core.UpdateAction:
 				if updateAction != nil {
 					t.Errorf("expected only 1 update action; had %v and found %v", updateAction, a)
 				} else {
@@ -704,22 +703,22 @@ type fixture struct {
 }
 
 func (f *fixture) expectUpdateDeploymentAction(d *exp.Deployment) {
-	f.actions = append(f.actions, core.NewUpdateAction("deployments", d.Namespace, d))
+	f.actions = append(f.actions, core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "deployments"}, d.Namespace, d))
 	f.objects.Items = append(f.objects.Items, d)
 }
 
 func (f *fixture) expectCreateRSAction(rs *exp.ReplicaSet) {
-	f.actions = append(f.actions, core.NewCreateAction("replicasets", rs.Namespace, rs))
+	f.actions = append(f.actions, core.NewCreateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
 	f.objects.Items = append(f.objects.Items, rs)
 }
 
 func (f *fixture) expectUpdateRSAction(rs *exp.ReplicaSet) {
-	f.actions = append(f.actions, core.NewUpdateAction("replicasets", rs.Namespace, rs))
+	f.actions = append(f.actions, core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
 	f.objects.Items = append(f.objects.Items, rs)
 }
 
 func (f *fixture) expectListPodAction(namespace string, opt api.ListOptions) {
-	f.actions = append(f.actions, testclient.NewListAction("pods", namespace, opt))
+	f.actions = append(f.actions, core.NewListAction(unversioned.GroupVersionResource{Resource: "pods"}, namespace, opt))
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -758,7 +757,7 @@ func (f *fixture) run(deploymentName string) {
 		}
 
 		expectedAction := f.actions[i]
-		if !expectedAction.Matches(action.GetVerb(), action.GetResource()) {
+		if !expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) {
 			f.t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expectedAction, action)
 			continue
 		}

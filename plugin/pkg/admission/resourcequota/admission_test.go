@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -159,14 +159,14 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	)
 	actionSet := sets.NewString()
 	for _, action := range kubeClient.Actions() {
-		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
 	}
 	if !actionSet.HasAll(expectedActionSet.List()...) {
 		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
 	}
 
 	lastActionIndex := len(kubeClient.Actions()) - 1
-	usage := kubeClient.Actions()[lastActionIndex].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := kubeClient.Actions()[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
 	expectedUsage := api.ResourceQuota{
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
@@ -372,14 +372,14 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	)
 	actionSet := sets.NewString()
 	for _, action := range kubeClient.Actions() {
-		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
 	}
 	if !actionSet.HasAll(expectedActionSet.List()...) {
 		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
 	}
 
 	lastActionIndex := len(kubeClient.Actions()) - 1
-	usage := kubeClient.Actions()[lastActionIndex].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := kubeClient.Actions()[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
 
 	// ensure only the quota-terminating was updated
 	if usage.Name != resourceQuotaTerminating.Name {
@@ -463,13 +463,13 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	)
 	actionSet := sets.NewString()
 	for _, action := range kubeClient.Actions() {
-		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
 	}
 	if !actionSet.HasAll(expectedActionSet.List()...) {
 		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
 	}
 	lastActionIndex := len(kubeClient.Actions()) - 1
-	usage := kubeClient.Actions()[lastActionIndex].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := kubeClient.Actions()[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
 
 	if usage.Name != resourceQuotaBestEffort.Name {
 		t.Errorf("Incremented the wrong quota, expected %v, actual %v", resourceQuotaBestEffort.Name, usage.Name)
