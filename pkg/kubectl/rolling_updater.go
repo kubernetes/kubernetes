@@ -505,19 +505,28 @@ func LoadExistingNextReplicationController(c client.ReplicationControllersNamesp
 	return newRc, err
 }
 
-func CreateNewControllerFromCurrentController(c client.Interface, codec runtime.Codec, namespace, oldName, newName, image, container, deploymentKey string) (*api.ReplicationController, error) {
+type NewControllerConfig struct {
+	Namespace        string
+	OldName, NewName string
+	Image            string
+	Container        string
+	DeploymentKey    string
+	PullPolicy       api.PullPolicy
+}
+
+func CreateNewControllerFromCurrentController(c client.Interface, codec runtime.Codec, cfg *NewControllerConfig) (*api.ReplicationController, error) {
 	containerIndex := 0
 	// load the old RC into the "new" RC
-	newRc, err := c.ReplicationControllers(namespace).Get(oldName)
+	newRc, err := c.ReplicationControllers(cfg.Namespace).Get(cfg.OldName)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(container) != 0 {
+	if len(cfg.Container) != 0 {
 		containerFound := false
 
 		for i, c := range newRc.Spec.Template.Spec.Containers {
-			if c.Name == container {
+			if c.Name == cfg.Container {
 				containerIndex = i
 				containerFound = true
 				break
@@ -525,31 +534,34 @@ func CreateNewControllerFromCurrentController(c client.Interface, codec runtime.
 		}
 
 		if !containerFound {
-			return nil, fmt.Errorf("container %s not found in pod", container)
+			return nil, fmt.Errorf("container %s not found in pod", cfg.Container)
 		}
 	}
 
-	if len(newRc.Spec.Template.Spec.Containers) > 1 && len(container) == 0 {
+	if len(newRc.Spec.Template.Spec.Containers) > 1 && len(cfg.Container) == 0 {
 		return nil, goerrors.New("Must specify container to update when updating a multi-container pod")
 	}
 
 	if len(newRc.Spec.Template.Spec.Containers) == 0 {
 		return nil, goerrors.New(fmt.Sprintf("Pod has no containers! (%v)", newRc))
 	}
-	newRc.Spec.Template.Spec.Containers[containerIndex].Image = image
+	newRc.Spec.Template.Spec.Containers[containerIndex].Image = cfg.Image
+	if len(cfg.PullPolicy) != 0 {
+		newRc.Spec.Template.Spec.Containers[containerIndex].ImagePullPolicy = cfg.PullPolicy
+	}
 
 	newHash, err := api.HashObject(newRc, codec)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(newName) == 0 {
-		newName = fmt.Sprintf("%s-%s", newRc.Name, newHash)
+	if len(cfg.NewName) == 0 {
+		cfg.NewName = fmt.Sprintf("%s-%s", newRc.Name, newHash)
 	}
-	newRc.Name = newName
+	newRc.Name = cfg.NewName
 
-	newRc.Spec.Selector[deploymentKey] = newHash
-	newRc.Spec.Template.Labels[deploymentKey] = newHash
+	newRc.Spec.Selector[cfg.DeploymentKey] = newHash
+	newRc.Spec.Template.Labels[cfg.DeploymentKey] = newHash
 	// Clear resource version after hashing so that identical updates get different hashes.
 	newRc.ResourceVersion = ""
 	return newRc, nil

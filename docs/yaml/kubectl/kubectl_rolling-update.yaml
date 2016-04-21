@@ -26,6 +26,9 @@ options:
 - name: image
   usage: |
     Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f
+- name: image-pull-policy
+  usage: |
+    Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.
 - name: include-extended-apis
   default_value: "true"
   usage: |
