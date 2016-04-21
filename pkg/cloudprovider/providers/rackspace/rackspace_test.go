@@ -107,6 +107,27 @@ func configFromEnv() (cfg Config, ok bool) {
 	return
 }
 
+func TestParseMetaData(t *testing.T) {
+	_, err := parseMetaData(strings.NewReader(""))
+	if err == nil {
+		t.Errorf("Should fail when invalid meta data is provided: %s", err)
+	}
+
+	id, err := parseMetaData(strings.NewReader(`
+	{
+		"UUID":"someuuid",
+		"name":"somename",
+		"project_id":"someprojectid"
+	}
+	`))
+	if err != nil {
+		t.Fatalf("Should succeed when valid meta data is provided: %s", err)
+	}
+	if id != "someuuid" {
+		t.Errorf("incorrect uuid: %s", id)
+	}
+}
+
 func TestNewRackspace(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
