@@ -183,7 +183,7 @@ kube::log::status "Starting kube-apiserver"
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
 
-KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,apps/v1alpha1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -529,7 +529,7 @@ runTests() {
   kubectl create -f hack/testdata/pod-with-precision.json "${kube_flags[@]}"
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'pod-with-precision:'
-  
+
   ## Patch preserves precision
   # Command
   kubectl patch "${kube_flags[@]}" pod pod-with-precision -p='{"metadata":{"annotations":{"patchkey": "patchvalue"}}}'
@@ -544,7 +544,7 @@ runTests() {
   # Post-condition: pod-with-precision POD has annotation
   kube::test::get_object_assert 'pod pod-with-precision' "{{${annotations_field}.annotatekey}}" 'annotatevalue'
   # Cleanup
-  kubectl delete pod pod-with-precision "${kube_flags[@]}" 
+  kubectl delete pod pod-with-precision "${kube_flags[@]}"
 
   ### Create valid-pod POD
   # Pre-condition: no POD exists
@@ -1792,6 +1792,6 @@ __EOF__
   kube::test::clear_all
 }
 
-KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1" runTests "v1"
+KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,apps/v1alpha1,extensions/v1beta1" runTests "v1"
 
 kube::log::status "TEST PASSED"
