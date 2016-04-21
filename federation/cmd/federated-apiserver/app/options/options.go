@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -119,39 +120,53 @@ func NewAPIServer() *APIServer {
 }
 
 // dest must be a map of group to groupVersion.
-func gvToMap(gvList string, dest map[string]string) {
-	for _, gv := range strings.Split(gvList, ",") {
-		if gv == "" {
+func mergeGroupVersionIntoMap(gvList string, dest map[string]unversioned.GroupVersion) error {
+	for _, gvString := range strings.Split(gvList, ",") {
+		if gvString == "" {
 			continue
 		}
 		// We accept two formats. "group/version" OR
 		// "group=group/version". The latter is used when types
 		// move between groups.
-		if !strings.Contains(gv, "=") {
-			dest[apiutil.GetGroup(gv)] = gv
+		if !strings.Contains(gvString, "=") {
+			gv, err := unversioned.ParseGroupVersion(gvString)
+			if err != nil {
+				return err
+			}
+			dest[gv.Group] = gv
+
 		} else {
-			parts := strings.SplitN(gv, "=", 2)
-			// TODO: error checking.
-			dest[parts[0]] = parts[1]
+			parts := strings.SplitN(gvString, "=", 2)
+			gv, err := unversioned.ParseGroupVersion(parts[1])
+			if err != nil {
+				return err
+			}
+			dest[parts[0]] = gv
 		}
 	}
+
+	return nil
 }
 
-// StorageGroupsToGroupVersions returns a map from group name to group version,
+// StorageGroupsToEncodingVersion returns a map from group name to group version,
 // computed from the s.DeprecatedStorageVersion and s.StorageVersions flags.
 // TODO: can we move the whole storage version concept to the generic apiserver?
-func (s *APIServer) StorageGroupsToGroupVersions() map[string]string {
-	storageVersionMap := map[string]string{}
+func (s *APIServer) StorageGroupsToEncodingVersion() (map[string]unversioned.GroupVersion, error) {
+	storageVersionMap := map[string]unversioned.GroupVersion{}
 	if s.DeprecatedStorageVersion != "" {
-		storageVersionMap[""] = s.DeprecatedStorageVersion
+		storageVersionMap[""] = unversioned.GroupVersion{Group: apiutil.GetGroup(s.DeprecatedStorageVersion), Version: apiutil.GetVersion(s.DeprecatedStorageVersion)}
 	}
 
 	// First, get the defaults.
-	gvToMap(s.DefaultStorageVersions, storageVersionMap)
+	if err := mergeGroupVersionIntoMap(s.DefaultStorageVersions, storageVersionMap); err != nil {
+		return nil, err
+	}
 	// Override any defaults with the user settings.
-	gvToMap(s.StorageVersions, storageVersionMap)
+	if err := mergeGroupVersionIntoMap(s.StorageVersions, storageVersionMap); err != nil {
+		return nil, err
+	}
 
-	return storageVersionMap
+	return storageVersionMap, nil
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet

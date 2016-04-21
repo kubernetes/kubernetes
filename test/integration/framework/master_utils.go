@@ -29,6 +29,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -149,31 +150,33 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
-	etcdClient := NewEtcdClient()
-	storageVersions := make(map[string]string)
+	etcdConfig := etcdstorage.EtcdConfig{
+		ServerList: []string{"http://127.0.0.1:4001"},
+		Prefix:     etcdtest.PathPrefix(),
+	}
 
-	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
-	autoscalingEtcdStorage := NewAutoscalingEtcdStorage(etcdClient)
-	storageVersions[autoscaling.GroupName] = testapi.Autoscaling.GroupVersion().String()
-	batchEtcdStorage := NewBatchEtcdStorage(etcdClient)
-	storageVersions[batch.GroupName] = testapi.Batch.GroupVersion().String()
-	appsEtcdStorage := NewAppsEtcdStorage(etcdClient)
-	storageVersions[apps.GroupName] = testapi.Apps.GroupVersion().String()
-	expEtcdStorage := NewExtensionsEtcdStorage(etcdClient)
-	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
+	negotiatedSerializer := NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), "application/json")
 
-	storageDestinations := genericapiserver.NewStorageDestinations()
-	storageDestinations.AddAPIGroup(api.GroupName, etcdStorage)
-	storageDestinations.AddAPIGroup(autoscaling.GroupName, autoscalingEtcdStorage)
-	storageDestinations.AddAPIGroup(batch.GroupName, batchEtcdStorage)
-	storageDestinations.AddAPIGroup(apps.GroupName, appsEtcdStorage)
-	storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
+	storageFactory := genericapiserver.NewDefaultStorageFactory(etcdConfig, negotiatedSerializer, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
+	storageFactory.SetSerializer(
+		unversioned.GroupResource{Group: api.GroupName, Resource: genericapiserver.AllResources},
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), "application/json"))
+	storageFactory.SetSerializer(
+		unversioned.GroupResource{Group: autoscaling.GroupName, Resource: genericapiserver.AllResources},
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Autoscaling.Codec(), "application/json"))
+	storageFactory.SetSerializer(
+		unversioned.GroupResource{Group: batch.GroupName, Resource: genericapiserver.AllResources},
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Batch.Codec(), "application/json"))
+	storageFactory.SetSerializer(
+		unversioned.GroupResource{Group: apps.GroupName, Resource: genericapiserver.AllResources},
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Apps.Codec(), "application/json"))
+	storageFactory.SetSerializer(
+		unversioned.GroupResource{Group: extensions.GroupName, Resource: genericapiserver.AllResources},
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Extensions.Codec(), "application/json"))
 
 	return &master.Config{
 		Config: &genericapiserver.Config{
-			StorageDestinations:     storageDestinations,
-			StorageVersions:         storageVersions,
+			StorageFactory:          storageFactory,
 			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 			APIPrefix:               "/api",
 			APIGroupPrefix:          "/apis",
