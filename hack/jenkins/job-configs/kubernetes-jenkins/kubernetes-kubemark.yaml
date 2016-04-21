@@ -55,6 +55,24 @@
                 export KUBE_GCE_ZONE="us-central1-f"
                 export KUBEMARK_MASTER_SIZE="n1-standard-1"
                 export KUBEMARK_NUM_NODES="5"
+        - '100-gce':
+            description: 'Run small-ish kubemark cluster to continously run performance experiments'
+            timeout: 240
+            cron-string: 'H H/6 * * *'
+            job-env: |
+                export E2E_NAME="kubemark-100"
+                export PROJECT="k8s-jenkins-kubemark"
+                export E2E_TEST="false"
+                export USE_KUBEMARK="true"
+                export KUBEMARK_TESTS="\[Feature:Performance\]"
+                export CREATE_SERVICES="true"
+                # Override defaults to be independent from GCE defaults and set kubemark parameters
+                export NUM_NODES="3"
+                export MASTER_SIZE="n1-standard-2"
+                export NODE_SIZE="n1-standard-4"
+                export KUBE_GCE_ZONE="us-east1-d"
+                export KUBEMARK_MASTER_SIZE="n1-standard-4"
+                export KUBEMARK_NUM_NODES="100"
         - 'high-density-100-gce':
             description: 'Run Kubemark high-density (100 pods/node) test on a fake 100 node cluster.'
             timeout: 160
