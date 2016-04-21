@@ -846,10 +846,21 @@ func printSubReplicaSetList(list *federation.SubReplicaSetList, w io.Writer, opt
 }
 
 func printCluster(c *federation.Cluster, w io.Writer, options PrintOptions) error {
-	name := c.Name
+	var statuses []string
+	for _, condition := range c.Status.Conditions {
+		if condition.Status == api.ConditionTrue {
+			statuses = append(statuses, string(condition.Type))
+		} else {
+			statuses = append(statuses, "Not"+string(condition.Type))
+		}
+	}
+	if len(statuses) == 0 {
+		statuses = append(statuses, "Unknown")
+	}
+
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-		name,
-		c.Status.Phase,
+		c.Name,
+		strings.Join(statuses, ","),
 		c.Status.Version,
 		translateTimestamp(c.CreationTimestamp),
 	); err != nil {
