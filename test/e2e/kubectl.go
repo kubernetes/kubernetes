@@ -552,6 +552,25 @@ var _ = Describe("Kubectl client", func() {
 			By("checking the result")
 			forEachReplicationController(c, ns, "app", "redis", validateReplicationControllerConfiguration)
 		})
+		It("should reuse nodePort when apply to an existing SVC", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+			}
+			serviceJson := mkpath("redis-master-service.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			By("creating Redis SVC")
+			runKubectlOrDie("create", "-f", serviceJson, nsFlag)
+			By("getting the original nodePort")
+			originalNodePort := runKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].nodePort}")
+			By("applying the same configuration")
+			runKubectlOrDie("apply", "-f", serviceJson, nsFlag)
+			By("getting the nodePort after applying configuration")
+			currentNodePort := runKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].nodePort}")
+			By("checking the result")
+			if originalNodePort != currentNodePort {
+				Failf("nodePort should keep the same")
+			}
+		})
 	})
 
 	Describe("Kubectl cluster-info", func() {
