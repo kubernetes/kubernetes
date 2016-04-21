@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/perftype"
 )
 
-// TODO(random-liu): Change the tests to actually use PerfData from the begining instead of
+// TODO(random-liu): Change the tests to actually use PerfData from the beginning instead of
 // translating one to the other here.
 
 // currentApiCallMetricsVersion is the current apicall performance metrics version. We should

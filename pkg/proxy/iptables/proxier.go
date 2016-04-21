@@ -620,7 +620,7 @@ func (proxier *Proxier) deleteServiceConnections(svcIPs []string) {
 	}
 }
 
-//execConntrackTool executes conntrack tool using given paramters
+//execConntrackTool executes conntrack tool using given parameters
 func (proxier *Proxier) execConntrackTool(parameters ...string) error {
 	conntrackPath, err := proxier.exec.LookPath("conntrack")
 	if err != nil {
