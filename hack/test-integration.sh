@@ -52,11 +52,10 @@ runTests() {
     KUBE_RACE="" \
     KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
     KUBE_TEST_API_VERSIONS="$1" \
-    KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,apps/v1alpha1,extensions/v1beta1" \
     "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
   kube::log::status "Running integration test scenario with watch cache on"
-  KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,apps/v1alpha1,extensions/v1beta1" KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
+  KUBE_TEST_API_VERSIONS="$1" "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} \
     --max-concurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}" --watch-cache=true
 
   cleanup
@@ -73,7 +72,7 @@ checkEtcdOnPath() {
 checkEtcdOnPath
 
 
-KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,apps/v1alpha1,extensions/v1beta1" "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
+"${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
