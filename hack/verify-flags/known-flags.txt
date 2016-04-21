@@ -116,6 +116,9 @@ etcd-servers-overrides
 event-burst
 event-qps
 event-ttl
+eviction-hard
+eviction-soft
+eviction-soft-grace-period
 executor-bindall
 executor-logv
 executor-path
