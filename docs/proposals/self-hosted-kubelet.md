@@ -128,6 +128,10 @@ services](https://github.com/kubernetes/kubernetes/issues/5754).
   persist the configuration for bootstrap kubelet on the node. Once we have
   checkpointing in kubelet, we will checkpoint the updated config and have the
   bootstrap kubelet use the updated config, if it were to take over.
+* Currently best practice when upgrading the kubelet on a node is to drain all
+  pods first. Automatically draining of the node during kubelet upgrade is out
+  of scope for this proposal. It is assumed that either the cluster
+  administrator or the daemonset upgrade policy will handle this.
 
 ## Other discussion
 
