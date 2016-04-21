@@ -123,6 +123,7 @@ func Run(s *options.CMServer) error {
 		return err
 	}
 
+	kubeconfig.ContentConfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = s.KubeAPIBurst
