@@ -68,7 +68,7 @@ func TestRunOnce(t *testing.T) {
 		statusManager:       status.NewManager(nil, podManager),
 		containerRefManager: kubecontainer.NewRefManager(),
 		podManager:          podManager,
-		os:                  containertest.FakeOS{},
+		os:                  &containertest.FakeOS{},
 		volumeManager:       newVolumeManager(),
 		diskSpaceManager:    diskSpaceManager,
 		containerRuntime:    fakeRuntime,

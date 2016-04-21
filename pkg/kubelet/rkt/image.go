@@ -64,7 +64,7 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 		return err
 	}
 
-	if _, err := r.runCommand("fetch", dockerPrefix+img); err != nil {
+	if _, err := r.cli.RunCommand("fetch", dockerPrefix+img); err != nil {
 		glog.Errorf("Failed to fetch: %v", err)
 		return err
 	}
@@ -100,7 +100,7 @@ func (r *Runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 	if err != nil {
 		return err
 	}
-	if _, err := r.runCommand("image", "rm", imageID); err != nil {
+	if _, err := r.cli.RunCommand("image", "rm", imageID); err != nil {
 		return err
 	}
 	return nil

@@ -231,7 +231,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		cadvisorInterface,
 		configFilePath,
 		nil,
-		containertest.FakeOS{},
+		&containertest.FakeOS{},
 		1*time.Second,  /* FileCheckFrequency */
 		1*time.Second,  /* HTTPCheckFrequency */
 		10*time.Second, /* MinimumGCAge */
@@ -263,7 +263,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		cadvisorInterface,
 		"",
 		nil,
-		containertest.FakeOS{},
+		&containertest.FakeOS{},
 		1*time.Second,  /* FileCheckFrequency */
 		1*time.Second,  /* HTTPCheckFrequency */
 		10*time.Second, /* MinimumGCAge */
