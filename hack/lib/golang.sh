@@ -26,6 +26,8 @@ if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
 fi
 
 # The set of server targets that we are only building for Linux
+# Note: if you are adding something here, you might need to add it to
+# kube::build::source_targets in build/common.sh as well.
 kube::golang::server_targets() {
   local targets=(
     cmd/kube-proxy
@@ -34,6 +36,7 @@ kube::golang::server_targets() {
     cmd/kubelet
     cmd/kubemark
     cmd/hyperkube
+    federation/cmd/federated-apiserver
     plugin/cmd/kube-scheduler
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
