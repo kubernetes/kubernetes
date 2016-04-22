@@ -36,6 +36,7 @@ var (
 	verbose   = flag.Bool("verbose", false, "On verification failure, emit pre-munge and post-munge versions.")
 	verify    = flag.Bool("verify", false, "Exit with status 1 if files would have needed changes but do not change.")
 	norecurse = flag.Bool("norecurse", false, "Only process the files of --root-dir.")
+	upstream  = flag.String("upstream", "upstream", "The name of the upstream Git remote to pull from")
 	rootDir   = flag.String("root-dir", "", "Root directory containing documents to be processed.")
 	// "repo-root" seems like a dumb name, this is the relative path (from rootDir) to get to the repoRoot
 	relRoot = flag.String("repo-root", "..", `Appended to --root-dir to get the repository root.
@@ -199,7 +200,7 @@ func main() {
 	flag.Parse()
 
 	if *rootDir == "" {
-		fmt.Fprintf(os.Stderr, "usage: %s [--help] [--verify] [--norecurse] --root-dir [--skip-munges=<skip list>] <docs root>\n", flag.Arg(0))
+		fmt.Fprintf(os.Stderr, "usage: %s [--help] [--verify] [--norecurse] --root-dir [--skip-munges=<skip list>] [--upstream=<git remote>] <docs root>\n", flag.Arg(0))
 		os.Exit(1)
 	}
 
@@ -216,14 +217,14 @@ func main() {
 		os.Exit(2)
 	}
 	inJenkins = len(os.Getenv("JENKINS_HOME")) != 0
-	out, err := exec.Command("git", "ls-tree", "-r", "--name-only", fmt.Sprintf("%s/%s", "upstream", latestReleaseBranch), absRootDir).CombinedOutput()
+	out, err := exec.Command("git", "ls-tree", "-r", "--name-only", fmt.Sprintf("%s/%s", *upstream, latestReleaseBranch), absRootDir).CombinedOutput()
 	if err != nil {
 		if inJenkins {
 			fmt.Fprintf(os.Stderr, "output: %s,\nERROR: %v\n", out, err)
 			os.Exit(2)
 		} else {
 			fmt.Fprintf(os.Stdout, "output: %s,\nERROR: %v\n", out, err)
-			fmt.Fprintf(os.Stdout, "`git ls-tree -r --name-only upstream/%s failed. We'll ignore this error locally, but Jenkins may pick an error. Munger uses the output of this command to determine in unversioned warning, if it should add a link to the doc in release branch.\n", latestReleaseBranch)
+			fmt.Fprintf(os.Stdout, "`git ls-tree -r --name-only %s/%s failed. We'll ignore this error locally, but Jenkins may pick an error. Munger uses the output of this command to determine in unversioned warning, if it should add a link to the doc in release branch.\n", *upstream, latestReleaseBranch)
 			filesInLatestRelease = ""
 		}
 	} else {
