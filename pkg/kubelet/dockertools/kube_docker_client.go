@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"strconv"
 	"time"
 
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
@@ -90,19 +89,6 @@ func convertFilters(filters map[string][]string) dockerfilters.Args {
 		}
 	}
 	return args
-}
-
-// convertEnv converts data to a go-dockerclient Env
-func convertEnv(src interface{}) (*docker.Env, error) {
-	m := make(map[string]interface{})
-	if err := convertType(&src, &m); err != nil {
-		return nil, err
-	}
-	env := &docker.Env{}
-	for k, v := range m {
-		env.SetAuto(k, v)
-	}
-	return env, nil
 }
 
 func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
@@ -232,61 +218,45 @@ func (d *kubeDockerClient) RemoveImage(image string) error {
 	return err
 }
 
-func (d *kubeDockerClient) Logs(opts docker.LogsOptions) error {
-	resp, err := d.client.ContainerLogs(getDefaultContext(), dockertypes.ContainerLogsOptions{
-		ContainerID: opts.Container,
-		ShowStdout:  opts.Stdout,
-		ShowStderr:  opts.Stderr,
-		Since:       strconv.FormatInt(opts.Since, 10),
-		Timestamps:  opts.Timestamps,
-		Follow:      opts.Follow,
-		Tail:        opts.Tail,
-	})
+func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
+	opts.ContainerID = id
+	resp, err := d.client.ContainerLogs(getDefaultContext(), opts)
 	if err != nil {
 		return err
 	}
 	defer resp.Close()
-	return d.redirectResponseToOutputStream(opts.RawTerminal, opts.OutputStream, opts.ErrorStream, resp)
+	return d.redirectResponseToOutputStream(sopts.RawTerminal, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
-func (d *kubeDockerClient) Version() (*docker.Env, error) {
+func (d *kubeDockerClient) Version() (*dockertypes.Version, error) {
 	resp, err := d.client.ServerVersion(getDefaultContext())
 	if err != nil {
 		return nil, err
 	}
-	return convertEnv(resp)
+	return &resp, nil
 }
 
-func (d *kubeDockerClient) Info() (*docker.Env, error) {
+func (d *kubeDockerClient) Info() (*dockertypes.Info, error) {
 	resp, err := d.client.Info(getDefaultContext())
 	if err != nil {
 		return nil, err
 	}
-	return convertEnv(resp)
+	return &resp, nil
 }
 
-func (d *kubeDockerClient) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
-	cfg := dockertypes.ExecConfig{}
-	if err := convertType(&opts, &cfg); err != nil {
-		return nil, err
-	}
-	resp, err := d.client.ContainerExecCreate(getDefaultContext(), cfg)
+// TODO(random-liu): Add unit test for exec and attach functions, just like what go-dockerclient did.
+func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
+	opts.Container = id
+	resp, err := d.client.ContainerExecCreate(getDefaultContext(), opts)
 	if err != nil {
 		return nil, err
 	}
-	exec := &docker.Exec{}
-	if err := convertType(&resp, exec); err != nil {
-		return nil, err
-	}
-	return exec, nil
+	return &resp, nil
 }
 
-func (d *kubeDockerClient) StartExec(startExec string, opts docker.StartExecOptions) error {
+func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
 	if opts.Detach {
-		return d.client.ContainerExecStart(getDefaultContext(), startExec, dockertypes.ExecStartCheck{
-			Detach: opts.Detach,
-			Tty:    opts.Tty,
-		})
+		return d.client.ContainerExecStart(getDefaultContext(), startExec, opts)
 	}
 	resp, err := d.client.ContainerExecAttach(getDefaultContext(), startExec, dockertypes.ExecConfig{
 		Detach: opts.Detach,
@@ -296,43 +266,25 @@ func (d *kubeDockerClient) StartExec(startExec string, opts docker.StartExecOpti
 		return err
 	}
 	defer resp.Close()
-	if opts.Success != nil {
-		opts.Success <- struct{}{}
-		<-opts.Success
-	}
-	return d.holdHijackedConnection(opts.RawTerminal || opts.Tty, opts.InputStream, opts.OutputStream, opts.ErrorStream, resp)
+	return d.holdHijackedConnection(sopts.RawTerminal || opts.Tty, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
-func (d *kubeDockerClient) InspectExec(id string) (*docker.ExecInspect, error) {
+func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
 	resp, err := d.client.ContainerExecInspect(getDefaultContext(), id)
 	if err != nil {
 		return nil, err
 	}
-	exec := &docker.ExecInspect{}
-	if err := convertType(&resp, exec); err != nil {
-		return nil, err
-	}
-	return exec, nil
+	return &resp, nil
 }
 
-func (d *kubeDockerClient) AttachToContainer(opts docker.AttachToContainerOptions) error {
-	resp, err := d.client.ContainerAttach(getDefaultContext(), dockertypes.ContainerAttachOptions{
-		ContainerID: opts.Container,
-		Stream:      opts.Stream,
-		Stdin:       opts.Stdin,
-		Stdout:      opts.Stdout,
-		Stderr:      opts.Stderr,
-		// TODO: How to deal with the *Logs* here? There is no *Logs* field in the engine-api.
-	})
+func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
+	opts.ContainerID = id
+	resp, err := d.client.ContainerAttach(getDefaultContext(), opts)
 	if err != nil {
 		return err
 	}
 	defer resp.Close()
-	if opts.Success != nil {
-		opts.Success <- struct{}{}
-		<-opts.Success
-	}
-	return d.holdHijackedConnection(opts.RawTerminal, opts.InputStream, opts.OutputStream, opts.ErrorStream, resp)
+	return d.holdHijackedConnection(sopts.RawTerminal, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
 // redirectResponseToOutputStream redirect the response stream to stdout and stderr. When tty is true, all stream will
@@ -387,6 +339,14 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 func parseDockerTimestamp(s string) (time.Time, error) {
 	// Timestamp returned by Docker is in time.RFC3339Nano format.
 	return time.Parse(time.RFC3339Nano, s)
+}
+
+// StreamOptions are the options used to configure the stream redirection
+type StreamOptions struct {
+	RawTerminal  bool
+	InputStream  io.Reader
+	OutputStream io.Writer
+	ErrorStream  io.Writer
 }
 
 // containerNotFoundError is the error returned by InspectContainer when container not found. We

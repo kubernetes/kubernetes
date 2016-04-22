@@ -68,13 +68,13 @@ type DockerInterface interface {
 	ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 	RemoveImage(image string) error
-	Logs(opts docker.LogsOptions) error
-	Version() (*docker.Env, error)
-	Info() (*docker.Env, error)
-	CreateExec(docker.CreateExecOptions) (*docker.Exec, error)
-	StartExec(string, docker.StartExecOptions) error
-	InspectExec(id string) (*docker.ExecInspect, error)
-	AttachToContainer(opts docker.AttachToContainerOptions) error
+	Logs(string, dockertypes.ContainerLogsOptions, StreamOptions) error
+	Version() (*dockertypes.Version, error)
+	Info() (*dockertypes.Info, error)
+	CreateExec(string, dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error)
+	StartExec(string, dockertypes.ExecStartCheck, StreamOptions) error
+	InspectExec(id string) (*dockertypes.ContainerExecInspect, error)
+	AttachToContainer(string, dockertypes.ContainerAttachOptions, StreamOptions) error
 }
 
 // KubeletContainerName encapsulates a pod name and a Kubernetes container name.

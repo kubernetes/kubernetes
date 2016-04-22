@@ -93,8 +93,13 @@ func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, 
 	return "", ""
 }
 
-func newTestDockerManagerWithHTTPClientWithVersion(fakeHTTPClient *fakeHTTP, version, apiVersion string) (*DockerManager, *FakeDockerClient) {
-	fakeDocker := NewFakeDockerClientWithVersion(version, apiVersion)
+func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerClient) (*DockerManager, *FakeDockerClient) {
+	if fakeHTTPClient == nil {
+		fakeHTTPClient = &fakeHTTP{}
+	}
+	if fakeDocker == nil {
+		fakeDocker = NewFakeDockerClient()
+	}
 	fakeRecorder := &record.FakeRecorder{}
 	containerRefManager := kubecontainer.NewRefManager()
 	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
@@ -116,11 +121,16 @@ func newTestDockerManagerWithHTTPClientWithVersion(fakeHTTPClient *fakeHTTP, ver
 }
 
 func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManager, *FakeDockerClient) {
-	return newTestDockerManagerWithHTTPClientWithVersion(fakeHTTPClient, "1.8.1", "1.20")
+	return createTestDockerManager(fakeHTTPClient, nil)
+}
+
+func newTestDockerManagerWithVersion(version, apiVersion string) (*DockerManager, *FakeDockerClient) {
+	fakeDocker := NewFakeDockerClientWithVersion(version, apiVersion)
+	return createTestDockerManager(nil, fakeDocker)
 }
 
 func newTestDockerManager() (*DockerManager, *FakeDockerClient) {
-	return newTestDockerManagerWithHTTPClient(&fakeHTTP{})
+	return createTestDockerManager(nil, nil)
 }
 
 func matchString(t *testing.T, pattern, str string) bool {
@@ -129,35 +139,6 @@ func matchString(t *testing.T, pattern, str string) bool {
 		t.Logf("unexpected error: %v", err)
 	}
 	return match
-}
-
-func TestNewDockerVersion(t *testing.T) {
-	cases := []struct {
-		value string
-		out   string
-		err   bool
-	}{
-		{value: "1", err: true},
-		{value: "1.8", err: true},
-		{value: "1.8.1", out: "1.8.1"},
-		{value: "1.8.1.fc21", out: "1.8.1-fc21"},
-		{value: "1.8.1.fc21.other", out: "1.8.1-fc21.other"},
-		{value: "1.8.1-fc21.other", out: "1.8.1-fc21.other"},
-		{value: "1.8.1-beta.12", out: "1.8.1-beta.12"},
-	}
-	for _, test := range cases {
-		v, err := newDockerVersion(test.value)
-		switch {
-		case err != nil && test.err:
-			continue
-		case (err != nil) != test.err:
-			t.Errorf("error for %q: expected %t, got %v", test.value, test.err, err)
-			continue
-		}
-		if v.String() != test.out {
-			t.Errorf("unexpected parsed version %q for %q", v, test.value)
-		}
-	}
 }
 
 func TestSetEntrypointAndCommand(t *testing.T) {
@@ -438,7 +419,7 @@ func TestKillContainerInPod(t *testing.T) {
 
 func TestKillContainerInPodWithPreStop(t *testing.T) {
 	manager, fakeDocker := newTestDockerManager()
-	fakeDocker.ExecInspect = &docker.ExecInspect{
+	fakeDocker.ExecInspect = &dockertypes.ContainerExecInspect{
 		Running:  false,
 		ExitCode: 0,
 	}
@@ -1730,7 +1711,7 @@ func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult
 }
 
 func TestSeccompIsDisabledWithDockerV110(t *testing.T) {
-	dm, fakeDocker := newTestDockerManagerWithHTTPClientWithVersion(&fakeHTTP{}, "1.10.1", "1.22")
+	dm, fakeDocker := newTestDockerManagerWithVersion("1.10.1", "1.22")
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
@@ -1769,7 +1750,7 @@ func TestSeccompIsDisabledWithDockerV110(t *testing.T) {
 }
 
 func TestSecurityOptsAreNilWithDockerV19(t *testing.T) {
-	dm, fakeDocker := newTestDockerManagerWithHTTPClientWithVersion(&fakeHTTP{}, "1.9.1", "1.21")
+	dm, fakeDocker := newTestDockerManagerWithVersion("1.9.1", "1.21")
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
@@ -1808,10 +1789,6 @@ func TestSecurityOptsAreNilWithDockerV19(t *testing.T) {
 }
 
 func TestCheckVersionCompatibility(t *testing.T) {
-	apiVersion, err := docker.NewAPIVersion(minimumDockerAPIVersion)
-	if err != nil {
-		t.Fatalf("unexpected error %v", err)
-	}
 	type test struct {
 		version    string
 		compatible bool
@@ -1821,22 +1798,17 @@ func TestCheckVersionCompatibility(t *testing.T) {
 		{minimumDockerAPIVersion, true},
 		// Invalid apiversion
 		{"invalid_api_version", false},
-	}
-	for i := range apiVersion {
-		apiVersion[i]++
-		// Newer apiversion
-		tests = append(tests, test{apiVersion.String(), true})
-		apiVersion[i] -= 2
 		// Older apiversion
-		if apiVersion[i] >= 0 {
-			tests = append(tests, test{apiVersion.String(), false})
-		}
-		apiVersion[i]++
+		{"1.0.0", false},
+		// Newer apiversion
+		// NOTE(random-liu): We need to bump up the newer apiversion,
+		// if docker apiversion really reaches "9.9.9" someday. But I
+		// really doubt whether the test could live that long.
+		{"9.9.9", true},
 	}
-
 	for i, tt := range tests {
 		testCase := fmt.Sprintf("test case #%d test version %q", i, tt.version)
-		dm, fakeDocker := newTestDockerManagerWithHTTPClientWithVersion(&fakeHTTP{}, "", tt.version)
+		dm, fakeDocker := newTestDockerManagerWithVersion("", tt.version)
 		err := dm.checkVersionCompatibility()
 		assert.Equal(t, tt.compatible, err == nil, testCase)
 		if tt.compatible == true {
@@ -1845,6 +1817,27 @@ func TestCheckVersionCompatibility(t *testing.T) {
 			err := dm.checkVersionCompatibility()
 			assert.NotNil(t, err, testCase+" version error check")
 		}
+	}
+}
+
+func TestVersion(t *testing.T) {
+	expectedVersion := "1.8.1"
+	expectedAPIVersion := "1.20"
+	dm, _ := newTestDockerManagerWithVersion(expectedVersion, expectedAPIVersion)
+	version, err := dm.Version()
+	if err != nil {
+		t.Errorf("got error while getting docker server version - %v", err)
+	}
+	if e, a := expectedVersion, version.String(); e != a {
+		t.Errorf("expect docker server version %q, got %q", e, a)
+	}
+
+	apiVersion, err := dm.APIVersion()
+	if err != nil {
+		t.Errorf("got error while getting docker api version - %v", err)
+	}
+	if e, a := expectedAPIVersion, apiVersion.String(); e != a {
+		t.Errorf("expect docker api version %q, got %q", e, a)
 	}
 }
 
