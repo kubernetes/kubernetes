@@ -50,25 +50,7 @@ func ValidateClusterUpdate(cluster, oldCluster *federation.Cluster) field.ErrorL
 	return allErrs
 }
 
-func phaseTransitionAllowed(from, to federation.ClusterPhase) bool {
-	validPhaseTransition := map[federation.ClusterPhase][]federation.ClusterPhase{
-		federation.ClusterPending:    {federation.ClusterRunning, federation.ClusterOffline, federation.ClusterTerminated},
-		federation.ClusterRunning:    {federation.ClusterPending, federation.ClusterOffline, federation.ClusterTerminated},
-		federation.ClusterOffline:    {federation.ClusterRunning, federation.ClusterTerminated},
-		federation.ClusterTerminated: {},
-	}
-	for _, allowedPhase := range validPhaseTransition[from] {
-		if to == allowedPhase {
-			return true
-		}
-	}
-	return false
-}
 func ValidateClusterStatusUpdate(cluster, oldCluster *federation.Cluster) field.ErrorList {
 	allErrs := validation.ValidateObjectMetaUpdate(&cluster.ObjectMeta, &oldCluster.ObjectMeta, field.NewPath("metadata"))
-	if !phaseTransitionAllowed(oldCluster.Status.Phase, cluster.Status.Phase) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("status", "phase"),
-			oldCluster.Status.Phase+" => "+cluster.Status.Phase, "cluster phase transition not allowed"))
-	}
 	return allErrs
 }

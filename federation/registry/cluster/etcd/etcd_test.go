@@ -57,7 +57,9 @@ func validNewCluster() *federation.Cluster {
 			},
 		},
 		Status: federation.ClusterStatus{
-			Phase: federation.ClusterPending,
+			Conditions: []federation.ClusterCondition{
+				{Type: federation.ClusterReady, Status: api.ConditionFalse},
+			},
 		},
 	}
 }
