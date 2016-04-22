@@ -196,6 +196,8 @@ func init() {
 		Convert_api_ObjectMeta_To_v1_ObjectMeta,
 		Convert_v1_ObjectReference_To_api_ObjectReference,
 		Convert_api_ObjectReference_To_v1_ObjectReference,
+		Convert_v1_OwnerReference_To_api_OwnerReference,
+		Convert_api_OwnerReference_To_v1_OwnerReference,
 		Convert_v1_PersistentVolume_To_api_PersistentVolume,
 		Convert_api_PersistentVolume_To_v1_PersistentVolume,
 		Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim,
@@ -1479,6 +1481,13 @@ func autoConvert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *a
 	} else {
 		out.Preconditions = nil
 	}
+	if in.OrphanDependents != nil {
+		in, out := &in.OrphanDependents, &out.OrphanDependents
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.OrphanDependents = nil
+	}
 	return nil
 }
 
@@ -1508,6 +1517,13 @@ func autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, ou
 		}
 	} else {
 		out.Preconditions = nil
+	}
+	if in.OrphanDependents != nil {
+		in, out := &in.OrphanDependents, &out.OrphanDependents
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.OrphanDependents = nil
 	}
 	return nil
 }
@@ -4090,6 +4106,24 @@ func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.Object
 	} else {
 		out.Annotations = nil
 	}
+	if in.OwnerReferences != nil {
+		in, out := &in.OwnerReferences, &out.OwnerReferences
+		*out = make([]api.OwnerReference, len(*in))
+		for i := range *in {
+			if err := Convert_v1_OwnerReference_To_api_OwnerReference(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.OwnerReferences = nil
+	}
+	if in.Finalizers != nil {
+		in, out := &in.Finalizers, &out.Finalizers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Finalizers = nil
+	}
 	return nil
 }
 
@@ -4145,6 +4179,24 @@ func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *Object
 	} else {
 		out.Annotations = nil
 	}
+	if in.OwnerReferences != nil {
+		in, out := &in.OwnerReferences, &out.OwnerReferences
+		*out = make([]OwnerReference, len(*in))
+		for i := range *in {
+			if err := Convert_api_OwnerReference_To_v1_OwnerReference(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.OwnerReferences = nil
+	}
+	if in.Finalizers != nil {
+		in, out := &in.Finalizers, &out.Finalizers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Finalizers = nil
+	}
 	return nil
 }
 
@@ -4186,6 +4238,36 @@ func autoConvert_api_ObjectReference_To_v1_ObjectReference(in *api.ObjectReferen
 
 func Convert_api_ObjectReference_To_v1_ObjectReference(in *api.ObjectReference, out *ObjectReference, s conversion.Scope) error {
 	return autoConvert_api_ObjectReference_To_v1_ObjectReference(in, out, s)
+}
+
+func autoConvert_v1_OwnerReference_To_api_OwnerReference(in *OwnerReference, out *api.OwnerReference, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*OwnerReference))(in)
+	}
+	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	out.Name = in.Name
+	out.UID = in.UID
+	return nil
+}
+
+func Convert_v1_OwnerReference_To_api_OwnerReference(in *OwnerReference, out *api.OwnerReference, s conversion.Scope) error {
+	return autoConvert_v1_OwnerReference_To_api_OwnerReference(in, out, s)
+}
+
+func autoConvert_api_OwnerReference_To_v1_OwnerReference(in *api.OwnerReference, out *OwnerReference, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.OwnerReference))(in)
+	}
+	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	out.Name = in.Name
+	out.UID = in.UID
+	return nil
+}
+
+func Convert_api_OwnerReference_To_v1_OwnerReference(in *api.OwnerReference, out *OwnerReference, s conversion.Scope) error {
+	return autoConvert_api_OwnerReference_To_v1_OwnerReference(in, out, s)
 }
 
 func autoConvert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, out *api.PersistentVolume, s conversion.Scope) error {

@@ -486,6 +486,10 @@ message DeleteOptions {
   // Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
   // returned.
   optional Preconditions preconditions = 2;
+
+  // Should the dependent objects be orphaned. If true/false, the "orphan"
+  // finalizer will be added to/removed from the object's finalizers list.
+  optional bool orphanDependents = 3;
 }
 
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
@@ -1436,6 +1440,16 @@ message ObjectMeta {
   // queryable and should be preserved when modifying objects.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/annotations.md
   map<string, string> annotations = 12;
+
+  // List of objects depended by this object. If ALL objects in the list have
+  // been deleted, this object will be garbage collected.
+  repeated OwnerReference ownerReferences = 13;
+
+  // Must be empty before the object is deleted from the registry. Each entry
+  // is an identifier for the responsible component that will remove the entry
+  // from the list. If the deletionTimestamp of the object is non-nil, entries
+  // in this list can only be removed.
+  repeated string finalizers = 14;
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
@@ -1472,6 +1486,26 @@ message ObjectReference {
   // referencing a part of an object.
   // TODO: this design is not final and this field is subject to change in the future.
   optional string fieldPath = 7;
+}
+
+// OwnerReference contains enough information to let you identify an owning
+// object. Currently, an owning object must be in the same namespace, so there
+// is no namespace field.
+message OwnerReference {
+  // API version of the referent.
+  optional string apiVersion = 5;
+
+  // Kind of the referent.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  optional string kind = 1;
+
+  // Name of the referent.
+  // More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+  optional string name = 3;
+
+  // UID of the referent.
+  // More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
+  optional string uid = 4;
 }
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
