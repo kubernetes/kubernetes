@@ -50,9 +50,9 @@ type FakeDockerClient struct {
 	Stopped       []string
 	Removed       []string
 	RemovedImages sets.String
-	VersionInfo   docker.Env
-	Information   docker.Env
-	ExecInspect   *docker.ExecInspect
+	VersionInfo   dockertypes.Version
+	Information   dockertypes.Info
+	ExecInspect   *dockertypes.ContainerExecInspect
 	execCmd       []string
 	EnableSleep   bool
 }
@@ -67,7 +67,7 @@ func NewFakeDockerClient() *FakeDockerClient {
 
 func NewFakeDockerClientWithVersion(version, apiVersion string) *FakeDockerClient {
 	return &FakeDockerClient{
-		VersionInfo:   docker.Env{fmt.Sprintf("Version=%s", version), fmt.Sprintf("ApiVersion=%s", apiVersion)},
+		VersionInfo:   dockertypes.Version{Version: version, APIVersion: apiVersion},
 		Errors:        make(map[string]error),
 		RemovedImages: sets.String{},
 		ContainerMap:  make(map[string]*dockertypes.ContainerJSON),
@@ -412,7 +412,7 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 
 // Logs is a test-spy implementation of DockerInterface.Logs.
 // It adds an entry "logs" to the internal method call record.
-func (f *FakeDockerClient) Logs(opts docker.LogsOptions) error {
+func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "logs")
@@ -437,39 +437,39 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 	return err
 }
 
-func (f *FakeDockerClient) Version() (*docker.Env, error) {
+func (f *FakeDockerClient) Version() (*dockertypes.Version, error) {
 	f.Lock()
 	defer f.Unlock()
 	return &f.VersionInfo, f.popError("version")
 }
 
-func (f *FakeDockerClient) Info() (*docker.Env, error) {
+func (f *FakeDockerClient) Info() (*dockertypes.Info, error) {
 	return &f.Information, nil
 }
 
-func (f *FakeDockerClient) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
+func (f *FakeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.execCmd = opts.Cmd
 	f.called = append(f.called, "create_exec")
-	return &docker.Exec{ID: "12345678"}, nil
+	return &dockertypes.ContainerExecCreateResponse{ID: "12345678"}, nil
 }
 
-func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error {
+func (f *FakeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start_exec")
 	return nil
 }
 
-func (f *FakeDockerClient) AttachToContainer(opts docker.AttachToContainerOptions) error {
+func (f *FakeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "attach")
 	return nil
 }
 
-func (f *FakeDockerClient) InspectExec(id string) (*docker.ExecInspect, error) {
+func (f *FakeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
 	return f.ExecInspect, f.popError("inspect_exec")
 }
 

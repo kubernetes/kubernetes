@@ -139,16 +139,16 @@ func (in instrumentedDockerInterface) RemoveImage(image string) error {
 	return err
 }
 
-func (in instrumentedDockerInterface) Logs(opts docker.LogsOptions) error {
+func (in instrumentedDockerInterface) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
 	const operation = "logs"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.Logs(opts)
+	err := in.client.Logs(id, opts, sopts)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
+func (in instrumentedDockerInterface) Version() (*dockertypes.Version, error) {
 	const operation = "version"
 	defer recordOperation(operation, time.Now())
 
@@ -157,7 +157,7 @@ func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
 	return out, err
 }
 
-func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
+func (in instrumentedDockerInterface) Info() (*dockertypes.Info, error) {
 	const operation = "info"
 	defer recordOperation(operation, time.Now())
 
@@ -166,25 +166,25 @@ func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
 	return out, err
 }
 
-func (in instrumentedDockerInterface) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
+func (in instrumentedDockerInterface) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
 	const operation = "create_exec"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.client.CreateExec(opts)
+	out, err := in.client.CreateExec(id, opts)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedDockerInterface) StartExec(startExec string, opts docker.StartExecOptions) error {
+func (in instrumentedDockerInterface) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
 	const operation = "start_exec"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.StartExec(startExec, opts)
+	err := in.client.StartExec(startExec, opts, sopts)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedDockerInterface) InspectExec(id string) (*docker.ExecInspect, error) {
+func (in instrumentedDockerInterface) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
 	const operation = "inspect_exec"
 	defer recordOperation(operation, time.Now())
 
@@ -193,11 +193,11 @@ func (in instrumentedDockerInterface) InspectExec(id string) (*docker.ExecInspec
 	return out, err
 }
 
-func (in instrumentedDockerInterface) AttachToContainer(opts docker.AttachToContainerOptions) error {
+func (in instrumentedDockerInterface) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
 	const operation = "attach"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.AttachToContainer(opts)
+	err := in.client.AttachToContainer(id, opts, sopts)
 	recordError(operation, err)
 	return err
 }

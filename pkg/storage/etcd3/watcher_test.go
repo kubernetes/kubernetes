@@ -168,6 +168,25 @@ func TestWatchError(t *testing.T) {
 	testCheckResult(t, 0, watch.Error, w, nil)
 }
 
+func TestWatchContextCancel(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	w := store.watcher.createWatchChan(canceledCtx, "/abc", 0, false, storage.Everything)
+	// When we do a client.Get with a canceled context, it will return error.
+	// Nonetheless, when we try to send it over internal errChan, we should detect
+	// it's context canceled and not send it.
+	err := w.sync()
+	w.ctx = ctx
+	w.sendError(err)
+	select {
+	case err := <-w.errChan:
+		t.Errorf("cancelling context shouldn't return any error. Err: %v", err)
+	default:
+	}
+}
+
 type testWatchStruct struct {
 	obj         *api.Pod
 	expectEvent bool

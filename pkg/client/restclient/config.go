@@ -30,8 +30,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/crypto"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -65,6 +67,9 @@ type Config struct {
 	// Impersonate is the username that this RESTClient will impersonate
 	Impersonate string
 
+	// Server requires plugin-specified authentication.
+	AuthProvider *clientcmdapi.AuthProviderConfig
+
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
 
@@ -90,6 +95,9 @@ type Config struct {
 
 	// Maximum burst for throttle
 	Burst int
+
+	// Rate limiter for limiting connections to the master from this client. If present overwrites QPS/Burst
+	RateLimiter flowcontrol.RateLimiter
 }
 
 // TLSClientConfig contains settings to enable transport layer security
@@ -155,7 +163,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		httpClient = &http.Client{Transport: transport}
 	}
 
-	client := NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, config.QPS, config.Burst, httpClient)
+	client := NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
 
 	return client, nil
 }
@@ -188,7 +196,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		versionConfig.GroupVersion = &v
 	}
 
-	client := NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, httpClient)
+	client := NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
 	return client, nil
 }
 

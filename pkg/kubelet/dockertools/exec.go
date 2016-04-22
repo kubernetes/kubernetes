@@ -24,7 +24,6 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -100,27 +99,25 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 type NativeExecHandler struct{}
 
 func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	createOpts := docker.CreateExecOptions{
-		Container:    container.ID,
+	createOpts := dockertypes.ExecConfig{
 		Cmd:          cmd,
 		AttachStdin:  stdin != nil,
 		AttachStdout: stdout != nil,
 		AttachStderr: stderr != nil,
 		Tty:          tty,
 	}
-	execObj, err := client.CreateExec(createOpts)
+	execObj, err := client.CreateExec(container.ID, createOpts)
 	if err != nil {
 		return fmt.Errorf("failed to exec in container - Exec setup failed - %v", err)
 	}
-	startOpts := docker.StartExecOptions{
-		Detach:       false,
+	startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
+	streamOpts := StreamOptions{
 		InputStream:  stdin,
 		OutputStream: stdout,
 		ErrorStream:  stderr,
-		Tty:          tty,
 		RawTerminal:  tty,
 	}
-	err = client.StartExec(execObj.ID, startOpts)
+	err = client.StartExec(execObj.ID, startOpts, streamOpts)
 	if err != nil {
 		return err
 	}
