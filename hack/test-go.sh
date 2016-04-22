@@ -323,10 +323,8 @@ for (( i=0, j=0; ; )); do
   apiVersion=${apiVersions[i]}
   etcdPrefix=${etcdPrefixes[j]}
   echo "Running tests for APIVersion: $apiVersion with etcdPrefix: $etcdPrefix"
-  # KUBE_TEST_API sets the version of each group to be tested. KUBE_API_VERSIONS
-  # register the groups/versions as supported by k8s. So KUBE_API_VERSIONS
-  # needs to be the superset of KUBE_TEST_API.
-  KUBE_TEST_API="${apiVersion}" KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,extensions/v1beta1,componentconfig/v1alpha1,metrics/v1alpha1,apps/v1alpha1,authorization.k8s.io/v1beta1" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+  # KUBE_TEST_API sets the version of each group to be tested.
+  KUBE_TEST_API="${apiVersion}" ETCD_PREFIX=${etcdPrefix} runTests "$@"
   i=${i}+1
   j=${j}+1
   if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then
