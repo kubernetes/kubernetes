@@ -107,7 +107,8 @@ func doMount(source string, target string, fstype string, options []string) erro
 	command := exec.Command("mount", mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
+		glog.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, source, target, fstype, options, string(output))
+		return fmt.Errorf("mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
 			err, source, target, fstype, options, string(output))
 	}
 	return err
@@ -299,6 +300,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	options = append(options, "defaults")
 
 	// Run fsck on the disk to fix repairable issues
+	glog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
 	args := []string{"-a", source}
 	cmd := mounter.Runner.Command("fsck", args...)
 	out, err := cmd.CombinedOutput()
@@ -317,6 +319,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	}
 
 	// Try to mount the disk
+	glog.V(4).Infof("Attempting to mount disk: %s %s %s", fstype, source, target)
 	err = mounter.Interface.Mount(source, target, fstype, options)
 	if err != nil {
 		// It is possible that this disk is not formatted. Double check using diskLooksUnformatted
@@ -331,12 +334,15 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			if fstype == "ext4" || fstype == "ext3" {
 				args = []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", source}
 			}
+			glog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
 			cmd := mounter.Runner.Command("mkfs."+fstype, args...)
 			_, err := cmd.CombinedOutput()
 			if err == nil {
 				// the disk has been formatted successfully try to mount it again.
+				glog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
 				return mounter.Interface.Mount(source, target, fstype, options)
 			}
+			glog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
 			return err
 		}
 	}
@@ -347,6 +353,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
 	args := []string{"-nd", "-o", "FSTYPE", disk}
 	cmd := mounter.Runner.Command("lsblk", args...)
+	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
 	dataOut, err := cmd.CombinedOutput()
 	output := strings.TrimSpace(string(dataOut))
 
@@ -354,6 +361,7 @@ func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, erro
 	// an error if so.
 
 	if err != nil {
+		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return false, err
 	}
 
