@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
+	federation "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 )
 
 var (
@@ -292,6 +293,7 @@ func (r *Request) RequestURI(uri string) *Request {
 const (
 	// A constant that clients can use to refer in a field selector to the object name field.
 	// Will be automatically emitted as the correct name for the API version.
+	clusterStatus     = "status.phase"
 	nodeUnschedulable = "spec.unschedulable"
 	objectNameField   = "metadata.name"
 	podHost           = "spec.nodeName"
@@ -379,6 +381,11 @@ var fieldMappings = versionToResourceToFieldMapping{
 			eventInvolvedResourceVersion: eventInvolvedResourceVersion,
 			eventInvolvedFieldPath:       eventInvolvedFieldPath,
 		},
+	},
+	federation.SchemeGroupVersion: resourceTypeToFieldMapping{
+	   "clusters": clientFieldNameToAPIVersionFieldName{
+			   clusterStatus:   clusterStatus,
+	   },
 	},
 }
 

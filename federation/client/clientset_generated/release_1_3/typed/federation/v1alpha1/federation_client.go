@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
