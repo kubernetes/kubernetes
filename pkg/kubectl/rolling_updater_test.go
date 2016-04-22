@@ -1403,7 +1403,6 @@ func TestUpdateWithRetries(t *testing.T) {
 		{StatusCode: 200, Body: objBody(codec, rc)},
 	}
 	fakeClient := &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
@@ -1494,7 +1493,6 @@ func TestAddDeploymentHash(t *testing.T) {
 	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == testapi.Default.ResourcePath("pods", "default", "") && m == "GET":

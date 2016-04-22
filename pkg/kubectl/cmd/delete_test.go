@@ -35,7 +35,6 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
@@ -67,7 +66,6 @@ func TestDeleteNamedObject(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
@@ -99,7 +97,6 @@ func TestDeleteObject(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -126,10 +123,9 @@ func TestDeleteObject(t *testing.T) {
 }
 
 func TestDeleteObjectNotFound(t *testing.T) {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -156,10 +152,9 @@ func TestDeleteObjectNotFound(t *testing.T) {
 }
 
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -196,7 +191,6 @@ func TestDeleteAllNotFound(t *testing.T) {
 
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == "GET":
@@ -238,7 +232,6 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == "GET":
@@ -273,7 +266,6 @@ func TestDeleteMultipleObject(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -307,7 +299,6 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -344,7 +335,6 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/baz" && m == "DELETE":
@@ -380,7 +370,6 @@ func TestDeleteDirectory(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && m == "DELETE":
@@ -411,7 +400,6 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/pods" && m == "GET":

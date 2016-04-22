@@ -191,7 +191,7 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	config.Codec = $.codecs|raw$.LegacyCodec(*config.GroupVersion)
+	config.NegotiatedSerializer = $.codecs|raw$
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

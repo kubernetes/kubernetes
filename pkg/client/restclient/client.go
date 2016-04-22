@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
@@ -160,8 +159,4 @@ func (c *RESTClient) Delete() *Request {
 // APIVersion returns the APIVersion this RESTClient is expected to use.
 func (c *RESTClient) APIVersion() unversioned.GroupVersion {
 	return *c.contentConfig.GroupVersion
-}
-
-func (c *RESTClient) Codec() runtime.Codec {
-	return c.contentConfig.Codec
 }

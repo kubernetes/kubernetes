@@ -47,8 +47,8 @@ func TestDoRequestSuccess(t *testing.T) {
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
-			GroupVersion: testapi.Default.GroupVersion(),
-			Codec:        testapi.Default.Codec(),
+			GroupVersion:         testapi.Default.GroupVersion(),
+			NegotiatedSerializer: testapi.NegotiatedSerializer,
 		},
 		Username: "user",
 		Password: "pass",
@@ -93,8 +93,8 @@ func TestDoRequestFailed(t *testing.T) {
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
-			GroupVersion: testapi.Default.GroupVersion(),
-			Codec:        testapi.Default.Codec(),
+			GroupVersion:         testapi.Default.GroupVersion(),
+			NegotiatedSerializer: testapi.NegotiatedSerializer,
 		},
 	})
 	if err != nil {
@@ -132,8 +132,8 @@ func TestDoRequestCreated(t *testing.T) {
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
-			GroupVersion: testapi.Default.GroupVersion(),
-			Codec:        testapi.Default.Codec(),
+			GroupVersion:         testapi.Default.GroupVersion(),
+			NegotiatedSerializer: testapi.NegotiatedSerializer,
 		},
 		Username: "user",
 		Password: "pass",

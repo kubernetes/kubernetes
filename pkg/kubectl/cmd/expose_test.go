@@ -310,7 +310,6 @@ func TestRunExposeService(t *testing.T) {
 		f, tf, codec := NewAPIFactory()
 		tf.Printer = &kubectl.JSONPrinter{}
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.calls[m] && m == "GET":

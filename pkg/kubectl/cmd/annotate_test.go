@@ -422,7 +422,6 @@ func TestAnnotateObject(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
@@ -472,7 +471,6 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
@@ -523,7 +521,6 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":

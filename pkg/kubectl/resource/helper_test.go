@@ -95,7 +95,6 @@ func TestHelperDelete(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
 		}
@@ -183,7 +182,6 @@ func TestHelperCreate(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
 		}
@@ -261,7 +259,6 @@ func TestHelperGet(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
 		}
@@ -332,7 +329,6 @@ func TestHelperList(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
 		}
@@ -464,7 +460,6 @@ func TestHelperReplace(t *testing.T) {
 	for i, test := range tests {
 		client := &fake.RESTClient{
 			Client: test.HTTPClient,
-			Codec:  testapi.Default.Codec(),
 			Resp:   test.Resp,
 			Err:    test.HttpErr,
 		}

@@ -67,7 +67,6 @@ func fakeClient() ClientMapper {
 func fakeClientWith(testName string, t *testing.T, data map[string]string) ClientMapper {
 	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
 		return &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				p := req.URL.Path
 				q := req.URL.RawQuery

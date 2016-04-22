@@ -130,10 +130,9 @@ type ContentConfig struct {
 	// a RESTClient directly. When initializing a Client, will be set with the default
 	// code version.
 	GroupVersion *unversioned.GroupVersion
-	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
-	// to a RESTClient or Client. Required when initializing a RESTClient, optional
-	// when initializing a Client.
-	Codec runtime.Codec
+	// NegotiatedSerializer is used for obtaining encoders and decoders for multiple
+	// supported media types.
+	NegotiatedSerializer runtime.NegotiatedSerializer
 }
 
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
@@ -144,8 +143,8 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	if config.GroupVersion == nil {
 		return nil, fmt.Errorf("GroupVersion is required when initializing a RESTClient")
 	}
-	if config.Codec == nil {
-		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
+	if config.NegotiatedSerializer == nil {
+		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
 	}
 
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
@@ -171,8 +170,8 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
 // the config.Version to be empty.
 func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
-	if config.Codec == nil {
-		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
+	if config.NegotiatedSerializer == nil {
+		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
 	}
 
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)

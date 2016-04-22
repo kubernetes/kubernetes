@@ -231,8 +231,8 @@ func SetKubernetesDefaults(config *restclient.Config) error {
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	copyGroupVersion := g.GroupVersion
 	config.GroupVersion = &copyGroupVersion
-	if config.Codec == nil {
-		config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = api.Codecs
 	}
 
 	return restclient.SetKubernetesDefaults(config)

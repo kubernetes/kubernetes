@@ -137,7 +137,6 @@ func TestCordon(t *testing.T) {
 		new_node := &api.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
@@ -424,7 +423,6 @@ func TestDrain(t *testing.T) {
 		f, tf, codec := NewAPIFactory()
 
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {

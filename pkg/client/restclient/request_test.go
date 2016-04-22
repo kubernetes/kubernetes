@@ -242,6 +242,13 @@ type NotAnAPIObject struct{}
 func (obj NotAnAPIObject) GroupVersionKind() *unversioned.GroupVersionKind       { return nil }
 func (obj NotAnAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
 
+func defaultContentConfig() ContentConfig {
+	return ContentConfig{
+		GroupVersion:         testapi.Default.GroupVersion(),
+		NegotiatedSerializer: testapi.NegotiatedSerializer,
+	}
+}
+
 func TestRequestBody(t *testing.T) {
 	// test unknown type
 	r := (&Request{}).Body([]string{"test"})
@@ -262,7 +269,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test unencodable api object
-	r = (&Request{content: ContentConfig{Codec: testapi.Default.Codec()}}).Body(&NotAnAPIObject{})
+	r = (&Request{content: defaultContentConfig()}).Body(&NotAnAPIObject{})
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)
 	}
@@ -338,7 +345,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, "", ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()}, nil, nil)
+		r := NewRequest(nil, "", uri, "", defaultContentConfig(), nil, nil)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -425,7 +432,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 
 	for _, testCase := range testCases {
 		r := &Request{
-			content:      ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()},
+			content:      defaultContentConfig(),
 			resourceName: testCase.Name,
 			resource:     testCase.Resource,
 		}
@@ -476,7 +483,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				content: ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()},
+				content: defaultContentConfig(),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusForbidden,
@@ -492,7 +499,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				content: ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()},
+				content: defaultContentConfig(),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
@@ -508,7 +515,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				content: ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()},
+				content: defaultContentConfig(),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
@@ -620,7 +627,7 @@ func TestRequestStream(t *testing.T) {
 						})))),
 					}, nil
 				}),
-				content: ContentConfig{Codec: testapi.Default.Codec()},
+				content: defaultContentConfig(),
 				baseURL: &url.URL{},
 			},
 			Err: true,
@@ -1242,6 +1249,7 @@ func TestWatch(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
+		// FIXME: Streaming encoder.
 		encoder := watchjson.NewEncoder(w, testapi.Default.Codec())
 		for _, item := range table {
 			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
@@ -1319,5 +1327,5 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		}
 	}
 	versionedAPIPath := testapi.Default.ResourcePath("", "", "")
-	return NewRESTClient(baseURL, versionedAPIPath, ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()}, 0, 0, nil, nil)
+	return NewRESTClient(baseURL, versionedAPIPath, defaultContentConfig(), 0, 0, nil, nil)
 }

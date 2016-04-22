@@ -118,7 +118,6 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	f, tf, codec := NewTestFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})},
 	}
 	tf.Namespace = "test"
@@ -179,7 +178,6 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 	for k, test := range testCases {
 		apiCodec := testapi.Default.Codec()
 		regularClient := &fake.RESTClient{
-			Codec: apiCodec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: 200, Body: objBody(apiCodec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})}, nil
 			}),
@@ -188,7 +186,6 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		f, tf, codec := NewMixedFactory(regularClient)
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})}, nil
 			}),
@@ -232,7 +229,6 @@ func TestGetSchemaObject(t *testing.T) {
 	codec := testapi.Default.Codec()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})},
 	}
 	tf.Namespace = "test"
@@ -253,7 +249,6 @@ func TestGetObjects(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
@@ -297,7 +292,6 @@ func TestGetSortedObjects(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
 	}
 	tf.Namespace = "test"
@@ -329,7 +323,6 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
@@ -356,7 +349,6 @@ func TestGetListObjects(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
 	}
 	tf.Namespace = "test"
@@ -399,7 +391,6 @@ func TestGetAllListObjects(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
 	}
 	tf.Namespace = "test"
@@ -429,7 +420,6 @@ func TestGetListComponentStatus(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, statuses)},
 	}
 	tf.Namespace = "test"
@@ -458,7 +448,6 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
@@ -497,7 +486,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
@@ -557,7 +545,6 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -609,7 +596,6 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/nodes/foo":
@@ -646,7 +632,6 @@ func TestGetByNameForcesFlag(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
@@ -706,7 +691,6 @@ func TestWatchSelector(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -748,7 +732,6 @@ func TestWatchResource(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
@@ -786,7 +769,6 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/replicationcontrollers/cassandra":
@@ -825,7 +807,6 @@ func TestWatchOnlyResource(t *testing.T) {
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
