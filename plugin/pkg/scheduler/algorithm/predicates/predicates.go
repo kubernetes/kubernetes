@@ -425,6 +425,10 @@ func podName(pod *api.Pod) string {
 func podFitsResourcesInternal(pod *api.Pod, nodeName string, nodeInfo *schedulercache.NodeInfo, info *api.Node) (bool, error) {
 	allocatable := info.Status.Allocatable
 	allowedPodNumber := allocatable.Pods().Value()
+	if int64(len(nodeInfo.Pods()))+1 > allowedPodNumber {
+		return false,
+			newInsufficientResourceError(podCountResourceName, 1, int64(len(nodeInfo.Pods())), allowedPodNumber)
+	}
 	podRequest := getResourceRequest(pod)
 	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
 		return true, nil
@@ -450,13 +454,6 @@ func (r *NodeStatus) PodFitsResources(pod *api.Pod, nodeName string, nodeInfo *s
 	info, err := r.info.GetNodeInfo(nodeName)
 	if err != nil {
 		return false, err
-	}
-	// TODO: move the following podNumber check to podFitsResourcesInternal when Kubelet allows podNumber check (See #20263).
-	allocatable := info.Status.Allocatable
-	allowedPodNumber := allocatable.Pods().Value()
-	if int64(len(nodeInfo.Pods()))+1 > allowedPodNumber {
-		return false,
-			newInsufficientResourceError(podCountResourceName, 1, int64(len(nodeInfo.Pods())), allowedPodNumber)
 	}
 	return podFitsResourcesInternal(pod, nodeName, nodeInfo, info)
 }
@@ -775,6 +772,7 @@ func RunGeneralPredicates(pod *api.Pod, nodeName string, nodeInfo *schedulercach
 	if !fit {
 		return fit, err
 	}
+
 	fit, err = PodFitsHost(pod, nodeName, nodeInfo)
 	if !fit {
 		return fit, err
