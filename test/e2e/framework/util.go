@@ -1368,27 +1368,6 @@ func ExpectNoError(err error, explain ...interface{}) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
 }
 
-// Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
-func Cleanup(filePath string, ns string, selectors ...string) {
-	By("using delete to clean up resources")
-	var nsArg string
-	if ns != "" {
-		nsArg = fmt.Sprintf("--namespace=%s", ns)
-	}
-	RunKubectlOrDie("delete", "--grace-period=0", "-f", filePath, nsArg)
-
-	for _, selector := range selectors {
-		resources := RunKubectlOrDie("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
-		if resources != "" {
-			Failf("Resources left running after stop:\n%s", resources)
-		}
-		pods := RunKubectlOrDie("get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
-		if pods != "" {
-			Failf("Pods left unterminated after stop:\n%s", pods)
-		}
-	}
-}
-
 // validatorFn is the function which is individual tests will implement.
 // we may want it to return more than just an error, at some point.
 type validatorFn func(c *client.Client, podID string) error
@@ -1518,6 +1497,7 @@ func (b kubectlBuilder) WithStdinReader(reader io.Reader) *kubectlBuilder {
 }
 
 func (b kubectlBuilder) ExecOrDie() string {
+	Logf("Executing kubectl ")
 	str, err := b.Exec()
 	Logf("stdout: %q", str)
 	Expect(err).NotTo(HaveOccurred())
@@ -1562,7 +1542,7 @@ func RunKubectl(args ...string) (string, error) {
 }
 
 // runKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
-func runKubectlOrDieInput(data string, args ...string) string {
+func RunKubectlOrDieInput(data string, args ...string) string {
 	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
 }
 
