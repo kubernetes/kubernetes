@@ -30,6 +30,7 @@ import (
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_federation_Cluster,
+		DeepCopy_federation_ClusterCondition,
 		DeepCopy_federation_ClusterList,
 		DeepCopy_federation_ClusterMeta,
 		DeepCopy_federation_ClusterSpec,
@@ -53,6 +54,20 @@ func DeepCopy_federation_Cluster(in Cluster, out *Cluster, c *conversion.Cloner)
 	if err := DeepCopy_federation_ClusterStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
+	return nil
+}
+
+func DeepCopy_federation_ClusterCondition(in ClusterCondition, out *ClusterCondition, c *conversion.Cloner) error {
+	out.Type = in.Type
+	out.Status = in.Status
+	if err := unversioned.DeepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
 	return nil
 }
 
@@ -99,7 +114,17 @@ func DeepCopy_federation_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conver
 }
 
 func DeepCopy_federation_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *conversion.Cloner) error {
-	out.Phase = in.Phase
+	if in.Conditions != nil {
+		in, out := in.Conditions, &out.Conditions
+		*out = make([]ClusterCondition, len(in))
+		for i := range in {
+			if err := DeepCopy_federation_ClusterCondition(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	if in.Capacity != nil {
 		in, out := in.Capacity, &out.Capacity
 		*out = make(api.ResourceList)
