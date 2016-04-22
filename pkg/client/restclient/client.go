@@ -63,7 +63,7 @@ type RESTClient struct {
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server.
-func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, client *http.Client) *RESTClient {
+func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) *RESTClient {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -79,8 +79,10 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	}
 
 	var throttle flowcontrol.RateLimiter
-	if maxQPS > 0 {
+	if maxQPS > 0 && rateLimiter == nil {
 		throttle = flowcontrol.NewTokenBucketRateLimiter(maxQPS, maxBurst)
+	} else if rateLimiter != nil {
+		throttle = rateLimiter
 	}
 	return &RESTClient{
 		base:             &base,
