@@ -178,13 +178,13 @@ type ObjectMeta struct {
 
 	// List of objects depended by this object. If ALL objects in the list have
 	// been deleted, this object will be garbage collected.
-	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid"`
+	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
 	// Must be empty before the object is deleted from the registry. Each entry
 	// is an identifier for the responsible component that will remove the entry
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
 	// in this list can only be removed.
-	Finalizers []string `json:"finalizers,omitempty"`
+	Finalizers []string `json:"finalizers,omitempty" protobuf:"bytes,14,rep,name=finalizers"`
 }
 
 const (
@@ -2344,7 +2344,7 @@ type DeleteOptions struct {
 
 	// Should the dependent objects be orphaned. If true/false, the "orphan"
 	// finalizer will be added to/removed from the object's finalizers list.
-	OrphanDependents *bool `json:"orphanDependents,omitempty"`
+	OrphanDependents *bool `json:"orphanDependents,omitempty" protobuf:"varint,3,opt,name=orphanDependents"`
 }
 
 // ExportOptions is the query options to the standard REST get call.

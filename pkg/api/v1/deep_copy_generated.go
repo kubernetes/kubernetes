@@ -114,6 +114,7 @@ func init() {
 		DeepCopy_v1_ObjectFieldSelector,
 		DeepCopy_v1_ObjectMeta,
 		DeepCopy_v1_ObjectReference,
+		DeepCopy_v1_OwnerReference,
 		DeepCopy_v1_PersistentVolume,
 		DeepCopy_v1_PersistentVolumeClaim,
 		DeepCopy_v1_PersistentVolumeClaimList,
@@ -605,6 +606,13 @@ func DeepCopy_v1_DeleteOptions(in DeleteOptions, out *DeleteOptions, c *conversi
 		}
 	} else {
 		out.Preconditions = nil
+	}
+	if in.OrphanDependents != nil {
+		in, out := in.OrphanDependents, &out.OrphanDependents
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.OrphanDependents = nil
 	}
 	return nil
 }
@@ -1556,6 +1564,24 @@ func DeepCopy_v1_ObjectMeta(in ObjectMeta, out *ObjectMeta, c *conversion.Cloner
 	} else {
 		out.Annotations = nil
 	}
+	if in.OwnerReferences != nil {
+		in, out := in.OwnerReferences, &out.OwnerReferences
+		*out = make([]OwnerReference, len(in))
+		for i := range in {
+			if err := DeepCopy_v1_OwnerReference(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.OwnerReferences = nil
+	}
+	if in.Finalizers != nil {
+		in, out := in.Finalizers, &out.Finalizers
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.Finalizers = nil
+	}
 	return nil
 }
 
@@ -1567,6 +1593,14 @@ func DeepCopy_v1_ObjectReference(in ObjectReference, out *ObjectReference, c *co
 	out.APIVersion = in.APIVersion
 	out.ResourceVersion = in.ResourceVersion
 	out.FieldPath = in.FieldPath
+	return nil
+}
+
+func DeepCopy_v1_OwnerReference(in OwnerReference, out *OwnerReference, c *conversion.Cloner) error {
+	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	out.Name = in.Name
+	out.UID = in.UID
 	return nil
 }
 
