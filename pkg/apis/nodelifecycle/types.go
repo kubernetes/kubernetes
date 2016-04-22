@@ -21,19 +21,19 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-type NodeDeployment struct {
+type NodeMaintenance struct {
 	unversioned.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata,omitempty"`
 
-	// Specification of the desired behavior of the NodeDeployment.
-	Spec NodeDeploymentSpec `json:"spec,omitempty"`
+	// Specification of the desired behavior of the NodeMaintenance.
+	Spec NodeMaintenanceSpec `json:"spec,omitempty"`
 
-	// Most recently observed status of the NodeDeployment.
-	Status NodeDeploymentStatus `json:"status,omitempty"`
+	// Most recently observed status of the NodeMaintenance.
+	Status NodeMaintenanceStatus `json:"status,omitempty"`
 }
 
-type NodeDeploymentSpec struct {
-	// Nodes this NodeDeployment should operate on.
+type NodeMaintenanceSpec struct {
+	// Nodes this NodeMaintenance should operate on.
 	//
 	// We could also use a NodeSelector, but it gets more confusing as nodes are added with the
 	// new selector; should we operate on them?  It's also nice that this is the same type as
@@ -42,7 +42,7 @@ type NodeDeploymentSpec struct {
 	Nodes []string `json:"nodes,omitempty"`
 
 	// The operation to do on nodes.
-	Operation NodeDeploymentOperation `json:"strategy,omitempty"`
+	Operation NodeMaintenanceOperation `json:"strategy,omitempty"`
 
 	// TODO: maybe add this?
 	//
@@ -60,44 +60,44 @@ type NodeDeploymentSpec struct {
 	RollingBack bool `json:"rollingBack,omitempty"`
 }
 
-// This is significantly different from Deployment's conception of Strategy, which is why I changed it to Operation.
-type NodeDeploymentOperation struct {
-	// Type of NodeDeployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
-	Type NodeDeploymentStrategyType string
+// This is significantly different from Maintenance's conception of Strategy, which is why I changed it to Operation.
+type NodeMaintenanceOperation struct {
+	// Type of NodeMaintenance. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
+	Type NodeMaintenanceStrategyType string
 
 	// Type of operation to perform. Can be "Recreate" or "InPlaceNodeUpgrade". Default is Recreate.
-	Operation NodeDeploymentOperationType `json:"type,omitempty"`
+	Operation NodeMaintenanceOperationType `json:"type,omitempty"`
 
 	// Rolling operation config params.
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be.
-	RollingUpdate *RollingUpdateNodeDeployment `json:"rollingUpdate,omitempty"`
+	RollingUpdate *RollingUpdateNodeMaintenance `json:"rollingUpdate,omitempty"`
 }
 
-type NodeDeploymentStrategyType string
+type NodeMaintenanceStrategyType string
 
 const (
 	// Kill all existing nodes before creating new ones.
-	RecreateNodeDeploymentStrategyType NodeDeploymentStrategyType = "Recreate"
+	RecreateNodeMaintenanceStrategyType NodeMaintenanceStrategyType = "Recreate"
 
 	// Operate on the nodes one by one.
-	RollingUpdateNodeDeploymentStrategyType NodeDeploymentStrategyType = "RollingUpdate"
+	RollingUpdateNodeMaintenanceStrategyType NodeMaintenanceStrategyType = "RollingUpdate"
 )
 
-type NodeDeploymentOperationType string
+type NodeMaintenanceOperationType string
 
 const (
 	// Recreate nodes one at a time all existing nodes before creating new ones.
-	RecreateNodeDeploymentStrategyType NodeDeploymentOperationType = "RecreateNode"
+	RecreateNodeMaintenanceStrategyType NodeMaintenanceOperationType = "RecreateNode"
 
 	// Do an in-place upgrade of the node, including kernel, which generally involves triggering
 	// an in-place update, copying metadata and rebooting the machine.
-	InPlaceNodeUpgradeNodeDeploymentStrategyType NodeDeploymentOperationType = "InPlaceNodeUpgrade"
+	InPlaceNodeUpgradeNodeMaintenanceStrategyType NodeMaintenanceOperationType = "InPlaceNodeUpgrade"
 )
 
 // Spec to control the desired behavior of rolling operation.
-type RollingUpdateNodeDeployment struct {
+type RollingUpdateNodeMaintenance struct {
 	// The maximum number of nodes that can be unavailable during the rolling operation.
 	// Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%).
 	// Absolute number is calculated from percentage by rounding up.
@@ -111,7 +111,7 @@ type RollingUpdateNodeDeployment struct {
 	// TODO: MaxSurge intstr.IntOrString `json:"maxSurge,omitempty"` (only for Recreate)
 }
 
-type NodeDeploymentStatus struct {
+type NodeMaintenanceStatus struct {
 	// The generation observed by the node deployment controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
