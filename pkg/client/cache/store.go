@@ -44,6 +44,7 @@ type Store interface {
 	// given list. Store takes ownership of the list, you should not reference
 	// it after calling this function.
 	Replace([]interface{}, string) error
+	Resync() error
 }
 
 // KeyFunc knows how to make a key from an object. Implementations should be deterministic.
@@ -213,6 +214,14 @@ func (c *cache) Replace(list []interface{}, resourceVersion string) error {
 	return nil
 }
 
+// Resync touches all items in the store to force processing
+func (c *cache) Resync() error {
+	if err := c.Replace(c.cacheStorage.List(), "0"); err != nil {
+		return err
+	}
+	return nil
+}
+
 // NewStore returns a Store implemented simply with a map and a lock.
 func NewStore(keyFunc KeyFunc) Store {
 	return &cache{
@@ -227,4 +236,55 @@ func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
 		cacheStorage: NewThreadSafeStore(indexers, Indices{}),
 		keyFunc:      keyFunc,
 	}
+}
+
+// FakeResyncStore lets you define a resync function
+type FakeResyncStore struct {
+	ResyncFunc func() error
+}
+
+// Resync calls the custom Resync function
+func (f *FakeResyncStore) Resync() error {
+	return f.ResyncFunc()
+}
+
+// Add does't do anything
+func (f *FakeResyncStore) Add(obj interface{}) error {
+	return nil
+
+}
+
+// Update does't do anything
+func (f *FakeResyncStore) Update(obj interface{}) error {
+	return nil
+}
+
+// Delete does't do anything
+func (f *FakeResyncStore) Delete(obj interface{}) error {
+	return nil
+}
+
+// List does't do anything
+func (f *FakeResyncStore) List() []interface{} {
+	return nil
+}
+
+// ListKeys does't do anything
+func (f *FakeResyncStore) ListKeys() []string {
+	return nil
+}
+
+// Get does't do anything
+func (f *FakeResyncStore) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	return nil, false, nil
+}
+
+// GetByKey does't do anything
+func (f *FakeResyncStore) GetByKey(key string) (item interface{}, exists bool, err error) {
+	return nil, false, nil
+}
+
+// Replace does't do anything
+func (f *FakeResyncStore) Replace([]interface{}, string) error {
+	return nil
 }

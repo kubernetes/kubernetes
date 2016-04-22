@@ -241,6 +241,17 @@ func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
 	return nil
 }
 
+// Resync will touch all objects to put them into the processing queue
+func (f *FIFO) Resync() error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	for id := range f.items {
+		f.queue = append(f.queue, id)
+	}
+	f.cond.Broadcast()
+	return nil
+}
+
 // NewFIFO returns a Store which can be used to queue up items to
 // process.
 func NewFIFO(keyFunc KeyFunc) *FIFO {

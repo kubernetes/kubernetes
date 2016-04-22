@@ -287,6 +287,13 @@ func TestHammerController(t *testing.T) {
 	t.Logf("got: %#v", outputSet)
 }
 
+/* This isn't a realistic test and will fail with a sensible ListAndWatch function
+   which won't relist every interval.  This test relies on the list function rather
+   than the watch.  It intentionally doesn't sent watch events to simulate a missed
+   watch update, but that is not realistic with etcd.  In a netsplit event, a watch
+   would be instantiated on the last known resource version and any missed updates
+   since that resource version would arrive via the watch.
+*/
 func TestUpdate(t *testing.T) {
 	// This test is going to exercise the various paths that result in a
 	// call to update.

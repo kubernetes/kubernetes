@@ -146,6 +146,10 @@ func (c *ExpirationCache) ListKeys() []string {
 func (c *ExpirationCache) Add(obj interface{}) error {
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
+	return c.addLocked(obj)
+}
+
+func (c *ExpirationCache) addLocked(obj interface{}) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
@@ -158,6 +162,10 @@ func (c *ExpirationCache) Add(obj interface{}) error {
 // simply calls `Add`. This effectively refreshes the timestamp.
 func (c *ExpirationCache) Update(obj interface{}) error {
 	return c.Add(obj)
+}
+
+func (c *ExpirationCache) updateLocked(obj interface{}) error {
+	return c.addLocked(obj)
 }
 
 // Delete removes an item from the cache.
@@ -188,6 +196,18 @@ func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) er
 		items[key] = &timestampedEntry{item, ts}
 	}
 	c.cacheStorage.Replace(items, resourceVersion)
+	return nil
+}
+
+// Resync will touch all objects to put them into the processing queue
+func (c *ExpirationCache) Resync() error {
+	c.expirationLock.Lock()
+	defer c.expirationLock.Unlock()
+	for _, item := range c.cacheStorage.List() {
+		if err := c.updateLocked(item); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

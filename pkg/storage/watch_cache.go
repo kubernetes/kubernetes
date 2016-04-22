@@ -324,3 +324,16 @@ func (w *watchCache) GetAllEventsSince(resourceVersion uint64) ([]watchCacheEven
 	defer w.RUnlock()
 	return w.GetAllEventsSinceThreadUnsafe(resourceVersion)
 }
+
+func (w *watchCache) Resync() error {
+	w.RLock()
+	defer w.RUnlock()
+	for _, item := range w.store.List() {
+		event := watchCacheEvent{Type: watch.Modified, Object: item.(runtime.Object)}
+		if w.onEvent != nil {
+			w.onEvent(event)
+		}
+	}
+	w.cond.Broadcast()
+	return nil
+}

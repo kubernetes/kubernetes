@@ -306,6 +306,10 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 func (f *DeltaFIFO) List() []interface{} {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+	return f.listLocked()
+}
+
+func (f *DeltaFIFO) listLocked() []interface{} {
 	list := make([]interface{}, 0, len(f.items))
 	for _, item := range f.items {
 		// Copy item's slice so operations on this slice (delta
@@ -393,6 +397,10 @@ func (f *DeltaFIFO) Pop() interface{} {
 func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	return f.replaceLocked(list)
+}
+
+func (f *DeltaFIFO) replaceLocked(list []interface{}) error {
 	keys := make(sets.String, len(list))
 
 	if !f.populated {
@@ -448,6 +456,16 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// Resync will send a sync event for each item
+func (f *DeltaFIFO) Resync() error {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	if err := f.replaceLocked(f.listLocked()); err != nil {
+		return fmt.Errorf("couldn't queue object: %v", err)
 	}
 	return nil
 }

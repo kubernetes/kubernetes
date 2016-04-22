@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/url"
 	"reflect"
@@ -80,17 +79,9 @@ type Reflector struct {
 }
 
 var (
-	// We try to spread the load on apiserver by setting timeouts for
-	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
-	// However, it can be modified to avoid periodic resync to break the
-	// TCP connection.
-	minWatchTimeout = 5 * time.Minute
 	// If we are within 'forceResyncThreshold' from the next planned resync
 	// and are just before issuing Watch(), resync will be forced now.
 	forceResyncThreshold = 3 * time.Second
-	// We try to set timeouts for Watch() so that we will finish about
-	// than 'timeoutThreshold' from next planned periodic resync.
-	timeoutThreshold = 1 * time.Second
 )
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
@@ -246,26 +237,6 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	return t.C, t.Stop
 }
 
-// We want to avoid situations when periodic resyncing is breaking the TCP
-// connection.
-// If response`s body is not read to completion before calling body.Close(),
-// that TCP connection will not be reused in the future - see #15664 issue
-// for more details.
-// Thus, we set timeout for watch requests to be smaller than the remaining
-// time until next periodic resync and force resyncing ourself to avoid
-// breaking TCP connection.
-//
-// TODO: This should be parametrizable based on server load.
-func (r *Reflector) timeoutForWatch() *int64 {
-	randTimeout := time.Duration(float64(minWatchTimeout) * (rand.Float64() + 1.0))
-	timeout := r.nextResync.Sub(r.now()) - timeoutThreshold
-	if timeout < 0 || randTimeout < timeout {
-		timeout = randTimeout
-	}
-	timeoutSeconds := int64(timeout.Seconds())
-	return &timeoutSeconds
-}
-
 // Returns true if we are close enough to next planned periodic resync
 // and we can force resyncing ourself now.
 func (r *Reflector) canForceResyncNow() bool {
@@ -281,8 +252,7 @@ func (r *Reflector) canForceResyncNow() bool {
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	glog.V(3).Infof("Listing and watching %v from %s", r.expectedType, r.name)
 	var resourceVersion string
-	resyncCh, cleanup := r.resyncChan()
-	defer cleanup()
+	var w watch.Interface
 
 	// Explicitly set "0" as resource version - it's fine for the List()
 	// to be served from cache and potentially be delayed relative to
@@ -307,13 +277,10 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	r.setLastSyncResourceVersion(resourceVersion)
 
 	for {
-		options := api.ListOptions{
+		watchOptions := api.ListOptions{
 			ResourceVersion: resourceVersion,
-			// We want to avoid situations when resyncing is breaking the TCP connection
-			// - see comment for 'timeoutForWatch()' for more details.
-			TimeoutSeconds: r.timeoutForWatch(),
 		}
-		w, err := r.listerWatcher.Watch(options)
+		w, err = r.listerWatcher.Watch(watchOptions)
 		if err != nil {
 			switch err {
 			case io.EOF:
@@ -337,16 +304,23 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			}
 			return nil
 		}
-		if err := r.watchHandler(w, &resourceVersion, resyncCh, stopCh); err != nil {
-			if err != errorResyncRequested && err != errorStopRequested {
+
+		if err := r.watchHandler(w, &resourceVersion, stopCh); err != nil {
+			if err != errorStopRequested {
 				glog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
 			}
 			return nil
 		}
-		if r.canForceResyncNow() {
-			glog.V(4).Infof("%s: next resync planned for %#v, forcing now", r.name, r.nextResync)
-			return nil
-		}
+		/*
+			if r.canForceResyncNow() {
+				glog.V(4).Infof("%s: next resync planned for %#v, forcing now", r.name, r.nextResync)
+				if err := r.store.Resync(); err != nil {
+					return err
+				}
+				cleanup()
+				resyncCh, cleanup = r.resyncChan()
+			}
+		*/
 	}
 }
 
@@ -360,7 +334,10 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
-func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, resyncCh <-chan time.Time, stopCh <-chan struct{}) error {
+func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, stopCh <-chan struct{}) error {
+	resyncCh, cleanup := r.resyncChan()
+	defer cleanup()
+
 	start := time.Now()
 	eventCount := 0
 
@@ -374,7 +351,12 @@ loop:
 		case <-stopCh:
 			return errorStopRequested
 		case <-resyncCh:
-			return errorResyncRequested
+			glog.V(4).Infof("%s: resyncing %v", r.name, r.expectedType)
+			if err := r.store.Resync(); err != nil {
+				return err
+			}
+			cleanup()
+			resyncCh, cleanup = r.resyncChan()
 		case event, ok := <-w.ResultChan():
 			if !ok {
 				break loop
