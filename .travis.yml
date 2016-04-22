@@ -1,27 +1,5 @@
-sudo: required
-
-# trusty required for docker
-# https://github.com/travis-ci/travis-ci/issues/5448
-dist: trusty
-
-services:
-  - docker
-
-language: go
-
-matrix:
-  include:
-    - go: 1.6
-
-install:
-  - go get github.com/tools/godep
-  - ./hack/install-etcd.sh
-  - ./hack/build-go.sh
-  - export PATH=$GOPATH/bin:./third_party/etcd:$PATH
+language: bash
 
 script:
-  - make verify BRANCH=$TRAVIS_BRANCH
-
-notifications:
-  irc: "chat.freenode.net#kubernetes-dev"
-  slack: kubernetes:PHPPkljtEsHXED6xl9IfOvKe
+    - echo "Travis is disabled on master. See issue 23611."
+    - echo "https://github.com/kubernetes/kubernetes/issues/23611"
