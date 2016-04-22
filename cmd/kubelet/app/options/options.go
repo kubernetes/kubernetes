@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
@@ -41,6 +40,8 @@ const (
 
 	defaultPodInfraContainerImageName    = "gcr.io/google_containers/pause"
 	defaultPodInfraContainerImageVersion = "2.0"
+
+	defaultRktAPIServiceEndpoint = "localhost:15441"
 )
 
 // Returns the arch-specific pause image that kubelet should use as the default
@@ -129,7 +130,7 @@ func NewKubeletServer() *KubeletServer {
 			KubeletCgroups:                 "",
 			ResolverConfig:                 kubetypes.ResolvConfDefault,
 			RktPath:                        "",
-			RktAPIEndpoint:                 rkt.DefaultRktAPIServiceEndpoint,
+			RktAPIEndpoint:                 defaultRktAPIServiceEndpoint,
 			RktStage1Image:                 "",
 			RootDirectory:                  defaultRootDir,
 			RuntimeCgroups:                 "",

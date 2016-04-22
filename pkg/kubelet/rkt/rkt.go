@@ -58,8 +58,7 @@ import (
 )
 
 const (
-	RktType                      = "rkt"
-	DefaultRktAPIServiceEndpoint = "localhost:15441"
+	RktType = "rkt"
 
 	minimumAppcVersion       = "0.7.4"
 	minimumRktBinVersion     = "1.2.1"
@@ -87,11 +86,7 @@ const (
 	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/termination-message-path"
 	dockerPrefix                     = "docker://"
 
-	authDir            = "auth.d"
 	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
-
-	defaultRktAPIServiceAddr = "localhost:15441"
-	defaultNetworkName       = "rkt.kubernetes.io"
 
 	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
 	// we want to able to consider SRV lookup names like _dns._udp.kube-dns.default.svc to be considered relative.
@@ -116,7 +111,10 @@ type Runtime struct {
 	// The grpc client for rkt api-service.
 	apisvcConn *grpc.ClientConn
 	apisvc     rktapi.PublicAPIClient
-	config     *Config
+
+	config    *Config
+	netConfig *NetworkPluginConfig
+
 	// TODO(yifan): Refactor this to be generic keyring.
 	dockerKeyring credentialprovider.DockerKeyring
 
@@ -149,6 +147,7 @@ type volumeGetter interface {
 func New(
 	apiEndpoint string,
 	config *Config,
+	netConfig *NetworkPluginConfig,
 	runtimeHelper kubecontainer.RuntimeHelper,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
@@ -192,6 +191,7 @@ func New(
 		apisvcConn:          apisvcConn,
 		apisvc:              rktapi.NewPublicAPIClient(apisvcConn),
 		config:              config,
+		netConfig:           netConfig,
 		dockerKeyring:       credentialprovider.NewDockerKeyring(),
 		containerRefManager: containerRefManager,
 		runtimeHelper:       runtimeHelper,
@@ -206,6 +206,10 @@ func New(
 	rkt.config, err = rkt.getConfig(rkt.config)
 	if err != nil {
 		return nil, fmt.Errorf("rkt: cannot get config from rkt api service: %v", err)
+	}
+
+	if err := rkt.netConfig.init(rkt.config); err != nil {
+		return nil, fmt.Errorf("rkt: Failed init network config: %v", err)
 	}
 
 	rkt.runner = lifecycle.NewHandlerRunner(httpClient, rkt, rkt)
@@ -839,7 +843,7 @@ func (r *Runtime) generateRunCommand(pod *api.Pod, uuid string) (string, error) 
 			return "", err
 		}
 	} else {
-		runPrepared = append(runPrepared, fmt.Sprintf("--net=%s", defaultNetworkName))
+		runPrepared = append(runPrepared, fmt.Sprintf("--net=%s", r.netConfig.networkName()))
 
 		// Setup DNS.
 		dnsServers, dnsSearches, err := r.runtimeHelper.GetClusterDNS(pod)
@@ -1688,7 +1692,7 @@ func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecont
 	if latestPod != nil {
 		// Try to fill the IP info.
 		for _, n := range latestPod.Networks {
-			if n.Name == defaultNetworkName {
+			if n.Name == r.netConfig.networkName() {
 				podStatus.IP = n.Ipv4
 			}
 		}
