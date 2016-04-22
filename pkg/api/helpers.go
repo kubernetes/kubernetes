@@ -427,3 +427,16 @@ func GetAffinityFromPodAnnotations(annotations map[string]string) (Affinity, err
 	}
 	return affinity, nil
 }
+
+const PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
+
+func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, error) {
+	var avoidPods AvoidPods
+	if len(annotations) > 0 && annotations[PreferAvoidPodsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[PreferAvoidPodsAnnotationKey]), &avoidPods)
+		if err != nil {
+			return avoidPods, err
+		}
+	}
+	return avoidPods, nil
+}

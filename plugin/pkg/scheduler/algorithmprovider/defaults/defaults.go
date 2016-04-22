@@ -173,5 +173,16 @@ func defaultPriorities() sets.String {
 				Weight: 1,
 			},
 		),
+		factory.RegisterPriorityConfigFactory(
+			"NodePreferAvoidPodsPriority",
+			factory.PriorityConfigFactory{
+				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
+					return priorities.NewNodePreferAvoidPodsPriority(args.ControllerLister, args.ReplicaSetLister)
+				},
+				// Set this weight large enough to override all other priority functions.
+				// TODO: Figure out a better way to do this, maybe at same time as fixing #24720.
+				Weight: 10000,
+			},
+		),
 	)
 }
