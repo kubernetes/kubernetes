@@ -40,7 +40,7 @@ shopt -u dotglob
 kube::util::gen-analytics "${KUBE_ROOT}"
 
 mungedocs=$(kube::util::find-binary "mungedocs")
-"${mungedocs}" "--root-dir=${KUBE_ROOT}/docs/" && ret=0 || ret=$?
+"${mungedocs}" "--upstream=${KUBE_GIT_UPSTREAM}" "--root-dir=${KUBE_ROOT}/docs/" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then
   echo "${KUBE_ROOT}/docs/ requires manual changes.  See preceding errors."
   exit 1
@@ -49,7 +49,7 @@ elif [[ $ret -gt 1 ]]; then
   exit 1
 fi
 
-"${mungedocs}" "--root-dir=${KUBE_ROOT}/examples/" && ret=0 || ret=$?
+"${mungedocs}" "--upstream=${KUBE_GIT_UPSTREAM}" "--root-dir=${KUBE_ROOT}/examples/" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then
   echo "${KUBE_ROOT}/examples/ requires manual changes.  See preceding errors."
   exit 1
@@ -58,7 +58,8 @@ elif [[ $ret -gt 1 ]]; then
   exit 1
 fi
 
-"${mungedocs}" "--skip-munges=unversioned-warning,analytics" \
+"${mungedocs}" "--upstream=${KUBE_GIT_UPSTREAM}" \
+               "--skip-munges=unversioned-warning,analytics" \
                "--norecurse" \
                "--root-dir=${KUBE_ROOT}/" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then
