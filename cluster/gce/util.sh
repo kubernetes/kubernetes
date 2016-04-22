@@ -25,6 +25,18 @@ source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" || "${OS_DISTRIBUTION}" == "trusty" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
+elif [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
+  # TODO(andyzheng0831): Switch to use the GCI specific code.
+  source "${KUBE_ROOT}/cluster/gce/trusty/helper.sh"
+  MASTER_IMAGE_PROJECT="google-containers"
+  # If choosing "gci" disto, at least the cluster master needs to run on GCI image.
+  # If the user does not set a GCI image for master, we run both master and nodes
+  # using the latest GCI dev image.
+  if [[ "${MASTER_IMAGE}" != gci* ]]; then
+    MASTER_IMAGE=$(gcloud compute images list | grep "gci-dev" | cut -d ' ' -f1)
+    NODE_IMAGE="${MASTER_IMAGE}"
+    NODE_IMAGE_PROJECT="${MASTER_IMAGE_PROJECT}"
+  fi
 else
   echo "Cannot operate on cluster using os distro: ${OS_DISTRIBUTION}" >&2
   exit 1
@@ -169,8 +181,6 @@ function set-preferred-region() {
 
 # Take the local tar files and upload them to Google Storage.  They will then be
 # downloaded by the master as part of the start up script for the master.
-# If running on Ubuntu trusty, we also pack the dir cluster/gce/trusty/kube-manifest
-# and upload it to Google Storage.
 #
 # Assumed vars:
 #   PROJECT
@@ -208,7 +218,7 @@ function upload-server-tars() {
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
   SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
-  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
+  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
     KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
   fi
 
@@ -241,7 +251,7 @@ function upload-server-tars() {
     server_binary_tar_urls+=("${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}")
     salt_tar_urls+=("${salt_gs_url/gs:\/\//https://storage.googleapis.com/}")
 
-    if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
+    if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
       local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
       copy-to-staging "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
       # Convert from gs:// URL to an https:// URL
@@ -257,7 +267,7 @@ function upload-server-tars() {
   else
     SERVER_BINARY_TAR_URL=$(join_csv "${server_binary_tar_urls[@]}")
     SALT_TAR_URL=$(join_csv "${salt_tar_urls[@]}")
-    if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
+    if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" ]]; then
       KUBE_MANIFESTS_TAR_URL=$(join_csv "${kube_manifests_tar_urls[@]}")
     fi
   fi
@@ -692,8 +702,8 @@ function create-nodes-template() {
 
   local template_name="${NODE_INSTANCE_PREFIX}-template"
 
-  # For master on trusty, we support running nodes on ContainerVM or trusty.
-  if [[ "${OS_DISTRIBUTION}" == "trusty" ]] && \
+  # For master on GCI or trusty, we support the hybrid mode with nodes on ContainerVM.
+  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" ]] && \
      [[ "${NODE_IMAGE}" == container* ]]; then
     source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
   fi

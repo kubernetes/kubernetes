@@ -213,7 +213,7 @@ var _ = Describe("Addon update", func() {
 		switch testContext.OSDistro {
 		case "debian":
 			sshExecAndVerify(sshClient, "sudo TEST_ADDON_CHECK_INTERVAL_SEC=1 /etc/init.d/kube-addons restart")
-		case "trusty":
+		case "trusty", "gci":
 			sshExecAndVerify(sshClient, "sudo initctl restart kube-addons TEST_ADDON_CHECK_INTERVAL_SEC=1")
 		default:
 			Failf("Unsupported OS distro type %s", testContext.OSDistro)
@@ -226,7 +226,7 @@ var _ = Describe("Addon update", func() {
 			switch testContext.OSDistro {
 			case "debian":
 				sshExec(sshClient, "sudo /etc/init.d/kube-addons restart")
-			case "trusty":
+			case "trusty", "gci":
 				sshExec(sshClient, "sudo initctl restart kube-addons")
 			default:
 				Failf("Unsupported OS distro type %s", testContext.OSDistro)
