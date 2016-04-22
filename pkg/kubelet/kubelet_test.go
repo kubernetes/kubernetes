@@ -55,6 +55,7 @@ import (
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -120,6 +121,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
+	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.os = containertest.FakeOS{}
 
@@ -200,6 +202,10 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, util.RealClock{})
 	kubelet.clock = fakeClock
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
+	// enable active deadline manager
+	if _, err := newActiveDeadlineManager(kubelet, kubelet.statusManager, kubelet.recorder, kubelet.clock); err != nil {
+		t.Fatalf("can't initialize active deadline manager: %v", err)
+	}
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil}
 }
 
@@ -3821,33 +3827,6 @@ func TestMakePortMappings(t *testing.T) {
 	}
 }
 
-func TestIsPodPastActiveDeadline(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	pods := newTestPods(5)
-
-	exceededActiveDeadlineSeconds := int64(30)
-	notYetActiveDeadlineSeconds := int64(120)
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
-	pods[0].Status.StartTime = &startTime
-	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
-	pods[1].Status.StartTime = &startTime
-	pods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
-	tests := []struct {
-		pod      *api.Pod
-		expected bool
-	}{{pods[0], true}, {pods[1], false}, {pods[2], false}, {pods[3], false}, {pods[4], false}}
-
-	kubelet.podManager.SetPods(pods)
-	for i, tt := range tests {
-		actual := kubelet.pastActiveDeadline(tt.pod)
-		if actual != tt.expected {
-			t.Errorf("[%d] expected %#v, got %#v", i, tt.expected, actual)
-		}
-	}
-}
-
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	fakeRuntime := testKubelet.fakeRuntime
@@ -3895,7 +3874,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 		t.Errorf("expected to found status for pod %q", pods[0].UID)
 	}
 	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q, ot %q.", api.PodFailed, status.Phase)
+		t.Fatalf("expected pod status %q, got %q.", api.PodFailed, status.Phase)
 	}
 }
 
@@ -4310,7 +4289,7 @@ func TestGetPodsToSync(t *testing.T) {
 		}
 
 	} else {
-		t.Errorf("expected %d pods to sync, got %d", 3, len(podsToSync))
+		t.Errorf("expected %d pods to sync, got %d, %v", 3, len(podsToSync), format.Pods(pods))
 	}
 }
 
