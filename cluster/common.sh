@@ -335,9 +335,9 @@ function find-release-tars() {
     exit 1
   fi
 
-  # This tarball is only used by Ubuntu Trusty.
+  # This tarball is used by GCI, Ubuntu Trusty, and CoreOS.
   KUBE_MANIFESTS_TAR=
-  if [[ "${KUBE_OS_DISTRIBUTION:-}" == "trusty" || "${KUBE_OS_DISTRIBUTION:-}" == "coreos" ]]; then
+  if [[ "${KUBE_OS_DISTRIBUTION:-}" == "trusty" || "${KUBE_OS_DISTRIBUTION:-}" == "gci" || "${KUBE_OS_DISTRIBUTION:-}" == "coreos" ]]; then
     KUBE_MANIFESTS_TAR="${KUBE_ROOT}/server/kubernetes-manifests.tar.gz"
     if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
       KUBE_MANIFESTS_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-manifests.tar.gz"
@@ -519,7 +519,7 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
+  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" ]]; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${KUBE_MANIFESTS_TAR_URL})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
