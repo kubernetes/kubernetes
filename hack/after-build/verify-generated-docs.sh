@@ -37,7 +37,7 @@ EXAMPLEROOT="${KUBE_ROOT}/examples/"
 # mungedocs --verify can (and should) be run on the real docs, otherwise their
 # links will be distorted. --verify means that it will not make changes.
 # --verbose gives us output we can use for a diff.
-"${mungedocs}" "--verify=true" "--verbose=true" "--root-dir=${DOCROOT}" && ret=0 || ret=$?
+"${mungedocs}" "--verify=true" "--verbose=true" "--upstream=${KUBE_GIT_UPSTREAM}" "--root-dir=${DOCROOT}" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then
   echo "${DOCROOT} is out of date. Please run hack/update-generated-docs.sh"
   exit 1
@@ -47,7 +47,7 @@ if [[ $ret -gt 1 ]]; then
   exit 1
 fi
 
-"${mungedocs}" "--verify=true" "--verbose=true" "--root-dir=${EXAMPLEROOT}" && ret=0 || ret=$?
+"${mungedocs}" "--verify=true" "--verbose=true" "--upstream=${KUBE_GIT_UPSTREAM}" "--root-dir=${EXAMPLEROOT}" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then
   echo "${EXAMPLEROOT} is out of date. Please run hack/update-generated-docs.sh"
   exit 1
