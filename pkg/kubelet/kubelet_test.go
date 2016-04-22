@@ -188,6 +188,7 @@ func newTestKubeletWithImageList(
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
+	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.os = &containertest.FakeOS{}
 
@@ -304,6 +305,14 @@ func newTestKubeletWithImageList(
 	if err != nil {
 		t.Fatalf("failed to initialize volume manager: %v", err)
 	}
+
+	// enable active deadline handler
+	activeDeadlineHandler, err := newActiveDeadlineHandler(kubelet.statusManager, kubelet.recorder, kubelet.clock)
+	if err != nil {
+		t.Fatalf("can't initialize active deadline handler: %v", err)
+	}
+	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
+	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
 }
@@ -3891,33 +3900,6 @@ func TestMakePortMappings(t *testing.T) {
 	}
 }
 
-func TestIsPodPastActiveDeadline(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	kubelet := testKubelet.kubelet
-	pods := newTestPods(5)
-
-	exceededActiveDeadlineSeconds := int64(30)
-	notYetActiveDeadlineSeconds := int64(120)
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
-	pods[0].Status.StartTime = &startTime
-	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
-	pods[1].Status.StartTime = &startTime
-	pods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
-	tests := []struct {
-		pod      *api.Pod
-		expected bool
-	}{{pods[0], true}, {pods[1], false}, {pods[2], false}, {pods[3], false}, {pods[4], false}}
-
-	kubelet.podManager.SetPods(pods)
-	for i, tt := range tests {
-		actual := kubelet.pastActiveDeadline(tt.pod)
-		if actual != tt.expected {
-			t.Errorf("[%d] expected %#v, got %#v", i, tt.expected, actual)
-		}
-	}
-}
-
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	fakeRuntime := testKubelet.fakeRuntime
@@ -3965,7 +3947,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 		t.Errorf("expected to found status for pod %q", pods[0].UID)
 	}
 	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q, ot %q.", api.PodFailed, status.Phase)
+		t.Fatalf("expected pod status %q, got %q.", api.PodFailed, status.Phase)
 	}
 }
 

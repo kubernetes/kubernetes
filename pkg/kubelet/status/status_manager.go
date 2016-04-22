@@ -66,15 +66,21 @@ type manager struct {
 	apiStatusVersions map[types.UID]uint64
 }
 
-// status.Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
-// the latest api.PodStatus. It also syncs updates back to the API server.
-type Manager interface {
-	// Start the API server status sync loop.
-	Start()
-
+// PodStatusProvider knows how to provide status for a pod.  It's intended to be used by other components
+// that need to introspect status.
+type PodStatusProvider interface {
 	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
 	// was a cache hit.
 	GetPodStatus(uid types.UID) (api.PodStatus, bool)
+}
+
+// Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
+// the latest api.PodStatus. It also syncs updates back to the API server.
+type Manager interface {
+	PodStatusProvider
+
+	// Start the API server status sync loop.
+	Start()
 
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
 	SetPodStatus(pod *api.Pod, status api.PodStatus)
