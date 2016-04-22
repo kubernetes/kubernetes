@@ -188,13 +188,13 @@ type Workflow struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	v1.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec represents the desired behaviour of the Workflow.
-	Spec WorkflowSpec `json:"spec,omitempty"`
+	Spec WorkflowSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status contains the current status of the Workflow
-	Status WorkflowStatus `json:"status,omitempty"`
+	Status WorkflowStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // WorkflowList implements list of Workflow.
@@ -202,49 +202,49 @@ type WorkflowList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of Workflow
-	Items []Workflow `json:"items"`
+	Items []Workflow `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // WorkflowSpec contains Workflow specification
 type WorkflowSpec struct {
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	v1.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=activeDeadlineSeconds"`
 
-	Steps map[string]WorkflowStep `json:"steps,omitempty"`
+	Steps map[string]WorkflowStep `json:"steps,omitempty" protobuf:"bytes,3,rep,name=steps"`
 
 	// Selector for created jobs (if any)
-	Selector *LabelSelector `json:"selector,omitempty"`
+	Selector *LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,opt,name=selector"`
 }
 
 // JobTemplateSpec contains necessary information to create a JobSpec
 type JobTemplateSpec struct {
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	v1.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec is a structure defining the expected behavior of a job.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
-	Spec JobSpec `json:"spec,omitempty"`
+	Spec JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 // WorkflowStep contains necessary information to identifiy the node of the workflow graph
 type WorkflowStep struct {
 	// JobTemplate contains the job specificaton that should be run in this Workflow.
 	// Only one between externalRef and jobTemplate can be set.
-	JobTemplate *JobTemplateSpec `json:"jobTemplate,omitempty"`
+	JobTemplate *JobTemplateSpec `json:"jobTemplate,omitempty" protobuf:"bytes,1,opt,name=sjobTemplate"`
 
 	// ExternalRef contains a reference to another schedulable resource.
 	// Only one between ExternalRef and JobTemplate can be set.
-	ExternalRef *v1.ObjectReference `json:"externalRef,omitempty"`
+	ExternalRef *v1.ObjectReference `json:"externalRef,omitempty" protobuf:"bytes,2,opt,name=externalRef"`
 
 	// Dependecies represent dependecies of the current workflow step
-	Dependencies []string `json:"dependencies,omitempty"`
+	Dependencies []string `json:"dependencies,omitempty" protobuf:"bytes,3,rep,name=dependencies"`
 }
 
 type WorkflowConditionType string
@@ -259,42 +259,42 @@ const (
 
 type WorkflowCondition struct {
 	// Type of workflow condition, currently only Complete.
-	Type WorkflowConditionType `json:"type"`
+	Type WorkflowConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=WorkflowConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	Status v1.ConditionStatus `json:"status"`
+	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/kubernetes/pkg/api/v1.ConditionStatus"`
 	// Last time the condition was checked.
-	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
 	// Last time the condition transited from one status to another.
-	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// (brief) reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
+	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
 	// Human readable message indicating details about last transition.
-	Message string `json:"message,omitempty"`
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 type WorkflowStatus struct {
 	// Conditions represent the latest available observations of an object's current state.
-	Conditions []WorkflowCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []WorkflowCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// StartTime represents time when the workflow was acknowledged by the Workflow controller
 	// It is not guaranteed to be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
 	// StartTime doesn't consider startime of `ExternalReference`
-	StartTime *unversioned.Time `json:"startTime,omitempty"`
+	StartTime *unversioned.Time `json:"startTime,omitempty" protobuf:"bytes,2,opt,name=startTime"`
 
 	// CompletionTime represents time when the workflow was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
-	CompletionTime *unversioned.Time `json:"completionTime,omitempty"`
+	CompletionTime *unversioned.Time `json:"completionTime,omitempty" protobuf:"bytes,3,opt,name=completionTime"`
 
 	// Statuses represent status of different steps
-	Statuses map[string]WorkflowStepStatus `json:statuses`
+	Statuses map[string]WorkflowStepStatus `json:"statuses" protobuf:"bytes,4,opt,name=statuses"`
 }
 
 // WorkflowStepStatus contains necessary information for the step status
 type WorkflowStepStatus struct {
 	// Complete reports the completion of status
-	Complete bool `json:"complete"`
+	Complete bool `json:"complete" protobuf:"varint,1,rep,name=complete"`
 	// Reference contains a reference to the WorkflowStep
-	Reference v1.ObjectReference `json:"reference"`
+	Reference v1.ObjectReference `json:"reference" protobuf:"bytes,2,opt,name=reference"`
 }

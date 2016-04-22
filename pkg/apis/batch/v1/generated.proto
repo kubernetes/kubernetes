@@ -145,6 +145,17 @@ message JobStatus {
   optional int32 failed = 6;
 }
 
+// JobTemplateSpec contains necessary information to create a JobSpec
+message JobTemplateSpec {
+  // Standard object's metadata.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  // Spec is a structure defining the expected behavior of a job.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  optional JobSpec spec = 2;
+}
+
 // A label selector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
@@ -173,5 +184,104 @@ message LabelSelectorRequirement {
   // the values array must be empty. This array is replaced during a strategic
   // merge patch.
   repeated string values = 3;
+}
+
+// Workflow implements
+message Workflow {
+  // Standard object's metadata.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  // Spec represents the desired behaviour of the Workflow.
+  optional WorkflowSpec spec = 2;
+
+  // Status contains the current status of the Workflow
+  optional WorkflowStatus status = 3;
+}
+
+message WorkflowCondition {
+  // Type of workflow condition, currently only Complete.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // Last time the condition was checked.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3;
+
+  // Last time the condition transited from one status to another.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4;
+
+  // (brief) reason for the condition's last transition.
+  optional string reason = 5;
+
+  // Human readable message indicating details about last transition.
+  optional string message = 6;
+}
+
+// WorkflowList implements list of Workflow.
+message WorkflowList {
+  // Standard list metadata
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+
+  // Items is the list of Workflow
+  repeated Workflow items = 2;
+}
+
+// WorkflowSpec contains Workflow specification
+message WorkflowSpec {
+  // Standard object's metadata.
+  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  optional int64 activeDeadlineSeconds = 2;
+
+  map<string, WorkflowStep> steps = 3;
+
+  // Selector for created jobs (if any)
+  optional LabelSelector selector = 4;
+}
+
+message WorkflowStatus {
+  // Conditions represent the latest available observations of an object's current state.
+  repeated WorkflowCondition conditions = 1;
+
+  // StartTime represents time when the workflow was acknowledged by the Workflow controller
+  // It is not guaranteed to be set in happens-before order across separate operations.
+  // It is represented in RFC3339 form and is in UTC.
+  // StartTime doesn't consider startime of `ExternalReference`
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time startTime = 2;
+
+  // CompletionTime represents time when the workflow was completed. It is not guaranteed to
+  // be set in happens-before order across separate operations.
+  // It is represented in RFC3339 form and is in UTC.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time completionTime = 3;
+
+  // Statuses represent status of different steps
+  map<string, WorkflowStepStatus> statuses = 4;
+}
+
+// WorkflowStep contains necessary information to identifiy the node of the workflow graph
+message WorkflowStep {
+  // JobTemplate contains the job specificaton that should be run in this Workflow.
+  // Only one between externalRef and jobTemplate can be set.
+  optional JobTemplateSpec jobTemplate = 1;
+
+  // ExternalRef contains a reference to another schedulable resource.
+  // Only one between ExternalRef and JobTemplate can be set.
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectReference externalRef = 2;
+
+  // Dependecies represent dependecies of the current workflow step
+  repeated string dependencies = 3;
+}
+
+// WorkflowStepStatus contains necessary information for the step status
+message WorkflowStepStatus {
+  // Complete reports the completion of status
+  optional bool complete = 1;
+
+  // Reference contains a reference to the WorkflowStep
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectReference reference = 2;
 }
 

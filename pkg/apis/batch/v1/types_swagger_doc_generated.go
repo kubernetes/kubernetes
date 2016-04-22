@@ -169,7 +169,7 @@ var map_WorkflowStatus = map[string]string{
 	"conditions":     "Conditions represent the latest available observations of an object's current state.",
 	"startTime":      "StartTime represents time when the workflow was acknowledged by the Workflow controller It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC. StartTime doesn't consider startime of `ExternalReference`",
 	"completionTime": "CompletionTime represents time when the workflow was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-	"Statuses":       "Statuses represent status of different steps",
+	"statuses":       "Statuses represent status of different steps",
 }
 
 func (WorkflowStatus) SwaggerDoc() map[string]string {

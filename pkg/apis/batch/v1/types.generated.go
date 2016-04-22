@@ -5023,7 +5023,7 @@ func (x *WorkflowStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("Statuses"))
+				r.EncodeString(codecSelferC_UTF81234, string("statuses"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				if x.Statuses == nil {
 					r.EncodeNil()
@@ -5151,7 +5151,7 @@ func (x *WorkflowStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 					z.DecFallback(x.CompletionTime, false)
 				}
 			}
-		case "Statuses":
+		case "statuses":
 			if r.TryDecodeAsNil() {
 				x.Statuses = nil
 			} else {
