@@ -39,7 +39,7 @@ type NodeMaintenanceSpec struct {
 	// new selector; should we operate on them?  It's also nice that this is the same type as
 	// NodesPendingOperation, NodesUndergoingOperation, and NodesPostOperation, because they all
 	// represent the same set of objects.
-	Nodes []string `json:"nodes,omitempty"`
+	Nodes NodeList `json:"nodes,omitempty"`
 
 	// The operation to do on nodes.
 	Operation NodeMaintenanceOperation `json:"strategy,omitempty"`
@@ -113,11 +113,11 @@ type NodeMaintenanceStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Nodes waiting to be operated on.
-	NodesPendingOperation []string `json:"nodePendingOperation,omitempty"`
+	NodesPendingOperation NodeList `json:"nodePendingOperation,omitempty"`
 
 	// Nodes currently being operated on.
-	NodesUndergoingOperation []string `json:"nodePendingOperation,omitempty"`
+	NodesUndergoingOperation NodeList `json:"nodePendingOperation,omitempty"`
 
 	// Nodes that have already been operated on.
-	NodesPostOperation []string `json:"nodePendingOperation,omitempty"`
+	NodesPostOperation NodeList `json:"nodePendingOperation,omitempty"`
 }
