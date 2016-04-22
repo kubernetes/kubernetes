@@ -61,7 +61,6 @@ base:
 {% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere', 'openstack' ] %}
     - nginx
 {% endif %}
-    - cadvisor
     - kube-client-tools
     - kube-master-addons
     - kube-admission-controls
