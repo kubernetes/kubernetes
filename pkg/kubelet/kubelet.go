@@ -530,6 +530,14 @@ func NewMainKubelet(
 	klet.evictionManager = evictionManager
 	klet.AddPodAdmitHandler(evictionAdmitHandler)
 
+	// enable active deadline handler
+	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, klet.recorder, klet.clock)
+	if err != nil {
+		return nil, err
+	}
+	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
+	klet.AddPodSyncHandler(activeDeadlineHandler)
+
 	// apply functional Option's
 	for _, opt := range kubeOptions {
 		opt(klet)
@@ -2076,29 +2084,8 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 	return nil
 }
 
-// pastActiveDeadline returns true if the pod has been active for more than
-// ActiveDeadlineSeconds.
-func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
-	if pod.Spec.ActiveDeadlineSeconds != nil {
-		podStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
-		if !ok {
-			podStatus = pod.Status
-		}
-		if !podStatus.StartTime.IsZero() {
-			startTime := podStatus.StartTime.Time
-			duration := kl.clock.Since(startTime)
-			allowedDuration := time.Duration(*pod.Spec.ActiveDeadlineSeconds) * time.Second
-			if duration >= allowedDuration {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // Get pods which should be resynchronized. Currently, the following pod should be resynchronized:
 //   * pod whose work is ready.
-//   * pod past the active deadline.
 //   * internal modules that request sync of a pod.
 func (kl *Kubelet) getPodsToSync() []*api.Pod {
 	allPods := kl.podManager.GetPods()
@@ -2109,12 +2096,6 @@ func (kl *Kubelet) getPodsToSync() []*api.Pod {
 	}
 	var podsToSync []*api.Pod
 	for _, pod := range allPods {
-		// TODO: move active deadline code into a sync/evict pattern
-		if kl.pastActiveDeadline(pod) {
-			// The pod has passed the active deadline
-			podsToSync = append(podsToSync, pod)
-			continue
-		}
 		if podUIDSet.Has(string(pod.UID)) {
 			// The work of the pod is ready
 			podsToSync = append(podsToSync, pod)
@@ -3544,17 +3525,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.P
 				Message: result.Message,
 			}
 		}
-	}
-
-	// TODO: Consider include the container information.
-	// TODO: move this into a sync/evictor
-	if kl.pastActiveDeadline(pod) {
-		reason := "DeadlineExceeded"
-		kl.recorder.Eventf(pod, api.EventTypeNormal, reason, "Pod was active on the node longer than specified deadline")
-		return api.PodStatus{
-			Phase:   api.PodFailed,
-			Reason:  reason,
-			Message: "Pod was active on the node longer than specified deadline"}
 	}
 
 	s := kl.convertStatusToAPIStatus(pod, podStatus)
