@@ -70,6 +70,7 @@ func New() *Generator {
 			`k8s.io/kubernetes/pkg/apis/autoscaling/v1`,
 			`k8s.io/kubernetes/pkg/apis/batch/v1`,
 			`k8s.io/kubernetes/pkg/apis/apps/v1alpha1`,
+			`k8s.io/kubernetes/federation/apis/federation/v1alpha1`,
 		}, ","),
 		DropEmbeddedFields: "k8s.io/kubernetes/pkg/api/unversioned.TypeMeta",
 	}
