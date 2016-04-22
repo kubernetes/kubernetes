@@ -157,7 +157,7 @@ install_kube_binary_config() {
     find "${dst_dir}" -name \*.manifest -or -name \*.json | \
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
-  cp "${dst_dir}/kubernetes/trusty/configure-helper.sh" /etc/kube-configure-helper.sh
+  cp "${dst_dir}/kubernetes/gci-trusty/configure-helper.sh" /etc/kube-configure-helper.sh
 
   # Clean up.
   rm -rf "${kube_home}/kubernetes"
