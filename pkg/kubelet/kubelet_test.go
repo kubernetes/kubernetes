@@ -125,7 +125,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = testKubeletHostname
-	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, false)
+	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
+	kubelet.runtimeState.setNetworkState(nil)
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)

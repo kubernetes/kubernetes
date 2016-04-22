@@ -215,9 +215,8 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		return fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
 	}
 
-	// Can't set up pods if we don't have a PodCIDR yet
-	if plugin.netConfig == nil {
-		return fmt.Errorf("Kubenet needs a PodCIDR to set up pods")
+	if err := plugin.NetworkStatus(); err != nil {
+		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
 	}
 
 	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
@@ -308,6 +307,14 @@ func (plugin *kubenetNetworkPlugin) Status(namespace string, name string, id kub
 		return nil, err
 	}
 	return &network.PodNetworkStatus{IP: ip}, nil
+}
+
+func (plugin *kubenetNetworkPlugin) NetworkStatus() error {
+	// Can't set up pods if we don't have a PodCIDR yet
+	if plugin.netConfig == nil {
+		return fmt.Errorf("Kubenet does not have netConfig. This is most likely due to lack of PodCIDR")
+	}
+	return nil
 }
 
 func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) *libcni.RuntimeConf {

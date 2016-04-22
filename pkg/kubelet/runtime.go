@@ -89,16 +89,11 @@ func (s *runtimeState) errors() []string {
 
 func newRuntimeState(
 	runtimeSyncThreshold time.Duration,
-	configureNetwork bool,
 ) *runtimeState {
-	var networkError error = nil
-	if configureNetwork {
-		networkError = fmt.Errorf("network state unknown")
-	}
 	return &runtimeState{
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
-		networkError:             networkError,
+		networkError:             fmt.Errorf("network state unknown"),
 		internalError:            nil,
 	}
 }
