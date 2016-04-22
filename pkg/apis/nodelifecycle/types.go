@@ -44,13 +44,10 @@ type NodeMaintenanceSpec struct {
 	// The operation to do on nodes.
 	Operation NodeMaintenanceOperation `json:"strategy,omitempty"`
 
-	// TODO: maybe add this?
-	//
-	// Minimum number of seconds for which a newly created pod should be ready
-	// without any of its container crashing, for it to be considered available.
-	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	//
-	// MinReadySeconds int `json:"minReadySeconds,omitempty"`
+	// Minimum number of seconds for which a node, having undergone some operation, should be
+	// ready for it to be considered post-operation.  Defaults to 0 (node will be considered
+	// available as soon as it is ready).
+	MinReadySeconds int `json:"minReadySeconds,omitempty"`
 
 	// Indicates that the deployment is paused and will not be processed by the
 	// deployment controller.
@@ -64,6 +61,9 @@ type NodeMaintenanceSpec struct {
 type NodeMaintenanceOperation struct {
 	// Type of NodeMaintenance. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	Type NodeMaintenanceStrategyType string
+
+	// Whether or not to drain the node of its pods before performing the operation.
+	DrainBeforeOperating bool `json:"drainBeforeOperating,omitempty"`
 
 	// Type of operation to perform. Can be "Recreate" or "InPlaceNodeUpgrade". Default is Recreate.
 	Operation NodeMaintenanceOperationType `json:"type,omitempty"`
@@ -101,14 +101,11 @@ type RollingUpdateNodeMaintenance struct {
 	// The maximum number of nodes that can be unavailable during the rolling operation.
 	// Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%).
 	// Absolute number is calculated from percentage by rounding up.
-	// (TODO This can not be 0 if MaxSurge is 0.)
 	// By default, a fixed value of 1 is used.
 	// Example: when this is set to 30%, we can immediately operate on 30%
 	// of the nodes when the rolling update starts. Once some nodes are post-operation, other
 	// nodes can be operated on.
 	MaxUnavailable intstr.IntOrString `json:"maxUnavailable,omitempty"`
-
-	// TODO: MaxSurge intstr.IntOrString `json:"maxSurge,omitempty"` (only for Recreate)
 }
 
 type NodeMaintenanceStatus struct {
