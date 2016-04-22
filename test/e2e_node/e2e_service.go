@@ -145,6 +145,7 @@ func (es *e2eService) startKubeletServer() (*exec.Cmd, error) {
 		"--hostname-override", es.nodeName, // Required because hostname is inconsistent across hosts
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
+		"--serialize-image-pulls", "false",
 	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:10255/healthz",
