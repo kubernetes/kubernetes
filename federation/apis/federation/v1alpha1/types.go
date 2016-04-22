@@ -34,19 +34,31 @@ type ClusterSpec struct {
 	Credential string `json:"credential,omitempty"`
 }
 
-type ClusterPhase string
+type ClusterConditionType string
 
-// These are the valid phases of a cluster.
+// These are valid conditions of a cluster.
 const (
-	// Newly registered clusters or clusters suspended by admin for various reasons. They are not eligible for accepting workloads
-	ClusterPending ClusterPhase = "pending"
-	// Clusters in normal status that can accept workloads
-	ClusterRunning ClusterPhase = "running"
-	// Clusters temporarily down or not reachable
-	ClusterOffline ClusterPhase = "offline"
-	// Clusters removed from federation
-	ClusterTerminated ClusterPhase = "terminated"
+	// ClusterReady means the cluster is ready to accept workloads.
+	ClusterReady ClusterConditionType = "Ready"
+	// ClusterOffline means the cluster is temporarily down or not reachable
+	ClusterOffline ClusterConditionType = "Offline"
 )
+
+// ClusterCondition describes current state of a cluster.
+type ClusterCondition struct {
+	// Type of cluster condition, Complete or Failed.
+	Type ClusterConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus `json:"status"`
+	// Last time the condition was checked.
+	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transit from one status to another.
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	// (brief) reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human readable message indicating details about last transition.
+	Message string `json:"message,omitempty"`
+}
 
 // Cluster metadata
 type ClusterMeta struct {
@@ -56,8 +68,8 @@ type ClusterMeta struct {
 
 // ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
 type ClusterStatus struct {
-	// Phase is the recently observed lifecycle phase of the cluster.
-	Phase ClusterPhase `json:"phase,omitempty"`
+	// Conditions is an array of current cluster conditions.
+	Conditions []ClusterCondition `json:"conditions,omitempty"`
 	// Capacity represents the total resources of the cluster
 	Capacity v1.ResourceList `json:"capacity,omitempty"`
 	// Allocatable represents the total resources of a cluster that are available for scheduling.
