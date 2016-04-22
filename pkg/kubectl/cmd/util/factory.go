@@ -36,7 +36,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/federation/apis/federation"
-	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"

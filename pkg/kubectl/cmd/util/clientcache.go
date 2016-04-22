@@ -17,19 +17,21 @@ limitations under the License.
 package util
 
 import (
-	fed_client_v1a1 "k8s.io/kubernetes/federation/client/clientset_generated/release_1_3/typed/federation/v1alpha1"
+
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	fed_client_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/release_1_3"
+	//kube_client_1_3 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 )
 
 func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 	return &ClientCache{
 		clients:    make(map[unversioned.GroupVersion]*client.Client),
 		configs:    make(map[unversioned.GroupVersion]*restclient.Config),
-		fedClients: make(map[unversioned.GroupVersion]*restclient.RESTClient),
+		fedClients: make(map[unversioned.GroupVersion]*fed_client_1_3.Clientset),
 		loader:     loader,
 	}
 }
@@ -39,7 +41,7 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 type ClientCache struct {
 	loader        clientcmd.ClientConfig
 	clients       map[unversioned.GroupVersion]*client.Client
-	fedClients    map[unversioned.GroupVersion]*restclient.RESTClient
+	fedClients    map[unversioned.GroupVersion]*fed_client_1_3.Clientset
 	configs       map[unversioned.GroupVersion]*restclient.Config
 	defaultConfig *restclient.Config
 	defaultClient *client.Client
@@ -129,7 +131,7 @@ func (c *ClientCache) ClientForVersion(version *unversioned.GroupVersion) (*clie
 	return kubeclient, nil
 }
 
-func (c *ClientCache) FederationClientForVersion(version *unversioned.GroupVersion) (*restclient.RESTClient, error) {
+func (c *ClientCache) FederationClientSetForVersion(version *unversioned.GroupVersion) (*fed_client_1_3.Clientset, error) {
 	if version != nil {
 		if client, ok := c.fedClients[*version]; ok {
 			return client, nil
@@ -141,20 +143,28 @@ func (c *ClientCache) FederationClientForVersion(version *unversioned.GroupVersi
 	}
 
 	// TODO: support multi versions of client with clientset
-	fedClient, err := fed_client_v1a1.NewForConfig(config)
+	fedClient, err := fed_client_1_3.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
-	c.fedClients[*config.GroupVersion] = fedClient.RESTClient
+	c.fedClients[*config.GroupVersion] = fedClient
 
 	if version != nil {
 		configCopy := *config
-		fedClient, err := fed_client_v1a1.NewForConfig(&configCopy)
+		fedClient, err := fed_client_1_3.NewForConfig(&configCopy)
 		if err != nil {
 			return nil, err
 		}
-		c.fedClients[*version] = fedClient.RESTClient
+		c.fedClients[*version] = fedClient
 	}
 
-	return fedClient.RESTClient, nil
+	return fedClient, nil
+}
+
+func (c *ClientCache) FederationClientForVersion(version *unversioned.GroupVersion) (*restclient.RESTClient, error) {
+	fedClientSet, err := c.FederationClientSetForVersion(version)
+	if (err != nil) {
+		return nil, err
+	}
+	return fedClientSet.FederationClient.RESTClient, nil
 }
