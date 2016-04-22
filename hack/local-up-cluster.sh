@@ -112,7 +112,8 @@ RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-false}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
-CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"}
+# current pvclaimbinder-sync-period default is 10m, which causes pvc->pv bindings to be noticeably slow
+CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"30s"} # 30s default results in ~25x reduction in binding time where the claim is created before the matching pv
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
