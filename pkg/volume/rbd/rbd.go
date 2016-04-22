@@ -210,9 +210,10 @@ func (b *rbdMounter) SetUp(fsGroup *int64) error {
 
 func (b *rbdMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
+	glog.V(4).Infof("rbd: attempting to SetUp and mount %s", dir)
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {
-		glog.Errorf("rbd: failed to setup")
+		glog.Errorf("rbd: failed to setup mount %s %v", dir, err)
 	}
 	return err
 }
