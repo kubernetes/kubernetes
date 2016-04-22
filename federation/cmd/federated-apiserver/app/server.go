@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -318,6 +317,6 @@ func getRuntimeConfigValue(s *options.APIServer, apiKey string, defaultValue boo
 // Parses the given runtime-config and formats it into genericapiserver.APIResourceConfigSource
 func parseRuntimeConfig(s *options.APIServer) (genericapiserver.APIResourceConfigSource, error) {
 	// TODO: parse the relevant group version when we add any.
-	resourceConfig := master.DefaultAPIResourceConfigSource()
+	resourceConfig := genericapiserver.NewResourceConfig()
 	return resourceConfig, nil
 }
