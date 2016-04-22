@@ -252,3 +252,23 @@ function kube-down {
   source "${ROOT}/openrc-default.sh"
   heat stack-delete ${STACK_NAME}
 }
+
+# Perform preparations required to run e2e tests
+function prepare-e2e {
+  echo "TODO: prepare-e2e" 1>&2
+}
+
+function test-build-release {
+  echo "test-build-release() " 1>&2
+}
+
+# Must ensure that the following ENV vars are set
+function detect-master {
+
+  source "${ROOT}/${KUBE_CONFIG_FILE:-"config-default.sh"}"
+  source "${ROOT}/openrc-default.sh"
+
+  export KUBE_MASTER_IP=$(nova show "${STACK_NAME}"-master | awk '$3=="network" {print $6}')
+
+  echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
+}
