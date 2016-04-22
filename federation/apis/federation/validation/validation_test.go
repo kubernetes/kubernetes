@@ -163,7 +163,9 @@ func TestValidateClusterStatusUpdate(t *testing.T) {
 					},
 				},
 				Status: federation.ClusterStatus{
-					Phase: federation.ClusterPending,
+					Conditions: []federation.ClusterCondition{
+						{Type: federation.ClusterReady, Status: api.ConditionTrue},
+					},
 				},
 			},
 			update: federation.Cluster{
@@ -177,7 +179,10 @@ func TestValidateClusterStatusUpdate(t *testing.T) {
 					},
 				},
 				Status: federation.ClusterStatus{
-					Phase: federation.ClusterRunning,
+					Conditions: []federation.ClusterCondition{
+						{Type: federation.ClusterReady, Status: api.ConditionTrue},
+						{Type: federation.ClusterOffline, Status: api.ConditionTrue},
+					},
 				},
 			},
 		},
@@ -191,38 +196,7 @@ func TestValidateClusterStatusUpdate(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]clusterUpdateTest{
-		"cluster phase transition not allowed": {
-			old: federation.Cluster{
-				ObjectMeta: api.ObjectMeta{Name: "cluster-s"},
-				Spec: federation.ClusterSpec{
-					ServerAddressByClientCIDRs: []unversioned.ServerAddressByClientCIDR{
-						{
-							ClientCIDR:    "0.0.0.0/0",
-							ServerAddress: "localhost:8888",
-						},
-					},
-				},
-				Status: federation.ClusterStatus{
-					Phase: federation.ClusterOffline,
-				},
-			},
-			update: federation.Cluster{
-				ObjectMeta: api.ObjectMeta{Name: "cluster-newname"},
-				Spec: federation.ClusterSpec{
-					ServerAddressByClientCIDRs: []unversioned.ServerAddressByClientCIDR{
-						{
-							ClientCIDR:    "0.0.0.0/0",
-							ServerAddress: "localhost:8888",
-						},
-					},
-				},
-				Status: federation.ClusterStatus{
-					Phase: federation.ClusterPending,
-				},
-			},
-		},
-	}
+	errorCases := map[string]clusterUpdateTest{}
 	for testName, errorCase := range errorCases {
 		errs := ValidateClusterStatusUpdate(&errorCase.update, &errorCase.old)
 		if len(errs) == 0 {

@@ -21,11 +21,4 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
-		func(obj *Cluster) {
-			if obj.Status.Phase == "" {
-				obj.Status.Phase = ClusterPending
-			}
-		},
-	)
 }
