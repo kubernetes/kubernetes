@@ -89,6 +89,11 @@ gen-conversion script.
     1. Touch types.generated.go in pkg/apis/`<group>`{/, `<version>`};
     2. Run hack/update-codecgen.sh.
 
+3. Generate protobuf objects:
+
+    1. Add your group to `cmd/libs/go2idl/go-to-protobuf/protobuf/cmd.go` to `New()` in the `Packages` field
+    2. Run hack/update-generated-protobuf.sh
+
 ### Client (optional):
 
 We are overhauling pkg/client, so this section might be outdated; see

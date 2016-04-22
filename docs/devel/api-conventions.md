@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 API Conventions
 ===============
 
-Updated: 10/8/2015
+Updated: 4/22/2016
 
 *This document is oriented at users who want a deeper understanding of the
 Kubernetes API structure, and developers wanting to extend the Kubernetes API.
@@ -805,6 +805,8 @@ APIs may return alternative representations of any resource in response to an
 Accept header or under alternative endpoints, but the default serialization for
 input and output of API responses MUST be JSON.
 
+Protobuf serialization of API objects are currently **EXPERIMENTAL** and will change without notice.
+
 All dates should be serialized as RFC3339 strings.
 
 ## Units
@@ -993,13 +995,13 @@ $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https:/
 > Host: 10.240.122.184
 > Accept: */*
 > Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc
-> 
+>
 
 < HTTP/1.1 404 Not Found
 < Content-Type: application/json
 < Date: Wed, 20 May 2015 18:10:42 GMT
 < Content-Length: 232
-< 
+<
 {
   "kind": "Status",
   "apiVersion": "v1",

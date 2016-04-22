@@ -51,6 +51,7 @@ found at [API Conventions](api-conventions.md).
     - [Edit types.go](#edit-typesgo)
   - [Edit validation.go](#edit-validationgo)
   - [Edit version conversions](#edit-version-conversions)
+  - [Generate protobuf objects](#generate-protobuf-objects)
   - [Edit json (un)marshaling code](#edit-json-unmarshaling-code)
   - [Making a new API Group](#making-a-new-api-group)
   - [Update the fuzzer](#update-the-fuzzer)
@@ -481,6 +482,22 @@ generator to create it from scratch.
 Unsurprisingly, adding manually written conversion also requires you to add
 tests to `pkg/api/<version>/conversion_test.go`.
 
+
+## Generate protobuf objects
+
+For any core API object, we also need to generate the Protobuf IDL and marshallers.
+That generation is done with
+
+```sh
+hack/update-generated-protobuf.sh
+```
+
+The vast majority of objects will not need any consideration when converting
+to protobuf, but be aware that if you depend on a Golang type in the standard
+library there may be additional work requried, although in practice we typically
+use our own equivalents for JSON serialization. The `pkg/api/serialization_test.go`
+will verify that your protobuf serialization preserves all fields - be sure to
+run it several times to ensure there are no incompletely calculated fields.
 
 ## Edit json (un)marshaling code
 
