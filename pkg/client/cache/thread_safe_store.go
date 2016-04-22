@@ -50,6 +50,7 @@ type ThreadSafeStore interface {
 	// AddIndexers adds more indexers to this store.  If you call this after you already have data
 	// in the store, the results are undefined.
 	AddIndexers(newIndexers Indexers) error
+	Resync() error
 }
 
 // threadSafeMap implements ThreadSafeStore
@@ -269,6 +270,11 @@ func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) error {
 			}
 		}
 	}
+	return nil
+}
+
+func (c *threadSafeMap) Resync() error {
+	// Nothing to do
 	return nil
 }
 
