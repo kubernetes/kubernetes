@@ -102,12 +102,12 @@ spec:
 
 The above structures will be represented in v1beta as a json encoded annotation like so:
 
-```
+```yaml
 kind: Namespace
 apiVersion: v1
 metadata:
   annotations:
-    net.beta.kubernetes.io/networkPolicy: "{\"ingress\": {\"isolation\": \"DefaultDeny\"}}" 
+    net.beta.kubernetes.io/ingress-isolation: DefaultDeny 
 ```
 
 ### NetworkPolicy Go Definition
@@ -118,7 +118,7 @@ objects (of which there can be multiple in a single namespace).  Pods selected b
 one or more NetworkPolicy objects should allow any incoming connections that match any
 ingress rule on those NetworkPolicy objects, per the network plugin’s capabilities.
 
-If `isolation` is not specified on a namespace, then all traffic is allowed to pods in that namespace.
+If `ingress-isolation` is not specified on a namespace, then all traffic is allowed to pods in that namespace.
 
 ```go
 type NetworkPolicy struct {
@@ -239,7 +239,7 @@ apiVersion: v1
 metadata:
   name: myns
   annotations:
-    net.beta.kubernetes.io/networkPolicy: "{\"ingress\": {\"isolation\": \"DefaultDeny\"}"
+    net.beta.kubernetes.io/ingress-isolation: DefaultDeny
 ---
 kind: NetworkPolicy
 apiVersion: v1beta 
