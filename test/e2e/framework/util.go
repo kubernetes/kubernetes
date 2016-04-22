@@ -3682,7 +3682,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 // CheckConnectivityToHost launches a pod running wget on the
 // specified node to test connectivity to the specified host.  An
 // error will be returned if the host is not reachable from the pod.
-func CheckConnectivityToHost(f *Framework, nodeName, podName, host string) error {
+func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeout int) error {
 	contName := fmt.Sprintf("%s-container", podName)
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
@@ -3696,7 +3696,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string) error
 				{
 					Name:    contName,
 					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"wget", "-s", host},
+					Command: []string{"wget", fmt.Sprintf("--timeout=%d", timeout), "-s", host},
 				},
 			},
 			NodeName:      nodeName,
