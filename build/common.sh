@@ -319,7 +319,7 @@ function kube::build::prepare_output() {
   # On RHEL/Fedora SELinux is enabled by default and currently breaks docker
   # volume mounts.  We can work around this by explicitly adding a security
   # context to the _output directory.
-  # Details: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Resource_Management_and_Linux_Containers_Guide/sec-Sharing_Data_Across_Containers.html#sec-Mounting_a_Host_Directory_to_a_Container
+  # Details: http://www.projectatomic.io/blog/2015/06/using-volumes-with-docker-can-cause-problems-with-selinux/
   if which selinuxenabled &>/dev/null && \
       selinuxenabled && \
       which chcon >/dev/null ; then
@@ -330,6 +330,12 @@ function kube::build::prepare_output() {
         echo "    Continuing, but this build may fail later if SELinux prevents access."
       fi
     fi
+    number=${#DOCKER_MOUNT_ARGS[@]}
+    for (( i=0; i<number; i++ )); do
+      if [[ "${DOCKER_MOUNT_ARGS[i]}" =~ "${KUBE_ROOT}" ]]; then
+        DOCKER_MOUNT_ARGS[i]="${DOCKER_MOUNT_ARGS[i]}:Z"
+      fi
+    done
   fi
 
 }
@@ -1493,7 +1499,7 @@ function kube::release::docker::release() {
     # Activate credentials for the k8s.production.user@gmail.com
     gcloud config set account k8s.production.user@gmail.com
   fi
-      
+
   for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
     for binary in "${binaries[@]}"; do
 
