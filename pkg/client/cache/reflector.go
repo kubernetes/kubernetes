@@ -337,15 +337,22 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			}
 			return nil
 		}
+
 		if err := r.watchHandler(w, &resourceVersion, resyncCh, stopCh); err != nil {
 			if err != errorResyncRequested && err != errorStopRequested {
 				glog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
 			}
-			return nil
+			if err != errorResyncRequested {
+				return nil
+			}
 		}
 		if r.canForceResyncNow() {
 			glog.V(4).Infof("%s: next resync planned for %#v, forcing now", r.name, r.nextResync)
-			return nil
+			if err := r.store.Resync(); err != nil {
+				return err
+			}
+			cleanup()
+			resyncCh, cleanup = r.resyncChan()
 		}
 	}
 }

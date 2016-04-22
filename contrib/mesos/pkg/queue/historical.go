@@ -377,6 +377,12 @@ func (f *HistoricalFIFO) merge(id string, obj UniqueCopyable) (notifications []E
 	return
 }
 
+// Resync will touch all objects to put them into the processing queue
+func (f *HistoricalFIFO) Resync() error {
+	// Nothing to do
+	return nil
+}
+
 // NewHistorical returns a Store which can be used to queue up items to
 // process. If a non-nil Mux is provided, then modifications to the
 // the FIFO are delivered on a channel specific to this fifo.

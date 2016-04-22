@@ -18,6 +18,8 @@ package cache
 
 import (
 	"sync"
+
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Queue is exactly like a Store, but has a Pop() method too.
@@ -234,6 +236,26 @@ func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
 	f.queue = f.queue[:0]
 	for id := range items {
 		f.queue = append(f.queue, id)
+	}
+	if len(f.queue) > 0 {
+		f.cond.Broadcast()
+	}
+	return nil
+}
+
+// Resync will touch all objects to put them into the processing queue
+func (f *FIFO) Resync() error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	inQueue := sets.NewString()
+	for _, id := range f.queue {
+		inQueue.Insert(id)
+	}
+	for id := range f.items {
+		if !inQueue.Has(id) {
+			f.queue = append(f.queue, id)
+		}
 	}
 	if len(f.queue) > 0 {
 		f.cond.Broadcast()
