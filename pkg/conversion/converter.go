@@ -116,6 +116,10 @@ func (c *Converter) DefaultMeta(t reflect.Type) (FieldMatchingFlags, *Meta) {
 
 // Convert_Slice_byte_To_Slice_byte prevents recursing into every byte
 func Convert_Slice_byte_To_Slice_byte(in *[]byte, out *[]byte, s Scope) error {
+	if *in == nil {
+		*out = nil
+		return nil
+	}
 	*out = make([]byte, len(*in))
 	copy(*out, *in)
 	return nil
