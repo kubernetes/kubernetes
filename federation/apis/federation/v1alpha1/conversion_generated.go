@@ -34,6 +34,8 @@ func init() {
 	if err := api.Scheme.AddGeneratedConversionFuncs(
 		Convert_v1alpha1_Cluster_To_federation_Cluster,
 		Convert_federation_Cluster_To_v1alpha1_Cluster,
+		Convert_v1alpha1_ClusterCondition_To_federation_ClusterCondition,
+		Convert_federation_ClusterCondition_To_v1alpha1_ClusterCondition,
 		Convert_v1alpha1_ClusterList_To_federation_ClusterList,
 		Convert_federation_ClusterList_To_v1alpha1_ClusterList,
 		Convert_v1alpha1_ClusterMeta_To_federation_ClusterMeta,
@@ -94,6 +96,48 @@ func autoConvert_federation_Cluster_To_v1alpha1_Cluster(in *federation.Cluster, 
 
 func Convert_federation_Cluster_To_v1alpha1_Cluster(in *federation.Cluster, out *Cluster, s conversion.Scope) error {
 	return autoConvert_federation_Cluster_To_v1alpha1_Cluster(in, out, s)
+}
+
+func autoConvert_v1alpha1_ClusterCondition_To_federation_ClusterCondition(in *ClusterCondition, out *federation.ClusterCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ClusterCondition))(in)
+	}
+	out.Type = federation.ClusterConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_v1alpha1_ClusterCondition_To_federation_ClusterCondition(in *ClusterCondition, out *federation.ClusterCondition, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ClusterCondition_To_federation_ClusterCondition(in, out, s)
+}
+
+func autoConvert_federation_ClusterCondition_To_v1alpha1_ClusterCondition(in *federation.ClusterCondition, out *ClusterCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*federation.ClusterCondition))(in)
+	}
+	out.Type = ClusterConditionType(in.Type)
+	out.Status = v1.ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_federation_ClusterCondition_To_v1alpha1_ClusterCondition(in *federation.ClusterCondition, out *ClusterCondition, s conversion.Scope) error {
+	return autoConvert_federation_ClusterCondition_To_v1alpha1_ClusterCondition(in, out, s)
 }
 
 func autoConvert_v1alpha1_ClusterList_To_federation_ClusterList(in *ClusterList, out *federation.ClusterList, s conversion.Scope) error {
@@ -228,7 +272,17 @@ func autoConvert_v1alpha1_ClusterStatus_To_federation_ClusterStatus(in *ClusterS
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ClusterStatus))(in)
 	}
-	out.Phase = federation.ClusterPhase(in.Phase)
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]federation.ClusterCondition, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_ClusterCondition_To_federation_ClusterCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	if err := v1.Convert_v1_ResourceList_To_api_ResourceList(&in.Capacity, &out.Capacity, s); err != nil {
 		return err
 	}
@@ -249,7 +303,17 @@ func autoConvert_federation_ClusterStatus_To_v1alpha1_ClusterStatus(in *federati
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*federation.ClusterStatus))(in)
 	}
-	out.Phase = ClusterPhase(in.Phase)
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]ClusterCondition, len(*in))
+		for i := range *in {
+			if err := Convert_federation_ClusterCondition_To_v1alpha1_ClusterCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	if in.Capacity != nil {
 		in, out := &in.Capacity, &out.Capacity
 		*out = make(v1.ResourceList, len(*in))

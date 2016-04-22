@@ -27,8 +27,7 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 	err := api.Scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.String(), "Cluster",
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.name",
-				"status.phase":
+			case "metadata.name":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
