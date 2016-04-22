@@ -183,7 +183,7 @@ kube::log::status "Starting kube-apiserver"
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
 
-KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,apps/v1alpha1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -1792,6 +1792,6 @@ __EOF__
   kube::test::clear_all
 }
 
-KUBE_API_VERSIONS="v1,autoscaling/v1,batch/v1,apps/v1alpha1,extensions/v1beta1" runTests "v1"
+runTests "v1"
 
 kube::log::status "TEST PASSED"
