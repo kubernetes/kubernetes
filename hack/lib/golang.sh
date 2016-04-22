@@ -269,7 +269,7 @@ EOF
   if [[ "${TRAVIS:-}" != "true" ]]; then
     local go_version
     go_version=($(go version))
-    if [[ "${go_version[2]}" < "go1.6" ]]; then
+    if [[ "${go_version[2]}" < "go1.6" && "${go_version[2]}" != "devel" ]]; then
       kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
 Kubernetes requires go version 1.6 or greater.
