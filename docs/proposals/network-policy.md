@@ -43,7 +43,7 @@ define how those pods should be allowed to communicate with each other.  The
 implementation of that policy at the network layer is left up to the
 chosen networking solution.
 
-> Note that this proposal does not yet include egress / cidr-based policy, which is still actively undergoing discussion in the SIG. These are expected to augment this proposal in a backwards compatible way. 
+> Note that this proposal does not yet include egress / cidr-based policy, which is still actively undergoing discussion in the SIG. These are expected to augment this proposal in a backwards compatible way.
 
 ## Implementation
 
@@ -101,6 +101,7 @@ spec:
 ```
 
 The above structures will be represented in v1beta as a json encoded annotation like so:
+
 ```
 kind: Namespace
 apiVersion: v1
@@ -109,7 +110,7 @@ metadata:
     net.beta.kubernetes.io/networkPolicy: "{\"ingress\": {\"isolation\": \"DefaultDeny\"}}" 
 ```
 
-### NetworkPolicy Go Definition 
+### NetworkPolicy Go Definition
 
 Once a Namespace is isolated, a mechanism to selectively allow traffic into the namespace and between pods within
 the namespace is required.  That is accomplished through ingress rules on `NetworkPolicy`
@@ -117,7 +118,7 @@ objects (of which there can be multiple in a single namespace).  Pods selected b
 one or more NetworkPolicy objects should allow any incoming connections that match any
 ingress rule on those NetworkPolicy objects, per the network plugin’s capabilities.
 
-If `isolation` is not specified on a namespace, then all traffic is allowed to pods in that namespace. 
+If `isolation` is not specified on a namespace, then all traffic is allowed to pods in that namespace.
 
 ```go
 type NetworkPolicy struct {
@@ -224,9 +225,9 @@ def is_traffic_allowed(traffic, pod):
 
 ### Open Questions
 
-- A single podSelector per NetworkPolicy may lead to managing a large number of NetworkPolicy objects, each of which is small and easy to understand on its own.  Allowing a podSelecor per ingress rule would allow for fewer, larger NetworkPolicy objects that may be easier to manage, but harder to understand individually.  This proposal has opted to favor a larger number of smaller objects that are easier to understand.  Is this the right decision? 
+- A single podSelector per NetworkPolicy may lead to managing a large number of NetworkPolicy objects, each of which is small and easy to understand on its own. However, this may lead for a policy change to require touching several policy objects. Allowing an optional podSelector per ingress rule additionally to the podSelector per NetworkPolicy object would allow the user to group rules into logical segments and define size/complexity ratio where it makes sense. This may lead to a smaller number of objects with more complexity if the user opts in to the additional podSelector.  This increases the complexity of the NetworkPolicy object itself. This proposal has opted to favor a larger number of smaller objects that are easier to understand, with the understanding that additional podSelectors could be added to this design in the future should the requirement become apparent.
 
-- Is the `Namespaces` selector in the `NetworkPolicySource` struct too coarse? Do we need to support the AND combination of `Namespaces` and `Pods`? 
+- Is the `Namespaces` selector in the `NetworkPolicySource` struct too coarse? Do we need to support the AND combination of `Namespaces` and `Pods`?
 
 ### Examples
 
@@ -257,7 +258,7 @@ spec:
           port: 6379
 ```
 
-2) Allow TCP 443 from any source in Bob's namespaces. 
+2) Allow TCP 443 from any source in Bob's namespaces.
 
 ```yaml
 kind: NetworkPolicy
