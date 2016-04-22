@@ -15143,6 +15143,9 @@
    "v1.ConfigMapList": {
     "id": "v1.ConfigMapList",
     "description": "ConfigMapList is a resource containing a list of ConfigMap objects.",
+    "required": [
+     "items"
+    ],
     "properties": {
      "kind": {
       "type": "string",
