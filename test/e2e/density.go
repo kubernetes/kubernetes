@@ -84,6 +84,26 @@ func density30AddonResourceVerifier() map[string]framework.ResourceConstraint {
 	return constraints
 }
 
+func logPodStartupStatus(c *client.Client, expectedPods int, ns string, observedLabels map[string]string, period time.Duration, stopCh chan struct{}) {
+	label := labels.SelectorFromSet(labels.Set(observedLabels))
+	podStore := framework.NewPodStore(c, ns, label, fields.Everything())
+	defer podStore.Stop()
+	ticker := time.NewTicker(period)
+	for {
+		select {
+		case <-ticker.C:
+			pods := podStore.List()
+			startupStatus := framework.ComputeRCStartupStatus(pods, expectedPods)
+			startupStatus.Print("Density")
+		case <-stopCh:
+			pods := podStore.List()
+			startupStatus := framework.ComputeRCStartupStatus(pods, expectedPods)
+			startupStatus.Print("Density")
+			return
+		}
+	}
+}
+
 // This test suite can take a long time to run, and can affect or be affected by other tests.
 // So by default it is added to the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -185,7 +205,7 @@ var _ = framework.KubeDescribe("Density", func() {
 		{podsPerNode: 30, runLatencyTest: true, interval: 10 * time.Second},
 		{podsPerNode: 50, runLatencyTest: false, interval: 10 * time.Second},
 		{podsPerNode: 95, runLatencyTest: true, interval: 10 * time.Second},
-		{podsPerNode: 100, runLatencyTest: false, interval: 1 * time.Second},
+		{podsPerNode: 100, runLatencyTest: false, interval: 10 * time.Second},
 	}
 
 	for _, testArg := range densityTests {
@@ -201,22 +221,29 @@ var _ = framework.KubeDescribe("Density", func() {
 		}
 		itArg := testArg
 		It(name, func() {
-			podsPerNode := itArg.podsPerNode
-			totalPods = podsPerNode * nodeCount
-			RCName = "density" + strconv.Itoa(totalPods) + "-" + uuid
 			fileHndl, err := os.Create(fmt.Sprintf(framework.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
 			framework.ExpectNoError(err)
 			defer fileHndl.Close()
-			config := framework.RCConfig{Client: c,
-				Image:                "gcr.io/google_containers/pause:2.0",
-				Name:                 RCName,
-				Namespace:            ns,
-				PollInterval:         itArg.interval,
-				PodStatusFile:        fileHndl,
-				Replicas:             totalPods,
-				CpuRequest:           nodeCpuCapacity / 100,
-				MemRequest:           nodeMemCapacity / 100,
-				MaxContainerFailures: &MaxContainerFailures,
+			podsPerNode := itArg.podsPerNode
+			totalPods = podsPerNode * nodeCount
+			// TODO: loop to podsPerNode instead of 1 when we're ready.
+			numberOrRCs := 1
+			RCConfigs := make([]framework.RCConfig, numberOrRCs)
+			for i := 0; i < numberOrRCs; i++ {
+				RCName = "density" + strconv.Itoa(totalPods) + "-" + strconv.Itoa(i) + "-" + uuid
+				RCConfigs[i] = framework.RCConfig{Client: c,
+					Image:                "gcr.io/google_containers/pause:2.0",
+					Name:                 RCName,
+					Namespace:            ns,
+					Labels:               map[string]string{"type": "densityPod"},
+					PollInterval:         itArg.interval,
+					PodStatusFile:        fileHndl,
+					Replicas:             (totalPods + numberOrRCs - 1) / numberOrRCs,
+					CpuRequest:           nodeCpuCapacity / 100,
+					MemRequest:           nodeMemCapacity / 100,
+					MaxContainerFailures: &MaxContainerFailures,
+					Silent:               true,
+				}
 			}
 
 			// Create a listener for events.
@@ -249,7 +276,7 @@ var _ = framework.KubeDescribe("Density", func() {
 			// uLock is a lock protects the updateCount
 			var uLock sync.Mutex
 			updateCount := 0
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": RCName}))
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"type": "densityPod"}))
 			_, updateController := controllerframework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -273,10 +300,22 @@ var _ = framework.KubeDescribe("Density", func() {
 			)
 			go updateController.Run(stop)
 
-			// Start the replication controller.
+			// Start all replication controllers.
 			startTime := time.Now()
-			framework.ExpectNoError(framework.RunRC(config))
+			wg := sync.WaitGroup{}
+			wg.Add(len(RCConfigs))
+			for i := range RCConfigs {
+				rcConfig := RCConfigs[i]
+				go func() {
+					framework.ExpectNoError(framework.RunRC(rcConfig))
+					wg.Done()
+				}()
+			}
+			logStopCh := make(chan struct{})
+			go logPodStartupStatus(c, totalPods, ns, map[string]string{"type": "densityPod"}, itArg.interval, logStopCh)
+			wg.Wait()
 			e2eStartupTime = time.Now().Sub(startTime)
+			close(logStopCh)
 			framework.Logf("E2E startup time for %d pods: %v", totalPods, e2eStartupTime)
 			framework.Logf("Throughput (pods/s) during cluster saturation phase: %v", float32(totalPods)/float32(e2eStartupTime/time.Second))
 
@@ -506,11 +545,14 @@ var _ = framework.KubeDescribe("Density", func() {
 
 			By("Deleting ReplicationController")
 			// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
-			rc, err := c.ReplicationControllers(ns).Get(RCName)
-			if err == nil && rc.Spec.Replicas != 0 {
-				By("Cleaning up the replication controller")
-				err := framework.DeleteRC(c, ns, RCName)
-				framework.ExpectNoError(err)
+			for i := range RCConfigs {
+				rcName := RCConfigs[i].Name
+				rc, err := c.ReplicationControllers(ns).Get(rcName)
+				if err == nil && rc.Spec.Replicas != 0 {
+					By("Cleaning up the replication controller")
+					err := framework.DeleteRC(c, ns, rcName)
+					framework.ExpectNoError(err)
+				}
 			}
 
 			By("Removing additional replication controllers if any")
