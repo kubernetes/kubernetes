@@ -2366,10 +2366,24 @@ func TestHandlePortConflicts(t *testing.T) {
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
 	kl.nodeLister = testNodeLister{nodes: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: kl.nodeName}},
+		{
+			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
+			Status: api.NodeStatus{
+				Allocatable: api.ResourceList{
+					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: kl.nodeName}},
+		{
+			ObjectMeta: api.ObjectMeta{Name: kl.nodeName},
+			Status: api.NodeStatus{
+				Allocatable: api.ResourceList{
+					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
 	}}
 
 	spec := api.PodSpec{NodeName: kl.nodeName, Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
@@ -2427,10 +2441,24 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
 	kl.nodeLister = testNodeLister{nodes: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"}},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+			Status: api.NodeStatus{
+				Allocatable: api.ResourceList{
+					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"}},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+			Status: api.NodeStatus{
+				Allocatable: api.ResourceList{
+					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
 	}}
 
 	pods := []*api.Pod{
@@ -2486,10 +2514,24 @@ func TestHandleNodeSelector(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kl := testKubelet.kubelet
 	kl.nodeLister = testNodeLister{nodes: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
+		{
+			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
+			Status: api.NodeStatus{
+				Allocatable: api.ResourceList{
+					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
+		{
+			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
+			Status: api.NodeStatus{
+				Allocatable: api.ResourceList{
+					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
 	}}
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
