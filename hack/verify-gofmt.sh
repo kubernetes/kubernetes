@@ -21,13 +21,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-GO_VERSION=($(go version))
-
-if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.4|go1.6') ]]; then
-  echo "Unsupported go version '${GO_VERSION[2]}', skipping gofmt."
-  exit 1
-fi
+kube::golang::verify_go_version
 
 cd "${KUBE_ROOT}"
 
