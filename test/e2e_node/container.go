@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 
 	"github.com/onsi/gomega/format"
@@ -100,5 +101,15 @@ func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
 	if containers == nil || len(containers) != 1 {
 		return ConformanceContainer{}, errors.New("Failed to get container")
 	}
-	return ConformanceContainer{containers[0], cc.Client, pod.Status.Phase, cc.NodeName}, nil
+	return ConformanceContainer{containers[0], cc.Client, pod.Status.Phase, pod.Spec.NodeName}, nil
+}
+
+func (cc *ConformanceContainer) Present() (bool, error) {
+	_, err := cc.Client.Pods(api.NamespaceDefault).Get(cc.Container.Name)
+	if err == nil {
+		return true, nil
+	} else if err != nil && apierrs.IsNotFound(err) {
+		return false, nil
+	}
+	return false, err
 }
