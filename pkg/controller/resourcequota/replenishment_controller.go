@@ -215,7 +215,7 @@ func ServiceReplenishmentUpdateFunc(options *ReplenishmentControllerOptions) fun
 	return func(oldObj, newObj interface{}) {
 		oldService := oldObj.(*api.Service)
 		newService := newObj.(*api.Service)
-		if core.QuotaServiceType(oldService) && !core.QuotaServiceType(newService) {
+		if core.QuotaServiceType(oldService) || core.QuotaServiceType(newService) {
 			options.ReplenishmentFunc(options.GroupKind, newService.Namespace, newService)
 		}
 	}

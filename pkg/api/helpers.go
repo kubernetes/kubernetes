@@ -153,6 +153,7 @@ var standardQuotaResources = sets.NewString(
 	string(ResourcePersistentVolumeClaims),
 	string(ResourceConfigMaps),
 	string(ResourceServicesNodePorts),
+	string(ResourceServicesLoadBalancers),
 )
 
 // IsStandardQuotaResourceName returns true if the resource is known to
@@ -192,6 +193,7 @@ var integerResources = sets.NewString(
 	string(ResourceConfigMaps),
 	string(ResourcePersistentVolumeClaims),
 	string(ResourceServicesNodePorts),
+	string(ResourceServicesLoadBalancers),
 )
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
