@@ -222,9 +222,9 @@ func TestWatchRead(t *testing.T) {
 
 	for _, protocol := range protocols {
 		for _, test := range testCases {
-			serializer, framer, _, ok := api.Codecs.StreamingSerializerForMediaType(test.MediaType, nil)
+			serializer, ok := api.Codecs.StreamingSerializerForMediaType(test.MediaType, nil)
 			if !ok {
-				t.Fatal(framer)
+				t.Fatal(serializer)
 			}
 
 			r, contentType := protocol.fn(test.Accept)
@@ -235,13 +235,13 @@ func TestWatchRead(t *testing.T) {
 			}
 			objectSerializer, ok := api.Codecs.SerializerForMediaType(test.MediaType, nil)
 			if !ok {
-				t.Fatal(framer)
+				t.Fatal(objectSerializer)
 			}
 			objectCodec := api.Codecs.DecoderToVersion(objectSerializer, testInternalGroupVersion)
 
 			var fr io.ReadCloser = r
 			if !protocol.selfFraming {
-				fr = framer.NewFrameReader(r)
+				fr = serializer.Framer.NewFrameReader(r)
 			}
 			d := streaming.NewDecoder(fr, serializer)
 
@@ -495,9 +495,9 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	timeoutCh := make(chan time.Time)
 	done := make(chan struct{})
 
-	_, framer, _, ok := api.Codecs.StreamingSerializerForMediaType("application/json", nil)
+	serializer, ok := api.Codecs.StreamingSerializerForMediaType("application/json", nil)
 	if !ok {
-		t.Fatal(framer)
+		t.Fatal(serializer)
 	}
 
 	// Setup a new watchserver
@@ -505,7 +505,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		watching: watcher,
 
 		mediaType:       "testcase/json",
-		framer:          framer,
+		framer:          serializer.Framer,
 		encoder:         newCodec,
 		embeddedEncoder: newCodec,
 

@@ -110,6 +110,7 @@ kube-apiserver
       --ssh-keyfile="": If non-empty, use secure SSH proxy to the nodes, using this user keyfile
       --ssh-user="": If non-empty, use secure SSH proxy to the nodes, using this user name
       --storage-backend="": The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.
+      --storage-media-type="application/json": The media type to use to store objects in storage. Defaults to application/json. Some resources may only support a specific media type and will ignore this setting.
       --storage-versions="apps/v1alpha1,authorization.k8s.io/v1beta1,autoscaling/v1,batch/v1,componentconfig/v1alpha1,extensions/v1beta1,metrics/v1alpha1,v1": The per-group version to store resources in. Specified in the format "group1/version1,group2/version2,...". In the case where objects are moved from one group to the other, you may specify the format "group1=group2/v1beta1,group3/v1beta1,...". You only need to pass the groups you wish to change from the defaults. It defaults to a list of preferred versions of all registered groups, which is derived from the KUBE_API_VERSIONS environment variable.
       --tls-cert-file="": File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). If HTTPS serving is enabled, and --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.
       --tls-private-key-file="": File containing x509 private key matching --tls-cert-file.

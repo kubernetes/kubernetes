@@ -27,6 +27,7 @@ import (
 // EnableCrossGroupDecoding modifies the given decoder in place, if it is a codec
 // from this package. It allows objects from one group to be auto-decoded into
 // another group. 'destGroup' must already exist in the codec.
+// TODO: this is an encapsulation violation and should be refactored
 func EnableCrossGroupDecoding(d runtime.Decoder, sourceGroup, destGroup string) error {
 	internal, ok := d.(*codec)
 	if !ok {
@@ -45,6 +46,7 @@ func EnableCrossGroupDecoding(d runtime.Decoder, sourceGroup, destGroup string) 
 // EnableCrossGroupEncoding modifies the given encoder in place, if it is a codec
 // from this package. It allows objects from one group to be auto-decoded into
 // another group. 'destGroup' must already exist in the codec.
+// TODO: this is an encapsulation violation and should be refactored
 func EnableCrossGroupEncoding(e runtime.Encoder, sourceGroup, destGroup string) error {
 	internal, ok := e.(*codec)
 	if !ok {

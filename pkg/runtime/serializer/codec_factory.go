@@ -31,6 +31,8 @@ type serializerType struct {
 	AcceptContentTypes []string
 	ContentType        string
 	FileExtensions     []string
+	// EncodesAsText should be true if this content type can be represented safely in UTF-8
+	EncodesAsText bool
 
 	Serializer       runtime.Serializer
 	PrettySerializer runtime.Serializer
@@ -65,6 +67,7 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 			AcceptContentTypes: []string{"application/json"},
 			ContentType:        "application/json",
 			FileExtensions:     []string{"json"},
+			EncodesAsText:      true,
 			Serializer:         jsonSerializer,
 			PrettySerializer:   jsonPrettySerializer,
 
@@ -77,6 +80,7 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 			AcceptContentTypes: []string{"application/yaml"},
 			ContentType:        "application/yaml",
 			FileExtensions:     []string{"yaml"},
+			EncodesAsText:      true,
 			Serializer:         yamlSerializer,
 
 			// TODO: requires runtime.RawExtension to properly distinguish when the nested content is
@@ -206,62 +210,91 @@ func (f CodecFactory) UniversalDeserializer() runtime.Decoder {
 //
 // TODO: the decoder will eventually be removed in favor of dealing with objects in their versioned form
 func (f CodecFactory) UniversalDecoder(versions ...unversioned.GroupVersion) runtime.Decoder {
-	return f.CodecForVersions(runtime.NoopEncoder{Decoder: f.universal}, nil, versions)
+	return f.CodecForVersions(nil, f.universal, nil, versions)
 }
 
 // CodecFor creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
 // it will default to runtime.APIVersionInternal. If encode is not specified for an object's group, the object is not
 // converted. If encode or decode are nil, no conversion is performed.
-func (f CodecFactory) CodecForVersions(serializer runtime.Serializer, encode []unversioned.GroupVersion, decode []unversioned.GroupVersion) runtime.Codec {
-	return versioning.NewCodecForScheme(f.scheme, serializer, serializer, encode, decode)
+func (f CodecFactory) CodecForVersions(encoder runtime.Encoder, decoder runtime.Decoder, encode []unversioned.GroupVersion, decode []unversioned.GroupVersion) runtime.Codec {
+	return versioning.NewCodecForScheme(f.scheme, encoder, decoder, encode, decode)
 }
 
 // DecoderToVersion returns a decoder that targets the provided group version.
-func (f CodecFactory) DecoderToVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder {
-	return f.CodecForVersions(serializer, nil, []unversioned.GroupVersion{gv})
+func (f CodecFactory) DecoderToVersion(decoder runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
+	return f.CodecForVersions(nil, decoder, nil, []unversioned.GroupVersion{gv})
 }
 
 // EncoderForVersion returns an encoder that targets the provided group version.
-func (f CodecFactory) EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
-	return f.CodecForVersions(serializer, []unversioned.GroupVersion{gv}, nil)
+func (f CodecFactory) EncoderForVersion(encoder runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
+	return f.CodecForVersions(encoder, nil, []unversioned.GroupVersion{gv}, nil)
 }
 
 // SerializerForMediaType returns a serializer that matches the provided RFC2046 mediaType, or false if no such
 // serializer exists
-func (f CodecFactory) SerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, bool) {
+func (f CodecFactory) SerializerForMediaType(mediaType string, params map[string]string) (runtime.SerializerInfo, bool) {
 	for _, s := range f.serializers {
 		for _, accepted := range s.AcceptContentTypes {
 			if accepted == mediaType {
-				if s.Specialize != nil && len(options) > 0 {
-					serializer, ok := s.Specialize(options)
-					return serializer, ok
+				// specialization abstracts variants to the content type
+				if s.Specialize != nil && len(params) > 0 {
+					serializer, ok := s.Specialize(params)
+					// TODO: return formatted mediaType+params
+					return runtime.SerializerInfo{Serializer: serializer, MediaType: s.ContentType, EncodesAsText: s.EncodesAsText}, ok
 				}
-				if v, ok := options["pretty"]; ok && v == "1" && s.PrettySerializer != nil {
-					return s.PrettySerializer, true
+
+				// legacy support for ?pretty=1 continues, but this is more formally defined
+				if v, ok := params["pretty"]; ok && v == "1" && s.PrettySerializer != nil {
+					return runtime.SerializerInfo{Serializer: s.PrettySerializer, MediaType: s.ContentType, EncodesAsText: s.EncodesAsText}, true
 				}
-				return s.Serializer, true
+
+				// return the base variant
+				return runtime.SerializerInfo{Serializer: s.Serializer, MediaType: s.ContentType, EncodesAsText: s.EncodesAsText}, true
 			}
 		}
 	}
-	return nil, false
+	return runtime.SerializerInfo{}, false
 }
 
 // StreamingSerializerForMediaType returns a serializer that matches the provided RFC2046 mediaType, or false if no such
 // serializer exists
-func (f CodecFactory) StreamingSerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, runtime.Framer, string, bool) {
+func (f CodecFactory) StreamingSerializerForMediaType(mediaType string, params map[string]string) (runtime.StreamSerializerInfo, bool) {
 	for _, s := range f.serializers {
 		for _, accepted := range s.AcceptStreamContentTypes {
 			if accepted == mediaType {
-				if s.StreamSpecialize != nil && len(options) > 0 {
-					serializer, ok := s.StreamSpecialize(options)
-					// TODO: have StreamSpecialize return exact content type
-					return serializer, s.Framer, s.StreamContentType, ok
+				// TODO: accept params
+				nested, ok := f.SerializerForMediaType(s.ContentType, nil)
+				if !ok {
+					panic("no serializer defined for internal content type")
 				}
-				return s.StreamSerializer, s.Framer, s.StreamContentType, true
+
+				if s.StreamSpecialize != nil && len(params) > 0 {
+					serializer, ok := s.StreamSpecialize(params)
+					// TODO: return formatted mediaType+params
+					return runtime.StreamSerializerInfo{
+						SerializerInfo: runtime.SerializerInfo{
+							Serializer:    serializer,
+							MediaType:     s.StreamContentType,
+							EncodesAsText: s.EncodesAsText,
+						},
+						Framer:   s.Framer,
+						Embedded: nested,
+					}, ok
+				}
+
+				return runtime.StreamSerializerInfo{
+					SerializerInfo: runtime.SerializerInfo{
+						Serializer:    s.StreamSerializer,
+						MediaType:     s.StreamContentType,
+						EncodesAsText: s.EncodesAsText,
+					},
+					Framer:   s.Framer,
+					Embedded: nested,
+				}, true
 			}
 		}
 	}
-	return nil, nil, "", false
+	return runtime.StreamSerializerInfo{}, false
 }
 
 // SerializerForFileExtension returns a serializer for the provided extension, or false if no serializer matches.

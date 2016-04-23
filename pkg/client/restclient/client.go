@@ -139,26 +139,23 @@ func readExpBackoffConfig() BackoffManager {
 func createSerializers(config ContentConfig) (*Serializers, error) {
 	negotiated := config.NegotiatedSerializer
 	contentType := config.ContentType
-	serializer, ok := negotiated.SerializerForMediaType(contentType, nil)
+	info, ok := negotiated.SerializerForMediaType(contentType, nil)
 	if !ok {
 		return nil, fmt.Errorf("serializer for %s not registered", contentType)
 	}
-	streamingSerializer, framer, _, ok := negotiated.StreamingSerializerForMediaType(contentType, nil)
+	streamInfo, ok := negotiated.StreamingSerializerForMediaType(contentType, nil)
 	if !ok {
 		return nil, fmt.Errorf("streaming serializer for %s not registered", contentType)
-	}
-	if framer == nil {
-		return nil, fmt.Errorf("no framer for %s", contentType)
 	}
 	internalGV := unversioned.GroupVersion{
 		Group:   config.GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}
 	return &Serializers{
-		Encoder:             negotiated.EncoderForVersion(serializer, *config.GroupVersion),
-		Decoder:             negotiated.DecoderToVersion(serializer, internalGV),
-		StreamingSerializer: streamingSerializer,
-		Framer:              framer,
+		Encoder:             negotiated.EncoderForVersion(info.Serializer, *config.GroupVersion),
+		Decoder:             negotiated.DecoderToVersion(info.Serializer, internalGV),
+		StreamingSerializer: streamInfo.Serializer,
+		Framer:              streamInfo.Framer,
 	}, nil
 }
 

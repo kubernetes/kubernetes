@@ -59,47 +59,33 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 	return t.C, t.Stop
 }
 
-type textEncodable interface {
-	// EncodesAsText should return true if objects should be transmitted as a WebSocket Text
-	// frame (otherwise, they will be sent as a Binary frame).
-	EncodesAsText() bool
-}
-
 // serveWatch handles serving requests to the server
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
 func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Request, res *restful.Response, timeout time.Duration) {
 	// negotiate for the stream serializer
-	serializer, framer, mediaType, exactMediaType, err := negotiateOutputStreamSerializer(req.Request, scope.Serializer)
+	serializer, err := negotiateOutputStreamSerializer(req.Request, scope.Serializer)
 	if err != nil {
 		scope.err(err, res.ResponseWriter, req.Request)
 		return
 	}
-	if framer == nil {
-		scope.err(fmt.Errorf("no framer defined for %q available for embedded encoding", mediaType), res.ResponseWriter, req.Request)
+	if serializer.Framer == nil {
+		scope.err(fmt.Errorf("no framer defined for %q available for embedded encoding", serializer.MediaType), res.ResponseWriter, req.Request)
 		return
 	}
-	encoder := scope.Serializer.EncoderForVersion(serializer, scope.Kind.GroupVersion())
+	encoder := scope.Serializer.EncoderForVersion(serializer.Serializer, scope.Kind.GroupVersion())
 
-	useTextFraming := false
-	if encodable, ok := serializer.(textEncodable); ok && encodable.EncodesAsText() {
-		useTextFraming = true
-	}
+	useTextFraming := serializer.EncodesAsText
 
 	// find the embedded serializer matching the media type
-	embeddedSerializer, ok := scope.Serializer.SerializerForMediaType(mediaType, nil)
-	if !ok {
-		scope.err(fmt.Errorf("no serializer defined for %q available for embedded encoding", mediaType), res.ResponseWriter, req.Request)
-		return
-	}
-	embeddedEncoder := scope.Serializer.EncoderForVersion(embeddedSerializer, scope.Kind.GroupVersion())
+	embeddedEncoder := scope.Serializer.EncoderForVersion(serializer.Embedded.Serializer, scope.Kind.GroupVersion())
 
 	server := &WatchServer{
 		watching: watcher,
 		scope:    scope,
 
 		useTextFraming:  useTextFraming,
-		mediaType:       exactMediaType,
-		framer:          framer,
+		mediaType:       serializer.MediaType,
+		framer:          serializer.Framer,
 		encoder:         encoder,
 		embeddedEncoder: embeddedEncoder,
 		fixup: func(obj runtime.Object) {

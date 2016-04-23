@@ -19,6 +19,7 @@ package testapi
 
 import (
 	"fmt"
+	"mime"
 	"os"
 	"reflect"
 	"strings"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	_ "k8s.io/kubernetes/pkg/api/install"
@@ -45,14 +47,16 @@ import (
 )
 
 var (
-	Groups               = make(map[string]TestGroup)
-	Default              TestGroup
-	Autoscaling          TestGroup
-	Batch                TestGroup
-	Extensions           TestGroup
-	Apps                 TestGroup
-	Federation           TestGroup
-	NegotiatedSerializer = api.Codecs
+	Groups      = make(map[string]TestGroup)
+	Default     TestGroup
+	Autoscaling TestGroup
+	Batch       TestGroup
+	Extensions  TestGroup
+	Apps        TestGroup
+	Federation  TestGroup
+
+	serializer        runtime.SerializerInfo
+	storageSerializer runtime.SerializerInfo
 )
 
 type TestGroup struct {
@@ -62,6 +66,30 @@ type TestGroup struct {
 }
 
 func init() {
+	if apiMediaType := os.Getenv("KUBE_TEST_API_TYPE"); len(apiMediaType) > 0 {
+		var ok bool
+		mediaType, options, err := mime.ParseMediaType(apiMediaType)
+		if err != nil {
+			panic(err)
+		}
+		serializer, ok = api.Codecs.SerializerForMediaType(mediaType, options)
+		if !ok {
+			panic(fmt.Sprintf("no serializer for %s", apiMediaType))
+		}
+	}
+
+	if storageMediaType := StorageMediaType(); len(storageMediaType) > 0 {
+		var ok bool
+		mediaType, options, err := mime.ParseMediaType(storageMediaType)
+		if err != nil {
+			panic(err)
+		}
+		storageSerializer, ok = api.Codecs.SerializerForMediaType(mediaType, options)
+		if !ok {
+			panic(fmt.Sprintf("no serializer for %s", storageMediaType))
+		}
+	}
+
 	kubeTestAPI := os.Getenv("KUBE_TEST_API")
 	if len(kubeTestAPI) != 0 {
 		testGroupVersions := strings.Split(kubeTestAPI, ",")
@@ -173,9 +201,40 @@ func (g TestGroup) InternalTypes() map[string]reflect.Type {
 }
 
 // Codec returns the codec for the API version to test against, as set by the
-// KUBE_TEST_API env var.
+// KUBE_TEST_API_TYPE env var.
 func (g TestGroup) Codec() runtime.Codec {
-	return api.Codecs.LegacyCodec(g.externalGroupVersion)
+	if serializer.Serializer == nil {
+		return api.Codecs.LegacyCodec(g.externalGroupVersion)
+	}
+	return api.Codecs.CodecForVersions(serializer, api.Codecs.UniversalDeserializer(), []unversioned.GroupVersion{g.externalGroupVersion}, nil)
+}
+
+// NegotiatedSerializer returns the negotiated serializer for the server.
+func (g TestGroup) NegotiatedSerializer() runtime.NegotiatedSerializer {
+	return api.Codecs
+}
+
+func StorageMediaType() string {
+	return os.Getenv("KUBE_TEST_API_STORAGE_TYPE")
+}
+
+// StorageCodec returns the codec for the API version to store in etcd, as set by the
+// KUBE_TEST_API_STORAGE_TYPE env var.
+func (g TestGroup) StorageCodec() runtime.Codec {
+	s := storageSerializer.Serializer
+
+	if s == nil {
+		return api.Codecs.LegacyCodec(g.externalGroupVersion)
+	}
+
+	// etcd2 only supports string data - we must wrap any result before returning
+	// TODO: remove for etcd3 / make parameterizable
+	if !storageSerializer.EncodesAsText {
+		s = runtime.NewBase64Serializer(s)
+	}
+	ds := recognizer.NewDecoder(s, api.Codecs.UniversalDeserializer())
+
+	return api.Codecs.CodecForVersions(s, ds, []unversioned.GroupVersion{g.externalGroupVersion}, nil)
 }
 
 // Converter returns the api.Scheme for the API version to test against, as set by the
