@@ -27,18 +27,38 @@ import (
 
 type RecognizingDecoder interface {
 	runtime.Decoder
+	// AccurateRecognizer should be true if this decoder can unambigously determine
+	// whether the content is known to it. Allows RecognizingDecoders to adjust certainty.
+	AccurateRecognizer() bool
+	// RecognizesData should return true if the input provided in the provided reader
+	// belongs to this decoder, or an error if the data could not be read or is ambiguous.
 	RecognizesData(peek io.Reader) (bool, error)
 }
 
+// NewDecoder creates a decoder that will attempt multiple decoders in an order defined
+// by:
+//
+// 1. The decoder implements RecognizingDecoder and returns true for AccurateRecognizer
+// 2. The decoder implements RecognizingDecoder and returns false for AccurateRecognizer
+// 3. All other decoders
+//
+// The order passed to the constructor is preserved within those priorities. Only the
+// last error encountered will be returned.
 func NewDecoder(decoders ...runtime.Decoder) runtime.Decoder {
 	recognizing, blind := []RecognizingDecoder{}, []runtime.Decoder{}
+	var ambiguous []runtime.Decoder
 	for _, d := range decoders {
 		if r, ok := d.(RecognizingDecoder); ok {
-			recognizing = append(recognizing, r)
+			if r.AccurateRecognizer() {
+				recognizing = append(recognizing, r)
+			} else {
+				ambiguous = append(ambiguous, r)
+			}
 		} else {
 			blind = append(blind, d)
 		}
 	}
+	blind = append(ambiguous, blind...)
 	return &decoder{
 		recognizing: recognizing,
 		blind:       blind,

@@ -185,6 +185,10 @@ func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides .
 	return encoder.Encode(obj)
 }
 
+// AccurateRecognizer returns true for JSON (objects must start with {) and false for
+// YAML (a YAML document could start with arbitrary bytes)
+func (s *Serializer) AccurateRecognizer() bool { return !s.yaml }
+
 // RecognizesData implements the RecognizingDecoder interface.
 func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
 	_, ok := utilyaml.GuessJSONStream(peek, 2048)

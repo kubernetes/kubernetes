@@ -224,6 +224,10 @@ func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides .
 	}
 }
 
+// AccurateRecognizer returns true because the Kubernetes protobuf format is prefixed with a
+// unique magic string.
+func (s *Serializer) AccurateRecognizer() bool { return true }
+
 // RecognizesData implements the RecognizingDecoder interface.
 func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
 	prefix := make([]byte, 4)
@@ -418,6 +422,10 @@ func (s *RawSerializer) EncodeToStream(obj runtime.Object, w io.Writer, override
 		return errNotMarshalable{reflect.TypeOf(obj)}
 	}
 }
+
+// AccurateRecognizer returns false because raw serialization does not provide a magic number or identifying
+// data.
+func (s *RawSerializer) AccurateRecognizer() bool { return false }
 
 // RecognizesData implements the RecognizingDecoder interface - objects encoded with this serializer
 // have no innate identifying information and so cannot be recognized.
