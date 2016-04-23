@@ -253,6 +253,33 @@ kube::golang::create_gopath_tree() {
   ln -s "${KUBE_ROOT}" "${go_pkg_dir}"
 }
 
+# Ensure the go tool exists and is a viable version.
+kube::golang::verify_go_version() {
+  if [[ -z "$(which go)" ]]; then
+    kube::log::usage_from_stdin <<EOF
+Can't find 'go' in PATH, please fix and retry.
+See http://golang.org/doc/install for installation instructions.
+EOF
+    return 2
+  fi
+
+  # Travis continuous build uses a head go release that doesn't report
+  # a version number, so we skip this check on Travis.  It's unnecessary
+  # there anyway.
+  if [[ "${TRAVIS:-}" != "true" ]]; then
+    local go_version
+    go_version=($(go version))
+    if [[ "${go_version[2]}" < "go1.6" ]]; then
+      kube::log::usage_from_stdin <<EOF
+Detected go version: ${go_version[*]}.
+Kubernetes requires go version 1.6 or greater.
+Please install Go version 1.6 or later.
+EOF
+      return 2
+    fi
+  fi
+}
+
 # kube::golang::setup_env will check that the `go` commands is available in
 # ${PATH}. If not running on Travis, it will also check that the Go version is
 # good enough for the Kubernetes build.
@@ -266,31 +293,9 @@ kube::golang::create_gopath_tree() {
 #   env-var GO15VENDOREXPERIMENT=1
 #   current directory is within GOPATH
 kube::golang::setup_env() {
+  kube::golang::verify_go_version
+
   kube::golang::create_gopath_tree
-
-  if [[ -z "$(which go)" ]]; then
-    kube::log::usage_from_stdin <<EOF
-Can't find 'go' in PATH, please fix and retry.
-See http://golang.org/doc/install for installation instructions.
-EOF
-    exit 2
-  fi
-
-  # Travis continuous build uses a head go release that doesn't report
-  # a version number, so we skip this check on Travis.  It's unnecessary
-  # there anyway.
-  if [[ "${TRAVIS:-}" != "true" ]]; then
-    local go_version
-    go_version=($(go version))
-    if [[ "${go_version[2]}" < "go1.4" ]]; then
-      kube::log::usage_from_stdin <<EOF
-Detected go version: ${go_version[*]}.
-Kubernetes requires go version 1.4 or greater.
-Please install Go version 1.4 or later.
-EOF
-      exit 2
-    fi
-  fi
 
   export GOPATH=${KUBE_GOPATH}
 
@@ -441,16 +446,12 @@ kube::golang::build_binaries_for_platform() {
   for test in "${tests[@]:+${tests[@]}}"; do
     local outfile=$(kube::golang::output_filename_for_binary "${test}" \
       "${platform}")
-    # Go 1.4 added -o to control where the binary is saved, but Go 1.3 doesn't
-    # have this flag. Whenever we deprecate go 1.3, update to use -o instead of
-    # changing into the output directory.
     mkdir -p "$(dirname ${outfile})"
-    pushd "$(dirname ${outfile})" >/dev/null
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
       -ldflags "${goldflags}" \
+      -o "${outfile}" \
       "$(dirname ${test})"
-    popd >/dev/null
   done
 }
 
