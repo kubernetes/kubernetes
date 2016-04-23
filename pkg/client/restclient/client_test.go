@@ -47,7 +47,7 @@ func TestDoRequestSuccess(t *testing.T) {
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         testapi.Default.GroupVersion(),
-			NegotiatedSerializer: testapi.NegotiatedSerializer,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		},
 		Username: "user",
 		Password: "pass",
@@ -92,7 +92,7 @@ func TestDoRequestFailed(t *testing.T) {
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         testapi.Default.GroupVersion(),
-			NegotiatedSerializer: testapi.NegotiatedSerializer,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		},
 	})
 	if err != nil {
@@ -130,7 +130,7 @@ func TestDoRequestCreated(t *testing.T) {
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         testapi.Default.GroupVersion(),
-			NegotiatedSerializer: testapi.NegotiatedSerializer,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		},
 		Username: "user",
 		Password: "pass",

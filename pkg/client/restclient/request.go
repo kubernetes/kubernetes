@@ -639,6 +639,10 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
+	if r.serializers.Framer == nil {
+		return nil, fmt.Errorf("watching resources is not possible with this client (content-type: %s)", r.content.ContentType)
+	}
+
 	url := r.URL().String()
 	req, err := http.NewRequest(r.verb, url, r.body)
 	if err != nil {

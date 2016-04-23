@@ -18,9 +18,11 @@ package genericapiserver
 
 import (
 	"fmt"
+	"mime"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -50,19 +52,25 @@ type DefaultStorageFactory struct {
 
 	Overrides map[unversioned.GroupResource]groupResourceOverrides
 
+	// DefaultMediaType is the media type used to store resources. If it is not set, "application/json" is used.
+	DefaultMediaType string
+
 	// DefaultSerializer is used to create encoders and decoders for the storage.Interface.
-	DefaultSerializer runtime.NegotiatedSerializer
+	DefaultSerializer runtime.StorageSerializer
 
 	// ResourceEncodingConfig describes how to encode a particular GroupVersionResource
 	ResourceEncodingConfig ResourceEncodingConfig
 
 	// APIResourceConfigSource indicates whether the *storage* is enabled, NOT the API
-	// This is discrete from resource enablement because those are separate concerns.  How it is surfaced to the user via flags
-	// or config is up to whoever is building this.
+	// This is discrete from resource enablement because those are separate concerns.  How this source is configured
+	// is left to the caller.
 	APIResourceConfigSource APIResourceConfigSource
 
-	// newEtcdFn exists to be overwritten for unit testing.  You should never set this in a normal world.
-	newEtcdFn func(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (etcdStorage storage.Interface, err error)
+	// newStorageCodecFn exists to be overwritten for unit testing.
+	newStorageCodecFn func(storageMediaType string, ns runtime.StorageSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (codec runtime.Codec, err error)
+
+	// newStorageFn exists to be overwritten for unit testing.
+	newStorageFn func(config storagebackend.Config) (etcdStorage storage.Interface, err error)
 }
 
 type groupResourceOverrides struct {
@@ -71,8 +79,10 @@ type groupResourceOverrides struct {
 	etcdLocation []string
 	// etcdPrefix contains the list of "special" prefixes for a GroupResource.  Resource=* means for the entire group
 	etcdPrefix string
+	// mediaType is the desired serializer to choose. If empty, the default is chosen.
+	mediaType string
 	// serializer contains the list of "special" serializers for a GroupResource.  Resource=* means for the entire group
-	serializer runtime.NegotiatedSerializer
+	serializer runtime.StorageSerializer
 	// cohabitatingResources keeps track of which resources must be stored together.  This happens when we have multiple ways
 	// of exposing one set of concepts.  autoscaling.HPA and extensions.HPA as a for instance
 	// The order of the slice matters!  It is the priority order of lookup for finding a storage location
@@ -83,15 +93,20 @@ var _ StorageFactory = &DefaultStorageFactory{}
 
 const AllResources = "*"
 
-func NewDefaultStorageFactory(config storagebackend.Config, defaultSerializer runtime.NegotiatedSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
+func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
+	if len(defaultMediaType) == 0 {
+		defaultMediaType = runtime.ContentTypeJSON
+	}
 	return &DefaultStorageFactory{
 		StorageConfig:           config,
 		Overrides:               map[unversioned.GroupResource]groupResourceOverrides{},
+		DefaultMediaType:        defaultMediaType,
 		DefaultSerializer:       defaultSerializer,
 		ResourceEncodingConfig:  resourceEncodingConfig,
 		APIResourceConfigSource: resourceConfig,
 
-		newEtcdFn: newEtcd,
+		newStorageCodecFn: NewStorageCodec,
+		newStorageFn:      newStorage,
 	}
 }
 
@@ -107,8 +122,9 @@ func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource unversioned.GroupRes
 	s.Overrides[groupResource] = overrides
 }
 
-func (s *DefaultStorageFactory) SetSerializer(groupResource unversioned.GroupResource, serializer runtime.NegotiatedSerializer) {
+func (s *DefaultStorageFactory) SetSerializer(groupResource unversioned.GroupResource, mediaType string, serializer runtime.StorageSerializer) {
 	overrides := s.Overrides[groupResource]
+	overrides.mediaType = mediaType
 	overrides.serializer = serializer
 	s.Overrides[groupResource] = overrides
 }
@@ -160,6 +176,14 @@ func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (st
 		etcdPrefix = exactResourceOverride.etcdPrefix
 	}
 
+	etcdMediaType := s.DefaultMediaType
+	if len(groupOverride.mediaType) != 0 {
+		etcdMediaType = groupOverride.mediaType
+	}
+	if len(exactResourceOverride.mediaType) != 0 {
+		etcdMediaType = exactResourceOverride.mediaType
+	}
+
 	etcdSerializer := s.DefaultSerializer
 	if groupOverride.serializer != nil {
 		etcdSerializer = groupOverride.serializer
@@ -183,27 +207,19 @@ func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (st
 		return nil, err
 	}
 
+	codec, err := s.newStorageCodecFn(etcdMediaType, etcdSerializer, storageEncodingVersion, internalVersion, config)
+	if err != nil {
+		return nil, err
+	}
+
+	config.Codec = codec
+
 	glog.V(3).Infof("storing %v in %v, reading as %v from %v", groupResource, storageEncodingVersion, internalVersion, config)
-	return s.newEtcdFn(etcdSerializer, storageEncodingVersion, internalVersion, config)
+	return s.newStorageFn(config)
 }
 
-func newEtcd(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (etcdStorage storage.Interface, err error) {
-	s, ok := ns.SerializerForMediaType("application/json", nil)
-	if !ok {
-		return nil, fmt.Errorf("unable to find serializer for JSON")
-	}
-	encoder := ns.EncoderForVersion(s, storageVersion)
-	decoder := ns.DecoderToVersion(s, memoryVersion)
-	if memoryVersion.Group != storageVersion.Group {
-		// Allow this codec to translate between groups.
-		if err = versioning.EnableCrossGroupEncoding(encoder, memoryVersion.Group, storageVersion.Group); err != nil {
-			return nil, fmt.Errorf("error setting up encoder from %v to %v: %v", memoryVersion, storageVersion, err)
-		}
-		if err = versioning.EnableCrossGroupDecoding(decoder, storageVersion.Group, memoryVersion.Group); err != nil {
-			return nil, fmt.Errorf("error setting up decoder from %v to %v: %v", storageVersion, memoryVersion, err)
-		}
-	}
-	config.Codec = runtime.NewCodec(encoder, decoder)
+// newStorage is the default implementation for creating a storage backend.
+func newStorage(config storagebackend.Config) (etcdStorage storage.Interface, err error) {
 	return storagebackend.Create(config)
 }
 
@@ -216,4 +232,40 @@ func (s *DefaultStorageFactory) Backends() []string {
 		backends.Insert(overrides.etcdLocation...)
 	}
 	return backends.List()
+}
+
+// NewStorageCodec assembles a storage codec for the provided storage media type, the provided serializer, and the requested
+// storage and memory versions.
+func NewStorageCodec(storageMediaType string, ns runtime.StorageSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (runtime.Codec, error) {
+	mediaType, options, err := mime.ParseMediaType(storageMediaType)
+	if err != nil {
+		return nil, fmt.Errorf("%q is not a valid mime-type", storageMediaType)
+	}
+	serializer, ok := ns.SerializerForMediaType(mediaType, options)
+	if !ok {
+		return nil, fmt.Errorf("unable to find serializer for %q", storageMediaType)
+	}
+
+	s := serializer.Serializer
+
+	// etcd2 only supports string data - we must wrap any result before returning
+	// TODO: storagebackend should return a boolean indicating whether it supports binary data
+	if !serializer.EncodesAsText && (config.Type == storagebackend.StorageTypeUnset || config.Type == storagebackend.StorageTypeETCD2) {
+		glog.V(4).Infof("Wrapping the underlying binary storage serializer with a base64 encoding for etcd2")
+		s = runtime.NewBase64Serializer(s)
+	}
+
+	ds := recognizer.NewDecoder(s, ns.UniversalDeserializer())
+	encoder := ns.EncoderForVersion(s, storageVersion)
+	decoder := ns.DecoderToVersion(ds, memoryVersion)
+	if memoryVersion.Group != storageVersion.Group {
+		// Allow this codec to translate between groups.
+		if err := versioning.EnableCrossGroupEncoding(encoder, memoryVersion.Group, storageVersion.Group); err != nil {
+			return nil, fmt.Errorf("error setting up encoder from %v to %v: %v", memoryVersion, storageVersion, err)
+		}
+		if err := versioning.EnableCrossGroupDecoding(decoder, storageVersion.Group, memoryVersion.Group); err != nil {
+			return nil, fmt.Errorf("error setting up decoder from %v to %v: %v", storageVersion, memoryVersion, err)
+		}
+	}
+	return runtime.NewCodec(encoder, decoder), nil
 }

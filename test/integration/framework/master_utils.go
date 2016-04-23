@@ -155,24 +155,29 @@ func NewMasterConfig() *master.Config {
 		Prefix:     etcdtest.PathPrefix(),
 	}
 
-	negotiatedSerializer := NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), "application/json")
+	negotiatedSerializer := NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), runtime.ContentTypeJSON)
 
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, negotiatedSerializer, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, negotiatedSerializer, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: api.GroupName, Resource: genericapiserver.AllResources},
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), "application/json"))
+		"",
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), runtime.ContentTypeJSON))
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: autoscaling.GroupName, Resource: genericapiserver.AllResources},
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Autoscaling.Codec(), "application/json"))
+		"",
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Autoscaling.Codec(), runtime.ContentTypeJSON))
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: batch.GroupName, Resource: genericapiserver.AllResources},
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Batch.Codec(), "application/json"))
+		"",
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Batch.Codec(), runtime.ContentTypeJSON))
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: apps.GroupName, Resource: genericapiserver.AllResources},
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Apps.Codec(), "application/json"))
+		"",
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Apps.Codec(), runtime.ContentTypeJSON))
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: extensions.GroupName, Resource: genericapiserver.AllResources},
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Extensions.Codec(), "application/json"))
+		"",
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Extensions.Codec(), runtime.ContentTypeJSON))
 
 	return &master.Config{
 		Config: &genericapiserver.Config{

@@ -195,14 +195,6 @@ func (s *Serializer) RecognizesData(peek io.Reader) (ok, unknown bool, err error
 	return ok, false, nil
 }
 
-// EncodesAsText returns true because both JSON and YAML are considered textual representations
-// of data. This is used to determine whether the serialized object should be transmitted over
-// a WebSocket Text or Binary frame. This must remain true for legacy compatibility with v1.1
-// watch over websocket implementations.
-func (s *Serializer) EncodesAsText() bool {
-	return true
-}
-
 // Framer is the default JSON framing behavior, with newlines delimiting individual objects.
 var Framer = jsonFramer{}
 

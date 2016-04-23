@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
-	serializerjson "k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -51,8 +50,10 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	conf = &confCopy
 
 	codec := dynamicCodec{}
-	legacyCodec := api.Codecs.LegacyCodec(v1.SchemeGroupVersion)
-	conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(codec, legacyCodec, serializerjson.Framer)
+
+	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
+	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+	conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo)
 
 	if conf.APIPath == "" {
 		conf.APIPath = "/api"

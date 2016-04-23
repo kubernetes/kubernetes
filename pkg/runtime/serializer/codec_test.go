@@ -267,7 +267,7 @@ func TestVersionedEncoding(t *testing.T) {
 	encoder, _ := cf.SerializerForFileExtension("json")
 
 	// codec that is unversioned uses the target version
-	unversionedCodec := cf.CodecForVersions(encoder, nil, nil)
+	unversionedCodec := cf.CodecForVersions(encoder, nil, nil, nil)
 	_, err = runtime.Encode(unversionedCodec, &TestType1{}, unversioned.GroupVersion{Version: "v3"})
 	if err == nil || !runtime.IsNotRegisteredError(err) {
 		t.Fatal(err)
