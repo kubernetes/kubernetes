@@ -17,10 +17,13 @@ limitations under the License.
 package vsphere
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"os/exec"
 	"net/url"
+	"strings"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
@@ -42,6 +45,8 @@ const ActivePowerState = "poweredOn"
 // VSphere is an implementation of cloud provider Interface for VSphere.
 type VSphere struct {
 	cfg *VSphereConfig
+	// InstanceID of the server where this VSphere object is instantiated.
+	localInstanceID string
 }
 
 type VSphereConfig struct {
@@ -52,6 +57,7 @@ type VSphereConfig struct {
 		VCenterPort   string `gcfg:"port"`
 		InsecureFlag  bool   `gcfg:"insecure-flag"`
 		Datacenter    string `gcfg:"datacenter"`
+		Datastore     string `gcfg:"datastore"`
 	}
 
 	Network struct {
@@ -80,9 +86,56 @@ func init() {
 	})
 }
 
+func readInstanceID(cfg *VSphereConfig) (string, error) {
+	cmd := exec.Command("bash", "-c", `dmidecode -t 1 | grep UUID | tr -d ' ' | cut -f 2 -d ':'`)
+	var out bytes.Buffer
+    cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create vSphere client
+	c, err := vsphereLogin(cfg, ctx)
+	if err != nil {
+		return "", err
+	}
+	defer c.Logout(ctx)
+
+	// Create a new finder
+	f := find.NewFinder(c.Client, true)
+
+	// Fetch and set data center
+	dc, err := f.Datacenter(ctx, cfg.Global.Datacenter)
+	if err != nil {
+		return "", err
+	}
+	f.SetDatacenter(dc)
+
+	s := object.NewSearchIndex(c.Client)
+
+	svm, err := s.FindByUuid(ctx, dc, strings.ToLower(strings.TrimSpace(out.String())), true, nil)
+	var vm mo.VirtualMachine
+	err = s.Properties(ctx, svm.Reference(), []string{"name"}, &vm)
+	if err != nil {
+		return "", err
+	}
+	return vm.Name, nil
+}
+
 func newVSphere(cfg VSphereConfig) (*VSphere, error) {
+	id, err := readInstanceID(&cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	vs := VSphere{
 		cfg: &cfg,
+		localInstanceID: id,
 	}
 	return &vs, nil
 }
@@ -179,11 +232,12 @@ func getInstances(cfg *VSphereConfig, ctx context.Context, c *govmomi.Client, fi
 
 type Instances struct {
 	cfg *VSphereConfig
+	localInstanceID string
 }
 
 // Instances returns an implementation of Instances for vSphere.
 func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
-	return &Instances{vs.cfg}, true
+	return &Instances{vs.cfg, vs.localInstanceID}, true
 }
 
 // List is an implementation of Instances.List.
@@ -258,7 +312,7 @@ func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 }
 
 func (i *Instances) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
+	return i.localInstanceID, nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
