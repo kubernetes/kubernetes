@@ -5,6 +5,7 @@ pkg-core:
 {% if grains['os_family'] == 'RedHat' %}
       - python
       - git
+      - socat
 {% else %}
       - apt-transport-https
       - python-apt
