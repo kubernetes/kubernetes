@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
@@ -50,7 +49,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	defaultEtcdLocation := []string{"http://127.0.0.1"}
 	for i, test := range testCases {
 		actualConfig := storagebackend.Config{}
-		newEtcdFn := func(ns runtime.NegotiatedSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (etcdStorage storage.Interface, err error) {
+		newStorageFn := func(config storagebackend.Config) (_ storage.Interface, err error) {
 			actualConfig = config
 			return nil, nil
 		}
@@ -59,8 +58,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			Prefix:     DefaultEtcdPathPrefix,
 			ServerList: defaultEtcdLocation,
 		}
-		storageFactory := NewDefaultStorageFactory(defaultConfig, api.Codecs, NewDefaultResourceEncodingConfig(), NewResourceConfig())
-		storageFactory.newEtcdFn = newEtcdFn
+		storageFactory := NewDefaultStorageFactory(defaultConfig, "", api.Codecs, NewDefaultResourceEncodingConfig(), NewResourceConfig())
+		storageFactory.newStorageFn = newStorageFn
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
 
 		var err error

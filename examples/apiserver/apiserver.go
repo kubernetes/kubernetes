@@ -45,7 +45,7 @@ func newStorageFactory() genericapiserver.StorageFactory {
 		Prefix:     genericapiserver.DefaultEtcdPathPrefix,
 		ServerList: []string{"http://127.0.0.1:4001"},
 	}
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(), genericapiserver.NewResourceConfig())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, "application/json", api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(), genericapiserver.NewResourceConfig())
 
 	return storageFactory
 }

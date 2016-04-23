@@ -54,6 +54,7 @@ type APIServer struct {
 	CloudConfigFile            string
 	CloudProvider              string
 	CorsAllowedOriginList      []string
+	DefaultStorageMediaType    string
 	DeleteCollectionWorkers    int
 	DeprecatedStorageVersion   string
 	EnableLogsSupport          bool
@@ -98,6 +99,7 @@ func NewAPIServer() *APIServer {
 		APIPrefix:               "/api",
 		AdmissionControl:        "AlwaysAdmit",
 		AuthorizationMode:       "AlwaysAllow",
+		DefaultStorageMediaType: "application/json",
 		DeleteCollectionWorkers: 1,
 		EnableLogsSupport:       true,
 		StorageConfig: storagebackend.Config{
@@ -215,6 +217,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"In the case where objects are moved from one group to the other, you may specify the format \"group1=group2/v1beta1,group3/v1beta1,...\". "+
 		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all registered groups, which is derived from the KUBE_API_VERSIONS environment variable.")
+	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, "The media type to use to store objects in storage. Defaults to application/json. Some resources may only support a specific media type and will ignore this setting.")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")

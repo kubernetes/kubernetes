@@ -17,6 +17,7 @@ limitations under the License.
 package recognizer
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -46,19 +47,13 @@ type RecognizingDecoder interface {
 // last error encountered will be returned.
 func NewDecoder(decoders ...runtime.Decoder) runtime.Decoder {
 	recognizing, blind := []RecognizingDecoder{}, []runtime.Decoder{}
-	var ambiguous []runtime.Decoder
 	for _, d := range decoders {
-		if r, ok := d.(RecognizingDecoder); ok {
-			if r.AccurateRecognizer() {
-				recognizing = append(recognizing, r)
-			} else {
-				ambiguous = append(ambiguous, r)
-			}
+		if r, ok := d.(RecognizingDecoder); ok && r.AccurateRecognizer() {
+			recognizing = append(recognizing, r)
 		} else {
 			blind = append(blind, d)
 		}
 	}
-	blind = append(ambiguous, blind...)
 	return &decoder{
 		recognizing: recognizing,
 		blind:       blind,
@@ -68,6 +63,29 @@ func NewDecoder(decoders ...runtime.Decoder) runtime.Decoder {
 type decoder struct {
 	recognizing []RecognizingDecoder
 	blind       []runtime.Decoder
+}
+
+var _ RecognizingDecoder = &decoder{}
+
+func (d *decoder) AccurateRecognizer() bool {
+	return len(d.recognizing) > 0
+}
+
+func (d *decoder) RecognizesData(peek io.Reader) (bool, error) {
+	var lastErr error
+	data, _ := bufio.NewReaderSize(peek, 1024).Peek(1024)
+	for _, r := range d.recognizing {
+		ok, err := r.RecognizesData(bytes.NewBuffer(data))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if !ok {
+			continue
+		}
+		return true, nil
+	}
+	return false, lastErr
 }
 
 func (d *decoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {

@@ -38,7 +38,7 @@ import (
 func init() {
 	codecsToTest = append(codecsToTest, func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error) {
 		s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), "application/arbitrary.content.type")
-		return api.Codecs.CodecForVersions(s, testapi.ExternalGroupVersions(), nil), nil
+		return api.Codecs.CodecForVersions(s, s, testapi.ExternalGroupVersions(), nil), nil
 	})
 }
 

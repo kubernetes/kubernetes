@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/url"
@@ -168,4 +169,28 @@ func (c *parameterCodec) EncodeParameters(obj Object, to unversioned.GroupVersio
 		obj = out
 	}
 	return queryparams.Convert(obj)
+}
+
+type base64Serializer struct {
+	Serializer
+}
+
+func NewBase64Serializer(s Serializer) Serializer {
+	return &base64Serializer{s}
+}
+
+func (s base64Serializer) EncodeToStream(obj Object, stream io.Writer, overrides ...unversioned.GroupVersion) error {
+	e := base64.NewEncoder(base64.StdEncoding, stream)
+	err := s.Serializer.EncodeToStream(obj, e, overrides...)
+	e.Close()
+	return err
+}
+
+func (s base64Serializer) Decode(data []byte, defaults *unversioned.GroupVersionKind, into Object) (Object, *unversioned.GroupVersionKind, error) {
+	out := make([]byte, base64.StdEncoding.DecodedLen(len(data)))
+	n, err := base64.StdEncoding.Decode(out, data)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.Serializer.Decode(out[:n], defaults, into)
 }
