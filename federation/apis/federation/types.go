@@ -30,6 +30,7 @@ type ClusterSpec struct {
 	ServerAddressByClientCIDRs []unversioned.ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" patchStrategy:"merge" patchMergeKey:"clientCIDR"`
 	// the type (e.g. bearer token, client certificate etc) and data of the credential used to access cluster.
 	// It’s used for system routines (not behalf of users)
+	// TODO: string may not enough, https://github.com/kubernetes/kubernetes/pull/23847#discussion_r59301275
 	Credential string `json:"credential,omitempty"`
 }
 

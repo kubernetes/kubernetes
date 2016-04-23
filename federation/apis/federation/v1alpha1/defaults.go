@@ -21,20 +21,4 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
-	// TODO: 1. does this default value needed?
-	// TODO: 2. adding this default value failes serialization_test
-	//func(obj *Cluster) {
-	//	if len(obj.Status.Conditions) == 0 {
-	//		obj.Status.Conditions = []ClusterCondition{
-	//			{
-	//				Type:    ClusterReady,
-	//				Status:  v1.ConditionFalse,
-	//				Reason:  "Create",
-	//				Message: "Newly created cluster, waiting cluster controller to verify the spec and update the status",
-	//			},
-	//		}
-	//	}
-	//},
-	)
 }
