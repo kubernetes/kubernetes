@@ -186,12 +186,13 @@ func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides .
 }
 
 // RecognizesData implements the RecognizingDecoder interface.
-func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
-	_, ok := utilyaml.GuessJSONStream(peek, 2048)
+func (s *Serializer) RecognizesData(peek io.Reader) (ok, unknown bool, err error) {
 	if s.yaml {
-		return !ok, nil
+		// we could potentially look for '---'
+		return false, true, nil
 	}
-	return ok, nil
+	_, ok = utilyaml.GuessJSONStream(peek, 2048)
+	return ok, false, nil
 }
 
 // EncodesAsText returns true because both JSON and YAML are considered textual representations
