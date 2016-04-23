@@ -174,7 +174,7 @@ func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (st
 		config.ServerList = overriddenEtcdLocations
 	}
 
-	storageEncodingVersion, err := s.ResourceEncodingConfig.StoragageEncodingFor(chosenStorageResource)
+	storageEncodingVersion, err := s.ResourceEncodingConfig.StorageEncodingFor(chosenStorageResource)
 	if err != nil {
 		return nil, err
 	}
