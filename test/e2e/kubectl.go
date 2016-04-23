@@ -727,8 +727,12 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			framework.Logf("namespace %v", ns)
 			framework.RunKubectlOrDie("create", "-f", controllerJson, nsFlag)
+
+			// It may take a while for the pods to get registered in some cases, wait to be sure.
+			By("Waiting for Redis master to start.")
+			waitFor(1)
 			forEachPod(func(pod api.Pod) {
-				framework.Logf("wait on %v ", ns)
+				framework.Logf("wait on redis-master startup in %v ", ns)
 				framework.LookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", framework.PodStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
