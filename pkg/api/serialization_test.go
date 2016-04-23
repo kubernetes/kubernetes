@@ -284,18 +284,14 @@ func TestObjectWatchFraming(t *testing.T) {
 	converted, _ := api.Scheme.ConvertToVersion(secret, "v1")
 	v1secret := converted.(*v1.Secret)
 	for _, streamingMediaType := range api.Codecs.SupportedStreamingMediaTypes() {
-		s, framer, mediaType, _ := api.Codecs.StreamingSerializerForMediaType(streamingMediaType, nil)
-		// TODO: remove this when the runtime.SerializerInfo PR lands
-		if mediaType == "application/vnd.kubernetes.protobuf;stream=watch" {
-			mediaType = "application/vnd.kubernetes.protobuf"
-		}
-		embedded, ok := api.Codecs.SerializerForMediaType(mediaType, nil)
-		if !ok {
-			t.Logf("no embedded serializer for %s", mediaType)
-			embedded = s
+		s, _ := api.Codecs.StreamingSerializerForMediaType(streamingMediaType, nil)
+		framer := s.Framer
+		embedded := s.Embedded.Serializer
+		if embedded == nil {
+			t.Errorf("no embedded serializer for %s", streamingMediaType)
+			continue
 		}
 		innerDecode := api.Codecs.DecoderToVersion(embedded, api.SchemeGroupVersion)
-		//innerEncode := api.Codecs.EncoderForVersion(embedded, api.SchemeGroupVersion)
 
 		// write a single object through the framer and back out
 		obj := &bytes.Buffer{}

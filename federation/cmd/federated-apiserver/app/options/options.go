@@ -44,6 +44,7 @@ type APIServer struct {
 	AuthorizationMode          string
 	AuthorizationConfig        apiserver.AuthorizationConfig
 	BasicAuthFile              string
+	DefaultStorageMediaType    string
 	DeleteCollectionWorkers    int
 	DeprecatedStorageVersion   string
 	EtcdServersOverrides       []string
@@ -76,6 +77,7 @@ func NewAPIServer() *APIServer {
 		ServerRunOptions:        genericapiserver.NewServerRunOptions(),
 		AdmissionControl:        "AlwaysAdmit",
 		AuthorizationMode:       "AlwaysAllow",
+		DefaultStorageMediaType: "application/json",
 		DeleteCollectionWorkers: 1,
 		EventTTL:                1 * time.Hour,
 		MasterServiceNamespace:  api.NamespaceDefault,
@@ -153,6 +155,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"In the case where objects are moved from one group to the other, you may specify the format \"group1=group2/v1beta1,group3/v1beta1,...\". "+
 		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all registered groups, which is derived from the KUBE_API_VERSIONS environment variable.")
+	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, "The media type to use to store objects in storage. Defaults to application/json. Some resources may only support a specific media type and will ignore this setting.")
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")
 	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, "If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.")
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")

@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type thirdPartyObjectConverter struct {
@@ -183,30 +184,38 @@ func NewNegotiatedSerializer(s runtime.NegotiatedSerializer, kind string, encode
 	}
 }
 
-func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
-	return NewCodec(runtime.NewCodec(
-		t.NegotiatedSerializer.EncoderForVersion(s, gv),
-		t.NegotiatedSerializer.DecoderToVersion(s, t.decodeGV),
-	), t.kind)
+func (t *thirdPartyResourceDataCodecFactory) SupportedMediaTypes() []string {
+	supported := sets.NewString(t.NegotiatedSerializer.SupportedMediaTypes()...)
+	return supported.Intersection(sets.NewString("application/json", "application/yaml")).List()
 }
 
-func (t *thirdPartyResourceDataCodecFactory) DecoderToVersion(s runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder {
-	return NewCodec(runtime.NewCodec(
-		t.NegotiatedSerializer.EncoderForVersion(s, t.encodeGV),
-		t.NegotiatedSerializer.DecoderToVersion(s, gv),
-	), t.kind)
+func (t *thirdPartyResourceDataCodecFactory) SupportedStreamingMediaTypes() []string {
+	supported := sets.NewString(t.NegotiatedSerializer.SupportedStreamingMediaTypes()...)
+	return supported.Intersection(sets.NewString("application/json", "application/json;stream=watch")).List()
 }
 
-type thirdPartyResourceDataCodec struct {
-	delegate runtime.Codec
+func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
+	return &thirdPartyResourceDataEncoder{delegate: t.NegotiatedSerializer.EncoderForVersion(s, gv), kind: t.kind}
+}
+
+func (t *thirdPartyResourceDataCodecFactory) DecoderToVersion(s runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
+	return NewDecoder(t.NegotiatedSerializer.DecoderToVersion(s, gv), t.kind)
+}
+
+func NewCodec(delegate runtime.Codec, kind string) runtime.Codec {
+	return runtime.NewCodec(NewEncoder(delegate, kind), NewDecoder(delegate, kind))
+}
+
+type thirdPartyResourceDataDecoder struct {
+	delegate runtime.Decoder
 	kind     string
 }
 
-var _ runtime.Codec = &thirdPartyResourceDataCodec{}
-
-func NewCodec(codec runtime.Codec, kind string) runtime.Codec {
-	return &thirdPartyResourceDataCodec{codec, kind}
+func NewDecoder(delegate runtime.Decoder, kind string) runtime.Decoder {
+	return &thirdPartyResourceDataDecoder{delegate: delegate, kind: kind}
 }
+
+var _ runtime.Decoder = &thirdPartyResourceDataDecoder{}
 
 func parseObject(data []byte) (map[string]interface{}, error) {
 	var obj interface{}
@@ -221,7 +230,7 @@ func parseObject(data []byte) (map[string]interface{}, error) {
 	return mapObj, nil
 }
 
-func (t *thirdPartyResourceDataCodec) populate(data []byte) (runtime.Object, error) {
+func (t *thirdPartyResourceDataDecoder) populate(data []byte) (runtime.Object, error) {
 	mapObj, err := parseObject(data)
 	if err != nil {
 		return nil, err
@@ -229,7 +238,7 @@ func (t *thirdPartyResourceDataCodec) populate(data []byte) (runtime.Object, err
 	return t.populateFromObject(mapObj, data)
 }
 
-func (t *thirdPartyResourceDataCodec) populateFromObject(mapObj map[string]interface{}, data []byte) (runtime.Object, error) {
+func (t *thirdPartyResourceDataDecoder) populateFromObject(mapObj map[string]interface{}, data []byte) (runtime.Object, error) {
 	typeMeta := unversioned.TypeMeta{}
 	if err := json.Unmarshal(data, &typeMeta); err != nil {
 		return nil, err
@@ -252,7 +261,7 @@ func (t *thirdPartyResourceDataCodec) populateFromObject(mapObj map[string]inter
 	}
 }
 
-func (t *thirdPartyResourceDataCodec) populateResource(objIn *extensions.ThirdPartyResourceData, mapObj map[string]interface{}, data []byte) error {
+func (t *thirdPartyResourceDataDecoder) populateResource(objIn *extensions.ThirdPartyResourceData, mapObj map[string]interface{}, data []byte) error {
 	metadata, ok := mapObj["metadata"].(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("unexpected object for metadata: %#v", mapObj["metadata"])
@@ -274,7 +283,7 @@ func (t *thirdPartyResourceDataCodec) populateResource(objIn *extensions.ThirdPa
 	return nil
 }
 
-func (t *thirdPartyResourceDataCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	if into == nil {
 		obj, err := t.populate(data)
 		if err != nil {
@@ -347,7 +356,7 @@ func (t *thirdPartyResourceDataCodec) Decode(data []byte, gvk *unversioned.Group
 	return thirdParty, actual, nil
 }
 
-func (t *thirdPartyResourceDataCodec) populateListResource(objIn *extensions.ThirdPartyResourceDataList, mapObj map[string]interface{}) error {
+func (t *thirdPartyResourceDataDecoder) populateListResource(objIn *extensions.ThirdPartyResourceDataList, mapObj map[string]interface{}) error {
 	items, ok := mapObj["items"].([]interface{})
 	if !ok {
 		return fmt.Errorf("unexpected object for items: %#v", mapObj["items"])
@@ -374,6 +383,17 @@ const template = `{
   "items": [ %s ]
 }`
 
+type thirdPartyResourceDataEncoder struct {
+	delegate runtime.Encoder
+	kind     string
+}
+
+func NewEncoder(delegate runtime.Encoder, kind string) runtime.Encoder {
+	return &thirdPartyResourceDataEncoder{delegate: delegate, kind: kind}
+}
+
+var _ runtime.Encoder = &thirdPartyResourceDataEncoder{}
+
 func encodeToJSON(obj *extensions.ThirdPartyResourceData, stream io.Writer) error {
 	var objOut interface{}
 	if err := json.Unmarshal(obj.Data, &objOut); err != nil {
@@ -388,7 +408,7 @@ func encodeToJSON(obj *extensions.ThirdPartyResourceData, stream io.Writer) erro
 	return encoder.Encode(objMap)
 }
 
-func (t *thirdPartyResourceDataCodec) EncodeToStream(obj runtime.Object, stream io.Writer, overrides ...unversioned.GroupVersion) (err error) {
+func (t *thirdPartyResourceDataEncoder) EncodeToStream(obj runtime.Object, stream io.Writer, overrides ...unversioned.GroupVersion) (err error) {
 	switch obj := obj.(type) {
 	case *extensions.ThirdPartyResourceData:
 		return encodeToJSON(obj, stream)

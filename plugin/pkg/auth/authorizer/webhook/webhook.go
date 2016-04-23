@@ -86,9 +86,13 @@ func New(kubeConfigFile string) (*WebhookAuthorizer, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	serializer := json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), false)
 	codec := versioning.NewCodecForScheme(api.Scheme, serializer, serializer, encodeVersions, decodeVersions)
-	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(codec, codec, json.Framer)
+	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(
+		runtime.SerializerInfo{Serializer: codec},
+		runtime.StreamSerializerInfo{},
+	)
 
 	restClient, err := restclient.UnversionedRESTClientFor(clientConfig)
 	if err != nil {

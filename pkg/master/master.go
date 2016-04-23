@@ -677,7 +677,14 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 
 func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(
-		generic.RESTOptions{Storage: m.thirdPartyStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: m.deleteCollectionWorkers}, group, kind)
+		generic.RESTOptions{
+			Storage:                 m.thirdPartyStorage,
+			Decorator:               generic.UndecoratedStorage,
+			DeleteCollectionWorkers: m.deleteCollectionWorkers,
+		},
+		group,
+		kind,
+	)
 
 	apiRoot := makeThirdPartyPath("")
 

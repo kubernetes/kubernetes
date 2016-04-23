@@ -86,32 +86,75 @@ type Framer interface {
 	NewFrameWriter(w io.Writer) io.Writer
 }
 
+// SerializerInfo contains information about a specific serialization format
+type SerializerInfo struct {
+	Serializer
+	// EncodesAsText indicates this serializer can be encoded to UTF-8 safely.
+	EncodesAsText bool
+	// MediaType is the value that represents this serializer over the wire.
+	MediaType string
+}
+
+// StreamSerializerInfo contains information about a specific stream serialization format
+type StreamSerializerInfo struct {
+	SerializerInfo
+	// Framer is the factory for retrieving streams that separate objects on the wire
+	Framer
+	// Embedded is the type of the nested serialization that should be used.
+	Embedded SerializerInfo
+}
+
 // NegotiatedSerializer is an interface used for obtaining encoders, decoders, and serializers
-// for multiple supported media types.
+// for multiple supported media types. This would commonly be accepted by a server component
+// that performs HTTP content negotiation to accept multiple formats.
 type NegotiatedSerializer interface {
 	// SupportedMediaTypes is the media types supported for reading and writing single objects.
 	SupportedMediaTypes() []string
-	// SerializerForMediaType returns a serializer for the provided media type.  Options is a set of
-	// parameters applied to the media type that may modify the resulting output.
-	SerializerForMediaType(mediaType string, options map[string]string) (Serializer, bool)
+	// SerializerForMediaType returns a serializer for the provided media type. params is the set of
+	// parameters applied to the media type that may modify the resulting output. ok will be false
+	// if no serializer matched the media type.
+	SerializerForMediaType(mediaType string, params map[string]string) (s SerializerInfo, ok bool)
 
 	// SupportedStreamingMediaTypes returns the media types of the supported streaming serializers.
 	// Streaming serializers control how multiple objects are written to a stream output.
 	SupportedStreamingMediaTypes() []string
 	// StreamingSerializerForMediaType returns a serializer for the provided media type that supports
 	// reading and writing multiple objects to a stream. It returns a framer and serializer, or an
-	// error if no such serializer can be created. Options is a set of parameters applied to the
-	// media type that may modify the resulting output.
-	StreamingSerializerForMediaType(mediaType string, options map[string]string) (Serializer, Framer, string, bool)
+	// error if no such serializer can be created. Params is the set of parameters applied to the
+	// media type that may modify the resulting output. ok will be false if no serializer matched
+	// the media type.
+	StreamingSerializerForMediaType(mediaType string, params map[string]string) (s StreamSerializerInfo, ok bool)
 
 	// EncoderForVersion returns an encoder that ensures objects being written to the provided
 	// serializer are in the provided group version.
 	// TODO: take multiple group versions
-	EncoderForVersion(serializer Serializer, gv unversioned.GroupVersion) Encoder
+	EncoderForVersion(serializer Encoder, gv unversioned.GroupVersion) Encoder
 	// DecoderForVersion returns a decoder that ensures objects being read by the provided
 	// serializer are in the provided group version by default.
 	// TODO: take multiple group versions
-	DecoderToVersion(serializer Serializer, gv unversioned.GroupVersion) Decoder
+	DecoderToVersion(serializer Decoder, gv unversioned.GroupVersion) Decoder
+}
+
+// StorageSerializer is an interface used for obtaining encoders, decoders, and serializers
+// that can read and write data at rest. This would commonly be used by client tools that must
+// read files, or server side storage interfaces that persist restful objects.
+type StorageSerializer interface {
+	// SerializerForMediaType returns a serializer for the provided media type.  Options is a set of
+	// parameters applied to the media type that may modify the resulting output.
+	SerializerForMediaType(mediaType string, options map[string]string) (SerializerInfo, bool)
+
+	// UniversalDeserializer returns a Serializer that can read objects in multiple supported formats
+	// by introspecting the data at rest.
+	UniversalDeserializer() Decoder
+
+	// EncoderForVersion returns an encoder that ensures objects being written to the provided
+	// serializer are in the provided group version.
+	// TODO: take multiple group versions
+	EncoderForVersion(serializer Encoder, gv unversioned.GroupVersion) Encoder
+	// DecoderForVersion returns a decoder that ensures objects being read by the provided
+	// serializer are in the provided group version by default.
+	// TODO: take multiple group versions
+	DecoderToVersion(serializer Decoder, gv unversioned.GroupVersion) Decoder
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -17,6 +17,7 @@ limitations under the License.
 package recognizer
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
