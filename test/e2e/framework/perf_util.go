@@ -25,9 +25,13 @@ import (
 // TODO(random-liu): Change the tests to actually use PerfData from the beginning instead of
 // translating one to the other here.
 
+// currentApiCallMetricsVersion is the current apicall performance metrics version. We should
+// bump up the version each time we make incompatible change to the metrics.
+const currentApiCallMetricsVersion = "v1"
+
 // ApiCallToPerfData transforms APIResponsiveness to PerfData.
 func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
-	perfData := &perftype.PerfData{}
+	perfData := &perftype.PerfData{Version: currentApiCallMetricsVersion}
 	for _, apicall := range apicalls.APICalls {
 		item := perftype.DataItem{
 			Data: map[string]float64{
@@ -46,6 +50,10 @@ func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
 	return perfData
 }
 
+// currentKubeletPerfMetricsVersion is the current kubelet performance metrics version. We should
+// bump up the version each time we make incompatible change to the metrics.
+const currentKubeletPerfMetricsVersion = "v1"
+
 // ResourceUsageToPerfData transforms ResourceUsagePerNode to PerfData. Notice that this function
 // only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
 func ResourceUsageToPerfData(usagePerNode ResourceUsagePerNode) *perftype.PerfData {
@@ -54,7 +62,7 @@ func ResourceUsageToPerfData(usagePerNode ResourceUsagePerNode) *perftype.PerfDa
 		for c, usage := range usages {
 			item := perftype.DataItem{
 				Data: map[string]float64{
-					"memory":     float64(usage.MemoryRSSInBytes) / (1024 * 1024),
+					"memory":     float64(usage.MemoryUsageInBytes) / (1024 * 1024),
 					"workingset": float64(usage.MemoryWorkingSetInBytes) / (1024 * 1024),
 					"rss":        float64(usage.MemoryRSSInBytes) / (1024 * 1024),
 				},
@@ -68,7 +76,10 @@ func ResourceUsageToPerfData(usagePerNode ResourceUsagePerNode) *perftype.PerfDa
 			items = append(items, item)
 		}
 	}
-	return &perftype.PerfData{DataItems: items}
+	return &perftype.PerfData{
+		Version:   currentKubeletPerfMetricsVersion,
+		DataItems: items,
+	}
 }
 
 // CPUUsageToPerfData transforms NodesCPUSummary to PerfData.
@@ -78,11 +89,11 @@ func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
 		for c, usage := range usages {
 			data := map[string]float64{}
 			for perc, value := range usage {
-				data[fmt.Sprintf("Perc%02.0f", perc*100)] = value * 100
+				data[fmt.Sprintf("Perc%02.0f", perc*100)] = value * 1000
 			}
 			item := perftype.DataItem{
 				Data: data,
-				Unit: "%",
+				Unit: "mCPU",
 				Labels: map[string]string{
 					"node":      node,
 					"container": c,
@@ -92,13 +103,17 @@ func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
 			items = append(items, item)
 		}
 	}
-	return &perftype.PerfData{DataItems: items}
+	return &perftype.PerfData{
+		Version:   currentKubeletPerfMetricsVersion,
+		DataItems: items,
+	}
 }
 
 // PrintPerfData prints the perfdata in json format with PerfResultTag prefix.
 // If an error occurs, nothing will be printed.
 func PrintPerfData(p *perftype.PerfData) {
+	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
 	if str := PrettyPrintJSON(p); str != "" {
-		Logf("%s", perftype.PerfResultTag+" "+str)
+		Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
 	}
 }
