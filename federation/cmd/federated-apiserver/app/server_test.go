@@ -73,12 +73,13 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 	}
 }
 
-var serverIP = "http://localhost:8080"
+var insecurePort = 8081
+var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
 var groupVersion = fed_v1a1.SchemeGroupVersion
 
 func TestRun(t *testing.T) {
 	s := options.NewAPIServer()
-	//TODO: s.
+	s.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.ServiceClusterIPRange = *ipNet
 	s.EtcdConfig.ServerList = []string{"http://localhost:4001"}
