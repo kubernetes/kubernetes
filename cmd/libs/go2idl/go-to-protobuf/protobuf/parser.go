@@ -81,9 +81,13 @@ func RewriteGeneratedGogoProtobufFile(name string, extractFn ExtractFunc, header
 		// remove types that are already declared
 		decls := []ast.Decl{}
 		for _, d := range file.Decls {
-			if !dropExistingTypeDeclarations(d, extractFn) {
-				decls = append(decls, d)
+			if dropExistingTypeDeclarations(d, extractFn) {
+				continue
 			}
+			if dropEmptyImportDeclarations(d) {
+				continue
+			}
+			decls = append(decls, d)
 		}
 		file.Decls = decls
 
@@ -93,6 +97,8 @@ func RewriteGeneratedGogoProtobufFile(name string, extractFn ExtractFunc, header
 	})
 }
 
+// dropExistingTypeDeclarations removes any type declaration for which extractFn returns true. The function
+// returns true if the entire declaration should be dropped.
 func dropExistingTypeDeclarations(decl ast.Decl, extractFn ExtractFunc) bool {
 	switch t := decl.(type) {
 	case *ast.GenDecl:
@@ -104,6 +110,33 @@ func dropExistingTypeDeclarations(decl ast.Decl, extractFn ExtractFunc) bool {
 			switch spec := s.(type) {
 			case *ast.TypeSpec:
 				if extractFn(spec) {
+					continue
+				}
+				specs = append(specs, spec)
+			}
+		}
+		if len(specs) == 0 {
+			return true
+		}
+		t.Specs = specs
+	}
+	return false
+}
+
+// dropEmptyImportDeclarations strips any generated but no-op imports from the generated code
+// to prevent generation from being able to define side-effects.  The function returns true
+// if the entire declaration should be dropped.
+func dropEmptyImportDeclarations(decl ast.Decl) bool {
+	switch t := decl.(type) {
+	case *ast.GenDecl:
+		if t.Tok != token.IMPORT {
+			return false
+		}
+		specs := []ast.Spec{}
+		for _, s := range t.Specs {
+			switch spec := s.(type) {
+			case *ast.ImportSpec:
+				if spec.Name != nil && spec.Name.Name == "_" {
 					continue
 				}
 				specs = append(specs, spec)
