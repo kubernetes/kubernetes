@@ -37,6 +37,7 @@ func NewCmdCreateSecret(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		},
 	}
 	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, cmdOut))
+	cmd.AddCommand(NewCmdCreateSecretTLS(f, cmdOut))
 	cmd.AddCommand(NewCmdCreateSecretGeneric(f, cmdOut))
 
 	return cmd
@@ -130,7 +131,7 @@ nodes to pull images on your behalf, they have to have the credentials.  You can
 by creating a dockercfg secret and attaching it to your service account.`
 
 	secretForDockerRegistryExample = `  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
-  $ kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`
+  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`
 )
 
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
@@ -181,6 +182,68 @@ func CreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra
 			Email:    cmdutil.GetFlagString(cmd, "docker-email"),
 			Password: cmdutil.GetFlagString(cmd, "docker-password"),
 			Server:   cmdutil.GetFlagString(cmd, "docker-server"),
+		}
+	default:
+		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+	}
+	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
+		Name:                name,
+		StructuredGenerator: generator,
+		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),
+		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
+	})
+}
+
+const (
+	secretForTLSLong = `
+Create a TLS secret from the given public/private key pair.
+
+The public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key.`
+
+	secretForTLSExample = `  # Create a new TLS secret named tls-secret with the given key pair:
+  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`
+)
+
+// NewCmdCreateSecretTLS is a macro command for creating secrets to work with Docker registries
+func NewCmdCreateSecretTLS(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
+		Short:   "Create a TLS secret.",
+		Long:    secretForTLSLong,
+		Example: secretForTLSExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			err := CreateSecretTLS(f, cmdOut, cmd, args)
+			cmdutil.CheckErr(err)
+		},
+	}
+	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddGeneratorFlags(cmd, cmdutil.SecretForTLSV1GeneratorName)
+	cmd.Flags().String("cert", "", "Path to PEM encoded public key certificate.")
+	cmd.Flags().String("key", "", "Path to private key associated with given certificate.")
+	return cmd
+}
+
+// CreateSecretTLS is the implementation of the create secret tls command
+func CreateSecretTLS(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+	name, err := NameFromCommandArgs(cmd, args)
+	if err != nil {
+		return err
+	}
+	requiredFlags := []string{"cert", "key"}
+	for _, requiredFlag := range requiredFlags {
+		if value := cmdutil.GetFlagString(cmd, requiredFlag); len(value) == 0 {
+			return cmdutil.UsageError(cmd, "flag %s is required", requiredFlag)
+		}
+	}
+	var generator kubectl.StructuredGenerator
+	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
+	case cmdutil.SecretForTLSV1GeneratorName:
+		generator = &kubectl.SecretForTLSGeneratorV1{
+			Name: name,
+			Key:  cmdutil.GetFlagString(cmd, "key"),
+			Cert: cmdutil.GetFlagString(cmd, "cert"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
