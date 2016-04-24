@@ -69,7 +69,7 @@ type ResourceQuotaController struct {
 	// knows how to calculate usage
 	registry quota.Registry
 	// controllers monitoring to notify for replenishment
-	replenishmentControllers []*framework.Controller
+	replenishmentControllers []framework.ControllerInterface
 }
 
 func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *ResourceQuotaController {
@@ -79,7 +79,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 		queue:                    workqueue.New(),
 		resyncPeriod:             options.ResyncPeriod,
 		registry:                 options.Registry,
-		replenishmentControllers: []*framework.Controller{},
+		replenishmentControllers: []framework.ControllerInterface{},
 	}
 
 	// set the synchronization handler

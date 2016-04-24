@@ -113,7 +113,7 @@ func TestSyncResourceQuota(t *testing.T) {
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactory(kubeClient),
+		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
@@ -199,7 +199,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactory(kubeClient),
+		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
@@ -276,7 +276,7 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactory(kubeClient),
+		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
