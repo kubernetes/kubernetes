@@ -1171,107 +1171,31 @@ func (e envs) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
 
 func (e envs) Less(i, j int) bool { return e[i].Name < e[j].Name }
 
+func buildService(name, namespace, clusterIP, protocol string, port int) api.Service {
+	return api.Service{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{{
+				Protocol: api.Protocol(protocol),
+				Port:     int32(port),
+			}},
+			ClusterIP: clusterIP,
+		},
+	}
+}
+
 func TestMakeEnvironmentVariables(t *testing.T) {
 	services := []api.Service{
-		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: api.NamespaceDefault},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8081,
-				}},
-				ClusterIP: "1.2.3.1",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test1"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8083,
-				}},
-				ClusterIP: "1.2.3.3",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "test2"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8084,
-				}},
-				ClusterIP: "1.2.3.4",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8085,
-				}},
-				ClusterIP: "1.2.3.5",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8085,
-				}},
-				ClusterIP: "None",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8085,
-				}},
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "kubernetes"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8086,
-				}},
-				ClusterIP: "1.2.3.6",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8088,
-				}},
-				ClusterIP: "1.2.3.8",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8088,
-				}},
-				ClusterIP: "None",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8088,
-				}},
-				ClusterIP: "",
-			},
-		},
+		buildService("kubernetes", api.NamespaceDefault, "1.2.3.1", "TCP", 8081),
+		buildService("test", "test1", "1.2.3.3", "TCP", 8083),
+		buildService("kubernetes", "test2", "1.2.3.4", "TCP", 8084),
+		buildService("test", "test2", "1.2.3.5", "TCP", 8085),
+		buildService("test", "test2", "None", "TCP", 8085),
+		buildService("test", "test2", "", "TCP", 8085),
+		buildService("kubernetes", "kubernetes", "1.2.3.6", "TCP", 8086),
+		buildService("not-special", "kubernetes", "1.2.3.8", "TCP", 8088),
+		buildService("not-special", "kubernetes", "None", "TCP", 8088),
+		buildService("not-special", "kubernetes", "", "TCP", 8088),
 	}
 
 	testCases := []struct {
@@ -2412,7 +2336,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 func TestHandleNodeSelector(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kl := testKubelet.kubelet
-	kl.nodeLister = testNodeLister{nodes: []api.Node{
+	nodes := []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
 			Status: api.NodeStatus{
@@ -2421,17 +2345,9 @@ func TestHandleNodeSelector(t *testing.T) {
 				},
 			},
 		},
-	}}
-	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
-		{
-			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
-			Status: api.NodeStatus{
-				Allocatable: api.ResourceList{
-					api.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
-				},
-			},
-		},
-	}}
+	}
+	kl.nodeLister = testNodeLister{nodes: nodes}
+	kl.nodeInfo = testNodeInfo{nodes: nodes}
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -2481,22 +2397,16 @@ func TestHandleNodeSelector(t *testing.T) {
 func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kl := testKubelet.kubelet
-	kl.nodeLister = testNodeLister{nodes: []api.Node{
+	nodes := []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 			Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: api.ResourceList{
 				api.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
 				api.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
 				api.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
 			}}},
-	}}
-	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-			Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
-				api.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
-			}}},
-	}}
+	}
+	kl.nodeLister = testNodeLister{nodes: nodes}
+	kl.nodeInfo = testNodeInfo{nodes: nodes}
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
