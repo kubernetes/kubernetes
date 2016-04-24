@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -36,9 +38,9 @@ const (
 	smallRCSize       = 5
 	mediumRCSize      = 30
 	bigRCSize         = 250
-	smallRCGroupName  = "load-test-small-rc"
-	mediumRCGroupName = "load-test-medium-rc"
-	bigRCGroupName    = "load-test-big-rc"
+	smallRCGroupName  = "load-small-rc"
+	mediumRCGroupName = "load-medium-rc"
+	bigRCGroupName    = "load-big-rc"
 	smallRCBatchSize  = 30
 	mediumRCBatchSize = 5
 	bigRCBatchSize    = 1
@@ -113,6 +115,19 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		It(name, func() {
 			totalPods := itArg.podsPerNode * nodeCount
 			configs = generateRCConfigs(totalPods, itArg.image, itArg.command, c, ns)
+			var services []*api.Service
+			// Read the environment variable to see if we want to create services
+			createServices := os.Getenv("CREATE_SERVICES")
+			if createServices == "true" {
+				framework.Logf("Creating services")
+				services := generateServicesForConfigs(configs)
+				for _, service := range services {
+					_, err := c.Services(ns).Create(service)
+					framework.ExpectNoError(err)
+				}
+			} else {
+				framework.Logf("Skipping service creation")
+			}
 
 			// Simulate lifetime of RC:
 			//  * create with initial size
@@ -149,6 +164,13 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			// We may want to revisit it in the future.
 			deletingTime := time.Duration(totalPods/5) * time.Second
 			deleteAllRC(configs, deletingTime)
+			if createServices == "true" {
+				for _, service := range services {
+					err := c.Services(ns).Delete(service.Name)
+					framework.ExpectNoError(err)
+				}
+				framework.Logf("%v Services created.", len(services))
+			}
 		})
 	}
 })
@@ -195,6 +217,28 @@ func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, cou
 		configs = append(configs, config)
 	}
 	return configs
+}
+
+func generateServicesForConfigs(configs []*framework.RCConfig) []*api.Service {
+	services := make([]*api.Service, 0, len(configs))
+	for _, config := range configs {
+		serviceName := config.Name + "-svc"
+		labels := map[string]string{"name": config.Name}
+		service := &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name: serviceName,
+			},
+			Spec: api.ServiceSpec{
+				Selector: labels,
+				Ports: []api.ServicePort{{
+					Port:       80,
+					TargetPort: intstr.FromInt(80),
+				}},
+			},
+		}
+		services = append(services, service)
+	}
+	return services
 }
 
 func sleepUpTo(d time.Duration) {
