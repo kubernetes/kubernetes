@@ -32,7 +32,6 @@ package intstr
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import _ "github.com/gogo/protobuf/gogoproto"
 
 import io "io"
 
