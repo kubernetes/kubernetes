@@ -17,12 +17,17 @@ limitations under the License.
 package testing
 
 import (
+	"errors"
 	"os"
 )
 
 // FakeOS mocks out certain OS calls to avoid perturbing the filesystem
 // on the test machine.
-type FakeOS struct{}
+// If a member of the form `*Fn` is set, that function will be called in place
+// of the real call.
+type FakeOS struct {
+	StatFn func(string) (os.FileInfo, error)
+}
 
 // Mkdir is a fake call that just returns nil.
 func (FakeOS) Mkdir(path string, perm os.FileMode) error {
@@ -32,4 +37,12 @@ func (FakeOS) Mkdir(path string, perm os.FileMode) error {
 // Symlink is a fake call that just returns nil.
 func (FakeOS) Symlink(oldname string, newname string) error {
 	return nil
+}
+
+// Stat is a fake that returns an error
+func (f FakeOS) Stat(path string) (os.FileInfo, error) {
+	if f.StatFn != nil {
+		return f.StatFn(path)
+	}
+	return nil, errors.New("unimplemented testing mock")
 }
