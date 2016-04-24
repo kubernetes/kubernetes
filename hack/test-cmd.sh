@@ -148,6 +148,9 @@ HOME="${KUBE_TEMP}"
 kube::log::status "Running kubectl with no options"
 "${KUBE_OUTPUT_HOSTBIN}/kubectl"
 
+# Only run kubelet on platforms it supports
+if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
+
 kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
   --really-crash-for-testing=true \
@@ -176,6 +179,8 @@ kube::log::status "Starting kubelet in masterful mode"
 KUBELET_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet"
+
+fi
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
@@ -206,7 +211,26 @@ kube::log::status "Starting controller-manager"
 CTLRMGR_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
-kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1/nodes/127.0.0.1" "apiserver(nodes)"
+
+if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
+  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1/nodes/127.0.0.1" "apiserver(nodes)"
+else
+  # create a fake node
+  kubectl create -f - -s "http://127.0.0.1:${API_PORT}" << __EOF__
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "127.0.0.1"
+  },
+  "status": {
+    "capacity": {
+      "memory": "1Gi"
+    }
+  }
+}
+__EOF__
+fi
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
