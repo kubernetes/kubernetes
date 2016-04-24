@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	jobcontroller "k8s.io/kubernetes/pkg/controller/job"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -192,6 +191,13 @@ func (w *WorkflowController) syncWorkflow(key string) error {
 		glog.V(4).Infof("Finished syncing workflow %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
+	if !w.jobStoreSynced() {
+		time.Sleep(100 * time.Millisecond) // @sdminonne: TODO remove hard coded value
+		glog.Infof("Waiting for job controller to sync, requeuing workflow %v", key)
+		w.queue.Add(key)
+		return nil
+	}
+
 	obj, exists, err := w.workflowStore.Store.GetByKey(key)
 	if !exists {
 		glog.V(4).Infof("Workflow has been deleted: %v", key)
@@ -204,29 +210,46 @@ func (w *WorkflowController) syncWorkflow(key string) error {
 		return err
 	}
 	workflow := *obj.(*extensions.Workflow)
-	glog.V(4).Infof("Syncing workflow %v", workflow.Name)
-	if !w.jobStoreSynced() {
-		glog.V(4).Infof("Syncing workflow %v", workflow.Name)
-		time.Sleep(100 * time.Millisecond)
-		glog.Infof("Waiting for job controller to sync, requeuing workflow %v", workflow.Name)
-		w.enqueueController(&workflow)
-		return nil
-	}
-
-	// Check the expectations of the workflow
 	workflowKey, err := controller.KeyFunc(&workflow)
 	if err != nil {
 		glog.Errorf("Couldn't get key for workflow %#v: %v", workflow, err)
 		return err
 	}
-	workflowNeedsSync := w.expectations.SatisfiedExpectations(workflowKey)
+
 	if workflow.Status.Statuses == nil {
 		workflow.Status.Statuses = make(map[string]extensions.WorkflowStepStatus, len(workflow.Spec.Steps))
-		//TODO: sdminonne StartTime must be updated
+		now := unversioned.Now()
+		workflow.Status.StartTime = &now
 	}
 
+	workflowNeedsSync := w.expectations.SatisfiedExpectations(workflowKey)
 	if !workflowNeedsSync {
-		glog.V(4).Infof("Workflow %v doensn't need synch", workflow.Name)
+		glog.V(4).Infof("Workflow %v doesn't need synch", workflow.Name)
+		return nil
+	}
+
+	if isWorkflowFinished(&workflow) {
+		return nil
+	}
+
+	if pastActiveDeadline(&workflow) {
+		// @sdminonne: TODO delete jobs & write error for the ExternalReference
+		now := unversioned.Now()
+		condition := extensions.WorkflowCondition{
+			Type:               extensions.WorkflowFailed,
+			Status:             api.ConditionTrue,
+			LastProbeTime:      now,
+			LastTransitionTime: now,
+			Reason:             "DeadlineExceeded",
+			Message:            "Workflow was active longer than specified deadline",
+		}
+		workflow.Status.Conditions = append(workflow.Status.Conditions, condition)
+		workflow.Status.CompletionTime = &now
+		w.recorder.Event(&workflow, api.EventTypeNormal, "DeadlineExceeded", "Workflow was active longer than specified deadline")
+		if err := w.updateHandler(&workflow); err != nil {
+			glog.Errorf("Failed to update workflow %v, requeuing.  Error: %v", workflow.Name, err)
+			w.enqueueController(&workflow)
+		}
 		return nil
 	}
 
@@ -241,9 +264,14 @@ func (w *WorkflowController) syncWorkflow(key string) error {
 
 // pastActiveDeadline checks if workflow has ActiveDeadlineSeconds field set and if it is exceeded.
 func pastActiveDeadline(workflow *extensions.Workflow) bool {
-	// TODO: add Status.StartTime
-	//           Status.CompletionTime
-	return false
+	if workflow.Spec.ActiveDeadlineSeconds == nil || workflow.Status.StartTime == nil {
+		return false
+	}
+	now := unversioned.Now()
+	start := workflow.Status.StartTime.Time
+	duration := now.Time.Sub(start)
+	allowedDuration := time.Duration(*workflow.Spec.ActiveDeadlineSeconds) * time.Second
+	return duration >= allowedDuration
 }
 
 func (w *WorkflowController) updateWorkflowStatus(workflow *extensions.Workflow) error {
@@ -346,13 +374,15 @@ func (w *WorkflowController) manageWorkflow(workflow *extensions.Workflow) bool 
 	}
 
 	if workflowComplete {
+		now := unversioned.Now()
 		condition := extensions.WorkflowCondition{
 			Type:               extensions.WorkflowComplete,
 			Status:             api.ConditionTrue,
-			LastProbeTime:      unversioned.Now(),
-			LastTransitionTime: unversioned.Now(),
+			LastProbeTime:      now,
+			LastTransitionTime: now,
 		}
 		workflow.Status.Conditions = append(workflow.Status.Conditions, condition)
+		workflow.Status.CompletionTime = &now
 		needsStatusUpdate = true
 	}
 
@@ -360,25 +390,22 @@ func (w *WorkflowController) manageWorkflow(workflow *extensions.Workflow) bool 
 }
 
 func (w *WorkflowController) manageWorkflowJob(workflow *extensions.Workflow, stepName string, step *extensions.WorkflowStep) bool {
-	glog.V(4).Infof("\t manageWorkflowJob: %v", stepName)
-
-	//check dependecies
 	for _, dependcyName := range step.Dependencies {
 		if dependencyStatus, ok := workflow.Status.Statuses[dependcyName]; !ok || !dependencyStatus.Complete {
-			// no step status or not complete
 			glog.V(4).Infof("Dependecy %v not satisfied for %v", dependcyName, stepName)
 			return false
 		}
 	}
 
-	// all dependency satisfied (or missing) update or create a job
+	// all dependency satisfied (or missing) need action: update or create step
 	key, err := controller.KeyFunc(workflow)
 	if err != nil {
 		glog.Errorf("Couldn't get key for workflow %#v: %v", workflow, err)
 		return false
 	}
-
-	jobList, err := w.jobStore.Jobs(workflow.Namespace).List(labels.Everything())
+	// fetch job by labelSelector and step
+	jobSelector := controller.CreateWorkflowJobLabelSelector(workflow, workflow.Spec.Steps[stepName].JobTemplate, stepName)
+	jobList, err := w.jobStore.Jobs(workflow.Namespace).List(jobSelector)
 	if err != nil {
 		glog.Errorf("Error getting jobs for workflow %q: %v", key, err)
 		w.queue.Add(key)
@@ -387,34 +414,27 @@ func (w *WorkflowController) manageWorkflowJob(workflow *extensions.Workflow, st
 
 	switch len(jobList.Items) {
 	case 0: // create job
-		if err := w.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName); err != nil {
+		err := w.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName)
+		if err != nil {
 			defer utilruntime.HandleError(err)
 			w.expectations.CreationObserved(key)
-			return true
 		}
 	case 1: // update status
 		job := jobList.Items[0]
 		reference, err := api.GetReference(&job)
 		if err != nil || reference == nil {
-			glog.Errorf("Unable to get reference from %v", job.Name)
+			glog.Errorf("Unable to get reference from %v: %v", job.Name, err)
 			return false
 		}
 		jobFinished := jobcontroller.IsJobFinished(&job)
-		if _, ok := workflow.Status.Statuses[stepName]; !ok {
-			workflow.Status.Statuses[stepName] = extensions.WorkflowStepStatus{
-				Complete:  jobFinished,
-				Reference: *reference}
-			return true
-		}
 		workflow.Status.Statuses[stepName] = extensions.WorkflowStepStatus{
 			Complete:  jobFinished,
 			Reference: *reference}
-		return jobFinished
 	default: // reconciliate
 		glog.Errorf("WorkflowController.manageWorkfloJob %v too many jobs reported... Need reconciliation", workflow.Name)
 		return false
 	}
-	return false
+	return true
 }
 
 func (w *WorkflowController) manageWorkflowReference(workflow *extensions.Workflow, stepName string, step *extensions.WorkflowStep) bool {

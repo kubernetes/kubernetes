@@ -258,7 +258,7 @@ const (
 )
 
 type WorkflowCondition struct {
-	// Type of workflow condition, currently only Complete.
+	// Type of workflow condition
 	Type WorkflowConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=WorkflowConditionType"`
 	// Status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/kubernetes/pkg/api/v1.ConditionStatus"`

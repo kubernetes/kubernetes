@@ -133,7 +133,7 @@ func (Workflow) SwaggerDoc() map[string]string {
 }
 
 var map_WorkflowCondition = map[string]string{
-	"type":               "Type of workflow condition, currently only Complete.",
+	"type":               "Type of workflow condition",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastProbeTime":      "Last time the condition was checked.",
 	"lastTransitionTime": "Last time the condition transited from one status to another.",

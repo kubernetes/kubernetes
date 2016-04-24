@@ -200,7 +200,7 @@ message Workflow {
 }
 
 message WorkflowCondition {
-  // Type of workflow condition, currently only Complete.
+  // Type of workflow condition
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.

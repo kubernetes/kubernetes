@@ -670,15 +670,6 @@ func getJobsPrefix(controllerName string) string {
 	return prefix
 }
 
-func getJobsLabelSet(object runtime.Object) labels.Set {
-	workflow := *object.(*extensions.Workflow)
-	desiredLabels := make(labels.Set)
-	for k, v := range workflow.Labels {
-		desiredLabels[k] = v
-	}
-	return desiredLabels
-}
-
 func getJobsAnnotationSet(template *extensions.JobTemplateSpec, object runtime.Object) (labels.Set, error) {
 	workflow := *object.(*extensions.Workflow)
 	desiredAnnotations := make(labels.Set)
@@ -703,9 +694,26 @@ func getJobsAnnotationSet(template *extensions.JobTemplateSpec, object runtime.O
 	return desiredAnnotations, nil
 }
 
-func (w WorkflowJobControl) CreateJob(namespace string, template *extensions.JobTemplateSpec, object runtime.Object, key string) error {
-	desiredLabels := getJobsLabelSet(object)
-	desiredLabels[key] = "" //  inserting step name as a key with empty value
+const WorkflowStepLabelKey = "kubernetes.io/workflow"
+
+func getWorkflowJobLabelSet(workflow *extensions.Workflow, template *extensions.JobTemplateSpec, stepName string) labels.Set {
+	desiredLabels := make(labels.Set)
+	for k, v := range workflow.Labels {
+		desiredLabels[k] = v
+	}
+	for k, v := range template.Labels {
+		desiredLabels[k] = v
+	}
+	desiredLabels[WorkflowStepLabelKey] = stepName // @sdminonne: TODO double check this
+	return desiredLabels
+}
+func CreateWorkflowJobLabelSelector(workflow *extensions.Workflow, template *extensions.JobTemplateSpec, stepName string) labels.Selector {
+	return labels.SelectorFromSet(getWorkflowJobLabelSet(workflow, template, stepName))
+}
+
+func (w WorkflowJobControl) CreateJob(namespace string, template *extensions.JobTemplateSpec, object runtime.Object, stepName string) error {
+	workflow := object.(*extensions.Workflow)
+	desiredLabels := getWorkflowJobLabelSet(workflow, template, stepName)
 	desiredAnnotations, err := getJobsAnnotationSet(template, object)
 	if err != nil {
 		return err
@@ -752,5 +760,31 @@ func (w WorkflowJobControl) DeleteJob(namespace, jobName string, object runtime.
 			w.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulDelete", "Deleted job: %v", jobName)
 		}
 	*/
+	return nil
+}
+
+type FakeJobControl struct {
+	sync.Mutex
+	CreatedJobTemplates []extensions.JobTemplateSpec
+	DeletedJobNames     []string
+	Err                 error
+}
+
+var _ JobControlInterface = &FakeJobControl{}
+
+func (f *FakeJobControl) CreateJob(namespace string, template *extensions.JobTemplateSpec, object runtime.Object, key string) error {
+	f.Lock()
+	defer f.Unlock()
+	f.CreatedJobTemplates = append(f.CreatedJobTemplates, *template)
+	return nil
+}
+
+func (f *FakeJobControl) DeleteJob(namespace, name string, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
+	if f.Err != nil {
+		return f.Err
+	}
+	f.DeletedJobNames = append(f.DeletedJobNames, name)
 	return nil
 }

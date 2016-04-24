@@ -1015,7 +1015,7 @@ const (
 )
 
 type WorkflowCondition struct {
-	// Type of workflow condition, currently only Complete.
+	// Type of workflow condition
 	Type WorkflowConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status api.ConditionStatus `json:"status"`
