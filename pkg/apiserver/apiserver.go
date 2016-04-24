@@ -167,19 +167,22 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 
 // TODO: document all handlers
 // InstallSupport registers the APIServer support functions
-func InstallSupport(mux Mux, ws *restful.WebService, checks ...healthz.HealthzChecker) {
+func InstallSupport(mux Mux, checks ...healthz.HealthzChecker) []*restful.WebService {
 	// TODO: convert healthz and metrics to restful and remove container arg
 	healthz.InstallHandler(mux, checks...)
 
 	// Set up a service to return the git code version.
-	ws.Path("/version")
-	ws.Doc("git code version from which this is built")
-	ws.Route(
-		ws.GET("/").To(handleVersion).
+	versionWS := new(restful.WebService)
+	versionWS.Path("/version")
+	versionWS.Doc("git code version from which this is built")
+	versionWS.Route(
+		versionWS.GET("/").To(handleVersion).
 			Doc("get the code version").
 			Operation("getCodeVersion").
 			Produces(restful.MIME_JSON).
 			Consumes(restful.MIME_JSON))
+
+	return []*restful.WebService{versionWS}
 }
 
 // InstallLogsSupport registers the APIServer log support function into a mux.
