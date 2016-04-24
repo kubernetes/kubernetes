@@ -35,6 +35,7 @@ MINION_FLAVOR=${MINION_FLAVOR:-m1.medium}
 
 EXTERNAL_NETWORK=${EXTERNAL_NETWORK:-public}
 
+#FIXME This can get set by evaulating the output of `swift auth` and stripping the base URL from OS_STORAGE_URL, but will require a refactor. Till then...
 SWIFT_SERVER_URL=${SWIFT_SERVER_URL:-http://192.168.123.100:8080}
 
 # Flag indicates if new image must be created. If 'false' then image with IMAGE_ID will be used.

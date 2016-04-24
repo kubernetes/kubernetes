@@ -7,7 +7,7 @@ write_files:
   - path: /srv/salt-overlay/salt/kube-apiserver/basic_auth.csv
     permissions: "0600"
     content: |
-      $apiserver_user,$apiserver_password,admin
+      $apiserver_password,$apiserver_user,admin
   - path: /srv/salt-overlay/salt/kube-apiserver/known_tokens.csv
     permissions: "0600"
     content: |
