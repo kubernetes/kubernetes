@@ -28,7 +28,6 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
-	docker "github.com/fsouza/go-dockerclient"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -40,11 +39,12 @@ type FakeDockerClient struct {
 	RunningContainerList []dockertypes.Container
 	ExitedContainerList  []dockertypes.Container
 	ContainerMap         map[string]*dockertypes.ContainerJSON
-	Image                *docker.Image
-	Images               []docker.APIImages
+	Image                *dockertypes.ImageInspect
+	Images               []dockertypes.Image
 	Errors               map[string]error
 	called               []string
 	pulled               []string
+
 	// Created, Stopped and Removed all container docker ID
 	Created       []string
 	Stopped       []string
@@ -281,7 +281,7 @@ func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 
 // InspectImage is a test-spy implementation of DockerInterface.InspectImage.
 // It adds an entry "inspect" to the internal method call record.
-func (f *FakeDockerClient) InspectImage(name string) (*docker.Image, error) {
+func (f *FakeDockerClient) InspectImage(name string) (*dockertypes.ImageInspect, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "inspect_image")
@@ -421,18 +421,14 @@ func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 
 // PullImage is a test-spy implementation of DockerInterface.PullImage.
 // It adds an entry "pull" to the internal method call record.
-func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+func (f *FakeDockerClient) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "pull")
 	err := f.popError("pull")
 	if err == nil {
-		registry := opts.Registry
-		if len(registry) != 0 {
-			registry = registry + "/"
-		}
 		authJson, _ := json.Marshal(auth)
-		f.pulled = append(f.pulled, fmt.Sprintf("%s%s:%s using %s", registry, opts.Repository, opts.Tag, string(authJson)))
+		f.pulled = append(f.pulled, fmt.Sprintf("%s:%s using %s", imageID, opts.Tag, string(authJson)))
 	}
 	return err
 }
@@ -473,17 +469,17 @@ func (f *FakeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 	return f.ExecInspect, f.popError("inspect_exec")
 }
 
-func (f *FakeDockerClient) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
+func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
 	err := f.popError("list_images")
 	return f.Images, err
 }
 
-func (f *FakeDockerClient) RemoveImage(image string) error {
+func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
 	err := f.popError("remove_image")
 	if err == nil {
 		f.RemovedImages.Insert(image)
 	}
-	return err
+	return []dockertypes.ImageDelete{{Deleted: image}}, err
 }
 
 func (f *FakeDockerClient) updateContainerStatus(id, status string) {
