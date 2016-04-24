@@ -18,12 +18,6 @@ kube::util::sortable_date() {
   date "+%Y%m%d-%H%M%S"
 }
 
-# this mimics the behavior of linux realpath which is not shipped by default with
-# mac OS X
-kube::util::realpath() {
-  [[ $1 = /* ]] && echo "$1" | sed 's/\/$//' || echo "$PWD/${1#./}"  | sed 's/\/$//'
-}
-
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
