@@ -151,10 +151,13 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
 	}
 	if attr.IsResourceRequest() {
 		r.Spec.ResourceAttributes = &v1beta1.ResourceAttributes{
-			Namespace: attr.GetNamespace(),
-			Verb:      attr.GetVerb(),
-			Group:     attr.GetAPIGroup(),
-			Resource:  attr.GetResource(),
+			Namespace:   attr.GetNamespace(),
+			Verb:        attr.GetVerb(),
+			Group:       attr.GetAPIGroup(),
+			Version:     attr.GetAPIVersion(),
+			Resource:    attr.GetResource(),
+			Subresource: attr.GetSubresource(),
+			Name:        attr.GetName(),
 		}
 	} else {
 		r.Spec.NonResourceAttributes = &v1beta1.NonResourceAttributes{
