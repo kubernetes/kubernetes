@@ -62,7 +62,7 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 				cmd.Help()
 				return
 			}
-			cmdutil.CheckErr(ValidateArgs(cmd, args))
+			options.Filenames = append(options.Filenames, args...)
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			cmdutil.CheckErr(RunCreate(f, cmd, out, options))
 		},
@@ -84,13 +84,6 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateConfigMap(f, out))
 	cmd.AddCommand(NewCmdCreateServiceAccount(f, out))
 	return cmd
-}
-
-func ValidateArgs(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageError(cmd, "Unexpected args: %v", args)
-	}
-	return nil
 }
 
 func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *CreateOptions) error {
