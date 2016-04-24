@@ -29,7 +29,6 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 	dockertypes "github.com/docker/engine-api/types"
 	dockernat "github.com/docker/go-connections/nat"
-	docker "github.com/fsouza/go-dockerclient"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
@@ -352,9 +351,8 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 }
 
 func TestDockerKeyringLookup(t *testing.T) {
-
 	ada := credentialprovider.LazyAuthConfiguration{
-		AuthConfiguration: docker.AuthConfiguration{
+		AuthConfig: dockertypes.AuthConfig{
 			Username: "ada",
 			Password: "smash",
 			Email:    "ada@example.com",
@@ -362,7 +360,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 	}
 
 	grace := credentialprovider.LazyAuthConfiguration{
-		AuthConfiguration: docker.AuthConfiguration{
+		AuthConfig: dockertypes.AuthConfig{
 			Username: "grace",
 			Password: "squash",
 			Email:    "grace@example.com",
@@ -425,7 +423,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 // NOTE: the above covers the case of a more specific match trumping just hostname.
 func TestIssue3797(t *testing.T) {
 	rex := credentialprovider.LazyAuthConfiguration{
-		AuthConfiguration: docker.AuthConfiguration{
+		AuthConfig: dockertypes.AuthConfig{
 			Username: "rex",
 			Password: "tiny arms",
 			Email:    "rex@example.com",
@@ -471,7 +469,7 @@ type imageTrackingDockerClient struct {
 	imageName string
 }
 
-func (f *imageTrackingDockerClient) InspectImage(name string) (image *docker.Image, err error) {
+func (f *imageTrackingDockerClient) InspectImage(name string) (image *dockertypes.ImageInspect, err error) {
 	image, err = f.FakeDockerClient.InspectImage(name)
 	f.imageName = name
 	return

@@ -30,7 +30,6 @@ import (
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
 	dockerfilters "github.com/docker/engine-api/types/filters"
-	docker "github.com/fsouza/go-dockerclient"
 	"golang.org/x/net/context"
 )
 
@@ -141,39 +140,26 @@ func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	return d.client.ContainerRemove(getDefaultContext(), opts)
 }
 
-func (d *kubeDockerClient) InspectImage(image string) (*docker.Image, error) {
+func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect, error) {
 	resp, _, err := d.client.ImageInspectWithRaw(getDefaultContext(), image, true)
 	if err != nil {
-		// TODO(random-liu): Use IsErrImageNotFound instead of ErrNoSuchImage
 		if dockerapi.IsErrImageNotFound(err) {
-			err = docker.ErrNoSuchImage
+			err = imageNotFoundError{ID: image}
 		}
 		return nil, err
 	}
-	imageInfo := &docker.Image{}
-	if err := convertType(&resp, imageInfo); err != nil {
-		return nil, err
-	}
-	return imageInfo, nil
+	return &resp, nil
 }
 
-func (d *kubeDockerClient) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
-	resp, err := d.client.ImageList(getDefaultContext(), dockertypes.ImageListOptions{
-		MatchName: opts.Filter,
-		All:       opts.All,
-		Filters:   convertFilters(opts.Filters),
-	})
+func (d *kubeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
+	images, err := d.client.ImageList(getDefaultContext(), opts)
 	if err != nil {
-		return nil, err
-	}
-	images := []docker.APIImages{}
-	if err = convertType(&resp, &images); err != nil {
 		return nil, err
 	}
 	return images, nil
 }
 
-func base64EncodeAuth(auth docker.AuthConfiguration) (string, error) {
+func base64EncodeAuth(auth dockertypes.AuthConfig) (string, error) {
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(auth); err != nil {
 		return "", err
@@ -181,16 +167,15 @@ func base64EncodeAuth(auth docker.AuthConfiguration) (string, error) {
 	return base64.URLEncoding.EncodeToString(buf.Bytes()), nil
 }
 
-func (d *kubeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
+	// RegistryAuth is the base64 encoded credentials for the registry
 	base64Auth, err := base64EncodeAuth(auth)
 	if err != nil {
 		return err
 	}
-	resp, err := d.client.ImagePull(getDefaultContext(), dockertypes.ImagePullOptions{
-		ImageID:      opts.Repository,
-		Tag:          opts.Tag,
-		RegistryAuth: base64Auth,
-	}, nil)
+	opts.ImageID = image
+	opts.RegistryAuth = base64Auth
+	resp, err := d.client.ImagePull(getDefaultContext(), opts, nil)
 	if err != nil {
 		return err
 	}
@@ -213,9 +198,8 @@ func (d *kubeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 	return nil
 }
 
-func (d *kubeDockerClient) RemoveImage(image string) error {
-	_, err := d.client.ImageRemove(getDefaultContext(), dockertypes.ImageRemoveOptions{ImageID: image})
-	return err
+func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
+	return d.client.ImageRemove(getDefaultContext(), dockertypes.ImageRemoveOptions{ImageID: image})
 }
 
 func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
@@ -358,4 +342,13 @@ type containerNotFoundError struct {
 
 func (e containerNotFoundError) Error() string {
 	return fmt.Sprintf("Error: No such container: %s", e.ID)
+}
+
+// imageNotFoundError is the error returned by InspectImage when image not found.
+type imageNotFoundError struct {
+	ID string
+}
+
+func (e imageNotFoundError) Error() string {
+	return fmt.Sprintf("Error: No such image: %s", e.ID)
 }

@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	dockertypes "github.com/docker/engine-api/types"
-	docker "github.com/fsouza/go-dockerclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -70,7 +69,7 @@ func TestToRuntimeContainer(t *testing.T) {
 }
 
 func TestToRuntimeImage(t *testing.T) {
-	original := &docker.APIImages{
+	original := &dockertypes.Image{
 		ID:          "aeeea",
 		RepoTags:    []string{"abc", "def"},
 		VirtualSize: 1234,

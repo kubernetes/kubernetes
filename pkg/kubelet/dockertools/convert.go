@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	dockertypes "github.com/docker/engine-api/types"
-	docker "github.com/fsouza/go-dockerclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -70,8 +69,8 @@ func toRuntimeContainer(c *dockertypes.Container) (*kubecontainer.Container, err
 	}, nil
 }
 
-// Converts docker.APIImages to kubecontainer.Image.
-func toRuntimeImage(image *docker.APIImages) (*kubecontainer.Image, error) {
+// Converts dockertypes.Image to kubecontainer.Image.
+func toRuntimeImage(image *dockertypes.Image) (*kubecontainer.Image, error) {
 	if image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime image")
 	}

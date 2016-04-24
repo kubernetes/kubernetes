@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 )
 
@@ -36,12 +36,12 @@ type DockerConfigProvider interface {
 	LazyProvide() *DockerConfigEntry
 }
 
-func LazyProvide(creds LazyAuthConfiguration) docker.AuthConfiguration {
+func LazyProvide(creds LazyAuthConfiguration) dockertypes.AuthConfig {
 	if creds.Provider != nil {
 		entry := *creds.Provider.LazyProvide()
-		return DockerConfigEntryToLazyAuthConfiguration(entry).AuthConfiguration
+		return DockerConfigEntryToLazyAuthConfiguration(entry).AuthConfig
 	} else {
-		return creds.AuthConfiguration
+		return creds.AuthConfig
 	}
 
 }
