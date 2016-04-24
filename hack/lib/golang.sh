@@ -309,7 +309,7 @@ kube::golang::setup_env() {
   # resultant binaries.  Go will not let us use GOBIN with `go install` and
   # cross-compiling, and `go install -o <file>` only works for a single pkg.
   local subdir
-  subdir=$(pwd | sed "s|$KUBE_ROOT||")
+  subdir=$(kube::realpath . | sed "s|$KUBE_ROOT||")
   cd "${KUBE_GOPATH}/src/${KUBE_GO_PACKAGE}/${subdir}"
 
   # Unset GOBIN in case it already exists in the current session.

@@ -26,11 +26,8 @@ DOCKER_HOST=${DOCKER_HOST:-""}
 DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
 readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox --virtualbox-memory 4096 --virtualbox-cpu-count -1"}
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-cd "${KUBE_ROOT}"
-
-# This'll canonicalize the path
-KUBE_ROOT=$PWD
+# This will canonicalize the path
+KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd -P)
 
 source hack/lib/init.sh
 
