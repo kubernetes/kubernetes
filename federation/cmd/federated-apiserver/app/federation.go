@@ -41,15 +41,15 @@ func installFederationAPIs(s *options.APIServer, g *genericapiserver.GenericAPIS
 		Decorator:               g.StorageDecorator(),
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 	})
-	clusterResources := map[string]rest.Storage{
+	federationResources := map[string]rest.Storage{
 		"clusters":        clusterStorage,
 		"clusters/status": clusterStatusStorage,
 	}
-	clusterGroupMeta := registered.GroupOrDie(federation.GroupName)
+	federationGroupMeta := registered.GroupOrDie(federation.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
-		GroupMeta: *clusterGroupMeta,
+		GroupMeta: *federationGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			"v1alpha1": clusterResources,
+			"v1alpha1": federationResources,
 		},
 		OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,
