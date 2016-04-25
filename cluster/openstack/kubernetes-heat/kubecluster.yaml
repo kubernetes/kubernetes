@@ -5,14 +5,6 @@ description: >
   (as specified by the number_of_minions parameter, which defaults to 3).
 
 parameters:
-  plugin_version:
-    type: string
-    description: version of CLC plugin. It is used when you show cluster list view.
-    default: 1.0
-    constraints:
-      - allowed_values:
-        - 1.0
-
   ssh_key_name:
     type: string
     description: name of ssh key to be provisioned on our server
