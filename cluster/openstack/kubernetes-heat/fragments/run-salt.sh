@@ -29,8 +29,8 @@ rm -rf /kube-install
 mkdir -p /kube-install
 cd /kube-install
 
-curl "$KUBERNETES_SERVER_URL" -o kubernetes-server.tar.gz
-curl "$KUBERNETES_SALT_URL" -o kubernetes-salt.tar.gz
+curl "${KUBERNETES_SERVER_URL}" -o kubernetes-server.tar.gz
+curl "${KUBERNETES_SALT_URL}" -o kubernetes-salt.tar.gz
 
 tar xzf kubernetes-salt.tar.gz
 ./kubernetes/saltbase/install.sh kubernetes-server.tar.gz

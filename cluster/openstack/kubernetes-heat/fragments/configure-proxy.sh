@@ -63,8 +63,8 @@ ENABLE_PROXY='$ENABLE_PROXY'
 if [[ "${ENABLE_PROXY}" == "true" ]]; then
   mkdir -p /etc/systemd/system/docker.service.d/
 
-  echo "$ETC_ENVIRONMENT" >> /etc/environment
-  echo "$ETC_PROFILE_D" > /etc/profile.d/proxy_config.sh
-  echo "$DOCKER_PROXY" > etc/systemd/system/docker.service.d/http-proxy.conf
+  echo "${ETC_ENVIRONMENT}" >> /etc/environment
+  echo "${ETC_PROFILE_D}" > /etc/profile.d/proxy_config.sh
+  echo "${DOCKER_PROXY}" > etc/systemd/system/docker.service.d/http-proxy.conf
   echo "proxy=$HTTP_PROXY" >> /etc/yum.conf
 fi

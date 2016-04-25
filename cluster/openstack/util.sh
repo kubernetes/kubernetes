@@ -24,7 +24,7 @@ set -e
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
 source "${ROOT}/${KUBE_CONFIG_FILE:-"config-default.sh"}"
-source "$KUBE_ROOT/cluster/common.sh"
+source "${KUBE_ROOT}/cluster/common.sh"
 if [ $CREATE_IMAGE = true ]; then
 source "${ROOT}/config-image.sh"
 fi
@@ -35,10 +35,10 @@ function verify-prereqs() {
  for client in swift glance nova heat;
  do
   if which $client >/dev/null 2>&1; then
-    echo "$client client installed"
+    echo "${client} client installed"
   else
-    echo "$client client does not exist"
-    echo "Please install $client client, and retry."
+    echo "${client} client does not exist"
+    echo "Please install ${client} client, and retry."
     exit 1
   fi
  done
@@ -49,7 +49,7 @@ function verify-prereqs() {
 # Assumed vars:
 #   KUBERNETES_PROVIDER
 function kube-up() {
-    echo "kube-up for provider $KUBERNETES_PROVIDER"
+    echo "kube-up for provider ${KUBERNETES_PROVIDER}"
     create-stack
 }
 
@@ -186,7 +186,7 @@ function run-heat-script() {
   if [ $CREATE_IMAGE = true ]; then
     echo "[INFO] Retrieve new image ID"
     IMAGE_ID=$(nova image-show ${OPENSTACK_IMAGE_NAME} | awk '$2=="id" {print $4}')
-    echo "[INFO] Image Id $IMAGE_ID"
+    echo "[INFO] Image Id ${IMAGE_ID}"
   fi
 
   if [[ ! $stack_status ]]; then
@@ -270,5 +270,5 @@ function detect-master {
 
   export KUBE_MASTER_IP=$(nova show "${STACK_NAME}"-master | awk '$3=="network" {print $6}')
 
-  echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
+  echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}" 1>&2
 }
