@@ -422,14 +422,14 @@ func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 
 // PullImage is a test-spy implementation of DockerInterface.PullImage.
 // It adds an entry "pull" to the internal method call record.
-func (f *FakeDockerClient) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
+func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "pull")
 	err := f.popError("pull")
 	if err == nil {
 		authJson, _ := json.Marshal(auth)
-		f.pulled = append(f.pulled, fmt.Sprintf("%s:%s using %s", imageID, opts.Tag, string(authJson)))
+		f.pulled = append(f.pulled, fmt.Sprintf("%s using %s", image, string(authJson)))
 	}
 	return err
 }

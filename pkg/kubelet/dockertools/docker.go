@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	dockerref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/jsonmessage"
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
@@ -144,9 +145,28 @@ func filterHTTPError(err error, image string) error {
 	}
 }
 
+// applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
+// a default tag will be applied.
+func applyDefaultImageTag(image string) (string, error) {
+	named, err := dockerref.ParseNamed(image)
+	if err != nil {
+		return "", fmt.Errorf("couldn't parse image reference %q: %v", image, err)
+	}
+	_, isTagged := named.(dockerref.Tagged)
+	_, isDigested := named.(dockerref.Digested)
+	if !isTagged && !isDigested {
+		named, err := dockerref.WithTag(named, parsers.DefaultImageTag)
+		if err != nil {
+			return "", fmt.Errorf("failed to apply default image tag %q: %v", image, err)
+		}
+		image = named.String()
+	}
+	return image, nil
+}
+
 func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
-	// If no tag was specified, use the default "latest".
-	imageID, tag, err := parsers.ParseImageName(image)
+	// If the image contains no tag or digest, a default tag should be applied.
+	image, err := applyDefaultImageTag(image)
 	if err != nil {
 		return err
 	}
@@ -156,15 +176,14 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 		return err
 	}
 
-	opts := dockertypes.ImagePullOptions{
-		Tag: tag,
-	}
+	// The only used image pull option RegistryAuth will be set in kube_docker_client
+	opts := dockertypes.ImagePullOptions{}
 
-	creds, haveCredentials := keyring.Lookup(imageID)
+	creds, haveCredentials := keyring.Lookup(image)
 	if !haveCredentials {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
 
-		err := p.client.PullImage(imageID, dockertypes.AuthConfig{}, opts)
+		err := p.client.PullImage(image, dockertypes.AuthConfig{}, opts)
 		if err == nil {
 			// Sometimes PullImage failed with no error returned.
 			exist, ierr := p.IsImagePresent(image)
@@ -191,7 +210,7 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		err = p.client.PullImage(imageID, credentialprovider.LazyProvide(currentCreds), opts)
+		err = p.client.PullImage(image, credentialprovider.LazyProvide(currentCreds), opts)
 		// If there was no error, return success
 		if err == nil {
 			return nil
