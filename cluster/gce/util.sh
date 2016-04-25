@@ -273,13 +273,16 @@ function upload-server-tars() {
 function detect-node-names {
   detect-project
   INSTANCE_GROUPS=()
-  INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list --zone "${ZONE}" --project "${PROJECT}" | grep ${NODE_INSTANCE_PREFIX} | cut -f1 -d" " || true))
+  INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list \
+    --zone "${ZONE}" --project "${PROJECT}" \
+    --regexp "${NODE_INSTANCE_PREFIX}-.+" \
+    --format='value(instanceGroup)' || true))
   NODE_NAMES=()
   if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
     for group in "${INSTANCE_GROUPS[@]}"; do
       NODE_NAMES+=($(gcloud compute instance-groups managed list-instances \
         "${group}" --zone "${ZONE}" --project "${PROJECT}" \
-        --format=yaml | grep instance: | cut -d ' ' -f 2))
+        --format='value(instance)'))
     done
     echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]}" >&2
     echo "NODE_NAMES=${NODE_NAMES[*]}" >&2
