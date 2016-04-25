@@ -43,6 +43,7 @@
             browser-url: https://github.com/kubernetes/kubernetes
             wipe-workspace: false
             skip-tag: true
+            shallow-clone: true
     triggers:
         - pollscm:
             cron: 'H/2 * * * *'
