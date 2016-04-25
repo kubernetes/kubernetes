@@ -92,7 +92,7 @@ func SetDefaults_ContainerPort(obj *ContainerPort) {
 func SetDefaults_Container(obj *Container) {
 	if obj.ImagePullPolicy == "" {
 		// Ignore error and assume it has been validated elsewhere
-		_, tag, _ := parsers.ParseImageName(obj.Image)
+		_, tag, _, _ := parsers.ParseImageName(obj.Image)
 
 		// Check image tag
 

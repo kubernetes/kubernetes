@@ -33,6 +33,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
+	dockerversion "github.com/docker/engine-api/types/versions"
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -894,40 +895,12 @@ func (v dockerVersion) String() string {
 }
 
 func (v dockerVersion) Compare(other string) (int, error) {
-	return compare(string(v), other), nil
-}
-
-// compare is copied from engine-api, it compares two version strings, returns -1 if
-// v1 < v2, 1 if v1 > v2, 0 otherwise.
-// TODO(random-liu): Leveraging the version comparison in engine-api after bumping up
-// the engine-api version. See #24076
-func compare(v1, v2 string) int {
-	var (
-		currTab  = strings.Split(v1, ".")
-		otherTab = strings.Split(v2, ".")
-	)
-
-	max := len(currTab)
-	if len(otherTab) > max {
-		max = len(otherTab)
+	if dockerversion.LessThan(string(v), other) {
+		return -1, nil
+	} else if dockerversion.GreaterThan(string(v), other) {
+		return 1, nil
 	}
-	for i := 0; i < max; i++ {
-		var currInt, otherInt int
-
-		if len(currTab) > i {
-			currInt, _ = strconv.Atoi(currTab[i])
-		}
-		if len(otherTab) > i {
-			otherInt, _ = strconv.Atoi(otherTab[i])
-		}
-		if currInt > otherInt {
-			return 1
-		}
-		if otherInt > currInt {
-			return -1
-		}
-	}
-	return 0
+	return 0, nil
 }
 
 func (dm *DockerManager) Type() string {
