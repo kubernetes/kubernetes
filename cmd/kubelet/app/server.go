@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -183,6 +184,11 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		return nil, err
 	}
 
+	thresholds, err := eviction.ParseThresholdConfig(s.EvictionHard, s.EvictionSoft, s.EvictionSoftGracePeriod)
+	if err != nil {
+		return nil, err
+	}
+
 	return &KubeletConfig{
 		Address:                   net.ParseIP(s.Address),
 		AllowPrivileged:           s.AllowPrivileged,
@@ -260,7 +266,8 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		HairpinMode:                    s.HairpinMode,
 		BabysitDaemons:                 s.BabysitDaemons,
 		ExperimentalFlannelOverlay:     s.ExperimentalFlannelOverlay,
-		NodeIP: net.ParseIP(s.NodeIP),
+		NodeIP:     net.ParseIP(s.NodeIP),
+		Thresholds: thresholds,
 	}, nil
 }
 
@@ -773,6 +780,7 @@ type KubeletConfig struct {
 	Writer                         io.Writer
 	VolumePlugins                  []volume.VolumePlugin
 	OutOfDiskTransitionFrequency   time.Duration
+	Thresholds                     []eviction.Threshold
 
 	ExperimentalFlannelOverlay bool
 	NodeIP                     net.IP
@@ -868,6 +876,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ContainerRuntimeOptions,
 		kc.HairpinMode,
 		kc.BabysitDaemons,
+		kc.Thresholds,
 		kc.Options,
 	)
 
