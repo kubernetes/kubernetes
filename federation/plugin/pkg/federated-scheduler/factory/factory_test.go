@@ -42,6 +42,7 @@ import (
 	latestschedulerapi "k8s.io/kubernetes/federation/plugin/pkg/federated-scheduler/api/latest"
 	"k8s.io/kubernetes/federation/plugin/pkg/federated-scheduler/schedulercache"
 
+	"fmt"
 )
 
 func TestCreate(t *testing.T) {
@@ -154,9 +155,11 @@ func TestDefaultErrorFunc(t *testing.T) {
 			Namespace: "bar",
 		},
 	}
+	codec, _ := api.Codecs.SerializerForFileExtension("json")
+
 	handler := utiltesting.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: runtime.EncodeOrDie(testapi.Extensions.Codec(), testReplicaSet),
+		ResponseBody: runtime.EncodeOrDie(codec, testReplicaSet),
 		T:            t,
 	}
 	mux := http.NewServeMux()
@@ -170,6 +173,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	federatedClientSet := release_1_3.NewForConfigOrDie(&federatedconfig)
 	factory := NewConfigFactory(federatedClientSet, kubeClientSet, api.DefaultSchedulerName)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
+
 	replicaSetBackoff := rsBackoff{
 		perRsBackoff:   map[types.NamespacedName]*backoffEntry{},
 		clock:           &fakeClock{},
@@ -233,6 +237,10 @@ func TestBind(t *testing.T) {
 		binding *federation.SubReplicaSet
 	}{
 		{binding: &federation.SubReplicaSet{
+			TypeMeta: apiunversioned.TypeMeta{
+				Kind:"SubReplicaSet",
+				APIVersion:"federation/v1alpha1",
+			},
 			ObjectMeta: v1.ObjectMeta {
 				Name: "foo",
 				Namespace: "bar",
@@ -253,11 +261,11 @@ func TestBind(t *testing.T) {
 	for _, item := range table {
 		handler := utiltesting.FakeHandler{
 			StatusCode:   200,
-			ResponseBody: "",
+			ResponseBody: "{\"result\":\"ok\"}",
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		// TODO: Uncomment when fix #19254
+
 		federatedconfig := restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Federation.GroupVersion()}}
 		federatedClientSet := release_1_3.NewForConfigOrDie(&federatedconfig)
 		b := binder{federatedClientSet}
@@ -266,11 +274,15 @@ func TestBind(t *testing.T) {
 		anno[unversioned.FederationReplicaSetKey] = "parent"
 
 		item.binding.Annotations = anno
+		fmt.Println(item.binding)
 		if err := b.Bind(item.binding); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		expectedBody := runtime.EncodeOrDie(testapi.Federation.Codec(), item.binding)
+
+		codec, _ := api.Codecs.SerializerForFileExtension("json")
+
+		expectedBody := runtime.EncodeOrDie(codec, item.binding)
 		handler.ValidateRequest(t, testapi.Federation.ResourcePath("subreplicasets", "bar", ""), "POST", &expectedBody)
 	}
 }

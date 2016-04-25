@@ -17,7 +17,6 @@ limitations under the License.
 package schedulercache
 
 import (
-	federation "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	"k8s.io/kubernetes/federation/plugin/pkg/federated-scheduler/schedulercache"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
@@ -25,23 +24,23 @@ import (
 // ReplicaSetsToCache is used for testing
 type ReplicaSetsToCache []*extensions.ReplicaSet
 
-func (r ReplicaSetsToCache) AssumeSubRSIfBindSucceed(subRS *federation.SubReplicaSet, bind func() bool) error {
+func (r ReplicaSetsToCache) AssumeReplicaSetIfBindSucceed(replicaSet *extensions.ReplicaSet, bind func() bool) error {
 	if !bind() {
 		return nil
 	}
 	return nil
 }
 
-func (r ReplicaSetsToCache) AddSubRS(subRS *federation.SubReplicaSet) error { return nil }
+func (r ReplicaSetsToCache) AddReplicaSet(replicaSet *extensions.ReplicaSet) error { return nil }
 
-func (r ReplicaSetsToCache) UpdateSubRS(oldSubRS, newSubRS *federation.SubReplicaSet) error { return nil }
+func (r ReplicaSetsToCache) UpdateReplicaSet(oldReplicaSet, newReplicaSet *extensions.ReplicaSet) error { return nil }
 
-func (r ReplicaSetsToCache) RemoveSubRS(subRS *federation.SubReplicaSet) error { return nil }
+func (r ReplicaSetsToCache) RemoveReplicaSet(replicaSet *extensions.ReplicaSet) error { return nil }
 
 func (r ReplicaSetsToCache) GetClusterNameToInfoMap() (map[string]*schedulercache.ClusterInfo, error) {
 	return nil, nil
 }
 
-func (r ReplicaSetsToCache) List() (selected []*federation.SubReplicaSet, err error) {
+func (r ReplicaSetsToCache) List() (selected []*extensions.ReplicaSet, err error) {
 	return nil, nil
 }

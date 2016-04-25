@@ -18,15 +18,15 @@ package schedulercache
 
 import (
 	"k8s.io/kubernetes/federation/plugin/pkg/federated-scheduler/schedulercache"
-	federation "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // FakeCache is used for testing
 type FakeCache struct {
-	AssumeFunc func(*federation.SubReplicaSet)
+	AssumeFunc func(*v1beta1.ReplicaSet)
 }
 
-func (f *FakeCache) AssumeSubRSIfBindSucceed(replicaSet *federation.SubReplicaSet, bind func() bool) error {
+func (f *FakeCache) AssumeReplicaSetIfBindSucceed(replicaSet *v1beta1.ReplicaSet, bind func() bool) error {
 	if !bind() {
 		return nil
 	}
@@ -34,14 +34,14 @@ func (f *FakeCache) AssumeSubRSIfBindSucceed(replicaSet *federation.SubReplicaSe
 	return nil
 }
 
-func (f *FakeCache) AddSubRS(replicaSet *federation.SubReplicaSet) error { return nil }
+func (f *FakeCache) AddReplicaSet(replicaSet *v1beta1.ReplicaSet) error { return nil }
 
-func (f *FakeCache) UpdateSubRS(oldReplicaSet, newReplicaSet *federation.SubReplicaSet) error { return nil }
+func (f *FakeCache) UpdateReplicaSet(oldReplicaSet, newReplicaSet *v1beta1.ReplicaSet) error { return nil }
 
-func (f *FakeCache) RemoveSubRS(replicaSet *federation.SubReplicaSet) error { return nil }
+func (f *FakeCache) RemoveReplicaSet(replicaSet *v1beta1.ReplicaSet) error { return nil }
 
 func (f *FakeCache) GetClusterNameToInfoMap() (map[string]*schedulercache.ClusterInfo, error) {
 	return nil, nil
 }
 
-func (f *FakeCache) List() ([]*federation.SubReplicaSet, error) { return nil, nil }
+func (f *FakeCache) List() ([]*v1beta1.ReplicaSet, error) { return nil, nil }

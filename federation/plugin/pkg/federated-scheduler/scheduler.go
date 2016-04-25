@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	pkgunversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	apiunversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/federation/apis/federation/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -98,7 +98,7 @@ func (s *Scheduler) scheduleOne() {
 		s.config.Error(rs, err)
 		return
 	}
-	if  scheduled {
+	if scheduled {
 		glog.V(3).Infof("%v has been scheduled, skip", rs.Name)
 		return
 	}
@@ -112,10 +112,6 @@ func (s *Scheduler) scheduleOne() {
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 
-	//1. split subReplicaSet
-	//2. bind dest cluster on subReplicaSet
-	//3. set annotation of parent replicaSet on subReplicaSet
-
 	subRS, err := splitSubReplicaSet(rs, dest)
 	if err != nil {
 		glog.V(1).Infof("Failed to split sub replicaset: %+v", rs)
@@ -123,7 +119,6 @@ func (s *Scheduler) scheduleOne() {
 		s.config.Error(rs, err)
 		return
 	}
-	//bind the destination cluster to sub rc
 
 	bindAction := func() bool {
 		bindingStart := time.Now()
@@ -142,25 +137,23 @@ func (s *Scheduler) scheduleOne() {
 	metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 }
 
+//generate subrs and assign annotation with scheduling result
 func splitSubReplicaSet(replicaSet *extensions.ReplicaSet, targetCluster string) (*federation.SubReplicaSet, error) {
 	subRS, err := generateSubRS(replicaSet)
 	if err != nil {
 		return nil, err
 	}
-	// Get the current annotations from the object.
 	annotations := subRS.Annotations
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
-	// Set federation ReplicaSet name
 	annotations[unversioned.FederationReplicaSetKey] = replicaSet.Name
-	// Set target cluster name, which is binding cluster
 	annotations[unversioned.TargetClusterKey] = targetCluster
-	// Update annotation
 	subRS.Annotations = annotations
 	return subRS, nil
 }
 
+//create subrs and assign assign properties of rs to be scheduled, generate and assign random name
 func generateSubRS(replicaSet *extensions.ReplicaSet) (*federation.SubReplicaSet, error) {
 	clone, err := conversion.NewCloner().DeepCopy(replicaSet)
 	if err != nil {
@@ -171,14 +164,14 @@ func generateSubRS(replicaSet *extensions.ReplicaSet) (*federation.SubReplicaSet
 		return nil, fmt.Errorf("Unexpected replicaset cast error : %v\n", rsTemp)
 	}
 	result := &federation.SubReplicaSet{
-		TypeMeta: pkgunversioned.TypeMeta{
-			Kind: "subreplicasets",
+		TypeMeta: apiunversioned.TypeMeta{
+			Kind: "SubReplicaSet",
 			APIVersion: "federation/v1alpha1",
 		},
+		Spec : rsTemp.Spec,
+		Status: rsTemp.Status,
+		ObjectMeta: rsTemp.ObjectMeta,
 	}
-	result.ObjectMeta = rsTemp.ObjectMeta
-	result.Spec = rsTemp.Spec
-	result.Status = rsTemp.Status
 
 	//to generate subrs name, we need a api.ObjectMeta instead of v1
 	meta := &api.ObjectMeta{}
@@ -187,14 +180,14 @@ func generateSubRS(replicaSet *extensions.ReplicaSet) (*federation.SubReplicaSet
 	api.GenerateName(api.SimpleNameGenerator, meta)
 	result.Name = meta.Name
 	result.GenerateName = rsTemp.Name
+
 	//unset resourceVersion before create the actual resource
 	result.ResourceVersion = ""
-	result.TypeMeta.Kind = "subreplicasets"
-	result.TypeMeta.APIVersion = "federation/v1alpha1"
-	fmt.Println("generating subreplicaset %v", result)
+
 	return result, nil
 }
 
+//covert subreplicaset to replicaset, and reset name
 func CoverSubRSToRS(subRS *federation.SubReplicaSet) ( *extensions.ReplicaSet, error) {
 	clone, err := conversion.NewCloner().DeepCopy(subRS)
 	if err != nil {
@@ -205,17 +198,19 @@ func CoverSubRSToRS(subRS *federation.SubReplicaSet) ( *extensions.ReplicaSet, e
 		return nil, fmt.Errorf("Unexpected subreplicaset cast error : %v\n", subrs)
 	}
 	result := &extensions.ReplicaSet{
-		TypeMeta: pkgunversioned.TypeMeta{
-			Kind: "replicaset",
+		TypeMeta: apiunversioned.TypeMeta{
+			Kind: "ReplicaSet",
 			APIVersion: "extensions/v1beta1",
 		},
+		Spec : subrs.Spec,
+		Status: subrs.Status,
+		ObjectMeta: subrs.ObjectMeta,
 	}
-	result.ObjectMeta = subrs.ObjectMeta
-	result.Spec = subrs.Spec
-	result.Status = subrs.Status
 	result.Name = subrs.GenerateName
 	return result, nil
 }
+
+//check if the rs has been scheduled, as we do not change the rs after schedule, so we need to iterate rs in cache
 func isScheduled(rs *extensions.ReplicaSet,cache schedulercache.Cache) (bool, error){
 	replicaSets, err := cache.List()
 	if err != nil {

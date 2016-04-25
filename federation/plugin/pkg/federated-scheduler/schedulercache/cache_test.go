@@ -23,41 +23,41 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	federation "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/federation/apis/federation/unversioned"
 )
 
-// TestAssumeSubReplicaSetScheduled tests that after a subRS is assumed, its information is aggregated
+// TestAssumeReplicaSetScheduled tests that after a replicaSet is assumed, its information is aggregated
 // on cluster level.
-func TestAssumeSubReplicaSetScheduled(t *testing.T) {
+func TestAssumeReplicaSetScheduled(t *testing.T) {
 	clusterName := "cluster"
-	testSubReplicaSets := []*federation.SubReplicaSet{
-		makeBaseSubReplicaSet(clusterName, "test"),
-		makeBaseSubReplicaSet(clusterName, "test-1"),
-		makeBaseSubReplicaSet(clusterName, "test-2"),
-		makeBaseSubReplicaSet(clusterName, "test-nonzero"),
+	testReplicaSets := []*v1beta1.ReplicaSet{
+		makeBaseReplicaSet(clusterName, "test"),
+		makeBaseReplicaSet(clusterName, "test-1"),
+		makeBaseReplicaSet(clusterName, "test-2"),
+		makeBaseReplicaSet(clusterName, "test-nonzero"),
 	}
 
 	tests := []struct {
-		subRSs      []*federation.SubReplicaSet
+		replicaSets []*v1beta1.ReplicaSet
 		clusterInfo *ClusterInfo
 	}{{
-		subRSs: []*federation.SubReplicaSet{testSubReplicaSets[0]},
+		replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[0]},
 		clusterInfo: &ClusterInfo{
-			replicaSets: []*federation.SubReplicaSet{testSubReplicaSets[0]},
+			replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[0]},
 		},
 	}, {
-		subRSs: []*federation.SubReplicaSet{testSubReplicaSets[1], testSubReplicaSets[2]},
+		replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[1], testReplicaSets[2]},
 		clusterInfo: &ClusterInfo{
-			replicaSets: []*federation.SubReplicaSet{testSubReplicaSets[1], testSubReplicaSets[2]},
+			replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[1], testReplicaSets[2]},
 		},
 	}}
 
 	for i, tt := range tests {
 		cache := newSchedulerCache(time.Second, time.Second, nil)
-		for _, subRS := range tt.subRSs {
-			if err := cache.AssumeSubRSIfBindSucceed(subRS, alwaysTrue); err != nil {
-				t.Fatalf("AssumeSubReplicaSetScheduled failed: %v", err)
+		for _, rs := range tt.replicaSets {
+			if err := cache.AssumeReplicaSetIfBindSucceed(rs, alwaysTrue); err != nil {
+				t.Fatalf("AssumeReplicaSetScheduled failed: %v", err)
 			}
 		}
 		c := cache.clusters[clusterName]
@@ -67,53 +67,53 @@ func TestAssumeSubReplicaSetScheduled(t *testing.T) {
 	}
 }
 
-type testExpireSubReplicaSetStruct struct {
-	subRS         *federation.SubReplicaSet
+type testExpireReplicaSetStruct struct {
+	rs          *v1beta1.ReplicaSet
 	assumedTime time.Time
 }
 
-// TestExpireSubReplicaSet tests that assumed subRSs will be removed if expired.
+// TestExpireReplicaSet tests that assumed replicaSets will be removed if expired.
 // The removal will be reflected in cluster info.
-func TestExpireSubReplicaSet(t *testing.T) {
+func TestExpireReplicaSet(t *testing.T) {
 	clusterName := "cluster"
-	testSubReplicaSets := []*federation.SubReplicaSet{
-		makeBaseSubReplicaSet(clusterName, "test-1"),
-		makeBaseSubReplicaSet(clusterName, "test-2"),
+	testReplicaSets := []*v1beta1.ReplicaSet{
+		makeBaseReplicaSet(clusterName, "test-1"),
+		makeBaseReplicaSet(clusterName, "test-2"),
 	}
 	now := time.Now()
 	ttl := 10 * time.Second
 	tests := []struct {
-		subRSs      []*testExpireSubReplicaSetStruct
+		replicaSets      []*testExpireReplicaSetStruct
 		cleanupTime time.Time
 
 		clusterInfo *ClusterInfo
-	}{{ // assumed subRS would expires
-		subRSs: []*testExpireSubReplicaSetStruct{
-			{subRS: testSubReplicaSets[0], assumedTime: now},
+	}{{ // assumed replicaSet would expires
+		replicaSets: []*testExpireReplicaSetStruct{
+			{rs: testReplicaSets[0], assumedTime: now},
 		},
 		cleanupTime: now.Add(2 * ttl),
 		clusterInfo:   nil,
 	}, { // first one would expire, second one would not.
-		subRSs: []*testExpireSubReplicaSetStruct{
-			{subRS: testSubReplicaSets[0], assumedTime: now},
-			{subRS: testSubReplicaSets[1], assumedTime: now.Add(3 * ttl / 2)},
+		replicaSets: []*testExpireReplicaSetStruct{
+			{rs: testReplicaSets[0], assumedTime: now},
+			{rs: testReplicaSets[1], assumedTime: now.Add(3 * ttl / 2)},
 		},
 		cleanupTime: now.Add(2 * ttl),
 		clusterInfo: &ClusterInfo{
-			replicaSets: []*federation.SubReplicaSet{testSubReplicaSets[1]},
+			replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[1]},
 		},
 	}}
 
 	for i, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
 
-		for _, subRS := range tt.subRSs {
-			if err := cache.assumeSubRSIfBindSucceed(subRS.subRS, alwaysTrue, subRS.assumedTime); err != nil {
-				t.Fatalf("assumeSubReplicaSet failed: %v", err)
+		for _, replicaSet := range tt.replicaSets {
+			if err := cache.assumeReplicaSetIfBindSucceed(replicaSet.rs, alwaysTrue, replicaSet.assumedTime); err != nil {
+				t.Fatalf("assumeReplicaSet failed: %v", err)
 			}
 		}
-		// subRSs that have assumedTime + ttl < cleanupTime will get expired and removed
-		cache.cleanupAssumedSubRS(tt.cleanupTime)
+		// replicaSets that have assumedTime + ttl < cleanupTime will get expired and removed
+		cache.cleanupAssumedReplicaSet(tt.cleanupTime)
 		n := cache.clusters[clusterName]
 		if !reflect.DeepEqual(n, tt.clusterInfo) {
 			t.Errorf("#%d: cluster info get=%s, want=%s", i, n, tt.clusterInfo)
@@ -121,44 +121,44 @@ func TestExpireSubReplicaSet(t *testing.T) {
 	}
 }
 
-// TestAddSubReplicaSetWillConfirm tests that a subRS being Add()ed will be confirmed if assumed.
-// The subRS info should still exist after manually expiring unconfirmed subRSs.
-func TestAddSubReplicaSetWillConfirm(t *testing.T) {
+// TestAddReplicaSetWillConfirm tests that a replicaSet being Add()ed will be confirmed if assumed.
+// The replicaSet info should still exist after manually expiring unconfirmed replicaSets.
+func TestAddReplicaSetWillConfirm(t *testing.T) {
 	clusterName := "cluster"
 	now := time.Now()
 	ttl := 10 * time.Second
 
-	testSubReplicaSets := []*federation.SubReplicaSet{
-		makeBaseSubReplicaSet(clusterName, "test-1"),
-		makeBaseSubReplicaSet(clusterName, "test-2"),
+	testReplicaSets := []*v1beta1.ReplicaSet{
+		makeBaseReplicaSet(clusterName, "test-1"),
+		makeBaseReplicaSet(clusterName, "test-2"),
 	}
 	tests := []struct {
-		subRSsToAssume []*federation.SubReplicaSet
-		subRSsToAdd    []*federation.SubReplicaSet
+		replicaSetsToAssume []*v1beta1.ReplicaSet
+		replicaSetsToAdd    []*v1beta1.ReplicaSet
 
-		clusterInfo    *ClusterInfo
-	}{{ // two subRS were assumed at same time. But first one is called Add() and gets confirmed.
-		subRSsToAssume: []*federation.SubReplicaSet{testSubReplicaSets[0], testSubReplicaSets[1]},
-		subRSsToAdd:    []*federation.SubReplicaSet{testSubReplicaSets[0]},
+		clusterInfo         *ClusterInfo
+	}{{ // two replicaSet were assumed at same time. But first one is called Add() and gets confirmed.
+		replicaSetsToAssume: []*v1beta1.ReplicaSet{testReplicaSets[0], testReplicaSets[1]},
+		replicaSetsToAdd:    []*v1beta1.ReplicaSet{testReplicaSets[0]},
 		clusterInfo: &ClusterInfo{
-			replicaSets: []*federation.SubReplicaSet{testSubReplicaSets[0]},
+			replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[0]},
 		},
 	}}
 
 	for i, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
-		for _, subRSToAssume := range tt.subRSsToAssume {
-			if err := cache.assumeSubRSIfBindSucceed(subRSToAssume, alwaysTrue, now); err != nil {
-				t.Fatalf("assumeSubReplicaSet failed: %v", err)
+		for _, replicaSetToAssume := range tt.replicaSetsToAssume {
+			if err := cache.assumeReplicaSetIfBindSucceed(replicaSetToAssume, alwaysTrue, now); err != nil {
+				t.Fatalf("assumeReplicaSet failed: %v", err)
 			}
 		}
-		for _, subRSToAdd := range tt.subRSsToAdd {
-			if err := cache.AddSubRS(subRSToAdd); err != nil {
-				t.Fatalf("AddSubReplicaSet failed: %v", err)
+		for _, replicaSetToAdd := range tt.replicaSetsToAdd {
+			if err := cache.AddReplicaSet(replicaSetToAdd); err != nil {
+				t.Fatalf("AddReplicaSet failed: %v", err)
 			}
 		}
-		cache.cleanupAssumedSubRS(now.Add(2 * ttl))
-		// check after expiration. confirmed subRSs shouldn't be expired.
+		cache.cleanupAssumedReplicaSet(now.Add(2 * ttl))
+		// check after expiration. confirmed replicaSets shouldn't be expired.
 		n := cache.clusters[clusterName]
 		if !reflect.DeepEqual(n, tt.clusterInfo) {
 			t.Errorf("#%d: cluster info get=%s, want=%s", i, n, tt.clusterInfo)
@@ -166,38 +166,38 @@ func TestAddSubReplicaSetWillConfirm(t *testing.T) {
 	}
 }
 
-// TestAddSubReplicaSetAfterExpiration tests that a subRS being Add()ed will be added back if expired.
-func TestAddSubReplicaSetAfterExpiration(t *testing.T) {
+// TestAddReplicaSetAfterExpiration tests that a replicaSet being Add()ed will be added back if expired.
+func TestAddReplicaSetAfterExpiration(t *testing.T) {
 	clusterName := "cluster"
 	ttl := 10 * time.Second
-	baseSubReplicaSet := makeBaseSubReplicaSet(clusterName, "test")
+	baseReplicaSet := makeBaseReplicaSet(clusterName, "test")
 	tests := []struct {
-		subRS       *federation.SubReplicaSet
+		replicaSet       *v1beta1.ReplicaSet
 
 		clusterInfo *ClusterInfo
 	}{{
-		subRS: baseSubReplicaSet,
+		replicaSet: baseReplicaSet,
 		clusterInfo: &ClusterInfo{
-			replicaSets: []*federation.SubReplicaSet{baseSubReplicaSet},
+			replicaSets: []*v1beta1.ReplicaSet{baseReplicaSet},
 		},
 	}}
 
 	now := time.Now()
 	for i, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
-		if err := cache.assumeSubRSIfBindSucceed(tt.subRS, alwaysTrue, now); err != nil {
-			t.Fatalf("assumeSubReplicaSet failed: %v", err)
+		if err := cache.assumeReplicaSetIfBindSucceed(tt.replicaSet, alwaysTrue, now); err != nil {
+			t.Fatalf("assumeReplicaSet failed: %v", err)
 		}
-		cache.cleanupAssumedSubRS(now.Add(2 * ttl))
+		cache.cleanupAssumedReplicaSet(now.Add(2 * ttl))
 		// It should be expired and removed.
 		n := cache.clusters[clusterName]
 		if n != nil {
 			t.Errorf("#%d: expecting nil cluster info, but get=%v", i, n)
 		}
-		if err := cache.AddSubRS(tt.subRS); err != nil {
-			t.Fatalf("AddSubReplicaSet failed: %v", err)
+		if err := cache.AddReplicaSet(tt.replicaSet); err != nil {
+			t.Fatalf("AddReplicaSet failed: %v", err)
 		}
-		// check after expiration. confirmed subRSs shouldn't be expired.
+		// check after expiration. confirmed replicaSets shouldn't be expired.
 		n = cache.clusters[clusterName]
 		if !reflect.DeepEqual(n, tt.clusterInfo) {
 			t.Errorf("#%d: cluster info get=%s, want=%s", i, n, tt.clusterInfo)
@@ -205,46 +205,46 @@ func TestAddSubReplicaSetAfterExpiration(t *testing.T) {
 	}
 }
 
-// TestUpdateSubReplicaSet tests that a subRS will be updated if added before.
-func TestUpdateSubReplicaSet(t *testing.T) {
+// TestUpdateReplicaSet tests that a replicaSet will be updated if added before.
+func TestUpdateReplicaSet(t *testing.T) {
 	clusterName := "cluster"
 	ttl := 10 * time.Second
-	testSubReplicaSets := []*federation.SubReplicaSet{
-		makeBaseSubReplicaSet(clusterName, "test"),
-		makeBaseSubReplicaSet(clusterName, "test"),
+	testReplicaSets := []*v1beta1.ReplicaSet{
+		makeBaseReplicaSet(clusterName, "test"),
+		makeBaseReplicaSet(clusterName, "test"),
 	}
 	tests := []struct {
-		subRSsToAssume []*federation.SubReplicaSet
-		subRSsToAdd    []*federation.SubReplicaSet
-		subRSsToUpdate []*federation.SubReplicaSet
+		replicaSetsToAssume []*v1beta1.ReplicaSet
+		replicaSetsToAdd    []*v1beta1.ReplicaSet
+		replicaSetsToUpdate []*v1beta1.ReplicaSet
 
 		clusterInfo    []*ClusterInfo
-	}{{ // add a subRS and then update it twice
-		subRSsToAdd:    []*federation.SubReplicaSet{testSubReplicaSets[0]},
-		subRSsToUpdate: []*federation.SubReplicaSet{testSubReplicaSets[0], testSubReplicaSets[1], testSubReplicaSets[0]},
+	}{{ // add a replicaSet and then update it twice
+		replicaSetsToAdd:    []*v1beta1.ReplicaSet{testReplicaSets[0]},
+		replicaSetsToUpdate: []*v1beta1.ReplicaSet{testReplicaSets[0], testReplicaSets[1], testReplicaSets[0]},
 		clusterInfo: []*ClusterInfo{{
-			replicaSets: []*federation.SubReplicaSet{testSubReplicaSets[1]},
+			replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[1]},
 		}, {
-			replicaSets: []*federation.SubReplicaSet{testSubReplicaSets[0]},
+			replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[0]},
 		}},
 	}}
 
 	for _, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
-		for _, subRSToAdd := range tt.subRSsToAdd {
-			if err := cache.AddSubRS(subRSToAdd); err != nil {
-				t.Fatalf("AddSubReplicaSet failed: %v", err)
+		for _, replicaSetToAdd := range tt.replicaSetsToAdd {
+			if err := cache.AddReplicaSet(replicaSetToAdd); err != nil {
+				t.Fatalf("AddReplicaSet failed: %v", err)
 			}
 		}
 
-		for i := range tt.subRSsToUpdate {
+		for i := range tt.replicaSetsToUpdate {
 			if i == 0 {
 				continue
 			}
-			if err := cache.UpdateSubRS(tt.subRSsToUpdate[i-1], tt.subRSsToUpdate[i]); err != nil {
-				t.Fatalf("UpdateSubReplicaSet failed: %v", err)
+			if err := cache.UpdateReplicaSet(tt.replicaSetsToUpdate[i-1], tt.replicaSetsToUpdate[i]); err != nil {
+				t.Fatalf("UpdateReplicaSet failed: %v", err)
 			}
-			// check after expiration. confirmed subRSs shouldn't be expired.
+			// check after expiration. confirmed replicaSets shouldn't be expired.
 			n := cache.clusters[clusterName]
 			if !reflect.DeepEqual(n, tt.clusterInfo[i-1]) {
 				t.Errorf("#%d: cluster info get=%s, want=%s", i-1, n, tt.clusterInfo)
@@ -253,55 +253,55 @@ func TestUpdateSubReplicaSet(t *testing.T) {
 	}
 }
 
-// TestExpireAddUpdateSubReplicaSet test the sequence that a subRS is expired, added, then updated
-func TestExpireAddUpdateSubReplicaSet(t *testing.T) {
+// TestExpireAddUpdateReplicaSet test the sequence that a replicaSet is expired, added, then updated
+func TestExpireAddUpdateReplicaSet(t *testing.T) {
 	clusterName := "cluster"
 	ttl := 10 * time.Second
-	testSubReplicaSets := []*federation.SubReplicaSet{
-		makeBaseSubReplicaSet(clusterName, "test"),
-		makeBaseSubReplicaSet(clusterName, "test"),
+	testReplicaSets := []*v1beta1.ReplicaSet{
+		makeBaseReplicaSet(clusterName, "test"),
+		makeBaseReplicaSet(clusterName, "test"),
 	}
 	tests := []struct {
-		subRSsToAssume []*federation.SubReplicaSet
-		subRSsToAdd    []*federation.SubReplicaSet
-		subRSsToUpdate []*federation.SubReplicaSet
+		replicaSetsToAssume []*v1beta1.ReplicaSet
+		replicaSetsToAdd    []*v1beta1.ReplicaSet
+		replicaSetsToUpdate []*v1beta1.ReplicaSet
 
 		clusterInfo    []*ClusterInfo
-	}{{ // SubReplicaSet is assumed, expired, and added. Then it would be updated twice.
-		subRSsToAssume: []*federation.SubReplicaSet{testSubReplicaSets[0]},
-		subRSsToAdd:    []*federation.SubReplicaSet{testSubReplicaSets[0]},
-		subRSsToUpdate: []*federation.SubReplicaSet{testSubReplicaSets[0], testSubReplicaSets[1], testSubReplicaSets[0]},
+	}{{ // ReplicaSet is assumed, expired, and added. Then it would be updated twice.
+		replicaSetsToAssume: []*v1beta1.ReplicaSet{testReplicaSets[0]},
+		replicaSetsToAdd:    []*v1beta1.ReplicaSet{testReplicaSets[0]},
+		replicaSetsToUpdate: []*v1beta1.ReplicaSet{testReplicaSets[0], testReplicaSets[1], testReplicaSets[0]},
 		clusterInfo: []*ClusterInfo{{
-			replicaSets: []*federation.SubReplicaSet{testSubReplicaSets[1]},
+			replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[1]},
 		}, {
-			replicaSets: []*federation.SubReplicaSet{testSubReplicaSets[0]},
+			replicaSets: []*v1beta1.ReplicaSet{testReplicaSets[0]},
 		}},
 	}}
 
 	now := time.Now()
 	for _, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
-		for _, subRSToAssume := range tt.subRSsToAssume {
-			if err := cache.assumeSubRSIfBindSucceed(subRSToAssume, alwaysTrue, now); err != nil {
-				t.Fatalf("assumeSubReplicaSet failed: %v", err)
+		for _, replicaSetToAssume := range tt.replicaSetsToAssume {
+			if err := cache.assumeReplicaSetIfBindSucceed(replicaSetToAssume, alwaysTrue, now); err != nil {
+				t.Fatalf("assumeReplicaSet failed: %v", err)
 			}
 		}
-		cache.cleanupAssumedSubRS(now.Add(2 * ttl))
+		cache.cleanupAssumedReplicaSet(now.Add(2 * ttl))
 
-		for _, subRSToAdd := range tt.subRSsToAdd {
-			if err := cache.AddSubRS(subRSToAdd); err != nil {
-				t.Fatalf("AddSubReplicaSet failed: %v", err)
+		for _, replicaSetToAdd := range tt.replicaSetsToAdd {
+			if err := cache.AddReplicaSet(replicaSetToAdd); err != nil {
+				t.Fatalf("AddReplicaSet failed: %v", err)
 			}
 		}
 
-		for i := range tt.subRSsToUpdate {
+		for i := range tt.replicaSetsToUpdate {
 			if i == 0 {
 				continue
 			}
-			if err := cache.UpdateSubRS(tt.subRSsToUpdate[i-1], tt.subRSsToUpdate[i]); err != nil {
-				t.Fatalf("UpdateSubReplicaSet failed: %v", err)
+			if err := cache.UpdateReplicaSet(tt.replicaSetsToUpdate[i-1], tt.replicaSetsToUpdate[i]); err != nil {
+				t.Fatalf("UpdateReplicaSet failed: %v", err)
 			}
-			// check after expiration. confirmed subRSs shouldn't be expired.
+			// check after expiration. confirmed replicaSets shouldn't be expired.
 			n := cache.clusters[clusterName]
 			if !reflect.DeepEqual(n, tt.clusterInfo[i-1]) {
 				t.Errorf("#%d: cluster info get=%s, want=%s", i-1, n, tt.clusterInfo)
@@ -310,84 +310,84 @@ func TestExpireAddUpdateSubReplicaSet(t *testing.T) {
 	}
 }
 
-// TestRemoveSubReplicaSet tests after added subRS is removed, its information should also be subtracted.
-func TestRemoveSubReplicaSet(t *testing.T) {
+// TestRemoveReplicaSet tests after added replicaSet is removed, its information should also be subtracted.
+func TestRemoveReplicaSet(t *testing.T) {
 	clusterName := "cluster"
-	baseSubReplicaSet := makeBaseSubReplicaSet(clusterName, "test")
+	baseReplicaSet := makeBaseReplicaSet(clusterName, "test")
 	tests := []struct {
-		subRS       *federation.SubReplicaSet
+		replicaSet       *v1beta1.ReplicaSet
 
 		clusterInfo *ClusterInfo
 	}{{
-		subRS: baseSubReplicaSet,
+		replicaSet: baseReplicaSet,
 		clusterInfo: &ClusterInfo{
-			replicaSets: []*federation.SubReplicaSet{baseSubReplicaSet},
+			replicaSets: []*v1beta1.ReplicaSet{baseReplicaSet},
 		},
 	}}
 
 	for i, tt := range tests {
 		cache := newSchedulerCache(time.Second, time.Second, nil)
-		if err := cache.AddSubRS(tt.subRS); err != nil {
-			t.Fatalf("AddSubReplicaSet failed: %v", err)
+		if err := cache.AddReplicaSet(tt.replicaSet); err != nil {
+			t.Fatalf("AddReplicaSet failed: %v", err)
 		}
 		n := cache.clusters[clusterName]
 		if !reflect.DeepEqual(n, tt.clusterInfo) {
 			t.Errorf("#%d: cluster info get=%s, want=%s", i, n, tt.clusterInfo)
 		}
 
-		if err := cache.RemoveSubRS(tt.subRS); err != nil {
-			t.Fatalf("RemoveSubReplicaSet failed: %v", err)
+		if err := cache.RemoveReplicaSet(tt.replicaSet); err != nil {
+			t.Fatalf("RemoveReplicaSet failed: %v", err)
 		}
 
 		n = cache.clusters[clusterName]
 		if n != nil {
-			t.Errorf("#%d: expecting subRS deleted and nil cluster info, get=%s", i, n)
+			t.Errorf("#%d: expecting replicaSet deleted and nil cluster info, get=%s", i, n)
 		}
 	}
 }
 
-func BenchmarkGetNodeNameToInfoMap1kNodes30kSubReplicaSets(b *testing.B) {
-	cache := setupCacheOf1kNodes30kSubReplicaSets(b)
+func BenchmarkGetNodeNameToInfoMap1kNodes30kReplicaSets(b *testing.B) {
+	cache := setupCacheOf1kNodes30kReplicaSets(b)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		cache.GetClusterNameToInfoMap()
 	}
 }
 
-func BenchmarkList1kNodes30kSubReplicaSets(b *testing.B) {
-	cache := setupCacheOf1kNodes30kSubReplicaSets(b)
+func BenchmarkList1kNodes30kReplicaSets(b *testing.B) {
+	cache := setupCacheOf1kNodes30kReplicaSets(b)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		cache.List()
 	}
 }
 
-func BenchmarkExpire100SubReplicaSets(b *testing.B) {
+func BenchmarkExpire100ReplicaSets(b *testing.B) {
 	benchmarkExpire(b, 100)
 }
 
-func BenchmarkExpire1kSubReplicaSets(b *testing.B) {
+func BenchmarkExpire1kReplicaSets(b *testing.B) {
 	benchmarkExpire(b, 1000)
 }
 
-func BenchmarkExpire10kSubReplicaSets(b *testing.B) {
+func BenchmarkExpire10kReplicaSets(b *testing.B) {
 	benchmarkExpire(b, 10000)
 }
 
-func benchmarkExpire(b *testing.B, subRSNum int) {
+func benchmarkExpire(b *testing.B, replicaSetNum int) {
 	now := time.Now()
 	for n := 0; n < b.N; n++ {
 		b.StopTimer()
-		cache := setupCacheWithAssumedSubRS(b, subRSNum, now)
+		cache := setupCacheWithAssumedReplicaSet(b, replicaSetNum, now)
 		b.StartTimer()
-		cache.cleanupAssumedSubRS(now.Add(2 * time.Second))
+		cache.cleanupAssumedReplicaSet(now.Add(2 * time.Second))
 	}
 }
 
-func makeBaseSubReplicaSet(clusterName, objName string) *federation.SubReplicaSet {
+func makeBaseReplicaSet(clusterName, objName string) *v1beta1.ReplicaSet {
 	annotations := map[string]string{}
 	annotations[unversioned.TargetClusterKey] = clusterName
-	return &federation.SubReplicaSet{
+	return &v1beta1.ReplicaSet{
 		ObjectMeta: v1.ObjectMeta{
 			Namespace: "cluster_info_cache_test",
 			Name:      objName,
@@ -396,32 +396,32 @@ func makeBaseSubReplicaSet(clusterName, objName string) *federation.SubReplicaSe
 	}
 }
 
-func setupCacheOf1kNodes30kSubReplicaSets(b *testing.B) Cache {
+func setupCacheOf1kNodes30kReplicaSets(b *testing.B) Cache {
 	cache := newSchedulerCache(time.Second, time.Second, nil)
 	for i := 0; i < 1000; i++ {
 		clusterName := fmt.Sprintf("cluster-%d", i)
 		for j := 0; j < 30; j++ {
-			objName := fmt.Sprintf("%s-subRS-%d", clusterName, j)
-			subRS := makeBaseSubReplicaSet(clusterName, objName)
+			objName := fmt.Sprintf("%s-replicaSet-%d", clusterName, j)
+			replicaSet := makeBaseReplicaSet(clusterName, objName)
 
-			if err := cache.AddSubRS(subRS); err != nil {
-				b.Fatalf("AddSubReplicaSet failed: %v", err)
+			if err := cache.AddReplicaSet(replicaSet); err != nil {
+				b.Fatalf("AddReplicaSet failed: %v", err)
 			}
 		}
 	}
 	return cache
 }
 
-func setupCacheWithAssumedSubRS(b *testing.B, subRSNum int, assumedTime time.Time) *schedulerCache {
+func setupCacheWithAssumedReplicaSet(b *testing.B, replicaSetNum int, assumedTime time.Time) *schedulerCache {
 	cache := newSchedulerCache(time.Second, time.Second, nil)
-	for i := 0; i < subRSNum; i++ {
+	for i := 0; i < replicaSetNum; i++ {
 		clusterName := fmt.Sprintf("cluster-%d", i/10)
-		objName := fmt.Sprintf("%s-subRS-%d", clusterName, i%10)
-		subRS := makeBaseSubReplicaSet(clusterName, objName)
+		objName := fmt.Sprintf("%s-replicaSet-%d", clusterName, i%10)
+		replicaSet := makeBaseReplicaSet(clusterName, objName)
 
-		err := cache.assumeSubRSIfBindSucceed(subRS, alwaysTrue, assumedTime)
+		err := cache.assumeReplicaSetIfBindSucceed(replicaSet, alwaysTrue, assumedTime)
 		if err != nil {
-			b.Fatalf("assumeSubReplicaSetIfBindSucceed failed: %v", err)
+			b.Fatalf("assumeReplicaSetIfBindSucceed failed: %v", err)
 		}
 	}
 	return cache

@@ -260,9 +260,7 @@ func (cache *schedulerCache) List() ([]*v1beta1.ReplicaSet, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	var result []*v1beta1.ReplicaSet
-	fmt.Println("cache info %v", cache)
 	for _, info := range cache.clusters {
-		fmt.Println("cluster info %v", info)
 		for _, rs := range info.replicaSets {
 				result = append(result, rs)
 		}

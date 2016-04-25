@@ -21,6 +21,7 @@ import (
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	"fmt"
 )
 
 type FederationInterface interface {
@@ -75,6 +76,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	if err != nil {
 		return err
 	}
+
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
@@ -85,7 +87,13 @@ func setConfigDefaults(config *restclient.Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
+	codec, ok := api.Codecs.SerializerForFileExtension("json")
+	if !ok {
+		return fmt.Errorf("unable to find serializer for JSON")
+	}
+	config.Codec = codec
+
+
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

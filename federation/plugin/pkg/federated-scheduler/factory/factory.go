@@ -306,20 +306,7 @@ func getClusterConditionPredicate() cache.ClusterConditionPredicate {
 func (factory *ConfigFactory) createReplicaSetLW() *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			result, err := factory.KubeClientSet.ExtensionsClient.ReplicaSets(api.NamespaceAll).List(options)
-			//TODO find out why type of items is missing, suppose be defect in clientset
-			result1, err := factory.KubeClientSet.CoreClient.Pods(api.NamespaceAll).List(options)
-			fmt.Println("-----------------list1 in createReplicaSetLW: %v", result1)
-
-			fmt.Println("-----------------list in createReplicaSetLW: %v", result)
-			fmt.Println(factory.KubeClientSet.ExtensionsClient.ReplicaSets("default").Get("frontend"))
-			fmt.Println("-----------------")
-			//fmt.Println(factory.KubeClientSet.ExtensionsClient.ReplicaSets())
-			for _, v := range result.Items {
-
-				fmt.Println("item %v", v)
-			}
-			return result, err
+			return factory.KubeClientSet.ExtensionsClient.ReplicaSets(api.NamespaceAll).List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return factory.KubeClientSet.ExtensionsClient.ReplicaSets(api.NamespaceAll).Watch(options)
@@ -331,14 +318,10 @@ func (factory *ConfigFactory) createReplicaSetLW() *cache.ListWatch {
 func (factory *ConfigFactory) createSubReplicaSetLW() *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			result, err := factory.FederatedClientSet.FederationClient.SubReplicaSets(api.NamespaceAll).List(options)
-			glog.V(4).Infof("listing subrs: %v", result)
-			return result, err
+			return factory.FederatedClientSet.FederationClient.SubReplicaSets(api.NamespaceAll).List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			result, err := factory.FederatedClientSet.FederationClient.SubReplicaSets(api.NamespaceAll).Watch(options)
-			glog.V(4).Infof("watching subrs: %v", result)
-			return result, err
+			return factory.FederatedClientSet.FederationClient.SubReplicaSets(api.NamespaceAll).Watch(options)
 		},
 	}
 }

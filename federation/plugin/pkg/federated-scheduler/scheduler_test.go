@@ -30,10 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/federation/apis/federation/unversioned"
+	apiunversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	federation "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	"k8s.io/kubernetes/federation/plugin/pkg/federated-scheduler/algorithm"
 	schedulertesting "k8s.io/kubernetes/federation/plugin/pkg/federated-scheduler/testing"
-
 )
 
 type fakeBinder struct {
@@ -46,6 +46,10 @@ func replicaSetWithID(id, desiredHost string) *extensions.ReplicaSet {
 	annotations := map[string]string{}
 	annotations[unversioned.FederationReplicaSetKey] = "cluster1,cluster2"
 	return &extensions.ReplicaSet{
+		TypeMeta: apiunversioned.TypeMeta{
+			Kind: "ReplicaSet",
+			APIVersion: "extensions/v1beta1",
+		},
 		ObjectMeta: v1.ObjectMeta{
 			Name: id,
 			SelfLink: testapi.Default.SelfLink("replicasets", id),
@@ -76,7 +80,7 @@ func TestScheduler(t *testing.T) {
 		sendReplicaSet        *extensions.ReplicaSet
 		algo                  algorithm.ScheduleAlgorithm
 		expectErrorReplicaSet *extensions.ReplicaSet
-		expectAssumedSubRS    *federation.SubReplicaSet
+		expectAssumedReplicaSet *extensions.ReplicaSet
 		expectError           error
 		expectBind            *federation.SubReplicaSet
 		eventReason           string
@@ -85,7 +89,7 @@ func TestScheduler(t *testing.T) {
 			sendReplicaSet: replicaSetWithID("foo", ""),
 			algo:             mockScheduler{"cluster1", nil},
 			expectBind:       getExpectSubRS(replicaSetWithID("foo", ""),"cluster1"),
-			expectAssumedSubRS: getExpectSubRS(replicaSetWithID("foo", ""),"cluster1"),
+			expectAssumedReplicaSet: replicaSetWithID("foo", ""),
 			eventReason:      "Scheduled",
 		}, {
 			sendReplicaSet:        replicaSetWithID("foo1", ""),
@@ -107,12 +111,12 @@ func TestScheduler(t *testing.T) {
 	for i, item := range table {
 		var gotError error
 		var gotReplicaSet *extensions.ReplicaSet
-		var gotAssumedSubRS *federation.SubReplicaSet
+		var gotAssumedReplicaSet *extensions.ReplicaSet
 		var gotBinding *federation.SubReplicaSet
 		c := &Config{
 			SchedulerCache: &schedulertesting.FakeCache{
-				AssumeFunc: func(subRS *federation.SubReplicaSet) {
-					gotAssumedSubRS = subRS
+				AssumeFunc: func(rs *extensions.ReplicaSet) {
+					gotAssumedReplicaSet = rs
 				},
 			},
 			ClusterLister: algorithm.FakeClusterLister(
@@ -149,8 +153,8 @@ func TestScheduler(t *testing.T) {
 			t.Errorf("%v: error: wanted %v, got %v", i, e, a)
 		}
 		//happy path: case 1
-		e := item.expectAssumedSubRS
-		a := gotAssumedSubRS
+		e := item.expectAssumedReplicaSet
+		a := gotAssumedReplicaSet
 		if a != nil {
 			if a.Name == a.GenerateName || !strings.HasPrefix(a.Name, a.GenerateName) {
 				t.Errorf("unexpected name: %#v", a)
