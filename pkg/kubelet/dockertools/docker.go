@@ -55,7 +55,7 @@ const (
 	minQuotaPerod = 1000
 )
 
-// DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
+// DockerInterface is an abstract interface for testability.  It abstracts the interface of docker client.
 type DockerInterface interface {
 	ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error)
 	InspectContainer(id string) (*dockertypes.ContainerJSON, error)
