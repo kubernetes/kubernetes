@@ -43,6 +43,8 @@ type Builder struct {
 	fset *token.FileSet
 	// map of package id to list of parsed files
 	parsed map[string][]parsedFile
+	// map of package id to absolute path (to prevent overlap)
+	absPaths map[string]string
 
 	// Set by makePackages, used by importer() and friends.
 	pkgs map[string]*tc.Package
@@ -81,11 +83,15 @@ func New() *Builder {
 			fmt.Printf("Warning: $GOROOT not set, and unable to run `which go` to find it: %v\n", err)
 		}
 	}
+	// Force this to off, since we don't properly parse CGo.  All symbols must
+	// have non-CGo equivalents.
+	c.CgoEnabled = false
 	return &Builder{
 		context:               &c,
 		buildInfo:             map[string]*build.Package{},
 		fset:                  token.NewFileSet(),
 		parsed:                map[string][]parsedFile{},
+		absPaths:              map[string]string{},
 		userRequested:         map[string]bool{},
 		endLineToCommentGroup: map[fileLine]*ast.CommentGroup{},
 		importGraph:           map[string]map[string]struct{}{},
@@ -101,8 +107,18 @@ func (b *Builder) AddBuildTags(tags ...string) {
 // e.g. test files and files for other platforms-- there is quite a bit of
 // logic of that nature in the build package.
 func (b *Builder) buildPackage(pkgPath string) (*build.Package, error) {
+	// This is a bit of a hack.  The srcDir argument to Import() should
+	// properly be the dir of the file which depends on the package to be
+	// imported, so that vendoring can work properly.  We assume that there is
+	// only one level of vendoring, and that the CWD is inside the GOPATH, so
+	// this should be safe.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get current directory: %v", err)
+	}
+
 	// First, find it, so we know what path to use.
-	pkg, err := b.context.Import(pkgPath, ".", build.FindOnly)
+	pkg, err := b.context.Import(pkgPath, cwd, build.FindOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to *find* %q: %v", pkgPath, err)
 	}
@@ -112,7 +128,7 @@ func (b *Builder) buildPackage(pkgPath string) (*build.Package, error) {
 	if pkg, ok := b.buildInfo[pkgPath]; ok {
 		return pkg, nil
 	}
-	pkg, err = b.context.Import(pkgPath, ".", build.ImportComment)
+	pkg, err = b.context.Import(pkgPath, cwd, build.ImportComment)
 	if err != nil {
 		return nil, fmt.Errorf("unable to import %q: %v", pkgPath, err)
 	}
@@ -127,21 +143,30 @@ func (b *Builder) buildPackage(pkgPath string) (*build.Package, error) {
 	return pkg, nil
 }
 
-// AddFile adds a file to the set. The name must be of the form canonical/pkg/path/file.go.
-func (b *Builder) AddFile(name string, src []byte) error {
-	return b.addFile(name, src, true)
+// AddFile adds a file to the set. The pkg must be of the form
+// "canonical/pkg/path" and the path must be the absolute path to the file.
+func (b *Builder) AddFile(pkg string, path string, src []byte) error {
+	return b.addFile(pkg, path, src, true)
 }
 
-// addFile adds a file to the set. The name must be of the form
-// canonical/pkg/path/file.go. A flag indicates whether this file was
-// user-requested or just from following the import graph.
-func (b *Builder) addFile(name string, src []byte, userRequested bool) error {
-	p, err := parser.ParseFile(b.fset, name, src, parser.DeclarationErrors|parser.ParseComments)
+// addFile adds a file to the set. The pkg must be of the form
+// "canonical/pkg/path" and the path must be the absolute path to the file. A
+// flag indicates whether this file was user-requested or just from following
+// the import graph.
+func (b *Builder) addFile(pkg string, path string, src []byte, userRequested bool) error {
+	p, err := parser.ParseFile(b.fset, path, src, parser.DeclarationErrors|parser.ParseComments)
 	if err != nil {
 		return err
 	}
-	pkg := filepath.Dir(name)
-	b.parsed[pkg] = append(b.parsed[pkg], parsedFile{name, p})
+	dirPath := filepath.Dir(path)
+	if prev, found := b.absPaths[pkg]; found {
+		if dirPath != prev {
+			return fmt.Errorf("package %q (%s) previously resolved to %s", pkg, dirPath, prev)
+		}
+	} else {
+		b.absPaths[pkg] = dirPath
+	}
+	b.parsed[pkg] = append(b.parsed[pkg], parsedFile{path, p})
 	b.userRequested[pkg] = userRequested
 	for _, c := range p.Comments {
 		position := b.fset.Position(c.End())
@@ -171,8 +196,18 @@ func (b *Builder) AddDir(dir string) error {
 // subdirectories; it returns an error only if the path couldn't be resolved;
 // any directories recursed into without go source are ignored.
 func (b *Builder) AddDirRecursive(dir string) error {
+	// This is a bit of a hack.  The srcDir argument to Import() should
+	// properly be the dir of the file which depends on the package to be
+	// imported, so that vendoring can work properly.  We assume that there is
+	// only one level of vendoring, and that the CWD is inside the GOPATH, so
+	// this should be safe.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("unable to get current directory: %v", err)
+	}
+
 	// First, find it, so we know what path to use.
-	pkg, err := b.context.Import(dir, ".", build.FindOnly)
+	pkg, err := b.context.Import(dir, cwd, build.FindOnly)
 	if err != nil {
 		return fmt.Errorf("unable to *find* %q: %v", dir, err)
 	}
@@ -203,7 +238,6 @@ func (b *Builder) addDir(dir string, userRequested bool) error {
 	if err != nil {
 		return err
 	}
-	dir = pkg.Dir
 	// Check in case this package was added (maybe dir was not canonical)
 	if _, alreadyAdded := b.parsed[dir]; alreadyAdded {
 		return nil
@@ -214,14 +248,13 @@ func (b *Builder) addDir(dir string, userRequested bool) error {
 			continue
 		}
 		absPath := filepath.Join(pkg.Dir, n)
-		pkgPath := filepath.Join(pkg.ImportPath, n)
 		data, err := ioutil.ReadFile(absPath)
 		if err != nil {
 			return fmt.Errorf("while loading %q: %v", absPath, err)
 		}
-		err = b.addFile(pkgPath, data, userRequested)
+		err = b.addFile(dir, absPath, data, userRequested)
 		if err != nil {
-			return fmt.Errorf("while parsing %q: %v", pkgPath, err)
+			return fmt.Errorf("while parsing %q: %v", absPath, err)
 		}
 	}
 	return nil
