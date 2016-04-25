@@ -275,13 +275,6 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 			registeredEndpoints[svcPort] = true
 		}
 	}
-	// Remove endpoints missing from the update.
-	for k := range lb.services {
-		if _, exists := registeredEndpoints[k]; !exists {
-			glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", k)
-			delete(lb.services, k)
-		}
-	}
 }
 
 // Tests whether two slices are equivalent.  This sorts both slices in-place.
