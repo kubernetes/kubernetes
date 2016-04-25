@@ -40,7 +40,6 @@ import (
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
@@ -156,26 +155,20 @@ func TestContainerNaming(t *testing.T) {
 	}
 }
 
-func TestParseImageName(t *testing.T) {
-	tests := []struct {
-		imageName string
-		name      string
-		tag       string
+func TestApplyDefaultImageTag(t *testing.T) {
+	for _, testCase := range []struct {
+		Input  string
+		Output string
 	}{
-		{"ubuntu", "ubuntu", "latest"},
-		{"ubuntu:2342", "ubuntu", "2342"},
-		{"ubuntu:latest", "ubuntu", "latest"},
-		{"foo/bar:445566", "foo/bar", "445566"},
-		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar", "latest"},
-		{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar", "5342"},
-		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar", "latest"},
-	}
-	for _, test := range tests {
-		name, tag, err := parsers.ParseImageName(test.imageName)
+		{Input: "root", Output: "root:latest"},
+		{Input: "root:tag", Output: "root:tag"},
+		{Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+	} {
+		image, err := applyDefaultImageTag(testCase.Input)
 		if err != nil {
-			t.Errorf("ParseImageName(%s) failed: %v", test.imageName, err)
-		} else if name != test.name || tag != test.tag {
-			t.Errorf("Expected name/tag: %s/%s, got %s/%s", test.name, test.tag, name, tag)
+			t.Errorf("applyDefaultTag(%s) failed: %v", testCase.Input, err)
+		} else if image != testCase.Output {
+			t.Errorf("Expected image reference: %q, got %q", testCase.Output, image)
 		}
 	}
 }

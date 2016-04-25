@@ -29,7 +29,6 @@ import (
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
-	dockerfilters "github.com/docker/engine-api/types/filters"
 	"golang.org/x/net/context"
 )
 
@@ -68,26 +67,6 @@ func newKubeDockerClient(dockerClient *dockerapi.Client) DockerInterface {
 // TODO(random-liu): Add timeout and timeout handling mechanism.
 func getDefaultContext() context.Context {
 	return context.Background()
-}
-
-// convertType converts between different types with the same json format.
-func convertType(src interface{}, dst interface{}) error {
-	data, err := json.Marshal(src)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(data, dst)
-}
-
-// convertFilters converts filters to the filter type in engine-api.
-func convertFilters(filters map[string][]string) dockerfilters.Args {
-	args := dockerfilters.NewArgs()
-	for name, fields := range filters {
-		for _, field := range fields {
-			args.Add(name, field)
-		}
-	}
-	return args
 }
 
 func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
@@ -136,8 +115,7 @@ func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
 }
 
 func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
-	opts.ContainerID = id
-	return d.client.ContainerRemove(getDefaultContext(), opts)
+	return d.client.ContainerRemove(getDefaultContext(), id, opts)
 }
 
 func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect, error) {
@@ -177,9 +155,8 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 	if err != nil {
 		return err
 	}
-	opts.ImageID = image
 	opts.RegistryAuth = base64Auth
-	resp, err := d.client.ImagePull(getDefaultContext(), opts, nil)
+	resp, err := d.client.ImagePull(getDefaultContext(), image, opts)
 	if err != nil {
 		return err
 	}
@@ -203,12 +180,11 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 }
 
 func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
-	return d.client.ImageRemove(getDefaultContext(), dockertypes.ImageRemoveOptions{ImageID: image})
+	return d.client.ImageRemove(getDefaultContext(), image, opts)
 }
 
 func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
-	opts.ContainerID = id
-	resp, err := d.client.ContainerLogs(getDefaultContext(), opts)
+	resp, err := d.client.ContainerLogs(getDefaultContext(), id, opts)
 	if err != nil {
 		return err
 	}
@@ -234,8 +210,7 @@ func (d *kubeDockerClient) Info() (*dockertypes.Info, error) {
 
 // TODO(random-liu): Add unit test for exec and attach functions, just like what go-dockerclient did.
 func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
-	opts.Container = id
-	resp, err := d.client.ContainerExecCreate(getDefaultContext(), opts)
+	resp, err := d.client.ContainerExecCreate(getDefaultContext(), id, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -266,8 +241,7 @@ func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 }
 
 func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
-	opts.ContainerID = id
-	resp, err := d.client.ContainerAttach(getDefaultContext(), opts)
+	resp, err := d.client.ContainerAttach(getDefaultContext(), id, opts)
 	if err != nil {
 		return err
 	}
