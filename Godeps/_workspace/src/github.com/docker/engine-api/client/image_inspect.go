@@ -11,7 +11,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-// ImageInspectWithRaw returns the image information and it's raw representation.
+// ImageInspectWithRaw returns the image information and its raw representation.
 func (cli *Client) ImageInspectWithRaw(ctx context.Context, imageID string, getSize bool) (types.ImageInspect, []byte, error) {
 	query := url.Values{}
 	if getSize {

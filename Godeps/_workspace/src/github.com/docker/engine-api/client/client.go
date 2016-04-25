@@ -21,7 +21,7 @@ type Client struct {
 	addr string
 	// basePath holds the path to prepend to the requests.
 	basePath string
-	// transport is the interface to sends request with, it implements transport.Client.
+	// transport is the interface to send request with, it implements transport.Client.
 	transport transport.Client
 	// version of the server to talk to.
 	version string
@@ -97,10 +97,14 @@ func (cli *Client) getAPIPath(p string, query url.Values) string {
 	} else {
 		apiPath = fmt.Sprintf("%s%s", cli.basePath, p)
 	}
-	if len(query) > 0 {
-		apiPath += "?" + query.Encode()
+
+	u := &url.URL{
+		Path: apiPath,
 	}
-	return apiPath
+	if len(query) > 0 {
+		u.RawQuery = query.Encode()
+	}
+	return u.String()
 }
 
 // ClientVersion returns the version string associated with this
@@ -108,6 +112,12 @@ func (cli *Client) getAPIPath(p string, query url.Values) string {
 // via the DOCKER_API_VERSION env var.
 func (cli *Client) ClientVersion() string {
 	return cli.version
+}
+
+// UpdateClientVersion updates the version string associated with this
+// instance of the Client.
+func (cli *Client) UpdateClientVersion(v string) {
+	cli.version = v
 }
 
 // ParseHost verifies that the given host strings is valid.

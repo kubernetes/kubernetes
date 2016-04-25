@@ -32,7 +32,7 @@ func (n NetworkMode) IsHost() bool {
 	return false
 }
 
-// IsPrivate indicates whether container uses it's private network stack.
+// IsPrivate indicates whether container uses its private network stack.
 func (n NetworkMode) IsPrivate() bool {
 	return !(n.IsHost() || n.IsContainer())
 }

@@ -19,7 +19,6 @@ type Config struct {
 	AttachStdout    bool                  // Attach the standard output
 	AttachStderr    bool                  // Attach the standard error
 	ExposedPorts    map[nat.Port]struct{} `json:",omitempty"` // List of exposed ports
-	PublishService  string                `json:",omitempty"` // Name of the network service exposed by the container
 	Tty             bool                  // Attach standard streams to a tty, including stdin if it is not closed.
 	OpenStdin       bool                  // Open stdin
 	StdinOnce       bool                  // If true, close stdin after the 1 attached client disconnects.

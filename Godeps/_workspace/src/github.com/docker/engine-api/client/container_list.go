@@ -35,7 +35,8 @@ func (cli *Client) ContainerList(ctx context.Context, options types.ContainerLis
 	}
 
 	if options.Filter.Len() > 0 {
-		filterJSON, err := filters.ToParam(options.Filter)
+		filterJSON, err := filters.ToParamWithVersion(cli.version, options.Filter)
+
 		if err != nil {
 			return nil, err
 		}
