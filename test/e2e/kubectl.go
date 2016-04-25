@@ -1025,6 +1025,40 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 	})
 
+	framework.KubeDescribe("Kubectl rolling-update", func() {
+		var nsFlag string
+		var rcName string
+		var c *client.Client
+
+		BeforeEach(func() {
+			c = f.Client
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			rcName = "e2e-test-nginx-rc"
+		})
+
+		AfterEach(func() {
+			framework.RunKubectlOrDie("delete", "rc", rcName, nsFlag)
+		})
+
+		It("should support rolling-update to same image [Conformance]", func() {
+			By("running the image " + nginxImage)
+			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
+			By("verifying the rc " + rcName + " was created")
+			rc, err := c.ReplicationControllers(ns).Get(rcName)
+			if err != nil {
+				framework.Failf("Failed getting rc %s: %v", rcName, err)
+			}
+			containers := rc.Spec.Template.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+				framework.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, nginxImage)
+			}
+
+			By("rolling-update to same image controller")
+			framework.RunKubectlOrDie("rolling-update", rcName, "--update-period=1s", "--image="+nginxImage, "--image-pull-policy="+string(api.PullIfNotPresent), nsFlag)
+			framework.ValidateController(c, nginxImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
+		})
+	})
+
 	framework.KubeDescribe("Kubectl run deployment", func() {
 		var nsFlag string
 		var dName string
@@ -1448,6 +1482,8 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 		}
 	}
 }
+
+func noOpValidatorFn(c *client.Client, podID string) error { return nil }
 
 // newBlockingReader returns a reader that allows reading the given string,
 // then blocks until Close() is called on the returned closer.
