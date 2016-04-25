@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -99,6 +100,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		extensions.Kind("Deployment"):               &DeploymentDescriber{adapter.FromUnversionedClient(c)},
 		extensions.Kind("Job"):                      &JobDescriber{c},
 		batch.Kind("Job"):                           &JobDescriber{c},
+		apps.Kind("PetSet"):                         &PetSetDescriber{c},
 		extensions.Kind("Ingress"):                  &IngressDescriber{c},
 	}
 
@@ -1623,6 +1625,46 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		} else {
 			fmt.Fprintf(out, "Pods:\tnot authorized\n")
 		}
+		if events != nil {
+			DescribeEvents(events, out)
+		}
+		return nil
+	})
+}
+
+type PetSetDescriber struct {
+	client *client.Client
+}
+
+func (p *PetSetDescriber) Describe(namespace, name string) (string, error) {
+	ps, err := p.client.Apps().PetSets(namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+	pc := p.client.Pods(namespace)
+
+	selector, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
+	if err != nil {
+		return "", err
+	}
+
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
+	if err != nil {
+		return "", err
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", ps.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", ps.Namespace)
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&ps.Spec.Template.Spec))
+		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(ps.Spec.Selector))
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(ps.Labels))
+		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", ps.Status.Replicas, ps.Spec.Replicas)
+		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(ps.Annotations))
+		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", ps.CreationTimestamp.Time.Format(time.RFC1123Z))
+		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		describeVolumes(ps.Spec.Template.Spec.Volumes, out, "")
+		events, _ := p.client.Events(namespace).Search(ps)
 		if events != nil {
 			DescribeEvents(events, out)
 		}

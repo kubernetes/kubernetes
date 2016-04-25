@@ -117,6 +117,7 @@ func NewPersistentVolumeRecycler(kubeClient clientset.Interface, syncPeriod time
 					glog.Errorf("Error casting object to PersistentVolume: %v", obj)
 					return
 				}
+				recycler.reclaimVolume(pv)
 				recycler.removeReleasedVolume(pv)
 			},
 		},

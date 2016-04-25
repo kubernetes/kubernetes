@@ -276,23 +276,6 @@ func TestValidatePetSetUpdate(t *testing.T) {
 				},
 			},
 		},
-		{
-			old: apps.PetSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
-					Template: validPodTemplate.Template,
-				},
-			},
-			update: apps.PetSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
-					Replicas: 1,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
-					Template: readWriteVolumePodTemplate.Template,
-				},
-			},
-		},
 	}
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
@@ -314,6 +297,23 @@ func TestValidatePetSetUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: apps.PetSetSpec{
 					Replicas: 2,
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Template: readWriteVolumePodTemplate.Template,
+				},
+			},
+		},
+		"updates to a field other than spec.Replicas": {
+			old: apps.PetSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: apps.PetSetSpec{
+					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Template: validPodTemplate.Template,
+				},
+			},
+			update: apps.PetSet{
+				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				Spec: apps.PetSetSpec{
+					Replicas: 1,
 					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 				},

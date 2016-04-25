@@ -56,7 +56,7 @@ func TestListPetSets(t *testing.T) {
 			},
 		},
 	}
-	receivedRSList, err := c.Setup(t).Apps().PetSet(ns).List(api.ListOptions{})
+	receivedRSList, err := c.Setup(t).Apps().PetSets(ns).List(api.ListOptions{})
 	c.Validate(t, receivedRSList, err)
 }
 
@@ -81,14 +81,14 @@ func TestGetPetSet(t *testing.T) {
 			},
 		},
 	}
-	receivedRS, err := c.Setup(t).Apps().PetSet(ns).Get("foo")
+	receivedRS, err := c.Setup(t).Apps().PetSets(ns).Get("foo")
 	c.Validate(t, receivedRS, err)
 }
 
 func TestGetPetSetWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{Error: true}
-	receivedPod, err := c.Setup(t).Apps().PetSet(ns).Get("")
+	receivedPod, err := c.Setup(t).Apps().PetSets(ns).Get("")
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
@@ -120,7 +120,7 @@ func TestUpdatePetSet(t *testing.T) {
 			},
 		},
 	}
-	receivedRS, err := c.Setup(t).Apps().PetSet(ns).Update(requestRS)
+	receivedRS, err := c.Setup(t).Apps().PetSets(ns).Update(requestRS)
 	c.Validate(t, receivedRS, err)
 }
 
@@ -130,7 +130,7 @@ func TestDeletePetSet(t *testing.T) {
 		Request:  simple.Request{Method: "DELETE", Path: testapi.Apps.ResourcePath(getPetSetResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200},
 	}
-	err := c.Setup(t).Apps().PetSet(ns).Delete("foo", nil)
+	err := c.Setup(t).Apps().PetSets(ns).Delete("foo", nil)
 	c.Validate(t, nil, err)
 }
 
@@ -158,7 +158,7 @@ func TestCreatePetSet(t *testing.T) {
 			},
 		},
 	}
-	receivedRS, err := c.Setup(t).Apps().PetSet(ns).Create(requestRS)
+	receivedRS, err := c.Setup(t).Apps().PetSets(ns).Create(requestRS)
 	c.Validate(t, receivedRS, err)
 }
 

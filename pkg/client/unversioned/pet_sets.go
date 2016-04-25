@@ -24,7 +24,7 @@ import (
 
 // PetSetNamespacer has methods to work with PetSet resources in a namespace
 type PetSetNamespacer interface {
-	PetSet(namespace string) PetSetInterface
+	PetSets(namespace string) PetSetInterface
 }
 
 // PetSetInterface exposes methods to work on PetSet resources.
