@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -20,7 +21,7 @@ var headerRegexp = regexp.MustCompile(`\ADocker/.+\s\((.+)\)\z`)
 // ImageBuild sends request to the daemon to build images.
 // The Body in the response implement an io.ReadCloser and it's up to the caller to
 // close it.
-func (cli *Client) ImageBuild(ctx context.Context, options types.ImageBuildOptions) (types.ImageBuildResponse, error) {
+func (cli *Client) ImageBuild(ctx context.Context, buildContext io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error) {
 	query, err := imageBuildOptionsToQuery(options)
 	if err != nil {
 		return types.ImageBuildResponse{}, err
@@ -34,7 +35,7 @@ func (cli *Client) ImageBuild(ctx context.Context, options types.ImageBuildOptio
 	headers.Add("X-Registry-Config", base64.URLEncoding.EncodeToString(buf))
 	headers.Set("Content-Type", "application/tar")
 
-	serverResp, err := cli.postRaw(ctx, "/build", query, options.Context, headers)
+	serverResp, err := cli.postRaw(ctx, "/build", query, buildContext, headers)
 	if err != nil {
 		return types.ImageBuildResponse{}, err
 	}
@@ -101,6 +102,11 @@ func imageBuildOptionsToQuery(options types.ImageBuildOptions) (url.Values, erro
 	}
 	query.Set("buildargs", string(buildArgsJSON))
 
+	labelsJSON, err := json.Marshal(options.Labels)
+	if err != nil {
+		return query, err
+	}
+	query.Set("labels", string(labelsJSON))
 	return query, nil
 }
 

@@ -8,7 +8,7 @@ import (
 	"github.com/docker/engine-api/types"
 )
 
-// ContainerWait pauses execution util a container is exits.
+// ContainerWait pauses execution until a container exits.
 // It returns the API status code as response of its readiness.
 func (cli *Client) ContainerWait(ctx context.Context, containerID string) (int, error) {
 	resp, err := cli.post(ctx, "/containers/"+containerID+"/wait", nil, nil, nil)

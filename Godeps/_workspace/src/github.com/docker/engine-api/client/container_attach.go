@@ -11,7 +11,7 @@ import (
 // It returns a types.HijackedConnection with the hijacked connection
 // and the a reader to get output. It's up to the called to close
 // the hijacked connection by calling types.HijackedResponse.Close.
-func (cli *Client) ContainerAttach(ctx context.Context, options types.ContainerAttachOptions) (types.HijackedResponse, error) {
+func (cli *Client) ContainerAttach(ctx context.Context, container string, options types.ContainerAttachOptions) (types.HijackedResponse, error) {
 	query := url.Values{}
 	if options.Stream {
 		query.Set("stream", "1")
@@ -30,5 +30,5 @@ func (cli *Client) ContainerAttach(ctx context.Context, options types.ContainerA
 	}
 
 	headers := map[string][]string{"Content-Type": {"text/plain"}}
-	return cli.postHijacked(ctx, "/containers/"+options.ContainerID+"/attach", query, nil, headers)
+	return cli.postHijacked(ctx, "/containers/"+container+"/attach", query, nil, headers)
 }
