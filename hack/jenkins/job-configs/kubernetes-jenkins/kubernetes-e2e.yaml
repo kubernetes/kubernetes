@@ -248,6 +248,7 @@
                 export ZONE="us-central1-b"
                 export NUM_NODES=1000
                 export MACHINE_TYPE="n1-highmem-2"
+                export ALLOWED_NOTREADY_NODES="10"
     jobs:
         - 'kubernetes-e2e-{suffix}'
 
