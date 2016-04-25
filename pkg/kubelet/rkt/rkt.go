@@ -200,6 +200,7 @@ func New(
 		livenessManager:     livenessManager,
 		volumeGetter:        volumeGetter,
 		execer:              execer,
+		os:                  os,
 		touchPath:           touchPath,
 	}
 
