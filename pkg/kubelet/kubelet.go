@@ -1415,7 +1415,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 // Make the environment variables for a pod in the given namespace.
 func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Container, podIP string) ([]kubecontainer.EnvVar, error) {
 	var result []kubecontainer.EnvVar
-	// Note:  These are added to the docker.Config, but are not included in the checksum computed
+	// Note:  These are added to the docker Config, but are not included in the checksum computed
 	// by dockertools.BuildDockerName(...).  That way, we can still determine whether an
 	// api.Container is already running by its hash. (We don't want to restart a container just
 	// because some service changed.)
