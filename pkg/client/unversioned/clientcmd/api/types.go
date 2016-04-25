@@ -45,6 +45,8 @@ type Config struct {
 	Contexts map[string]*Context `json:"contexts"`
 	// CurrentContext is the name of the context that you would like to use by default
 	CurrentContext string `json:"current-context"`
+	// PreviousContext is the name of the context previously used
+	PreviousContext string `json:"previous-context"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
 }

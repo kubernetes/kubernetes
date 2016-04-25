@@ -53,6 +53,7 @@ func init() {
 
 		func(in *Config, out *api.Config, s conversion.Scope) error {
 			out.CurrentContext = in.CurrentContext
+			out.PreviousContext = in.PreviousContext
 			if err := s.Convert(&in.Preferences, &out.Preferences, 0); err != nil {
 				return err
 			}
@@ -77,6 +78,7 @@ func init() {
 		},
 		func(in *api.Config, out *Config, s conversion.Scope) error {
 			out.CurrentContext = in.CurrentContext
+			out.PreviousContext = in.PreviousContext
 			if err := s.Convert(&in.Preferences, &out.Preferences, 0); err != nil {
 				return err
 			}
