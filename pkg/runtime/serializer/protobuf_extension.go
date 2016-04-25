@@ -21,11 +21,14 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/serializer/protobuf"
 )
 
-// contentTypeProtobuf is the protobuf type exposed for Kubernetes. It is private to prevent others from
-// depending on it unintentionally.
-// TODO: potentially move to pkg/api (since it's part of the Kube public API) and pass it in to the
-//   CodecFactory on initialization.
-const contentTypeProtobuf = "application/vnd.kubernetes.protobuf"
+const (
+	// contentTypeProtobuf is the protobuf type exposed for Kubernetes. It is private to prevent others from
+	// depending on it unintentionally.
+	// TODO: potentially move to pkg/api (since it's part of the Kube public API) and pass it in to the
+	//   CodecFactory on initialization.
+	contentTypeProtobuf      = "application/vnd.kubernetes.protobuf"
+	contentTypeProtobufWatch = contentTypeProtobuf + ";stream=watch"
+)
 
 func protobufSerializer(scheme *runtime.Scheme) (serializerType, bool) {
 	serializer := protobuf.NewSerializer(scheme, runtime.ObjectTyperToTyper(scheme), contentTypeProtobuf)
@@ -36,6 +39,11 @@ func protobufSerializer(scheme *runtime.Scheme) (serializerType, bool) {
 		FileExtensions:     []string{"pb"},
 		Serializer:         serializer,
 		RawSerializer:      raw,
+
+		AcceptStreamContentTypes: []string{contentTypeProtobuf, contentTypeProtobufWatch},
+		StreamContentType:        contentTypeProtobufWatch,
+		Framer:                   protobuf.LengthDelimitedFramer,
+		StreamSerializer:         raw,
 	}, true
 }
 

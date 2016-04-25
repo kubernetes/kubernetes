@@ -31,7 +31,7 @@ import (
 
 // NewSerializer creates a JSON serializer that handles encoding versioned objects into the proper JSON form. If typer
 // is not nil, the object has the group, version, and kind fields set.
-func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer, pretty bool) runtime.Serializer {
+func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer, pretty bool) *Serializer {
 	return &Serializer{
 		meta:    meta,
 		creater: creater,
@@ -44,7 +44,7 @@ func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtim
 // NewYAMLSerializer creates a YAML serializer that handles encoding versioned objects into the proper YAML form. If typer
 // is not nil, the object has the group, version, and kind fields set. This serializer supports only the subset of YAML that
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
-func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer) runtime.Serializer {
+func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer) *Serializer {
 	return &Serializer{
 		meta:    meta,
 		creater: creater,
@@ -194,30 +194,56 @@ func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
 	return ok, nil
 }
 
-// NewFrameWriter implements stream framing for this serializer
-func (s *Serializer) NewFrameWriter(w io.Writer) io.Writer {
-	if s.yaml {
-		// TODO: needs document framing
-		return nil
-	}
-	// we can write JSON objects directly to the writer, because they are self-framing
-	return w
-}
-
-// NewFrameReader implements stream framing for this serializer
-func (s *Serializer) NewFrameReader(r io.Reader) io.Reader {
-	if s.yaml {
-		// TODO: needs document framing
-		return nil
-	}
-	// we need to extract the JSON chunks of data to pass to Decode()
-	return framer.NewJSONFramedReader(r)
-}
-
 // EncodesAsText returns true because both JSON and YAML are considered textual representations
 // of data. This is used to determine whether the serialized object should be transmitted over
 // a WebSocket Text or Binary frame. This must remain true for legacy compatibility with v1.1
 // watch over websocket implementations.
 func (s *Serializer) EncodesAsText() bool {
 	return true
+}
+
+// Framer is the default JSON framing behavior, with newlines delimiting individual objects.
+var Framer = jsonFramer{}
+
+type jsonFramer struct{}
+
+// NewFrameWriter implements stream framing for this serializer
+func (jsonFramer) NewFrameWriter(w io.Writer) io.Writer {
+	// we can write JSON objects directly to the writer, because they are self-framing
+	return w
+}
+
+// NewFrameReader implements stream framing for this serializer
+func (jsonFramer) NewFrameReader(r io.Reader) io.Reader {
+	// we need to extract the JSON chunks of data to pass to Decode()
+	return framer.NewJSONFramedReader(r)
+}
+
+// Framer is the default JSON framing behavior, with newlines delimiting individual objects.
+var YAMLFramer = yamlFramer{}
+
+type yamlFramer struct{}
+
+// NewFrameWriter implements stream framing for this serializer
+func (yamlFramer) NewFrameWriter(w io.Writer) io.Writer {
+	return yamlFrameWriter{w}
+}
+
+// NewFrameReader implements stream framing for this serializer
+func (yamlFramer) NewFrameReader(r io.Reader) io.Reader {
+	// extract the YAML document chunks directly
+	return utilyaml.NewDocumentDecoder(r)
+}
+
+type yamlFrameWriter struct {
+	w io.Writer
+}
+
+// Write separates each document with the YAML document separator (`---` followed by line
+// break). Writers must write well formed YAML documents (include a final line break).
+func (w yamlFrameWriter) Write(data []byte) (n int, err error) {
+	if _, err := w.w.Write([]byte("---\n")); err != nil {
+		return 0, err
+	}
+	return w.w.Write(data)
 }
