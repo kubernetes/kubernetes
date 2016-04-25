@@ -80,12 +80,37 @@ type ParameterCodec interface {
 	EncodeParameters(obj Object, to unversioned.GroupVersion) (url.Values, error)
 }
 
+// Framer is a factory for creating readers and writers that obey a particular framing pattern.
+type Framer interface {
+	NewFrameReader(r io.Reader) io.Reader
+	NewFrameWriter(w io.Writer) io.Writer
+}
+
 // NegotiatedSerializer is an interface used for obtaining encoders, decoders, and serializers
 // for multiple supported media types.
 type NegotiatedSerializer interface {
+	// SupportedMediaTypes is the media types supported for reading and writing single objects.
 	SupportedMediaTypes() []string
+	// SerializerForMediaType returns a serializer for the provided media type.  Options is a set of
+	// parameters applied to the media type that may modify the resulting output.
 	SerializerForMediaType(mediaType string, options map[string]string) (Serializer, bool)
+
+	// SupportedStreamingMediaTypes returns the media types of the supported streaming serializers.
+	// Streaming serializers control how multiple objects are written to a stream output.
+	SupportedStreamingMediaTypes() []string
+	// StreamingSerializerForMediaType returns a serializer for the provided media type that supports
+	// reading and writing multiple objects to a stream. It returns a framer and serializer, or an
+	// error if no such serializer can be created. Options is a set of parameters applied to the
+	// media type that may modify the resulting output.
+	StreamingSerializerForMediaType(mediaType string, options map[string]string) (Serializer, Framer, string, bool)
+
+	// EncoderForVersion returns an encoder that ensures objects being written to the provided
+	// serializer are in the provided group version.
+	// TODO: take multiple group versions
 	EncoderForVersion(serializer Serializer, gv unversioned.GroupVersion) Encoder
+	// DecoderForVersion returns a decoder that ensures objects being read by the provided
+	// serializer are in the provided group version by default.
+	// TODO: take multiple group versions
 	DecoderToVersion(serializer Serializer, gv unversioned.GroupVersion) Decoder
 }
 

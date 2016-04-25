@@ -62,6 +62,13 @@ func DeepCopy_serializer_CodecFactory(in CodecFactory, out *CodecFactory, c *con
 	} else {
 		out.accepts = nil
 	}
+	if in.streamingAccepts != nil {
+		in, out := in.streamingAccepts, &out.streamingAccepts
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.streamingAccepts = nil
+	}
 	if in.legacySerializer == nil {
 		out.legacySerializer = nil
 	} else if newVal, err := c.DeepCopy(in.legacySerializer); err != nil {

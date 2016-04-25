@@ -27,30 +27,51 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func negotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.Serializer, string, error) {
+func negotiateOutput(req *http.Request, supported []string) (string, map[string]string, error) {
 	acceptHeader := req.Header.Get("Accept")
-	supported := ns.SupportedMediaTypes()
 	if len(acceptHeader) == 0 && len(supported) > 0 {
 		acceptHeader = supported[0]
 	}
 	accept, ok := negotiate(acceptHeader, supported)
 	if !ok {
-		return nil, "", errNotAcceptable{supported}
+		return "", nil, errNotAcceptable{supported}
 	}
 
 	pretty := isPrettyPrint(req)
 	if _, ok := accept.Params["pretty"]; !ok && pretty {
 		accept.Params["pretty"] = "1"
 	}
+
 	mediaType := accept.Type
 	if len(accept.SubType) > 0 {
 		mediaType += "/" + accept.SubType
 	}
-	if s, ok := ns.SerializerForMediaType(mediaType, accept.Params); ok {
+
+	return mediaType, accept.Params, nil
+}
+
+func negotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.Serializer, string, error) {
+	supported := ns.SupportedMediaTypes()
+	mediaType, params, err := negotiateOutput(req, supported)
+	if err != nil {
+		return nil, "", err
+	}
+	if s, ok := ns.SerializerForMediaType(mediaType, params); ok {
 		return s, mediaType, nil
 	}
-
 	return nil, "", errNotAcceptable{supported}
+}
+
+func negotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.Serializer, runtime.Framer, string, string, error) {
+	supported := ns.SupportedMediaTypes()
+	mediaType, params, err := negotiateOutput(req, supported)
+	if err != nil {
+		return nil, nil, "", "", err
+	}
+	if s, f, exactMediaType, ok := ns.StreamingSerializerForMediaType(mediaType, params); ok {
+		return s, f, mediaType, exactMediaType, nil
+	}
+	return nil, nil, "", "", errNotAcceptable{supported}
 }
 
 func negotiateInputSerializer(req *http.Request, s runtime.NegotiatedSerializer) (runtime.Serializer, error) {
