@@ -21,11 +21,14 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestDecodeUnstructured(t *testing.T) {
@@ -44,7 +47,13 @@ func TestDecodeUnstructured(t *testing.T) {
 				Raw:         []byte(rawJson),
 				ContentType: runtime.ContentTypeJSON,
 			},
-			&runtime.Unstructured{TypeMeta: runtime.TypeMeta{Kind: "Foo", APIVersion: "Bar"}, Object: map[string]interface{}{"test": "value"}},
+			&runtime.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "Foo",
+					"apiVersion": "Bar",
+					"test":       "value",
+				},
+			},
 		},
 	}
 	if errs := runtime.DecodeList(pl.Items, runtime.UnstructuredJSONScheme); len(errs) == 1 {
@@ -66,36 +75,21 @@ func TestDecode(t *testing.T) {
 		{
 			json: []byte(`{"apiVersion": "test", "kind": "test_kind"}`),
 			want: &runtime.Unstructured{
-				TypeMeta: runtime.TypeMeta{
-					APIVersion: "test",
-					Kind:       "test_kind",
-				},
 				Object: map[string]interface{}{"apiVersion": "test", "kind": "test_kind"},
 			},
 		},
 		{
 			json: []byte(`{"apiVersion": "test", "kind": "test_list", "items": []}`),
 			want: &runtime.UnstructuredList{
-				TypeMeta: runtime.TypeMeta{
-					APIVersion: "test",
-					Kind:       "test_list",
-				},
+				Object: map[string]interface{}{"apiVersion": "test", "kind": "test_list"},
 			},
 		},
 		{
 			json: []byte(`{"items": [{"metadata": {"name": "object1"}, "apiVersion": "test", "kind": "test_kind"}, {"metadata": {"name": "object2"}, "apiVersion": "test", "kind": "test_kind"}], "apiVersion": "test", "kind": "test_list"}`),
 			want: &runtime.UnstructuredList{
-				TypeMeta: runtime.TypeMeta{
-					APIVersion: "test",
-					Kind:       "test_list",
-				},
+				Object: map[string]interface{}{"apiVersion": "test", "kind": "test_list"},
 				Items: []*runtime.Unstructured{
 					{
-						TypeMeta: runtime.TypeMeta{
-							APIVersion: "test",
-							Kind:       "test_kind",
-						},
-						Name: "object1",
 						Object: map[string]interface{}{
 							"metadata":   map[string]interface{}{"name": "object1"},
 							"apiVersion": "test",
@@ -103,11 +97,6 @@ func TestDecode(t *testing.T) {
 						},
 					},
 					{
-						TypeMeta: runtime.TypeMeta{
-							APIVersion: "test",
-							Kind:       "test_kind",
-						},
-						Name: "object2",
 						Object: map[string]interface{}{
 							"metadata":   map[string]interface{}{"name": "object2"},
 							"apiVersion": "test",
@@ -129,6 +118,177 @@ func TestDecode(t *testing.T) {
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("Decode(%q) want: %v\ngot: %v", string(tc.json), tc.want, got)
 		}
+	}
+}
+
+func TestUnstructuredGetters(t *testing.T) {
+	unstruct := runtime.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "test_kind",
+			"apiVersion": "test_version",
+			"metadata": map[string]interface{}{
+				"name":              "test_name",
+				"namespace":         "test_namespace",
+				"generateName":      "test_generateName",
+				"uid":               "test_uid",
+				"resourceVersion":   "test_resourceVersion",
+				"selfLink":          "test_selfLink",
+				"creationTimestamp": "2009-11-10T23:00:00Z",
+				"deletionTimestamp": "2010-11-10T23:00:00Z",
+				"labels": map[string]interface{}{
+					"test_label": "test_value",
+				},
+				"annotations": map[string]interface{}{
+					"test_annotation": "test_value",
+				},
+			},
+		},
+	}
+
+	if got, want := unstruct.GetAPIVersion(), "test_version"; got != want {
+		t.Errorf("GetAPIVersions() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetKind(), "test_kind"; got != want {
+		t.Errorf("GetKind() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetNamespace(), "test_namespace"; got != want {
+		t.Errorf("GetNamespace() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetName(), "test_name"; got != want {
+		t.Errorf("GetName() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetGenerateName(), "test_generateName"; got != want {
+		t.Errorf("GetGenerateName() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetUID(), types.UID("test_uid"); got != want {
+		t.Errorf("GetUID() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetResourceVersion(), "test_resourceVersion"; got != want {
+		t.Errorf("GetResourceVersion() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetSelfLink(), "test_selfLink"; got != want {
+		t.Errorf("GetSelfLink() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetCreationTimestamp(), unversioned.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Errorf("GetCreationTimestamp() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetDeletionTimestamp(), unversioned.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC); got == nil || !got.Equal(want) {
+		t.Errorf("GetDeletionTimestamp() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetLabels(), map[string]string{"test_label": "test_value"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("GetLabels() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetAnnotations(), map[string]string{"test_annotation": "test_value"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("GetAnnotations() = %s, want %s", got, want)
+	}
+}
+
+func TestUnstructuredSetters(t *testing.T) {
+	unstruct := runtime.Unstructured{}
+
+	want := runtime.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "test_kind",
+			"apiVersion": "test_version",
+			"metadata": map[string]interface{}{
+				"name":              "test_name",
+				"namespace":         "test_namespace",
+				"generateName":      "test_generateName",
+				"uid":               "test_uid",
+				"resourceVersion":   "test_resourceVersion",
+				"selfLink":          "test_selfLink",
+				"creationTimestamp": "2009-11-10T23:00:00Z",
+				"deletionTimestamp": "2010-11-10T23:00:00Z",
+				"labels": map[string]interface{}{
+					"test_label": "test_value",
+				},
+				"annotations": map[string]interface{}{
+					"test_annotation": "test_value",
+				},
+			},
+		},
+	}
+
+	unstruct.SetAPIVersion("test_version")
+	unstruct.SetKind("test_kind")
+	unstruct.SetNamespace("test_namespace")
+	unstruct.SetName("test_name")
+	unstruct.SetGenerateName("test_generateName")
+	unstruct.SetUID(types.UID("test_uid"))
+	unstruct.SetResourceVersion("test_resourceVersion")
+	unstruct.SetSelfLink("test_selfLink")
+	unstruct.SetCreationTimestamp(unversioned.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
+	date := unversioned.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC)
+	unstruct.SetDeletionTimestamp(&date)
+	unstruct.SetLabels(map[string]string{"test_label": "test_value"})
+	unstruct.SetAnnotations(map[string]string{"test_annotation": "test_value"})
+
+	if !reflect.DeepEqual(unstruct, want) {
+		t.Errorf("Wanted: \n%s\n Got:\n%s", unstruct, want)
+	}
+}
+
+func TestUnstructuredListGetters(t *testing.T) {
+	unstruct := runtime.UnstructuredList{
+		Object: map[string]interface{}{
+			"kind":       "test_kind",
+			"apiVersion": "test_version",
+			"metadata": map[string]interface{}{
+				"resourceVersion": "test_resourceVersion",
+				"selfLink":        "test_selfLink",
+			},
+		},
+	}
+
+	if got, want := unstruct.GetAPIVersion(), "test_version"; got != want {
+		t.Errorf("GetAPIVersions() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetKind(), "test_kind"; got != want {
+		t.Errorf("GetKind() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetResourceVersion(), "test_resourceVersion"; got != want {
+		t.Errorf("GetResourceVersion() = %s, want %s", got, want)
+	}
+
+	if got, want := unstruct.GetSelfLink(), "test_selfLink"; got != want {
+		t.Errorf("GetSelfLink() = %s, want %s", got, want)
+	}
+}
+
+func TestUnstructuredListSetters(t *testing.T) {
+	unstruct := runtime.UnstructuredList{}
+
+	want := runtime.UnstructuredList{
+		Object: map[string]interface{}{
+			"kind":       "test_kind",
+			"apiVersion": "test_version",
+			"metadata": map[string]interface{}{
+				"resourceVersion": "test_resourceVersion",
+				"selfLink":        "test_selfLink",
+			},
+		},
+	}
+
+	unstruct.SetAPIVersion("test_version")
+	unstruct.SetKind("test_kind")
+	unstruct.SetResourceVersion("test_resourceVersion")
+	unstruct.SetSelfLink("test_selfLink")
+
+	if !reflect.DeepEqual(unstruct, want) {
+		t.Errorf("Wanted: \n%s\n Got:\n%s", unstruct, want)
 	}
 }
 

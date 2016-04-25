@@ -177,3 +177,5 @@ type RESTMapper interface {
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
 }
+
+var _ Object = &runtime.Unstructured{}
