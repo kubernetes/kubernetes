@@ -19,7 +19,7 @@ script
 	set -o nounset
 
 	# Fetch the script for installing master binary and configuration files.
-	curl --fail --silent --show-error \
+	curl --fail --retry 5 --retry-delay 3 --silent --show-error \
 		-H "X-Google-Metadata-Request: True" \
 		-o /etc/kube-configure.sh \
 		http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
