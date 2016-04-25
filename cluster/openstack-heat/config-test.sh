@@ -16,4 +16,4 @@
 
 ## Contains configuration values for interacting with the Ubuntu cluster in test mode
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/openstack/config-default.sh"
+source "${KUBE_ROOT}/cluster/openstack-heat/config-default.sh"
