@@ -56,12 +56,14 @@ func (cli *Client) delete(ctx context.Context, path string, query url.Values, he
 }
 
 func (cli *Client) sendRequest(ctx context.Context, method, path string, query url.Values, obj interface{}, headers map[string][]string) (*serverResponse, error) {
-	body, err := encodeData(obj)
-	if err != nil {
-		return nil, err
-	}
+	var body io.Reader
 
-	if body != nil {
+	if obj != nil {
+		var err error
+		body, err = encodeData(obj)
+		if err != nil {
+			return nil, err
+		}
 		if headers == nil {
 			headers = make(map[string][]string)
 		}
@@ -83,6 +85,11 @@ func (cli *Client) sendClientRequest(ctx context.Context, method, path string, q
 	}
 
 	req, err := cli.newRequest(method, path, query, body, headers)
+	if cli.proto == "unix" || cli.proto == "npipe" {
+		// For local communications, it doesn't matter what the host is. We just
+		// need a valid and meaningful host name. (See #189)
+		req.Host = "docker"
+	}
 	req.URL.Host = cli.addr
 	req.URL.Scheme = cli.transport.Scheme()
 
