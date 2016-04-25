@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"reflect"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
@@ -31,6 +33,9 @@ import (
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidatePetSetName(name string, prefix bool) (bool, string) {
+	// TODO: Validate that there's name for the suffix inserted by the pets.
+	// Currently this is just "-index". In the future we may allow a user
+	// specified list of suffixes and we need  to validate the longest one.
 	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
 
@@ -96,8 +101,22 @@ func ValidatePetSet(petSet *apps.PetSet) field.ErrorList {
 // ValidatePetSetUpdate tests if required fields in the PetSet are set.
 func ValidatePetSetUpdate(petSet, oldPetSet *apps.PetSet) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&petSet.ObjectMeta, &oldPetSet.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, ValidatePetSetSpec(&petSet.Spec, field.NewPath("spec"))...)
+
+	// TODO: For now we're taking the safe route and disallowing all updates to spec except for Spec.Replicas.
+	// Enable on a case by case basis.
+	restoreReplicas := petSet.Spec.Replicas
+	petSet.Spec.Replicas = oldPetSet.Spec.Replicas
+
+	// The generation changes for this update
+	restoreGeneration := petSet.Generation
+	petSet.Generation = oldPetSet.Generation
+
+	if !reflect.DeepEqual(petSet, oldPetSet) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to petset spec for fields other than 'replicas' are forbidden."))
+	}
+	petSet.Spec.Replicas = restoreReplicas
+	petSet.Generation = restoreGeneration
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(petSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
 	return allErrs
 }
 
