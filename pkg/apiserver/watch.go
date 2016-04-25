@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/pkg/watch/versioned"
@@ -180,15 +181,25 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
+	defer flusher.Flush()
 
+	delay := wait.NewChannelDelayedAction(
+		wait.Interval{Count: 10, Interval: 100 * time.Millisecond},
+		wait.Interval{Count: 100, Interval: 500 * time.Millisecond},
+	)
+
+	watchCh := s.watching.ResultChan()
 	buf := &bytes.Buffer{}
 	for {
 		select {
 		case <-cn.CloseNotify():
 			return
+		case <-delay.After():
+			delay.Done()
+			flusher.Flush()
 		case <-timeoutCh:
 			return
-		case event, ok := <-s.watching.ResultChan():
+		case event, ok := <-watchCh:
 			if !ok {
 				// End of results.
 				return
@@ -210,7 +221,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// client disconnect.
 				return
 			}
-			flusher.Flush()
+			if len(watchCh) == 0 && delay.Run() {
+				flusher.Flush()
+			}
 
 			buf.Reset()
 		}
