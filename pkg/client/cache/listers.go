@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
@@ -556,4 +557,68 @@ func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id st
 	}
 
 	return o.(*api.PersistentVolumeClaim), nil
+}
+
+// StoreToPetSetLister gives a store List and Exists methods. The store must contain only PetSets.
+type StoreToPetSetLister struct {
+	Store
+}
+
+// Exists checks if the given PetSet exists in the store.
+func (s *StoreToPetSetLister) Exists(ps *apps.PetSet) (bool, error) {
+	_, exists, err := s.Store.Get(ps)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// List lists all PetSets in the store.
+func (s *StoreToPetSetLister) List() (psList []apps.PetSet, err error) {
+	for _, ps := range s.Store.List() {
+		psList = append(psList, *(ps.(*apps.PetSet)))
+	}
+	return psList, nil
+}
+
+type storePetSetsNamespacer struct {
+	store     Store
+	namespace string
+}
+
+func (s *StoreToPetSetLister) PetSets(namespace string) storePetSetsNamespacer {
+	return storePetSetsNamespacer{s.Store, namespace}
+}
+
+// GetPodPetSets returns a list of PetSets managing a pod. Returns an error only if no matching PetSets are found.
+func (s *StoreToPetSetLister) GetPodPetSets(pod *api.Pod) (psList []apps.PetSet, err error) {
+	var selector labels.Selector
+	var ps apps.PetSet
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no PetSets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		ps = *m.(*apps.PetSet)
+		if ps.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
+		if err != nil {
+			err = fmt.Errorf("invalid selector: %v", err)
+			return
+		}
+
+		// If a PetSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		psList = append(psList, ps)
+	}
+	if len(psList) == 0 {
+		err = fmt.Errorf("could not find PetSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
 }

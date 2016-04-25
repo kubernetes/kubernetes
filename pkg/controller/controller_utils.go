@@ -413,15 +413,15 @@ func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *a
 	return r.createPods(nodeName, namespace, template, object)
 }
 
-func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Object) (*api.Pod, error) {
 	desiredLabels := getPodsLabelSet(template)
-	desiredAnnotations, err := getPodsAnnotationSet(template, object)
+	desiredAnnotations, err := getPodsAnnotationSet(template, parentObject)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	accessor, err := meta.Accessor(object)
+	accessor, err := meta.Accessor(parentObject)
 	if err != nil {
-		return fmt.Errorf("object does not have ObjectMeta, %v", err)
+		return nil, fmt.Errorf("parentObject does not have ObjectMeta, %v", err)
 	}
 	prefix := getPodsPrefix(accessor.GetName())
 
@@ -433,7 +433,15 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 		},
 	}
 	if err := api.Scheme.Convert(&template.Spec, &pod.Spec); err != nil {
-		return fmt.Errorf("unable to convert pod template: %v", err)
+		return nil, fmt.Errorf("unable to convert pod template: %v", err)
+	}
+	return pod, nil
+}
+
+func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+	pod, err := GetPodFromTemplate(template, object)
+	if err != nil {
+		return err
 	}
 	if len(nodeName) != 0 {
 		pod.Spec.NodeName = nodeName
@@ -445,6 +453,11 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *api.Pod
 		r.Recorder.Eventf(object, api.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create pods: %v", err)
 	} else {
+		accessor, err := meta.Accessor(object)
+		if err != nil {
+			glog.Errorf("parentObject does not have ObjectMeta, %v", err)
+			return nil
+		}
 		glog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
 		r.Recorder.Eventf(object, api.EventTypeNormal, "SuccessfulCreate", "Created pod: %v", newPod.Name)
 	}

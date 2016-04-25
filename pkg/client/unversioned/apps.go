@@ -32,7 +32,7 @@ type AppsClient struct {
 	*restclient.RESTClient
 }
 
-func (c *AppsClient) PetSet(namespace string) PetSetInterface {
+func (c *AppsClient) PetSets(namespace string) PetSetInterface {
 	return newPetSet(c, namespace)
 }
 

@@ -64,6 +64,7 @@ func TestPetSetStrategy(t *testing.T) {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 
+	// Just Spec.Replicas is allowed to change
 	validPs := &apps.PetSet{
 		ObjectMeta: api.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace},
 		Spec: apps.PetSetSpec{
@@ -72,6 +73,13 @@ func TestPetSetStrategy(t *testing.T) {
 		},
 		Status: apps.PetSetStatus{Replicas: 4},
 	}
+	Strategy.PrepareForUpdate(validPs, ps)
+	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
+	if len(errs) != 0 {
+		t.Errorf("Updating spec.Replicas is allowed on a petset.")
+	}
+
+	validPs.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "bar"}}
 	Strategy.PrepareForUpdate(validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 	if len(errs) == 0 {
