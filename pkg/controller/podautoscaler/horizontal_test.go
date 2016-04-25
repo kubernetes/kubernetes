@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"math"
 	"testing"
 	"time"
 
@@ -38,9 +39,14 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
-	heapster "k8s.io/heapster/api/v1/types"
-
+	glog "github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
+	heapster "k8s.io/heapster/api/v1/types"
+)
+
+// unit tests need tolerance awareness to calibrate.
+const (
+	tolerance = .1
 )
 
 func (w fakeResponseWrapper) DoRaw() ([]byte, error) {
@@ -379,13 +385,6 @@ func (tc *testCase) runTest(t *testing.T) {
 	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: testClient.Core().Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
 
-	hpaController := &HorizontalController{
-		metricsClient:   metricsClient,
-		eventRecorder:   recorder,
-		scaleNamespacer: testClient.Extensions(),
-		hpaNamespacer:   testClient.Extensions(),
-	}
-
 	store, frameworkController := newInformer(hpaController, time.Minute)
 	hpaController.store = store
 	hpaController.controller = frameworkController
@@ -395,6 +394,9 @@ func (tc *testCase) runTest(t *testing.T) {
 	go hpaController.Run(stop)
 
 	tc.Lock()
+	hpaController := NewHorizontalController(testClient, testClient.Extensions(), testClient.Extensions(), metricsClient, tolerance, time.Second, time.Second)
+	err := hpaController.reconcileAutoscalers()
+	assert.Equal(t, nil, err)
 	if tc.verifyEvents {
 		tc.Unlock()
 		// We need to wait for events to be broadcasted (sleep for longer than record.sleepDuration).
@@ -746,4 +748,74 @@ func TestEventNotCreated(t *testing.T) {
 	tc.runTest(t)
 }
 
-// TODO: add more tests
+// TestComputedToleranceAlgImplementation is a regression test which
+// back-calculates a minimal percentage for downscaling based on a small percentage
+// increase in pod utilization which is calibrated against the tolerance value.
+func TestComputedToleranceAlgImplementation(t *testing.T) {
+
+	startPods := 10
+	// 150 mCPU per pod.
+	totalUsedCPUOfAllPods := uint64(startPods * 150)
+	// Each pod starts out asking for 2X what is really needed.
+	// This means we will have a 50% ratio of used/requested
+	totalRequestedCPUOfAllPods := 2 * totalUsedCPUOfAllPods
+	requestedToUsed := float64(totalRequestedCPUOfAllPods / totalUsedCPUOfAllPods)
+	// Spread the amount we ask over 10 pods.  We can add some jitter later in reportedLevels.
+	perPodRequested := int(totalRequestedCPUOfAllPods) / startPods
+
+	// Force a minimal scaling event by satisfying  (tolerance < 1 - resourcesUsedRatio).
+	target := math.Abs(1/(requestedToUsed*(1-tolerance))) + .01
+	finalCpuPercentTarget := int(target * 100)
+	resourcesUsedRatio := float64(totalUsedCPUOfAllPods) / float64(float64(totalRequestedCPUOfAllPods)*target)
+	// the autoscaler will compare this vs. tolearnce.  Lets calculate the usageRatio, which will be
+	// compared w tolerance.
+	usageRatioToleranceValue := float64(1 - resourcesUsedRatio)
+	// i.e. .60 * 20 -> scaled down expectation.
+	finalPods := math.Ceil(resourcesUsedRatio * float64(startPods))
+
+	glog.Infof("To breach tolerance %f we will create a utilization ratio difference of %f", tolerance, usageRatioToleranceValue)
+	tc := testCase{
+		minReplicas:     0,
+		maxReplicas:     1000,
+		initialReplicas: startPods,
+		desiredReplicas: int(finalPods),
+		CPUTarget:       finalCpuPercentTarget,
+		reportedLevels: []uint64{
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+		},
+		reportedCPURequests: []resource.Quantity{
+			resource.MustParse(fmt.Sprint(perPodRequested+100) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-100) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+10) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-10) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+2) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-2) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+1) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-1) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
+		},
+	}
+
+	tc.runTest(t)
+
+	// Reuse the data structure above, now testing "unscaling".
+	glog.Infof("Now, we test that no scaling happens if we are in a very close margin to the tolerance.")
+	target = math.Abs(1/(requestedToUsed*(1-tolerance))) + .004
+	finalCpuPercentTarget = int(target * 100)
+	tc.CPUTarget = finalCpuPercentTarget
+	tc.initialReplicas = startPods
+	tc.desiredReplicas = startPods
+	tc.runTest(t)
+}
+
+// TODO: add more tests, e.g., enforcement of upscal/downscale window.
