@@ -275,6 +275,14 @@ func (s *Scheme) New(kind unversioned.GroupVersionKind) (Object, error) {
 	return nil, &notRegisteredErr{gvk: kind}
 }
 
+// AddGenericConversionFunc adds a function that accepts the ConversionFunc call pattern
+// (for two conversion types) to the converter. These functions are checked first during
+// a normal conversion, but are otherwise not called. Use AddConversionFuncs when registering
+// typed conversions.
+func (s *Scheme) AddGenericConversionFunc(fn conversion.GenericConversionFunc) {
+	s.converter.AddGenericConversionFunc(fn)
+}
+
 // Log sets a logger on the scheme. For test purposes only
 func (s *Scheme) Log(l conversion.DebugLogger) {
 	s.converter.Debug = l
