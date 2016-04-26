@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package json
+package versioned_test
 
 import (
 	"encoding/json"
@@ -25,8 +25,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 func TestDecoder(t *testing.T) {
@@ -34,7 +36,8 @@ func TestDecoder(t *testing.T) {
 
 	for _, eventType := range table {
 		out, in := io.Pipe()
-		decoder := NewDecoder(out, testapi.Default.Codec())
+		codec := testapi.Default.Codec()
+		decoder := versioned.NewDecoder(streaming.NewDecoder(out, codec), codec)
 
 		expect := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
@@ -43,7 +46,11 @@ func TestDecoder(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
-			if err := encoder.Encode(&WatchEvent{eventType, runtime.RawExtension{Raw: json.RawMessage(data)}}); err != nil {
+			event := versioned.Event{
+				Type:   string(eventType),
+				Object: runtime.RawExtension{Raw: json.RawMessage(data)},
+			}
+			if err := encoder.Encode(&event); err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
 			in.Close()
@@ -82,7 +89,8 @@ func TestDecoder(t *testing.T) {
 
 func TestDecoder_SourceClose(t *testing.T) {
 	out, in := io.Pipe()
-	decoder := NewDecoder(out, testapi.Default.Codec())
+	codec := testapi.Default.Codec()
+	decoder := versioned.NewDecoder(streaming.NewDecoder(out, codec), codec)
 
 	done := make(chan struct{})
 

@@ -224,7 +224,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	// Setup a fake server to listen for requests, and run the ReplicaSet controller in steady state
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: "",
+		ResponseBody: "{}",
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
@@ -266,7 +266,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	// This is a happy server just to record the PUT request we expect for status.Replicas
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: "",
+		ResponseBody: "{}",
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
@@ -311,7 +311,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	// Setup a test server so we can lie about the current state of pods
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: "",
+		ResponseBody: "{}",
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
@@ -574,7 +574,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	// This server should force a requeue of the controller because it fails to update status.Replicas.
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   500,
-		ResponseBody: "",
+		ResponseBody: "{}",
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()

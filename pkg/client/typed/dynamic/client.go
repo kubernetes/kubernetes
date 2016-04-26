@@ -26,11 +26,14 @@ import (
 	"net/url"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
+	serializerjson "k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -47,7 +50,9 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	confCopy := *conf
 	conf = &confCopy
 
-	conf.Codec = dynamicCodec{}
+	codec := dynamicCodec{}
+	legacyCodec := api.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+	conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(codec, legacyCodec, serializerjson.Framer)
 
 	if conf.APIPath == "" {
 		conf.APIPath = "/api"
