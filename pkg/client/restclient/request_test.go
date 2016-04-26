@@ -1308,5 +1308,9 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		}
 	}
 	versionedAPIPath := testapi.Default.ResourcePath("", "", "")
-	return NewRESTClient(baseURL, versionedAPIPath, ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()}, 0, 0, nil, nil)
+	client, err := NewRESTClient(baseURL, versionedAPIPath, ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()}, 0, 0, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create a client: %v", err)
+	}
+	return client
 }
