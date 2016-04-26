@@ -21,6 +21,8 @@ There is also early support for building Docker "run" containers
 
 ## Key scripts
 
+The following scripts are found in the `build/` directory:
+
 * `run.sh`: Run a command in a build docker container.  Common invocations:
   *  `run.sh hack/build-go.sh`: Build just linux binaries in the container.  Pass options and packages as necessary.
   *  `run.sh hack/build-cross.sh`: Build all binaries for all platforms
@@ -33,7 +35,7 @@ There is also early support for building Docker "run" containers
 
 ## Releasing
 
-The `release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images and then (optionally) upload all build artifacts to a GCS bucket.
+The `build/release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images and then (optionally) upload all build artifacts to a GCS bucket.
 
 The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Cross compiled client utilities.
