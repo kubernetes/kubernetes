@@ -25,6 +25,7 @@ DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
 readonly DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
 readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox"}
+DOCKER_MACHINE_MEMORY=${DOCKER_MACHINE_MEMORY:-3072}
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
@@ -186,14 +187,19 @@ function kube::build::prepare_docker_machine() {
   kube::log::status "docker-machine was found."
   docker-machine inspect "${DOCKER_MACHINE_NAME}" >/dev/null || {
     kube::log::status "Creating a machine to build Kubernetes"
+    local docker_machine_opts
+    if [[ "${DOCKER_MACHINE_DRIVER}" == 'virtualbox' ]]; then
+      docker_machine_opts=" --virtualbox-memory ${DOCKER_MACHINE_MEMORY}"
+    fi
     docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" \
       --engine-env HTTP_PROXY="${KUBERNETES_HTTP_PROXY:-}" \
       --engine-env HTTPS_PROXY="${KUBERNETES_HTTPS_PROXY:-}" \
       --engine-env NO_PROXY="${KUBERNETES_NO_PROXY:-127.0.0.1}" \
+      ${docker_machine_opts} \
       "${DOCKER_MACHINE_NAME}" > /dev/null || {
       kube::log::error "Something went wrong creating a machine."
       kube::log::error "Try the following: "
-      kube::log::error "docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
+      kube::log::error "docker-machine create -d ${DOCKER_MACHINE_DRIVER}${docker_machine_opts} ${DOCKER_MACHINE_NAME}"
       return 1
     }
   }
