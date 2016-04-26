@@ -19,6 +19,7 @@ package fake
 import (
 	v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -29,9 +30,11 @@ type FakeClusters struct {
 	Fake *FakeFederation
 }
 
+var clustersResource = unversioned.GroupVersionResource{Group: "federation", Version: "v1alpha1", Resource: "clusters"}
+
 func (c *FakeClusters) Create(cluster *v1alpha1.Cluster) (result *v1alpha1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction("clusters", cluster), &v1alpha1.Cluster{})
+		Invokes(core.NewRootCreateAction(clustersResource, cluster), &v1alpha1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -40,7 +43,7 @@ func (c *FakeClusters) Create(cluster *v1alpha1.Cluster) (result *v1alpha1.Clust
 
 func (c *FakeClusters) Update(cluster *v1alpha1.Cluster) (result *v1alpha1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction("clusters", cluster), &v1alpha1.Cluster{})
+		Invokes(core.NewRootUpdateAction(clustersResource, cluster), &v1alpha1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -49,7 +52,7 @@ func (c *FakeClusters) Update(cluster *v1alpha1.Cluster) (result *v1alpha1.Clust
 
 func (c *FakeClusters) UpdateStatus(cluster *v1alpha1.Cluster) (*v1alpha1.Cluster, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction("clusters", "status", cluster), &v1alpha1.Cluster{})
+		Invokes(core.NewRootUpdateSubresourceAction(clustersResource, "status", cluster), &v1alpha1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -58,12 +61,12 @@ func (c *FakeClusters) UpdateStatus(cluster *v1alpha1.Cluster) (*v1alpha1.Cluste
 
 func (c *FakeClusters) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction("clusters", name), &v1alpha1.Cluster{})
+		Invokes(core.NewRootDeleteAction(clustersResource, name), &v1alpha1.Cluster{})
 	return err
 }
 
 func (c *FakeClusters) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction("clusters", listOptions)
+	action := core.NewRootDeleteCollectionAction(clustersResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.ClusterList{})
 	return err
@@ -71,7 +74,7 @@ func (c *FakeClusters) DeleteCollection(options *api.DeleteOptions, listOptions 
 
 func (c *FakeClusters) Get(name string) (result *v1alpha1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction("clusters", name), &v1alpha1.Cluster{})
+		Invokes(core.NewRootGetAction(clustersResource, name), &v1alpha1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -80,7 +83,7 @@ func (c *FakeClusters) Get(name string) (result *v1alpha1.Cluster, err error) {
 
 func (c *FakeClusters) List(opts api.ListOptions) (result *v1alpha1.ClusterList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction("clusters", opts), &v1alpha1.ClusterList{})
+		Invokes(core.NewRootListAction(clustersResource, opts), &v1alpha1.ClusterList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -101,5 +104,5 @@ func (c *FakeClusters) List(opts api.ListOptions) (result *v1alpha1.ClusterList,
 // Watch returns a watch.Interface that watches the requested clusters.
 func (c *FakeClusters) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction("clusters", opts))
+		InvokesWatch(core.NewRootWatchAction(clustersResource, opts))
 }

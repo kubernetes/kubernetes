@@ -19,6 +19,7 @@ package fake
 import (
 	v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -30,9 +31,11 @@ type FakeSubReplicaSets struct {
 	ns   string
 }
 
+var subreplicasetsResource = unversioned.GroupVersionResource{Group: "federation", Version: "v1alpha1", Resource: "subreplicasets"}
+
 func (c *FakeSubReplicaSets) Create(subReplicaSet *v1alpha1.SubReplicaSet) (result *v1alpha1.SubReplicaSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("subreplicasets", c.ns, subReplicaSet), &v1alpha1.SubReplicaSet{})
+		Invokes(core.NewCreateAction(subreplicasetsResource, c.ns, subReplicaSet), &v1alpha1.SubReplicaSet{})
 
 	if obj == nil {
 		return nil, err
@@ -42,7 +45,7 @@ func (c *FakeSubReplicaSets) Create(subReplicaSet *v1alpha1.SubReplicaSet) (resu
 
 func (c *FakeSubReplicaSets) Update(subReplicaSet *v1alpha1.SubReplicaSet) (result *v1alpha1.SubReplicaSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("subreplicasets", c.ns, subReplicaSet), &v1alpha1.SubReplicaSet{})
+		Invokes(core.NewUpdateAction(subreplicasetsResource, c.ns, subReplicaSet), &v1alpha1.SubReplicaSet{})
 
 	if obj == nil {
 		return nil, err
@@ -52,7 +55,7 @@ func (c *FakeSubReplicaSets) Update(subReplicaSet *v1alpha1.SubReplicaSet) (resu
 
 func (c *FakeSubReplicaSets) UpdateStatus(subReplicaSet *v1alpha1.SubReplicaSet) (*v1alpha1.SubReplicaSet, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("subreplicasets", "status", c.ns, subReplicaSet), &v1alpha1.SubReplicaSet{})
+		Invokes(core.NewUpdateSubresourceAction(subreplicasetsResource, "status", c.ns, subReplicaSet), &v1alpha1.SubReplicaSet{})
 
 	if obj == nil {
 		return nil, err
@@ -62,13 +65,13 @@ func (c *FakeSubReplicaSets) UpdateStatus(subReplicaSet *v1alpha1.SubReplicaSet)
 
 func (c *FakeSubReplicaSets) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("subreplicasets", c.ns, name), &v1alpha1.SubReplicaSet{})
+		Invokes(core.NewDeleteAction(subreplicasetsResource, c.ns, name), &v1alpha1.SubReplicaSet{})
 
 	return err
 }
 
 func (c *FakeSubReplicaSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction("subreplicasets", c.ns, listOptions)
+	action := core.NewDeleteCollectionAction(subreplicasetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.SubReplicaSetList{})
 	return err
@@ -76,7 +79,7 @@ func (c *FakeSubReplicaSets) DeleteCollection(options *api.DeleteOptions, listOp
 
 func (c *FakeSubReplicaSets) Get(name string) (result *v1alpha1.SubReplicaSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("subreplicasets", c.ns, name), &v1alpha1.SubReplicaSet{})
+		Invokes(core.NewGetAction(subreplicasetsResource, c.ns, name), &v1alpha1.SubReplicaSet{})
 
 	if obj == nil {
 		return nil, err
@@ -86,7 +89,7 @@ func (c *FakeSubReplicaSets) Get(name string) (result *v1alpha1.SubReplicaSet, e
 
 func (c *FakeSubReplicaSets) List(opts api.ListOptions) (result *v1alpha1.SubReplicaSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("subreplicasets", c.ns, opts), &v1alpha1.SubReplicaSetList{})
+		Invokes(core.NewListAction(subreplicasetsResource, c.ns, opts), &v1alpha1.SubReplicaSetList{})
 
 	if obj == nil {
 		return nil, err
@@ -108,6 +111,6 @@ func (c *FakeSubReplicaSets) List(opts api.ListOptions) (result *v1alpha1.SubRep
 // Watch returns a watch.Interface that watches the requested subReplicaSets.
 func (c *FakeSubReplicaSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("subreplicasets", c.ns, opts))
+		InvokesWatch(core.NewWatchAction(subreplicasetsResource, c.ns, opts))
 
 }

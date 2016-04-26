@@ -54,12 +54,12 @@ type Clientset struct {
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
-	return &fakediscovery.FakeDiscovery{&c.Fake}
+	return &fakediscovery.FakeDiscovery{Fake: &c.Fake}
 }
 
 var _ clientset.Interface = &Clientset{}
 
 // Federation retrieves the FederationClient
 func (c *Clientset) Federation() v1alpha1federation.FederationInterface {
-	return &fakev1alpha1federation.FakeFederation{&c.Fake}
+	return &fakev1alpha1federation.FakeFederation{Fake: &c.Fake}
 }
