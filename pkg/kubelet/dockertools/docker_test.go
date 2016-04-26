@@ -171,8 +171,10 @@ func TestParseImageName(t *testing.T) {
 		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar", "latest"},
 	}
 	for _, test := range tests {
-		name, tag := parsers.ParseImageName(test.imageName)
-		if name != test.name || tag != test.tag {
+		name, tag, err := parsers.ParseImageName(test.imageName)
+		if err != nil {
+			t.Errorf("ParseImageName(%s) failed: %v", test.imageName, err)
+		} else if name != test.name || tag != test.tag {
 			t.Errorf("Expected name/tag: %s/%s, got %s/%s", test.name, test.tag, name, tag)
 		}
 	}

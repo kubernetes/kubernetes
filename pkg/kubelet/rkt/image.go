@@ -47,7 +47,11 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 	img := image.Image
 	// TODO(yifan): The credential operation is a copy from dockertools package,
 	// Need to resolve the code duplication.
-	repoToPull, _ := parsers.ParseImageName(img)
+	repoToPull, _, err := parsers.ParseImageName(img)
+	if err != nil {
+		return err
+	}
+
 	keyring, err := credentialprovider.MakeDockerKeyring(pullSecrets, r.dockerKeyring)
 	if err != nil {
 		return err
@@ -138,7 +142,11 @@ func (s sortByImportTime) Less(i, j int) bool { return s[i].ImportTimestamp < s[
 // will return the result reversely sorted by the import time, so that the latest
 // image comes first.
 func (r *Runtime) listImages(image string, detail bool) ([]*rktapi.Image, error) {
-	repoToPull, tag := parsers.ParseImageName(image)
+	repoToPull, tag, err := parsers.ParseImageName(image)
+	if err != nil {
+		return nil, err
+	}
+
 	listResp, err := r.apisvc.ListImages(context.Background(), &rktapi.ListImagesRequest{
 		Detail: detail,
 		Filters: []*rktapi.ImageFilter{
