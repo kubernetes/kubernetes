@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -109,7 +110,7 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = expvalidation.ValidateDeployment(t)
-	case *extensions.Job:
+	case *batch.Job:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
@@ -237,7 +238,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../docs/user-guide": {
 			"multi-pod":            nil,
 			"pod":                  &api.Pod{},
-			"job":                  &extensions.Job{},
+			"job":                  &batch.Job{},
 			"ingress":              &extensions.Ingress{},
 			"nginx-deployment":     &extensions.Deployment{},
 			"new-nginx-deployment": &extensions.Deployment{},
@@ -405,12 +406,12 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"javaweb-2": &api.Pod{},
 		},
 		"../examples/job/work-queue-1": {
-			"job": &extensions.Job{},
+			"job": &batch.Job{},
 		},
 		"../examples/job/work-queue-2": {
 			"redis-pod":     &api.Pod{},
 			"redis-service": &api.Service{},
-			"job":           &extensions.Job{},
+			"job":           &batch.Job{},
 		},
 		"../examples/azure_file": {
 			"azure": &api.Pod{},

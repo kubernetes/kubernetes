@@ -60,6 +60,7 @@ func DefaultNameSystem() string {
 var fallbackPackages = []string{
 	"k8s.io/kubernetes/pkg/api/unversioned",
 	"k8s.io/kubernetes/pkg/apis/extensions",
+	"k8s.io/kubernetes/pkg/apis/batch",
 }
 
 func getInternalTypeFor(context *generator.Context, t *types.Type) (*types.Type, bool) {

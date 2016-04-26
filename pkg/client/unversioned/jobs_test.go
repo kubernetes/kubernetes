@@ -51,8 +51,8 @@ func testListJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 			Path:   group.ResourcePath(getJobsResourceName(), ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
-			Body: &extensions.JobList{
-				Items: []extensions.Job{
+			Body: &batch.JobList{
+				Items: []batch.Job{
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo",
@@ -61,7 +61,7 @@ func testListJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 								"name": "baz",
 							},
 						},
-						Spec: extensions.JobSpec{
+						Spec: batch.JobSpec{
 							Template: api.PodTemplateSpec{},
 						},
 					},
@@ -90,7 +90,7 @@ func testGetJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 		},
 		Response: simple.Response{
 			StatusCode: 200,
-			Body: &extensions.Job{
+			Body: &batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -98,7 +98,7 @@ func testGetJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 						"name": "baz",
 					},
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Template: api.PodTemplateSpec{},
 				},
 			},
@@ -117,7 +117,7 @@ func TestGetJob(t *testing.T) {
 
 func testUpdateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 	ns := api.NamespaceDefault
-	requestJob := &extensions.Job{
+	requestJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
@@ -132,7 +132,7 @@ func testUpdateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) 
 		},
 		Response: simple.Response{
 			StatusCode: 200,
-			Body: &extensions.Job{
+			Body: &batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -140,7 +140,7 @@ func testUpdateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) 
 						"name": "baz",
 					},
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Template: api.PodTemplateSpec{},
 				},
 			},
@@ -159,7 +159,7 @@ func TestUpdateJob(t *testing.T) {
 
 func testUpdateJobStatus(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 	ns := api.NamespaceDefault
-	requestJob := &extensions.Job{
+	requestJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
@@ -174,7 +174,7 @@ func testUpdateJobStatus(t *testing.T, group testapi.TestGroup, resourceGroup st
 		},
 		Response: simple.Response{
 			StatusCode: 200,
-			Body: &extensions.Job{
+			Body: &batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -182,10 +182,10 @@ func testUpdateJobStatus(t *testing.T, group testapi.TestGroup, resourceGroup st
 						"name": "baz",
 					},
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Template: api.PodTemplateSpec{},
 				},
-				Status: extensions.JobStatus{
+				Status: batch.JobStatus{
 					Active: 1,
 				},
 			},
@@ -225,7 +225,7 @@ func TestDeleteJob(t *testing.T) {
 
 func testCreateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 	ns := api.NamespaceDefault
-	requestJob := &extensions.Job{
+	requestJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
@@ -240,7 +240,7 @@ func testCreateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) 
 		},
 		Response: simple.Response{
 			StatusCode: 200,
-			Body: &extensions.Job{
+			Body: &batch.Job{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -248,7 +248,7 @@ func testCreateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) 
 						"name": "baz",
 					},
 				},
-				Spec: extensions.JobSpec{
+				Spec: batch.JobSpec{
 					Template: api.PodTemplateSpec{},
 				},
 			},

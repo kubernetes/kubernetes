@@ -48,7 +48,7 @@ func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
 	case extensions.Kind("ReplicaSet"):
 		return &ReplicaSetScaler{c.Extensions()}, nil
 	case extensions.Kind("Job"), batch.Kind("Job"):
-		return &JobScaler{c.Extensions()}, nil // Either kind of job can be scaled with Extensions interface.
+		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
 	case extensions.Kind("Deployment"):
 		return &DeploymentScaler{c.Extensions()}, nil
 	}
@@ -252,7 +252,7 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 }
 
 // ValidateJob ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
-func (precondition *ScalePrecondition) ValidateJob(job *extensions.Job) error {
+func (precondition *ScalePrecondition) ValidateJob(job *batch.Job) error {
 	if precondition.Size != -1 && job.Spec.Parallelism == nil {
 		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), "nil"}
 	}
@@ -266,7 +266,7 @@ func (precondition *ScalePrecondition) ValidateJob(job *extensions.Job) error {
 }
 
 type JobScaler struct {
-	c client.ExtensionsInterface
+	c client.BatchInterface
 }
 
 // ScaleSimple is responsible for updating job's parallelism.
