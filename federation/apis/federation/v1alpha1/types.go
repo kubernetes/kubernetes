@@ -77,6 +77,8 @@ type ClusterStatus struct {
 	ClusterMeta `json:",inline" protobuf:"bytes,4,opt,name=clusterMeta"`
 }
 
+// +genclient=true,nonNamespaced=true
+
 // Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
 type Cluster struct {
 	unversioned.TypeMeta `json:",inline"`
