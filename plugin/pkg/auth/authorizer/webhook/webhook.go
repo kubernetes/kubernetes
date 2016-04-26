@@ -21,16 +21,16 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+//	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer/json"
-	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
+//	"k8s.io/kubernetes/pkg/runtime"
+//	"k8s.io/kubernetes/pkg/runtime/serializer/json"
+//	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
 )
@@ -85,8 +85,9 @@ func New(kubeConfigFile string) (*WebhookAuthorizer, error) {
 	if err != nil {
 		return nil, err
 	}
-	serializer := json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), false)
-	clientConfig.ContentConfig.Codec = versioning.NewCodecForScheme(api.Scheme, serializer, serializer, encodeVersions, decodeVersions)
+	//serializer := json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), false)
+	// FIXME: Set negotiatedSerializer
+	//clientConfig.ContentConfig.Codec = versioning.NewCodecForScheme(api.Scheme, serializer, serializer, encodeVersions, decodeVersions)
 
 	restClient, err := restclient.UnversionedRESTClientFor(clientConfig)
 	if err != nil {

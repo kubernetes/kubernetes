@@ -179,10 +179,9 @@ func TestApplyObject(t *testing.T) {
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
@@ -218,10 +217,9 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathNameRC && m == "GET":
@@ -265,10 +263,9 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	nameSVC, currentSVC := readAndAnnotateService(t, filenameSVC)
 	pathSVC := "/namespaces/test/services/" + nameSVC
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":

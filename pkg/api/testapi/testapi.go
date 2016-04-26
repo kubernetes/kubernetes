@@ -43,12 +43,13 @@ import (
 )
 
 var (
-	Groups      = make(map[string]TestGroup)
-	Default     TestGroup
-	Autoscaling TestGroup
-	Batch       TestGroup
-	Extensions  TestGroup
-	Apps        TestGroup
+	Groups               = make(map[string]TestGroup)
+	Default              TestGroup
+	Autoscaling          TestGroup
+	Batch                TestGroup
+	Extensions           TestGroup
+	Apps                 TestGroup
+	NegotiatedSerializer = api.Codecs
 )
 
 type TestGroup struct {

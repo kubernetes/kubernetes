@@ -230,7 +230,6 @@ func TestRefetchSchemaWhenValidationFails(t *testing.T) {
 	requests := map[string]int{}
 
 	c := &fake.RESTClient{
-		Codec: testapi.Default.Codec(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
@@ -287,7 +286,6 @@ func TestValidateCachesSchema(t *testing.T) {
 	requests := map[string]int{}
 
 	c := &fake.RESTClient{
-		Codec: testapi.Default.Codec(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":

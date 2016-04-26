@@ -39,11 +39,12 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
-	watchjson "k8s.io/kubernetes/pkg/watch/json"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 var (
@@ -140,6 +141,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		backoffMgr: backoff,
 		throttle:   throttle,
 	}
+	// TODO: Set this appropriate when issuing a request.
 	if len(content.ContentType) > 0 {
 		r.SetHeader("Accept", content.ContentType+", */*")
 	}
@@ -517,6 +519,21 @@ func (r *Request) Timeout(d time.Duration) *Request {
 	return r
 }
 
+func (r *Request) encoder() (runtime.Encoder, bool) {
+	negotiated := r.content.NegotiatedSerializer
+	contentType := r.content.ContentType
+	if contentType == "" {
+		// If no contentType is specified, default to application/json.
+		contentType = "application/json"
+	}
+	serializer, ok := negotiated.SerializerForMediaType(contentType, nil)
+	if !ok {
+		return nil, false
+	}
+	return negotiated.EncoderForVersion(serializer, *r.content.GroupVersion), true
+}
+
+
 // Body makes the request use obj as the body. Optional.
 // If obj is a string, try to read a file of that name.
 // If obj is a []byte, send it directly.
@@ -547,7 +564,13 @@ func (r *Request) Body(obj interface{}) *Request {
 		if reflect.ValueOf(t).IsNil() {
 			return r
 		}
-		data, err := runtime.Encode(r.content.Codec, t)
+		encoder, exists := r.encoder()
+		if !exists {
+			r.err = fmt.Errorf("ContentType not supported by serializer")
+			return r
+		}
+
+		data, err := runtime.Encode(encoder, t)
 		if err != nil {
 			r.err = err
 			return r
@@ -628,6 +651,35 @@ func (r *Request) tryThrottle() {
 	}
 }
 
+func (r *Request) decoder(contentType string) (runtime.Decoder, bool) {
+	negotiated := r.content.NegotiatedSerializer
+	if contentType == "" {
+		// If no contentType is specified, default to application/json.
+		contentType = "application/json"
+	}
+	serializer, ok := negotiated.SerializerForMediaType(contentType, nil)
+	if !ok {
+		return nil, false
+	}
+	internalGV := unversioned.GroupVersion{Group: r.content.GroupVersion.Group, Version: runtime.APIVersionInternal}
+	return negotiated.DecoderToVersion(serializer, internalGV), true
+}
+
+func (r *Request) streamingDecoder(contentType string, reader io.ReadCloser) (streaming.Decoder, runtime.Decoder, bool) {
+	negotiated := r.content.NegotiatedSerializer
+	if contentType == "" {
+		// If no contentType is specified, default to application/json.
+		contentType = "application/json"
+	}
+	serializer, framer, _, ok := negotiated.StreamingSerializerForMediaType(contentType, nil)
+	if !ok {
+		return nil, nil, false
+	}
+	fr := framer.NewFrameReader(reader)
+	internalGV := unversioned.GroupVersion{Group: r.content.GroupVersion.Group, Version: runtime.APIVersionInternal}
+	return streaming.NewDecoder(fr, serializer), negotiated.DecoderToVersion(serializer, internalGV), true
+}
+
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch() (watch.Interface, error) {
@@ -670,7 +722,11 @@ func (r *Request) Watch() (watch.Interface, error) {
 		}
 		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
 	}
-	return watch.NewStreamWatcher(watchjson.NewDecoder(resp.Body, r.content.Codec)), nil
+	streamingDecoder, decoder, exists := r.streamingDecoder(r.content.ContentType, resp.Body)
+	if !exists {
+		return nil, fmt.Errorf("couldn't get streaming decoder")
+	}
+	return versioned.NewStreamWatcher(streamingDecoder, decoder, *r.content.GroupVersion), nil
 }
 
 // updateURLMetrics is a convenience function for pushing metrics.
@@ -738,9 +794,13 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 			return nil, fmt.Errorf("%v while accessing %v", resp.Status, url)
 		}
 
-		if runtimeObject, err := runtime.Decode(r.content.Codec, bodyBytes); err == nil {
+		decoder, exists := r.decoder(resp.Header.Get("Content-Type"))
+		if !exists {
+			// FIXME: Return a correct error.
+			return nil, errors.FromObject(&unversioned.Status{})
+		}
+		if runtimeObject, err := runtime.Decode(decoder, bodyBytes); err == nil {
 			statusError := errors.FromObject(runtimeObject)
-
 			if _, ok := statusError.(errors.APIStatus); ok {
 				return nil, statusError
 			}
@@ -869,6 +929,12 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	}
 	glog.V(8).Infof("Response Body: %s", string(body))
 
+	decoder, exists := r.decoder(resp.Header.Get("Content-Type"))
+	if !exists {
+		// FIXME: Return a correct error.
+		return Result{err: errors.FromObject(&unversioned.Status{})}
+	}
+
 	// Did the server give us a status response?
 	isStatusResponse := false
 	// Because release-1.1 server returns Status with empty APIVersion at paths
@@ -876,7 +942,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	// default groupVersion, otherwise a status response won't be correctly
 	// decoded.
 	status := &unversioned.Status{}
-	err := runtime.DecodeInto(r.content.Codec, body, status)
+	err := runtime.DecodeInto(decoder, body, status)
 	if err == nil && len(status.Status) > 0 {
 		isStatusResponse = true
 	}
@@ -902,7 +968,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		body:        body,
 		contentType: resp.Header.Get("Content-Type"),
 		statusCode:  resp.StatusCode,
-		decoder:     r.content.Codec,
+		decoder:     decoder,
 	}
 }
 

@@ -151,7 +151,6 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 	for _, test := range tests {
 		f, tf, codec := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
 			}),
@@ -267,7 +266,6 @@ func TestGenerateService(t *testing.T) {
 		f, tf, codec := NewAPIFactory()
 		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case test.expectPOST && m == "POST" && p == "/namespaces/namespace/services":

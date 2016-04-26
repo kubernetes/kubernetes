@@ -348,10 +348,9 @@ func stringBody(body string) io.ReadCloser {
 //}
 
 func Example_printReplicationControllerWithNamespace() {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
-		Codec:  codec,
 		Client: nil,
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
@@ -394,10 +393,9 @@ func Example_printReplicationControllerWithNamespace() {
 }
 
 func Example_printMultiContainersReplicationControllerWithWide() {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
-		Codec:  codec,
 		Client: nil,
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
@@ -443,10 +441,9 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 }
 
 func Example_printReplicationController() {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
-		Codec:  codec,
 		Client: nil,
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
@@ -492,10 +489,9 @@ func Example_printReplicationController() {
 }
 
 func Example_printPodWithWideFormat() {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
-		Codec:  codec,
 		Client: nil,
 	}
 	nodeName := "kubernetes-minion-abcd"
@@ -528,10 +524,9 @@ func Example_printPodWithWideFormat() {
 }
 
 func Example_printPodWithShowLabels() {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, true, false, []string{})
 	tf.Client = &fake.RESTClient{
-		Codec:  codec,
 		Client: nil,
 	}
 	nodeName := "kubernetes-minion-abcd"
@@ -660,10 +655,9 @@ func newAllPhasePodList() *api.PodList {
 }
 
 func Example_printPodHideTerminated() {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
-		Codec:  codec,
 		Client: nil,
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
@@ -681,10 +675,9 @@ func Example_printPodHideTerminated() {
 }
 
 func Example_printPodShowAll() {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, true, false, false, []string{})
 	tf.Client = &fake.RESTClient{
-		Codec:  codec,
 		Client: nil,
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
@@ -704,10 +697,9 @@ func Example_printPodShowAll() {
 }
 
 func Example_printServiceWithNamespacesAndLabels() {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _ := NewAPIFactory()
 	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, false, []string{"l1"})
 	tf.Client = &fake.RESTClient{
-		Codec:  codec,
 		Client: nil,
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)

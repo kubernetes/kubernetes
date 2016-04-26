@@ -31,7 +31,6 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 	f, tf, codec := NewTestFactory()
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})},
 	}
 	tf.Namespace = "non-default"
@@ -55,7 +54,6 @@ func TestDescribeObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
@@ -88,7 +86,6 @@ func TestDescribeListObjects(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
 	}
 

@@ -47,7 +47,8 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	confCopy := *conf
 	conf = &confCopy
 
-	conf.Codec = dynamicCodec{}
+	// FIXME: Set it correctly.
+	//conf.Codec = dynamicCodec{}
 
 	if conf.APIPath == "" {
 		conf.APIPath = "/api"

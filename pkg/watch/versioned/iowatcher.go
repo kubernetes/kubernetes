@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package watch
+package versioned
 
 import (
 	"io"
@@ -22,12 +22,15 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.
-type Decoder interface {
+/*type Decoder interface {
 	// Decode should return the type of event, the decoded object, or an error.
 	// An error will cause StreamWatcher to call Close(). Decode should block until
 	// it has data or an error occurs.
@@ -37,32 +40,36 @@ type Decoder interface {
 	// the stream that it is no longer being watched. Close() must cause any
 	// outstanding call to Decode() to return with an error of some sort.
 	Close()
-}
+}*/
 
 // StreamWatcher turns any stream for which you can write a Decoder interface
 // into a watch.Interface.
 type StreamWatcher struct {
-	source Decoder
-	result chan Event
+	source streaming.Decoder
+	decoder runtime.Decoder
+	result chan watch.Event
+	group unversioned.GroupVersion
 	sync.Mutex
 	stopped bool
 }
 
 // NewStreamWatcher creates a StreamWatcher from the given decoder.
-func NewStreamWatcher(d Decoder) *StreamWatcher {
+func NewStreamWatcher(d streaming.Decoder, d2 runtime.Decoder, group unversioned.GroupVersion) *StreamWatcher {
 	sw := &StreamWatcher{
 		source: d,
+		decoder: d2,
+		group: group,
 		// It's easy for a consumer to add buffering via an extra
 		// goroutine/channel, but impossible for them to remove it,
 		// so nonbuffered is better.
-		result: make(chan Event),
+		result: make(chan watch.Event),
 	}
 	go sw.receive()
 	return sw
 }
 
 // ResultChan implements Interface.
-func (sw *StreamWatcher) ResultChan() <-chan Event {
+func (sw *StreamWatcher) ResultChan() <-chan watch.Event {
 	return sw.result
 }
 
@@ -73,7 +80,8 @@ func (sw *StreamWatcher) Stop() {
 	defer sw.Unlock()
 	if !sw.stopped {
 		sw.stopped = true
-		sw.source.Close()
+		// FIXME: Figure out how to close.
+//		sw.source.Close()
 	}
 }
 
@@ -90,7 +98,8 @@ func (sw *StreamWatcher) receive() {
 	defer sw.Stop()
 	defer utilruntime.HandleCrash()
 	for {
-		action, obj, err := sw.source.Decode()
+		var event Event
+		_, _, err := sw.source.Decode(nil, &event)
 		if err != nil {
 			// Ignore expected error.
 			if sw.stopping() {
@@ -111,9 +120,13 @@ func (sw *StreamWatcher) receive() {
 			}
 			return
 		}
-		sw.result <- Event{
-			Type:   action,
-			Object: obj,
+
+		// FIXME: Do we really need to pass another decoder here?
+		object, err := runtime.Decode(sw.decoder, event.Object.Raw)
+		if err != nil {
+			glog.Errorf("unexpected error: %v", err)
+			return
 		}
+		sw.result <- watch.Event{Type: watch.EventType(event.Type), Object: object}
 	}
 }

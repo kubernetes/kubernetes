@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func CreateHTTPClient(roundTripper func(*http.Request) (*http.Response, error)) *http.Client {
@@ -43,7 +42,6 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 // RESTClient provides a fake RESTClient interface.
 type RESTClient struct {
 	Client *http.Client
-	Codec  runtime.Codec
 	Req    *http.Request
 	Resp   *http.Response
 	Err    error
@@ -70,7 +68,7 @@ func (c *RESTClient) Delete() *restclient.Request {
 }
 
 func (c *RESTClient) request(verb string) *restclient.Request {
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: c.Codec}, nil, nil)
+	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion(), NegotiatedSerializer: testapi.NegotiatedSerializer}, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
