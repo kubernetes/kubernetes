@@ -410,7 +410,7 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 	return &attribs
 }
 
-func WithActingAs(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.Authorizer) http.Handler {
+func WithImpersonation(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.Authorizer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		requestedSubject := req.Header.Get("Impersonate-User")
 		if len(requestedSubject) == 0 {
@@ -430,12 +430,17 @@ func WithActingAs(handler http.Handler, requestContextMapper api.RequestContextM
 		}
 
 		actingAsAttributes := &authorizer.AttributesRecord{
-			User:     requestor,
-			Verb:     "impersonate",
-			APIGroup: api.GroupName,
-			Resource: "users",
-			// ResourceName:    requestedSubject,
+			User:            requestor,
+			Verb:            "impersonate",
+			APIGroup:        api.GroupName,
+			Resource:        "users",
+			Name:            requestedSubject,
 			ResourceRequest: true,
+		}
+		if namespace, name, err := serviceaccount.SplitUsername(requestedSubject); err == nil {
+			actingAsAttributes.Resource = "serviceaccounts"
+			actingAsAttributes.Namespace = namespace
+			actingAsAttributes.Name = name
 		}
 
 		err := a.Authorize(actingAsAttributes)
