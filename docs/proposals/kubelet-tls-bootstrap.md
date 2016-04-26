@@ -79,26 +79,23 @@ It will have the following structure:
 ```go
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata,omitempty"`
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
 
 	// The certificate request itself and any additonal information.
 	Spec CertificateSigningRequestSpec `json:"spec,omitempty"`
 
 	// Derived information about the request.
 	Status CertificateSigningRequestStatus `json:"status,omitempty"`
-
-	// The current approval state of the request.
-	Approve CertificateSigningRequestApproval `json:"approve,omitempty"`
 }
 
 // This information is immutable after the request is created.
 type CertificateSigningRequestSpec struct {
-	// base64-encoded PKCS#10 CSR data
-	CertificateRequest string `json:"request"`
+	// Base64-encoded PKCS#10 CSR data
+	Request string `json:"request"`
 
 	// Any extra information the node wishes to send with the request.
-	ExtraInfo []string `json:"extra,omitempty"`
+	ExtraInfo []string `json:"extrainfo,omitempty"`
 }
 
 // This information is derived from the request by Kubernetes and cannot be
@@ -116,36 +113,42 @@ type CertificateSigningRequestStatus struct {
 	Fingerprint string `json:"fingerprint,omitempty"`
 
 	// Subject fields from the request
-	Subject pkix.Name `json:"subject,omitempty"`
+	Subject internal.Subject `json:"subject,omitempty"`
 
 	// DNS SANs from the request
-	Hostnames []string `json:"dns,omitempty"`
+	Hostnames []string `json:"hostnames,omitempty"`
 
 	// IP SANs from the request
-	IPAddresses []string `json:"ip,omitempty"`
+	IPAddresses []string `json:"ipaddresses,omitempty"`
+
+	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty"`
 }
 
-type CertificateSigningRequestApproval struct {
-	// CSR approval state, one of Submitted, Approved, or Denied
-	State CertificateRequestState `json:"state"`
+type RequestConditionType string
 
+// These are the possible states for a certificate request.
+const (
+	Approved RequestConditionType = "Approved"
+	Denied   RequestConditionType = "Denied"
+)
+
+type CertificateSigningRequestCondition struct {
+	// request approval state, currently Approved or Denied.
+	Type RequestConditionType `json:"type"`
 	// brief reason for the request state
 	Reason string `json:"reason,omitempty"`
 	// human readable message with details about the request state
 	Message string `json:"message,omitempty"`
-
 	// If request was approved, the controller will place the issued certificate here.
 	Certificate []byte `json:"certificate,omitempty"`
 }
 
-type CertificateRequestState string
+type CertificateSigningRequestList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
-// These are the possible states for a certificate request.
-const (
-	RequestSubmitted CertificateRequestState = "Submitted"
-	RequestApproved  CertificateRequestState = "Approved"
-	RequestDenied    CertificateRequestState = "Denied"
-)
+	Items []CertificateSigningRequest `json:"items,omitempty"`
+}
 ```
 
 We also introduce CertificateSigningRequestList to allow listing all the CSRs in the cluster:
@@ -181,26 +184,26 @@ The apiserver persists the CertificateSigningRequests and exposes the List of
 all CSRs for an administrator to approve or reject.
 
 A new certificate controller watches for certificate requests. It must first
-validate the signature on each CSR and set `CertificateRequestState=Denied` on
-any requests with invalid signatures. For valid requests, it will set
-`CertificateRequestState=Submitted`. The controller will derive the information
-in `CertificateSigningRequestStatus` and update that object. The controller
-should watch for updates the approval state of any CertificateSigningRequest.
-When a request is approved (signified by CertificateRequestState changing from
-Submitted to Approved) the controller should generate and sign a certificate
-based on that CSR, then update the approval subresource with the certificate
-data.
+validate the signature on each CSR and add `Condition=Denied` on
+any requests with invalid signatures (with Reason and Message incidicating
+such). For valid requests, the controller will derive the information in
+`CertificateSigningRequestStatus` and update that object. The controller should
+watch for updates to the approval condition of any CertificateSigningRequest.
+When a request is approved (signified by Conditions containing only Approved)
+the controller should generate and sign a certificate based on that CSR, then
+update the condition with the certificate data using the `/approval`
+subresource.
 
 ### Manual CSR approval
 
 An administrator using `kubectl` or another API client can query the
-CertificateSigningRequestList and update the approval state of
+CertificateSigningRequestList and update the approval condition of
 CertificateSigningRequests. The default state is empty, indicating that there
-has been no decision so far. Once a request has passed basic validation it will
-be "Submitted". A state of "Approved" indicates that the admin has approved the
-request and the certificate controller should issue the certificate. A state of
-"Denied" indicates that the admin has denied the request. An admin may also
-supply Reason and Message fields to explain the rejection.
+has been no decision so far. A state of "Approved" indicates that the admin has
+approved the request and the certificate controller should issue the
+certificate. A state of "Denied" indicates that admin has denied the
+request. An admin may also supply Reason and Message fields to explain the
+rejection.
 
 ## kube-apiserver support
 
@@ -222,7 +225,8 @@ interaction will be similar to
 [salt-key](https://docs.saltstack.com/en/latest/ref/cli/salt-key.html).
 
 Specifically, the admin will have the ability to retrieve the full list of
-pending CSRs, inspect their contents, and set their states to one of:
+pending CSRs, inspect their contents, and set their approval conditions to one
+of:
 
 1. **Approved** if the controller should issue the cert
 2. **Denied** if the controller should not issue the cert
