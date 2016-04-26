@@ -52,12 +52,12 @@ fi
 
 BASH_TARGETS="
 	generated-protobuf
-  codecgen
+	codegen
+	codecgen
 	generated-docs
 	generated-swagger-docs
 	swagger-spec
-	api-reference-docs
-	codegen"
+	api-reference-docs"
 
 
 for t in $BASH_TARGETS
