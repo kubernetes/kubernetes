@@ -52,9 +52,11 @@ import (
 func TestQuota(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
+	initializationCh := make(chan struct{})
 	// Set up a master
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		<-initializationCh
 		m.Handler.ServeHTTP(w, req)
 	}))
 	// TODO: Uncomment when fix #19254
@@ -71,6 +73,7 @@ func TestQuota(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
+	close(initializationCh)
 
 	go replicationcontroller.NewReplicationManagerFromClient(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas, 4096).
 		Run(3, wait.NeverStop)
