@@ -6,8 +6,10 @@ readonly green=$(tput bold; tput setaf 2)
 
 exit_code=0
 
+echo "If this takes a long time you can try installing gb (getgb.io) in your path. It should HUGELY speed this up after the first build."
+echo "BUT BUT BUT having gb in your \$PATH will cause everything to fail if you have symlinks in your cwd due to a bug in gb"
 echo -ne "Checking that it builds... "
-if ! OUT=$("hack/build-go.sh" 2>&1); then
+if ! OUT=$("hack/verify-code-builds.sh" 2>&1); then
   echo
   echo "${red}${OUT}"
   exit_code=1

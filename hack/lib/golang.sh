@@ -488,6 +488,44 @@ kube::golang::get_physmem() {
   echo 1
 }
 
+
+kube::golang::verify_code_builds() {
+  if ! OUT=$(which gb 2>&1); then
+    hack/build-go.sh
+    return
+  fi
+  # Check for `go` binary and set ${GOPATH}.
+  kube::golang::setup_env
+
+  local alltargets
+  alltargets=("${KUBE_ALL_TARGETS[@]}")
+
+  local targets=()
+  for target in "${alltargets[@]}"; do
+    # KUBE_ALL_TARGETS will call things pkg.test when it wants to use go test to build pkg.
+    # since there is no pkg.test and we don't want to build these with gb, just ignore them.
+    # This basically is only getting rid of test/e2e/e2e.test on 16 Aug 2015.
+    if [[ "${target}" == *".test" ]]; then
+      continue
+    fi
+    targets+=("${target}")
+  done
+  local binaries
+  binaries=($(kube::golang::binaries_from_targets "${targets[@]}"))
+
+  kube::log::status "Fast building the whole tree"
+  kube::log::status "  DO NOT USE THESE BUILDS FOR ANYTHING OTHER THAN A COMPILE CHECK"
+
+  # We need to make the godeps available where gb wants them.
+  if [[ ! -d "${KUBE_ROOT}/_output/local/go/vendor" ]]; then
+    ln -s "${KUBE_ROOT}/Godeps/_workspace" -T "${KUBE_ROOT}/_output/local/go/vendor"
+  fi
+
+  pushd "${KUBE_ROOT}/_output/local/go" > /dev/null
+  gb build "${binaries[@]}"
+  kube::golang::place_bins
+}
+
 # Build binaries targets specified
 #
 # Input:
@@ -580,3 +618,5 @@ kube::golang::build_binaries() {
     fi
   )
 }
+
+# ex: ts=2 sw=2 et filetype=sh
