@@ -124,9 +124,8 @@ func TestZones(t *testing.T) {
 	cfg.Global.Datacenter = "myDatacenter"
 
 	// Create vSphere configuration object
-	vs, err := newVSphere(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	vs := VSphere{
+		cfg: &cfg,
 	}
 
 	z, ok := vs.Zones()
