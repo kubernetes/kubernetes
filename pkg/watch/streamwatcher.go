@@ -42,9 +42,9 @@ type Decoder interface {
 // StreamWatcher turns any stream for which you can write a Decoder interface
 // into a watch.Interface.
 type StreamWatcher struct {
-	source Decoder
-	result chan Event
 	sync.Mutex
+	source  Decoder
+	result  chan Event
 	stopped bool
 }
 

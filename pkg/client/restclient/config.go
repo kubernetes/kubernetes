@@ -139,6 +139,8 @@ type ContentConfig struct {
 	// when initializing a Client.
 	//
 	// DEPRECATED: Please use NegotiatedSerializer instead.
+	// Codec is currently used only in some tests and will be removed soon.
+	// All production setups should use NegotiatedSerializer.
 	Codec runtime.Codec
 }
 
