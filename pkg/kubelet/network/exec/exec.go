@@ -146,7 +146,7 @@ func (plugin *execNetworkPlugin) TearDownPod(namespace string, name string, id k
 	return err
 }
 
-func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
+func (plugin *execNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
 	out, err := utilexec.New().Command(plugin.getExecutable(), statusCmd, namespace, name, id.ID).CombinedOutput()
 	glog.V(5).Infof("Status 'exec' network plugin output: %s, %v", string(out), err)
 	if err != nil {

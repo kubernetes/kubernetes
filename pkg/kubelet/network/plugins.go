@@ -73,10 +73,10 @@ type NetworkPlugin interface {
 	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
-	Status(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
+	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
 
 	// NetworkStatus returns error if the network plugin is in error state
-	NetworkStatus() error
+	Status() error
 }
 
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
@@ -191,10 +191,10 @@ func (plugin *NoopNetworkPlugin) TearDownPod(namespace string, name string, id k
 	return nil
 }
 
-func (plugin *NoopNetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
+func (plugin *NoopNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
 	return nil, nil
 }
 
-func (plugin *NoopNetworkPlugin) NetworkStatus() error {
+func (plugin *NoopNetworkPlugin) Status() error {
 	return nil
 }
