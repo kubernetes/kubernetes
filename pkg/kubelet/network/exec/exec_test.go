@@ -281,7 +281,7 @@ func TestPluginStatusHook(t *testing.T) {
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, nettest.NewFakeHost(nil))
 
-	ip, err := plug.Status("namespace", "name", kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
+	ip, err := plug.GetPodNetworkStatus("namespace", "name", kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
 	if err != nil {
 		t.Errorf("Expected nil got %v", err)
 	}
@@ -320,7 +320,7 @@ func TestPluginStatusHookIPv6(t *testing.T) {
 		t.Errorf("InitNetworkPlugin() failed: %v", err)
 	}
 
-	ip, err := plug.Status("namespace", "name", kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
+	ip, err := plug.GetPodNetworkStatus("namespace", "name", kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
 	if err != nil {
 		t.Errorf("Status() failed: %v", err)
 	}
