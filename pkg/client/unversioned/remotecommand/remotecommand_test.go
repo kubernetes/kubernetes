@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -212,7 +213,11 @@ func TestStream(t *testing.T) {
 			server := httptest.NewServer(fakeServer(t, name, exec, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount, testCase.ServerProtocols))
 
 			url, _ := url.ParseRequestURI(server.URL)
-			c, err := restclient.NewRESTClient(url, "", restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "x"}}, -1, -1, nil, nil)
+			config := restclient.ContentConfig{
+				GroupVersion:         &unversioned.GroupVersion{Group: "x"},
+				NegotiatedSerializer: testapi.NegotiatedSerializer,
+			}
+			c, err := restclient.NewRESTClient(url, "", config, -1, -1, nil, nil)
 			if err != nil {
 				t.Fatalf("failed to create a client: %v", err)
 			}

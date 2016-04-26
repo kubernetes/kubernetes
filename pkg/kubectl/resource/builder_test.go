@@ -39,10 +39,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/watch"
-	watchjson "k8s.io/kubernetes/pkg/watch/json"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 func stringBody(body string) io.ReadCloser {
@@ -51,7 +52,8 @@ func stringBody(body string) io.ReadCloser {
 
 func watchBody(events ...watch.Event) string {
 	buf := &bytes.Buffer{}
-	enc := watchjson.NewEncoder(buf, testapi.Default.Codec())
+	codec := testapi.Default.Codec()
+	enc := versioned.NewEncoder(streaming.NewEncoder(buf, codec), codec)
 	for _, e := range events {
 		enc.Encode(&e)
 	}
