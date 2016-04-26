@@ -297,6 +297,7 @@ func Run(s *options.APIServer) error {
 	}
 
 	installFederationAPIs(s, m, storageFactory)
+	installExtensionsAPIs(s, m, storageFactory)
 
 	m.Run(s.ServerRunOptions)
 	return nil

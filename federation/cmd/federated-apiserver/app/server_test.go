@@ -27,6 +27,7 @@ import (
 	fed_v1a1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	ext_v1b1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"net"
 	"net/http"
 	"time"
@@ -75,7 +76,10 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 
 var insecurePort = 8081
 var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
-var groupVersion = fed_v1a1.SchemeGroupVersion
+var groupVersions = []unversioned.GroupVersion{
+	fed_v1a1.SchemeGroupVersion,
+	ext_v1b1.SchemeGroupVersion,
+}
 
 func TestRun(t *testing.T) {
 	s := options.NewAPIServer()
@@ -141,9 +145,12 @@ func findGroup(groups []unversioned.APIGroup, groupName string) *unversioned.API
 }
 
 func testAPIGroupList(t *testing.T) {
-	var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
-		GroupVersion: groupVersion.String(),
-		Version:      groupVersion.Version,
+	groupVersionForDiscoveryMap := make(map[string]unversioned.GroupVersionForDiscovery)
+	for _, groupVersion := range groupVersions {
+		groupVersionForDiscoveryMap[groupVersion.Group] = unversioned.GroupVersionForDiscovery{
+			GroupVersion: groupVersion.String(),
+			Version:      groupVersion.Version,
+		}
 	}
 
 	serverURL := serverIP + "/apis"
@@ -157,31 +164,41 @@ func testAPIGroupList(t *testing.T) {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
 	}
 
-	found := findGroup(apiGroupList.Groups, groupVersion.Group)
-	assert.NotNil(t, found)
-	assert.Equal(t, found.Name, groupVersion.Group)
-	assert.Equal(t, 1, len(found.Versions))
-	assert.Equal(t, found.Versions[0], groupVersionForDiscovery)
-	assert.Equal(t, found.PreferredVersion, groupVersionForDiscovery)
+	for _, groupVersion := range groupVersions {
+		found := findGroup(apiGroupList.Groups, groupVersion.Group)
+		assert.NotNil(t, found)
+		assert.Equal(t, found.Name, groupVersion.Group)
+		assert.Equal(t, 1, len(found.Versions))
+		groupVersionForDiscovery := groupVersionForDiscoveryMap[groupVersion.Group]
+		assert.Equal(t, found.Versions[0], groupVersionForDiscovery)
+		assert.Equal(t, found.PreferredVersion, groupVersionForDiscovery)
+	}
 }
 
 func testAPIGroup(t *testing.T) {
-	serverURL := serverIP + "/apis/federation"
-	contents, err := readResponse(serverURL)
-	if err != nil {
-		t.Fatalf("%v", err)
+	for _, groupVersion := range groupVersions {
+		serverURL := serverIP + "/apis/" + groupVersion.Group
+		contents, err := readResponse(serverURL)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		var apiGroup unversioned.APIGroup
+		err = json.Unmarshal(contents, &apiGroup)
+		if err != nil {
+			t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
+		}
+		// empty APIVersion for extensions group
+		if groupVersion.Group == "extensions" {
+			assert.Equal(t, apiGroup.APIVersion, "")
+		} else {
+			assert.Equal(t, apiGroup.APIVersion, "v1")
+		}
+		assert.Equal(t, apiGroup.Name, groupVersion.Group)
+		assert.Equal(t, 1, len(apiGroup.Versions))
+		assert.Equal(t, apiGroup.Versions[0].GroupVersion, groupVersion.String())
+		assert.Equal(t, apiGroup.Versions[0].Version, groupVersion.Version)
+		assert.Equal(t, apiGroup.Versions[0], apiGroup.PreferredVersion)
 	}
-	var apiGroup unversioned.APIGroup
-	err = json.Unmarshal(contents, &apiGroup)
-	if err != nil {
-		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
-	}
-	assert.Equal(t, apiGroup.APIVersion, "v1")
-	assert.Equal(t, apiGroup.Name, groupVersion.Group)
-	assert.Equal(t, 1, len(apiGroup.Versions))
-	assert.Equal(t, apiGroup.Versions[0].GroupVersion, groupVersion.String())
-	assert.Equal(t, apiGroup.Versions[0].Version, groupVersion.Version)
-	assert.Equal(t, apiGroup.Versions[0], apiGroup.PreferredVersion)
 }
 
 func findResource(resources []unversioned.APIResource, resourceName string) *unversioned.APIResource {
@@ -194,7 +211,12 @@ func findResource(resources []unversioned.APIResource, resourceName string) *unv
 }
 
 func testAPIResourceList(t *testing.T) {
-	serverURL := serverIP + "/apis/federation/v1alpha1"
+	testFederationResourceList(t)
+	testExtensionsResourceList(t)
+}
+
+func testFederationResourceList(t *testing.T) {
+	serverURL := serverIP + "/apis/" + fed_v1a1.SchemeGroupVersion.String()
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -205,7 +227,7 @@ func testAPIResourceList(t *testing.T) {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
 	}
 	assert.Equal(t, apiResourceList.APIVersion, "v1")
-	assert.Equal(t, apiResourceList.GroupVersion, groupVersion.String())
+	assert.Equal(t, apiResourceList.GroupVersion, fed_v1a1.SchemeGroupVersion.String())
 
 	found := findResource(apiResourceList.APIResources, "clusters")
 	assert.NotNil(t, found)
@@ -220,4 +242,30 @@ func testAPIResourceList(t *testing.T) {
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 
+}
+
+func testExtensionsResourceList(t *testing.T) {
+	serverURL := serverIP + "/apis/" + ext_v1b1.SchemeGroupVersion.String()
+	contents, err := readResponse(serverURL)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var apiResourceList unversioned.APIResourceList
+	err = json.Unmarshal(contents, &apiResourceList)
+	if err != nil {
+		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
+	}
+	// empty APIVersion for extensions group
+	assert.Equal(t, apiResourceList.APIVersion, "")
+	assert.Equal(t, apiResourceList.GroupVersion, ext_v1b1.SchemeGroupVersion.String())
+
+	found := findResource(apiResourceList.APIResources, "replicasets")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "replicasets/status")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "replicasets/scale")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
 }
