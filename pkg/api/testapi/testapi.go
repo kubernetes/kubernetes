@@ -153,8 +153,8 @@ func init() {
 	if _, ok := Groups[batch.GroupName]; !ok {
 		Groups[batch.GroupName] = TestGroup{
 			externalGroupVersion: unversioned.GroupVersion{Group: batch.GroupName, Version: registered.GroupOrDie(batch.GroupName).GroupVersion.Version},
-			internalGroupVersion: extensions.SchemeGroupVersion,
-			internalTypes:        api.Scheme.KnownTypes(extensions.SchemeGroupVersion),
+			internalGroupVersion: batch.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(batch.SchemeGroupVersion),
 		}
 	}
 	if _, ok := Groups[apps.GroupName]; !ok {
