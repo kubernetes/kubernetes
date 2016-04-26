@@ -36,6 +36,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -290,11 +291,13 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					{Group: api.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
 					{Group: extensions.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
 					{Group: metrics.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
+					{Group: federation.GroupName, Version: meta.AnyVersion, Resource: meta.AnyResource},
 				},
 				KindPriority: []unversioned.GroupVersionKind{
 					{Group: api.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
 					{Group: extensions.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
 					{Group: metrics.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
+					{Group: federation.GroupName, Version: meta.AnyVersion, Kind: meta.AnyKind},
 				},
 			}
 			return priorityRESTMapper, api.Scheme
@@ -327,6 +330,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return c.RESTClient, nil
 			case extensions.SchemeGroupVersion.Group:
 				return c.ExtensionsClient.RESTClient, nil
+			case federation.GroupName:
+				return clients.FederationClientForVersion(&mappingVersion)
 			default:
 				if !registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 					return nil, fmt.Errorf("unknown api group/version: %s", gvk.String())
@@ -576,8 +581,13 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					}
 					dir = path.Join(cacheDir, version.String())
 				}
+				fedClient, err := clients.FederationClientForVersion(nil)
+				if err != nil {
+					return nil, err
+				}
 				return &clientSwaggerSchema{
 					c:        client,
+					fedc:     fedClient,
 					cacheDir: dir,
 					mapper:   api.RESTMapper,
 				}, nil
@@ -755,6 +765,7 @@ func getServicePorts(spec api.ServiceSpec) []string {
 
 type clientSwaggerSchema struct {
 	c        *client.Client
+	fedc     *restclient.RESTClient
 	cacheDir string
 	mapper   meta.RESTMapper
 }
@@ -912,6 +923,12 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 			return errors.New("unable to validate: no experimental client")
 		}
 		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
+	}
+	if gvk.Group == federation.GroupName {
+		if c.fedc == nil {
+			return errors.New("unable to validate: no federation client")
+		}
+		return getSchemaAndValidate(c.fedc, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
 	}
 	return getSchemaAndValidate(c.c.RESTClient, data, "api", gvk.GroupVersion().String(), c.cacheDir)
 }
