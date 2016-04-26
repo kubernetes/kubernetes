@@ -199,3 +199,12 @@ func (in instrumentedDockerInterface) AttachToContainer(id string, opts dockerty
 	recordError(operation, err)
 	return err
 }
+
+func (in instrumentedDockerInterface) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
+	const operation = "image_history"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.ImageHistory(id)
+	recordError(operation, err)
+	return out, err
+}

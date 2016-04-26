@@ -151,6 +151,10 @@ func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect
 	return &resp, nil
 }
 
+func (d *kubeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
+	return d.client.ImageHistory(getDefaultContext(), id)
+}
+
 func (d *kubeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
 	images, err := d.client.ImageList(getDefaultContext(), opts)
 	if err != nil {
