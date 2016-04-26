@@ -1010,6 +1010,38 @@ func TestThirdPartyDiscovery(t *testing.T) {
 	}
 }
 
+type FakeTunneler struct {
+	SecondsSinceSyncValue       int64
+	SecondsSinceSSHKeySyncValue int64
+}
+
+func (t *FakeTunneler) Run(genericapiserver.AddressFunc)        {}
+func (t *FakeTunneler) Stop()                                   {}
+func (t *FakeTunneler) Dial(net, addr string) (net.Conn, error) { return nil, nil }
+func (t *FakeTunneler) SecondsSinceSync() int64                 { return t.SecondsSinceSyncValue }
+func (t *FakeTunneler) SecondsSinceSSHKeySync() int64           { return t.SecondsSinceSSHKeySyncValue }
+
+// TestIsTunnelSyncHealthy verifies that the 600 second lag test
+// is honored.
+func TestIsTunnelSyncHealthy(t *testing.T) {
+	assert := assert.New(t)
+	tunneler := &FakeTunneler{}
+	master := &Master{
+		GenericAPIServer: &genericapiserver.GenericAPIServer{},
+		tunneler:         tunneler,
+	}
+
+	// Pass case: 540 second lag
+	tunneler.SecondsSinceSyncValue = 540
+	err := master.IsTunnelSyncHealthy(nil)
+	assert.NoError(err, "IsTunnelSyncHealthy() should not have returned an error.")
+
+	// Fail case: 720 second lag
+	tunneler.SecondsSinceSyncValue = 720
+	err = master.IsTunnelSyncHealthy(nil)
+	assert.Error(err, "IsTunnelSyncHealthy() should have returned an error.")
+}
+
 func testThirdPartyDiscovery(t *testing.T, version string) {
 	_, etcdserver, server, assert := initThirdParty(t, version)
 	// TODO: Uncomment when fix #19254
