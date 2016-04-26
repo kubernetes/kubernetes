@@ -29,8 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/watch"
-	watchjson "k8s.io/kubernetes/pkg/watch/json"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 func getJSON(version, kind, name string) []byte {
@@ -449,7 +450,7 @@ func TestWatch(t *testing.T) {
 				t.Errorf("Watch(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
-			enc := watchjson.NewEncoder(w, dynamicCodec{})
+			enc := versioned.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
 			for _, e := range tc.events {
 				enc.Encode(&e)
 			}
