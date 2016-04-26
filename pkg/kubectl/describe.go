@@ -47,6 +47,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
+	fed_client_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/release_1_3"
 )
 
 // Describer generates output for the named resource or an error
@@ -1935,6 +1936,19 @@ func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 
 		return nil
 	})
+}
+
+type ClusterDescriber struct {
+	KubClientSet clientset.Interface
+	FedClientSet fed_client_1_3.Interface
+}
+
+func (d *ClusterDescriber) Describe(namespace, name string) (string, error) {
+	cluster, err := d.FedClientSet.Federation().Clusters().Get(name)
+	if err != nil {
+		return "", fmt.Errorf("error getting cluster: %v", err)
+	}
+	return cluster.Name, nil
 }
 
 // newErrNoDescriber creates a new ErrNoDescriber with the names of the provided types.

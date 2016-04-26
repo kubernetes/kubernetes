@@ -219,8 +219,8 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	return allErrs
 }
 
-// This matches type name in the swagger spec, such as "v1.Binding".
-var versionRegexp = regexp.MustCompile(`^v.+\..*`)
+// This matches type name in the swagger spec, such as "v1.Binding", "unversioned.ServerAddressByClientCIDR.
+var versionRegexp = regexp.MustCompile(`^(v.+|unversioned)\..*`)
 
 func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType string, fieldDetails *swagger.ModelProperty) []error {
 	// TODO: caesarxuchao: because we have multiple group/versions and objects

@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	fed_client_v1a1 "k8s.io/kubernetes/federation/client/clientset_generated/release_1_3/typed/federation/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -26,9 +27,10 @@ import (
 
 func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 	return &ClientCache{
-		clients: make(map[unversioned.GroupVersion]*client.Client),
-		configs: make(map[unversioned.GroupVersion]*restclient.Config),
-		loader:  loader,
+		clients:    make(map[unversioned.GroupVersion]*client.Client),
+		configs:    make(map[unversioned.GroupVersion]*restclient.Config),
+		fedClients: make(map[unversioned.GroupVersion]*restclient.RESTClient),
+		loader:     loader,
 	}
 }
 
@@ -37,6 +39,7 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 type ClientCache struct {
 	loader        clientcmd.ClientConfig
 	clients       map[unversioned.GroupVersion]*client.Client
+	fedClients    map[unversioned.GroupVersion]*restclient.RESTClient
 	configs       map[unversioned.GroupVersion]*restclient.Config
 	defaultConfig *restclient.Config
 	defaultClient *client.Client
@@ -124,4 +127,34 @@ func (c *ClientCache) ClientForVersion(version *unversioned.GroupVersion) (*clie
 	}
 
 	return kubeclient, nil
+}
+
+func (c *ClientCache) FederationClientForVersion(version *unversioned.GroupVersion) (*restclient.RESTClient, error) {
+	if version != nil {
+		if client, ok := c.fedClients[*version]; ok {
+			return client, nil
+		}
+	}
+	config, err := c.ClientConfigForVersion(version)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: support multi versions of client with clientset
+	fedClient, err := fed_client_v1a1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	c.fedClients[*config.GroupVersion] = fedClient.RESTClient
+
+	if version != nil {
+		configCopy := *config
+		fedClient, err := fed_client_v1a1.NewForConfig(&configCopy)
+		if err != nil {
+			return nil, err
+		}
+		c.fedClients[*version] = fedClient.RESTClient
+	}
+
+	return fedClient.RESTClient, nil
 }

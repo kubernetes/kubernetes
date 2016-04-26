@@ -49,6 +49,8 @@ func main() {
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1",
 		"k8s.io/kubernetes/pkg/apis/metrics",
 		"k8s.io/kubernetes/pkg/apis/metrics/v1alpha1",
+		"k8s.io/kubernetes/federation/apis/federation",
+		"k8s.io/kubernetes/federation/apis/federation/v1alpha1",
 	}
 
 	if err := arguments.Execute(

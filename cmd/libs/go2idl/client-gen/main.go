@@ -28,32 +28,45 @@ import (
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
+	"strings"
 )
 
 var (
 	test          = flag.BoolP("test", "t", false, "set this flag to generate the client code for the testdata")
 	inputVersions = flag.StringSlice("input", []string{"api/", "extensions/"}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\". Default to \"api/,extensions\"")
+	basePath      = flag.String("base", "k8s.io/kubernetes/pkg/apis", "base path to look for the api group. Default to \"k8s.io/kubernetes/pkg/apis\"")
 	clientsetName = flag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
 	clientsetPath = flag.String("clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>. Default to \"k8s.io/kubernetes/pkg/client/clientset_generated/\"")
 	clientsetOnly = flag.Bool("clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
 	fakeClient    = flag.Bool("fake-clientset", true, "when set, client-gen will generate the fake clientset that can be used in tests")
 )
 
-func versionToPath(group string, version string) (path string) {
-	const base = "k8s.io/kubernetes/pkg"
+func versionToPath(gvPath string, group string, version string) (path string) {
 	// special case for the core group
 	if group == "api" {
-		path = filepath.Join(base, "api", version)
+		path = filepath.Join(*basePath, "../api", version)
 	} else {
-		path = filepath.Join(base, "apis", group, version)
+		path = filepath.Join(*basePath, "../apis", gvPath, group, version)
 	}
 	return
+}
+
+func parsePathGroupVersion(pgvString string) (gvPath string, gvString string) {
+	subs := strings.Split(pgvString, "/")
+	length := len(subs)
+	switch length {
+	case 0, 1, 2:
+		return "", pgvString
+	default:
+		return strings.Join(subs[:length-2], "/"), strings.Join(subs[length-2:], "/")
+	}
 }
 
 func parseInputVersions() (paths []string, groupVersions []unversioned.GroupVersion, gvToPath map[unversioned.GroupVersion]string, err error) {
 	var visitedGroups = make(map[string]struct{})
 	gvToPath = make(map[unversioned.GroupVersion]string)
 	for _, gvString := range *inputVersions {
+		gvPath, gvString := parsePathGroupVersion(gvString)
 		gv, err := unversioned.ParseGroupVersion(gvString)
 		if err != nil {
 			return nil, nil, nil, err
@@ -64,7 +77,7 @@ func parseInputVersions() (paths []string, groupVersions []unversioned.GroupVers
 		}
 		visitedGroups[gv.Group] = struct{}{}
 		groupVersions = append(groupVersions, gv)
-		path := versionToPath(gv.Group, gv.Version)
+		path := versionToPath(gvPath, gv.Group, gv.Version)
 		paths = append(paths, path)
 		gvToPath[gv] = path
 	}
@@ -122,6 +135,8 @@ func main() {
 			FakeClient:              *fakeClient,
 			CmdArgs:                 cmdArgs,
 		}
+
+		fmt.Printf("==arguments: %v\n", arguments)
 	}
 
 	if err := arguments.Execute(
