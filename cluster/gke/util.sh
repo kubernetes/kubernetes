@@ -249,10 +249,7 @@ function detect-node-names {
   detect-node-instance-group
   NODE_NAMES=($(gcloud compute instance-groups managed list-instances \
     "${NODE_INSTANCE_GROUP}" --zone "${ZONE}" --project "${PROJECT}" \
-    --format=yaml | grep instance: | cut -d ' ' -f 2))
-
-  # Strip path if return value is selflink
-  NODE_NAMES=($(for i in ${NODE_NAMES[@]}; do basename "$i"; done))
+    --format='value(instance)'))
 
   echo "NODE_NAMES=${NODE_NAMES[*]}"
 }
