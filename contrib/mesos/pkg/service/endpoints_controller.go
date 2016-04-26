@@ -245,7 +245,6 @@ func (e *endpointController) worker() {
 	}
 }
 
-// HACK(sttts): add annotations to the endpoint about the respective container ports
 func (e *endpointController) syncService(key string) {
 	startTime := time.Now()
 	defer func() {
@@ -332,7 +331,6 @@ func (e *endpointController) syncService(key string) {
 			containerPortAnnotations[fmt.Sprintf(meta.ContainerPortKeyFormat, portProto, pod.Status.HostIP, portNum)] = strconv.Itoa(containerPort)
 		}
 	}
-	subsets = endpoints.RepackSubsets(subsets)
 
 	// See if there's actually an update here.
 	currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
