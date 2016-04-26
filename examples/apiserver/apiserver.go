@@ -62,13 +62,8 @@ func Run(serverOptions *genericapiserver.ServerRunOptions) error {
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
 	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
 	genericapiserver.ValidateRunOptions(serverOptions)
-	config := &genericapiserver.Config{
-		EnableIndex:          true,
-		EnableSwaggerSupport: true,
-		APIPrefix:            "/api",
-		APIGroupPrefix:       "/apis",
-		Serializer:           api.Codecs,
-	}
+	config := genericapiserver.NewConfig(serverOptions)
+	config.Serializer = api.Codecs
 	s, err := genericapiserver.New(config)
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
