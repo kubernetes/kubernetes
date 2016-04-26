@@ -204,7 +204,8 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	config.Codec = $.codecs|raw$.LegacyCodec(*config.GroupVersion)
+	config.NegotiatedSerializer = $.codecs|raw$
+
 	if config.QPS == 0 {
 		config.QPS = 5
 	}
@@ -232,11 +233,7 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	codec, ok := $.codecs|raw$.SerializerForFileExtension("json")
-	if !ok {
-		return $.Errorf|raw$("unable to find serializer for JSON")
-	}
-	config.Codec = codec
+	config.NegotiatedSerializer = $.codecs|raw$
 
 	if config.QPS == 0 {
 		config.QPS = 5
