@@ -1,0 +1,134 @@
+#cloud-config
+coreos:
+  update:
+    group: "stable"
+    reboot-strategy: "reboot"
+  flannel:
+    interface: $private_ipv4
+    etcd_endpoints: "%(etcd_endpoints)s"
+  units:
+  - name: flanneld.service
+    command: restart
+    drop-ins:
+    - name: 50-network-config.conf
+      content: |
+        [Unit]
+        Description=flannel is an etcd backed overlay network for containers
+        [Service]
+        ExecStartPre=/bin/bash -c "until /usr/bin/etcdctl --peers \"%(etcd_endpoints)s\" set /coreos.com/network/config '{\"Network\": \"%(overlay_network_cidr)s\", \"Backend\": {\"Type\": \"vxlan\"}}' ; do /usr/bin/sleep 1 ; done"
+        ExecStartPost=/bin/bash -c "until [ -e /run/flannel/subnet.env ]; do /usr/bin/sleep 1; done"
+  - name: docker.service
+    command: start
+    drop-ins:
+    - name: 40-flannel.conf
+      content: |
+        [Unit]
+        After=flanneld.service
+        Wants=flanneld.service
+  - name: logrotate.timer
+    command: start
+    content: |
+      [Unit]
+      Description=Periodic Log Rotation
+      [Timer]
+      OnUnitActiveSec=30m
+      AccuracySec=1m
+      Persistent=true
+  - name: logrotate.service
+    command: start
+    content: |
+      [Unit]
+      Description=Rotate and Compress System Logs
+      [Service]
+      ExecStart=/usr/sbin/logrotate /etc/logrotate.d/logrotate.conf
+  - name: cert-sync.service
+    command: start
+    content: |
+      [Unit]
+      Description=Copy SSL certificates and keys out of S3.
+      Requires=docker.service
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=-/bin/bash -c "mkdir /etc/kubernetes; mkdir /etc/kubernetes/ssl"
+      # TODO: Build our own awscli-enabled docker image
+      ExecStartPre=/usr/bin/docker pull xueshanf/awscli:latest
+      # TODO: Consider using the --delete option which will force delete any files in the dest that aren't in the src.
+      ExecStart=/usr/bin/docker run -v /etc/kubernetes/ssl:/certs --rm xueshanf/awscli aws s3 sync s3://%(cert_bucket)s/kubemaster /certs
+      ExecStartPost=/usr/bin/docker rmi xueshanf/awscli
+  - name: kube-kubelet.service
+    command: start
+    content: |
+      [Unit]
+      Description=Kubernetes Kubelet
+      Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+      Requires=docker.service
+      After=docker.service
+      [Service]
+      ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/%(kube_version)s/bin/linux/amd64/kubelet
+      ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
+      ExecStart=/opt/bin/kubelet \
+        --allow-privileged=true \
+        --api_servers=http://127.0.0.1:8080 \
+        --cloud-provider=aws \
+        --cluster_dns=%(kube_dns_ip)s \
+        --cluster_domain=cluster.local \
+        --config=/etc/kubernetes/manifests/ \
+        --hairpin-mode=none \
+        --hostname_override=$private_ipv4 \
+        --reconcile-cidr=false \
+        --register-schedulable=false \
+        --logtostderr=true
+      Restart=always
+      RestartSec=10
+      [Install]
+      WantedBy=multi-user.target
+  - name: kube-create-system-namespace.service
+    command: start
+    content: |
+      [Unit]
+      Description=Create the kube-system namespace if it doesn't already exist.
+      Requires=kube-kubelet.service
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/bin/bash -c "until curl http://127.0.0.1:8080/version ; do /usr/bin/sleep 1 ; done"
+      ExecStart=/usr/bin/curl -XPOST -d'{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"kube-system"}}' "http://127.0.0.1:8080/api/v1/namespaces"
+write_files:
+  - path: "/etc/logrotate.d/logrotate.conf"
+    permissins: "0644"
+    owner: "core"
+    content: |
+%(log_rotate_content)s
+  - path: /etc/systemd/system/docker.service.d/increase-ulimit.conf
+    permissions: "0644"
+    owner: "core"
+    content: |
+      [Service]
+      LimitNOFILE=65535
+  - path: /etc/systemd/system/docker.service.d/50-docker-log-sizing.conf
+    permissions: "0644"
+    owner: "core"
+    content: |
+      [Service]
+      Environment=DOCKER_OPTS='--log-driver=json-file --log-opt max-size=5m --log-opt max-file=10'
+  - path: "/etc/kubernetes/manifests/kube_apiserver.yaml"
+    permissions: "0644"
+    owner: "core"
+    content: |
+%(kube_apiserver_content)s
+  - path: "/etc/kubernetes/manifests/kube_proxy.yaml"
+    permissions: "0644"
+    owner: "core"
+    content: |
+%(kube_proxy_content)s
+  - path: "/etc/kubernetes/manifests/kube_controller_manager.yaml"
+    permissions: "0644"
+    owner: "core"
+    content: |
+%(kube_controller_manager_content)s
+  - path: "/etc/kubernetes/manifests/kube_scheduler.yaml"
+    permissions: "0644"
+    owner: "core"
+    content: |
+%(kube_scheduler_content)s
