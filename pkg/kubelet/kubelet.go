@@ -3157,7 +3157,7 @@ func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
 var oldNodeUnschedulable bool
 
 // record if node schedulable change.
-func (kl *Kubelet) recordNodeSchdulableEvent(node *api.Node) {
+func (kl *Kubelet) recordNodeSchedulableEvent(node *api.Node) {
 	if oldNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
 			kl.recordNodeStatusEvent(api.EventTypeNormal, kubecontainer.NodeNotSchedulable)
@@ -3195,7 +3195,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*api.Node) error {
 		withoutError(kl.setNodeStatusInfo),
 		withoutError(kl.setNodeOODCondition),
 		withoutError(kl.setNodeReadyCondition),
-		withoutError(kl.recordNodeSchdulableEvent),
+		withoutError(kl.recordNodeSchedulableEvent),
 	}
 }
 
