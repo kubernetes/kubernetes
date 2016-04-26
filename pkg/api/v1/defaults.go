@@ -66,7 +66,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		},
 		func(obj *Container) {
 			if obj.ImagePullPolicy == "" {
-				_, tag := parsers.ParseImageName(obj.Image)
+				// Ignore error and assume it has been validated elsewhere
+				_, tag, _ := parsers.ParseImageName(obj.Image)
+
 				// Check image tag
 
 				if tag == "latest" {
