@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -120,7 +119,7 @@ func Run(s *options.APIServer) error {
 	var proxyDialerFn apiserver.ProxyDialerFunc
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
-		var installSSH master.InstallSSHKey
+		var installSSH genericapiserver.InstallSSHKey
 		if cloud != nil {
 			if instances, supported := cloud.Instances(); supported {
 				installSSH = instances.AddSSHKeyToAllInstances
@@ -137,7 +136,7 @@ func Run(s *options.APIServer) error {
 			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.Port), 10)),
 			Path:   "healthz",
 		}
-		tunneler := master.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
+		tunneler := genericapiserver.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
 
 		// Use the tunneler's dialer to connect to the kubelet
 		s.KubeletConfig.Dial = tunneler.Dial
@@ -318,6 +317,6 @@ func getRuntimeConfigValue(s *options.APIServer, apiKey string, defaultValue boo
 // Parses the given runtime-config and formats it into genericapiserver.APIResourceConfigSource
 func parseRuntimeConfig(s *options.APIServer) (genericapiserver.APIResourceConfigSource, error) {
 	// TODO: parse the relevant group version when we add any.
-	resourceConfig := master.DefaultAPIResourceConfigSource()
+	resourceConfig := genericapiserver.NewResourceConfig()
 	return resourceConfig, nil
 }

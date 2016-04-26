@@ -102,7 +102,7 @@ type Config struct {
 	EventTTL                time.Duration
 	KubeletClient           kubeletclient.KubeletClient
 	// Used to start and monitor tunneling
-	Tunneler Tunneler
+	Tunneler genericapiserver.Tunneler
 
 	disableThirdPartyControllerForTesting bool
 }
@@ -136,7 +136,7 @@ type Master struct {
 	disableThirdPartyControllerForTesting bool
 
 	// Used to start and monitor tunneling
-	tunneler Tunneler
+	tunneler genericapiserver.Tunneler
 }
 
 // thirdPartyEntry combines objects storage and API group into one struct

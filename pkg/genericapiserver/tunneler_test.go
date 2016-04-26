@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package genericapiserver
 
 import (
 	"fmt"
@@ -64,27 +64,6 @@ func TestSecondsSinceSync(t *testing.T) {
 	tunneler.lastSync = time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC).Unix()
 	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(-2678400), tunneler.SecondsSinceSync())
-}
-
-// TestIsTunnelSyncHealthy verifies that the 600 second lag test
-// is honored.
-func TestIsTunnelSyncHealthy(t *testing.T) {
-	tunneler := &SSHTunneler{}
-	master, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-	master.tunneler = tunneler
-
-	// Pass case: 540 second lag
-	tunneler.lastSync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
-	tunneler.lastSSHKeySync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 9, 1, 1, time.UTC))
-	err := master.IsTunnelSyncHealthy(nil)
-	assert.NoError(err, "IsTunnelSyncHealthy() should not have returned an error.")
-
-	// Fail case: 720 second lag
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 12, 1, 1, time.UTC))
-	err = master.IsTunnelSyncHealthy(nil)
-	assert.Error(err, "IsTunnelSyncHealthy() should have returned an error.")
 }
 
 // generateTempFile creates a temporary file path
