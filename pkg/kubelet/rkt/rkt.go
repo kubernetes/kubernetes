@@ -41,6 +41,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -89,7 +90,18 @@ const (
 	k8sRktContainerHashAnno          = "rkt.kubernetes.io/container-hash"
 	k8sRktRestartCountAnno           = "rkt.kubernetes.io/restart-count"
 	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/termination-message-path"
-	dockerPrefix                     = "docker://"
+
+	// TODO(euank): This has significant security concerns as a stage1 image is
+	// effectively root.
+	// Furthermore, this (using an annotation) is a hack to pass an extra
+	// non-portable argument in. It should not be relied on to be stable.
+	// In the future, this might be subsumed by a first-class api object, or by a
+	// kitchen-sink params object (#17064).
+	// See discussion in #23944
+	// Also, do we want more granularity than path-at-the-kubelet-level and
+	// image/name-at-the-pod-level?
+	k8sRktStage1NameAnno = "rkt.alpha.kubernetes.io/stage1-name-override"
+	dockerPrefix         = "docker://"
 
 	authDir            = "auth.d"
 	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
@@ -130,7 +142,7 @@ type Runtime struct {
 	runtimeHelper       kubecontainer.RuntimeHelper
 	recorder            record.EventRecorder
 	livenessManager     proberesults.Manager
-	volumeGetter        volumeGetter
+	volumeGetter        VolumeGetter
 	imagePuller         kubecontainer.ImagePuller
 	runner              kubecontainer.HandlerRunner
 	execer              utilexec.Interface
@@ -154,7 +166,7 @@ type Runtime struct {
 var _ kubecontainer.Runtime = &Runtime{}
 
 // TODO(yifan): Remove this when volumeManager is moved to separate package.
-type volumeGetter interface {
+type VolumeGetter interface {
 	GetVolumes(podUID types.UID) (kubecontainer.VolumeMap, bool)
 }
 
@@ -181,7 +193,7 @@ func New(
 	containerRefManager *kubecontainer.RefManager,
 	podGetter podGetter,
 	livenessManager proberesults.Manager,
-	volumeGetter volumeGetter,
+	volumeGetter VolumeGetter,
 	httpClient kubetypes.HttpGetter,
 	networkPlugin network.NetworkPlugin,
 	hairpinMode bool,
@@ -264,10 +276,8 @@ func New(
 }
 
 func (r *Runtime) buildCommand(args ...string) *exec.Cmd {
-	cmd := exec.Command(r.config.Path)
-	cmd.Args = append(cmd.Args, r.config.buildGlobalOptions()...)
-	cmd.Args = append(cmd.Args, args...)
-	return cmd
+	allArgs := append(r.config.buildGlobalOptions(), args...)
+	return exec.Command(r.config.Path, allArgs...)
 }
 
 // convertToACName converts a string into ACName.
@@ -285,7 +295,8 @@ func (r *Runtime) RunCommand(args ...string) ([]string, error) {
 
 	var stdout, stderr bytes.Buffer
 	cmd := r.buildCommand(args...)
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("failed to run %v: %v\nstdout: %v\nstderr: %v", args, err, stdout.String(), stderr.String())
 	}
@@ -595,14 +606,19 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 		}
 	}
 
+	requiresPrivileged := false
 	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktKubeletAnno), k8sRktKubeletAnnoValue)
 	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktUIDAnno), string(pod.UID))
 	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktNameAnno), pod.Name)
 	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktNamespaceAnno), pod.Namespace)
 	manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktRestartCountAnno), strconv.Itoa(restartCount))
+	if stage1Name, ok := pod.Annotations[k8sRktStage1NameAnno]; ok {
+		requiresPrivileged = true
+		manifest.Annotations.Set(*appctypes.MustACIdentifier(k8sRktStage1NameAnno), stage1Name)
+	}
 
 	for _, c := range pod.Spec.Containers {
-		err := r.newAppcRuntimeApp(pod, c, pullSecrets, manifest)
+		err := r.newAppcRuntimeApp(pod, c, requiresPrivileged, pullSecrets, manifest)
 		if err != nil {
 			return nil, err
 		}
@@ -707,7 +723,11 @@ func (r *Runtime) makeContainerLogMount(opts *kubecontainer.RunContainerOptions,
 	return &mnt, nil
 }
 
-func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets []api.Secret, manifest *appcschema.PodManifest) error {
+func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, requiresPrivileged bool, pullSecrets []api.Secret, manifest *appcschema.PodManifest) error {
+	if requiresPrivileged && !capabilities.Get().AllowPrivileged {
+		return fmt.Errorf("cannot make %q: running a custom stage1 requires a privileged security context", format.Pod(pod))
+	}
+
 	if err, _ := r.imagePuller.PullImage(pod, &c, pullSecrets); err != nil {
 		return nil
 	}
@@ -950,6 +970,27 @@ func (r *Runtime) cleanupPodNetwork(pod *api.Pod) error {
 	return teardownErr
 }
 
+func (r *Runtime) preparePodArgs(manifest *appcschema.PodManifest, manifestFileName string) []string {
+	// Order of precedence for the stage1:
+	// 1) pod annotation (stage1 name)
+	// 2) kubelet configured stage1 (stage1 path)
+	// 3) empty; whatever rkt's compiled to default to
+	stage1ImageCmd := ""
+	if r.config.Stage1Image != "" {
+		stage1ImageCmd = "--stage1-path=" + r.config.Stage1Image
+	}
+	if stage1Name, ok := manifest.Annotations.Get(k8sRktStage1NameAnno); ok {
+		stage1ImageCmd = "--stage1-name=" + stage1Name
+	}
+
+	// Run 'rkt prepare' to get the rkt UUID.
+	cmds := []string{"prepare", "--quiet", "--pod-manifest", manifestFileName}
+	if stage1ImageCmd != "" {
+		cmds = append(cmds, stage1ImageCmd)
+	}
+	return cmds
+}
+
 // preparePod will:
 //
 // 1. Invoke 'rkt prepare' to prepare the pod, and get the rkt pod uuid.
@@ -958,7 +999,7 @@ func (r *Runtime) cleanupPodNetwork(pod *api.Pod) error {
 // On success, it will return a string that represents name of the unit file
 // and the runtime pod.
 func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret, netnsName string) (string, *kubecontainer.Pod, error) {
-	// Generate the pod manifest from the pod spec.
+	// Generate the appc pod manifest from the k8s pod spec.
 	manifest, err := r.makePodManifest(pod, pullSecrets)
 	if err != nil {
 		return "", nil, err
@@ -986,12 +1027,8 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret, netnsName s
 		return "", nil, err
 	}
 
-	// Run 'rkt prepare' to get the rkt UUID.
-	cmds := []string{"prepare", "--quiet", "--pod-manifest", manifestFile.Name()}
-	if r.config.Stage1Image != "" {
-		cmds = append(cmds, "--stage1-path", r.config.Stage1Image)
-	}
-	output, err := r.cli.RunCommand(cmds...)
+	prepareCmd := r.preparePodArgs(manifest, manifestFile.Name())
+	output, err := r.RunCommand(prepareCmd...)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1809,7 +1846,7 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 	if err != nil {
 		return err
 	}
-	args := append([]string{}, "enter", fmt.Sprintf("--app=%s", id.appName), id.uuid)
+	args := []string{"enter", fmt.Sprintf("--app=%s", id.appName), id.uuid}
 	args = append(args, cmd...)
 	command := r.buildCommand(args...)
 

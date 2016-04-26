@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 // Generated via `mockgen k8s.io/kubernetes/pkg/kubelet/rkt VolumeGetter > mock_rkt/mock_volume_getter.go`
 // Edited to include required boilerplate
 // Source: k8s.io/kubernetes/pkg/kubelet/rkt (interfaces: VolumeGetter)
