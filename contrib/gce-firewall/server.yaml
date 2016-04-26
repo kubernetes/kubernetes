@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: gce-firewall-server
+spec:
+  replicas: 1
+  selector:
+    name: gce-firewall-server
+  template:
+    metadata:
+      labels:
+        name: gce-firewall-server
+    spec:
+      containers:
+      - name: gce-firewall-server-container
+        image: artfulcoder/gce-firewall:1.1
+        command: [ "/server", "-port", "8080", "-alsologtostderr", "true" ]
+        ports:
+        - name: listenport
+          containerPort: 8080
+        volumeMounts:
+        - name: etcssl
+          mountPath: /etc/ssl
+      volumes:
+      - name: etcssl
+        hostPath:
+          path: /etc/ssl

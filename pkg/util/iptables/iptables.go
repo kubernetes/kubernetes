@@ -47,12 +47,16 @@ type Interface interface {
 	EnsureChain(table Table, chain Chain) (bool, error)
 	// FlushChain clears the specified chain.  If the chain did not exist, return error.
 	FlushChain(table Table, chain Chain) error
+	// ListChain lists all rules of the chain
+	ListChain(table Table, chain Chain) (string, error)
 	// DeleteChain deletes the specified chain.  If the chain did not exist, return error.
 	DeleteChain(table Table, chain Chain) error
 	// EnsureRule checks if the specified rule is present and, if not, creates it.  If the rule existed, return true.
 	EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
 	DeleteRule(table Table, chain Chain, args ...string) error
+	// DeleteRuleNumber deletes rule number.
+	DeleteRuleNumber(table Table, chain Chain, ruleNumber int) error
 	// IsIpv6 returns true if this is managing ipv6 tables
 	IsIpv6() bool
 	// TODO: (BenTheElder) Unit-Test Save/SaveAll, Restore/RestoreAll
@@ -85,7 +89,8 @@ type Table string
 
 const (
 	TableNAT    Table = "nat"
-	TableFilter Table = "filter"
+	TableFILTER Table = "filter"
+	TableMANGLE Table = "mangle"
 )
 
 type Chain string
@@ -228,6 +233,20 @@ func (runner *runner) FlushChain(table Table, chain Chain) error {
 	return nil
 }
 
+// ListChain lists all rules of the chain
+func (runner *runner) ListChain(table Table, chain Chain) (string, error) {
+	fullArgs := makeFullArgs(table, chain)
+
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	out, err := runner.run(opListChain, fullArgs)
+	if err != nil {
+		return "", fmt.Errorf("error listing rules of chain %q: %v: %s", chain, err, out)
+	}
+	return string(out), nil
+}
+
 // DeleteChain is part of Interface.
 func (runner *runner) DeleteChain(table Table, chain Chain) error {
 	fullArgs := makeFullArgs(table, chain)
@@ -281,6 +300,18 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 	out, err := runner.run(opDeleteRule, fullArgs)
 	if err != nil {
 		return fmt.Errorf("error deleting rule: %v: %s", err, out)
+	}
+	return nil
+}
+
+// DeleteRuleNumber is part of Interface.
+func (runner *runner) DeleteRuleNumber(table Table, chain Chain, ruleNumber int) error {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	_, err := runner.runWithFullArgs("-t", string(table), string(opDeleteRule), string(chain), fmt.Sprintf("%d", ruleNumber))
+	if err != nil {
+		return fmt.Errorf("error deleting rule number: %v: %d", err, ruleNumber)
 	}
 	return nil
 }
@@ -382,6 +413,13 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 	// Don't log err here - callers might not think it is an error.
 }
 
+func (runner *runner) runWithFullArgs(args ...string) ([]byte, error) {
+	iptablesCmd := runner.iptablesCommand()
+	glog.V(4).Infof("running iptables %v", args)
+	return runner.exec.Command(iptablesCmd, args...).CombinedOutput()
+	// Don't log err here - callers might not think it is an error.
+}
+
 // Returns (bool, nil) if it was able to check the existence of the rule, or
 // (<undefined>, error) if the process of checking failed.
 func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
@@ -460,6 +498,7 @@ type operation string
 const (
 	opCreateChain operation = "-N"
 	opFlushChain  operation = "-F"
+	opListChain   operation = "-L"
 	opDeleteChain operation = "-X"
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"

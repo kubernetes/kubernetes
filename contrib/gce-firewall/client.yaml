@@ -1,0 +1,18 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: gce-firewall
+spec:
+  template:
+    metadata:
+      name: gce-firewall-client
+      labels:
+        daemon: gce-firewall-client
+    spec:
+      hostNetwork: true
+      containers:
+      - name: gce-firewall
+        image: artfulcoder/gce-firewall:1.1
+        securityContext:
+          privileged: true
+        command: [ "/client", "-serviceName", "gce-firewall-service", "-alsologtostderr", "true" ]
