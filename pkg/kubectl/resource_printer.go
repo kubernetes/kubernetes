@@ -881,16 +881,19 @@ func getServiceExternalIP(svc *api.Service) string {
 		if len(svc.Spec.ExternalIPs) > 0 {
 			return strings.Join(svc.Spec.ExternalIPs, ",")
 		}
-		return "nodes"
+		return "<nodes>"
 	case api.ServiceTypeLoadBalancer:
 		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer)
 		if len(svc.Spec.ExternalIPs) > 0 {
 			result := append(strings.Split(lbIps, ","), svc.Spec.ExternalIPs...)
 			return strings.Join(result, ",")
 		}
-		return lbIps
+		if len(lbIps) > 0 {
+			return lbIps
+		}
+		return "<pending>"
 	}
-	return "unknown"
+	return "<unknown>"
 }
 
 func makePortString(ports []api.ServicePort) string {
