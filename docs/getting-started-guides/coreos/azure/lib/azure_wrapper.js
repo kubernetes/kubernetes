@@ -239,13 +239,15 @@ exports.queue_machines = function (name_prefix, coreos_update_channel, cloud_con
 };
 
 exports.create_config = function (name, nodes) {
+  var dnsName=util.getazdnsname(name);
+  var vnetName=util.getvnet(name);
   conf = {
     name: name,
     nodes: nodes,
     weave_salt: util.rand_string(),
     resources: {
-      vnet: [name, 'internal-vnet', util.rand_suffix].join('-'),
-      service: [name, util.rand_suffix].join('-'),
+      vnet: vnetName,
+      service: dnsName,
       ssh_key: create_ssh_key(name),
     }
   };
