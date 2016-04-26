@@ -46,15 +46,16 @@ type FakeDockerClient struct {
 	pulled               []string
 
 	// Created, Stopped and Removed all container docker ID
-	Created       []string
-	Stopped       []string
-	Removed       []string
-	RemovedImages sets.String
-	VersionInfo   dockertypes.Version
-	Information   dockertypes.Info
-	ExecInspect   *dockertypes.ContainerExecInspect
-	execCmd       []string
-	EnableSleep   bool
+	Created         []string
+	Stopped         []string
+	Removed         []string
+	RemovedImages   sets.String
+	VersionInfo     dockertypes.Version
+	Information     dockertypes.Info
+	ExecInspect     *dockertypes.ContainerExecInspect
+	execCmd         []string
+	EnableSleep     bool
+	ImageHistoryMap map[string][]dockertypes.ImageHistory
 }
 
 // We don't check docker version now, just set the docker version of fake docker client to 1.8.1.
@@ -482,6 +483,12 @@ func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 	return []dockertypes.ImageDelete{{Deleted: image}}, err
 }
 
+func (f *FakeDockerClient) InjectImages(images []dockertypes.Image) {
+	f.Lock()
+	defer f.Unlock()
+	f.Images = append(f.Images, images...)
+}
+
 func (f *FakeDockerClient) updateContainerStatus(id, status string) {
 	for i := range f.RunningContainerList {
 		if f.RunningContainerList[i].ID == id {
@@ -527,6 +534,18 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+func (f *FakeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
+	f.Lock()
+	defer f.Unlock()
+	history := f.ImageHistoryMap[id]
+	return history, nil
+}
+
+func (f *FakeDockerClient) InjectImageHistory(data map[string][]dockertypes.ImageHistory) {
+	f.Lock()
+	defer f.Unlock()
+	f.ImageHistoryMap = data
 }
 
 // dockerTimestampToString converts the timestamp to string

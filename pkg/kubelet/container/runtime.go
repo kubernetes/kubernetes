@@ -46,6 +46,12 @@ type ImageSpec struct {
 	Image string
 }
 
+// ImageStats contains statistics about all the images currently available.
+type ImageStats struct {
+	// Total amount of storage consumed by existing images.
+	TotalStorageBytes uint64
+}
+
 // Runtime interface defines the interfaces that should be implemented
 // by a container runtime.
 // Thread safety is required from implementations of this interface.
@@ -86,6 +92,8 @@ type Runtime interface {
 	ListImages() ([]Image, error)
 	// Removes the specified image.
 	RemoveImage(image ImageSpec) error
+	// Returns Image statistics.
+	ImageStats() (*ImageStats, error)
 	// TODO(vmarmol): Unify pod and containerID args.
 	// GetContainerLogs returns logs of a specific container. By
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
