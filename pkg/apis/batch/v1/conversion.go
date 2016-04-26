@@ -18,14 +18,22 @@ package v1
 
 import (
 	"fmt"
+	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) {
 	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs()
+	err := scheme.AddConversionFuncs(
+		Convert_batch_JobSpec_To_v1_JobSpec,
+		Convert_v1_JobSpec_To_batch_JobSpec,
+	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
@@ -44,4 +52,92 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+}
+
+func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*batch.JobSpec))(in)
+	}
+	if in.Parallelism != nil {
+		out.Parallelism = new(int32)
+		*out.Parallelism = int32(*in.Parallelism)
+	} else {
+		out.Parallelism = nil
+	}
+	if in.Completions != nil {
+		out.Completions = new(int32)
+		*out.Completions = int32(*in.Completions)
+	} else {
+		out.Completions = nil
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		out.ActiveDeadlineSeconds = new(int64)
+		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1.LabelSelector
+	if in.Selector != nil {
+		out.Selector = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.ManualSelector != nil {
+		out.ManualSelector = new(bool)
+		*out.ManualSelector = *in.ManualSelector
+	} else {
+		out.ManualSelector = nil
+	}
+
+	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobSpec))(in)
+	}
+	if in.Parallelism != nil {
+		out.Parallelism = new(int)
+		*out.Parallelism = int(*in.Parallelism)
+	} else {
+		out.Parallelism = nil
+	}
+	if in.Completions != nil {
+		out.Completions = new(int)
+		*out.Completions = int(*in.Completions)
+	} else {
+		out.Completions = nil
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		out.ActiveDeadlineSeconds = new(int64)
+		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	// unable to generate simple pointer conversion for v1.LabelSelector -> unversioned.LabelSelector
+	if in.Selector != nil {
+		out.Selector = new(unversioned.LabelSelector)
+		if err := Convert_v1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.ManualSelector != nil {
+		out.ManualSelector = new(bool)
+		*out.ManualSelector = *in.ManualSelector
+	} else {
+		out.ManualSelector = nil
+	}
+
+	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	return nil
 }

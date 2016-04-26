@@ -314,9 +314,9 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
-	jobs := reaper.Extensions().Jobs(namespace)
+	jobs := reaper.Batch().Jobs(namespace)
 	pods := reaper.Pods(namespace)
-	scaler, err := ScalerFor(extensions.Kind("Job"), *reaper)
+	scaler, err := ScalerFor(batch.Kind("Job"), *reaper)
 	if err != nil {
 		return err
 	}

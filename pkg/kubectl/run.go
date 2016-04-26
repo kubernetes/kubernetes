@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -280,12 +281,12 @@ func (JobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object
 	}
 	podSpec.RestartPolicy = restartPolicy
 
-	job := extensions.Job{
+	job := batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
-		Spec: extensions.JobSpec{
+		Spec: batch.JobSpec{
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: labels,
 			},
