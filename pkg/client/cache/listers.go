@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	federation "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -555,4 +556,89 @@ func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id st
 	}
 
 	return o.(*api.PersistentVolumeClaim), nil
+}
+
+type StoreToClusterLister struct {
+	Store
+}
+
+// ClusterConditionPredicate is a function that indicates whether the given cluster's conditions meet
+// some set of criteria defined by the function.
+type ClusterConditionPredicate func(cluster federation.Cluster) bool
+
+// storeToClusterConditionLister filters and returns nodes matching the given type and status from the store.
+type storeToClusterConditionLister struct {
+	store     Store
+	predicate ClusterConditionPredicate
+}
+
+// NodeCondition returns a storeToNodeConditionLister
+func (s *StoreToClusterLister) ClusterCondition(predicate ClusterConditionPredicate) storeToClusterConditionLister {
+	// TODO: Move this filtering server side. Currently our selectors don't facilitate searching through a list so we
+	// have the reflector filter out the Unschedulable field and sift through node conditions in the lister.
+	return storeToClusterConditionLister{s.Store, predicate}
+}
+
+func (s *StoreToClusterLister) List() (clusters federation.ClusterList, err error) {
+	for _, m := range s.Store.List() {
+		clusters.Items = append(clusters.Items, *(m.(*federation.Cluster)))
+	}
+	return clusters, nil
+}
+
+// List returns a list of nodes that match the conditions defined by the predicate functions in the storeToClusterConditionLister.
+func (s storeToClusterConditionLister) List() (clusters federation.ClusterList, err error) {
+	for _, m := range s.store.List() {
+		cluster := *m.(*federation.Cluster)
+		if s.predicate(cluster) {
+			clusters.Items = append(clusters.Items, cluster)
+		} else {
+			glog.V(5).Infof("Cluster %s matches none of the conditions", cluster.Name)
+		}
+	}
+	return
+}
+
+// StoreToSubRSLister gives a store List and Exists methods. The store must contain only SubRSs.
+type StoreToSubRSLister struct {
+	Store
+}
+
+// Exists checks if the given SubRS exists in the store.
+func (s *StoreToSubRSLister) Exists(rs *federation.SubReplicaSet) (bool, error) {
+	_, exists, err := s.Store.Get(rs)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// List lists all SubRSs in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToSubRSLister) List() (rss []federation.SubReplicaSet, err error) {
+	for _, rs := range s.Store.List() {
+		rss = append(rss, *(rs.(*federation.SubReplicaSet)))
+	}
+	return rss, nil
+}
+
+type storeSubRSsNamespacer struct {
+	store     Store
+	namespace string
+}
+
+func (s storeSubRSsNamespacer) List(selector labels.Selector) (rss []federation.SubReplicaSet, err error) {
+	for _, c := range s.store.List() {
+		rs := *(c.(*federation.SubReplicaSet))
+		if s.namespace == api.NamespaceAll || s.namespace == rs.Namespace {
+			if selector.Matches(labels.Set(rs.Labels)) {
+				rss = append(rss, rs)
+			}
+		}
+	}
+	return
+}
+
+func (s *StoreToSubRSLister) SubRSs(namespace string) storeSubRSsNamespacer {
+	return storeSubRSsNamespacer{s.Store, namespace}
 }
