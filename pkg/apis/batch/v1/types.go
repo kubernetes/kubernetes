@@ -21,6 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
+// +genclient=true
+
 // Job represents the configuration of a single job.
 type Job struct {
 	unversioned.TypeMeta `json:",inline"`
