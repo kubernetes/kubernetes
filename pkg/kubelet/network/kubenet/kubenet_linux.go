@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilsets "k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
 
@@ -195,7 +196,20 @@ func (plugin *kubenetNetworkPlugin) Name() string {
 	return KubenetPluginName
 }
 
+func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
+	return utilsets.NewInt(network.NET_PLUGIN_CAPABILITY_SHAPING)
+}
+
 func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	pod, ok := plugin.host.GetPodByName(namespace, name)
+	if !ok {
+		return fmt.Errorf("pod %q cannot be found", name)
+	}
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
+	if err != nil {
+		return fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
+	}
+
 	// Can't set up pods if we don't have a PodCIDR yet
 	if plugin.netConfig == nil {
 		return fmt.Errorf("Kubenet needs a PodCIDR to set up pods")
@@ -235,7 +249,12 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		plugin.shaper.ReconcileInterface()
 	}
 
-	// TODO: get ingress/egress from Pod.Spec and add pod CIDR to shaper
+	if egress != nil || ingress != nil {
+		ipAddr, _, _ := net.ParseCIDR(plugin.podCIDRs[id])
+		if err = plugin.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", ipAddr.String()), egress, ingress); err != nil {
+			return fmt.Errorf("Failed to add pod to shaper: %v", err)
+		}
+	}
 
 	return nil
 }
