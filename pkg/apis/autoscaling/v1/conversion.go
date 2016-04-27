@@ -66,12 +66,7 @@ func Convert_extensions_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscale
 	if err := Convert_extensions_SubresourceReference_To_v1_CrossVersionObjectReference(&in.ScaleRef, &out.ScaleTargetRef, s); err != nil {
 		return err
 	}
-	if in.MinReplicas != nil {
-		out.MinReplicas = new(int32)
-		*out.MinReplicas = int32(*in.MinReplicas)
-	} else {
-		out.MinReplicas = nil
-	}
+	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = int32(in.MaxReplicas)
 	if in.CPUUtilization != nil {
 		out.TargetCPUUtilizationPercentage = new(int32)
@@ -87,11 +82,7 @@ func Convert_v1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPodAutoscale
 	if err := Convert_v1_CrossVersionObjectReference_To_extensions_SubresourceReference(&in.ScaleTargetRef, &out.ScaleRef, s); err != nil {
 		return err
 	}
-	if in.MinReplicas != nil {
-		*out.MinReplicas = *in.MinReplicas
-	} else {
-		out.MinReplicas = nil
-	}
+	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
 	if in.TargetCPUUtilizationPercentage != nil {
 		out.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: *in.TargetCPUUtilizationPercentage}
