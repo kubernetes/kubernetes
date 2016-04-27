@@ -226,18 +226,12 @@ func (m *Master) InstallAPIs(c *Config) {
 			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
 	}
-
-	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
-	webservices := apiserver.InstallSupport(m.MuxHelper, healthzChecks...)
+	healthz.InstallHandler(m.MuxHelper, healthzChecks...)
 
 	if c.EnableProfiling {
 		m.MuxHelper.HandleFunc("/metrics", MetricsWithReset)
 	} else {
 		m.MuxHelper.HandleFunc("/metrics", defaultMetricsHandler)
-	}
-
-	for i := range webservices {
-		m.HandlerContainer.Add(webservices[i])
 	}
 
 	// allGroups records all supported groups at /apis
