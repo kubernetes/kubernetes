@@ -73,6 +73,7 @@ const (
 	simplePodPort            = 80
 	runJobTimeout            = 5 * time.Minute
 	nginxImage               = "gcr.io/google_containers/nginx:1.7.9"
+	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 )
 
 var (
@@ -538,7 +539,7 @@ var _ = Describe("Kubectl client", func() {
 	Describe("Kubectl apply", func() {
 		It("should apply a new configuration to an existing RC", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(testContext.RepoRoot, kubeCtlManifestPath, file)
 			}
 			controllerJson := mkpath("redis-master-controller.json")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -554,7 +555,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 		It("should reuse nodePort when apply to an existing SVC", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(testContext.RepoRoot, kubeCtlManifestPath, file)
 			}
 			serviceJson := mkpath("redis-master-service.json")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -595,7 +596,7 @@ var _ = Describe("Kubectl client", func() {
 			SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
 
 			mkpath := func(file string) string {
-				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(testContext.RepoRoot, kubeCtlManifestPath, file)
 			}
 			controllerJson := mkpath("redis-master-controller.json")
 			serviceJson := mkpath("redis-master-service.json")
@@ -615,7 +616,7 @@ var _ = Describe("Kubectl client", func() {
 					{"Status:", "Running"},
 					{"IP:"},
 					{"Controllers:", "ReplicationController/redis-master"},
-					{"Image:", "redis"},
+					{"Image:", redisImage},
 					{"cpu:", "BestEffort"},
 					{"State:", "Running"},
 				}
@@ -627,7 +628,7 @@ var _ = Describe("Kubectl client", func() {
 			requiredStrings := [][]string{
 				{"Name:", "redis-master"},
 				{"Namespace:", ns},
-				{"Image(s):", "redis"},
+				{"Image(s):", redisImage},
 				{"Selector:", "app=redis,role=master"},
 				{"Labels:", "app=redis,role=master"},
 				{"Replicas:", "1 current", "1 desired"},
@@ -692,7 +693,7 @@ var _ = Describe("Kubectl client", func() {
 	Describe("Kubectl expose", func() {
 		It("should create services for rc [Conformance]", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(testContext.RepoRoot, kubeCtlManifestPath, file)
 			}
 			controllerJson := mkpath("redis-master-controller.json")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -801,7 +802,7 @@ var _ = Describe("Kubectl client", func() {
 		containerName := "redis-master"
 		BeforeEach(func() {
 			mkpath := func(file string) string {
-				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(testContext.RepoRoot, kubeCtlManifestPath, file)
 			}
 			rcPath = mkpath("redis-master-controller.json")
 			By("creating an rc")
@@ -859,7 +860,7 @@ var _ = Describe("Kubectl client", func() {
 	Describe("Kubectl patch", func() {
 		It("should add annotations for pods in rc [Conformance]", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+				return filepath.Join(testContext.RepoRoot, kubeCtlManifestPath, file)
 			}
 			controllerJson := mkpath("redis-master-controller.json")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
