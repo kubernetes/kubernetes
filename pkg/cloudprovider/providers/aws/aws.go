@@ -1289,6 +1289,7 @@ func (c *AWSCloud) IsDiskDetached(diskName string) (bool, error) {
 
 // Implements Volumes.AttachDisk
 func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly bool) (string, error) {
+	glog.V(5).Infof("AttachDisk %s", diskName)
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
@@ -1357,6 +1358,8 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 
 // Implements Volumes.DetachDisk
 func (aws *AWSCloud) DetachDisk(diskName string, instanceName string, wait bool) (string, error) {
+	glog.V(5).Infof("DetachDisk %s", diskName)
+
 	disk, err := newAWSDisk(aws, diskName)
 	if err != nil {
 		return "", err
