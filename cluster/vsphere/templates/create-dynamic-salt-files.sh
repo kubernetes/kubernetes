@@ -112,7 +112,7 @@ node_instance_prefix: $NODE_INSTANCE_PREFIX
 service_cluster_ip_range: $SERVICE_CLUSTER_IP_RANGE
 enable_cluster_monitoring: "${ENABLE_CLUSTER_MONITORING:-none}"
 enable_cluster_logging: "${ENABLE_CLUSTER_LOGGING:false}"
-enable_cluster_ui: "${ENABLE_CLUSTER_UI:false}"
+enable_cluster_ui: "${ENABLE_CLUSTER_UI:true}"
 enable_node_logging: "${ENABLE_NODE_LOGGING:false}"
 logging_destination: $LOGGING_DESTINATION
 elasticsearch_replicas: $ELASTICSEARCH_LOGGING_REPLICAS
@@ -123,6 +123,7 @@ dns_domain: $DNS_DOMAIN
 e2e_storage_test_environment: "${E2E_STORAGE_TEST_ENVIRONMENT:-false}"
 cluster_cidr: "$NODE_IP_RANGES"
 allocate_node_cidrs: "${ALLOCATE_NODE_CIDRS:-true}"
+admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 EOF
 
 mkdir -p /srv/salt-overlay/salt/nginx
