@@ -1340,7 +1340,7 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 		if err != nil {
 			attachEnded = true
 			// TODO: Check if the volume was concurrently attached?
-			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
+			return ec2Device, fmt.Errorf("Error attaching EBS volume: %v", err)
 		}
 
 		glog.V(2).Infof("AttachVolume request returned %v", attachResponse)
@@ -1348,7 +1348,10 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 
 	err = disk.waitForAttachmentStatus("attached")
 	if err != nil {
-		return "", err
+		// Return the device even if there was an error - it could be time out
+		// and AWS is still trying to attach the volume. Caller may want to
+		// detach it manually.
+		return ec2Device, err
 	}
 
 	attachEnded = true
