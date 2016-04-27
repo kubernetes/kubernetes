@@ -298,6 +298,18 @@ func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
 	return false
 }
 
+func areTypesAliased(in, out *types.Type) bool {
+	// If one of the types is Alias, resolve it.
+	if in.Kind == types.Alias {
+		return areTypesAliased(in.Underlying, out)
+	}
+	if out.Kind == types.Alias {
+		return areTypesAliased(in, out.Underlying)
+	}
+
+	return in == out
+}
+
 const (
 	apiPackagePath        = "k8s.io/kubernetes/pkg/api"
 	conversionPackagePath = "k8s.io/kubernetes/pkg/conversion"
@@ -588,6 +600,13 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 }
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
+	if strings.Contains(inType.Name.Name, "ContainerStateRunning") {
+		fmt.Printf("doStruct(%#v, %#v)\n", inType, outType)
+	}
+	if areTypesAliased(inType, outType) {
+		sw.Do("out = in\n", nil)
+		return
+	}
 	for _, m := range inType.Members {
 		outMember, isOutMember := findMember(outType, m.Name)
 		if !isOutMember {
