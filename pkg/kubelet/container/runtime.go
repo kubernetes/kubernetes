@@ -79,7 +79,10 @@ type Runtime interface {
 	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
-	KillPod(pod *api.Pod, runningPod Pod) error
+	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
+	// only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
+	// it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
+	KillPod(pod *api.Pod, runningPod Pod, gracePeriodOverride *int64) error
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
