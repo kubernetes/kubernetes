@@ -1539,6 +1539,35 @@ func ValidateNodeSelector(nodeSelector *api.NodeSelector, fldPath *field.Path) f
 	return allErrs
 }
 
+func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if annotations[api.PreferAvoidPodsAnnotationKey] != "" {
+		allErrs = append(allErrs, ValidateAvoidPodsInNodeAnnotations(annotations, fldPath)...)
+	}
+	return allErrs
+}
+
+// ValidateAvoidPodsInNodeAnnotations tests that the serialized AvoidPods in Node.Annotations has valid data
+func ValidateAvoidPodsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	avoids, err := api.GetAvoidPodsFromNodeAnnotations(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("AvoidPods"), api.PreferAvoidPodsAnnotationKey, err.Error()))
+		return allErrs
+	}
+
+	if len(avoids.PreferAvoidPods) != 0 {
+		for _, pa := range avoids.PreferAvoidPods {
+			if pa.PodSignature.PodController == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("PodSignature"), ""))
+			}
+		}
+	}
+
+	return allErrs
+}
+
 // ValidatePreferredSchedulingTerms tests that the specified SoftNodeAffinity fields has valid data
 func ValidatePreferredSchedulingTerms(terms []api.PreferredSchedulingTerm, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -2085,7 +2114,9 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume, fldPath *field.Path) 
 
 // ValidateNode tests if required fields in the node are set.
 func ValidateNode(node *api.Node) field.ErrorList {
-	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, field.NewPath("metadata"))
+	fldPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
+	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
 
 	// Only validate spec. All status fields are optional and can be updated later.
 
@@ -2101,6 +2132,7 @@ func ValidateNode(node *api.Node) field.ErrorList {
 // ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
 func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, field.NewPath("metadata").Child("annotations"))...)
 
 	// TODO: Enable the code once we have better api object.status update model. Currently,
 	// anyone can update node status.

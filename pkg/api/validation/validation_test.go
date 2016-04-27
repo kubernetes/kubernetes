@@ -3847,6 +3847,43 @@ func TestValidateNode(t *testing.T) {
 				ExternalID: "external",
 			},
 		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name: "abc",
+				Annotations: map[string]string{
+					api.PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "podSignature": {
+							                "podController": {
+							                    "kind": "ReplicationController",
+							                    "namespace": "default",
+							                    "name": "foo",
+							                    "apiVersion": "v1"
+							                }
+							            },
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+				},
+			},
+			Status: api.NodeStatus{
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeLegacyHostIP, Address: "something"},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
+				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+			},
+		},
 	}
 	for _, successCase := range successCases {
 		if errs := ValidateNode(&successCase); len(errs) != 0 {
@@ -3898,6 +3935,32 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 		},
+		"missing-podSignature": {
+			ObjectMeta: api.ObjectMeta{
+				Name: "abc-123",
+				Annotations: map[string]string{
+					api.PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+				},
+			},
+			Status: api.NodeStatus{
+				Addresses: []api.NodeAddress{},
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+			},
+		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateNode(&v)
@@ -3907,11 +3970,12 @@ func TestValidateNode(t *testing.T) {
 		for i := range errs {
 			field := errs[i].Field
 			expectedFields := map[string]bool{
-				"metadata.name":        true,
-				"metadata.labels":      true,
-				"metadata.annotations": true,
-				"metadata.namespace":   true,
-				"spec.externalID":      true,
+				"metadata.name":                     true,
+				"metadata.labels":                   true,
+				"metadata.annotations":              true,
+				"metadata.namespace":                true,
+				"spec.externalID":                   true,
+				"metadata.annotations.PodSignature": true,
 			}
 			if expectedFields[field] == false {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
