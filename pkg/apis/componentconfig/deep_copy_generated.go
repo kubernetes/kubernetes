@@ -276,6 +276,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.HairpinMode = in.HairpinMode
 	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
+	out.NvidiaGPUs = in.NvidiaGPUs
 	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
 	out.ResolverConfig = in.ResolverConfig

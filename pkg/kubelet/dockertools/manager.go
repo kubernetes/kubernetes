@@ -569,6 +569,7 @@ func (dm *DockerManager) runContainer(
 	memoryLimit := container.Resources.Limits.Memory().Value()
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
+	nvidiaGPULimit := container.Resources.Limits.NvidiaGPU()
 	var cpuShares int64
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
@@ -579,6 +580,16 @@ func (dm *DockerManager) runContainer(
 		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
 		// of CPU shares.
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
+	}
+	var devices []dockercontainer.DeviceMapping
+	if nvidiaGPULimit.Value() != 0 {
+		// Experimental. For now, we hardcode /dev/nvidia0 no matter what the user asks for
+		// (we only support one device per node).
+		devices = []dockercontainer.DeviceMapping{
+			{"/dev/nvidia0", "/dev/nvidia0", "mrw"},
+			{"/dev/nvidiactl", "/dev/nvidiactl", "mrw"},
+			{"/dev/nvidia-uvm", "/dev/nvidia-uvm", "mrw"},
+		}
 	}
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
@@ -615,6 +626,7 @@ func (dm *DockerManager) runContainer(
 			Memory:     memoryLimit,
 			MemorySwap: -1,
 			CPUShares:  cpuShares,
+			Devices:    devices,
 		},
 		SecurityOpt: securityOpts,
 	}
