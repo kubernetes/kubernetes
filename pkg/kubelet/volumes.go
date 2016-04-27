@@ -207,9 +207,9 @@ func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
 	return volumes, nil
 }
 
-// cleanerTuple is a union struct to allow separating detaching from the cleaner.
+// cleaner is a union struct to allow separating detaching from the cleaner.
 // some volumes require detachment but not all.  Unmounter cannot be nil but Detacher is optional.
-type cleanerTuple struct {
+type cleaner struct {
 	Unmounter volume.Unmounter
 	Detacher  *volume.Detacher
 }
@@ -217,12 +217,12 @@ type cleanerTuple struct {
 // getPodVolumesFromDisk examines directory structure to determine volumes that
 // are presently active and mounted. Returns a union struct containing a volume.Unmounter
 // and potentially a volume.Detacher.
-func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleanerTuple {
-	currentVolumes := make(map[string]cleanerTuple)
+func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleaner {
+	currentVolumes := make(map[string]cleaner)
 	podUIDs, err := kl.listPodsFromDisk()
 	if err != nil {
 		glog.Errorf("Could not get pods from disk: %v", err)
-		return map[string]cleanerTuple{}
+		return map[string]cleaner{}
 	}
 	// Find the volumes for each on-disk pod.
 	for _, podUID := range podUIDs {
@@ -245,7 +245,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]cleanerTuple {
 				continue
 			}
 
-			tuple := cleanerTuple{Unmounter: unmounter}
+			tuple := cleaner{Unmounter: unmounter}
 			detacher, err := kl.newVolumeDetacherFromPlugins(volume.Kind, volume.Name, podUID)
 			// plugin can be nil but a non-nil error is a legitimate error
 			if err != nil {
