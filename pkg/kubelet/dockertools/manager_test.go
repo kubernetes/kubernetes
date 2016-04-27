@@ -407,7 +407,7 @@ func TestKillContainerInPod(t *testing.T) {
 
 	fakeDocker.SetFakeRunningContainers(containers)
 
-	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container in pod."); err != nil {
+	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container in pod.", nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Assert the container has been stopped.
@@ -470,7 +470,7 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 	containerToKill := containers[0]
 	fakeDocker.SetFakeRunningContainers(containers)
 
-	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container with preStop."); err != nil {
+	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container with preStop.", nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Assert the container has been stopped.
@@ -507,7 +507,7 @@ func TestKillContainerInPodWithError(t *testing.T) {
 	fakeDocker.SetFakeRunningContainers(containers)
 	fakeDocker.InjectError("stop", fmt.Errorf("sample error"))
 
-	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container with error."); err == nil {
+	if err := manager.KillContainerInPod(kubecontainer.ContainerID{}, &pod.Spec.Containers[0], pod, "test kill container with error.", nil); err == nil {
 		t.Errorf("expected error, found nil")
 	}
 }
@@ -1107,7 +1107,7 @@ func TestGetRestartCount(t *testing.T) {
 		if cs == nil {
 			t.Fatalf("Can't find status for container %q", containerName)
 		}
-		dm.KillContainerInPod(cs.ID, &pod.Spec.Containers[0], pod, "test container restart count.")
+		dm.KillContainerInPod(cs.ID, &pod.Spec.Containers[0], pod, "test container restart count.", nil)
 	}
 	// Container "bar" starts the first time.
 	// TODO: container lists are expected to be sorted reversely by time.

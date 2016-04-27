@@ -1169,14 +1169,15 @@ func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (stri
 // We can only deprecate this after refactoring kubelet.
 // TODO(random-liu): After using pod status for KillPod(), we can also remove the kubernetesPodLabel, because all the needed information should have
 // been extract from new labels and stored in pod status.
-func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
-	result := dm.killPodWithSyncResult(pod, runningPod)
+// only hard eviction scenarios should provide a grace period override, all other code paths must pass nil.
+func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+	result := dm.killPodWithSyncResult(pod, runningPod, gracePeriodOverride)
 	return result.Error()
 }
 
 // TODO(random-liu): This is just a temporary function, will be removed when we acturally add PodSyncResult
 // NOTE(random-liu): The pod passed in could be *nil* when kubelet restarted.
-func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod) (result kubecontainer.PodSyncResult) {
+func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
 	// Send the kills in parallel since they may take a long time.
 	// There may be len(runningPod.Containers) or len(runningPod.Containers)-1 of result in the channel
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
@@ -1212,7 +1213,7 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 			}
 
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			err := dm.KillContainerInPod(container.ID, containerSpec, pod, "Need to kill pod.")
+			err := dm.KillContainerInPod(container.ID, containerSpec, pod, "Need to kill pod.", gracePeriodOverride)
 			if err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, runningPod.ID)
@@ -1245,7 +1246,7 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 		}
 		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, networkContainer.Name)
 		result.AddSyncResult(killContainerResult)
-		if err := dm.KillContainerInPod(networkContainer.ID, networkSpec, pod, "Need to kill pod."); err != nil {
+		if err := dm.KillContainerInPod(networkContainer.ID, networkSpec, pod, "Need to kill pod.", gracePeriodOverride); err != nil {
 			killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 			glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, runningPod.ID)
 		}
@@ -1255,7 +1256,7 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 
 // KillContainerInPod kills a container in the pod. It must be passed either a container ID or a container and pod,
 // and will attempt to lookup the other information if missing.
-func (dm *DockerManager) KillContainerInPod(containerID kubecontainer.ContainerID, container *api.Container, pod *api.Pod, message string) error {
+func (dm *DockerManager) KillContainerInPod(containerID kubecontainer.ContainerID, container *api.Container, pod *api.Pod, message string, gracePeriodOverride *int64) error {
 	switch {
 	case containerID.IsEmpty():
 		// Locate the container.
@@ -1287,12 +1288,14 @@ func (dm *DockerManager) KillContainerInPod(containerID kubecontainer.ContainerI
 			pod = storedPod
 		}
 	}
-	return dm.killContainer(containerID, container, pod, message)
+	return dm.killContainer(containerID, container, pod, message, gracePeriodOverride)
 }
 
 // killContainer accepts a containerID and an optional container or pod containing shutdown policies. Invoke
-// KillContainerInPod if information must be retrieved first.
-func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, container *api.Container, pod *api.Pod, reason string) error {
+// KillContainerInPod if information must be retrieved first.  It is only valid to provide a grace period override
+// during hard eviction scenarios.  All other code paths in kubelet must never provide a grace period override otherwise
+// data corruption could occur in the end-user application.
+func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, container *api.Container, pod *api.Pod, reason string, gracePeriodOverride *int64) error {
 	ID := containerID.ID
 	name := ID
 	if container != nil {
@@ -1333,10 +1336,20 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		gracePeriod -= int64(unversioned.Now().Sub(start.Time).Seconds())
 	}
 
-	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
-	if gracePeriod < minimumGracePeriodInSeconds {
-		gracePeriod = minimumGracePeriodInSeconds
+	// if the caller did not specify a grace period override, we ensure that the grace period
+	// is not less than the minimal shutdown window to avoid unnecessary SIGKILLs.  if a caller
+	// did provide an override, we always set the gracePeriod to that value.  the only valid
+	// time to send an override is during eviction scenarios where we want to do a hard kill of
+	// a container because of resource exhaustion for incompressible resources (i.e. disk, memory).
+	if gracePeriodOverride == nil {
+		if gracePeriod < minimumGracePeriodInSeconds {
+			gracePeriod = minimumGracePeriodInSeconds
+		}
+	} else {
+		gracePeriod = *gracePeriodOverride
+		glog.V(2).Infof("Killing container %q, but using %d second grace period override", name, gracePeriod)
 	}
+
 	err := dm.client.StopContainer(ID, int(gracePeriod))
 	if err == nil {
 		glog.V(2).Infof("Container %q exited after %s", name, unversioned.Now().Sub(start.Time))
@@ -1460,7 +1473,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		handlerErr := dm.runner.Run(id, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
 			err := fmt.Errorf("PostStart handler: %v", handlerErr)
-			dm.KillContainerInPod(id, container, pod, err.Error())
+			dm.KillContainerInPod(id, container, pod, err.Error(), nil)
 			return kubecontainer.ContainerID{}, err
 		}
 	}
@@ -1795,7 +1808,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 
 		// Killing phase: if we want to start new infra container, or nothing is running kill everything (including infra container)
 		// TODO(random-liu): We'll use pod status directly in the future
-		killResult := dm.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(podStatus))
+		killResult := dm.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(podStatus), nil)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
 			return
@@ -1819,7 +1832,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 				}
 				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerStatus.Name)
 				result.AddSyncResult(killContainerResult)
-				if err := dm.KillContainerInPod(containerStatus.ID, podContainer, pod, killMessage); err != nil {
+				if err := dm.KillContainerInPod(containerStatus.ID, podContainer, pod, killMessage, nil); err != nil {
 					killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 					glog.Errorf("Error killing container %q(id=%q) for pod %q: %v", containerStatus.Name, containerStatus.ID, format.Pod(pod), err)
 					return
@@ -1871,7 +1884,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 				result.AddSyncResult(killContainerResult)
 				if delErr := dm.KillContainerInPod(kubecontainer.ContainerID{
 					ID:   string(podInfraContainerID),
-					Type: "docker"}, nil, pod, message); delErr != nil {
+					Type: "docker"}, nil, pod, message, nil); delErr != nil {
 					killContainerResult.Fail(kubecontainer.ErrKillContainer, delErr.Error())
 					glog.Warningf("Clear infra container failed for pod %q: %v", format.Pod(pod), delErr)
 				}
