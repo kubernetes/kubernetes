@@ -213,8 +213,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 		Expect(string(body)).To(Equal("pass"))
 	})
 
-	// Marked with [Flaky] until the tests prove themselves stable.
-	framework.KubeDescribe("[Flaky] Granular Checks", func() {
+	framework.KubeDescribe("Granular Checks", func() {
 
 		connectivityTimeout := 10
 
