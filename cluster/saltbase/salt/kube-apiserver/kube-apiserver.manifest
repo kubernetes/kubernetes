@@ -63,22 +63,20 @@
   {% set client_ca_file = "--client-ca-file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
 
-{% set token_auth_file = "--token-auth-file=/dev/null" -%}
-{% set basic_auth_file = "" -%}
-
 {% set min_request_timeout = "" -%}
 {% if grains.minRequestTimeout is defined -%}
   {% set min_request_timeout = "--min-request-timeout=" + grains.minRequestTimeout -%}
 {% endif -%}
 
-{% if grains.cloud is defined -%}
-{% if grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere', 'photon-controller' ] -%}
-    {% set token_auth_file = "--token-auth-file=/srv/kubernetes/known_tokens.csv" -%}
-{% endif -%}
-{% endif -%}
-
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere', 'photon-controller' ]  %}
-  {% set basic_auth_file = "--basic-auth-file=/srv/kubernetes/basic_auth.csv" -%}
+{% set token_auth_file = " --token-auth-file=/dev/null" -%}
+{% set basic_auth_file = "" -%}
+{% set authz_mode = "" -%}
+{% set abac_policy_file = "" -%}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere']  %}
+  {% set token_auth_file = " --token-auth-file=/srv/kubernetes/known_tokens.csv" -%}
+  {% set basic_auth_file = " --basic-auth-file=/srv/kubernetes/basic_auth.csv" -%}
+  {% set authz_mode = " --authorization-mode=ABAC" -%}
+  {% set abac_policy_file = " --authorization-policy-file=/srv/kubernetes/abac-authz-policy.jsonl" -%}
 {% endif -%}
 
 {% set admission_control = "" -%}
@@ -96,8 +94,8 @@
   {% set log_level = pillar['api_server_test_log_level'] -%}
 {% endif -%}
 
-{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
-{% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options -%}
+{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout -%}
+{% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['apiserver_test_args'] is defined -%}
