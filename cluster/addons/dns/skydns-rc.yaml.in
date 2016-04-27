@@ -1,3 +1,8 @@
+{% set host_network = "false" -%}
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vsphere', 'photon-controller' ] %}
+  {% set host_network = "true" -%}
+{% endif %}
+
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -19,9 +24,7 @@ spec:
         version: v11
         kubernetes.io/cluster-service: "true"
     spec:
-{% if grains['cloud'] is defined and grains['cloud'] in [ 'vsphere', 'photon-controller' ] %}
-      hostNetwork: true
-{% endif %}
+      hostNetwork: {{ host_network }}
       containers:
       - name: etcd
         image: gcr.io/google_containers/etcd-amd64:2.2.1

@@ -651,8 +651,10 @@ prepare_kube_addons() {
     mv "${addon_dst_dir}/dns/skydns-rc.yaml.in" "${dns_rc_file}"
     mv "${addon_dst_dir}/dns/skydns-svc.yaml.in" "${dns_svc_file}"
     # Replace the salt configurations with variable values.
+    remove_salt_config_comments "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_replicas'\] *}}@${DNS_REPLICAS}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"
+    sed -i -e "s@{{ *host_network *}}@false@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"
   fi
   if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
