@@ -47,7 +47,7 @@ docker:
       - pkg: docker-io
 
 {% endif %}
-{% elif grains.cloud is defined and grains.cloud == 'vsphere' and grains.os == 'Debian' and grains.osrelease_info[0] >=8 %}
+{% elif grains.cloud is defined and grains.cloud in ['vsphere', 'photon-controller'] and grains.os == 'Debian' and grains.osrelease_info[0] >=8 %}
 
 {% if pillar.get('is_systemd') %}
 
@@ -69,6 +69,7 @@ docker:
         environment_file: {{ environment_file }}
     - require:
       - file: /opt/kubernetes/helpers/docker-prestart
+      - pkg: docker-engine
 
 # The docker service.running block below doesn't work reliably
 # Instead we run our script which e.g. does a systemd daemon-reload
