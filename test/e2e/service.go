@@ -194,13 +194,13 @@ var _ = framework.KubeDescribe("Services", func() {
 		containerPorts1 := []api.ContainerPort{
 			{
 				Name:          svc1port,
-				ContainerPort: port1,
+				ContainerPort: int32(port1),
 			},
 		}
 		containerPorts2 := []api.ContainerPort{
 			{
 				Name:          svc2port,
-				ContainerPort: port2,
+				ContainerPort: int32(port2),
 			},
 		}
 
@@ -385,7 +385,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			svc.Spec.Type = api.ServiceTypeNodePort
 		})
 		jig.SanityCheckService(service, api.ServiceTypeNodePort)
-		nodePort := service.Spec.Ports[0].NodePort
+		nodePort := int(service.Spec.Ports[0].NodePort)
 
 		By("creating pod to be part of service " + serviceName)
 		jig.RunOrFail(ns, nil)
@@ -446,7 +446,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		if tcpService.Spec.Ports[0].Port != udpService.Spec.Ports[0].Port {
 			framework.Failf("expected to use the same port for TCP and UDP")
 		}
-		svcPort := tcpService.Spec.Ports[0].Port
+		svcPort := int(tcpService.Spec.Ports[0].Port)
 		framework.Logf("service port (TCP and UDP): %d", svcPort)
 
 		By("creating a pod to be part of the TCP service " + serviceName)
@@ -462,7 +462,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			s.Spec.Type = api.ServiceTypeNodePort
 		})
 		jig.SanityCheckService(tcpService, api.ServiceTypeNodePort)
-		tcpNodePort := tcpService.Spec.Ports[0].NodePort
+		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
 		framework.Logf("TCP node port: %d", tcpNodePort)
 
 		By("changing the UDP service to type=NodePort")
@@ -470,7 +470,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			s.Spec.Type = api.ServiceTypeNodePort
 		})
 		jig.SanityCheckService(udpService, api.ServiceTypeNodePort)
-		udpNodePort := udpService.Spec.Ports[0].NodePort
+		udpNodePort := int(udpService.Spec.Ports[0].NodePort)
 		framework.Logf("UDP node port: %d", udpNodePort)
 
 		By("hitting the TCP service's NodePort")
@@ -516,7 +516,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		// Wait for the load balancer to be created asynchronously
 		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name)
 		jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
-		if tcpService.Spec.Ports[0].NodePort != tcpNodePort {
+		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
 			framework.Failf("TCP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", tcpNodePort, tcpService.Spec.Ports[0].NodePort)
 		}
 		if requestedIP != "" && getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]) != requestedIP {
@@ -547,7 +547,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			// 2nd one should be faster since they ran in parallel.
 			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name)
 			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
-			if udpService.Spec.Ports[0].NodePort != udpNodePort {
+			if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
 				framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
 			}
 			udpIngressIP = getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
@@ -579,7 +579,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		tcpService = jig.ChangeServiceNodePortOrFail(ns1, tcpService.Name, tcpNodePort)
 		jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 		tcpNodePortOld := tcpNodePort
-		tcpNodePort = tcpService.Spec.Ports[0].NodePort
+		tcpNodePort = int(tcpService.Spec.Ports[0].NodePort)
 		if tcpNodePort == tcpNodePortOld {
 			framework.Failf("TCP Spec.Ports[0].NodePort (%d) did not change", tcpNodePort)
 		}
@@ -596,7 +596,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			jig.SanityCheckService(udpService, api.ServiceTypeNodePort)
 		}
 		udpNodePortOld := udpNodePort
-		udpNodePort = udpService.Spec.Ports[0].NodePort
+		udpNodePort = int(udpService.Spec.Ports[0].NodePort)
 		if udpNodePort == udpNodePortOld {
 			framework.Failf("UDP Spec.Ports[0].NodePort (%d) did not change", udpNodePort)
 		}
@@ -633,11 +633,11 @@ var _ = framework.KubeDescribe("Services", func() {
 		})
 		jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 		svcPortOld := svcPort
-		svcPort = tcpService.Spec.Ports[0].Port
+		svcPort = int(tcpService.Spec.Ports[0].Port)
 		if svcPort == svcPortOld {
 			framework.Failf("TCP Spec.Ports[0].Port (%d) did not change", svcPort)
 		}
-		if tcpService.Spec.Ports[0].NodePort != tcpNodePort {
+		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
 			framework.Failf("TCP Spec.Ports[0].NodePort (%d) changed", tcpService.Spec.Ports[0].NodePort)
 		}
 		if getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]) != tcpIngressIP {
@@ -653,10 +653,10 @@ var _ = framework.KubeDescribe("Services", func() {
 		} else {
 			jig.SanityCheckService(udpService, api.ServiceTypeNodePort)
 		}
-		if udpService.Spec.Ports[0].Port != svcPort {
+		if int(udpService.Spec.Ports[0].Port) != svcPort {
 			framework.Failf("UDP Spec.Ports[0].Port (%d) did not change", udpService.Spec.Ports[0].Port)
 		}
-		if udpService.Spec.Ports[0].NodePort != udpNodePort {
+		if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
 			framework.Failf("UDP Spec.Ports[0].NodePort (%d) changed", udpService.Spec.Ports[0].NodePort)
 		}
 		if loadBalancerSupportsUDP && getIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
@@ -801,7 +801,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		if port.NodePort == 0 {
 			framework.Failf("got unexpected Spec.Ports[0].nodePort for new service: %v", service)
 		}
-		if !ServiceNodePortRange.Contains(port.NodePort) {
+		if !ServiceNodePortRange.Contains(int(port.NodePort)) {
 			framework.Failf("got unexpected (out-of-range) port for new service: %v", service)
 		}
 
@@ -815,7 +815,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 		By(fmt.Sprintf("changing service "+serviceName+" to out-of-range NodePort %d", outOfRangeNodePort))
 		result, err := updateService(c, ns, serviceName, func(s *api.Service) {
-			s.Spec.Ports[0].NodePort = outOfRangeNodePort
+			s.Spec.Ports[0].NodePort = int32(outOfRangeNodePort)
 		})
 		if err == nil {
 			framework.Failf("failed to prevent update of service with out-of-range NodePort: %v", result)
@@ -830,7 +830,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		By(fmt.Sprintf("creating service "+serviceName+" with out-of-range NodePort %d", outOfRangeNodePort))
 		service = t.BuildServiceSpec()
 		service.Spec.Type = api.ServiceTypeNodePort
-		service.Spec.Ports[0].NodePort = outOfRangeNodePort
+		service.Spec.Ports[0].NodePort = int32(outOfRangeNodePort)
 		service, err = t.CreateService(service)
 		if err == nil {
 			framework.Failf("failed to prevent create of service with out-of-range NodePort (%d): %v", outOfRangeNodePort, service)
@@ -869,7 +869,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		if port.NodePort == 0 {
 			framework.Failf("got unexpected Spec.Ports[0].nodePort for new service: %v", service)
 		}
-		if !ServiceNodePortRange.Contains(port.NodePort) {
+		if !ServiceNodePortRange.Contains(int(port.NodePort)) {
 			framework.Failf("got unexpected (out-of-range) port for new service: %v", service)
 		}
 		nodePort := port.NodePort
@@ -938,11 +938,11 @@ func getContainerPortsByPodUID(endpoints *api.Endpoints) PortsByPodUID {
 				key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
 				mesosContainerPortString := endpoints.Annotations[key]
 				if mesosContainerPortString != "" {
-					var err error
-					containerPort, err = strconv.Atoi(mesosContainerPortString)
+					mesosContainerPort, err := strconv.Atoi(mesosContainerPortString)
 					if err != nil {
 						continue
 					}
+					containerPort = int32(mesosContainerPort)
 					framework.Logf("Mapped mesos host port %d to container port %d via annotation %s=%s", hostPort, containerPort, key, mesosContainerPortString)
 				}
 
@@ -950,7 +950,7 @@ func getContainerPortsByPodUID(endpoints *api.Endpoints) PortsByPodUID {
 				if _, ok := m[addr.TargetRef.UID]; !ok {
 					m[addr.TargetRef.UID] = make([]int, 0)
 				}
-				m[addr.TargetRef.UID] = append(m[addr.TargetRef.UID], containerPort)
+				m[addr.TargetRef.UID] = append(m[addr.TargetRef.UID], int(containerPort))
 			}
 		}
 	}
@@ -1279,7 +1279,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 		},
 		Spec: api.ServiceSpec{
 			Ports: []api.ServicePort{{
-				Port:       port,
+				Port:       int32(port),
 				TargetPort: intstr.FromInt(9376),
 				Protocol:   "TCP",
 			}},
@@ -1540,7 +1540,7 @@ func (j *ServiceTestJig) SanityCheckService(svc *api.Service, svcType api.Servic
 			framework.Failf("unexpected Spec.Ports[%d].NodePort (%d) for service", i, port.NodePort)
 		}
 		if hasNodePort {
-			if !ServiceNodePortRange.Contains(port.NodePort) {
+			if !ServiceNodePortRange.Contains(int(port.NodePort)) {
 				framework.Failf("out-of-range nodePort (%d) for service", port.NodePort)
 			}
 		}
@@ -1603,7 +1603,7 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 		offs2 := (offs1 + i) % ServiceNodePortRange.Size
 		newPort := ServiceNodePortRange.Base + offs2
 		service, err = j.UpdateService(namespace, name, func(s *api.Service) {
-			s.Spec.Ports[0].NodePort = newPort
+			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
 		if err != nil && strings.Contains(err.Error(), "provided port is already allocated") {
 			framework.Logf("tried nodePort %d, but it is in use, will try another", newPort)
@@ -1751,7 +1751,7 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *api.Replicat
 	if err != nil {
 		framework.Failf("Failed to created RC %q: %v", rc.Name, err)
 	}
-	pods, err := j.waitForPodsCreated(namespace, rc.Spec.Replicas)
+	pods, err := j.waitForPodsCreated(namespace, int(rc.Spec.Replicas))
 	if err != nil {
 		framework.Failf("Failed to create pods: %v", err)
 	}
@@ -1851,7 +1851,7 @@ func (t *ServiceTestFixture) BuildServiceSpec() *api.Service {
 
 // CreateWebserverRC creates rc-backed pods with the well-known webserver
 // configuration and records it for cleanup.
-func (t *ServiceTestFixture) CreateWebserverRC(replicas int) *api.ReplicationController {
+func (t *ServiceTestFixture) CreateWebserverRC(replicas int32) *api.ReplicationController {
 	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, api.ProtocolTCP, t.Labels)
 	rcAct, err := t.createRC(rcSpec)
 	if err != nil {

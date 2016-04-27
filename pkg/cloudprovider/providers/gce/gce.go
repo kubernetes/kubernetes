@@ -717,8 +717,8 @@ func loadBalancerPortRange(ports []api.ServicePort) (string, error) {
 		return "", fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(ports[0].Protocol))
 	}
 
-	minPort := 65536
-	maxPort := 0
+	minPort := int32(65536)
+	maxPort := int32(0)
 	for i := range ports {
 		if ports[i].Port < minPort {
 			minPort = ports[i].Port
@@ -776,7 +776,7 @@ func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress st
 	// Make sure the allowed ports match.
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
-		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
+		allowedPorts[ix] = strconv.Itoa(int(ports[ix].Port))
 	}
 	if !slicesEqual(allowedPorts, fw.Allowed[0].Ports) {
 		return true, true, nil
@@ -910,7 +910,7 @@ func (gce *GCECloud) updateFirewall(name, region, desc string, sourceRanges nets
 func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges netsets.IPNet, ports []api.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
-		allowedPorts[ix] = strconv.Itoa(ports[ix].Port)
+		allowedPorts[ix] = strconv.Itoa(int(ports[ix].Port))
 	}
 	hostTags, err := gce.computeHostTags(hosts)
 	if err != nil {
@@ -1248,7 +1248,7 @@ func (gce *GCECloud) CreateFirewall(name, desc string, sourceRanges netsets.IPNe
 	// if UDP ports are required. This means the method signature will change
 	// forcing downstream clients to refactor interfaces.
 	for _, p := range ports {
-		svcPorts = append(svcPorts, api.ServicePort{Port: int(p), Protocol: api.ProtocolTCP})
+		svcPorts = append(svcPorts, api.ServicePort{Port: int32(p), Protocol: api.ProtocolTCP})
 	}
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {
@@ -1282,7 +1282,7 @@ func (gce *GCECloud) UpdateFirewall(name, desc string, sourceRanges netsets.IPNe
 	// if UDP ports are required. This means the method signature will change,
 	// forcing downstream clients to refactor interfaces.
 	for _, p := range ports {
-		svcPorts = append(svcPorts, api.ServicePort{Port: int(p), Protocol: api.ProtocolTCP})
+		svcPorts = append(svcPorts, api.ServicePort{Port: int32(p), Protocol: api.ProtocolTCP})
 	}
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {

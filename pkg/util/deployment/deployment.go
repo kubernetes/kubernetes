@@ -237,8 +237,8 @@ func SetFromReplicaSetTemplate(deployment *extensions.Deployment, template api.P
 }
 
 // Returns the sum of Replicas of the given replica sets.
-func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
-	totalReplicaCount := 0
+func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int32 {
+	totalReplicaCount := int32(0)
 	for _, rs := range replicaSets {
 		if rs != nil {
 			totalReplicaCount += rs.Spec.Replicas
@@ -248,8 +248,8 @@ func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
 }
 
 // GetActualReplicaCountForReplicaSets returns the sum of actual replicas of the given replica sets.
-func GetActualReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int {
-	totalReplicaCount := 0
+func GetActualReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int32 {
+	totalReplicaCount := int32(0)
 	for _, rs := range replicaSets {
 		if rs != nil {
 			totalReplicaCount += rs.Status.Replicas
@@ -259,7 +259,7 @@ func GetActualReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) i
 }
 
 // Returns the number of available pods corresponding to the given replica sets.
-func GetAvailablePodsForReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int) (int, error) {
+func GetAvailablePodsForReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int32) (int32, error) {
 	allPods, err := GetPodsForReplicaSets(c, rss)
 	if err != nil {
 		return 0, err
@@ -267,8 +267,8 @@ func GetAvailablePodsForReplicaSets(c clientset.Interface, rss []*extensions.Rep
 	return getReadyPodsCount(allPods, minReadySeconds), nil
 }
 
-func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
-	readyPodCount := 0
+func getReadyPodsCount(pods []api.Pod, minReadySeconds int32) int32 {
+	readyPodCount := int32(0)
 	for _, pod := range pods {
 		if IsPodAvailable(&pod, minReadySeconds) {
 			readyPodCount++
@@ -277,7 +277,7 @@ func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
 	return readyPodCount
 }
 
-func IsPodAvailable(pod *api.Pod, minReadySeconds int) bool {
+func IsPodAvailable(pod *api.Pod, minReadySeconds int32) bool {
 	if !controller.IsPodActive(*pod) {
 		return false
 	}
@@ -340,17 +340,17 @@ func IsRollingUpdate(deployment *extensions.Deployment) bool {
 // When one of the followings is true, we're rolling out the deployment; otherwise, we're scaling it.
 // 1) The new RS is saturated: newRS's replicas == deployment's replicas
 // 2) Max number of pods allowed is reached: deployment's replicas + maxSurge == all RSs' replicas
-func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) (int, error) {
+func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) (int32, error) {
 	switch deployment.Spec.Strategy.Type {
 	case extensions.RollingUpdateDeploymentStrategyType:
 		// Check if we can scale up.
-		maxSurge, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Replicas, true)
+		maxSurge, err := intstrutil.GetValueFromIntOrPercent(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, int(deployment.Spec.Replicas), true)
 		if err != nil {
 			return 0, err
 		}
 		// Find the total number of pods
 		currentPodCount := GetReplicaCountForReplicaSets(allRSs)
-		maxTotalPods := deployment.Spec.Replicas + maxSurge
+		maxTotalPods := deployment.Spec.Replicas + int32(maxSurge)
 		if currentPodCount >= maxTotalPods {
 			// Cannot scale up.
 			return newRS.Spec.Replicas, nil
@@ -358,7 +358,7 @@ func NewRSNewReplicas(deployment *extensions.Deployment, allRSs []*extensions.Re
 		// Scale up.
 		scaleUpCount := maxTotalPods - currentPodCount
 		// Do not exceed the number of desired replicas.
-		scaleUpCount = integer.IntMin(scaleUpCount, deployment.Spec.Replicas-newRS.Spec.Replicas)
+		scaleUpCount = int32(integer.IntMin(int(scaleUpCount), int(deployment.Spec.Replicas-newRS.Spec.Replicas)))
 		return newRS.Spec.Replicas + scaleUpCount, nil
 	case extensions.RecreateDeploymentStrategyType:
 		return deployment.Spec.Replicas, nil
@@ -389,12 +389,12 @@ func WaitForObservedDeployment(getDeploymentFunc func() (*extensions.Deployment,
 // 1 desired, max unavailable 25%, surge 1% - should scale new(+1), then old(-1)
 // 2 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1), then new(+1), then old(-1)
 // 1 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1)
-func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired int) (int, int, error) {
-	surge, err := intstrutil.GetValueFromIntOrPercent(maxSurge, desired, true)
+func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired int32) (int32, int32, error) {
+	surge, err := intstrutil.GetValueFromIntOrPercent(maxSurge, int(desired), true)
 	if err != nil {
 		return 0, 0, err
 	}
-	unavailable, err := intstrutil.GetValueFromIntOrPercent(maxUnavailable, desired, false)
+	unavailable, err := intstrutil.GetValueFromIntOrPercent(maxUnavailable, int(desired), false)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -407,5 +407,5 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 		unavailable = 1
 	}
 
-	return surge, unavailable, nil
+	return int32(surge), int32(unavailable), nil
 }

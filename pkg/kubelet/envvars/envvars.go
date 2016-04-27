@@ -44,13 +44,13 @@ func FromServices(services *api.ServiceList) []api.EnvVar {
 		result = append(result, api.EnvVar{Name: name, Value: service.Spec.ClusterIP})
 		// First port - give it the backwards-compatible name
 		name = makeEnvVariableName(service.Name) + "_SERVICE_PORT"
-		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(service.Spec.Ports[0].Port)})
+		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(int(service.Spec.Ports[0].Port))})
 		// All named ports (only the first may be unnamed, checked in validation)
 		for i := range service.Spec.Ports {
 			sp := &service.Spec.Ports[i]
 			if sp.Name != "" {
 				pn := name + "_" + makeEnvVariableName(sp.Name)
-				result = append(result, api.EnvVar{Name: pn, Value: strconv.Itoa(sp.Port)})
+				result = append(result, api.EnvVar{Name: pn, Value: strconv.Itoa(int(sp.Port))})
 			}
 		}
 		// Docker-compatible vars.
@@ -96,7 +96,7 @@ func makeLinkVariables(service *api.Service) []api.EnvVar {
 			},
 			{
 				Name:  portPrefix + "_PORT",
-				Value: strconv.Itoa(sp.Port),
+				Value: strconv.Itoa(int(sp.Port)),
 			},
 			{
 				Name:  portPrefix + "_ADDR",

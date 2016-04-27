@@ -725,7 +725,7 @@ func newTestPersistentVolumeClaimForQuota(name string) *api.PersistentVolumeClai
 }
 
 // newTestReplicationControllerForQuota returns a simple replication controller
-func newTestReplicationControllerForQuota(name, image string, replicas int) *api.ReplicationController {
+func newTestReplicationControllerForQuota(name, image string, replicas int32) *api.ReplicationController {
 	return &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,

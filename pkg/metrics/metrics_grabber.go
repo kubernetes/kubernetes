@@ -94,14 +94,14 @@ func (g *MetricsGrabber) GrabFromKubelet(nodeName string) (KubeletMetrics, error
 		return KubeletMetrics{}, fmt.Errorf("Error listing nodes with name %v, got %v", nodeName, nodes.Items)
 	}
 	kubeletPort := nodes.Items[0].Status.DaemonEndpoints.KubeletEndpoint.Port
-	return g.grabFromKubeletInternal(nodeName, kubeletPort)
+	return g.grabFromKubeletInternal(nodeName, int(kubeletPort))
 }
 
 func (g *MetricsGrabber) grabFromKubeletInternal(nodeName string, kubeletPort int) (KubeletMetrics, error) {
 	if kubeletPort <= 0 || kubeletPort > 65535 {
 		return KubeletMetrics{}, fmt.Errorf("Invalid Kubelet port %v. Skipping Kubelet's metrics gathering.", kubeletPort)
 	}
-	output, err := g.getMetricsFromNode(nodeName, kubeletPort)
+	output, err := g.getMetricsFromNode(nodeName, int(kubeletPort))
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -173,7 +173,7 @@ func (g *MetricsGrabber) Grab(unknownMetrics sets.String) (MetricsCollection, er
 		} else {
 			for _, node := range nodes.Items {
 				kubeletPort := node.Status.DaemonEndpoints.KubeletEndpoint.Port
-				metrics, err := g.grabFromKubeletInternal(node.Name, kubeletPort)
+				metrics, err := g.grabFromKubeletInternal(node.Name, int(kubeletPort))
 				if err != nil {
 					errs = append(errs, err)
 				}

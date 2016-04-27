@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	})
 })
 
-func newRS(rsName string, replicas int, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
+func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
 	zero := int64(0)
 	return &extensions.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{
@@ -109,7 +109,7 @@ func newRS(rsName string, replicas int, rsPodLabels map[string]string, imageName
 	}
 }
 
-func newDeployment(deploymentName string, replicas int, podLabels map[string]string, imageName string, image string, strategyType extensions.DeploymentStrategyType, revisionHistoryLimit *int) *extensions.Deployment {
+func newDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName string, image string, strategyType extensions.DeploymentStrategyType, revisionHistoryLimit *int32) *extensions.Deployment {
 	zero := int64(0)
 	return &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
@@ -217,7 +217,7 @@ func testNewDeployment(f *framework.Framework) {
 
 	deploymentName := "test-new-deployment"
 	podLabels := map[string]string{"name": nginxImageName}
-	replicas := 1
+	replicas := int32(1)
 	framework.Logf("Creating simple deployment %s", deploymentName)
 	d := newDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
 	d.Annotations = map[string]string{"test": "should-copy-to-replica-set", kubectl.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
@@ -257,7 +257,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	}
 
 	rsName := "test-rolling-update-controller"
-	replicas := 3
+	replicas := int32(3)
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
@@ -306,7 +306,7 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 		"pod":  nginxImageName,
 	}
 	rsName := "test-rolling-scale-controller"
-	replicas := 1
+	replicas := int32(1)
 
 	rsRevision := "3546343826724305832"
 	annotations := make(map[string]string)
@@ -369,7 +369,7 @@ func testRecreateDeployment(f *framework.Framework) {
 	}
 
 	rsName := "test-recreate-controller"
-	replicas := 3
+	replicas := int32(3)
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
@@ -423,8 +423,8 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 		"pod":  nginxImageName,
 	}
 	rsName := "test-cleanup-controller"
-	replicas := 1
-	revisionHistoryLimit := util.IntPtr(0)
+	replicas := int32(1)
+	revisionHistoryLimit := util.Int32Ptr(0)
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 
@@ -478,7 +478,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
 
-	err = framework.WaitForDeploymentOldRSsNum(c, ns, deploymentName, *revisionHistoryLimit)
+	err = framework.WaitForDeploymentOldRSsNum(c, ns, deploymentName, int(*revisionHistoryLimit))
 	Expect(err).NotTo(HaveOccurred())
 	close(stopCh)
 }
@@ -499,7 +499,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	}
 
 	rsName := "test-rollover-controller"
-	rsReplicas := 4
+	rsReplicas := int32(4)
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
@@ -509,13 +509,13 @@ func testRolloverDeployment(f *framework.Framework) {
 		Expect(err).NotTo(HaveOccurred())
 	}
 	// Wait for the required pods to be ready for at least minReadySeconds (be available)
-	deploymentMinReadySeconds := 5
-	err = framework.WaitForPodsReady(c, ns, podName, deploymentMinReadySeconds)
+	deploymentMinReadySeconds := int32(5)
+	err = framework.WaitForPodsReady(c, ns, podName, int(deploymentMinReadySeconds))
 	Expect(err).NotTo(HaveOccurred())
 
 	// Create a deployment to delete nginx pods and instead bring up redis-slave pods.
 	deploymentName, deploymentImageName := "test-rollover-deployment", "redis-slave"
-	deploymentReplicas := 4
+	deploymentReplicas := int32(4)
 	deploymentImage := "gcr.io/google_samples/gb-redisslave:v1"
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	framework.Logf("Creating deployment %s", deploymentName)
@@ -653,7 +653,7 @@ func testRollbackDeployment(f *framework.Framework) {
 
 	// 1. Create a deployment to create nginx pods.
 	deploymentName, deploymentImageName := "test-rollback-deployment", nginxImageName
-	deploymentReplicas := 1
+	deploymentReplicas := int32(1)
 	deploymentImage := nginxImage
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	framework.Logf("Creating deployment %s", deploymentName)
@@ -765,7 +765,7 @@ func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 
 	// Create an old RS without revision
 	rsName := "test-rollback-no-revision-controller"
-	rsReplicas := 0
+	rsReplicas := int32(0)
 	rs := newRS(rsName, rsReplicas, rsPodLabels, nginxImageName, nginxImage)
 	rs.Annotations = make(map[string]string)
 	rs.Annotations["make"] = "difference"
@@ -774,7 +774,7 @@ func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 
 	// 1. Create a deployment to create nginx pods, which have different template than the replica set created above.
 	deploymentName, deploymentImageName := "test-rollback-no-revision-deployment", nginxImageName
-	deploymentReplicas := 1
+	deploymentReplicas := int32(1)
 	deploymentImage := nginxImage
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	framework.Logf("Creating deployment %s", deploymentName)
@@ -898,7 +898,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	podLabels := map[string]string{"name": podName}
 
 	rsName := "test-adopted-controller"
-	replicas := 3
+	replicas := int32(3)
 	image := nginxImage
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, podLabels, podName, image))
 	Expect(err).NotTo(HaveOccurred())

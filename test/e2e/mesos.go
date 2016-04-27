@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		nodelist := framework.ListSchedulableNodesOrDie(f.Client)
 
 		const ns = "static-pods"
-		numpods := len(nodelist.Items)
+		numpods := int32(len(nodelist.Items))
 		framework.ExpectNoError(framework.WaitForPodsRunningReady(ns, numpods, wait.ForeverTestTimeout),
 			fmt.Sprintf("number of static pods in namespace %s is %d", ns, numpods))
 	})
