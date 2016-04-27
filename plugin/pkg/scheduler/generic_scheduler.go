@@ -22,9 +22,11 @@ import (
 	"math/rand"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -68,6 +70,14 @@ type genericScheduler struct {
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a Fiterror error with reasons.
 func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeLister) (string, error) {
+	var trace *util.Trace
+	if pod != nil {
+		trace = util.NewTrace(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
+	} else {
+		trace = util.NewTrace("Scheduling <nil> pod")
+	}
+	defer trace.LogIfLong(20 * time.Millisecond)
+
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return "", err
@@ -82,8 +92,8 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 		return "", err
 	}
 
+	trace.Step("Computing predicates")
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, nodeNameToInfo, g.predicates, nodes, g.extenders)
-
 	if err != nil {
 		return "", err
 	}
@@ -95,11 +105,13 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 		}
 	}
 
+	trace.Step("Prioritizing")
 	priorityList, err := PrioritizeNodes(pod, nodeNameToInfo, g.prioritizers, algorithm.FakeNodeLister(filteredNodes), g.extenders)
 	if err != nil {
 		return "", err
 	}
 
+	trace.Step("Selecting host")
 	return g.selectHost(priorityList)
 }
 
