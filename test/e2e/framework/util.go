@@ -421,7 +421,7 @@ func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api
 // that it requires the list of pods on every iteration. This is useful, for
 // example, in cluster startup, because the number of pods increases while
 // waiting.
-func WaitForPodsRunningReady(ns string, minPods int, timeout time.Duration) error {
+func WaitForPodsRunningReady(ns string, minPods int32, timeout time.Duration) error {
 	c, err := LoadClient()
 	if err != nil {
 		return err
@@ -438,7 +438,7 @@ func WaitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
 			return false, nil
 		}
-		replicas := 0
+		replicas := int32(0)
 		for _, rc := range rcList.Items {
 			replicas += rc.Spec.Replicas
 		}
@@ -448,7 +448,7 @@ func WaitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
 			return false, nil
 		}
-		nOk, replicaOk, badPods := 0, 0, []api.Pod{}
+		nOk, replicaOk, badPods := int32(0), int32(0), []api.Pod{}
 		for _, pod := range podList.Items {
 			if res, err := PodRunningReady(&pod); res && err == nil {
 				nOk++
@@ -1231,7 +1231,7 @@ func PodsResponding(c *client.Client, ns, name string, wantName bool, pods *api.
 	return wait.PollImmediate(Poll, podRespondingTimeout, PodProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
 }
 
-func PodsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList, error) {
+func PodsCreated(c *client.Client, ns, name string, replicas int32) (*api.PodList, error) {
 	timeout := 2 * time.Minute
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
@@ -1251,7 +1251,7 @@ func PodsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList,
 		}
 		Logf("Pod name %s: Found %d pods out of %d", name, len(created), replicas)
 
-		if len(created) == replicas {
+		if int32(len(created)) == replicas {
 			pods.Items = created
 			return pods, nil
 		}
@@ -1274,7 +1274,7 @@ func podsRunning(c *client.Client, pods *api.PodList) []error {
 	return e
 }
 
-func VerifyPods(c *client.Client, ns, name string, wantName bool, replicas int) error {
+func VerifyPods(c *client.Client, ns, name string, wantName bool, replicas int32) error {
 	pods, err := PodsCreated(c, ns, name, replicas)
 	if err != nil {
 		return err
@@ -1747,7 +1747,7 @@ func (config *DeploymentConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: extensions.DeploymentSpec{
-			Replicas: config.Replicas,
+			Replicas: int32(config.Replicas),
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": config.Name,
@@ -1800,7 +1800,7 @@ func (config *ReplicaSetConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: config.Replicas,
+			Replicas: int32(config.Replicas),
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": config.Name,
@@ -1853,7 +1853,7 @@ func (config *RCConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: config.Replicas,
+			Replicas: int32(config.Replicas),
 			Selector: map[string]string{
 				"name": config.Name,
 			},
@@ -1902,13 +1902,13 @@ func (config *RCConfig) applyTo(template *api.PodTemplateSpec) {
 	if config.Ports != nil {
 		for k, v := range config.Ports {
 			c := &template.Spec.Containers[0]
-			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v})
+			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: int32(v)})
 		}
 	}
 	if config.HostPorts != nil {
 		for k, v := range config.HostPorts {
 			c := &template.Spec.Containers[0]
-			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v, HostPort: v})
+			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: int32(v), HostPort: int32(v)})
 		}
 	}
 	if config.CpuLimit > 0 || config.MemLimit > 0 {
@@ -2461,7 +2461,7 @@ func waitForReplicaSetPodsGone(c *client.Client, rs *extensions.ReplicaSet) erro
 
 // Waits for the deployment to reach desired state.
 // Returns an error if minAvailable or maxCreated is broken at any times.
-func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated, minReadySeconds int) error {
+func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated, minReadySeconds int32) error {
 	var oldRSs, allOldRSs, allRSs []*extensions.ReplicaSet
 	var newRS *extensions.ReplicaSet
 	var deployment *extensions.Deployment
@@ -2528,7 +2528,7 @@ func WaitForDeploymentUpdatedReplicasLTE(c clientset.Interface, ns, deploymentNa
 		if err != nil {
 			return false, err
 		}
-		if deployment.Status.ObservedGeneration >= desiredGeneration && deployment.Status.UpdatedReplicas >= minUpdatedReplicas {
+		if deployment.Status.ObservedGeneration >= desiredGeneration && deployment.Status.UpdatedReplicas >= int32(minUpdatedReplicas) {
 			return true, nil
 		}
 		return false, nil
@@ -2619,7 +2619,7 @@ func WaitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds i
 			return false, nil
 		}
 		for _, pod := range pods.Items {
-			if !deploymentutil.IsPodAvailable(&pod, minReadySeconds) {
+			if !deploymentutil.IsPodAvailable(&pod, int32(minReadySeconds)) {
 				return false, nil
 			}
 		}
@@ -2654,7 +2654,7 @@ func WaitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string
 	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) { return c.Extensions().Deployments(ns).Get(deploymentName) }, desiredGeneration, Poll, 1*time.Minute)
 }
 
-func logPodsOfReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int) {
+func logPodsOfReplicaSets(c clientset.Interface, rss []*extensions.ReplicaSet, minReadySeconds int32) {
 	allPods, err := deploymentutil.GetPodsForReplicaSets(c, rss)
 	if err == nil {
 		for _, pod := range allPods {
@@ -2743,7 +2743,7 @@ func FailedContainers(pod *api.Pod) map[string]ContainerFailures {
 				if state, ok = states[status.ContainerID]; !ok {
 					state = ContainerFailures{}
 				}
-				state.Restarts = status.RestartCount
+				state.Restarts = int(status.RestartCount)
 				states[status.ContainerID] = state
 			}
 		}
@@ -3352,9 +3352,9 @@ func getSvcNodePort(client *client.Client, ns, name string, svcPort int) (int, e
 		return 0, err
 	}
 	for _, p := range svc.Spec.Ports {
-		if p.Port == svcPort {
+		if p.Port == int32(svcPort) {
 			if p.NodePort != 0 {
-				return p.NodePort, nil
+				return int(p.NodePort), nil
 			}
 		}
 	}
@@ -3682,7 +3682,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 					Name:  containerName,
 					Image: "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
 					Env:   []api.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
-					Ports: []api.ContainerPort{{ContainerPort: port}},
+					Ports: []api.ContainerPort{{ContainerPort: int32(port)}},
 				},
 			},
 			NodeName:      nodeName,

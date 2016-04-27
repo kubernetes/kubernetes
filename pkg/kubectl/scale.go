@@ -129,8 +129,8 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 
 // ValidateReplicationController ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
 func (precondition *ScalePrecondition) ValidateReplicationController(controller *api.ReplicationController) error {
-	if precondition.Size != -1 && controller.Spec.Replicas != precondition.Size {
-		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(controller.Spec.Replicas)}
+	if precondition.Size != -1 && int(controller.Spec.Replicas) != precondition.Size {
+		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(controller.Spec.Replicas))}
 	}
 	if len(precondition.ResourceVersion) != 0 && controller.ResourceVersion != precondition.ResourceVersion {
 		return PreconditionError{"resource version", precondition.ResourceVersion, controller.ResourceVersion}
@@ -152,7 +152,7 @@ func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, p
 			return err
 		}
 	}
-	controller.Spec.Replicas = int(newSize)
+	controller.Spec.Replicas = int32(newSize)
 	// TODO: do retry on 409 errors here?
 	if _, err := scaler.c.ReplicationControllers(namespace).Update(controller); err != nil {
 		if errors.IsInvalid(err) {
@@ -191,8 +191,8 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 
 // ValidateReplicaSet ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
 func (precondition *ScalePrecondition) ValidateReplicaSet(replicaSet *extensions.ReplicaSet) error {
-	if precondition.Size != -1 && replicaSet.Spec.Replicas != precondition.Size {
-		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(replicaSet.Spec.Replicas)}
+	if precondition.Size != -1 && int(replicaSet.Spec.Replicas) != precondition.Size {
+		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(replicaSet.Spec.Replicas))}
 	}
 	if len(precondition.ResourceVersion) != 0 && replicaSet.ResourceVersion != precondition.ResourceVersion {
 		return PreconditionError{"resource version", precondition.ResourceVersion, replicaSet.ResourceVersion}
@@ -214,7 +214,7 @@ func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, precondition
 			return err
 		}
 	}
-	rs.Spec.Replicas = int(newSize)
+	rs.Spec.Replicas = int32(newSize)
 	// TODO: do retry on 409 errors here?
 	if _, err := scaler.c.ReplicaSets(namespace).Update(rs); err != nil {
 		if errors.IsInvalid(err) {
@@ -256,8 +256,8 @@ func (precondition *ScalePrecondition) ValidateJob(job *batch.Job) error {
 	if precondition.Size != -1 && job.Spec.Parallelism == nil {
 		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), "nil"}
 	}
-	if precondition.Size != -1 && *job.Spec.Parallelism != precondition.Size {
-		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), strconv.Itoa(*job.Spec.Parallelism)}
+	if precondition.Size != -1 && int(*job.Spec.Parallelism) != precondition.Size {
+		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), strconv.Itoa(int(*job.Spec.Parallelism))}
 	}
 	if len(precondition.ResourceVersion) != 0 && job.ResourceVersion != precondition.ResourceVersion {
 		return PreconditionError{"resource version", precondition.ResourceVersion, job.ResourceVersion}
@@ -280,7 +280,7 @@ func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *Scal
 			return err
 		}
 	}
-	parallelism := int(newSize)
+	parallelism := int32(newSize)
 	job.Spec.Parallelism = &parallelism
 	if _, err := scaler.c.Jobs(namespace).Update(job); err != nil {
 		if errors.IsInvalid(err) {
@@ -319,8 +319,8 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 
 // ValidateDeployment ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
 func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions.Deployment) error {
-	if precondition.Size != -1 && deployment.Spec.Replicas != precondition.Size {
-		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(deployment.Spec.Replicas)}
+	if precondition.Size != -1 && int(deployment.Spec.Replicas) != precondition.Size {
+		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(deployment.Spec.Replicas))}
 	}
 	if len(precondition.ResourceVersion) != 0 && deployment.ResourceVersion != precondition.ResourceVersion {
 		return PreconditionError{"resource version", precondition.ResourceVersion, deployment.ResourceVersion}
@@ -346,7 +346,7 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 
 	// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
 	// For now I'm falling back to regular Deployment update operation.
-	deployment.Spec.Replicas = int(newSize)
+	deployment.Spec.Replicas = int32(newSize)
 	if _, err := scaler.c.Deployments(namespace).Update(deployment); err != nil {
 		if errors.IsInvalid(err) {
 			return ScaleError{ScaleUpdateInvalidFailure, deployment.ResourceVersion, err}

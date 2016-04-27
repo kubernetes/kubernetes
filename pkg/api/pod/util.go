@@ -49,7 +49,7 @@ func FindPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
 				if port.Name == name && port.Protocol == svcPort.Protocol {
-					return port.ContainerPort, nil
+					return int(port.ContainerPort), nil
 				}
 			}
 		}

@@ -92,7 +92,7 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 		return nil, fmt.Errorf("empty lun")
 	}
 
-	lun := strconv.Itoa(*fc.Lun)
+	lun := strconv.Itoa(int(*fc.Lun))
 
 	return &fcDiskMounter{
 		fcDisk: &fcDisk{

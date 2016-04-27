@@ -429,7 +429,7 @@ func (rm *ReplicationManager) worker() {
 
 // manageReplicas checks and updates replicas for the given replication controller.
 func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.ReplicationController) {
-	diff := len(filteredPods) - rc.Spec.Replicas
+	diff := len(filteredPods) - int(rc.Spec.Replicas)
 	rcKey, err := controller.KeyFunc(rc)
 	if err != nil {
 		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)

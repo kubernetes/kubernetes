@@ -740,7 +740,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 
 		_, err = members.Create(lb.network, members.CreateOpts{
 			PoolID:       pool.ID,
-			ProtocolPort: ports[0].NodePort, //TODO: need to handle multi-port
+			ProtocolPort: int(ports[0].NodePort), //TODO: need to handle multi-port
 			Address:      addr,
 		}).Extract()
 		if err != nil {
@@ -774,7 +774,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		Name:         name,
 		Description:  fmt.Sprintf("Kubernetes external service %s", name),
 		Protocol:     "TCP",
-		ProtocolPort: ports[0].Port, //TODO: need to handle multi-port
+		ProtocolPort: int(ports[0].Port), //TODO: need to handle multi-port
 		PoolID:       pool.ID,
 		SubnetID:     lb.opts.SubnetId,
 		Persistence:  persistence,

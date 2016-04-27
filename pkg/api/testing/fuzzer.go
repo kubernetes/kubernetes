@@ -159,8 +159,8 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		},
 		func(j *batch.JobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			completions := int(c.Rand.Int31())
-			parallelism := int(c.Rand.Int31())
+			completions := int32(c.Rand.Int31())
+			parallelism := int32(c.Rand.Int31())
 			j.Completions = &completions
 			j.Parallelism = &parallelism
 			if c.Rand.Int31()%2 == 0 {
@@ -395,9 +395,9 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		},
 		func(s *extensions.HorizontalPodAutoscalerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			minReplicas := int(c.Rand.Int31())
+			minReplicas := int32(c.Rand.Int31())
 			s.MinReplicas = &minReplicas
-			s.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int(int32(c.RandUint64()))}
+			s.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int32(c.RandUint64())}
 		},
 		func(s *extensions.SubresourceReference, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again

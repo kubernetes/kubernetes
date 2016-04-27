@@ -576,7 +576,7 @@ func podReadyTime(pod *api.Pod) unversioned.Time {
 func maxContainerRestarts(pod *api.Pod) int {
 	maxRestarts := 0
 	for _, c := range pod.Status.ContainerStatuses {
-		maxRestarts = integer.IntMax(maxRestarts, c.RestartCount)
+		maxRestarts = integer.IntMax(maxRestarts, int(c.RestartCount))
 	}
 	return maxRestarts
 }

@@ -84,7 +84,7 @@ func TestValidateJob(t *testing.T) {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
-	negative := -1
+	negative := int32(-1)
 	negative64 := int64(-1)
 	errorCases := map[string]batch.Job{
 		"spec.parallelism:must be greater than or equal to 0": {

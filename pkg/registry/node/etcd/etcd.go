@@ -123,7 +123,7 @@ func (r *REST) getKubeletPort(ctx api.Context, nodeName string) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf("Unexpected object type: %#v", node)
 	}
-	return node.Status.DaemonEndpoints.KubeletEndpoint.Port, nil
+	return int(node.Status.DaemonEndpoints.KubeletEndpoint.Port), nil
 }
 
 func (c *REST) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {

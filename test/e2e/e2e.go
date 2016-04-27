@@ -120,7 +120,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
-	if err := framework.WaitForPodsRunningReady(api.NamespaceSystem, framework.TestContext.MinStartupPods, podStartupTimeout); err != nil {
+	if err := framework.WaitForPodsRunningReady(api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout); err != nil {
 		if c, errClient := framework.LoadClient(); errClient != nil {
 			framework.Logf("Unable to dump cluster information because: %v", errClient)
 		} else {

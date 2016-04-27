@@ -339,7 +339,7 @@ func (jm *JobController) syncJob(key string) error {
 	}
 
 	activePods := controller.FilterActivePods(podList.Items)
-	active := len(activePods)
+	active := int32(len(activePods))
 	succeeded, failed := getStatus(podList.Items)
 	conditions := len(job.Status.Conditions)
 	if job.Status.StartTime == nil {
@@ -358,9 +358,9 @@ func (jm *JobController) syncJob(key string) error {
 		// some sort of solution to above problem.
 		// kill remaining active pods
 		wait := sync.WaitGroup{}
-		wait.Add(active)
-		for i := 0; i < active; i++ {
-			go func(ix int) {
+		wait.Add(int(active))
+		for i := int32(0); i < active; i++ {
+			go func(ix int32) {
 				defer wait.Done()
 				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, &job); err != nil {
 					defer utilruntime.HandleError(err)
@@ -449,17 +449,17 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 }
 
 // getStatus returns no of succeeded and failed pods running a job
-func getStatus(pods []api.Pod) (succeeded, failed int) {
-	succeeded = filterPods(pods, api.PodSucceeded)
-	failed = filterPods(pods, api.PodFailed)
+func getStatus(pods []api.Pod) (succeeded, failed int32) {
+	succeeded = int32(filterPods(pods, api.PodSucceeded))
+	failed = int32(filterPods(pods, api.PodFailed))
 	return
 }
 
 // manageJob is the core method responsible for managing the number of running
 // pods according to what is specified in the job.Spec.
-func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *batch.Job) int {
+func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int32, job *batch.Job) int32 {
 	var activeLock sync.Mutex
-	active := len(activePods)
+	active := int32(len(activePods))
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
@@ -469,7 +469,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ba
 
 	if active > parallelism {
 		diff := active - parallelism
-		jm.expectations.ExpectDeletions(jobKey, diff)
+		jm.expectations.ExpectDeletions(jobKey, int(diff))
 		glog.V(4).Infof("Too many pods running job %q, need %d, deleting %d", jobKey, parallelism, diff)
 		// Sort the pods in the order such that not-ready < ready, unscheduled
 		// < scheduled, and pending < running. This ensures that we delete pods
@@ -478,9 +478,9 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ba
 
 		active -= diff
 		wait := sync.WaitGroup{}
-		wait.Add(diff)
-		for i := 0; i < diff; i++ {
-			go func(ix int) {
+		wait.Add(int(diff))
+		for i := int32(0); i < diff; i++ {
+			go func(ix int32) {
 				defer wait.Done()
 				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil {
 					defer utilruntime.HandleError(err)
@@ -495,7 +495,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ba
 		wait.Wait()
 
 	} else if active < parallelism {
-		wantActive := 0
+		wantActive := int32(0)
 		if job.Spec.Completions == nil {
 			// Job does not specify a number of completions.  Therefore, number active
 			// should be equal to parallelism, unless the job has seen at least
@@ -518,13 +518,13 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int, job *ba
 			glog.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active)
 			diff = 0
 		}
-		jm.expectations.ExpectCreations(jobKey, diff)
+		jm.expectations.ExpectCreations(jobKey, int(diff))
 		glog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
 
 		active += diff
 		wait := sync.WaitGroup{}
-		wait.Add(diff)
-		for i := 0; i < diff; i++ {
+		wait.Add(int(diff))
+		for i := int32(0); i < diff; i++ {
 			go func() {
 				defer wait.Done()
 				if err := jm.podControl.CreatePods(job.Namespace, &job.Spec.Template, job); err != nil {

@@ -379,7 +379,7 @@ func TestReplicaSetStop(t *testing.T) {
 func TestJobStop(t *testing.T) {
 	name := "foo"
 	ns := "default"
-	zero := 0
+	zero := int32(0)
 	tests := []struct {
 		Name            string
 		Objs            []runtime.Object

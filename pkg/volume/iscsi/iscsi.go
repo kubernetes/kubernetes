@@ -89,7 +89,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 		readOnly = spec.ReadOnly
 	}
 
-	lun := strconv.Itoa(iscsi.Lun)
+	lun := strconv.Itoa(int(iscsi.Lun))
 	portal := portalMounter(iscsi.TargetPortal)
 
 	iface := iscsi.ISCSIInterface
