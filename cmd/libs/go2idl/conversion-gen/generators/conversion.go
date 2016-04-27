@@ -660,14 +660,15 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 }
 
 func (g *genConversion) doPointer(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("*out = new($.Elem|raw$)\n", outType)
 	if outType.Elem.IsAssignable() {
 		if inType.Elem == outType.Elem {
-			sw.Do("**out = **in\n", nil)
+			sw.Do("*out = *in\n", nil)
 		} else {
-			sw.Do("**out = $.|raw$(**in)\n", outType.Elem)
+			sw.Do("*out = new($.Elem|raw$)\n", outType)
+			sw.Do("**out = $.|raw$(*in)\n", outType.Elem)
 		}
 	} else {
+		sw.Do("*out = new($.Elem|raw$)\n", outType)
 		if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 			sw.Do("if err := $.|raw$(*in, *out, s); err != nil {\n", function)
 		} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
