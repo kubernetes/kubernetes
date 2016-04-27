@@ -755,10 +755,7 @@ func autoConvert_v1_ConfigMap_To_api_ConfigMap(in *ConfigMap, out *api.ConfigMap
 	}
 	if in.Data != nil {
 		in, out := &in.Data, &out.Data
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Data = nil
 	}
@@ -781,10 +778,7 @@ func autoConvert_api_ConfigMap_To_v1_ConfigMap(in *api.ConfigMap, out *ConfigMap
 	}
 	if in.Data != nil {
 		in, out := &in.Data, &out.Data
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Data = nil
 	}
@@ -2287,10 +2281,7 @@ func autoConvert_v1_FlexVolumeSource_To_api_FlexVolumeSource(in *FlexVolumeSourc
 	out.ReadOnly = in.ReadOnly
 	if in.Options != nil {
 		in, out := &in.Options, &out.Options
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Options = nil
 	}
@@ -2319,10 +2310,7 @@ func autoConvert_api_FlexVolumeSource_To_v1_FlexVolumeSource(in *api.FlexVolumeS
 	out.ReadOnly = in.ReadOnly
 	if in.Options != nil {
 		in, out := &in.Options, &out.Options
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Options = nil
 	}
@@ -4064,19 +4052,13 @@ func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.Object
 	}
 	if in.Labels != nil {
 		in, out := &in.Labels, &out.Labels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Labels = nil
 	}
 	if in.Annotations != nil {
 		in, out := &in.Annotations, &out.Annotations
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Annotations = nil
 	}
@@ -4118,19 +4100,13 @@ func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *Object
 	}
 	if in.Labels != nil {
 		in, out := &in.Labels, &out.Labels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Labels = nil
 	}
 	if in.Annotations != nil {
 		in, out := &in.Annotations, &out.Annotations
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Annotations = nil
 	}
@@ -5308,10 +5284,7 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.NodeSelector = nil
 	}
@@ -6252,14 +6225,7 @@ func autoConvert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversi
 	}
 	if in.Data != nil {
 		in, out := &in.Data, &out.Data
-		*out = make(map[string][]byte, len(*in))
-		for key, val := range *in {
-			newVal := new([]byte)
-			if err := conversion.Convert_Slice_byte_To_Slice_byte(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
+		*out = *in
 	} else {
 		out.Data = nil
 	}
@@ -6283,14 +6249,7 @@ func autoConvert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversi
 	}
 	if in.Data != nil {
 		in, out := &in.Data, &out.Data
-		*out = make(map[string][]byte, len(*in))
-		for key, val := range *in {
-			newVal := new([]byte)
-			if err := conversion.Convert_Slice_byte_To_Slice_byte(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
+		*out = *in
 	} else {
 		out.Data = nil
 	}
@@ -6871,10 +6830,7 @@ func autoConvert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.Ser
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Selector = nil
 	}
@@ -6910,10 +6866,7 @@ func autoConvert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *Ser
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.Selector = nil
 	}

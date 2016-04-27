@@ -646,10 +646,7 @@ func autoConvert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback(in 
 	out.Name = in.Name
 	if in.UpdatedAnnotations != nil {
 		in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.UpdatedAnnotations = nil
 	}
@@ -673,10 +670,7 @@ func autoConvert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback(in 
 	out.Name = in.Name
 	if in.UpdatedAnnotations != nil {
 		in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.UpdatedAnnotations = nil
 	}
@@ -1708,10 +1702,7 @@ func autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in *LabelSel
 	}
 	if in.MatchLabels != nil {
 		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.MatchLabels = nil
 	}
@@ -1739,10 +1730,7 @@ func autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in *unversio
 	}
 	if in.MatchLabels != nil {
 		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.MatchLabels = nil
 	}

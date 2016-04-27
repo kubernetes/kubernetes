@@ -377,10 +377,7 @@ func autoConvert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector
 	}
 	if in.MatchLabels != nil {
 		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.MatchLabels = nil
 	}
@@ -408,10 +405,7 @@ func autoConvert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.L
 	}
 	if in.MatchLabels != nil {
 		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = *in
 	} else {
 		out.MatchLabels = nil
 	}
