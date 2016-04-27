@@ -163,7 +163,19 @@ func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
 			if !ok {
 				return nil, nil, fmt.Errorf("not a pod")
 			}
-			return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+
+			// podLabels is already sitting there ready to be used.
+			// podFields is not available directly and requires allocation of a map.
+			// Only bother if the fields might be useful to determining the match.
+			// One common case is for a replication controller to set up a watch
+			// based on labels alone; in that case we can avoid allocating the field map.
+			// This is especially important in the apiserver.
+			podLabels := labels.Set(pod.ObjectMeta.Labels)
+			var podFields fields.Set
+			if !field.Empty() && label.Matches(podLabels) {
+				podFields = PodToSelectableFields(pod)
+			}
+			return podLabels, podFields, nil
 		},
 	}
 }
