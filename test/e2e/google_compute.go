@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -38,13 +39,17 @@ func createGCEStaticIP(name string) (string, error) {
 	// NAME           REGION      ADDRESS       STATUS
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
-	glog.Infof("Creating static IP with name %q in project %q", name, framework.TestContext.CloudConfig.ProjectID)
 	var outputBytes []byte
 	var err error
+	region, err := gce.GetGCERegion(framework.TestContext.CloudConfig.Zone)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert zone to region: %v", err)
+	}
+	glog.Infof("Creating static IP with name %q in project %q in region %q", name, framework.TestContext.CloudConfig.ProjectID, region)
 	for attempts := 0; attempts < 4; attempts++ {
 		outputBytes, err = exec.Command("gcloud", "compute", "addresses", "create",
 			name, "--project", framework.TestContext.CloudConfig.ProjectID,
-			"--region", "us-central1", "-q").CombinedOutput()
+			"--region", region, "-q").CombinedOutput()
 		if err == nil {
 			break
 		}
@@ -77,9 +82,14 @@ func deleteGCEStaticIP(name string) error {
 	// NAME           REGION      ADDRESS       STATUS
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
+	region, err := gce.GetGCERegion(framework.TestContext.CloudConfig.Zone)
+	if err != nil {
+		return fmt.Errorf("failed to convert zone to region: %v", err)
+	}
+	glog.Infof("Deleting static IP with name %q in project %q in region %q", name, framework.TestContext.CloudConfig.ProjectID, region)
 	outputBytes, err := exec.Command("gcloud", "compute", "addresses", "delete",
 		name, "--project", framework.TestContext.CloudConfig.ProjectID,
-		"--region", "us-central1", "-q").CombinedOutput()
+		"--region", region, "-q").CombinedOutput()
 	if err != nil {
 		// Ditch the error, since the stderr in the output is what actually contains
 		// any useful info.
