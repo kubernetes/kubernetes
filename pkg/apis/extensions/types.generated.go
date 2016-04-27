@@ -198,7 +198,7 @@ func (x *ScaleSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Replicas = 0
 			} else {
-				x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Replicas = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -228,7 +228,7 @@ func (x *ScaleSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Replicas = 0
 	} else {
-		x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Replicas = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj5++
@@ -396,7 +396,7 @@ func (x *ScaleStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Replicas = 0
 			} else {
-				x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Replicas = int32(r.DecodeInt(32))
 			}
 		case "selector":
 			if r.TryDecodeAsNil() {
@@ -443,7 +443,7 @@ func (x *ScaleStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Replicas = 0
 	} else {
-		x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Replicas = int32(r.DecodeInt(32))
 	}
 	yyj7++
 	if yyhl7 {
@@ -1475,7 +1475,7 @@ func (x *CPUTargetUtilization) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			if r.TryDecodeAsNil() {
 				x.TargetPercentage = 0
 			} else {
-				x.TargetPercentage = int(r.DecodeInt(codecSelferBitsize1234))
+				x.TargetPercentage = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -1505,7 +1505,7 @@ func (x *CPUTargetUtilization) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.TargetPercentage = 0
 	} else {
-		x.TargetPercentage = int(r.DecodeInt(codecSelferBitsize1234))
+		x.TargetPercentage = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj5++
@@ -2540,20 +2540,20 @@ func (x *HorizontalPodAutoscalerSpec) codecDecodeSelfFromMap(l int, d *codec1978
 				}
 			} else {
 				if x.MinReplicas == nil {
-					x.MinReplicas = new(int)
+					x.MinReplicas = new(int32)
 				}
 				yym6 := z.DecBinary()
 				_ = yym6
 				if false {
 				} else {
-					*((*int)(x.MinReplicas)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.MinReplicas)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "maxReplicas":
 			if r.TryDecodeAsNil() {
 				x.MaxReplicas = 0
 			} else {
-				x.MaxReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.MaxReplicas = int32(r.DecodeInt(32))
 			}
 		case "cpuUtilization":
 			if r.TryDecodeAsNil() {
@@ -2614,13 +2614,13 @@ func (x *HorizontalPodAutoscalerSpec) codecDecodeSelfFromArray(l int, d *codec19
 		}
 	} else {
 		if x.MinReplicas == nil {
-			x.MinReplicas = new(int)
+			x.MinReplicas = new(int32)
 		}
 		yym12 := z.DecBinary()
 		_ = yym12
 		if false {
 		} else {
-			*((*int)(x.MinReplicas)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.MinReplicas)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj9++
@@ -2637,7 +2637,7 @@ func (x *HorizontalPodAutoscalerSpec) codecDecodeSelfFromArray(l int, d *codec19
 	if r.TryDecodeAsNil() {
 		x.MaxReplicas = 0
 	} else {
-		x.MaxReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.MaxReplicas = int32(r.DecodeInt(32))
 	}
 	yyj9++
 	if yyhl9 {
@@ -2962,13 +2962,13 @@ func (x *HorizontalPodAutoscalerStatus) codecDecodeSelfFromMap(l int, d *codec19
 			if r.TryDecodeAsNil() {
 				x.CurrentReplicas = 0
 			} else {
-				x.CurrentReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.CurrentReplicas = int32(r.DecodeInt(32))
 			}
 		case "desiredReplicas":
 			if r.TryDecodeAsNil() {
 				x.DesiredReplicas = 0
 			} else {
-				x.DesiredReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.DesiredReplicas = int32(r.DecodeInt(32))
 			}
 		case "currentCPUUtilizationPercentage":
 			if r.TryDecodeAsNil() {
@@ -2977,13 +2977,13 @@ func (x *HorizontalPodAutoscalerStatus) codecDecodeSelfFromMap(l int, d *codec19
 				}
 			} else {
 				if x.CurrentCPUUtilizationPercentage == nil {
-					x.CurrentCPUUtilizationPercentage = new(int)
+					x.CurrentCPUUtilizationPercentage = new(int32)
 				}
 				yym11 := z.DecBinary()
 				_ = yym11
 				if false {
 				} else {
-					*((*int)(x.CurrentCPUUtilizationPercentage)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.CurrentCPUUtilizationPercentage)) = int32(r.DecodeInt(32))
 				}
 			}
 		default:
@@ -3071,7 +3071,7 @@ func (x *HorizontalPodAutoscalerStatus) codecDecodeSelfFromArray(l int, d *codec
 	if r.TryDecodeAsNil() {
 		x.CurrentReplicas = 0
 	} else {
-		x.CurrentReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.CurrentReplicas = int32(r.DecodeInt(32))
 	}
 	yyj12++
 	if yyhl12 {
@@ -3087,7 +3087,7 @@ func (x *HorizontalPodAutoscalerStatus) codecDecodeSelfFromArray(l int, d *codec
 	if r.TryDecodeAsNil() {
 		x.DesiredReplicas = 0
 	} else {
-		x.DesiredReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.DesiredReplicas = int32(r.DecodeInt(32))
 	}
 	yyj12++
 	if yyhl12 {
@@ -3106,13 +3106,13 @@ func (x *HorizontalPodAutoscalerStatus) codecDecodeSelfFromArray(l int, d *codec
 		}
 	} else {
 		if x.CurrentCPUUtilizationPercentage == nil {
-			x.CurrentCPUUtilizationPercentage = new(int)
+			x.CurrentCPUUtilizationPercentage = new(int32)
 		}
 		yym20 := z.DecBinary()
 		_ = yym20
 		if false {
 		} else {
-			*((*int)(x.CurrentCPUUtilizationPercentage)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.CurrentCPUUtilizationPercentage)) = int32(r.DecodeInt(32))
 		}
 	}
 	for {
@@ -5674,7 +5674,7 @@ func (x *DeploymentSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Replicas = 0
 			} else {
-				x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Replicas = int32(r.DecodeInt(32))
 			}
 		case "selector":
 			if r.TryDecodeAsNil() {
@@ -5711,7 +5711,7 @@ func (x *DeploymentSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.MinReadySeconds = 0
 			} else {
-				x.MinReadySeconds = int(r.DecodeInt(codecSelferBitsize1234))
+				x.MinReadySeconds = int32(r.DecodeInt(32))
 			}
 		case "revisionHistoryLimit":
 			if r.TryDecodeAsNil() {
@@ -5720,13 +5720,13 @@ func (x *DeploymentSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.RevisionHistoryLimit == nil {
-					x.RevisionHistoryLimit = new(int)
+					x.RevisionHistoryLimit = new(int32)
 				}
 				yym11 := z.DecBinary()
 				_ = yym11
 				if false {
 				} else {
-					*((*int)(x.RevisionHistoryLimit)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.RevisionHistoryLimit)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "paused":
@@ -5774,7 +5774,7 @@ func (x *DeploymentSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Replicas = 0
 	} else {
-		x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Replicas = int32(r.DecodeInt(32))
 	}
 	yyj14++
 	if yyhl14 {
@@ -5851,7 +5851,7 @@ func (x *DeploymentSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.MinReadySeconds = 0
 	} else {
-		x.MinReadySeconds = int(r.DecodeInt(codecSelferBitsize1234))
+		x.MinReadySeconds = int32(r.DecodeInt(32))
 	}
 	yyj14++
 	if yyhl14 {
@@ -5870,13 +5870,13 @@ func (x *DeploymentSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 	} else {
 		if x.RevisionHistoryLimit == nil {
-			x.RevisionHistoryLimit = new(int)
+			x.RevisionHistoryLimit = new(int32)
 		}
 		yym22 := z.DecBinary()
 		_ = yym22
 		if false {
 		} else {
-			*((*int)(x.RevisionHistoryLimit)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.RevisionHistoryLimit)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj14++
@@ -7203,25 +7203,25 @@ func (x *DeploymentStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Replicas = 0
 			} else {
-				x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Replicas = int32(r.DecodeInt(32))
 			}
 		case "updatedReplicas":
 			if r.TryDecodeAsNil() {
 				x.UpdatedReplicas = 0
 			} else {
-				x.UpdatedReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.UpdatedReplicas = int32(r.DecodeInt(32))
 			}
 		case "availableReplicas":
 			if r.TryDecodeAsNil() {
 				x.AvailableReplicas = 0
 			} else {
-				x.AvailableReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.AvailableReplicas = int32(r.DecodeInt(32))
 			}
 		case "unavailableReplicas":
 			if r.TryDecodeAsNil() {
 				x.UnavailableReplicas = 0
 			} else {
-				x.UnavailableReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.UnavailableReplicas = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -7267,7 +7267,7 @@ func (x *DeploymentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	if r.TryDecodeAsNil() {
 		x.Replicas = 0
 	} else {
-		x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Replicas = int32(r.DecodeInt(32))
 	}
 	yyj9++
 	if yyhl9 {
@@ -7283,7 +7283,7 @@ func (x *DeploymentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	if r.TryDecodeAsNil() {
 		x.UpdatedReplicas = 0
 	} else {
-		x.UpdatedReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.UpdatedReplicas = int32(r.DecodeInt(32))
 	}
 	yyj9++
 	if yyhl9 {
@@ -7299,7 +7299,7 @@ func (x *DeploymentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	if r.TryDecodeAsNil() {
 		x.AvailableReplicas = 0
 	} else {
-		x.AvailableReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.AvailableReplicas = int32(r.DecodeInt(32))
 	}
 	yyj9++
 	if yyhl9 {
@@ -7315,7 +7315,7 @@ func (x *DeploymentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	if r.TryDecodeAsNil() {
 		x.UnavailableReplicas = 0
 	} else {
-		x.UnavailableReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.UnavailableReplicas = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj9++
@@ -8065,19 +8065,19 @@ func (x *DaemonSetStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.CurrentNumberScheduled = 0
 			} else {
-				x.CurrentNumberScheduled = int(r.DecodeInt(codecSelferBitsize1234))
+				x.CurrentNumberScheduled = int32(r.DecodeInt(32))
 			}
 		case "numberMisscheduled":
 			if r.TryDecodeAsNil() {
 				x.NumberMisscheduled = 0
 			} else {
-				x.NumberMisscheduled = int(r.DecodeInt(codecSelferBitsize1234))
+				x.NumberMisscheduled = int32(r.DecodeInt(32))
 			}
 		case "desiredNumberScheduled":
 			if r.TryDecodeAsNil() {
 				x.DesiredNumberScheduled = 0
 			} else {
-				x.DesiredNumberScheduled = int(r.DecodeInt(codecSelferBitsize1234))
+				x.DesiredNumberScheduled = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -8107,7 +8107,7 @@ func (x *DaemonSetStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	if r.TryDecodeAsNil() {
 		x.CurrentNumberScheduled = 0
 	} else {
-		x.CurrentNumberScheduled = int(r.DecodeInt(codecSelferBitsize1234))
+		x.CurrentNumberScheduled = int32(r.DecodeInt(32))
 	}
 	yyj7++
 	if yyhl7 {
@@ -8123,7 +8123,7 @@ func (x *DaemonSetStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	if r.TryDecodeAsNil() {
 		x.NumberMisscheduled = 0
 	} else {
-		x.NumberMisscheduled = int(r.DecodeInt(codecSelferBitsize1234))
+		x.NumberMisscheduled = int32(r.DecodeInt(32))
 	}
 	yyj7++
 	if yyhl7 {
@@ -8139,7 +8139,7 @@ func (x *DaemonSetStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	if r.TryDecodeAsNil() {
 		x.DesiredNumberScheduled = 0
 	} else {
-		x.DesiredNumberScheduled = int(r.DecodeInt(codecSelferBitsize1234))
+		x.DesiredNumberScheduled = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj7++
@@ -12480,7 +12480,7 @@ func (x *ReplicaSetSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Replicas = 0
 			} else {
-				x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Replicas = int32(r.DecodeInt(32))
 			}
 		case "selector":
 			if r.TryDecodeAsNil() {
@@ -12534,7 +12534,7 @@ func (x *ReplicaSetSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Replicas = 0
 	} else {
-		x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Replicas = int32(r.DecodeInt(32))
 	}
 	yyj8++
 	if yyhl8 {
@@ -12762,13 +12762,13 @@ func (x *ReplicaSetStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Replicas = 0
 			} else {
-				x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Replicas = int32(r.DecodeInt(32))
 			}
 		case "fullyLabeledReplicas":
 			if r.TryDecodeAsNil() {
 				x.FullyLabeledReplicas = 0
 			} else {
-				x.FullyLabeledReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.FullyLabeledReplicas = int32(r.DecodeInt(32))
 			}
 		case "observedGeneration":
 			if r.TryDecodeAsNil() {
@@ -12804,7 +12804,7 @@ func (x *ReplicaSetStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	if r.TryDecodeAsNil() {
 		x.Replicas = 0
 	} else {
-		x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Replicas = int32(r.DecodeInt(32))
 	}
 	yyj7++
 	if yyhl7 {
@@ -12820,7 +12820,7 @@ func (x *ReplicaSetStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	if r.TryDecodeAsNil() {
 		x.FullyLabeledReplicas = 0
 	} else {
-		x.FullyLabeledReplicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.FullyLabeledReplicas = int32(r.DecodeInt(32))
 	}
 	yyj7++
 	if yyhl7 {
@@ -15289,7 +15289,7 @@ func (x codecSelfer1234) decSliceHorizontalPodAutoscaler(v *[]HorizontalPodAutos
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 320)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 312)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
@@ -15646,7 +15646,7 @@ func (x codecSelfer1234) decSliceDeployment(v *[]Deployment, d *codec1978.Decode
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 664)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 648)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
@@ -15765,7 +15765,7 @@ func (x codecSelfer1234) decSliceDaemonSet(v *[]DaemonSet, d *codec1978.Decoder)
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 584)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 576)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
@@ -16479,7 +16479,7 @@ func (x codecSelfer1234) decSliceReplicaSet(v *[]ReplicaSet, d *codec1978.Decode
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 592)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 584)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]

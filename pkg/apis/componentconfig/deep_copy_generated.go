@@ -145,7 +145,7 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in KubeProxyConfiguration, 
 	out.HostnameOverride = in.HostnameOverride
 	if in.IPTablesMasqueradeBit != nil {
 		in, out := in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
-		*out = new(int)
+		*out = new(int32)
 		**out = *in
 	} else {
 		out.IPTablesMasqueradeBit = nil
@@ -158,7 +158,7 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in KubeProxyConfiguration, 
 	out.Master = in.Master
 	if in.OOMScoreAdj != nil {
 		in, out := in.OOMScoreAdj, &out.OOMScoreAdj
-		*out = new(int)
+		*out = new(int32)
 		**out = *in
 	} else {
 		out.OOMScoreAdj = nil

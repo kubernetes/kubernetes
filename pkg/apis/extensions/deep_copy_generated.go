@@ -281,7 +281,7 @@ func DeepCopy_extensions_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, 
 	out.MinReadySeconds = in.MinReadySeconds
 	if in.RevisionHistoryLimit != nil {
 		in, out := in.RevisionHistoryLimit, &out.RevisionHistoryLimit
-		*out = new(int)
+		*out = new(int32)
 		**out = *in
 	} else {
 		out.RevisionHistoryLimit = nil
@@ -388,7 +388,7 @@ func DeepCopy_extensions_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerS
 	}
 	if in.MinReplicas != nil {
 		in, out := in.MinReplicas, &out.MinReplicas
-		*out = new(int)
+		*out = new(int32)
 		**out = *in
 	} else {
 		out.MinReplicas = nil
@@ -427,7 +427,7 @@ func DeepCopy_extensions_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscale
 	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentCPUUtilizationPercentage != nil {
 		in, out := in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
-		*out = new(int)
+		*out = new(int32)
 		**out = *in
 	} else {
 		out.CurrentCPUUtilizationPercentage = nil
