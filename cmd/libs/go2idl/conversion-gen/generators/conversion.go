@@ -513,6 +513,10 @@ func (g *genConversion) doBuiltin(inType, outType *types.Type, sw *generator.Sni
 }
 
 func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.SnippetWriter) {
+	if inType == outType {
+		sw.Do("*out = *in\n", outType)
+		return
+	}
 	sw.Do("*out = make($.|raw$, len(*in))\n", outType)
 	if outType.Key.IsAssignable() {
 		sw.Do("for key, val := range *in {\n", nil)
