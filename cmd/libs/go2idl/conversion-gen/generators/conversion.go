@@ -598,17 +598,13 @@ func (g *genConversion) generateFor(inType, outType *types.Type, sw *generator.S
 
 func (g *genConversion) doBuiltin(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	if inType == outType {
-		sw.Do("*out = *in\n", nil)
+		sw.Do("out = in\n", nil)
 	} else {
 		sw.Do("*out = $.|raw$(*in)\n", outType)
 	}
 }
 
 func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	if inType == outType {
-		sw.Do("*out = *in\n", outType)
-		return
-	}
 	sw.Do("*out = make($.|raw$, len(*in))\n", outType)
 	if outType.Key.IsAssignable() {
 		sw.Do("for key, val := range *in {\n", nil)
@@ -680,13 +676,6 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 }
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	if strings.Contains(inType.Name.Name, "ContainerStateRunning") {
-		fmt.Printf("doStruct(%#v, %#v)\n", inType, outType)
-	}
-	if areTypesAliased(inType, outType) {
-		sw.Do("out = in\n", nil)
-		return
-	}
 	for _, m := range inType.Members {
 		outMember, isOutMember := findMember(outType, m.Name)
 		if !isOutMember {
@@ -714,6 +703,11 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
 			}
 		case types.Map, types.Slice, types.Pointer:
+			if g.isDirectlyAssignable(m.Type, outMember.Type) {
+				sw.Do("out.$.name$ = in.$.name$\n", args)
+				continue
+			}
+
 			sw.Do("if in.$.name$ != nil {\n", args)
 			sw.Do("in, out := &in.$.name$, &out.$.name$\n", args)
 			g.generateFor(m.Type, outMember.Type, sw)
@@ -721,6 +715,10 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("out.$.name$ = nil\n", args)
 			sw.Do("}\n", nil)
 		case types.Struct:
+			if g.isDirectlyAssignable(m.Type, outMember.Type) {
+				sw.Do("out.$.name$ = in.$.name$\n", args)
+				continue
+			}
 			if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
 				funcName := g.funcNameTmpl(m.Type, outMember.Type)
 				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
@@ -762,16 +760,19 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 	}
 }
 
+func (g *genConversion) isDirectlyAssignable(inType, outType *types.Type) bool {
+	return inType == outType || areTypesAliased(inType, outType)
+}
+
 func (g *genConversion) doPointer(inType, outType *types.Type, sw *generator.SnippetWriter) {
+	sw.Do("*out = new($.Elem|raw$)\n", outType)
 	if outType.Elem.IsAssignable() {
 		if inType.Elem == outType.Elem {
 			sw.Do("*out = *in\n", nil)
 		} else {
-			sw.Do("*out = new($.Elem|raw$)\n", outType)
 			sw.Do("**out = $.|raw$(*in)\n", outType.Elem)
 		}
 	} else {
-		sw.Do("*out = new($.Elem|raw$)\n", outType)
 		if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 			sw.Do("if err := $.|raw$(*in, *out, s); err != nil {\n", function)
 		} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
