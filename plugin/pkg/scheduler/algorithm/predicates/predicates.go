@@ -683,7 +683,7 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 				// "0" is explicitly ignored in PodFitsHostPorts,
 				// which is the only function that uses this value.
 				if podPort.HostPort != 0 {
-					ports[podPort.HostPort] = true
+					ports[int(podPort.HostPort)] = true
 				}
 			}
 		}

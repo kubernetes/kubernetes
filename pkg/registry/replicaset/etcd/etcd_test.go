@@ -295,7 +295,7 @@ func TestScaleUpdate(t *testing.T) {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.ScaleSpec{
-			Replicas: replicas,
+			Replicas: int32(replicas),
 		},
 	}
 
@@ -308,7 +308,7 @@ func TestScaleUpdate(t *testing.T) {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
 	scale := obj.(*extensions.Scale)
-	if scale.Spec.Replicas != replicas {
+	if scale.Spec.Replicas != int32(replicas) {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, scale.Spec.Replicas)
 	}
 

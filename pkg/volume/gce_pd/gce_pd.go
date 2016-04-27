@@ -94,7 +94,7 @@ func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, pod
 	fsType := gce.FSType
 	partition := ""
 	if gce.Partition != 0 {
-		partition = strconv.Itoa(gce.Partition)
+		partition = strconv.Itoa(int(gce.Partition))
 	}
 
 	return &gcePersistentDiskMounter{

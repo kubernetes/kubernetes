@@ -285,8 +285,8 @@ func TestControllerServicePorts(t *testing.T) {
 
 	controller := master.NewBootstrapController()
 
-	assert.Equal(1000, controller.ExtraServicePorts[0].Port)
-	assert.Equal(1010, controller.ExtraServicePorts[1].Port)
+	assert.Equal(int32(1000), controller.ExtraServicePorts[0].Port)
+	assert.Equal(int32(1010), controller.ExtraServicePorts[1].Port)
 }
 
 // TestGetNodeAddresses verifies that proper results are returned

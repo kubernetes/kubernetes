@@ -88,14 +88,14 @@ func Convert_v1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPodAutoscale
 		return err
 	}
 	if in.MinReplicas != nil {
-		out.MinReplicas = new(int)
-		*out.MinReplicas = int(*in.MinReplicas)
+		out.MinReplicas = new(int32)
+		*out.MinReplicas = *in.MinReplicas
 	} else {
 		out.MinReplicas = nil
 	}
-	out.MaxReplicas = int(in.MaxReplicas)
+	out.MaxReplicas = in.MaxReplicas
 	if in.TargetCPUUtilizationPercentage != nil {
-		out.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int(*in.TargetCPUUtilizationPercentage)}
+		out.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: *in.TargetCPUUtilizationPercentage}
 	}
 	return nil
 }

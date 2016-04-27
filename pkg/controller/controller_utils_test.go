@@ -60,7 +60,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 			ResourceVersion: "18",
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
+			Replicas: int32(replicas),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{

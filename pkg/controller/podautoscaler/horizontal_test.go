@@ -67,14 +67,14 @@ type fakeResource struct {
 
 type testCase struct {
 	sync.Mutex
-	minReplicas     int
-	maxReplicas     int
-	initialReplicas int
-	desiredReplicas int
+	minReplicas     int32
+	maxReplicas     int32
+	initialReplicas int32
+	desiredReplicas int32
 
 	// CPU target utilization as a percentage of the requested resources.
-	CPUTarget           int
-	CPUCurrent          int
+	CPUTarget           int32
+	CPUCurrent          int32
 	verifyCPUCurrent    bool
 	reportedLevels      []uint64
 	reportedCPURequests []resource.Quantity
@@ -103,7 +103,7 @@ func (tc *testCase) computeCPUCurrent() {
 	for _, req := range tc.reportedCPURequests {
 		requested += int(req.MilliValue())
 	}
-	tc.CPUCurrent = 100 * reported / requested
+	tc.CPUCurrent = int32(100 * reported / requested)
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {

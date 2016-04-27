@@ -198,7 +198,7 @@ func extractPort(param intstr.IntOrString, container api.Container) (int, error)
 func findPortByName(container api.Container, portName string) (int, error) {
 	for _, port := range container.Ports {
 		if port.Name == portName {
-			return port.ContainerPort, nil
+			return int(port.ContainerPort), nil
 		}
 	}
 	return 0, fmt.Errorf("port %s not found", portName)

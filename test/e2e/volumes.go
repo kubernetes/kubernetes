@@ -87,7 +87,7 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 
 		serverPodPorts[i] = api.ContainerPort{
 			Name:          portName,
-			ContainerPort: config.serverPorts[i],
+			ContainerPort: int32(config.serverPorts[i]),
 			Protocol:      api.ProtocolTCP,
 		}
 	}

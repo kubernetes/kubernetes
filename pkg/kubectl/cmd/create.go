@@ -173,7 +173,7 @@ See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more d
 func makePortsString(ports []api.ServicePort, useNodePort bool) string {
 	pieces := make([]string, len(ports))
 	for ix := range ports {
-		var port int
+		var port int32
 		if useNodePort {
 			port = ports[ix].NodePort
 		} else {

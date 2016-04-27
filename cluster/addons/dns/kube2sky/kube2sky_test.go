@@ -111,7 +111,7 @@ type hostPort struct {
 func getHostPort(service *kapi.Service) *hostPort {
 	return &hostPort{
 		Host: service.Spec.ClusterIP,
-		Port: service.Spec.Ports[0].Port,
+		Port: int(service.Spec.Ports[0].Port),
 	}
 }
 
@@ -181,7 +181,7 @@ func newService(namespace, serviceName, clusterIP, portName string, portNumber i
 		Spec: kapi.ServiceSpec{
 			ClusterIP: clusterIP,
 			Ports: []kapi.ServicePort{
-				{Port: portNumber, Name: portName, Protocol: "TCP"},
+				{Port: int32(portNumber), Name: portName, Protocol: "TCP"},
 			},
 		},
 	}
@@ -212,7 +212,7 @@ func newSubset() kapi.EndpointSubset {
 
 func newSubsetWithOnePort(portName string, port int, ips ...string) kapi.EndpointSubset {
 	subset := newSubset()
-	subset.Ports = append(subset.Ports, kapi.EndpointPort{Port: port, Name: portName, Protocol: "TCP"})
+	subset.Ports = append(subset.Ports, kapi.EndpointPort{Port: int32(port), Name: portName, Protocol: "TCP"})
 	for _, ip := range ips {
 		subset.Addresses = append(subset.Addresses, kapi.EndpointAddress{IP: ip})
 	}
@@ -221,7 +221,7 @@ func newSubsetWithOnePort(portName string, port int, ips ...string) kapi.Endpoin
 
 func newSubsetWithTwoPorts(portName1 string, portNumber1 int, portName2 string, portNumber2 int, ips ...string) kapi.EndpointSubset {
 	subset := newSubsetWithOnePort(portName1, portNumber1, ips...)
-	subset.Ports = append(subset.Ports, kapi.EndpointPort{Port: portNumber2, Name: portName2, Protocol: "TCP"})
+	subset.Ports = append(subset.Ports, kapi.EndpointPort{Port: int32(portNumber2), Name: portName2, Protocol: "TCP"})
 	return subset
 }
 

@@ -65,7 +65,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 			ResourceVersion: "18",
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
+			Replicas: int32(replicas),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -231,7 +231,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	activePods := 5
 	rc := newReplicationController(activePods)
 	manager.rcStore.Store.Add(rc)
-	rc.Status = api.ReplicationControllerStatus{Replicas: activePods}
+	rc.Status = api.ReplicationControllerStatus{Replicas: int32(activePods)}
 	newPodList(manager.podStore.Store, activePods, api.PodRunning, rc, "pod")
 
 	fakePodControl := controller.FakePodControl{}
@@ -628,7 +628,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 			// returned an rc with replicas=1.
 			if c, ok := action.GetObject().(*api.ReplicationController); !ok {
 				t.Errorf("Expected an rc as the argument to update, got %T", c)
-			} else if c.Status.Replicas != numReplicas {
+			} else if c.Status.Replicas != int32(numReplicas) {
 				t.Errorf("Expected update for rc to contain replicas %v, got %v instead",
 					numReplicas, c.Status.Replicas)
 			}
@@ -664,7 +664,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	// Size up the controller, then size it down, and confirm the expected create/delete pattern
 	for _, replicas := range []int{numReplicas, 0} {
 
-		controllerSpec.Spec.Replicas = replicas
+		controllerSpec.Spec.Replicas = int32(replicas)
 		manager.rcStore.Store.Add(controllerSpec)
 
 		for i := 0; i < numReplicas; i += burstReplicas {
@@ -765,7 +765,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 		}
 
 		// Confirm that we've created the right number of replicas
-		activePods := len(manager.podStore.Store.List())
+		activePods := int32(len(manager.podStore.Store.List()))
 		if activePods != controllerSpec.Spec.Replicas {
 			t.Fatalf("Unexpected number of active pods, expected %d, got %d", controllerSpec.Spec.Replicas, activePods)
 		}

@@ -137,7 +137,7 @@ func makePodsFromRC(c client.Interface, name string, podCount int) {
 			Name: name,
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: podCount,
+			Replicas: int32(podCount),
 			Selector: map[string]string{"name": name},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
