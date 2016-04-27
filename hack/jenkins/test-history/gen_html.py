@@ -197,7 +197,7 @@ def main(args):
                 f.write(html)
     html = html_header()
     html.append('<h1>Kubernetes Tests</h1>')
-    html.append('Last updated %s' % time.strftime('%F'))
+    html.append('Last updated %s' % time.strftime('%F %T %Z'))
     if options.prefixes:
         html.append('<h2>All suites starting with:</h2>')
         html.extend(gen_metadata_links(prefix_metadata))

@@ -23,13 +23,9 @@ from __future__ import print_function
 
 import json
 import os
-import re
-import subprocess
 import sys
 import time
 import urllib2
-import xml.etree.ElementTree as ET
-import zlib
 
 
 def get_json(url):
@@ -49,98 +45,26 @@ def get_jobs(server):
         yield job['name']
 
 def get_builds(server, job):
-    """Generates all build numbers for a given job."""
-    job_json = get_json('{}/job/{}/api/json'.format(server, job))
+    """Retrieves build numbers, statuses, and timestamps for a given job."""
+    job_json = get_json('{}/job/{}/api/json?tree={}'.format(
+        server, job, 'builds[number,timestamp,building]'))
     if not job_json:
         return
     for build in job_json['builds']:
-        yield build['number']
+        yield build['number'], build['building'], build['timestamp']
 
-def get_build_info(server, job, build):
-    """Returns building status along with timestamp for a given build."""
-    path = '{}/job/{}/{}/api/json'.format(server, job, str(build))
-    build_json = get_json(path)
-    if not build_json:
-        return
-    return build_json['building'], build_json['timestamp']
-
-def gcs_ls(path):
-    """Lists objects under a path on gcs."""
-    try:
-        result = subprocess.check_output(
-            ['gsutil', 'ls', path],
-            stderr=open(os.devnull, 'w'))
-    except subprocess.CalledProcessError:
-        result = b''
-    for subpath in result.decode('utf-8').split():
-        yield subpath
-
-def gcs_ls_build(job, build):
-    """Lists all files under a given job and build path."""
-    url = 'gs://kubernetes-jenkins/logs/{}/{}'.format(job, str(build))
-    for path in gcs_ls(url):
-        yield path
-
-def gcs_ls_artifacts(job, build):
-    """Lists all artifacts for a build."""
-    for path in gcs_ls_build(job, build):
-        if path.endswith('artifacts/'):
-            for artifact in gcs_ls(path):
-                yield artifact
-
-def gcs_ls_junit_paths(job, build):
-    """Lists the paths of JUnit XML files for a build."""
-    for path in gcs_ls_artifacts(job, build):
-        if re.match('.*/junit.*\.xml$', path):
-            yield path
-
-def gcs_get_tests(path):
-    """Generates test data out of the provided JUnit path.
-
-    Returns None if there's an issue parsing the XML.
-    Yields name, time, failed, skipped for each test.
-    """
-    try:
-        data = subprocess.check_output(
-            ['gsutil', 'cat', path], stderr=open(os.devnull, 'w'))
-    except subprocess.CalledProcessError:
-        return
-
-    try:
-        data = zlib.decompress(data, zlib.MAX_WBITS | 16)
-    except zlib.error:
-        # Don't fail if it's not gzipped.
-        pass
-
-    try:
-        root = ET.fromstring(data)
-    except ET.ParseError:
-        return
-
-    for child in root:
-        name = child.attrib['name']
-        time = float(child.attrib['time'])
-        failed = False
-        skipped = False
-        for param in child:
-            if param.tag == 'skipped':
-                skipped = True
-            elif param.tag == 'failure':
-                failed = True
-        yield name, time, failed, skipped
-
-def get_tests_from_junit_path(path):
-    """Generates all tests in a JUnit GCS path."""
-    for test in gcs_get_tests(path):
-        if not test:
-            continue
-        yield test
-
-def get_tests_from_build(job, build):
+def get_tests_from_build(server, job, build):
     """Generates all tests for a build."""
-    for junit_path in gcs_ls_junit_paths(job, build):
-        for test in get_tests_from_junit_path(junit_path):
-            yield test
+    report = get_json('{}/job/{}/{}/testReport/api/json?tree={}'.format(
+        server, job, build, 'suites[cases[name,status,duration]]'))
+    if report is None:
+        return
+    for suite in report['suites']:
+        for case in suite['cases']:
+            status = case['status']
+            failed = status == 'FAILED'
+            skipped = status == 'SKIPPED'
+            yield case['name'], case['duration'], failed, skipped
 
 def get_daily_builds(server, prefix):
     """Generates all (job, build) pairs for the last day."""
@@ -148,8 +72,8 @@ def get_daily_builds(server, prefix):
     for job in get_jobs(server):
         if not job.startswith(prefix):
             continue
-        for build in reversed(sorted(get_builds(server, job))):
-            building, timestamp = get_build_info(server, job, build)
+        for build, building, timestamp in sorted(
+                get_builds(server, job), reverse=True):
             # Skip if it's still building.
             if building:
                 continue
@@ -158,12 +82,36 @@ def get_daily_builds(server, prefix):
                 break
             yield job, build
 
+def builds_for_tests(tests):
+    builds_have = set()
+    for test in tests.itervalues():
+        for builds in test.itervalues():
+            for build in builds:
+                builds_have.add(build['build'])
+    return builds_have
+
+def remove_unwanted(tests, builds_wanted):
+    for test in tests.values():
+        for job, builds in test.items():  # intentional copy
+            builds[:] = [b for b in builds if b['build'] in builds_wanted]
+            if not builds:
+                test.pop(job)
+
 def get_tests(server, prefix):
     """Returns a dictionary of tests to be JSON encoded."""
     tests = {}
+    builds_have = set()
+    builds_wanted = set()
+    if os.path.exists('tests.json'):
+        tests = json.load(open('tests.json'))
+        builds_have = builds_for_tests(tests)
     for job, build in get_daily_builds(server, prefix):
+        builds_wanted.add(build)
+        if build in builds_have:
+            continue
         print('{}/{}'.format(job, str(build)))
-        for name, duration, failed, skipped in get_tests_from_build(job, build):
+        for name, duration, failed, skipped in get_tests_from_build(
+                server, job, build):
             if name not in tests:
                 tests[name] = {}
             if skipped:
@@ -175,6 +123,7 @@ def get_tests(server, prefix):
                 'failed': failed,
                 'time': duration
             })
+    remove_unwanted(tests, builds_wanted)
     return tests
 
 if __name__ == '__main__':
