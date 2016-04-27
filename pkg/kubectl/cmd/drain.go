@@ -183,7 +183,7 @@ func (o *DrainOptions) RunDrain() error {
 		return err
 	}
 
-	pods, err := o.getPodsForDeletion()
+	pods, err := o.GetPodsForDeletion()
 	if err != nil {
 		return err
 	}
@@ -195,10 +195,10 @@ func (o *DrainOptions) RunDrain() error {
 	return nil
 }
 
-// getPodsForDeletion returns all the pods we're going to delete.  If there are
+// GetPodsForDeletion returns all the pods we're going to delete.  If there are
 // any unmanaged pods and the user didn't pass --force, we return that list in
 // an error.
-func (o *DrainOptions) getPodsForDeletion() ([]api.Pod, error) {
+func (o *DrainOptions) GetPodsForDeletion() ([]api.Pod, error) {
 	pods := []api.Pod{}
 	podList, err := o.client.Pods(api.NamespaceAll).List(api.ListOptions{FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": o.nodeInfo.Name})})
 	if err != nil {
