@@ -267,9 +267,6 @@ func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *R
 // The following two PodSpec conversions are done here to support ServiceAccount
 // as an alias for ServiceAccountName.
 func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.PodSpec))(in)
-	}
 	if in.Volumes != nil {
 		out.Volumes = make([]Volume, len(in.Volumes))
 		for i := range in.Volumes {
@@ -332,9 +329,7 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 }
 
 func Convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*PodSpec))(in)
-	}
+	Default_v1_PodSpec(in)
 	if in.Volumes != nil {
 		out.Volumes = make([]api.Volume, len(in.Volumes))
 		for i := range in.Volumes {
@@ -451,10 +446,6 @@ func Convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.Service
 }
 
 func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurityContext, out *PodSecurityContext, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.PodSecurityContext))(in)
-	}
-
 	out.SupplementalGroups = in.SupplementalGroups
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(SELinuxOptions)
@@ -486,10 +477,6 @@ func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurity
 }
 
 func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityContext, out *api.PodSecurityContext, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*PodSecurityContext))(in)
-	}
-
 	out.SupplementalGroups = in.SupplementalGroups
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(api.SELinuxOptions)
@@ -521,9 +508,6 @@ func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityCont
 }
 
 func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.ResourceList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ResourceList))(in)
-	}
 	if *in == nil {
 		return nil
 	}
