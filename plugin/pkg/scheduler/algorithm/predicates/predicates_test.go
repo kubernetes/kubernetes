@@ -71,21 +71,23 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*api.P
 	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
 }
 
-func makeResources(milliCPU int64, memory int64, pods int64) api.NodeResources {
+func makeResources(milliCPU int64, memory int64, nvidiaGPUs int64, pods int64) api.NodeResources {
 	return api.NodeResources{
 		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
-			api.ResourcePods:   *resource.NewQuantity(pods, resource.DecimalSI),
+			api.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+			api.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
+			api.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
+			api.ResourceNvidiaGPU: *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
 		},
 	}
 }
 
-func makeAllocatableResources(milliCPU int64, memory int64, pods int64) api.ResourceList {
+func makeAllocatableResources(milliCPU int64, memory int64, nvidiaGPUs int64, pods int64) api.ResourceList {
 	return api.ResourceList{
-		api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-		api.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
-		api.ResourcePods:   *resource.NewQuantity(pods, resource.DecimalSI),
+		api.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+		api.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
+		api.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
+		api.ResourceNvidiaGPU: *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
 	}
 }
 
@@ -95,8 +97,9 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 		containers = append(containers, api.Container{
 			Resources: api.ResourceRequirements{
 				Requests: api.ResourceList{
-					api.ResourceCPU:    *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(req.memory, resource.BinarySI),
+					api.ResourceCPU:       *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
+					api.ResourceMemory:    *resource.NewQuantity(req.memory, resource.BinarySI),
+					api.ResourceNvidiaGPU: *resource.NewQuantity(req.nvidiaGPU, resource.DecimalSI),
 				},
 			},
 		})
@@ -159,7 +162,7 @@ func TestPodFitsResources(t *testing.T) {
 	}
 
 	for _, test := range enoughPodsTests {
-		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}}
+		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)}}
 		test.nodeInfo.SetNode(&node)
 
 		fits, err := PodFitsResources(test.pod, test.nodeInfo)
@@ -204,7 +207,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range notEnoughPodsTests {
-		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1)}}
+		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1)}}
 		test.nodeInfo.SetNode(&node)
 
 		fits, err := PodFitsResources(test.pod, test.nodeInfo)
@@ -1529,7 +1532,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
 			node: &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "machine1"},
-				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)},
 			},
 			fits: true,
 			wErr: nil,
@@ -1541,11 +1544,38 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
 			node: &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "machine1"},
-				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)},
 			},
 			fits: false,
 			wErr: newInsufficientResourceError("CPU", 8, 5, 10),
 			test: "not enough cpu resource",
+		},
+		{
+			pod: &api.Pod{},
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
+			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32)}},
+			fits: true,
+			wErr: nil,
+			test: "no resources/port/host requested always fits on GPU machine",
+		},
+		{
+			pod: newResourcePod(resourceRequest{milliCPU: 3, memory: 1, nvidiaGPU: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 10, nvidiaGPU: 1})),
+			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32)}},
+			fits: false,
+			wErr: newInsufficientResourceError("NvidiaGpu", 1, 1, 1),
+			test: "not enough GPU resource",
+		},
+		{
+			pod: newResourcePod(resourceRequest{milliCPU: 3, memory: 1, nvidiaGPU: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 10, nvidiaGPU: 0})),
+			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32)}},
+			fits: true,
+			wErr: nil,
+			test: "enough GPU resource",
 		},
 		{
 			pod: &api.Pod{
@@ -1556,7 +1586,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(),
 			node: &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "machine1"},
-				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)},
 			},
 			fits: false,
 			wErr: ErrPodNotMatchHostName,
@@ -1567,7 +1597,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
 			node: &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "machine1"},
-				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)},
 			},
 			fits: false,
 			wErr: ErrPodNotFitsHostPorts,

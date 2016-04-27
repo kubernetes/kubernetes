@@ -19,9 +19,10 @@ package predicates
 import "fmt"
 
 const (
-	podCountResourceName string = "PodCount"
-	cpuResourceName      string = "CPU"
-	memoryResoureceName  string = "Memory"
+	podCountResourceName  string = "PodCount"
+	cpuResourceName       string = "CPU"
+	memoryResoureceName   string = "Memory"
+	nvidiaGpuResourceName string = "NvidiaGpu"
 )
 
 var (
