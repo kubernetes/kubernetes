@@ -177,9 +177,13 @@ type Volumes interface {
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
 	AttachDisk(diskName string, instanceName string, readOnly bool) (string, error)
 	// Detach the disk from the specified instance
-	// instanceName can be empty to mean "the instance on which we are running"
+	// instanceName can be empty to mean "the instance on which we are running".
+	// If wait==true, it waits for the detachment for 1 minute.
+	// If wait==false, it fires DetachVolume operation in AWS and does not wait
+	// for result. This should be as the last resort when error cleanup is
+	// needed.
 	// Returns the device where the volume was attached
-	DetachDisk(diskName string, instanceName string) (string, error)
+	DetachDisk(diskName string, instanceName string, wait bool) (string, error)
 	// Return 'true' if given disk is currently detached.
 	// Returns 'false' in all other cases ("attaching", "attached", "detaching")
 	IsDiskDetached(diskName string) (bool, error)
@@ -1352,7 +1356,7 @@ func (c *AWSCloud) AttachDisk(diskName string, instanceName string, readOnly boo
 }
 
 // Implements Volumes.DetachDisk
-func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, error) {
+func (aws *AWSCloud) DetachDisk(diskName string, instanceName string, wait bool) (string, error) {
 	disk, err := newAWSDisk(aws, diskName)
 	if err != nil {
 		return "", err
@@ -1386,9 +1390,11 @@ func (aws *AWSCloud) DetachDisk(diskName string, instanceName string) (string, e
 		return "", errors.New("no response from DetachVolume")
 	}
 
-	err = disk.waitForAttachmentStatus("detached")
-	if err != nil {
-		return "", err
+	if wait {
+		err = disk.waitForAttachmentStatus("detached")
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if mountDevice != "" {
