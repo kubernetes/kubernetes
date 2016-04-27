@@ -201,24 +201,9 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*JobSpec))(in)
 	}
-	if in.Parallelism != nil {
-		in, out := &in.Parallelism, &out.Parallelism
-		*out = *in
-	} else {
-		out.Parallelism = nil
-	}
-	if in.Completions != nil {
-		in, out := &in.Completions, &out.Completions
-		*out = *in
-	} else {
-		out.Completions = nil
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		*out = *in
-	} else {
-		out.ActiveDeadlineSeconds = nil
-	}
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
 		*out = new(unversioned.LabelSelector)
@@ -228,12 +213,7 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 	} else {
 		out.Selector = nil
 	}
-	if in.ManualSelector != nil {
-		in, out := &in.ManualSelector, &out.ManualSelector
-		*out = *in
-	} else {
-		out.ManualSelector = nil
-	}
+	out.ManualSelector = in.ManualSelector
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
 		return err
@@ -245,24 +225,9 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*batch.JobSpec))(in)
 	}
-	if in.Parallelism != nil {
-		in, out := &in.Parallelism, &out.Parallelism
-		*out = *in
-	} else {
-		out.Parallelism = nil
-	}
-	if in.Completions != nil {
-		in, out := &in.Completions, &out.Completions
-		*out = *in
-	} else {
-		out.Completions = nil
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		*out = *in
-	} else {
-		out.ActiveDeadlineSeconds = nil
-	}
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
 		*out = new(LabelSelector)
@@ -272,12 +237,7 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 	} else {
 		out.Selector = nil
 	}
-	if in.ManualSelector != nil {
-		in, out := &in.ManualSelector, &out.ManualSelector
-		*out = *in
-	} else {
-		out.ManualSelector = nil
-	}
+	out.ManualSelector = in.ManualSelector
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
 		return err
@@ -300,24 +260,8 @@ func autoConvert_v1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobSt
 	} else {
 		out.Conditions = nil
 	}
-	if in.StartTime != nil {
-		in, out := &in.StartTime, &out.StartTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.StartTime = nil
-	}
-	if in.CompletionTime != nil {
-		in, out := &in.CompletionTime, &out.CompletionTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.CompletionTime = nil
-	}
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -343,24 +287,8 @@ func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobSt
 	} else {
 		out.Conditions = nil
 	}
-	if in.StartTime != nil {
-		in, out := &in.StartTime, &out.StartTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.StartTime = nil
-	}
-	if in.CompletionTime != nil {
-		in, out := &in.CompletionTime, &out.CompletionTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.CompletionTime = nil
-	}
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -375,12 +303,7 @@ func autoConvert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LabelSelector))(in)
 	}
-	if in.MatchLabels != nil {
-		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = *in
-	} else {
-		out.MatchLabels = nil
-	}
+	out.MatchLabels = in.MatchLabels
 	if in.MatchExpressions != nil {
 		in, out := &in.MatchExpressions, &out.MatchExpressions
 		*out = make([]unversioned.LabelSelectorRequirement, len(*in))
@@ -403,12 +326,7 @@ func autoConvert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.L
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*unversioned.LabelSelector))(in)
 	}
-	if in.MatchLabels != nil {
-		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = *in
-	} else {
-		out.MatchLabels = nil
-	}
+	out.MatchLabels = in.MatchLabels
 	if in.MatchExpressions != nil {
 		in, out := &in.MatchExpressions, &out.MatchExpressions
 		*out = make([]LabelSelectorRequirement, len(*in))
@@ -433,13 +351,7 @@ func autoConvert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequire
 	}
 	out.Key = in.Key
 	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
-	if in.Values != nil {
-		in, out := &in.Values, &out.Values
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Values = nil
-	}
+	out.Values = in.Values
 	return nil
 }
 
@@ -453,13 +365,7 @@ func autoConvert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequire
 	}
 	out.Key = in.Key
 	out.Operator = LabelSelectorOperator(in.Operator)
-	if in.Values != nil {
-		in, out := &in.Values, &out.Values
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Values = nil
-	}
+	out.Values = in.Values
 	return nil
 }
 

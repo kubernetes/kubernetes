@@ -22,7 +22,6 @@ package v1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	conversion "k8s.io/kubernetes/pkg/conversion"
@@ -159,29 +158,11 @@ func autoConvert_v1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAut
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HorizontalPodAutoscalerStatus))(in)
 	}
-	if in.ObservedGeneration != nil {
-		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = *in
-	} else {
-		out.ObservedGeneration = nil
-	}
-	if in.LastScaleTime != nil {
-		in, out := &in.LastScaleTime, &out.LastScaleTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.LastScaleTime = nil
-	}
+	out.ObservedGeneration = in.ObservedGeneration
+	out.LastScaleTime = in.LastScaleTime
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentCPUUtilizationPercentage != nil {
-		in, out := &in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
-		*out = *in
-	} else {
-		out.CurrentCPUUtilizationPercentage = nil
-	}
+	out.CurrentCPUUtilizationPercentage = in.CurrentCPUUtilizationPercentage
 	return nil
 }
 
@@ -193,29 +174,11 @@ func autoConvert_extensions_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAut
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.HorizontalPodAutoscalerStatus))(in)
 	}
-	if in.ObservedGeneration != nil {
-		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = *in
-	} else {
-		out.ObservedGeneration = nil
-	}
-	if in.LastScaleTime != nil {
-		in, out := &in.LastScaleTime, &out.LastScaleTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.LastScaleTime = nil
-	}
+	out.ObservedGeneration = in.ObservedGeneration
+	out.LastScaleTime = in.LastScaleTime
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentCPUUtilizationPercentage != nil {
-		in, out := &in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
-		*out = *in
-	} else {
-		out.CurrentCPUUtilizationPercentage = nil
-	}
+	out.CurrentCPUUtilizationPercentage = in.CurrentCPUUtilizationPercentage
 	return nil
 }
 

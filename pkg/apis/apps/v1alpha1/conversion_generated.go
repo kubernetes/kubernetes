@@ -151,12 +151,7 @@ func autoConvert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in *PetSetStatus, ou
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PetSetStatus))(in)
 	}
-	if in.ObservedGeneration != nil {
-		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = *in
-	} else {
-		out.ObservedGeneration = nil
-	}
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = int(in.Replicas)
 	return nil
 }
@@ -169,12 +164,7 @@ func autoConvert_apps_PetSetStatus_To_v1alpha1_PetSetStatus(in *apps.PetSetStatu
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*apps.PetSetStatus))(in)
 	}
-	if in.ObservedGeneration != nil {
-		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = *in
-	} else {
-		out.ObservedGeneration = nil
-	}
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = int32(in.Replicas)
 	return nil
 }
