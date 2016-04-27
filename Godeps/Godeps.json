@@ -2120,6 +2120,10 @@
 			"ImportPath": "k8s.io/heapster/metrics/apis/metrics/v1alpha1",
 			"Comment": "v1.1.0-beta2",
 			"Rev": "9cb18ac0ceb193eb530a1fe339355c94ea454d85"
+		},
+		{
+			"ImportPath": "github.com/xanzy/go-cloudstack",
+			"Rev": "6e28220a0503ff25e2c1480791e23d12872140ac"
 		}
 	]
 }
