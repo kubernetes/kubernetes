@@ -61,6 +61,7 @@ func Run(serverOptions *genericapiserver.ServerRunOptions) error {
 	// Set ServiceClusterIPRange
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
 	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
+	serverOptions.StorageConfig.ServerList = []string{"http://127.0.0.1:4001"}
 	genericapiserver.ValidateRunOptions(serverOptions)
 	config := genericapiserver.NewConfig(serverOptions)
 	config.Serializer = api.Codecs

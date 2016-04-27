@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 
@@ -80,10 +79,6 @@ cluster's shared state through which all other components interact.`,
 func Run(s *options.APIServer) error {
 	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
 
-	if len(s.StorageConfig.ServerList) == 0 {
-		glog.Fatalf("--etcd-servers must be specified")
-	}
-
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
 		// TODO(vmarmol): Implement support for HostNetworkSources.
@@ -95,17 +90,16 @@ func Run(s *options.APIServer) error {
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
-	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-	if err != nil {
-		glog.Fatalf("Cloud provider could not be initialized: %v", err)
-	}
-
 	// Setup tunneler if needed
 	var tunneler genericapiserver.Tunneler
 	var proxyDialerFn apiserver.ProxyDialerFunc
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSH genericapiserver.InstallSSHKey
+		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+		if err != nil {
+			glog.Fatalf("Cloud provider could not be initialized: %v", err)
+		}
 		if cloud != nil {
 			if instances, supported := cloud.Instances(); supported {
 				installSSH = instances.AddSSHKeyToAllInstances
@@ -243,30 +237,6 @@ func Run(s *options.APIServer) error {
 
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
 	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
-
-	if len(s.ExternalHost) == 0 {
-		// TODO: extend for other providers
-		if s.CloudProvider == "gce" {
-			instances, supported := cloud.Instances()
-			if !supported {
-				glog.Fatalf("GCE cloud provider has no instances.  this shouldn't happen. exiting.")
-			}
-			name, err := os.Hostname()
-			if err != nil {
-				glog.Fatalf("Failed to get hostname: %v", err)
-			}
-			addrs, err := instances.NodeAddresses(name)
-			if err != nil {
-				glog.Warningf("Unable to obtain external host address from cloud provider: %v", err)
-			} else {
-				for _, addr := range addrs {
-					if addr.Type == api.NodeExternalIP {
-						s.ExternalHost = addr.Address
-					}
-				}
-			}
-		}
-	}
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
