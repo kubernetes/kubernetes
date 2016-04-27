@@ -535,7 +535,7 @@ func (x *ScaleSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Replicas = 0
 			} else {
-				x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Replicas = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -565,7 +565,7 @@ func (x *ScaleSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Replicas = 0
 	} else {
-		x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Replicas = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj5++
@@ -723,7 +723,7 @@ func (x *ScaleStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Replicas = 0
 			} else {
-				x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Replicas = int32(r.DecodeInt(32))
 			}
 		case "selector":
 			if r.TryDecodeAsNil() {
@@ -759,7 +759,7 @@ func (x *ScaleStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Replicas = 0
 	} else {
-		x.Replicas = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Replicas = int32(r.DecodeInt(32))
 	}
 	yyj6++
 	if yyhl6 {
