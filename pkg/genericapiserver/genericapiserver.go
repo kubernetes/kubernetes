@@ -454,6 +454,8 @@ func (s *GenericAPIServer) init(c *Config) {
 		s.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	}
 
+	apiserver.InstallVersionHandler(s.MuxHelper, s.HandlerContainer)
+
 	handler := http.Handler(s.mux.(*http.ServeMux))
 
 	// TODO: handle CORS and auth using go-restful
