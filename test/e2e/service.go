@@ -1079,6 +1079,9 @@ func createPodOrFail(c *client.Client, ns, name string, labels map[string]string
 					Name:  "test",
 					Image: "gcr.io/google_containers/pause:2.0",
 					Ports: containerPorts,
+					// Add a dummy environment variable to work around a docker issue.
+					// https://github.com/docker/docker/issues/14203
+					Env: []api.EnvVar{{Name: "FOO", Value: " "}},
 				},
 			},
 		},
