@@ -41,6 +41,10 @@ func (v *mockVolumes) DetachDisk(diskName string, instanceName string) (string, 
 	return "", fmt.Errorf("not implemented")
 }
 
+func (v *mockVolumes) IsDiskDetached(diskName string) (bool, error) {
+	return false, fmt.Errorf("not implemented")
+}
+
 func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName string, err error) {
 	return "", fmt.Errorf("not implemented")
 }
