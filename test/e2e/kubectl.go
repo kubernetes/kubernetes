@@ -770,7 +770,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 					framework.Failf("1 port is expected")
 				}
 				port := service.Spec.Ports[0]
-				if port.Port != servicePort {
+				if port.Port != int32(servicePort) {
 					framework.Failf("Wrong service port: %d", port.Port)
 				}
 				if port.TargetPort.IntValue() != redisPort {

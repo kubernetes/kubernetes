@@ -553,15 +553,15 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 }
 
 func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int) error {
-	if ds.Status.DesiredNumberScheduled == desiredNumberScheduled && ds.Status.CurrentNumberScheduled == currentNumberScheduled && ds.Status.NumberMisscheduled == numberMisscheduled {
+	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled && int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled && int(ds.Status.NumberMisscheduled) == numberMisscheduled {
 		return nil
 	}
 
 	var updateErr, getErr error
 	for i := 0; i <= StatusUpdateRetries; i++ {
-		ds.Status.DesiredNumberScheduled = desiredNumberScheduled
-		ds.Status.CurrentNumberScheduled = currentNumberScheduled
-		ds.Status.NumberMisscheduled = numberMisscheduled
+		ds.Status.DesiredNumberScheduled = int32(desiredNumberScheduled)
+		ds.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
+		ds.Status.NumberMisscheduled = int32(numberMisscheduled)
 
 		_, updateErr = dsClient.UpdateStatus(ds)
 		if updateErr == nil {

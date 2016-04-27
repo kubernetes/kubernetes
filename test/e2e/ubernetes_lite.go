@@ -52,7 +52,7 @@ var _ = framework.KubeDescribe("Ubernetes Lite", func() {
 	})
 
 	It("should spread the pods of a replication controller across zones", func() {
-		SpreadRCOrFail(f, (2*zoneCount)+1, image)
+		SpreadRCOrFail(f, int32((2*zoneCount)+1), image)
 	})
 })
 
@@ -181,7 +181,7 @@ func checkZoneSpreading(c *client.Client, pods *api.PodList, zoneNames []string)
 }
 
 // Check that the pods comprising a replication controller get spread evenly across available zones
-func SpreadRCOrFail(f *framework.Framework, replicaCount int, image string) {
+func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	name := "ubelite-spread-rc-" + string(util.NewUUID())
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	controller, err := f.Client.ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{

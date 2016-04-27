@@ -158,7 +158,7 @@ func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object
 func JobToSelectableFields(job *batch.Job) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(job.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
-		"status.successful": strconv.Itoa(job.Status.Succeeded),
+		"status.successful": strconv.Itoa(int(job.Status.Succeeded)),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

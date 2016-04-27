@@ -54,7 +54,7 @@ var validPodTemplate = api.PodTemplate{
 	},
 }
 
-var validReplicas = 8
+var validReplicas = int32(8)
 
 var validControllerSpec = api.ReplicationControllerSpec{
 	Replicas: validReplicas,
@@ -108,7 +108,7 @@ func TestUpdate(t *testing.T) {
 	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	replicas := 12
+	replicas := int32(12)
 	update := extensions.Scale{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec: extensions.ScaleSpec{

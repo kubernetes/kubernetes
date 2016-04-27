@@ -367,7 +367,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
 		// set deployment's history and scale to 0
 		// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
-		d.Spec.RevisionHistoryLimit = util.IntPtr(0)
+		d.Spec.RevisionHistoryLimit = util.Int32Ptr(0)
 		d.Spec.Replicas = 0
 		d.Spec.Paused = true
 	})

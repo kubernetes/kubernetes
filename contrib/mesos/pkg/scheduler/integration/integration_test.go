@@ -293,7 +293,7 @@ func NewTestPod() (*api.Pod, int) {
 				{
 					Ports: []api.ContainerPort{
 						{
-							ContainerPort: 8000 + currentPodNum,
+							ContainerPort: int32(8000 + currentPodNum),
 							Protocol:      api.ProtocolTCP,
 						},
 					},

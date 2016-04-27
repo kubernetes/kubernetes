@@ -80,7 +80,7 @@ func masterUpgradeGKE(v string) error {
 	return err
 }
 
-var nodeUpgrade = func(f *framework.Framework, replicas int, v string) error {
+var nodeUpgrade = func(f *framework.Framework, replicas int32, v string) error {
 	// Perform the upgrade.
 	var err error
 	switch framework.TestContext.Provider {
@@ -172,7 +172,7 @@ func nodeUpgradeGKE(v string) error {
 
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 
-	svcName, replicas := "baz", 2
+	svcName, replicas := "baz", int32(2)
 	var rcName, ip, v string
 	var ingress api.LoadBalancerIngress
 
@@ -429,7 +429,7 @@ func runCmd(command string, args ...string) (string, string, error) {
 	return stdout, stderr, nil
 }
 
-func validate(f *framework.Framework, svcNameWant, rcNameWant string, ingress api.LoadBalancerIngress, podsWant int) error {
+func validate(f *framework.Framework, svcNameWant, rcNameWant string, ingress api.LoadBalancerIngress, podsWant int32) error {
 	framework.Logf("Beginning cluster validation")
 	// Verify RC.
 	rcs, err := f.Client.ReplicationControllers(f.Namespace.Name).List(api.ListOptions{})

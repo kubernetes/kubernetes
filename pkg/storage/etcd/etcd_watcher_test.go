@@ -270,7 +270,7 @@ func emptySubsets() []api.EndpointSubset {
 func makeSubsets(ip string, port int) []api.EndpointSubset {
 	return []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{{IP: ip}},
-		Ports:     []api.EndpointPort{{Port: port}},
+		Ports:     []api.EndpointPort{{Port: int32(port)}},
 	}}
 }
 

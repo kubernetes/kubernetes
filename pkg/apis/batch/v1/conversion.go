@@ -58,24 +58,9 @@ func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s conv
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*batch.JobSpec))(in)
 	}
-	if in.Parallelism != nil {
-		out.Parallelism = new(int32)
-		*out.Parallelism = int32(*in.Parallelism)
-	} else {
-		out.Parallelism = nil
-	}
-	if in.Completions != nil {
-		out.Completions = new(int32)
-		*out.Completions = int32(*in.Completions)
-	} else {
-		out.Completions = nil
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		out.ActiveDeadlineSeconds = new(int64)
-		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
-	} else {
-		out.ActiveDeadlineSeconds = nil
-	}
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1.LabelSelector
 	if in.Selector != nil {
 		out.Selector = new(LabelSelector)
@@ -102,24 +87,9 @@ func Convert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conv
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*JobSpec))(in)
 	}
-	if in.Parallelism != nil {
-		out.Parallelism = new(int)
-		*out.Parallelism = int(*in.Parallelism)
-	} else {
-		out.Parallelism = nil
-	}
-	if in.Completions != nil {
-		out.Completions = new(int)
-		*out.Completions = int(*in.Completions)
-	} else {
-		out.Completions = nil
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		out.ActiveDeadlineSeconds = new(int64)
-		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
-	} else {
-		out.ActiveDeadlineSeconds = nil
-	}
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	// unable to generate simple pointer conversion for v1.LabelSelector -> unversioned.LabelSelector
 	if in.Selector != nil {
 		out.Selector = new(unversioned.LabelSelector)

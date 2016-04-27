@@ -57,8 +57,8 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 
 	// HostPath recycling is for testing and development purposes only!
 	hostPathConfig := volume.VolumeConfig{
-		RecyclerMinimumTimeout:   config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutHostPath,
-		RecyclerTimeoutIncrement: config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutHostPath,
+		RecyclerMinimumTimeout:   int(config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutHostPath),
+		RecyclerTimeoutIncrement: int(config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutHostPath),
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
@@ -67,8 +67,8 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(hostPathConfig)...)
 
 	nfsConfig := volume.VolumeConfig{
-		RecyclerMinimumTimeout:   config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutNFS,
-		RecyclerTimeoutIncrement: config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutNFS,
+		RecyclerMinimumTimeout:   int(config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutNFS),
+		RecyclerTimeoutIncrement: int(config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutNFS),
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {

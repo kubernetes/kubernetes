@@ -281,7 +281,7 @@ func TestScaleUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
 	}
-	replicas := 12
+	replicas := int32(12)
 	update := autoscaling.Scale{
 		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: autoscaling.ScaleSpec{

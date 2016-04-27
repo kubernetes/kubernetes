@@ -66,7 +66,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.Repl
 			ResourceVersion: "18",
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: replicas,
+			Replicas: int32(replicas),
 			Selector: &unversioned.LabelSelector{MatchLabels: selectorMap},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -237,7 +237,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(activePods, labelMap)
 	manager.rsStore.Store.Add(rs)
-	rs.Status = extensions.ReplicaSetStatus{Replicas: activePods}
+	rs.Status = extensions.ReplicaSetStatus{Replicas: int32(activePods)}
 	newPodList(manager.podStore.Store, activePods, api.PodRunning, labelMap, rs, "pod")
 
 	fakePodControl := controller.FakePodControl{}
@@ -643,7 +643,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 			// returned a ReplicaSet with replicas=1.
 			if c, ok := action.GetObject().(*extensions.ReplicaSet); !ok {
 				t.Errorf("Expected a ReplicaSet as the argument to update, got %T", c)
-			} else if c.Status.Replicas != numReplicas {
+			} else if int(c.Status.Replicas) != numReplicas {
 				t.Errorf("Expected update for ReplicaSet to contain replicas %v, got %v instead",
 					numReplicas, c.Status.Replicas)
 			}
@@ -669,7 +669,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	rsSpec := newReplicaSet(numReplicas, labelMap)
 	manager.rsStore.Store.Add(rsSpec)
 
-	expectedPods := 0
+	expectedPods := int32(0)
 	pods := newPodList(nil, numReplicas, api.PodPending, labelMap, rsSpec, "pod")
 
 	rsKey, err := controller.KeyFunc(rsSpec)
@@ -678,7 +678,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	}
 
 	// Size up the controller, then size it down, and confirm the expected create/delete pattern
-	for _, replicas := range []int{numReplicas, 0} {
+	for _, replicas := range []int32{int32(numReplicas), 0} {
 
 		rsSpec.Spec.Replicas = replicas
 		manager.rsStore.Store.Add(rsSpec)
@@ -688,21 +688,21 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 			// The store accrues active pods. It's also used by the ReplicaSet to determine how many
 			// replicas to create.
-			activePods := len(manager.podStore.Store.List())
+			activePods := int32(len(manager.podStore.Store.List()))
 			if replicas != 0 {
 				// This is the number of pods currently "in flight". They were created by the
 				// ReplicaSet controller above, which then puts the ReplicaSet to sleep till
 				// all of them have been observed.
 				expectedPods = replicas - activePods
-				if expectedPods > burstReplicas {
-					expectedPods = burstReplicas
+				if expectedPods > int32(burstReplicas) {
+					expectedPods = int32(burstReplicas)
 				}
 				// This validates the ReplicaSet manager sync actually created pods
-				validateSyncReplicaSet(t, &fakePodControl, expectedPods, 0)
+				validateSyncReplicaSet(t, &fakePodControl, int(expectedPods), 0)
 
 				// This simulates the watch events for all but 1 of the expected pods.
 				// None of these should wake the controller because it has expectations==BurstReplicas.
-				for i := 0; i < expectedPods-1; i++ {
+				for i := int32(0); i < expectedPods-1; i++ {
 					manager.podStore.Store.Add(&pods.Items[i])
 					manager.addPod(&pods.Items[i])
 				}
@@ -716,10 +716,10 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				}
 			} else {
 				expectedPods = (replicas - activePods) * -1
-				if expectedPods > burstReplicas {
-					expectedPods = burstReplicas
+				if expectedPods > int32(burstReplicas) {
+					expectedPods = int32(burstReplicas)
 				}
-				validateSyncReplicaSet(t, &fakePodControl, 0, expectedPods)
+				validateSyncReplicaSet(t, &fakePodControl, 0, int(expectedPods))
 
 				// To accurately simulate a watch we must delete the exact pods
 				// the rs is waiting for.
@@ -782,12 +782,12 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 		}
 
 		// Confirm that we've created the right number of replicas
-		activePods := len(manager.podStore.Store.List())
+		activePods := int32(len(manager.podStore.Store.List()))
 		if activePods != rsSpec.Spec.Replicas {
 			t.Fatalf("Unexpected number of active pods, expected %d, got %d", rsSpec.Spec.Replicas, activePods)
 		}
 		// Replenish the pod list, since we cut it down sizing up
-		pods = newPodList(nil, replicas, api.PodRunning, labelMap, rsSpec, "pod")
+		pods = newPodList(nil, int(replicas), api.PodRunning, labelMap, rsSpec, "pod")
 	}
 }
 

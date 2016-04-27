@@ -199,7 +199,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 }
 
 func TestPluginVolume(t *testing.T) {
-	lun := 0
+	lun := int32(0)
 	vol := &api.Volume{
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
@@ -214,7 +214,7 @@ func TestPluginVolume(t *testing.T) {
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
-	lun := 0
+	lun := int32(0)
 	vol := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name: "vol1",
@@ -239,7 +239,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	lun := 0
+	lun := int32(0)
 	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name: "pvA",
