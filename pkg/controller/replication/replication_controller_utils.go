@@ -31,8 +31,8 @@ func updateReplicaCount(rcClient unversionedcore.ReplicationControllerInterface,
 	// This is the steady state. It happens when the rc doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
-	if controller.Status.Replicas == numReplicas &&
-		controller.Status.FullyLabeledReplicas == numFullyLabeledReplicas &&
+	if int(controller.Status.Replicas) == numReplicas &&
+		int(controller.Status.FullyLabeledReplicas) == numFullyLabeledReplicas &&
 		controller.Generation == controller.Status.ObservedGeneration {
 		return nil
 	}
@@ -49,7 +49,7 @@ func updateReplicaCount(rcClient unversionedcore.ReplicationControllerInterface,
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", controller.Status.FullyLabeledReplicas, numFullyLabeledReplicas) +
 			fmt.Sprintf("sequence No: %v->%v", controller.Status.ObservedGeneration, generation))
 
-		rc.Status = api.ReplicationControllerStatus{Replicas: numReplicas, FullyLabeledReplicas: numFullyLabeledReplicas, ObservedGeneration: generation}
+		rc.Status = api.ReplicationControllerStatus{Replicas: int32(numReplicas), FullyLabeledReplicas: int32(numFullyLabeledReplicas), ObservedGeneration: generation}
 		_, updateErr = rcClient.UpdateStatus(rc)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr

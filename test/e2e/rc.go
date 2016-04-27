@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("ReplicationController", func() {
 // which is checked for each replica.
 func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	name := "my-hostname-" + test + "-" + string(util.NewUUID())
-	replicas := 2
+	replicas := int32(2)
 
 	// Create a replication controller for a service
 	// that serves its hostname.

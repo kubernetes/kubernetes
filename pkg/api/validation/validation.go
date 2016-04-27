@@ -991,10 +991,10 @@ func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) fiel
 		}
 		if port.ContainerPort == 0 {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, PortRangeErrorMsg))
-		} else if !validation.IsValidPortNum(port.ContainerPort) {
+		} else if !validation.IsValidPortNum(int(port.ContainerPort)) {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, PortRangeErrorMsg))
 		}
-		if port.HostPort != 0 && !validation.IsValidPortNum(port.HostPort) {
+		if port.HostPort != 0 && !validation.IsValidPortNum(int(port.HostPort)) {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("hostPort"), port.HostPort, PortRangeErrorMsg))
 		}
 		if len(port.Protocol) == 0 {
@@ -1796,7 +1796,7 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 		}
 	}
 
-	if !validation.IsValidPortNum(sp.Port) {
+	if !validation.IsValidPortNum(int(sp.Port)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), sp.Port, PortRangeErrorMsg))
 	}
 
@@ -1879,7 +1879,7 @@ func ValidateNonEmptySelector(selectorMap map[string]string, fldPath *field.Path
 }
 
 // Validates the given template and ensures that it is in accordance with the desrired selector and replicas.
-func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map[string]string, replicas int, fldPath *field.Path) field.ErrorList {
+func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map[string]string, replicas int32, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
@@ -2636,7 +2636,7 @@ func validateEndpointPort(port *api.EndpointPort, requireName bool, fldPath *fie
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), port.Name, DNS1123LabelErrorMsg))
 		}
 	}
-	if !validation.IsValidPortNum(port.Port) {
+	if !validation.IsValidPortNum(int(port.Port)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, PortRangeErrorMsg))
 	}
 	if len(port.Protocol) == 0 {

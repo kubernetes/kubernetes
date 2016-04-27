@@ -153,8 +153,7 @@ func autoConvert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in *PetSetStatus, ou
 	}
 	if in.ObservedGeneration != nil {
 		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.ObservedGeneration = nil
 	}
@@ -172,8 +171,7 @@ func autoConvert_apps_PetSetStatus_To_v1alpha1_PetSetStatus(in *apps.PetSetStatu
 	}
 	if in.ObservedGeneration != nil {
 		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.ObservedGeneration = nil
 	}

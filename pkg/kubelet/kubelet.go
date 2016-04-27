@@ -1318,8 +1318,8 @@ func makePortMappings(container *api.Container) (ports []kubecontainer.PortMappi
 	names := make(map[string]struct{})
 	for _, p := range container.Ports {
 		pm := kubecontainer.PortMapping{
-			HostPort:      p.HostPort,
-			ContainerPort: p.ContainerPort,
+			HostPort:      int(p.HostPort),
+			ContainerPort: int(p.ContainerPort),
 			Protocol:      p.Protocol,
 			HostIP:        p.HostIP,
 		}
@@ -3319,7 +3319,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontain
 		cid := cs.ID.String()
 		status := &api.ContainerStatus{
 			Name:         cs.Name,
-			RestartCount: cs.RestartCount,
+			RestartCount: int32(cs.RestartCount),
 			Image:        cs.Image,
 			ImageID:      cs.ImageID,
 			ContainerID:  cid,
@@ -3329,7 +3329,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontain
 			status.State.Running = &api.ContainerStateRunning{StartedAt: unversioned.NewTime(cs.StartedAt)}
 		case kubecontainer.ContainerStateExited:
 			status.State.Terminated = &api.ContainerStateTerminated{
-				ExitCode:    cs.ExitCode,
+				ExitCode:    int32(cs.ExitCode),
 				Reason:      cs.Reason,
 				Message:     cs.Message,
 				StartedAt:   unversioned.NewTime(cs.StartedAt),

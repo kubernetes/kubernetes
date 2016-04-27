@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -1197,11 +1198,15 @@ type ContainerStateWaiting struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 }
 
+/*
 // ContainerStateRunning is a running state of a container.
 type ContainerStateRunning struct {
 	// Time at which the container was last (re-)started
 	StartedAt unversioned.Time `json:"startedAt,omitempty" protobuf:"bytes,1,opt,name=startedAt"`
 }
+*/
+
+type ContainerStateRunning api.ContainerStateRunning
 
 // ContainerStateTerminated is a terminated state of a container.
 type ContainerStateTerminated struct {

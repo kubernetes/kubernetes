@@ -596,7 +596,7 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
 		container := pod.Status.ContainerStatuses[i]
 
-		restarts += container.RestartCount
+		restarts += int(container.RestartCount)
 		if container.State.Waiting != nil && container.State.Waiting.Reason != "" {
 			reason = container.State.Waiting.Reason
 		} else if container.State.Terminated != nil && container.State.Terminated.Reason != "" {

@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("ReplicaSet", func() {
 // image serves its hostname which is checked for each replica.
 func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image string) {
 	name := "my-hostname-" + test + "-" + string(util.NewUUID())
-	replicas := 2
+	replicas := int32(2)
 
 	// Create a ReplicaSet for a service that serves its hostname.
 	// The source for the Docker containter kubernetes/serve_hostname is

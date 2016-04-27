@@ -729,7 +729,7 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 	for _, pod := range pods {
 		for _, container := range pod.Spec.Containers {
 			for _, podPort := range container.Ports {
-				ports[podPort.HostPort] = true
+				ports[int(podPort.HostPort)] = true
 			}
 		}
 	}

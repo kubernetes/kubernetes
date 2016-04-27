@@ -158,12 +158,12 @@ func createPortAndServiceSpec(servicePort int, nodePort int, servicePortName str
 	//Use the Cluster IP type for the service port if NodePort isn't provided.
 	//Otherwise, we will be binding the master service to a NodePort.
 	servicePorts := []api.ServicePort{{Protocol: api.ProtocolTCP,
-		Port:       servicePort,
+		Port:       int32(servicePort),
 		Name:       servicePortName,
 		TargetPort: intstr.FromInt(servicePort)}}
 	serviceType := api.ServiceTypeClusterIP
 	if nodePort > 0 {
-		servicePorts[0].NodePort = nodePort
+		servicePorts[0].NodePort = int32(nodePort)
 		serviceType = api.ServiceTypeNodePort
 	}
 	if extraServicePorts != nil {
@@ -175,7 +175,7 @@ func createPortAndServiceSpec(servicePort int, nodePort int, servicePortName str
 // createEndpointPortSpec creates an array of endpoint ports
 func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndpointPorts []api.EndpointPort) []api.EndpointPort {
 	endpointPorts := []api.EndpointPort{{Protocol: api.ProtocolTCP,
-		Port: endpointPort,
+		Port: int32(endpointPort),
 		Name: endpointPortName,
 	}}
 	if extraEndpointPorts != nil {

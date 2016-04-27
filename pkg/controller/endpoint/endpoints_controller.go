@@ -370,7 +370,7 @@ func (e *EndpointController) syncService(key string) {
 				podHostNames[string(pod.Status.PodIP)] = hostRecord
 			}
 
-			epp := api.EndpointPort{Name: portName, Port: portNum, Protocol: portProto}
+			epp := api.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 			epa := api.EndpointAddress{
 				IP: pod.Status.PodIP,
 				TargetRef: &api.ObjectReference{

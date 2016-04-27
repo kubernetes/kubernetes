@@ -80,7 +80,7 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRe
 	// Wait for the restart state to be as desired.
 	deadline := time.Now().Add(timeout)
 	lastRestartCount := initialRestartCount
-	observedRestarts := 0
+	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = c.Pods(ns).Get(podDescr.Name)
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podDescr.Name))
@@ -94,7 +94,7 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRe
 			}
 		}
 		observedRestarts = restartCount - initialRestartCount
-		if expectNumRestarts > 0 && observedRestarts >= expectNumRestarts {
+		if expectNumRestarts > 0 && int(observedRestarts) >= expectNumRestarts {
 			// Stop if we have observed more than expectNumRestarts restarts.
 			break
 		}
@@ -104,7 +104,7 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRe
 	// If we expected 0 restarts, fail if observed any restart.
 	// If we expected n restarts (n > 0), fail if we observed < n restarts.
 	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
-		observedRestarts < expectNumRestarts) {
+		int(observedRestarts) < expectNumRestarts) {
 		framework.Failf("pod %s/%s - expected number of restarts: %t, found restarts: %t",
 			ns, podDescr.Name, expectNumRestarts, observedRestarts)
 	}

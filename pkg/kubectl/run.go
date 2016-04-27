@@ -105,7 +105,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 			Labels: labels,
 		},
 		Spec: extensions.DeploymentSpec{
-			Replicas: count,
+			Replicas: int32(count),
 			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -605,7 +605,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 			Labels: labels,
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: count,
+			Replicas: int32(count),
 			Selector: labels,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -680,11 +680,11 @@ func updatePodPorts(params map[string]string, podSpec *api.PodSpec) (err error) 
 	if port > 0 {
 		podSpec.Containers[0].Ports = []api.ContainerPort{
 			{
-				ContainerPort: port,
+				ContainerPort: int32(port),
 			},
 		}
 		if hostPort > 0 {
-			podSpec.Containers[0].Ports[0].HostPort = hostPort
+			podSpec.Containers[0].Ports[0].HostPort = int32(hostPort)
 		}
 	}
 	return nil

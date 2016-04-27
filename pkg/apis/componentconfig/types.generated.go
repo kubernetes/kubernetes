@@ -589,7 +589,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			if r.TryDecodeAsNil() {
 				x.HealthzPort = 0
 			} else {
-				x.HealthzPort = int(r.DecodeInt(codecSelferBitsize1234))
+				x.HealthzPort = int32(r.DecodeInt(32))
 			}
 		case "hostnameOverride":
 			if r.TryDecodeAsNil() {
@@ -604,13 +604,13 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 				}
 			} else {
 				if x.IPTablesMasqueradeBit == nil {
-					x.IPTablesMasqueradeBit = new(int)
+					x.IPTablesMasqueradeBit = new(int32)
 				}
 				yym10 := z.DecBinary()
 				_ = yym10
 				if false {
 				} else {
-					*((*int)(x.IPTablesMasqueradeBit)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.IPTablesMasqueradeBit)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "iptablesSyncPeriodSeconds":
@@ -653,13 +653,13 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 				}
 			} else {
 				if x.OOMScoreAdj == nil {
-					x.OOMScoreAdj = new(int)
+					x.OOMScoreAdj = new(int32)
 				}
 				yym17 := z.DecBinary()
 				_ = yym17
 				if false {
 				} else {
-					*((*int)(x.OOMScoreAdj)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.OOMScoreAdj)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "mode":
@@ -699,7 +699,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Deco
 			if r.TryDecodeAsNil() {
 				x.ConntrackMax = 0
 			} else {
-				x.ConntrackMax = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ConntrackMax = int32(r.DecodeInt(32))
 			}
 		case "conntrackTCPEstablishedTimeout":
 			if r.TryDecodeAsNil() {
@@ -804,7 +804,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	if r.TryDecodeAsNil() {
 		x.HealthzPort = 0
 	} else {
-		x.HealthzPort = int(r.DecodeInt(codecSelferBitsize1234))
+		x.HealthzPort = int32(r.DecodeInt(32))
 	}
 	yyj28++
 	if yyhl28 {
@@ -839,13 +839,13 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 		}
 	} else {
 		if x.IPTablesMasqueradeBit == nil {
-			x.IPTablesMasqueradeBit = new(int)
+			x.IPTablesMasqueradeBit = new(int32)
 		}
 		yym35 := z.DecBinary()
 		_ = yym35
 		if false {
 		} else {
-			*((*int)(x.IPTablesMasqueradeBit)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.IPTablesMasqueradeBit)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj28++
@@ -938,13 +938,13 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 		}
 	} else {
 		if x.OOMScoreAdj == nil {
-			x.OOMScoreAdj = new(int)
+			x.OOMScoreAdj = new(int32)
 		}
 		yym42 := z.DecBinary()
 		_ = yym42
 		if false {
 		} else {
-			*((*int)(x.OOMScoreAdj)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.OOMScoreAdj)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj28++
@@ -1034,7 +1034,7 @@ func (x *KubeProxyConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.De
 	if r.TryDecodeAsNil() {
 		x.ConntrackMax = 0
 	} else {
-		x.ConntrackMax = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ConntrackMax = int32(r.DecodeInt(32))
 	}
 	yyj28++
 	if yyhl28 {
@@ -3092,7 +3092,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			if r.TryDecodeAsNil() {
 				x.RegistryBurst = 0
 			} else {
-				x.RegistryBurst = int(r.DecodeInt(codecSelferBitsize1234))
+				x.RegistryBurst = int32(r.DecodeInt(32))
 			}
 		case "eventRecordQPS":
 			if r.TryDecodeAsNil() {
@@ -3104,7 +3104,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			if r.TryDecodeAsNil() {
 				x.EventBurst = 0
 			} else {
-				x.EventBurst = int(r.DecodeInt(codecSelferBitsize1234))
+				x.EventBurst = int32(r.DecodeInt(32))
 			}
 		case "enableDebuggingHandlers":
 			if r.TryDecodeAsNil() {
@@ -3131,13 +3131,13 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			if r.TryDecodeAsNil() {
 				x.MaxPerPodContainerCount = 0
 			} else {
-				x.MaxPerPodContainerCount = int(r.DecodeInt(codecSelferBitsize1234))
+				x.MaxPerPodContainerCount = int32(r.DecodeInt(32))
 			}
 		case "maxContainerCount":
 			if r.TryDecodeAsNil() {
 				x.MaxContainerCount = 0
 			} else {
-				x.MaxContainerCount = int(r.DecodeInt(codecSelferBitsize1234))
+				x.MaxContainerCount = int32(r.DecodeInt(32))
 			}
 		case "cAdvisorPort":
 			if r.TryDecodeAsNil() {
@@ -3149,7 +3149,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			if r.TryDecodeAsNil() {
 				x.HealthzPort = 0
 			} else {
-				x.HealthzPort = int(r.DecodeInt(codecSelferBitsize1234))
+				x.HealthzPort = int32(r.DecodeInt(32))
 			}
 		case "healthzBindAddress":
 			if r.TryDecodeAsNil() {
@@ -3161,7 +3161,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			if r.TryDecodeAsNil() {
 				x.OOMScoreAdj = 0
 			} else {
-				x.OOMScoreAdj = int(r.DecodeInt(codecSelferBitsize1234))
+				x.OOMScoreAdj = int32(r.DecodeInt(32))
 			}
 		case "registerNode":
 			if r.TryDecodeAsNil() {
@@ -3236,19 +3236,19 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			if r.TryDecodeAsNil() {
 				x.ImageGCHighThresholdPercent = 0
 			} else {
-				x.ImageGCHighThresholdPercent = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ImageGCHighThresholdPercent = int32(r.DecodeInt(32))
 			}
 		case "imageGCLowThresholdPercent":
 			if r.TryDecodeAsNil() {
 				x.ImageGCLowThresholdPercent = 0
 			} else {
-				x.ImageGCLowThresholdPercent = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ImageGCLowThresholdPercent = int32(r.DecodeInt(32))
 			}
 		case "lowDiskSpaceThresholdMB":
 			if r.TryDecodeAsNil() {
 				x.LowDiskSpaceThresholdMB = 0
 			} else {
-				x.LowDiskSpaceThresholdMB = int(r.DecodeInt(codecSelferBitsize1234))
+				x.LowDiskSpaceThresholdMB = int32(r.DecodeInt(32))
 			}
 		case "volumeStatsAggPeriod":
 			if r.TryDecodeAsNil() {
@@ -3371,7 +3371,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			if r.TryDecodeAsNil() {
 				x.MaxPods = 0
 			} else {
-				x.MaxPods = int(r.DecodeInt(codecSelferBitsize1234))
+				x.MaxPods = int32(r.DecodeInt(32))
 			}
 		case "dockerExecHandlerName":
 			if r.TryDecodeAsNil() {
@@ -3437,7 +3437,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			if r.TryDecodeAsNil() {
 				x.KubeAPIBurst = 0
 			} else {
-				x.KubeAPIBurst = int(r.DecodeInt(codecSelferBitsize1234))
+				x.KubeAPIBurst = int32(r.DecodeInt(32))
 			}
 		case "serializeImagePulls":
 			if r.TryDecodeAsNil() {
@@ -3903,7 +3903,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.RegistryBurst = 0
 	} else {
-		x.RegistryBurst = int(r.DecodeInt(codecSelferBitsize1234))
+		x.RegistryBurst = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -3935,7 +3935,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.EventBurst = 0
 	} else {
-		x.EventBurst = int(r.DecodeInt(codecSelferBitsize1234))
+		x.EventBurst = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -3992,7 +3992,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.MaxPerPodContainerCount = 0
 	} else {
-		x.MaxPerPodContainerCount = int(r.DecodeInt(codecSelferBitsize1234))
+		x.MaxPerPodContainerCount = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -4008,7 +4008,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.MaxContainerCount = 0
 	} else {
-		x.MaxContainerCount = int(r.DecodeInt(codecSelferBitsize1234))
+		x.MaxContainerCount = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -4040,7 +4040,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.HealthzPort = 0
 	} else {
-		x.HealthzPort = int(r.DecodeInt(codecSelferBitsize1234))
+		x.HealthzPort = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -4072,7 +4072,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.OOMScoreAdj = 0
 	} else {
-		x.OOMScoreAdj = int(r.DecodeInt(codecSelferBitsize1234))
+		x.OOMScoreAdj = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -4227,7 +4227,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.ImageGCHighThresholdPercent = 0
 	} else {
-		x.ImageGCHighThresholdPercent = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ImageGCHighThresholdPercent = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -4243,7 +4243,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.ImageGCLowThresholdPercent = 0
 	} else {
-		x.ImageGCLowThresholdPercent = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ImageGCLowThresholdPercent = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -4259,7 +4259,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.LowDiskSpaceThresholdMB = 0
 	} else {
-		x.LowDiskSpaceThresholdMB = int(r.DecodeInt(codecSelferBitsize1234))
+		x.LowDiskSpaceThresholdMB = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -4572,7 +4572,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.MaxPods = 0
 	} else {
-		x.MaxPods = int(r.DecodeInt(codecSelferBitsize1234))
+		x.MaxPods = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -4748,7 +4748,7 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	if r.TryDecodeAsNil() {
 		x.KubeAPIBurst = 0
 	} else {
-		x.KubeAPIBurst = int(r.DecodeInt(codecSelferBitsize1234))
+		x.KubeAPIBurst = int32(r.DecodeInt(32))
 	}
 	yyj94++
 	if yyhl94 {
@@ -5222,7 +5222,7 @@ func (x *KubeSchedulerConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.
 			if r.TryDecodeAsNil() {
 				x.Port = 0
 			} else {
-				x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Port = int32(r.DecodeInt(32))
 			}
 		case "address":
 			if r.TryDecodeAsNil() {
@@ -5264,7 +5264,7 @@ func (x *KubeSchedulerConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.
 			if r.TryDecodeAsNil() {
 				x.KubeAPIBurst = 0
 			} else {
-				x.KubeAPIBurst = int(r.DecodeInt(codecSelferBitsize1234))
+				x.KubeAPIBurst = int32(r.DecodeInt(32))
 			}
 		case "schedulerName":
 			if r.TryDecodeAsNil() {
@@ -5319,7 +5319,7 @@ func (x *KubeSchedulerConfiguration) codecDecodeSelfFromArray(l int, d *codec197
 	if r.TryDecodeAsNil() {
 		x.Port = 0
 	} else {
-		x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Port = int32(r.DecodeInt(32))
 	}
 	yyj16++
 	if yyhl16 {
@@ -5431,7 +5431,7 @@ func (x *KubeSchedulerConfiguration) codecDecodeSelfFromArray(l int, d *codec197
 	if r.TryDecodeAsNil() {
 		x.KubeAPIBurst = 0
 	} else {
-		x.KubeAPIBurst = int(r.DecodeInt(codecSelferBitsize1234))
+		x.KubeAPIBurst = int32(r.DecodeInt(32))
 	}
 	yyj16++
 	if yyhl16 {
@@ -6929,7 +6929,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			if r.TryDecodeAsNil() {
 				x.Port = 0
 			} else {
-				x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Port = int32(r.DecodeInt(32))
 			}
 		case "address":
 			if r.TryDecodeAsNil() {
@@ -6953,67 +6953,67 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			if r.TryDecodeAsNil() {
 				x.ConcurrentEndpointSyncs = 0
 			} else {
-				x.ConcurrentEndpointSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ConcurrentEndpointSyncs = int32(r.DecodeInt(32))
 			}
 		case "concurrentRSSyncs":
 			if r.TryDecodeAsNil() {
 				x.ConcurrentRSSyncs = 0
 			} else {
-				x.ConcurrentRSSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ConcurrentRSSyncs = int32(r.DecodeInt(32))
 			}
 		case "concurrentRCSyncs":
 			if r.TryDecodeAsNil() {
 				x.ConcurrentRCSyncs = 0
 			} else {
-				x.ConcurrentRCSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ConcurrentRCSyncs = int32(r.DecodeInt(32))
 			}
 		case "concurrentResourceQuotaSyncs":
 			if r.TryDecodeAsNil() {
 				x.ConcurrentResourceQuotaSyncs = 0
 			} else {
-				x.ConcurrentResourceQuotaSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ConcurrentResourceQuotaSyncs = int32(r.DecodeInt(32))
 			}
 		case "concurrentDeploymentSyncs":
 			if r.TryDecodeAsNil() {
 				x.ConcurrentDeploymentSyncs = 0
 			} else {
-				x.ConcurrentDeploymentSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ConcurrentDeploymentSyncs = int32(r.DecodeInt(32))
 			}
 		case "concurrentDaemonSetSyncs":
 			if r.TryDecodeAsNil() {
 				x.ConcurrentDaemonSetSyncs = 0
 			} else {
-				x.ConcurrentDaemonSetSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ConcurrentDaemonSetSyncs = int32(r.DecodeInt(32))
 			}
 		case "concurrentJobSyncs":
 			if r.TryDecodeAsNil() {
 				x.ConcurrentJobSyncs = 0
 			} else {
-				x.ConcurrentJobSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ConcurrentJobSyncs = int32(r.DecodeInt(32))
 			}
 		case "concurrentNamespaceSyncs":
 			if r.TryDecodeAsNil() {
 				x.ConcurrentNamespaceSyncs = 0
 			} else {
-				x.ConcurrentNamespaceSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+				x.ConcurrentNamespaceSyncs = int32(r.DecodeInt(32))
 			}
 		case "lookupCacheSizeForRC":
 			if r.TryDecodeAsNil() {
 				x.LookupCacheSizeForRC = 0
 			} else {
-				x.LookupCacheSizeForRC = int(r.DecodeInt(codecSelferBitsize1234))
+				x.LookupCacheSizeForRC = int32(r.DecodeInt(32))
 			}
 		case "lookupCacheSizeForRS":
 			if r.TryDecodeAsNil() {
 				x.LookupCacheSizeForRS = 0
 			} else {
-				x.LookupCacheSizeForRS = int(r.DecodeInt(codecSelferBitsize1234))
+				x.LookupCacheSizeForRS = int32(r.DecodeInt(32))
 			}
 		case "lookupCacheSizeForDaemonSet":
 			if r.TryDecodeAsNil() {
 				x.LookupCacheSizeForDaemonSet = 0
 			} else {
-				x.LookupCacheSizeForDaemonSet = int(r.DecodeInt(codecSelferBitsize1234))
+				x.LookupCacheSizeForDaemonSet = int32(r.DecodeInt(32))
 			}
 		case "serviceSyncPeriod":
 			if r.TryDecodeAsNil() {
@@ -7109,7 +7109,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			if r.TryDecodeAsNil() {
 				x.TerminatedPodGCThreshold = 0
 			} else {
-				x.TerminatedPodGCThreshold = int(r.DecodeInt(codecSelferBitsize1234))
+				x.TerminatedPodGCThreshold = int32(r.DecodeInt(32))
 			}
 		case "horizontalPodAutoscalerSyncPeriod":
 			if r.TryDecodeAsNil() {
@@ -7166,7 +7166,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			if r.TryDecodeAsNil() {
 				x.DeletingPodsBurst = 0
 			} else {
-				x.DeletingPodsBurst = int(r.DecodeInt(codecSelferBitsize1234))
+				x.DeletingPodsBurst = int32(r.DecodeInt(32))
 			}
 		case "nodeMonitorGracePeriod":
 			if r.TryDecodeAsNil() {
@@ -7187,7 +7187,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			if r.TryDecodeAsNil() {
 				x.RegisterRetryCount = 0
 			} else {
-				x.RegisterRetryCount = int(r.DecodeInt(codecSelferBitsize1234))
+				x.RegisterRetryCount = int32(r.DecodeInt(32))
 			}
 		case "nodeStartupGracePeriod":
 			if r.TryDecodeAsNil() {
@@ -7271,7 +7271,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromMap(l int, d *co
 			if r.TryDecodeAsNil() {
 				x.KubeAPIBurst = 0
 			} else {
-				x.KubeAPIBurst = int(r.DecodeInt(codecSelferBitsize1234))
+				x.KubeAPIBurst = int32(r.DecodeInt(32))
 			}
 		case "leaderElection":
 			if r.TryDecodeAsNil() {
@@ -7342,7 +7342,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.Port = 0
 	} else {
-		x.Port = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Port = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7406,7 +7406,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.ConcurrentEndpointSyncs = 0
 	} else {
-		x.ConcurrentEndpointSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ConcurrentEndpointSyncs = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7422,7 +7422,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.ConcurrentRSSyncs = 0
 	} else {
-		x.ConcurrentRSSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ConcurrentRSSyncs = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7438,7 +7438,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.ConcurrentRCSyncs = 0
 	} else {
-		x.ConcurrentRCSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ConcurrentRCSyncs = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7454,7 +7454,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.ConcurrentResourceQuotaSyncs = 0
 	} else {
-		x.ConcurrentResourceQuotaSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ConcurrentResourceQuotaSyncs = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7470,7 +7470,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.ConcurrentDeploymentSyncs = 0
 	} else {
-		x.ConcurrentDeploymentSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ConcurrentDeploymentSyncs = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7486,7 +7486,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.ConcurrentDaemonSetSyncs = 0
 	} else {
-		x.ConcurrentDaemonSetSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ConcurrentDaemonSetSyncs = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7502,7 +7502,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.ConcurrentJobSyncs = 0
 	} else {
-		x.ConcurrentJobSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ConcurrentJobSyncs = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7518,7 +7518,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.ConcurrentNamespaceSyncs = 0
 	} else {
-		x.ConcurrentNamespaceSyncs = int(r.DecodeInt(codecSelferBitsize1234))
+		x.ConcurrentNamespaceSyncs = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7534,7 +7534,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.LookupCacheSizeForRC = 0
 	} else {
-		x.LookupCacheSizeForRC = int(r.DecodeInt(codecSelferBitsize1234))
+		x.LookupCacheSizeForRC = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7550,7 +7550,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.LookupCacheSizeForRS = 0
 	} else {
-		x.LookupCacheSizeForRS = int(r.DecodeInt(codecSelferBitsize1234))
+		x.LookupCacheSizeForRS = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7566,7 +7566,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.LookupCacheSizeForDaemonSet = 0
 	} else {
-		x.LookupCacheSizeForDaemonSet = int(r.DecodeInt(codecSelferBitsize1234))
+		x.LookupCacheSizeForDaemonSet = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7732,7 +7732,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.TerminatedPodGCThreshold = 0
 	} else {
-		x.TerminatedPodGCThreshold = int(r.DecodeInt(codecSelferBitsize1234))
+		x.TerminatedPodGCThreshold = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7839,7 +7839,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.DeletingPodsBurst = 0
 	} else {
-		x.DeletingPodsBurst = int(r.DecodeInt(codecSelferBitsize1234))
+		x.DeletingPodsBurst = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -7880,7 +7880,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.RegisterRetryCount = 0
 	} else {
-		x.RegisterRetryCount = int(r.DecodeInt(codecSelferBitsize1234))
+		x.RegisterRetryCount = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -8074,7 +8074,7 @@ func (x *KubeControllerManagerConfiguration) codecDecodeSelfFromArray(l int, d *
 	if r.TryDecodeAsNil() {
 		x.KubeAPIBurst = 0
 	} else {
-		x.KubeAPIBurst = int(r.DecodeInt(codecSelferBitsize1234))
+		x.KubeAPIBurst = int32(r.DecodeInt(32))
 	}
 	yyj62++
 	if yyhl62 {
@@ -8608,13 +8608,13 @@ func (x *PersistentVolumeRecyclerConfiguration) codecDecodeSelfFromMap(l int, d 
 			if r.TryDecodeAsNil() {
 				x.MaximumRetry = 0
 			} else {
-				x.MaximumRetry = int(r.DecodeInt(codecSelferBitsize1234))
+				x.MaximumRetry = int32(r.DecodeInt(32))
 			}
 		case "minimumTimeoutNFS":
 			if r.TryDecodeAsNil() {
 				x.MinimumTimeoutNFS = 0
 			} else {
-				x.MinimumTimeoutNFS = int(r.DecodeInt(codecSelferBitsize1234))
+				x.MinimumTimeoutNFS = int32(r.DecodeInt(32))
 			}
 		case "podTemplateFilePathNFS":
 			if r.TryDecodeAsNil() {
@@ -8626,7 +8626,7 @@ func (x *PersistentVolumeRecyclerConfiguration) codecDecodeSelfFromMap(l int, d 
 			if r.TryDecodeAsNil() {
 				x.IncrementTimeoutNFS = 0
 			} else {
-				x.IncrementTimeoutNFS = int(r.DecodeInt(codecSelferBitsize1234))
+				x.IncrementTimeoutNFS = int32(r.DecodeInt(32))
 			}
 		case "podTemplateFilePathHostPath":
 			if r.TryDecodeAsNil() {
@@ -8638,13 +8638,13 @@ func (x *PersistentVolumeRecyclerConfiguration) codecDecodeSelfFromMap(l int, d 
 			if r.TryDecodeAsNil() {
 				x.MinimumTimeoutHostPath = 0
 			} else {
-				x.MinimumTimeoutHostPath = int(r.DecodeInt(codecSelferBitsize1234))
+				x.MinimumTimeoutHostPath = int32(r.DecodeInt(32))
 			}
 		case "incrementTimeoutHostPath":
 			if r.TryDecodeAsNil() {
 				x.IncrementTimeoutHostPath = 0
 			} else {
-				x.IncrementTimeoutHostPath = int(r.DecodeInt(codecSelferBitsize1234))
+				x.IncrementTimeoutHostPath = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -8674,7 +8674,7 @@ func (x *PersistentVolumeRecyclerConfiguration) codecDecodeSelfFromArray(l int, 
 	if r.TryDecodeAsNil() {
 		x.MaximumRetry = 0
 	} else {
-		x.MaximumRetry = int(r.DecodeInt(codecSelferBitsize1234))
+		x.MaximumRetry = int32(r.DecodeInt(32))
 	}
 	yyj11++
 	if yyhl11 {
@@ -8690,7 +8690,7 @@ func (x *PersistentVolumeRecyclerConfiguration) codecDecodeSelfFromArray(l int, 
 	if r.TryDecodeAsNil() {
 		x.MinimumTimeoutNFS = 0
 	} else {
-		x.MinimumTimeoutNFS = int(r.DecodeInt(codecSelferBitsize1234))
+		x.MinimumTimeoutNFS = int32(r.DecodeInt(32))
 	}
 	yyj11++
 	if yyhl11 {
@@ -8722,7 +8722,7 @@ func (x *PersistentVolumeRecyclerConfiguration) codecDecodeSelfFromArray(l int, 
 	if r.TryDecodeAsNil() {
 		x.IncrementTimeoutNFS = 0
 	} else {
-		x.IncrementTimeoutNFS = int(r.DecodeInt(codecSelferBitsize1234))
+		x.IncrementTimeoutNFS = int32(r.DecodeInt(32))
 	}
 	yyj11++
 	if yyhl11 {
@@ -8754,7 +8754,7 @@ func (x *PersistentVolumeRecyclerConfiguration) codecDecodeSelfFromArray(l int, 
 	if r.TryDecodeAsNil() {
 		x.MinimumTimeoutHostPath = 0
 	} else {
-		x.MinimumTimeoutHostPath = int(r.DecodeInt(codecSelferBitsize1234))
+		x.MinimumTimeoutHostPath = int32(r.DecodeInt(32))
 	}
 	yyj11++
 	if yyhl11 {
@@ -8770,7 +8770,7 @@ func (x *PersistentVolumeRecyclerConfiguration) codecDecodeSelfFromArray(l int, 
 	if r.TryDecodeAsNil() {
 		x.IncrementTimeoutHostPath = 0
 	} else {
-		x.IncrementTimeoutHostPath = int(r.DecodeInt(codecSelferBitsize1234))
+		x.IncrementTimeoutHostPath = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj11++

@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 						Image:           "gcr.io/google_containers/fakegitserver:0.1",
 						ImagePullPolicy: "IfNotPresent",
 						Ports: []api.ContainerPort{
-							{ContainerPort: containerPort},
+							{ContainerPort: int32(containerPort)},
 						},
 					},
 				},
@@ -92,7 +92,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 				Ports: []api.ServicePort{
 					{
 						Name:       "http-portal",
-						Port:       httpPort,
+						Port:       int32(httpPort),
 						TargetPort: intstr.FromInt(containerPort),
 					},
 				},

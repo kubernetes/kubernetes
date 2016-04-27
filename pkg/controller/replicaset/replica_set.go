@@ -416,7 +416,7 @@ func (rsc *ReplicaSetController) worker() {
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 func (rsc *ReplicaSetController) manageReplicas(filteredPods []*api.Pod, rs *extensions.ReplicaSet) {
-	diff := len(filteredPods) - rs.Spec.Replicas
+	diff := len(filteredPods) - int(rs.Spec.Replicas)
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
 		glog.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err)
