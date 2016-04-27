@@ -19,6 +19,7 @@ package genericapiserver
 import (
 	"net"
 
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
@@ -34,15 +35,18 @@ const (
 type ServerRunOptions struct {
 	APIGroupPrefix            string
 	APIPrefix                 string
+	AdvertiseAddress          net.IP
 	BindAddress               net.IP
 	CertDirectory             string
-	AdvertiseAddress          net.IP
 	ClientCAFile              string
+	CloudConfigFile           string
+	CloudProvider             string
 	CorsAllowedOriginList     []string
 	EnableLogsSupport         bool
 	EnableProfiling           bool
 	EnableSwaggerUI           bool
 	EnableWatchCache          bool
+	StorageConfig             storagebackend.Config
 	ExternalHost              string
 	InsecureBindAddress       net.IP
 	InsecurePort              int
@@ -61,10 +65,14 @@ type ServerRunOptions struct {
 
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
-		APIGroupPrefix:       "/apis",
-		APIPrefix:            "/api",
-		BindAddress:          net.ParseIP("0.0.0.0"),
-		CertDirectory:        "/var/run/kubernetes",
+		APIGroupPrefix: "/apis",
+		APIPrefix:      "/api",
+		BindAddress:    net.ParseIP("0.0.0.0"),
+		CertDirectory:  "/var/run/kubernetes",
+		StorageConfig: storagebackend.Config{
+			Prefix: DefaultEtcdPathPrefix,
+			DeserializationCacheSize: DefaultDeserializationCacheSize,
+		},
 		EnableLogsSupport:    true,
 		EnableProfiling:      true,
 		EnableWatchCache:     true,
@@ -100,7 +108,20 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 
 	fs.StringVar(&s.ClientCAFile, "client-ca-file", s.ClientCAFile, "If set, any request presenting a client certificate signed by one of the authorities in the client-ca-file is authenticated with an identity corresponding to the CommonName of the client certificate.")
+
+	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
+	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
+
+	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type, "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
+	fs.StringSliceVar(&s.StorageConfig.ServerList, "etcd-servers", s.StorageConfig.ServerList, "List of etcd servers to connect with (http://ip:port), comma separated.")
+	fs.StringVar(&s.StorageConfig.Prefix, "etcd-prefix", s.StorageConfig.Prefix, "The prefix for all resource paths in etcd.")
+	fs.StringVar(&s.StorageConfig.KeyFile, "etcd-keyfile", s.StorageConfig.KeyFile, "SSL key file used to secure etcd communication")
+	fs.StringVar(&s.StorageConfig.CertFile, "etcd-certfile", s.StorageConfig.CertFile, "SSL certification file used to secure etcd communication")
+	fs.StringVar(&s.StorageConfig.CAFile, "etcd-cafile", s.StorageConfig.CAFile, "SSL Certificate Authority file used to secure etcd communication")
+	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum, "If true, enable quorum read")
+	fs.IntVar(&s.StorageConfig.DeserializationCacheSize, "deserialization-cache-size", s.StorageConfig.DeserializationCacheSize, "Number of deserialized json objects to cache in memory.")
 
 	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 

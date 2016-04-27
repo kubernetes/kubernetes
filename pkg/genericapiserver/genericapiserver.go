@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
@@ -576,13 +577,21 @@ func verifyServiceNodePort(options *ServerRunOptions) {
 	}
 }
 
+func verifyEtcdServersList(options *ServerRunOptions) {
+	if len(options.StorageConfig.ServerList) == 0 {
+		glog.Fatalf("--etcd-servers must be specified")
+	}
+}
+
 func ValidateRunOptions(options *ServerRunOptions) {
 	verifyClusterIPFlags(options)
 	verifyServiceNodePort(options)
+	verifyEtcdServersList(options)
 }
 
 func DefaultAndValidateRunOptions(options *ServerRunOptions) {
 	ValidateRunOptions(options)
+
 	// If advertise-address is not specified, use bind-address. If bind-address
 	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
 	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
@@ -595,6 +604,35 @@ func DefaultAndValidateRunOptions(options *ServerRunOptions) {
 		options.AdvertiseAddress = hostIP
 	}
 	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
+
+	// Set default value for ExternalHost if not specified.
+	if len(options.ExternalHost) == 0 {
+		// TODO: extend for other providers
+		if options.CloudProvider == "gce" {
+			cloud, err := cloudprovider.InitCloudProvider(options.CloudProvider, options.CloudConfigFile)
+			if err != nil {
+				glog.Fatalf("Cloud provider could not be initialized: %v", err)
+			}
+			instances, supported := cloud.Instances()
+			if !supported {
+				glog.Fatalf("GCE cloud provider has no instances.  this shouldn't happen. exiting.")
+			}
+			name, err := os.Hostname()
+			if err != nil {
+				glog.Fatalf("Failed to get hostname: %v", err)
+			}
+			addrs, err := instances.NodeAddresses(name)
+			if err != nil {
+				glog.Warningf("Unable to obtain external host address from cloud provider: %v", err)
+			} else {
+				for _, addr := range addrs {
+					if addr.Type == api.NodeExternalIP {
+						options.ExternalHost = addr.Address
+					}
+				}
+			}
+		}
+	}
 }
 
 func (s *GenericAPIServer) Run(options *ServerRunOptions) {
