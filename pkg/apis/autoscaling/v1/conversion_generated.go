@@ -161,8 +161,7 @@ func autoConvert_v1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAut
 	}
 	if in.ObservedGeneration != nil {
 		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.ObservedGeneration = nil
 	}
@@ -175,12 +174,11 @@ func autoConvert_v1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAut
 	} else {
 		out.LastScaleTime = nil
 	}
-	out.CurrentReplicas = int(in.CurrentReplicas)
-	out.DesiredReplicas = int(in.DesiredReplicas)
+	out.CurrentReplicas = in.CurrentReplicas
+	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentCPUUtilizationPercentage != nil {
 		in, out := &in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
-		*out = new(int)
-		**out = int(**in)
+		*out = *in
 	} else {
 		out.CurrentCPUUtilizationPercentage = nil
 	}
@@ -197,8 +195,7 @@ func autoConvert_extensions_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAut
 	}
 	if in.ObservedGeneration != nil {
 		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.ObservedGeneration = nil
 	}
@@ -211,12 +208,11 @@ func autoConvert_extensions_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAut
 	} else {
 		out.LastScaleTime = nil
 	}
-	out.CurrentReplicas = int32(in.CurrentReplicas)
-	out.DesiredReplicas = int32(in.DesiredReplicas)
+	out.CurrentReplicas = in.CurrentReplicas
+	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentCPUUtilizationPercentage != nil {
 		in, out := &in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
-		*out = new(int32)
-		**out = int32(**in)
+		*out = *in
 	} else {
 		out.CurrentCPUUtilizationPercentage = nil
 	}
@@ -279,7 +275,7 @@ func autoConvert_v1_ScaleSpec_To_autoscaling_ScaleSpec(in *ScaleSpec, out *autos
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ScaleSpec))(in)
 	}
-	out.Replicas = int(in.Replicas)
+	out.Replicas = in.Replicas
 	return nil
 }
 
@@ -291,7 +287,7 @@ func autoConvert_autoscaling_ScaleSpec_To_v1_ScaleSpec(in *autoscaling.ScaleSpec
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*autoscaling.ScaleSpec))(in)
 	}
-	out.Replicas = int32(in.Replicas)
+	out.Replicas = in.Replicas
 	return nil
 }
 
@@ -303,7 +299,7 @@ func autoConvert_v1_ScaleStatus_To_autoscaling_ScaleStatus(in *ScaleStatus, out 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ScaleStatus))(in)
 	}
-	out.Replicas = int(in.Replicas)
+	out.Replicas = in.Replicas
 	out.Selector = in.Selector
 	return nil
 }
@@ -316,7 +312,7 @@ func autoConvert_autoscaling_ScaleStatus_To_v1_ScaleStatus(in *autoscaling.Scale
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*autoscaling.ScaleStatus))(in)
 	}
-	out.Replicas = int32(in.Replicas)
+	out.Replicas = in.Replicas
 	out.Selector = in.Selector
 	return nil
 }

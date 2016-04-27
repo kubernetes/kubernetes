@@ -203,22 +203,19 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 	}
 	if in.Parallelism != nil {
 		in, out := &in.Parallelism, &out.Parallelism
-		*out = new(int)
-		**out = int(**in)
+		*out = *in
 	} else {
 		out.Parallelism = nil
 	}
 	if in.Completions != nil {
 		in, out := &in.Completions, &out.Completions
-		*out = new(int)
-		**out = int(**in)
+		*out = *in
 	} else {
 		out.Completions = nil
 	}
 	if in.ActiveDeadlineSeconds != nil {
 		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.ActiveDeadlineSeconds = nil
 	}
@@ -233,8 +230,7 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 	}
 	if in.ManualSelector != nil {
 		in, out := &in.ManualSelector, &out.ManualSelector
-		*out = new(bool)
-		**out = **in
+		*out = *in
 	} else {
 		out.ManualSelector = nil
 	}
@@ -251,22 +247,19 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 	}
 	if in.Parallelism != nil {
 		in, out := &in.Parallelism, &out.Parallelism
-		*out = new(int32)
-		**out = int32(**in)
+		*out = *in
 	} else {
 		out.Parallelism = nil
 	}
 	if in.Completions != nil {
 		in, out := &in.Completions, &out.Completions
-		*out = new(int32)
-		**out = int32(**in)
+		*out = *in
 	} else {
 		out.Completions = nil
 	}
 	if in.ActiveDeadlineSeconds != nil {
 		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.ActiveDeadlineSeconds = nil
 	}
@@ -281,8 +274,7 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 	}
 	if in.ManualSelector != nil {
 		in, out := &in.ManualSelector, &out.ManualSelector
-		*out = new(bool)
-		**out = **in
+		*out = *in
 	} else {
 		out.ManualSelector = nil
 	}
@@ -326,9 +318,9 @@ func autoConvert_v1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobSt
 	} else {
 		out.CompletionTime = nil
 	}
-	out.Active = int(in.Active)
-	out.Succeeded = int(in.Succeeded)
-	out.Failed = int(in.Failed)
+	out.Active = in.Active
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 
@@ -369,9 +361,9 @@ func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobSt
 	} else {
 		out.CompletionTime = nil
 	}
-	out.Active = int32(in.Active)
-	out.Succeeded = int32(in.Succeeded)
-	out.Failed = int32(in.Failed)
+	out.Active = in.Active
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 

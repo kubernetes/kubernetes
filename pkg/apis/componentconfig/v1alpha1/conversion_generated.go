@@ -51,12 +51,11 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.BindAddress = in.BindAddress
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HealthzBindAddress = in.HealthzBindAddress
-	out.HealthzPort = int(in.HealthzPort)
+	out.HealthzPort = in.HealthzPort
 	out.HostnameOverride = in.HostnameOverride
 	if in.IPTablesMasqueradeBit != nil {
 		in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
-		*out = new(int)
-		**out = int(**in)
+		*out = *in
 	} else {
 		out.IPTablesMasqueradeBit = nil
 	}
@@ -69,8 +68,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.Master = in.Master
 	if in.OOMScoreAdj != nil {
 		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
-		*out = new(int)
-		**out = int(**in)
+		*out = *in
 	} else {
 		out.OOMScoreAdj = nil
 	}
@@ -81,7 +79,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	if err := s.Convert(&in.UDPIdleTimeout, &out.UDPIdleTimeout, 0); err != nil {
 		return err
 	}
-	out.ConntrackMax = int(in.ConntrackMax)
+	out.ConntrackMax = in.ConntrackMax
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, 0); err != nil {
 		return err
@@ -103,12 +101,11 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.BindAddress = in.BindAddress
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HealthzBindAddress = in.HealthzBindAddress
-	out.HealthzPort = int32(in.HealthzPort)
+	out.HealthzPort = in.HealthzPort
 	out.HostnameOverride = in.HostnameOverride
 	if in.IPTablesMasqueradeBit != nil {
 		in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
-		*out = new(int32)
-		**out = int32(**in)
+		*out = *in
 	} else {
 		out.IPTablesMasqueradeBit = nil
 	}
@@ -121,8 +118,7 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.Master = in.Master
 	if in.OOMScoreAdj != nil {
 		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
-		*out = new(int32)
-		**out = int32(**in)
+		*out = *in
 	} else {
 		out.OOMScoreAdj = nil
 	}
@@ -133,7 +129,7 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	if err := s.Convert(&in.UDPIdleTimeout, &out.UDPIdleTimeout, 0); err != nil {
 		return err
 	}
-	out.ConntrackMax = int32(in.ConntrackMax)
+	out.ConntrackMax = in.ConntrackMax
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, 0); err != nil {
 		return err
@@ -152,7 +148,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
-	out.Port = in.Port
+	out.Port = int32(in.Port)
 	out.Address = in.Address
 	out.AlgorithmProvider = in.AlgorithmProvider
 	out.PolicyConfigFile = in.PolicyConfigFile
@@ -161,7 +157,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	}
 	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
-	out.KubeAPIBurst = in.KubeAPIBurst
+	out.KubeAPIBurst = int32(in.KubeAPIBurst)
 	out.SchedulerName = in.SchedulerName
 	if err := Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
@@ -180,7 +176,7 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
-	out.Port = in.Port
+	out.Port = int(in.Port)
 	out.Address = in.Address
 	out.AlgorithmProvider = in.AlgorithmProvider
 	out.PolicyConfigFile = in.PolicyConfigFile
@@ -189,7 +185,7 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	}
 	out.ContentType = in.ContentType
 	out.KubeAPIQPS = in.KubeAPIQPS
-	out.KubeAPIBurst = in.KubeAPIBurst
+	out.KubeAPIBurst = int(in.KubeAPIBurst)
 	out.SchedulerName = in.SchedulerName
 	if err := Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err

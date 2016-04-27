@@ -26,7 +26,6 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
-	types "k8s.io/kubernetes/pkg/types"
 	reflect "reflect"
 )
 
@@ -322,7 +321,7 @@ func autoConvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStore
 	}
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
-	out.Partition = int(in.Partition)
+	out.Partition = in.Partition
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
@@ -337,7 +336,7 @@ func autoConvert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStore
 	}
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
-	out.Partition = int32(in.Partition)
+	out.Partition = in.Partition
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
@@ -1185,8 +1184,8 @@ func autoConvert_v1_ContainerPort_To_api_ContainerPort(in *ContainerPort, out *a
 		defaulting.(func(*ContainerPort))(in)
 	}
 	out.Name = in.Name
-	out.HostPort = int(in.HostPort)
-	out.ContainerPort = int(in.ContainerPort)
+	out.HostPort = in.HostPort
+	out.ContainerPort = in.ContainerPort
 	out.Protocol = api.Protocol(in.Protocol)
 	out.HostIP = in.HostIP
 	return nil
@@ -1201,8 +1200,8 @@ func autoConvert_api_ContainerPort_To_v1_ContainerPort(in *api.ContainerPort, ou
 		defaulting.(func(*api.ContainerPort))(in)
 	}
 	out.Name = in.Name
-	out.HostPort = int32(in.HostPort)
-	out.ContainerPort = int32(in.ContainerPort)
+	out.HostPort = in.HostPort
+	out.ContainerPort = in.ContainerPort
 	out.Protocol = Protocol(in.Protocol)
 	out.HostIP = in.HostIP
 	return nil
@@ -1320,8 +1319,8 @@ func autoConvert_v1_ContainerStateTerminated_To_api_ContainerStateTerminated(in 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerStateTerminated))(in)
 	}
-	out.ExitCode = int(in.ExitCode)
-	out.Signal = int(in.Signal)
+	out.ExitCode = in.ExitCode
+	out.Signal = in.Signal
 	out.Reason = in.Reason
 	out.Message = in.Message
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.StartedAt, &out.StartedAt, s); err != nil {
@@ -1342,8 +1341,8 @@ func autoConvert_api_ContainerStateTerminated_To_v1_ContainerStateTerminated(in 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ContainerStateTerminated))(in)
 	}
-	out.ExitCode = int32(in.ExitCode)
-	out.Signal = int32(in.Signal)
+	out.ExitCode = in.ExitCode
+	out.Signal = in.Signal
 	out.Reason = in.Reason
 	out.Message = in.Message
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.StartedAt, &out.StartedAt, s); err != nil {
@@ -1398,7 +1397,7 @@ func autoConvert_v1_ContainerStatus_To_api_ContainerStatus(in *ContainerStatus, 
 		return err
 	}
 	out.Ready = in.Ready
-	out.RestartCount = int(in.RestartCount)
+	out.RestartCount = in.RestartCount
 	out.Image = in.Image
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
@@ -1421,7 +1420,7 @@ func autoConvert_api_ContainerStatus_To_v1_ContainerStatus(in *api.ContainerStat
 		return err
 	}
 	out.Ready = in.Ready
-	out.RestartCount = int32(in.RestartCount)
+	out.RestartCount = in.RestartCount
 	out.Image = in.Image
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
@@ -1436,7 +1435,7 @@ func autoConvert_v1_DaemonEndpoint_To_api_DaemonEndpoint(in *DaemonEndpoint, out
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonEndpoint))(in)
 	}
-	out.Port = int(in.Port)
+	out.Port = in.Port
 	return nil
 }
 
@@ -1448,7 +1447,7 @@ func autoConvert_api_DaemonEndpoint_To_v1_DaemonEndpoint(in *api.DaemonEndpoint,
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.DaemonEndpoint))(in)
 	}
-	out.Port = int32(in.Port)
+	out.Port = in.Port
 	return nil
 }
 
@@ -1465,8 +1464,7 @@ func autoConvert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *a
 	}
 	if in.GracePeriodSeconds != nil {
 		in, out := &in.GracePeriodSeconds, &out.GracePeriodSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.GracePeriodSeconds = nil
 	}
@@ -1495,8 +1493,7 @@ func autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, ou
 	}
 	if in.GracePeriodSeconds != nil {
 		in, out := &in.GracePeriodSeconds, &out.GracePeriodSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.GracePeriodSeconds = nil
 	}
@@ -1661,7 +1658,7 @@ func autoConvert_v1_EndpointPort_To_api_EndpointPort(in *EndpointPort, out *api.
 		defaulting.(func(*EndpointPort))(in)
 	}
 	out.Name = in.Name
-	out.Port = int(in.Port)
+	out.Port = in.Port
 	out.Protocol = api.Protocol(in.Protocol)
 	return nil
 }
@@ -1675,7 +1672,7 @@ func autoConvert_api_EndpointPort_To_v1_EndpointPort(in *api.EndpointPort, out *
 		defaulting.(func(*api.EndpointPort))(in)
 	}
 	out.Name = in.Name
-	out.Port = int32(in.Port)
+	out.Port = in.Port
 	out.Protocol = Protocol(in.Protocol)
 	return nil
 }
@@ -2028,7 +2025,7 @@ func autoConvert_v1_Event_To_api_Event(in *Event, out *api.Event, s conversion.S
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTimestamp, &out.LastTimestamp, s); err != nil {
 		return err
 	}
-	out.Count = int(in.Count)
+	out.Count = in.Count
 	out.Type = in.Type
 	return nil
 }
@@ -2061,7 +2058,7 @@ func autoConvert_api_Event_To_v1_Event(in *api.Event, out *Event, s conversion.S
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTimestamp, &out.LastTimestamp, s); err != nil {
 		return err
 	}
-	out.Count = int32(in.Count)
+	out.Count = in.Count
 	out.Type = in.Type
 	return nil
 }
@@ -2233,8 +2230,7 @@ func autoConvert_v1_FCVolumeSource_To_api_FCVolumeSource(in *FCVolumeSource, out
 	}
 	if in.Lun != nil {
 		in, out := &in.Lun, &out.Lun
-		*out = new(int)
-		**out = int(**in)
+		*out = *in
 	} else {
 		out.Lun = nil
 	}
@@ -2260,8 +2256,7 @@ func autoConvert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource,
 	}
 	if in.Lun != nil {
 		in, out := &in.Lun, &out.Lun
-		*out = new(int32)
-		**out = int32(**in)
+		*out = *in
 	} else {
 		out.Lun = nil
 	}
@@ -2368,7 +2363,7 @@ func autoConvert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolume
 	}
 	out.PDName = in.PDName
 	out.FSType = in.FSType
-	out.Partition = int(in.Partition)
+	out.Partition = in.Partition
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
@@ -2383,7 +2378,7 @@ func autoConvert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolume
 	}
 	out.PDName = in.PDName
 	out.FSType = in.FSType
-	out.Partition = int32(in.Partition)
+	out.Partition = in.Partition
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
@@ -2636,7 +2631,7 @@ func autoConvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeSo
 	}
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
-	out.Lun = int(in.Lun)
+	out.Lun = in.Lun
 	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
@@ -2653,7 +2648,7 @@ func autoConvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *api.ISCSIVolu
 	}
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
-	out.Lun = int32(in.Lun)
+	out.Lun = in.Lun
 	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
@@ -3065,8 +3060,7 @@ func autoConvert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.Lis
 	out.ResourceVersion = in.ResourceVersion
 	if in.TimeoutSeconds != nil {
 		in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.TimeoutSeconds = nil
 	}
@@ -3094,8 +3088,7 @@ func autoConvert_api_ListOptions_To_v1_ListOptions(in *api.ListOptions, out *Lis
 	out.ResourceVersion = in.ResourceVersion
 	if in.TimeoutSeconds != nil {
 		in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.TimeoutSeconds = nil
 	}
@@ -4065,8 +4058,7 @@ func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.Object
 	}
 	if in.DeletionGracePeriodSeconds != nil {
 		in, out := &in.DeletionGracePeriodSeconds, &out.DeletionGracePeriodSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.DeletionGracePeriodSeconds = nil
 	}
@@ -4120,8 +4112,7 @@ func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *Object
 	}
 	if in.DeletionGracePeriodSeconds != nil {
 		in, out := &in.DeletionGracePeriodSeconds, &out.DeletionGracePeriodSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.DeletionGracePeriodSeconds = nil
 	}
@@ -5126,8 +5117,7 @@ func autoConvert_v1_PodLogOptions_To_api_PodLogOptions(in *PodLogOptions, out *a
 	out.Previous = in.Previous
 	if in.SinceSeconds != nil {
 		in, out := &in.SinceSeconds, &out.SinceSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.SinceSeconds = nil
 	}
@@ -5143,15 +5133,13 @@ func autoConvert_v1_PodLogOptions_To_api_PodLogOptions(in *PodLogOptions, out *a
 	out.Timestamps = in.Timestamps
 	if in.TailLines != nil {
 		in, out := &in.TailLines, &out.TailLines
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.TailLines = nil
 	}
 	if in.LimitBytes != nil {
 		in, out := &in.LimitBytes, &out.LimitBytes
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.LimitBytes = nil
 	}
@@ -5174,8 +5162,7 @@ func autoConvert_api_PodLogOptions_To_v1_PodLogOptions(in *api.PodLogOptions, ou
 	out.Previous = in.Previous
 	if in.SinceSeconds != nil {
 		in, out := &in.SinceSeconds, &out.SinceSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.SinceSeconds = nil
 	}
@@ -5191,15 +5178,13 @@ func autoConvert_api_PodLogOptions_To_v1_PodLogOptions(in *api.PodLogOptions, ou
 	out.Timestamps = in.Timestamps
 	if in.TailLines != nil {
 		in, out := &in.TailLines, &out.TailLines
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.TailLines = nil
 	}
 	if in.LimitBytes != nil {
 		in, out := &in.LimitBytes, &out.LimitBytes
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.LimitBytes = nil
 	}
@@ -5255,15 +5240,13 @@ func autoConvert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurity
 	}
 	if in.RunAsUser != nil {
 		in, out := &in.RunAsUser, &out.RunAsUser
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.RunAsUser = nil
 	}
 	if in.RunAsNonRoot != nil {
 		in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
-		*out = new(bool)
-		**out = **in
+		*out = *in
 	} else {
 		out.RunAsNonRoot = nil
 	}
@@ -5276,8 +5259,7 @@ func autoConvert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurity
 	}
 	if in.FSGroup != nil {
 		in, out := &in.FSGroup, &out.FSGroup
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.FSGroup = nil
 	}
@@ -5313,15 +5295,13 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	out.RestartPolicy = RestartPolicy(in.RestartPolicy)
 	if in.TerminationGracePeriodSeconds != nil {
 		in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.TerminationGracePeriodSeconds = nil
 	}
 	if in.ActiveDeadlineSeconds != nil {
 		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.ActiveDeadlineSeconds = nil
 	}
@@ -5630,8 +5610,7 @@ func autoConvert_v1_Preconditions_To_api_Preconditions(in *Preconditions, out *a
 	}
 	if in.UID != nil {
 		in, out := &in.UID, &out.UID
-		*out = new(types.UID)
-		**out = **in
+		*out = *in
 	} else {
 		out.UID = nil
 	}
@@ -5648,8 +5627,7 @@ func autoConvert_api_Preconditions_To_v1_Preconditions(in *api.Preconditions, ou
 	}
 	if in.UID != nil {
 		in, out := &in.UID, &out.UID
-		*out = new(types.UID)
-		**out = **in
+		*out = *in
 	} else {
 		out.UID = nil
 	}
@@ -5664,7 +5642,7 @@ func autoConvert_v1_PreferredSchedulingTerm_To_api_PreferredSchedulingTerm(in *P
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PreferredSchedulingTerm))(in)
 	}
-	out.Weight = int(in.Weight)
+	out.Weight = in.Weight
 	if err := Convert_v1_NodeSelectorTerm_To_api_NodeSelectorTerm(&in.Preference, &out.Preference, s); err != nil {
 		return err
 	}
@@ -5679,7 +5657,7 @@ func autoConvert_api_PreferredSchedulingTerm_To_v1_PreferredSchedulingTerm(in *a
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PreferredSchedulingTerm))(in)
 	}
-	out.Weight = int32(in.Weight)
+	out.Weight = in.Weight
 	if err := Convert_api_NodeSelectorTerm_To_v1_NodeSelectorTerm(&in.Preference, &out.Preference, s); err != nil {
 		return err
 	}
@@ -5697,11 +5675,11 @@ func autoConvert_v1_Probe_To_api_Probe(in *Probe, out *api.Probe, s conversion.S
 	if err := Convert_v1_Handler_To_api_Handler(&in.Handler, &out.Handler, s); err != nil {
 		return err
 	}
-	out.InitialDelaySeconds = int(in.InitialDelaySeconds)
-	out.TimeoutSeconds = int(in.TimeoutSeconds)
-	out.PeriodSeconds = int(in.PeriodSeconds)
-	out.SuccessThreshold = int(in.SuccessThreshold)
-	out.FailureThreshold = int(in.FailureThreshold)
+	out.InitialDelaySeconds = in.InitialDelaySeconds
+	out.TimeoutSeconds = in.TimeoutSeconds
+	out.PeriodSeconds = in.PeriodSeconds
+	out.SuccessThreshold = in.SuccessThreshold
+	out.FailureThreshold = in.FailureThreshold
 	return nil
 }
 
@@ -5716,11 +5694,11 @@ func autoConvert_api_Probe_To_v1_Probe(in *api.Probe, out *Probe, s conversion.S
 	if err := Convert_api_Handler_To_v1_Handler(&in.Handler, &out.Handler, s); err != nil {
 		return err
 	}
-	out.InitialDelaySeconds = int32(in.InitialDelaySeconds)
-	out.TimeoutSeconds = int32(in.TimeoutSeconds)
-	out.PeriodSeconds = int32(in.PeriodSeconds)
-	out.SuccessThreshold = int32(in.SuccessThreshold)
-	out.FailureThreshold = int32(in.FailureThreshold)
+	out.InitialDelaySeconds = in.InitialDelaySeconds
+	out.TimeoutSeconds = in.TimeoutSeconds
+	out.PeriodSeconds = in.PeriodSeconds
+	out.SuccessThreshold = in.SuccessThreshold
+	out.FailureThreshold = in.FailureThreshold
 	return nil
 }
 
@@ -5942,8 +5920,8 @@ func autoConvert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStat
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerStatus))(in)
 	}
-	out.Replicas = int(in.Replicas)
-	out.FullyLabeledReplicas = int(in.FullyLabeledReplicas)
+	out.Replicas = in.Replicas
+	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -5956,8 +5934,8 @@ func autoConvert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStat
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ReplicationControllerStatus))(in)
 	}
-	out.Replicas = int32(in.Replicas)
-	out.FullyLabeledReplicas = int32(in.FullyLabeledReplicas)
+	out.Replicas = in.Replicas
+	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -6449,8 +6427,7 @@ func autoConvert_v1_SecurityContext_To_api_SecurityContext(in *SecurityContext, 
 	}
 	if in.Privileged != nil {
 		in, out := &in.Privileged, &out.Privileged
-		*out = new(bool)
-		**out = **in
+		*out = *in
 	} else {
 		out.Privileged = nil
 	}
@@ -6465,22 +6442,19 @@ func autoConvert_v1_SecurityContext_To_api_SecurityContext(in *SecurityContext, 
 	}
 	if in.RunAsUser != nil {
 		in, out := &in.RunAsUser, &out.RunAsUser
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.RunAsUser = nil
 	}
 	if in.RunAsNonRoot != nil {
 		in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
-		*out = new(bool)
-		**out = **in
+		*out = *in
 	} else {
 		out.RunAsNonRoot = nil
 	}
 	if in.ReadOnlyRootFilesystem != nil {
 		in, out := &in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem
-		*out = new(bool)
-		**out = **in
+		*out = *in
 	} else {
 		out.ReadOnlyRootFilesystem = nil
 	}
@@ -6506,8 +6480,7 @@ func autoConvert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityConte
 	}
 	if in.Privileged != nil {
 		in, out := &in.Privileged, &out.Privileged
-		*out = new(bool)
-		**out = **in
+		*out = *in
 	} else {
 		out.Privileged = nil
 	}
@@ -6522,22 +6495,19 @@ func autoConvert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityConte
 	}
 	if in.RunAsUser != nil {
 		in, out := &in.RunAsUser, &out.RunAsUser
-		*out = new(int64)
-		**out = **in
+		*out = *in
 	} else {
 		out.RunAsUser = nil
 	}
 	if in.RunAsNonRoot != nil {
 		in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
-		*out = new(bool)
-		**out = **in
+		*out = *in
 	} else {
 		out.RunAsNonRoot = nil
 	}
 	if in.ReadOnlyRootFilesystem != nil {
 		in, out := &in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem
-		*out = new(bool)
-		**out = **in
+		*out = *in
 	} else {
 		out.ReadOnlyRootFilesystem = nil
 	}
@@ -6824,11 +6794,11 @@ func autoConvert_v1_ServicePort_To_api_ServicePort(in *ServicePort, out *api.Ser
 	}
 	out.Name = in.Name
 	out.Protocol = api.Protocol(in.Protocol)
-	out.Port = int(in.Port)
+	out.Port = in.Port
 	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.TargetPort, &out.TargetPort, s); err != nil {
 		return err
 	}
-	out.NodePort = int(in.NodePort)
+	out.NodePort = in.NodePort
 	return nil
 }
 
@@ -6842,11 +6812,11 @@ func autoConvert_api_ServicePort_To_v1_ServicePort(in *api.ServicePort, out *Ser
 	}
 	out.Name = in.Name
 	out.Protocol = Protocol(in.Protocol)
-	out.Port = int32(in.Port)
+	out.Port = in.Port
 	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.TargetPort, &out.TargetPort, s); err != nil {
 		return err
 	}
-	out.NodePort = int32(in.NodePort)
+	out.NodePort = in.NodePort
 	return nil
 }
 
