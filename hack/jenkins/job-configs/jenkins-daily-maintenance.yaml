@@ -9,8 +9,11 @@
             gcloud components update
             gcloud components update alpha
             gcloud components update beta
+            # Select only exited or dead containers that weren't created today.
+            # A sort of work-around for https://github.com/kubernetes/kubernetes/issues/24661
+            containers_to_remove=($(docker ps -a -f 'status=exited' -f 'status=dead' --format='{{.CreatedAt}}\t{{.ID}}' | grep -v ^$(date +%Y-%m-%d) | cut -f2 || true))
             # Copied from http://blog.yohanliyanage.com/2015/05/docker-clean-up-after-yourself/
-            docker rm -v $(docker ps -a -q -f 'status=exited' -f 'status=dead') || true
+            docker rm -v "${containers_to_remove[@]:+${containers_to_remove[@]}}" || true
             docker rmi $(docker images -q -f 'dangling=true') || true
             docker run -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/docker:/var/lib/docker --rm martin/docker-cleanup-volumes
 
