@@ -32,7 +32,7 @@ fi
 # Verify prereqs on host machine
 function verify-prereqs() {
  # Check the OpenStack command-line clients
- for client in swift glance nova heat;
+ for client in swift glance nova openstack;
  do
   if which $client >/dev/null 2>&1; then
     echo "${client} client installed"
@@ -61,7 +61,7 @@ function kube-up() {
 function validate-cluster() {
 
   while (( --$STACK_CREATE_TIMEOUT >= 0)) ;do
-     local status=$(heat stack-show "${STACK_NAME}" | awk '$2=="stack_status" {print $4}')
+     local status=$(openstack stack show "${STACK_NAME}" | awk '$2=="stack_status" {print $4}')
      if [[ $status ]]; then
         echo "Cluster status ${status}"
         if [ $status = "CREATE_COMPLETE" ]; then
@@ -145,7 +145,7 @@ function add-keypair() {
 #   OPENSTACK_IMAGE_NAME
 function create-glance-image() {
   if [[ ${CREATE_IMAGE} == "true" ]]; then
-    local image_status=$(nova image-show ${OPENSTACK_IMAGE_NAME} | awk '$2=="id" {print $4}')
+    local image_status=$(openstack image show ${OPENSTACK_IMAGE_NAME} | awk '$2=="id" {print $4}')
 
     if [[ ! $image_status ]]; then
       if [[ "${DOWNLOAD_IMAGE}" == "true" ]]; then
@@ -180,12 +180,12 @@ function create-glance-image() {
 #   STACK_NAME
 function run-heat-script() {
 
-  local stack_status=$(heat stack-show ${STACK_NAME})
+  local stack_status=$(openstack stack show ${STACK_NAME})
   local swift_repo_url="${SWIFT_SERVER_URL}/v1/AUTH_${SWIFT_PROJECT_ID}/kubernetes"
 
   if [ $CREATE_IMAGE = true ]; then
     echo "[INFO] Retrieve new image ID"
-    IMAGE_ID=$(nova image-show ${OPENSTACK_IMAGE_NAME} | awk '$2=="id" {print $4}')
+    IMAGE_ID=$(openstack image show ${OPENSTACK_IMAGE_NAME} | awk '$2=="id" {print $4}')
     echo "[INFO] Image Id ${IMAGE_ID}"
   fi
 
@@ -193,34 +193,34 @@ function run-heat-script() {
     echo "[INFO] Create stack ${STACK_NAME}"
     (
       cd ${ROOT}/kubernetes-heat
-      heat --api-timeout 60 stack-create \
-      -P external_network=${EXTERNAL_NETWORK} \
-      -P ssh_key_name=${KUBERNETES_KEYPAIR_NAME} \
-      -P server_image=${IMAGE_ID} \
-      -P master_flavor=${MASTER_FLAVOR} \
-      -P minion_flavor=${MINION_FLAVOR} \
-      -P number_of_minions=${NUMBER_OF_MINIONS} \
-      -P max_number_of_minions=${MAX_NUMBER_OF_MINIONS} \
-      -P dns_nameserver=${DNS_SERVER} \
-      -P kubernetes_salt_url=${swift_repo_url}/kubernetes-salt.tar.gz \
-      -P kubernetes_server_url=${swift_repo_url}/kubernetes-server.tar.gz \
-      -P os_auth_url=${OS_AUTH_URL} \
-      -P os_username=${OS_USERNAME} \
-      -P os_password=${OS_PASSWORD} \
-      -P os_region_name=${OS_REGION_NAME} \
-      -P os_tenant_id=${OS_TENANT_ID} \
-      -P enable_proxy=${ENABLE_PROXY} \
-      -P ftp_proxy="${FTP_PROXY}" \
-      -P http_proxy="${HTTP_PROXY}" \
-      -P https_proxy="${HTTPS_PROXY}" \
-      -P socks_proxy="${SOCKS_PROXY}" \
-      -P no_proxy="${NO_PROXY}" \
-      --template-file kubecluster.yaml \
+      openstack stack create --timeout 60 \
+      --parameter external_network=${EXTERNAL_NETWORK} \
+      --parameter ssh_key_name=${KUBERNETES_KEYPAIR_NAME} \
+      --parameter server_image=${IMAGE_ID} \
+      --parameter master_flavor=${MASTER_FLAVOR} \
+      --parameter minion_flavor=${MINION_FLAVOR} \
+      --parameter number_of_minions=${NUMBER_OF_MINIONS} \
+      --parameter max_number_of_minions=${MAX_NUMBER_OF_MINIONS} \
+      --parameter dns_nameserver=${DNS_SERVER} \
+      --parameter kubernetes_salt_url=${swift_repo_url}/kubernetes-salt.tar.gz \
+      --parameter kubernetes_server_url=${swift_repo_url}/kubernetes-server.tar.gz \
+      --parameter os_auth_url=${OS_AUTH_URL} \
+      --parameter os_username=${OS_USERNAME} \
+      --parameter os_password=${OS_PASSWORD} \
+      --parameter os_region_name=${OS_REGION_NAME} \
+      --parameter os_tenant_id=${OS_TENANT_ID} \
+      --parameter enable_proxy=${ENABLE_PROXY} \
+      --parameter ftp_proxy="${FTP_PROXY}" \
+      --parameter http_proxy="${HTTP_PROXY}" \
+      --parameter https_proxy="${HTTPS_PROXY}" \
+      --parameter socks_proxy="${SOCKS_PROXY}" \
+      --parameter no_proxy="${NO_PROXY}" \
+      --template kubecluster.yaml \
       ${STACK_NAME}
     )
   else
     echo "[INFO] Stack ${STACK_NAME} already exists"
-    heat stack-show ${STACK_NAME}
+    openstack stack show ${STACK_NAME}
   fi
 }
 
@@ -250,7 +250,7 @@ function configure-kubectl() {
 #   STACK_NAME
 function kube-down {
   source "${ROOT}/openrc-default.sh"
-  heat stack-delete ${STACK_NAME}
+  openstack stack delete ${STACK_NAME}
 }
 
 # Perform preparations required to run e2e tests
