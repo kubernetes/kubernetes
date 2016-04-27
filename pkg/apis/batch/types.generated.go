@@ -1053,13 +1053,13 @@ func (x *JobSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.Parallelism == nil {
-					x.Parallelism = new(int)
+					x.Parallelism = new(int32)
 				}
 				yym5 := z.DecBinary()
 				_ = yym5
 				if false {
 				} else {
-					*((*int)(x.Parallelism)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.Parallelism)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "completions":
@@ -1069,13 +1069,13 @@ func (x *JobSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.Completions == nil {
-					x.Completions = new(int)
+					x.Completions = new(int32)
 				}
 				yym7 := z.DecBinary()
 				_ = yym7
 				if false {
 				} else {
-					*((*int)(x.Completions)) = int(r.DecodeInt(codecSelferBitsize1234))
+					*((*int32)(x.Completions)) = int32(r.DecodeInt(32))
 				}
 			}
 		case "activeDeadlineSeconds":
@@ -1165,13 +1165,13 @@ func (x *JobSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 	} else {
 		if x.Parallelism == nil {
-			x.Parallelism = new(int)
+			x.Parallelism = new(int32)
 		}
 		yym17 := z.DecBinary()
 		_ = yym17
 		if false {
 		} else {
-			*((*int)(x.Parallelism)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.Parallelism)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj15++
@@ -1191,13 +1191,13 @@ func (x *JobSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		}
 	} else {
 		if x.Completions == nil {
-			x.Completions = new(int)
+			x.Completions = new(int32)
 		}
 		yym19 := z.DecBinary()
 		_ = yym19
 		if false {
 		} else {
-			*((*int)(x.Completions)) = int(r.DecodeInt(codecSelferBitsize1234))
+			*((*int32)(x.Completions)) = int32(r.DecodeInt(32))
 		}
 	}
 	yyj15++
@@ -1661,19 +1661,19 @@ func (x *JobStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Active = 0
 			} else {
-				x.Active = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Active = int32(r.DecodeInt(32))
 			}
 		case "succeeded":
 			if r.TryDecodeAsNil() {
 				x.Succeeded = 0
 			} else {
-				x.Succeeded = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Succeeded = int32(r.DecodeInt(32))
 			}
 		case "failed":
 			if r.TryDecodeAsNil() {
 				x.Failed = 0
 			} else {
-				x.Failed = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Failed = int32(r.DecodeInt(32))
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -1787,7 +1787,7 @@ func (x *JobStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Active = 0
 	} else {
-		x.Active = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Active = int32(r.DecodeInt(32))
 	}
 	yyj13++
 	if yyhl13 {
@@ -1803,7 +1803,7 @@ func (x *JobStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Succeeded = 0
 	} else {
-		x.Succeeded = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Succeeded = int32(r.DecodeInt(32))
 	}
 	yyj13++
 	if yyhl13 {
@@ -1819,7 +1819,7 @@ func (x *JobStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Failed = 0
 	} else {
-		x.Failed = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Failed = int32(r.DecodeInt(32))
 	}
 	for {
 		yyj13++
@@ -2347,7 +2347,7 @@ func (x codecSelfer1234) decSliceJob(v *[]Job, d *codec1978.Decoder) {
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 624)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 616)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
