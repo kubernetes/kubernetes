@@ -224,7 +224,7 @@ export KUBECONFIG=/path/to/kubeconfig
 export KUBERNETES_CONFORMANCE_TEST=y
 
 # run all conformance tests
-go run hack/e2e.go -v --test_args="--ginkgo.focus=\[Conformance\]"
+go run hack/e2e.go -v --test --test_args="--ginkgo.focus=\[Conformance\]"
 
 # run all parallel-safe conformance tests in parallel
 GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.focus=\[Conformance\] --ginkgo.skip=\[Serial\]"
