@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
-	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
@@ -163,10 +162,8 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 }
 
 // TODO: document all handlers
-// InstallSupport registers the APIServer support functions
-func InstallSupport(mux Mux, checks ...healthz.HealthzChecker) []*restful.WebService {
-	// TODO: convert healthz and metrics to restful and remove container arg
-	healthz.InstallHandler(mux, checks...)
+// InstallVersionHandler registers the APIServer's `/version` handler
+func InstallVersionHandler(mux Mux, container *restful.Container) {
 
 	// Set up a service to return the git code version.
 	versionWS := new(restful.WebService)
@@ -179,7 +176,7 @@ func InstallSupport(mux Mux, checks ...healthz.HealthzChecker) []*restful.WebSer
 			Produces(restful.MIME_JSON).
 			Consumes(restful.MIME_JSON))
 
-	return []*restful.WebService{versionWS}
+	container.Add(versionWS)
 }
 
 // InstallLogsSupport registers the APIServer log support function into a mux.
