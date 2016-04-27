@@ -52,6 +52,9 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
+// Default_api_Pod is a no-op to trigger this package to be ignored
+func Default_api_Pod(*Pod) {}
+
 func AddToScheme(scheme *runtime.Scheme) {
 	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
 		panic(err)
