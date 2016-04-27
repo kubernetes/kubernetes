@@ -456,7 +456,7 @@ type GCEPersistentDiskVolumeSource struct {
 	// Optional: Partition on the disk to mount.
 	// If omitted, kubelet will attempt to mount the device name.
 	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
-	Partition int `json:"partition,omitempty"`
+	Partition int32 `json:"partition,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
@@ -472,7 +472,7 @@ type ISCSIVolumeSource struct {
 	// Required:  target iSCSI Qualified Name
 	IQN string `json:"iqn,omitempty"`
 	// Required: iSCSI target lun number
-	Lun int `json:"lun,omitempty"`
+	Lun int32 `json:"lun,omitempty"`
 	// Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.
 	ISCSIInterface string `json:"iscsiInterface,omitempty"`
 	// Filesystem type to mount.
@@ -492,7 +492,7 @@ type FCVolumeSource struct {
 	// Required: FC target world wide names (WWNs)
 	TargetWWNs []string `json:"targetWWNs"`
 	// Required: FC target lun number
-	Lun *int `json:"lun"`
+	Lun *int32 `json:"lun"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -542,7 +542,7 @@ type AWSElasticBlockStoreVolumeSource struct {
 	// Optional: Partition on the disk to mount.
 	// If omitted, kubelet will attempt to mount the device name.
 	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
-	Partition int `json:"partition,omitempty"`
+	Partition int32 `json:"partition,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
@@ -731,9 +731,9 @@ type ContainerPort struct {
 	Name string `json:"name,omitempty"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
 	// If HostNetwork is specified, this must match ContainerPort.
-	HostPort int `json:"hostPort,omitempty"`
+	HostPort int32 `json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
-	ContainerPort int `json:"containerPort"`
+	ContainerPort int32 `json:"containerPort"`
 	// Required: Supports "TCP" and "UDP".
 	Protocol Protocol `json:"protocol,omitempty"`
 	// Optional: What host IP to bind the external port to.
@@ -858,16 +858,16 @@ type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
 	// Length of time before health checking is activated.  In seconds.
-	InitialDelaySeconds int `json:"initialDelaySeconds,omitempty"`
+	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
 	// Length of time before health checking times out.  In seconds.
-	TimeoutSeconds int `json:"timeoutSeconds,omitempty"`
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
 	// How often (in seconds) to perform the probe.
-	PeriodSeconds int `json:"periodSeconds,omitempty"`
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// Must be 1 for liveness.
-	SuccessThreshold int `json:"successThreshold,omitempty"`
+	SuccessThreshold int32 `json:"successThreshold,omitempty"`
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
-	FailureThreshold int `json:"failureThreshold,omitempty"`
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
@@ -998,8 +998,8 @@ type ContainerStateRunning struct {
 }
 
 type ContainerStateTerminated struct {
-	ExitCode    int              `json:"exitCode"`
-	Signal      int              `json:"signal,omitempty"`
+	ExitCode    int32            `json:"exitCode"`
+	Signal      int32            `json:"signal,omitempty"`
 	Reason      string           `json:"reason,omitempty"`
 	Message     string           `json:"message,omitempty"`
 	StartedAt   unversioned.Time `json:"startedAt,omitempty"`
@@ -1025,7 +1025,7 @@ type ContainerStatus struct {
 	Ready bool `json:"ready"`
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
-	RestartCount int    `json:"restartCount"`
+	RestartCount int32  `json:"restartCount"`
 	Image        string `json:"image"`
 	ImageID      string `json:"imageID"`
 	ContainerID  string `json:"containerID,omitempty"`
@@ -1188,7 +1188,7 @@ type NodeAffinity struct {
 // (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
 type PreferredSchedulingTerm struct {
 	// Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
-	Weight int `json:"weight"`
+	Weight int32 `json:"weight"`
 	// A node selector term, associated with the corresponding weight.
 	Preference NodeSelectorTerm `json:"preference"`
 }
@@ -1362,7 +1362,7 @@ type PodTemplateList struct {
 // a TemplateRef or a Template set.
 type ReplicationControllerSpec struct {
 	// Replicas is the number of desired replicas.
-	Replicas int `json:"replicas"`
+	Replicas int32 `json:"replicas"`
 
 	// Selector is a label query over pods that should match the Replicas count.
 	Selector map[string]string `json:"selector"`
@@ -1382,10 +1382,10 @@ type ReplicationControllerSpec struct {
 // controller.
 type ReplicationControllerStatus struct {
 	// Replicas is the number of actual replicas.
-	Replicas int `json:"replicas"`
+	Replicas int32 `json:"replicas"`
 
 	// The number of pods that have labels matching the labels of the pod template of the replication controller.
-	FullyLabeledReplicas int `json:"fullyLabeledReplicas,omitempty"`
+	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas,omitempty"`
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -1529,7 +1529,7 @@ type ServicePort struct {
 	Protocol Protocol `json:"protocol"`
 
 	// The port that will be exposed on the service.
-	Port int `json:"port"`
+	Port int32 `json:"port"`
 
 	// Optional: The target port on pods selected by this service.  If this
 	// is a string, it will be looked up as a named port in the target
@@ -1541,7 +1541,7 @@ type ServicePort struct {
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
-	NodePort int `json:"nodePort"`
+	NodePort int32 `json:"nodePort"`
 }
 
 // +genclient=true
@@ -1644,7 +1644,7 @@ type EndpointPort struct {
 	Name string
 
 	// The port number.
-	Port int
+	Port int32
 
 	// The IP protocol for this port.
 	Protocol Protocol
@@ -1684,7 +1684,7 @@ type DaemonEndpoint struct {
 	*/
 
 	// Port number of the given endpoint.
-	Port int `json:"Port"`
+	Port int32 `json:"Port"`
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.
@@ -2126,7 +2126,7 @@ type Event struct {
 	LastTimestamp unversioned.Time `json:"lastTimestamp,omitempty"`
 
 	// The number of times this event has occurred.
-	Count int `json:"count,omitempty"`
+	Count int32 `json:"count,omitempty"`
 
 	// Type of this event (Normal, Warning), new types could be added in the future.
 	Type string `json:"type,omitempty"`
