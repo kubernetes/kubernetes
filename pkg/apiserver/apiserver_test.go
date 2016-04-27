@@ -317,10 +317,8 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		}
 	}
 
-	webservices := InstallSupport(mux)
-	for i := range webservices {
-		container.Add(webservices[i])
-	}
+	InstallVersionHandler(mux, container)
+
 	return &defaultAPIServer{mux, container}
 }
 
@@ -3263,10 +3261,7 @@ func TestXGSubresource(t *testing.T) {
 		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 	}
 
-	webservices := InstallSupport(mux)
-	for i := range webservices {
-		container.Add(webservices[i])
-	}
+	InstallVersionHandler(mux, container)
 
 	handler := defaultAPIServer{mux, container}
 	server := httptest.NewServer(handler)
