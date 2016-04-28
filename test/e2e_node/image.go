@@ -76,3 +76,7 @@ func (ci *ConformanceImage) List() ([]string, error) {
 func (ci *ConformanceImage) Remove() error {
 	return ci.Runtime.RemoveImage(ci.Image)
 }
+
+func (ci *ConformanceImage) GetTag() string {
+	return ci.Image.Image
+}
