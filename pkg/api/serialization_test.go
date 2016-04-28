@@ -17,6 +17,7 @@ limitations under the License.
 package api_test
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"math/rand"
@@ -267,6 +268,36 @@ func TestUnversionedTypes(t *testing.T) {
 			continue
 		}
 	}
+}
+
+func TestObjectFraming(t *testing.T) {
+	f := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
+	secret := &api.Secret{}
+	f.Fuzz(secret)
+	secret.Data["binary"] = []byte{0x00, 0x10, 0x30, 0x55, 0xff, 0x00}
+	secret.Data["utf8"] = []byte("a string with \u0345 characters")
+	versioned, _ := api.Scheme.ConvertToVersion(secret, "v1")
+	v1secret := versioned.(*v1.Secret)
+	s, framer, _, _ := api.Codecs.StreamingSerializerForMediaType("application/json", nil)
+	obj := &bytes.Buffer{}
+	if err := s.EncodeToStream(v1secret, obj); err != nil {
+		t.Fatal(err)
+	}
+	out := &bytes.Buffer{}
+	w := framer.NewFrameWriter(out)
+	if n, err := w.Write(obj.Bytes()); err != nil || n != len(obj.Bytes()) {
+		t.Fatal(err)
+	}
+
+	r := framer.NewFrameReader(out)
+	in := make([]byte, len(obj.Bytes())+1)
+	n, err := r.Read(in)
+	if err != nil {
+		t.Fatalf("%d vs %d: %v", n, len(obj.Bytes()), err)
+	}
+	result := in[:n]
+
+	t.Logf("\n%s\n%s\n%s", obj.Bytes(), result, hex.Dump(result))
 }
 
 const benchmarkSeed = 100
