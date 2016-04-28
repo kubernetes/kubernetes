@@ -48,7 +48,7 @@ type alwaysPullImages struct {
 
 func (a *alwaysPullImages) Admit(attributes admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
-	if len(attributes.GetSubresource()) != 0 || attributes.GetResource() != api.Resource("pods") {
+	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 	pod, ok := attributes.GetObject().(*api.Pod)

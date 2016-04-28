@@ -25,7 +25,7 @@ import (
 
 func extractResourceName(a Attributes) (name string, resource unversioned.GroupResource, err error) {
 	name = "Unknown"
-	resource = a.GetResource()
+	resource = a.GetResource().GroupResource()
 	obj := a.GetObject()
 	if obj != nil {
 		accessor, err := meta.Accessor(obj)

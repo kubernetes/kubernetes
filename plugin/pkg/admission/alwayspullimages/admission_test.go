@@ -40,7 +40,7 @@ func TestAdmission(t *testing.T) {
 			},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, api.Kind("Pod"), pod.Namespace, pod.Name, api.Resource("pods"), "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
@@ -97,7 +97,7 @@ func TestOtherResources(t *testing.T) {
 	for _, tc := range tests {
 		handler := &alwaysPullImages{}
 
-		err := handler.Admit(admission.NewAttributesRecord(tc.object, api.Kind(tc.kind), namespace, name, api.Resource(tc.resource), tc.subresource, admission.Create, nil))
+		err := handler.Admit(admission.NewAttributesRecord(tc.object, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, nil))
 
 		if tc.expectError {
 			if err == nil {
