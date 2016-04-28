@@ -29,7 +29,6 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -49,11 +48,8 @@ public class KubernetesSeedProviderTest {
 
     @Test
     public void testDefaultSeeds() throws  Exception {
-       Map<String, String> params = ImmutableMap.of(
-            "seeds", "192.168.1.0,8.8.8.8"
-       );
 
-        KubernetesSeedProvider provider = new KubernetesSeedProvider(params);
+        KubernetesSeedProvider provider = new KubernetesSeedProvider(new HashMap<String,String>());
         List<InetAddress>  seeds = provider.getDefaultSeeds();
         List<InetAddress> seedsTest = new ArrayList<>();
         seedsTest.add(InetAddress.getByName("8.4.4.4"));
