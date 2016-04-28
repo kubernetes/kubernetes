@@ -111,7 +111,6 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 		} else if policy.Argument.LabelsPresence != nil {
 			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewNodeLabelPredicate(
-					args.NodeInfo,
 					policy.Argument.LabelsPresence.Labels,
 					policy.Argument.LabelsPresence.Presence,
 				)

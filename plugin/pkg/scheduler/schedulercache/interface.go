@@ -71,6 +71,15 @@ type Cache interface {
 	// RemovePod removes a pod. The pod's information would be subtracted from assigned node.
 	RemovePod(pod *api.Pod) error
 
+	// AddNode adds overall information about node.
+	AddNode(node *api.Node) error
+
+	// UpdateNode updates overall information about node.
+	UpdateNode(oldNode, newNode *api.Node) error
+
+	// RemoveNode removes overall information about node.
+	RemoveNode(node *api.Node) error
+
 	// GetNodeNameToInfoMap returns a map of node names to node info. The node info contains
 	// aggregated information of pods scheduled (including assumed to be) on this node.
 	GetNodeNameToInfoMap() (map[string]*NodeInfo, error)

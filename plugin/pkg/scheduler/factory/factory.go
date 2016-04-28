@@ -75,7 +75,9 @@ type ConfigFactory struct {
 	StopEverything chan struct{}
 
 	scheduledPodPopulator *framework.Controller
-	schedulerCache        schedulercache.Cache
+	nodePopulator         *framework.Controller
+
+	schedulerCache schedulercache.Cache
 
 	// SchedulerName of a scheduler is used to select which pods will be
 	// processed by this scheduler, based on pods's annotation key:
@@ -93,7 +95,7 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
 		ScheduledPodLister: &cache.StoreToPodLister{},
 		// Only nodes in the "Ready" condition with status == "True" are schedulable
-		NodeLister:       &cache.StoreToNodeLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		NodeLister:       &cache.StoreToNodeLister{},
 		PVLister:         &cache.StoreToPVFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		PVCLister:        &cache.StoreToPVCFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ServiceLister:    &cache.StoreToServiceLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
@@ -115,55 +117,120 @@ func NewConfigFactory(client *client.Client, schedulerName string) *ConfigFactor
 		&api.Pod{},
 		0,
 		framework.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				pod, ok := obj.(*api.Pod)
-				if !ok {
-					glog.Errorf("cannot convert to *api.Pod")
-					return
-				}
-				if err := schedulerCache.AddPod(pod); err != nil {
-					glog.Errorf("scheduler cache AddPod failed: %v", err)
-				}
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				oldPod, ok := oldObj.(*api.Pod)
-				if !ok {
-					glog.Errorf("cannot convert to *api.Pod")
-					return
-				}
-				newPod, ok := newObj.(*api.Pod)
-				if !ok {
-					glog.Errorf("cannot convert to *api.Pod")
-					return
-				}
-				if err := schedulerCache.UpdatePod(oldPod, newPod); err != nil {
-					glog.Errorf("scheduler cache UpdatePod failed: %v", err)
-				}
-			},
-			DeleteFunc: func(obj interface{}) {
-				var pod *api.Pod
-				switch t := obj.(type) {
-				case *api.Pod:
-					pod = t
-				case cache.DeletedFinalStateUnknown:
-					var ok bool
-					pod, ok = t.Obj.(*api.Pod)
-					if !ok {
-						glog.Errorf("cannot convert to *api.Pod")
-						return
-					}
-				default:
-					glog.Errorf("cannot convert to *api.Pod")
-					return
-				}
-				if err := schedulerCache.RemovePod(pod); err != nil {
-					glog.Errorf("scheduler cache RemovePod failed: %v", err)
-				}
-			},
+			AddFunc:    c.addPodToCache,
+			UpdateFunc: c.updatePodInCache,
+			DeleteFunc: c.deletePodFromCache,
+		},
+	)
+
+	c.NodeLister.Store, c.nodePopulator = framework.NewInformer(
+		c.createNodeLW(),
+		&api.Node{},
+		0,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc:    c.addNodeToCache,
+			UpdateFunc: c.updateNodeInCache,
+			DeleteFunc: c.deleteNodeFromCache,
 		},
 	)
 
 	return c
+}
+
+func (c *ConfigFactory) addPodToCache(obj interface{}) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		glog.Errorf("cannot convert to *api.Pod: %v", obj)
+		return
+	}
+	if err := c.schedulerCache.AddPod(pod); err != nil {
+		glog.Errorf("scheduler cache AddPod failed: %v", err)
+	}
+}
+
+func (c *ConfigFactory) updatePodInCache(oldObj, newObj interface{}) {
+	oldPod, ok := oldObj.(*api.Pod)
+	if !ok {
+		glog.Errorf("cannot convert oldObj to *api.Pod: %v", oldObj)
+		return
+	}
+	newPod, ok := newObj.(*api.Pod)
+	if !ok {
+		glog.Errorf("cannot convert newObj to *api.Pod: %v", newObj)
+		return
+	}
+	if err := c.schedulerCache.UpdatePod(oldPod, newPod); err != nil {
+		glog.Errorf("scheduler cache UpdatePod failed: %v", err)
+	}
+}
+
+func (c *ConfigFactory) deletePodFromCache(obj interface{}) {
+	var pod *api.Pod
+	switch t := obj.(type) {
+	case *api.Pod:
+		pod = t
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		pod, ok = t.Obj.(*api.Pod)
+		if !ok {
+			glog.Errorf("cannot convert to *api.Pod: %v", t.Obj)
+			return
+		}
+	default:
+		glog.Errorf("cannot convert to *api.Pod: %v", t)
+		return
+	}
+	if err := c.schedulerCache.RemovePod(pod); err != nil {
+		glog.Errorf("scheduler cache RemovePod failed: %v", err)
+	}
+}
+
+func (c *ConfigFactory) addNodeToCache(obj interface{}) {
+	node, ok := obj.(*api.Node)
+	if !ok {
+		glog.Errorf("cannot convert to *api.Node: %v", obj)
+		return
+	}
+	if err := c.schedulerCache.AddNode(node); err != nil {
+		glog.Errorf("scheduler cache AddNode failed: %v", err)
+	}
+}
+
+func (c *ConfigFactory) updateNodeInCache(oldObj, newObj interface{}) {
+	oldNode, ok := oldObj.(*api.Node)
+	if !ok {
+		glog.Errorf("cannot convert oldObj to *api.Node: %v", oldObj)
+		return
+	}
+	newNode, ok := newObj.(*api.Node)
+	if !ok {
+		glog.Errorf("cannot convert newObj to *api.Node: %v", newObj)
+		return
+	}
+	if err := c.schedulerCache.UpdateNode(oldNode, newNode); err != nil {
+		glog.Errorf("scheduler cache UpdateNode failed: %v", err)
+	}
+}
+
+func (c *ConfigFactory) deleteNodeFromCache(obj interface{}) {
+	var node *api.Node
+	switch t := obj.(type) {
+	case *api.Node:
+		node = t
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		node, ok = t.Obj.(*api.Node)
+		if !ok {
+			glog.Errorf("cannot convert to *api.Node: %v", t.Obj)
+			return
+		}
+	default:
+		glog.Errorf("cannot convert to *api.Node: %v", t)
+		return
+	}
+	if err := c.schedulerCache.RemoveNode(node); err != nil {
+		glog.Errorf("scheduler cache RemoveNode failed: %v", err)
+	}
 }
 
 // Create creates a scheduler with the default algorithm provider.
@@ -247,9 +314,8 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	// Begin populating scheduled pods.
 	go f.scheduledPodPopulator.Run(f.StopEverything)
 
-	// Watch nodes.
-	// Nodes may be listed frequently, so provide a local up-to-date cache.
-	cache.NewReflector(f.createNodeLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
+	// Begin populating nodes.
+	go f.nodePopulator.Run(f.StopEverything)
 
 	// Watch PVs & PVCs
 	// They may be listed frequently for scheduling constraints, so provide a local up-to-date cache.
