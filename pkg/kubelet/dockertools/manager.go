@@ -87,6 +87,9 @@ const (
 	// Remote API version for docker daemon version v1.10
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
 	dockerV110APIVersion = "1.22"
+
+	// Minimum Docker limits is 4MB.
+	minimumDockerMemoryLimit = 4 * 1024 * 1024
 )
 
 var (
@@ -556,6 +559,9 @@ func (dm *DockerManager) runContainer(
 		}
 	}
 	memoryLimit := container.Resources.Limits.Memory().Value()
+	if memoryLimit > 0 && memoryLimit < minimumDockerMemoryLimit {
+		memoryLimit = minimumDockerMemoryLimit
+	}
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
 	var cpuShares int64

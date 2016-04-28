@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -136,7 +137,92 @@ var _ = Describe("Kubelet", func() {
 
 			It("it should be possible to delete", func() {
 				err := cl.Pods(namespace).Delete(podName, &api.DeleteOptions{})
+				Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
+			})
+		})
+		Context("when scheduling a busybox command in a pod with limits", func() {
+			It("it should run successfully with low CPU limits", func() {
+				podName := "busybox-scheduling-with-cpu-limits"
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      podName,
+						Namespace: namespace,
+					},
+					Spec: api.PodSpec{
+						// Force the Pod to schedule to the node without a scheduler running
+						NodeName: *nodeName,
+						// Don't restart the Pod since it is expected to exit
+						RestartPolicy: api.RestartPolicyNever,
+						Containers: []api.Container{
+							{
+								Image:   "gcr.io/google_containers/busybox",
+								Name:    podName,
+								Command: []string{"sh", "-c", "echo 'Hello World' ; sleep 240"},
+								Resources: api.ResourceRequirements{
+									Limits: api.ResourceList{
+										api.ResourceCPU: resource.MustParse("5m"),
+									},
+								},
+							},
+						},
+					},
+				}
+				_, err := cl.Pods(namespace).Create(pod)
 				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+				Eventually(func() error {
+					apiPod, err := cl.Pods(namespace).Get(pod.Name)
+					if err != nil {
+						return fmt.Errorf("failed to get pod status - %v", err)
+					}
+					if apiPod.Status.Phase != api.PodRunning {
+						return fmt.Errorf("pod %q is not yet in running phase", apiPod.Name)
+					}
+					return nil
+				}, time.Minute, time.Second*4).Should(BeNil())
+				err = cl.Pods(namespace).Delete(podName, &api.DeleteOptions{})
+				Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
+			})
+			It("it should run successfully with low Memory limits", func() {
+				podName := "busybox-scheduling-with-memory-limits"
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      podName,
+						Namespace: namespace,
+					},
+					Spec: api.PodSpec{
+						// Force the Pod to schedule to the node without a scheduler running
+						NodeName: *nodeName,
+						// Don't restart the Pod since it is expected to exit
+						RestartPolicy: api.RestartPolicyNever,
+						Containers: []api.Container{
+							{
+								Image: "gcr.io/google_containers/pause",
+								Name:  podName,
+								Resources: api.ResourceRequirements{
+									Limits: api.ResourceList{
+										api.ResourceMemory: resource.MustParse("3.5M"),
+									},
+								},
+							},
+						},
+					},
+				}
+				_, err := cl.Pods(namespace).Create(pod)
+				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+				Eventually(func() error {
+					apiPod, err := cl.Pods(namespace).Get(pod.Name)
+					if err != nil {
+						return fmt.Errorf("failed to get pod status - %v", err)
+					}
+					switch apiPod.Status.Phase {
+					case api.PodRunning:
+						return nil
+					default:
+						return fmt.Errorf("pod %q is not in running phase - %+v", apiPod.Name, apiPod.Status)
+					}
+				}, time.Minute, time.Second*4).Should(BeNil())
+				err = cl.Pods(namespace).Delete(podName, &api.DeleteOptions{})
+				Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 			})
 		})
 	})
