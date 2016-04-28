@@ -83,9 +83,9 @@ func (d *decoder) Decode(defaults *unversioned.GroupVersionKind, into runtime.Ob
 				continue
 			}
 			// double the buffer size up to maxBytes
-			if cap(d.buf) < d.maxBytes {
+			if len(d.buf) < d.maxBytes {
 				base += n
-				d.buf = append(d.buf, make([]byte, cap(d.buf))...)
+				d.buf = append(d.buf, make([]byte, len(d.buf))...)
 				continue
 			}
 			// must read the rest of the frame (until we stop getting ErrShortBuffer)
