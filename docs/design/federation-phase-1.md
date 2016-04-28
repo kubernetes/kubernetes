@@ -140,14 +140,25 @@ time.
 
 ## Ubernetes Scheduler
 
-The Ubernetes Scheduler schedules resources onto the underlying
-Kubernetes clusters.  For example it watches for unscheduled Ubernetes
-replication controllers (those that have not yet been scheduled onto
-underlying Kubernetes clusters) and performs the global scheduling
-work.  For each unscheduled replication controller, it calls policy
-engine to decide how to spit workloads among clusters. It creates a
-Kubernetes Replication Controller on one ore more underlying cluster,
-and post them back to `etcd` storage.
+Whereas the Kubernetes scheduler schedules pending pods onto
+underlying nodes, the Ubernetes Scheduler schedules resources onto the
+underlying Kubernetes clusters.  So the Ubernetes scheduler creates
+per-cluster Kubernetes API objects corresponding to Ubernetes API
+objects.
+
+For example, for Replication Controllers:
+
+1. watches it's persistent store (typically etcd) for unscheduled
+Ubernetes replication controllers (those that have not yet been
+scheduled onto underlying Kubernetes clusters)
+1. performs the global scheduling work, by consulting the policy
+engine to decide how to spit workloads among clusters
+1. creates a local record of a Kubernetes Replication Controller for 
+each underlying cluster onto which it decides to schedule (including
+the desired number of replicas for each cluster).  This constitutes
+the desired state of each Kubernetes replication controller, from the point of view
+of Ubernetes.
+1. saves these records back to the Ubernetes persistent store.
 
 One sublety worth noting here is that the scheduling decision is
 arrived at by combining the application-specific request from the user (which might
@@ -157,23 +168,42 @@ clusters over AWS clusters" or "spread load equally across clusters").
 
 ## Ubernetes Cluster Controller
 
-The cluster controller
-performs the following two kinds of work:
+The cluster controller's job is to reconcile the desired state of the
+underlying Kubernetes clusters (as recorded by Ubernetes in it's
+persistent store of desired objects) against the real Kubernetes
+clusters' states.
 
-1. It watches all the sub-resources that are created by Ubernetes
-   components, like a sub-RC or a sub-service. And then it creates the
-   corresponding API objects on the underlying K8S clusters.
-1. It periodically retrieves the available resources metrics from the
-   underlying K8S cluster, and updates them as object status of the
-   `cluster` API object.  An alternative design might be to run a pod
-   in each underlying cluster that reports metrics for that cluster to
-   the Ubernetes control plane.  Which approach is better remains an
-   open topic of discussion.
+To achieve this, it performs the following three kinds of work:
+
+1. It watches the Ubernetes persistent store for new or changed
+   desired Kubernetes resources (e.g. replication controllers or
+   services), and creates or modifies the corresponding API objects on
+   the underlying Kubernetes clusters.
+1. It watches the state of the underlying Kubernetes clusters' API
+   objects, and reacts accordingly when this is at odds with it's
+   persistent store of desired state (to cater for, e.g, the
+   possibility of some external agent deleting or modifying the
+   underlying resources).  Note that it will be necessary to be able
+   to disable this behaviour to make it possible for things like
+   Kubernetes pod autoscalers, which intentionally and automatically
+   modify Kubernetes replication controller's desired state, to
+   interoperate correctly with Ubernetes.  The details of this
+   interoperability are as yet undefined. In practise 1 and 2 are
+   implemented as a single reconciliation loop.
+1. It periodically retrieves available resource metrics from
+   underlying Kubernetes clusters, and updates the status of
+   corresponding Ubernetes `cluster` API objects.  This information
+   may, for example, be used by the Ubernetes scheduler to decide
+   which cluster to place replicas into, avoiding overloaded clusters.
+   An alternative implementation might be to run a pod in each underlying
+   cluster that reports metrics for that cluster to the Ubernetes
+   control plane.  Which approach is better remains an open topic of
+   discussion.
 
 ## Ubernetes Service Controller
 
 The Ubernetes service controller is a federation-level implementation
-of K8S service controller. It watches service resources created on
+of Kubernetes service controller. It watches service resources created on
 control plane, creates corresponding K8S services on each involved K8S
 clusters.  Besides interacting with services resources on each
 individual K8S clusters, the Ubernetes service controller also
