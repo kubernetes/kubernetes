@@ -38,6 +38,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -46,10 +47,12 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -64,6 +67,29 @@ func getTestTokenAuth() authenticator.Request {
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
 	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
 	return bearertoken.New(tokenAuthenticator)
+}
+
+func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
+	kubecfgFile, err := ioutil.TempFile("", "webhook-kubecfg")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(kubecfgFile.Name())
+	config := v1.Config{
+		Clusters: []v1.NamedCluster{
+			{
+				Cluster: v1.Cluster{Server: serverURL},
+			},
+		},
+	}
+	if err := json.NewEncoder(kubecfgFile).Encode(config); err != nil {
+		return nil, err
+	}
+	webhookTokenAuth, err := webhook.New(kubecfgFile.Name())
+	if err != nil {
+		return nil, err
+	}
+	return bearertoken.New(webhookTokenAuth), nil
 }
 
 func path(resource, namespace, name string) string {
@@ -1220,4 +1246,129 @@ func TestReadOnlyAuthorization(t *testing.T) {
 			}
 		}()
 	}
+}
+
+// TestWebhookTokenAuthenticator tests that a master can use the webhook token
+// authenticator to call out to a remote web server for authentication
+// decisions.
+func TestWebhookTokenAuthenticator(t *testing.T) {
+	framework.DeleteAllEtcdKeys()
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	authServer := newTestWebhookTokenAuthServer()
+	defer authServer.Close()
+	authenticator, err := getTestWebhookTokenAuth(authServer.URL)
+	if err != nil {
+		t.Fatalf("error starting webhook token authenticator server: %v", err)
+	}
+
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig.Authenticator = authenticator
+	masterConfig.Authorizer = allowAliceAuthorizer{}
+	m, err = master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
+
+	transport := http.DefaultTransport
+
+	for _, r := range getTestRequests() {
+		// Expect Bob's requests to all fail.
+		token := BobToken
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+		func() {
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Logf("case %v", r)
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// Expect all of Bob's actions to return Forbidden
+			if resp.StatusCode != http.StatusForbidden {
+				t.Logf("case %v", r)
+				t.Errorf("Expected http.Forbidden, but got %s", resp.Status)
+			}
+		}()
+		// Expect Alice's requests to succeed.
+		token = AliceToken
+		bodyBytes = bytes.NewReader([]byte(r.body))
+		req, err = http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+		func() {
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Logf("case %v", r)
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// Expect all of Alice's actions to at least get past authn/authz.
+			if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+				t.Logf("case %v", r)
+				t.Errorf("Expected something other than Unauthorized/Forbidden, but got %s", resp.Status)
+			}
+		}()
+	}
+}
+
+// newTestWebhookTokenAuthServer creates an http token authentication server
+// that knows about both Alice and Bob.
+func newTestWebhookTokenAuthServer() *httptest.Server {
+	serveHTTP := func(w http.ResponseWriter, r *http.Request) {
+		var review authenticationv1beta1.TokenReview
+		if err := json.NewDecoder(r.Body).Decode(&review); err != nil {
+			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
+			return
+		}
+		type userInfo struct {
+			Username string   `json:"username"`
+			UID      string   `json:"uid"`
+			Groups   []string `json:"groups"`
+		}
+		type status struct {
+			Authenticated bool     `json:"authenticated"`
+			User          userInfo `json:"user"`
+		}
+		var username, uid string
+		authenticated := false
+		if review.Spec.Token == AliceToken {
+			authenticated, username, uid = true, "alice", "1"
+		} else if review.Spec.Token == BobToken {
+			authenticated, username, uid = true, "bob", "2"
+		}
+
+		resp := struct {
+			APIVersion string `json:"apiVersion"`
+			Status     status `json:"status"`
+		}{
+			APIVersion: authenticationv1beta1.SchemeGroupVersion.String(),
+			Status: status{
+				authenticated,
+				userInfo{
+					Username: username,
+					UID:      uid,
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}
+
+	server := httptest.NewUnstartedServer(http.HandlerFunc(serveHTTP))
+	server.Start()
+	return server
 }
