@@ -23,122 +23,130 @@ import (
 
 func addDefaultingFuncs(scheme *runtime.Scheme) {
 	scheme.AddDefaultingFuncs(
-		func(obj *APIVersion) {
-		},
-		func(obj *DaemonSet) {
-			labels := obj.Spec.Template.Labels
-
-			// TODO: support templates defined elsewhere when we support them in the API
-			if labels != nil {
-				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &LabelSelector{
-						MatchLabels: labels,
-					}
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
-		},
-		func(obj *Deployment) {
-			// Default labels and selector to labels from pod template spec.
-			labels := obj.Spec.Template.Labels
-
-			if labels != nil {
-				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &LabelSelector{MatchLabels: labels}
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
-			// Set DeploymentSpec.Replicas to 1 if it is not set.
-			if obj.Spec.Replicas == nil {
-				obj.Spec.Replicas = new(int32)
-				*obj.Spec.Replicas = 1
-			}
-			strategy := &obj.Spec.Strategy
-			// Set default DeploymentStrategyType as RollingUpdate.
-			if strategy.Type == "" {
-				strategy.Type = RollingUpdateDeploymentStrategyType
-			}
-			if strategy.Type == RollingUpdateDeploymentStrategyType {
-				if strategy.RollingUpdate == nil {
-					rollingUpdate := RollingUpdateDeployment{}
-					strategy.RollingUpdate = &rollingUpdate
-				}
-				if strategy.RollingUpdate.MaxUnavailable == nil {
-					// Set default MaxUnavailable as 1 by default.
-					maxUnavailable := intstr.FromInt(1)
-					strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
-				}
-				if strategy.RollingUpdate.MaxSurge == nil {
-					// Set default MaxSurge as 1 by default.
-					maxSurge := intstr.FromInt(1)
-					strategy.RollingUpdate.MaxSurge = &maxSurge
-				}
-			}
-		},
-		func(obj *Job) {
-			labels := obj.Spec.Template.Labels
-			// TODO: support templates defined elsewhere when we support them in the API
-			if labels != nil {
-				// if an autoselector is requested, we'll build the selector later with controller-uid and job-name
-				autoSelector := bool(obj.Spec.AutoSelector != nil && *obj.Spec.AutoSelector)
-
-				// otherwise, we are using a manual selector
-				manualSelector := !autoSelector
-
-				// and default behavior for an unspecified manual selector is to use the pod template labels
-				if manualSelector && obj.Spec.Selector == nil {
-					obj.Spec.Selector = &LabelSelector{
-						MatchLabels: labels,
-					}
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
-			// For a non-parallel job, you can leave both `.spec.completions` and
-			// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
-			if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {
-				obj.Spec.Completions = new(int32)
-				*obj.Spec.Completions = 1
-				obj.Spec.Parallelism = new(int32)
-				*obj.Spec.Parallelism = 1
-			}
-			if obj.Spec.Parallelism == nil {
-				obj.Spec.Parallelism = new(int32)
-				*obj.Spec.Parallelism = 1
-			}
-		},
-		func(obj *HorizontalPodAutoscaler) {
-			if obj.Spec.MinReplicas == nil {
-				minReplicas := int32(1)
-				obj.Spec.MinReplicas = &minReplicas
-			}
-			if obj.Spec.CPUUtilization == nil {
-				obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
-			}
-		},
-		func(obj *ReplicaSet) {
-			labels := obj.Spec.Template.Labels
-
-			// TODO: support templates defined elsewhere when we support them in the API
-			if labels != nil {
-				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &LabelSelector{
-						MatchLabels: labels,
-					}
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
-			if obj.Spec.Replicas == nil {
-				obj.Spec.Replicas = new(int32)
-				*obj.Spec.Replicas = 1
-			}
-		},
+		SetDefaults_DaemonSet,
+		SetDefaults_Deployment,
+		SetDefaults_Job,
+		SetDefaults_HorizontalPodAutoscaler,
+		SetDefaults_ReplicaSet,
 	)
+}
+
+func SetDefaults_DaemonSet(obj *DaemonSet) {
+	labels := obj.Spec.Template.Labels
+
+	// TODO: support templates defined elsewhere when we support them in the API
+	if labels != nil {
+		if obj.Spec.Selector == nil {
+			obj.Spec.Selector = &LabelSelector{
+				MatchLabels: labels,
+			}
+		}
+		if len(obj.Labels) == 0 {
+			obj.Labels = labels
+		}
+	}
+}
+
+func SetDefaults_Deployment(obj *Deployment) {
+	// Default labels and selector to labels from pod template spec.
+	labels := obj.Spec.Template.Labels
+
+	if labels != nil {
+		if obj.Spec.Selector == nil {
+			obj.Spec.Selector = &LabelSelector{MatchLabels: labels}
+		}
+		if len(obj.Labels) == 0 {
+			obj.Labels = labels
+		}
+	}
+	// Set DeploymentSpec.Replicas to 1 if it is not set.
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
+	strategy := &obj.Spec.Strategy
+	// Set default DeploymentStrategyType as RollingUpdate.
+	if strategy.Type == "" {
+		strategy.Type = RollingUpdateDeploymentStrategyType
+	}
+	if strategy.Type == RollingUpdateDeploymentStrategyType {
+		if strategy.RollingUpdate == nil {
+			rollingUpdate := RollingUpdateDeployment{}
+			strategy.RollingUpdate = &rollingUpdate
+		}
+		if strategy.RollingUpdate.MaxUnavailable == nil {
+			// Set default MaxUnavailable as 1 by default.
+			maxUnavailable := intstr.FromInt(1)
+			strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		}
+		if strategy.RollingUpdate.MaxSurge == nil {
+			// Set default MaxSurge as 1 by default.
+			maxSurge := intstr.FromInt(1)
+			strategy.RollingUpdate.MaxSurge = &maxSurge
+		}
+	}
+}
+
+func SetDefaults_Job(obj *Job) {
+	labels := obj.Spec.Template.Labels
+	// TODO: support templates defined elsewhere when we support them in the API
+	if labels != nil {
+		// if an autoselector is requested, we'll build the selector later with controller-uid and job-name
+		autoSelector := bool(obj.Spec.AutoSelector != nil && *obj.Spec.AutoSelector)
+
+		// otherwise, we are using a manual selector
+		manualSelector := !autoSelector
+
+		// and default behavior for an unspecified manual selector is to use the pod template labels
+		if manualSelector && obj.Spec.Selector == nil {
+			obj.Spec.Selector = &LabelSelector{
+				MatchLabels: labels,
+			}
+		}
+		if len(obj.Labels) == 0 {
+			obj.Labels = labels
+		}
+	}
+	// For a non-parallel job, you can leave both `.spec.completions` and
+	// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
+	if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {
+		obj.Spec.Completions = new(int32)
+		*obj.Spec.Completions = 1
+		obj.Spec.Parallelism = new(int32)
+		*obj.Spec.Parallelism = 1
+	}
+	if obj.Spec.Parallelism == nil {
+		obj.Spec.Parallelism = new(int32)
+		*obj.Spec.Parallelism = 1
+	}
+}
+
+func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
+	if obj.Spec.MinReplicas == nil {
+		minReplicas := int32(1)
+		obj.Spec.MinReplicas = &minReplicas
+	}
+	if obj.Spec.CPUUtilization == nil {
+		obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
+	}
+}
+
+func SetDefaults_ReplicaSet(obj *ReplicaSet) {
+	labels := obj.Spec.Template.Labels
+
+	// TODO: support templates defined elsewhere when we support them in the API
+	if labels != nil {
+		if obj.Spec.Selector == nil {
+			obj.Spec.Selector = &LabelSelector{
+				MatchLabels: labels,
+			}
+		}
+		if len(obj.Labels) == 0 {
+			obj.Labels = labels
+		}
+	}
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
 }
