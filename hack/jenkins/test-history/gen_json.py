@@ -193,7 +193,7 @@ def main(server, match):
     """Collect test info in matching jobs."""
     print('Finding tests in jobs matching {} at server {}'.format(
         match, server))
-    matcher = re.compile(match)
+    matcher = re.compile(match).match
     tests = get_tests(server, matcher)
     with open('tests.json', 'w') as buf:
         json.dump(tests, buf, sort_keys=True)
