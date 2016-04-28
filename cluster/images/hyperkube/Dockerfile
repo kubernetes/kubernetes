@@ -64,3 +64,6 @@ RUN chmod a+rx \
         /usr/share/google/safe_format_and_mount \
         /setup-files.sh \
         /make-ca-cert.sh
+
+# Create symlinks for each hyperkube server
+RUN /hyperkube --make-symlinks
