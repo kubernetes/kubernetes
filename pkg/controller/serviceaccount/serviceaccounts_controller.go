@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -71,7 +72,9 @@ func NewServiceAccountsController(cl clientset.Interface, options ServiceAccount
 		client:                  cl,
 		serviceAccountsToEnsure: options.ServiceAccounts,
 	}
-
+	if cl != nil && cl.Core().GetRESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().GetRESTClient().GetRateLimiter())
+	}
 	accountSelector := fields.Everything()
 	if len(options.ServiceAccounts) == 1 {
 		// If we're maintaining a single account, we can scope the accounts we watch to just that name

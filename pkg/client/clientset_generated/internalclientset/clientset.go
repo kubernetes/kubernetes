@@ -44,16 +44,25 @@ type Clientset struct {
 
 // Core retrieves the CoreClient
 func (c *Clientset) Core() unversionedcore.CoreInterface {
+	if c == nil {
+		return nil
+	}
 	return c.CoreClient
 }
 
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
+	if c == nil {
+		return nil
+	}
 	return c.ExtensionsClient
 }
 
 // Batch retrieves the BatchClient
 func (c *Clientset) Batch() unversionedbatch.BatchInterface {
+	if c == nil {
+		return nil
+	}
 	return c.BatchClient
 }
 

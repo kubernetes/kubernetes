@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -49,6 +50,9 @@ type GCController struct {
 }
 
 func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *GCController {
+	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
+	}
 	gcc := &GCController{
 		kubeClient: kubeClient,
 		threshold:  threshold,

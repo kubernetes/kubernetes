@@ -23,6 +23,7 @@ import (
 )
 
 type BatchInterface interface {
+	GetRESTClient() *restclient.RESTClient
 	JobsGetter
 }
 
@@ -87,4 +88,13 @@ func setConfigDefaults(config *restclient.Config) error {
 		config.Burst = 10
 	}
 	return nil
+}
+
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *BatchClient) GetRESTClient() *restclient.RESTClient {
+	if c == nil {
+		return nil
+	}
+	return c.RESTClient
 }
