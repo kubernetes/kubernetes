@@ -131,13 +131,13 @@ func NewJSONFramedReader(r io.ReadCloser) io.ReadCloser {
 func (r *jsonFrameReader) Read(data []byte) (int, error) {
 	// Return whatever remaining data exists from an in progress frame
 	if n := len(r.remaining); n > 0 {
-		if n <= cap(data) {
+		if n <= len(data) {
 			data = append(data[0:0], r.remaining...)
 			r.remaining = nil
 			return n, nil
 		}
 
-		n = cap(data)
+		n = len(data)
 		data = append(data[0:0], r.remaining[:n]...)
 		r.remaining = r.remaining[n:]
 		return n, io.ErrShortBuffer
