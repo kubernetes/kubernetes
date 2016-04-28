@@ -910,6 +910,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/etcd/etcd.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${dst_dir}"
+  cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-addons/namespace.yaml" "${dst_dir}"
   cp "${salt_dir}/kube-addons/kube-addons.sh" "${dst_dir}"
