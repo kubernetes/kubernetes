@@ -1516,9 +1516,9 @@ function kube::release::docker::release() {
   fi
 }
 
-function kube::release::has_gcloud_account() {
+function kube::release::gcloud_account_is_active() {
   local -r account="${1-}"
-  if [[ -n $(gcloud auth list --filter-account $account 2>/dev/null) ]]; then
+  if [[ -n $(gcloud auth list --filter-account $account 2>/dev/null | grep "active") ]]; then
     return 0
   else
     return 1
