@@ -41,10 +41,11 @@ type HyperKube struct {
 	Name string // The executable name, used for help and soft-link invocation
 	Long string // A long description of the binary.  It will be world wrapped before output.
 
-	servers     []Server
-	baseFlags   *pflag.FlagSet
-	out         io.Writer
-	helpFlagVal bool
+	servers             []Server
+	baseFlags           *pflag.FlagSet
+	out                 io.Writer
+	helpFlagVal         bool
+	makeSymlinksFlagVal bool
 }
 
 // AddServer adds a server to the HyperKube object.
@@ -75,6 +76,8 @@ func (hk *HyperKube) Flags() *pflag.FlagSet {
 		hk.baseFlags.SetOutput(ioutil.Discard)
 		hk.baseFlags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 		hk.baseFlags.BoolVarP(&hk.helpFlagVal, "help", "h", false, "help for "+hk.Name)
+		hk.baseFlags.BoolVar(&hk.makeSymlinksFlagVal, "make-symlinks", false, "create a symlink for each server in current directory")
+		hk.baseFlags.MarkHidden("make-symlinks") // hide this flag from appearing in servers' usage output
 
 		// These will add all of the "global" flags (defined with both the
 		// flag and pflag packages) to the new flag set we have.
@@ -117,7 +120,8 @@ func (hk *HyperKube) Printf(format string, i ...interface{}) {
 func (hk *HyperKube) Run(args []string) error {
 	// If we are called directly, parse all flags up to the first real
 	// argument.  That should be the server to run.
-	baseCommand := path.Base(args[0])
+	command := args[0]
+	baseCommand := path.Base(command)
 	serverName := baseCommand
 	if serverName == hk.Name {
 		args = args[1:]
@@ -131,6 +135,10 @@ func (hk *HyperKube) Run(args []string) error {
 			}
 			hk.Usage()
 			return err
+		}
+
+		if hk.makeSymlinksFlagVal {
+			return hk.MakeSymlinks(command)
 		}
 
 		verflag.PrintAndExitIfRequested()
@@ -200,7 +208,32 @@ Servers
 {{range .Servers}}
   {{.Name}}
 {{.Long | trim | wrap "    "}}{{end}}
+Call '{{.Name}} --make-symlinks' to create symlinks for each server in the local directory.
 Call '{{.Name}} <server> --help' for help on a specific server.
 `
 	util.ExecuteTemplate(hk.Out(), tt, hk)
+}
+
+// MakeSymlinks will create a symlink for each registered hyperkube server in the local directory.
+func (hk *HyperKube) MakeSymlinks(command string) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	var errs bool
+	for _, s := range hk.servers {
+		link := path.Join(wd, s.Name())
+
+		err := os.Symlink(command, link)
+		if err != nil {
+			errs = true
+			hk.Println(err)
+		}
+	}
+
+	if errs {
+		return errors.New("Error creating one or more symlinks.")
+	}
+	return nil
 }
