@@ -36,7 +36,8 @@ Documentation for other releases can be found at
 
 ## Background
 
-This document proposes a system for enforcing resource requirements constraints as part of admission control.
+This document proposes a system for enforcing resource requirements constraints
+as part of admission control.
 
 ## Use cases
 
@@ -64,7 +65,8 @@ const (
   LimitTypeContainer LimitType = "Container"
 )
 
-// LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
+// LimitRangeItem defines a min/max usage limit for any resource that matches
+// on kind.
 type LimitRangeItem struct {
   // Type of resource that this limit applies to.
   Type LimitType `json:"type,omitempty"`
@@ -72,29 +74,38 @@ type LimitRangeItem struct {
   Max ResourceList `json:"max,omitempty"`
   // Min usage constraints on this kind by resource name.
   Min ResourceList `json:"min,omitempty"`
-  // Default resource requirement limit value by resource name if resource limit is omitted.
+  // Default resource requirement limit value by resource name if resource limit
+  // is omitted.
   Default ResourceList `json:"default,omitempty"`
-  // DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
+  // DefaultRequest is the default resource requirement request value by
+  // resource name if resource request is omitted.
   DefaultRequest ResourceList `json:"defaultRequest,omitempty"`
-  // MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
+  // MaxLimitRequestRatio if specified, the named resource must have a request
+  // and limit that are both non-zero where limit divided by request is less
+  // than or equal to the enumerated value; this represents the max burst for
+  // the named resource.
   MaxLimitRequestRatio ResourceList `json:"maxLimitRequestRatio,omitempty"`
 }
 
-// LimitRangeSpec defines a min/max usage limit for resources that match on kind.
+// LimitRangeSpec defines a min/max usage limit for resources that match
+// on kind.
 type LimitRangeSpec struct {
   // Limits is the list of LimitRangeItem objects that are enforced.
   Limits []LimitRangeItem `json:"limits"`
 }
 
-// LimitRange sets resource usage limits for each kind of resource in a Namespace.
+// LimitRange sets resource usage limits for each kind of resource in a
+// Namespace.
 type LimitRange struct {
   TypeMeta `json:",inline"`
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: 
+  //    http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   ObjectMeta `json:"metadata,omitempty"`
 
   // Spec defines the limits enforced.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // More info:
+  //   http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
   Spec LimitRangeSpec `json:"spec,omitempty"`
 }
 
@@ -102,24 +113,29 @@ type LimitRange struct {
 type LimitRangeList struct {
   TypeMeta `json:",inline"`
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // More info: 
+  //   http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   ListMeta `json:"metadata,omitempty"`
 
   // Items is a list of LimitRange objects.
-  // More info: http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md
+  // More info:
+  //   http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md
   Items []LimitRange `json:"items"`
 }
 ```
 
 ### Validation
 
-Validation of a **LimitRange** enforces that for a given named resource the following rules apply:
+Validation of a **LimitRange** enforces that for a given named resource the
+following rules apply:
 
-Min (if specified) <= DefaultRequest (if specified) <= Default (if specified) <= Max (if specified)
+Min (if specified) <= DefaultRequest (if specified) <= Default (if specified)
+<= Max (if specified)
 
 ### Default Value Behavior
 
-The following default value behaviors are applied to a LimitRange for a given named resource.
+The following default value behaviors are applied to a LimitRange for a given
+named resource.
 
 ```
 if LimitRangeItem.Default[resourceName] is undefined 
@@ -137,11 +153,14 @@ if LimitRangeItem.DefaultRequest[resourceName] is undefined
 
 ## AdmissionControl plugin: LimitRanger
 
-The **LimitRanger** plug-in introspects all incoming pod requests and evaluates the constraints defined on a LimitRange.
+The **LimitRanger** plug-in introspects all incoming pod requests and evaluates
+the constraints defined on a LimitRange.
 
-If a constraint is not specified for an enumerated resource, it is not enforced or tracked.
+If a constraint is not specified for an enumerated resource, it is not enforced
+or tracked.
 
-To enable the plug-in and support for LimitRange, the kube-apiserver must be configured as follows:
+To enable the plug-in and support for LimitRange, the kube-apiserver must be
+configured as follows:
 
 ```console
 $ kube-apiserver --admission-control=LimitRanger
@@ -158,7 +177,7 @@ Supported Resources:
 
 Supported Constraints:
 
-Per container, the following must hold true
+Per container, the following must hold true:
 
 | Constraint | Behavior |
 | ---------- | -------- |
@@ -168,8 +187,10 @@ Per container, the following must hold true
 
 Supported Defaults:
 
-1. Default - if the named resource has no enumerated value, the Limit is equal to the Default
-2. DefaultRequest - if the named resource has no enumerated value, the Request is equal to the DefaultRequest
+1. Default - if the named resource has no enumerated value, the Limit is equal
+to the Default
+2. DefaultRequest - if the named resource has no enumerated value, the Request
+is equal to the DefaultRequest
 
 **Type: Pod**
 
@@ -190,7 +211,8 @@ Across all containers in pod, the following must hold true
 
 ## Run-time configuration
 
-The default ```LimitRange``` that is applied via Salt configuration will be updated as follows:
+The default ```LimitRange``` that is applied via Salt configuration will be
+updated as follows:
 
 ```
 apiVersion: "v1"
@@ -219,7 +241,8 @@ the following would happen.
 
 1. The incoming container cpu would request 250m with a limit of 500m.
 2. The incoming container memory would request 250Mi with a limit of 500Mi
-3. If the container is later resized, it's cpu would be constrained to between .1 and 1 and the ratio of limit to request could not exceed 4.
+3. If the container is later resized, it's cpu would be constrained to between
+.1 and 1 and the ratio of limit to request could not exceed 4.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.md?pixel)]()

@@ -43,24 +43,30 @@ Documentation for other releases can be found at
 ## Background
 
 High level goals:
+* Enable an easy-to-use mechanism to provide admission control to cluster.
+* Enable a provider to support multiple admission control strategies or author
+their own.
+* Ensure any rejected request can propagate errors back to the caller with why
+the request failed.
 
-* Enable an easy-to-use mechanism to provide admission control to cluster
-* Enable a provider to support multiple admission control strategies or author their own
-* Ensure any rejected request can propagate errors back to the caller with why the request failed
-
-Authorization via policy is focused on answering if a user is authorized to perform an action.
+Authorization via policy is focused on answering if a user is authorized to
+perform an action.
 
 Admission Control is focused on if the system will accept an authorized action.
 
-Kubernetes may choose to dismiss an authorized action based on any number of admission control strategies.
+Kubernetes may choose to dismiss an authorized action based on any number of
+admission control strategies.
 
-This proposal documents the basic design, and describes how any number of admission control plug-ins could be injected.
+This proposal documents the basic design, and describes how any number of
+admission control plug-ins could be injected.
 
-Implementation of specific admission control strategies are handled in separate documents.
+Implementation of specific admission control strategies are handled in separate
+documents.
 
 ## kube-apiserver
 
-The kube-apiserver takes the following OPTIONAL arguments to enable admission control
+The kube-apiserver takes the following OPTIONAL arguments to enable admission
+control:
 
 | Option | Behavior |
 | ------ | -------- |
@@ -72,7 +78,8 @@ An **AdmissionControl** plug-in is an implementation of the following interface:
 ```go
 package admission
 
-// Attributes is an interface used by a plug-in to make an admission decision on a individual request.
+// Attributes is an interface used by a plug-in to make an admission decision
+// on a individual request.
 type Attributes interface {
   GetNamespace() string
   GetKind() string
@@ -88,8 +95,8 @@ type Interface interface {
 }
 ```
 
-A **plug-in** must be compiled with the binary, and is registered as an available option by providing a name, and implementation
-of admission.Interface.
+A **plug-in** must be compiled with the binary, and is registered as an
+available option by providing a name, and implementation of admission.Interface.
 
 ```go
 func init() {
@@ -97,9 +104,12 @@ func init() {
 }
 ```
 
-Invocation of admission control is handled by the **APIServer** and not individual **RESTStorage** implementations.
+Invocation of admission control is handled by the **APIServer** and not
+individual **RESTStorage** implementations.
 
-This design assumes that **Issue 297** is adopted, and as a consequence, the general framework of the APIServer request/response flow will ensure the following:
+This design assumes that **Issue 297** is adopted, and as a consequence, the
+general framework of the APIServer request/response flow will ensure the
+following:
 
 1. Incoming request
 2. Authenticate user

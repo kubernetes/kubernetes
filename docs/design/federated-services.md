@@ -76,7 +76,7 @@ Documentation for other releases can be found at
       load balancers between the client and the serving Pod, failover
       might be completely automatic (i.e. the client's end of the
       connection remains intact, and the client is completely
-      oblivious of the fail-over).  This approach incurs network speed
+      oblivious of the fail-over). This approach incurs network speed
       and cost penalties (by traversing possibly multiple load
       balancers), but requires zero smarts in clients, DNS libraries,
       recursing DNS servers etc, as the IP address of the endpoint
@@ -102,17 +102,17 @@ Documentation for other releases can be found at
 A Kubernetes application configuration (e.g. for a Pod, Replication
 Controller, Service etc) should be able to be successfully deployed
 into any Kubernetes Cluster or Ubernetes Federation of Clusters,
-without modification.  More specifically, a typical configuration
+without modification. More specifically, a typical configuration
 should work correctly (although possibly not optimally) across any of
 the following environments:
 
 1. A single Kubernetes Cluster on one cloud provider (e.g. Google
-   Compute Engine, GCE)
+   Compute Engine, GCE).
 1. A single Kubernetes Cluster on a different cloud provider
-   (e.g. Amazon Web Services, AWS)
+   (e.g. Amazon Web Services, AWS).
 1. A single Kubernetes Cluster on a non-cloud, on-premise data center
 1. A Federation of Kubernetes Clusters all on the same cloud provider
-   (e.g. GCE)
+   (e.g. GCE).
 1. A Federation of Kubernetes Clusters across multiple different cloud
    providers and/or on-premise data centers (e.g. one cluster on
    GCE/GKE, one on AWS, and one on-premise).
@@ -122,18 +122,18 @@ the following environments:
 It should be possible to explicitly opt out of portability across some
 subset of the above environments in order to take advantage of
 non-portable load balancing and DNS features of one or more
-environments.  More specifically, for example:
+environments. More specifically, for example:
 
 1. For HTTP(S) applications running on GCE-only Federations,
    [GCE Global L7 Load Balancers](https://cloud.google.com/compute/docs/load-balancing/http/global-forwarding-rules)
-   should be usable.  These provide single, static global IP addresses
+   should be usable. These provide single, static global IP addresses
    which load balance and fail over globally (i.e. across both regions
-   and zones).  These allow for really dumb clients, but they only
+   and zones). These allow for really dumb clients, but they only
    work on GCE, and only for HTTP(S) traffic.
 1. For non-HTTP(S) applications running on GCE-only Federations within
    a single region,
    [GCE L4 Network Load Balancers](https://cloud.google.com/compute/docs/load-balancing/network/)
-   should be usable.  These provide TCP (i.e. both HTTP/S and
+   should be usable. These provide TCP (i.e. both HTTP/S and
    non-HTTP/S) load balancing and failover, but only on GCE, and only
    within a single region.
    [Google Cloud DNS](https://cloud.google.com/dns) can be used to
@@ -141,7 +141,7 @@ environments.  More specifically, for example:
    providers and on-premise clusters, as it's plain DNS, IP only).
 1. For applications running on AWS-only Federations,
    [AWS Elastic Load Balancers (ELB's)](https://aws.amazon.com/elasticloadbalancing/details/)
-   should be usable.  These provide both L7 (HTTP(S)) and L4 load
+   should be usable. These provide both L7 (HTTP(S)) and L4 load
    balancing, but only within a single region, and only on AWS
    ([AWS Route 53 DNS service](https://aws.amazon.com/route53/) can be
    used to load balance and fail over across multiple regions, and is
@@ -153,7 +153,7 @@ Ubernetes cross-cluster load balancing is built on top of the following:
 
 1. [GCE Global L7 Load Balancers](https://cloud.google.com/compute/docs/load-balancing/http/global-forwarding-rules)
    provide single, static global IP addresses which load balance and
-   fail over globally (i.e. across both regions and zones).  These
+   fail over globally (i.e. across both regions and zones). These
    allow for really dumb clients, but they only work on GCE, and only
    for HTTP(S) traffic.
 1. [GCE L4 Network Load Balancers](https://cloud.google.com/compute/docs/load-balancing/network/)
@@ -170,7 +170,7 @@ Ubernetes cross-cluster load balancing is built on top of the following:
    doesn't provide any built-in geo-DNS, latency-based routing, health
    checking, weighted round robin or other advanced capabilities.
    It's plain old DNS. We would need to build all the aforementioned
-   on top of it.  It can provide internal DNS services (i.e. serve RFC
+   on top of it. It can provide internal DNS services (i.e. serve RFC
    1918 addresses).
    1. [AWS Route 53 DNS service](https://aws.amazon.com/route53/) can
    be used to load balance and fail over across regions, and is also
@@ -185,23 +185,24 @@ Ubernetes cross-cluster load balancing is built on top of the following:
    service IP which is load-balanced (currently simple round-robin)
    across the healthy pods comprising a service within a single
    Kubernetes cluster.
-1. [Kubernetes Ingress](http://kubernetes.io/v1.1/docs/user-guide/ingress.html): A generic wrapper around cloud-provided L4 and L7 load balancing services, and roll-your-own load balancers run in pods, e.g. HA Proxy.
+1. [Kubernetes Ingress](http://kubernetes.io/v1.1/docs/user-guide/ingress.html):
+A generic wrapper around cloud-provided L4 and L7 load balancing services, and
+roll-your-own load balancers run in pods, e.g. HA Proxy.
 
 ## Ubernetes API
 
-The Ubernetes API for load balancing should be compatible with the
-equivalent Kubernetes API, to ease porting of clients between
-Ubernetes and Kubernetes. Further details below.
+The Ubernetes API for load balancing should be compatible with the equivalent
+Kubernetes API, to ease porting of clients between Ubernetes and Kubernetes.
+Further details below.
 
 ## Common Client Behavior
 
-To be useful, our load balancing solution needs to work properly with
-real client applications. There are a few different classes of
-those...
+To be useful, our load balancing solution needs to work properly with real
+client applications. There are a few different classes of those...
 
 ### Browsers
 
-These are the most common external clients.  These are all well-written.  See below.
+These are the most common external clients. These are all well-written. See below.
 
 ### Well-written clients
 
@@ -218,8 +219,8 @@ Examples:
 
 ### Dumb clients
 
-1. Don't do a DNS resolution every time they connect (or do cache
-   beyond the TTL).
+1. Don't do a DNS resolution every time they connect (or do cache beyond the
+TTL).
 1. Do try multiple A records
 
 Examples:
@@ -237,34 +238,34 @@ Examples:
 
 ### Dumbest clients
 
-1. Never do a DNS lookup - are pre-configured with a single (or
-   possibly multiple) fixed server IP(s).  Nothing else matters.
+1. Never do a DNS lookup - are pre-configured with a single (or possibly
+multiple) fixed server IP(s). Nothing else matters.
 
 ## Architecture and Implementation
 
-### General control plane architecture
+### General Control Plane Architecture
 
-Each cluster hosts one or more Ubernetes master components (Ubernetes API servers, controller managers with leader election, and
-etcd quorum members.  This is documented in more detail in a
-[separate design doc: Kubernetes/Ubernetes Control Plane Resilience](https://docs.google.com/document/d/1jGcUVg9HDqQZdcgcFYlWMXXdZsplDdY6w3ZGJbU7lAw/edit#).
+Each cluster hosts one or more Ubernetes master components (Ubernetes API
+servers, controller managers with leader election, and etcd quorum members. This
+is documented in more detail in a separate design doc:
+[Kubernetes/Ubernetes Control Plane Resilience](https://docs.google.com/document/d/1jGcUVg9HDqQZdcgcFYlWMXXdZsplDdY6w3ZGJbU7lAw/edit#).
 
-In the description below, assume that 'n' clusters, named
-'cluster-1'... 'cluster-n' have been registered against an Ubernetes
-Federation "federation-1", each with their own set of Kubernetes API
-endpoints,so,
+In the description below, assume that 'n' clusters, named 'cluster-1'...
+'cluster-n' have been registered against an Ubernetes Federation "federation-1",
+each with their own set of Kubernetes API endpoints,so,
 "[http://endpoint-1.cluster-1](http://endpoint-1.cluster-1),
 [http://endpoint-2.cluster-1](http://endpoint-2.cluster-1)
 ... [http://endpoint-m.cluster-n](http://endpoint-m.cluster-n) .
 
 ### Federated Services
 
-Ubernetes Services are pretty straight-forward.  They're comprised of
-multiple equivalent underlying Kubernetes Services, each with their
-own external endpoint, and a load balancing mechanism across them.
-Let's work through how exactly that works in practice.
+Ubernetes Services are pretty straight-forward.  They're comprised of multiple
+equivalent underlying Kubernetes Services, each with their own external
+endpoint, and a load balancing mechanism across them. Let's work through how
+exactly that works in practice.
 
-Our user creates the following Ubernetes Service (against an Ubernetes
-API endpoint):
+Our user creates the following Ubernetes Service (against an Ubernetes API
+endpoint):
 
     $ kubectl create -f my-service.yaml --context="federation-1"
 
@@ -290,9 +291,9 @@ where service.yaml contains the following:
         run: my-service
       type: LoadBalancer
 
-Ubernetes in turn creates one equivalent service (identical config to
-the above) in each of the underlying Kubernetes clusters, each of
-which results in something like this:
+Ubernetes in turn creates one equivalent service (identical config to the above)
+in each of the underlying Kubernetes clusters, each of which results in
+something like this:
 
     $ kubectl get -o yaml --context="cluster-1" service my-service
 
@@ -329,9 +330,8 @@ which results in something like this:
         ingress:
         - ip: 104.197.117.10
 
-Similar services are created in `cluster-2` and `cluster-3`, each of
-which are allocated their own `spec.clusterIP`, and
-`status.loadBalancer.ingress.ip`.
+Similar services are created in `cluster-2` and `cluster-3`, each of which are
+allocated their own `spec.clusterIP`, and `status.loadBalancer.ingress.ip`.
 
 In Ubernetes `federation-1`, the resulting federated service looks as follows:
 
@@ -376,21 +376,21 @@ Note that the federated service:
 1. has no clusterIP (as it is cluster-independent)
 1. has a federation-wide load balancer hostname
 
-In addition to the set of underlying Kubernetes services (one per
-cluster) described above, Ubernetes has also created a DNS name
-(e.g. on [Google Cloud DNS](https://cloud.google.com/dns) or
-[AWS Route 53](https://aws.amazon.com/route53/), depending on
-configuration) which provides load balancing across all of those
-services.  For example, in a very basic configuration:
+In addition to the set of underlying Kubernetes services (one per cluster)
+described above, Ubernetes has also created a DNS name (e.g. on
+[Google Cloud DNS](https://cloud.google.com/dns) or
+[AWS Route 53](https://aws.amazon.com/route53/), depending on configuration)
+which provides load balancing across all of those services. For example, in a
+very basic configuration:
 
     $ dig +noall +answer my-service.my-namespace.my-federation.my-domain.com
     my-service.my-namespace.my-federation.my-domain.com 180 IN	A 104.197.117.10
     my-service.my-namespace.my-federation.my-domain.com 180 IN	A 104.197.74.77
     my-service.my-namespace.my-federation.my-domain.com 180 IN	A 104.197.38.157
 
-Each of the above IP addresses (which are just the external load
-balancer ingress IP's of each cluster service) is of course load
-balanced across the pods comprising the service in each cluster.
+Each of the above IP addresses (which are just the external load balancer
+ingress IP's of each cluster service) is of course load balanced across the pods
+comprising the service in each cluster.
 
 In a more sophisticated configuration (e.g. on GCE or GKE), Ubernetes
 automatically creates a
@@ -411,23 +411,21 @@ for failover purposes:
     my-service.my-namespace.my-federation.my-domain.com 180 IN	A 104.197.74.77
     my-service.my-namespace.my-federation.my-domain.com 180 IN	A 104.197.38.157
 
-If Ubernetes Global Service Health Checking is enabled, multiple
-service health checkers running across the federated clusters
-collaborate to monitor the health of the service endpoints, and
-automatically remove unhealthy endpoints from the DNS record (e.g. a
-majority quorum is required to vote a service endpoint unhealthy, to
-avoid false positives due to individual health checker network
+If Ubernetes Global Service Health Checking is enabled, multiple service health
+checkers running across the federated clusters collaborate to monitor the health
+of the service endpoints, and automatically remove unhealthy endpoints from the
+DNS record (e.g. a majority quorum is required to vote a service endpoint
+unhealthy, to avoid false positives due to individual health checker network
 isolation).
 
 ### Federated Replication Controllers
 
-So far we have a federated service defined, with a resolvable load
-balancer hostname by which clients can reach it, but no pods serving
-traffic directed there.  So now we need a Federated Replication
-Controller.  These are also fairly straight-forward, being comprised
-of multiple underlying Kubernetes Replication Controllers which do the
-hard work of keeping the desired number of Pod replicas alive in each
-Kubernetes cluster.
+So far we have a federated service defined, with a resolvable load balancer
+hostname by which clients can reach it, but no pods serving traffic directed
+there. So now we need a Federated Replication Controller. These are also fairly
+straight-forward, being comprised of multiple underlying Kubernetes Replication
+Controllers which do the hard work of keeping the desired number of Pod replicas
+alive in each Kubernetes cluster.
 
     $ kubectl create -f my-service-rc.yaml --context="federation-1"
 
@@ -495,54 +493,49 @@ something like this:
     status:
       replicas: 2
 
-The exact number of replicas created in each underlying cluster will
-of course depend on what scheduling policy is in force.  In the above
-example, the scheduler created an equal number of replicas (2) in each
-of the three underlying clusters, to make up the total of 6 replicas
-required.  To handle entire cluster failures, various approaches are possible,
-including:
+The exact number of replicas created in each underlying cluster will of course
+depend on what scheduling policy is in force. In the above example, the
+scheduler created an equal number of replicas (2) in each of the three
+underlying clusters, to make up the total of 6 replicas required. To handle
+entire cluster failures, various approaches are possible, including:
 1. **simple overprovisioing**, such that sufficient replicas remain even if a
-   cluster fails.  This wastes some resources, but is simple and
-   reliable.
+   cluster fails. This wastes some resources, but is simple and reliable.
 2. **pod autoscaling**, where the replication controller in each
       cluster automatically and autonomously increases the number of
       replicas in its cluster in response to the additional traffic
-      diverted from the
-      failed cluster.  This saves resources and is reatively simple,
-      but there is some delay in the autoscaling.
+      diverted from the failed cluster. This saves resources and is relatively
+      simple, but there is some delay in the autoscaling.
 3. **federated replica migration**, where the Ubernetes Federation
    Control Plane detects the cluster failure and automatically
    increases the replica count in the remainaing clusters to make up
-   for the lost replicas in the failed cluster.  This does not seem to
+   for the lost replicas in the failed cluster. This does not seem to
    offer any benefits relative to pod autoscaling above, and is
    arguably more complex to implement, but we note it here as a
    possibility.
 
 ### Implementation Details
 
-The implementation approach and architecture is very similar to
-Kubernetes, so if you're familiar with how Kubernetes works, none of
-what follows will be surprising.  One additional design driver not
-present in Kubernetes is that Ubernetes aims to be resilient to
-individual cluster and availability zone failures.  So the control
-plane spans multiple clusters.  More specifically:
+The implementation approach and architecture is very similar to Kubernetes, so
+if you're familiar with how Kubernetes works, none of what follows will be
+surprising. One additional design driver not present in Kubernetes is that
+Ubernetes aims to be resilient to individual cluster and availability zone
+failures. So the control plane spans multiple clusters. More specifically:
 
 + Ubernetes runs it's own distinct set of API servers (typically one
    or more per underlying Kubernetes cluster).  These are completely
    distinct from the Kubernetes API servers for each of the underlying
    clusters.
 +  Ubernetes runs it's own distinct quorum-based metadata store (etcd,
-   by default).  Approximately 1 quorum member runs in each underlying
+   by default). Approximately 1 quorum member runs in each underlying
    cluster ("approximately" because we aim for an odd number of quorum
    members, and typically don't want more than 5 quorum members, even
    if we have a larger number of federated clusters, so 2 clusters->3
    quorum members, 3->3, 4->3, 5->5, 6->5, 7->5 etc).
 
-Cluster Controllers in Ubernetes watch against the Ubernetes API
-server/etcd state, and apply changes to the underlying kubernetes
-clusters accordingly.  They also have the anti-entropy mechanism for
-reconciling ubernetes "desired desired" state against kubernetes
-"actual desired" state.
+Cluster Controllers in Ubernetes watch against the Ubernetes API server/etcd
+state, and apply changes to the underlying kubernetes clusters accordingly. They
+also have the anti-entropy mechanism for reconciling ubernetes "desired desired"
+state against kubernetes "actual desired" state.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
