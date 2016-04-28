@@ -141,7 +141,7 @@ func TestJSONFrameReader(t *testing.T) {
 func TestJSONFrameReaderShortBuffer(t *testing.T) {
 	b := bytes.NewBufferString("{\"test\":true}\n1\n[\"a\"]")
 	r := NewJSONFramedReader(ioutil.NopCloser(b))
-	buf := make([]byte, 0, 3)
+	buf := make([]byte, 3)
 
 	if n, err := r.Read(buf); err != io.ErrShortBuffer || n != 3 || string(buf[:n]) != `{"t` {
 		t.Fatalf("unexpected: %v %d %q", err, n, buf)
