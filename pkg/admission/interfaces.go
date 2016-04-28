@@ -32,7 +32,7 @@ type Attributes interface {
 	// GetNamespace is the namespace associated with the request (if any)
 	GetNamespace() string
 	// GetResource is the name of the resource being requested.  This is not the kind.  For example: pods
-	GetResource() unversioned.GroupResource
+	GetResource() unversioned.GroupVersionResource
 	// GetSubresource is the name of the subresource being requested.  This is a different resource, scoped to the parent resource, but it may have a different kind.
 	// For instance, /pods has the resource "pods" and the kind "Pod", while /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod"
 	// (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource "binding", and kind "Binding".
@@ -42,7 +42,7 @@ type Attributes interface {
 	// GetObject is the object from the incoming request prior to default values being applied
 	GetObject() runtime.Object
 	// GetKind is the type of object being manipulated.  For example: Pod
-	GetKind() unversioned.GroupKind
+	GetKind() unversioned.GroupVersionKind
 	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info
 }

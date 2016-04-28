@@ -299,7 +299,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	name := a.GetName()
 
 	evaluators := e.registry.Evaluators()
-	evaluator, found := evaluators[a.GetKind()]
+	evaluator, found := evaluators[a.GetKind().GroupKind()]
 	if !found {
 		return quotas, nil
 	}

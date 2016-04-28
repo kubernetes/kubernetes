@@ -49,7 +49,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
-	if len(a.GetNamespace()) == 0 || a.GetKind() == api.Kind("Namespace") {
+	if len(a.GetNamespace()) == 0 || a.GetKind().GroupKind() == api.Kind("Namespace") {
 		return nil
 	}
 

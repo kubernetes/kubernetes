@@ -51,14 +51,14 @@ type lifecycle struct {
 
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	// prevent deletion of immortal namespaces
-	if a.GetOperation() == admission.Delete && a.GetKind() == api.Kind("Namespace") && l.immortalNamespaces.Has(a.GetName()) {
-		return errors.NewForbidden(a.GetResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
+	if a.GetOperation() == admission.Delete && a.GetKind().GroupKind() == api.Kind("Namespace") && l.immortalNamespaces.Has(a.GetName()) {
+		return errors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
-	if len(a.GetNamespace()) == 0 || a.GetKind() == api.Kind("Namespace") {
+	if len(a.GetNamespace()) == 0 || a.GetKind().GroupKind() == api.Kind("Namespace") {
 		// if a namespace is deleted, we want to prevent all further creates into it
 		// while it is undergoing termination.  to reduce incidences where the cache
 		// is slow to update, we forcefully remove the namespace from our local cache.
