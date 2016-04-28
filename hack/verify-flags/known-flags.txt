@@ -232,6 +232,7 @@ lock-file
 log-flush-frequency
 long-running-request-regexp
 low-diskspace-threshold-mb
+make-symlinks
 manifest-url
 manifest-url-header
 masquerade-all
