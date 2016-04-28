@@ -47,7 +47,7 @@ func (w *lengthDelimitedFrameWriter) Write(data []byte) (int, error) {
 }
 
 type lengthDelimitedFrameReader struct {
-	r         io.Reader
+	r         io.ReadCloser
 	remaining int
 }
 
@@ -63,7 +63,7 @@ type lengthDelimitedFrameReader struct {
 //
 // If the buffer passed to Read is not long enough to contain an entire frame, io.ErrShortRead
 // will be returned along with the number of bytes read.
-func NewLengthDelimitedFrameReader(r io.Reader) io.Reader {
+func NewLengthDelimitedFrameReader(r io.ReadCloser) io.ReadCloser {
 	return &lengthDelimitedFrameReader{r: r}
 }
 
@@ -104,7 +104,12 @@ func (r *lengthDelimitedFrameReader) Read(data []byte) (int, error) {
 	return n, nil
 }
 
+func (r *lengthDelimitedFrameReader) Close() error {
+	return r.r.Close()
+}
+
 type jsonFrameReader struct {
+	r         io.ReadCloser
 	decoder   *json.Decoder
 	remaining []byte
 }
@@ -114,8 +119,9 @@ type jsonFrameReader struct {
 //
 // The boundaries between each frame are valid JSON objects. A JSON parsing error will terminate
 // the read.
-func NewJSONFramedReader(r io.Reader) io.Reader {
+func NewJSONFramedReader(r io.ReadCloser) io.ReadCloser {
 	return &jsonFrameReader{
+		r:       r,
 		decoder: json.NewDecoder(r),
 	}
 }
@@ -153,4 +159,8 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 		return n, io.ErrShortBuffer
 	}
 	return len(m), nil
+}
+
+func (r *jsonFrameReader) Close() error {
+	return r.r.Close()
 }
