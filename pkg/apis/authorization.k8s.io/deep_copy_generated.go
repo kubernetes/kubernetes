@@ -28,28 +28,28 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_authorization_LocalSubjectAccessReview,
-		DeepCopy_authorization_NonResourceAttributes,
-		DeepCopy_authorization_ResourceAttributes,
-		DeepCopy_authorization_SelfSubjectAccessReview,
-		DeepCopy_authorization_SelfSubjectAccessReviewSpec,
-		DeepCopy_authorization_SubjectAccessReview,
-		DeepCopy_authorization_SubjectAccessReviewSpec,
-		DeepCopy_authorization_SubjectAccessReviewStatus,
+		DeepCopy_authorizationk8sio_LocalSubjectAccessReview,
+		DeepCopy_authorizationk8sio_NonResourceAttributes,
+		DeepCopy_authorizationk8sio_ResourceAttributes,
+		DeepCopy_authorizationk8sio_SelfSubjectAccessReview,
+		DeepCopy_authorizationk8sio_SelfSubjectAccessReviewSpec,
+		DeepCopy_authorizationk8sio_SubjectAccessReview,
+		DeepCopy_authorizationk8sio_SubjectAccessReviewSpec,
+		DeepCopy_authorizationk8sio_SubjectAccessReviewStatus,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
 	}
 }
 
-func DeepCopy_authorization_LocalSubjectAccessReview(in LocalSubjectAccessReview, out *LocalSubjectAccessReview, c *conversion.Cloner) error {
+func DeepCopy_authorizationk8sio_LocalSubjectAccessReview(in LocalSubjectAccessReview, out *LocalSubjectAccessReview, c *conversion.Cloner) error {
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if in.Spec != nil {
 		in, out := in.Spec, &out.Spec
 		*out = new(SubjectAccessReviewSpec)
-		if err := DeepCopy_authorization_SubjectAccessReviewSpec(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_SubjectAccessReviewSpec(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -58,7 +58,7 @@ func DeepCopy_authorization_LocalSubjectAccessReview(in LocalSubjectAccessReview
 	if in.Status != nil {
 		in, out := in.Status, &out.Status
 		*out = new(SubjectAccessReviewStatus)
-		if err := DeepCopy_authorization_SubjectAccessReviewStatus(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_SubjectAccessReviewStatus(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -67,13 +67,13 @@ func DeepCopy_authorization_LocalSubjectAccessReview(in LocalSubjectAccessReview
 	return nil
 }
 
-func DeepCopy_authorization_NonResourceAttributes(in NonResourceAttributes, out *NonResourceAttributes, c *conversion.Cloner) error {
+func DeepCopy_authorizationk8sio_NonResourceAttributes(in NonResourceAttributes, out *NonResourceAttributes, c *conversion.Cloner) error {
 	out.Path = in.Path
 	out.Verb = in.Verb
 	return nil
 }
 
-func DeepCopy_authorization_ResourceAttributes(in ResourceAttributes, out *ResourceAttributes, c *conversion.Cloner) error {
+func DeepCopy_authorizationk8sio_ResourceAttributes(in ResourceAttributes, out *ResourceAttributes, c *conversion.Cloner) error {
 	out.Namespace = in.Namespace
 	out.Verb = in.Verb
 	out.Group = in.Group
@@ -84,14 +84,14 @@ func DeepCopy_authorization_ResourceAttributes(in ResourceAttributes, out *Resou
 	return nil
 }
 
-func DeepCopy_authorization_SelfSubjectAccessReview(in SelfSubjectAccessReview, out *SelfSubjectAccessReview, c *conversion.Cloner) error {
+func DeepCopy_authorizationk8sio_SelfSubjectAccessReview(in SelfSubjectAccessReview, out *SelfSubjectAccessReview, c *conversion.Cloner) error {
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if in.Spec != nil {
 		in, out := in.Spec, &out.Spec
 		*out = new(SelfSubjectAccessReviewSpec)
-		if err := DeepCopy_authorization_SelfSubjectAccessReviewSpec(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_SelfSubjectAccessReviewSpec(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -100,7 +100,7 @@ func DeepCopy_authorization_SelfSubjectAccessReview(in SelfSubjectAccessReview, 
 	if in.Status != nil {
 		in, out := in.Status, &out.Status
 		*out = new(SubjectAccessReviewStatus)
-		if err := DeepCopy_authorization_SubjectAccessReviewStatus(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_SubjectAccessReviewStatus(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -109,11 +109,11 @@ func DeepCopy_authorization_SelfSubjectAccessReview(in SelfSubjectAccessReview, 
 	return nil
 }
 
-func DeepCopy_authorization_SelfSubjectAccessReviewSpec(in SelfSubjectAccessReviewSpec, out *SelfSubjectAccessReviewSpec, c *conversion.Cloner) error {
+func DeepCopy_authorizationk8sio_SelfSubjectAccessReviewSpec(in SelfSubjectAccessReviewSpec, out *SelfSubjectAccessReviewSpec, c *conversion.Cloner) error {
 	if in.ResourceAttributes != nil {
 		in, out := in.ResourceAttributes, &out.ResourceAttributes
 		*out = new(ResourceAttributes)
-		if err := DeepCopy_authorization_ResourceAttributes(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_ResourceAttributes(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -122,7 +122,7 @@ func DeepCopy_authorization_SelfSubjectAccessReviewSpec(in SelfSubjectAccessRevi
 	if in.NonResourceAttributes != nil {
 		in, out := in.NonResourceAttributes, &out.NonResourceAttributes
 		*out = new(NonResourceAttributes)
-		if err := DeepCopy_authorization_NonResourceAttributes(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_NonResourceAttributes(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -131,14 +131,14 @@ func DeepCopy_authorization_SelfSubjectAccessReviewSpec(in SelfSubjectAccessRevi
 	return nil
 }
 
-func DeepCopy_authorization_SubjectAccessReview(in SubjectAccessReview, out *SubjectAccessReview, c *conversion.Cloner) error {
+func DeepCopy_authorizationk8sio_SubjectAccessReview(in SubjectAccessReview, out *SubjectAccessReview, c *conversion.Cloner) error {
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
 	if in.Spec != nil {
 		in, out := in.Spec, &out.Spec
 		*out = new(SubjectAccessReviewSpec)
-		if err := DeepCopy_authorization_SubjectAccessReviewSpec(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_SubjectAccessReviewSpec(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -147,7 +147,7 @@ func DeepCopy_authorization_SubjectAccessReview(in SubjectAccessReview, out *Sub
 	if in.Status != nil {
 		in, out := in.Status, &out.Status
 		*out = new(SubjectAccessReviewStatus)
-		if err := DeepCopy_authorization_SubjectAccessReviewStatus(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_SubjectAccessReviewStatus(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -156,11 +156,11 @@ func DeepCopy_authorization_SubjectAccessReview(in SubjectAccessReview, out *Sub
 	return nil
 }
 
-func DeepCopy_authorization_SubjectAccessReviewSpec(in SubjectAccessReviewSpec, out *SubjectAccessReviewSpec, c *conversion.Cloner) error {
+func DeepCopy_authorizationk8sio_SubjectAccessReviewSpec(in SubjectAccessReviewSpec, out *SubjectAccessReviewSpec, c *conversion.Cloner) error {
 	if in.ResourceAttributes != nil {
 		in, out := in.ResourceAttributes, &out.ResourceAttributes
 		*out = new(ResourceAttributes)
-		if err := DeepCopy_authorization_ResourceAttributes(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_ResourceAttributes(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -169,7 +169,7 @@ func DeepCopy_authorization_SubjectAccessReviewSpec(in SubjectAccessReviewSpec, 
 	if in.NonResourceAttributes != nil {
 		in, out := in.NonResourceAttributes, &out.NonResourceAttributes
 		*out = new(NonResourceAttributes)
-		if err := DeepCopy_authorization_NonResourceAttributes(*in, *out, c); err != nil {
+		if err := DeepCopy_authorizationk8sio_NonResourceAttributes(*in, *out, c); err != nil {
 			return err
 		}
 	} else {
@@ -199,7 +199,7 @@ func DeepCopy_authorization_SubjectAccessReviewSpec(in SubjectAccessReviewSpec, 
 	return nil
 }
 
-func DeepCopy_authorization_SubjectAccessReviewStatus(in SubjectAccessReviewStatus, out *SubjectAccessReviewStatus, c *conversion.Cloner) error {
+func DeepCopy_authorizationk8sio_SubjectAccessReviewStatus(in SubjectAccessReviewStatus, out *SubjectAccessReviewStatus, c *conversion.Cloner) error {
 	out.Allowed = in.Allowed
 	out.Reason = in.Reason
 	return nil
