@@ -93,6 +93,14 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	}
 }
 
+// GetRateLimiter returns rate limier for a given client, or nil if it's called on a nil client
+func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
+	if c == nil {
+		return nil
+	}
+	return c.Throttle
+}
+
 // readExpBackoffConfig handles the internal logic of determining what the
 // backoff policy is.  By default if no information is available, NoBackoff.
 // TODO Generalize this see #17727 .
