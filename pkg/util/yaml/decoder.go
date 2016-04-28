@@ -78,6 +78,7 @@ func (d *YAMLToJSONDecoder) Decode(into interface{}) error {
 // YAMLDecoder reads chunks of objects and returns ErrShortBuffer if
 // the data is not sufficient.
 type YAMLDecoder struct {
+	r         io.ReadCloser
 	scanner   *bufio.Scanner
 	remaining []byte
 }
@@ -87,10 +88,11 @@ type YAMLDecoder struct {
 // the YAML spec) into its own chunk. io.ErrShortBuffer will be
 // returned if the entire buffer could not be read to assist
 // the caller in framing the chunk.
-func NewDocumentDecoder(r io.Reader) io.Reader {
+func NewDocumentDecoder(r io.ReadCloser) io.ReadCloser {
 	scanner := bufio.NewScanner(r)
 	scanner.Split(splitYAMLDocument)
 	return &YAMLDecoder{
+		r:       r,
 		scanner: scanner,
 	}
 }
@@ -125,6 +127,10 @@ func (d *YAMLDecoder) Read(data []byte) (n int, err error) {
 	copy(data, d.remaining[:left])
 	d.remaining = d.remaining[left:]
 	return len(data), io.ErrShortBuffer
+}
+
+func (d *YAMLDecoder) Close() error {
+	return d.r.Close()
 }
 
 const yamlSeparator = "\n---"
