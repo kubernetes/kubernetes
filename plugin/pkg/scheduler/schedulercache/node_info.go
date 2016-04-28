@@ -30,6 +30,9 @@ var emptyResource = Resource{}
 
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
+	// Overall node information.
+	node *api.Node
+
 	// Total requested resource of all pods on this node.
 	// It includes assumed pods which scheduler sends binding to apiserver but
 	// didn't get it as scheduled yet.
@@ -56,6 +59,14 @@ func NewNodeInfo(pods ...*api.Pod) *NodeInfo {
 		ni.addPod(pod)
 	}
 	return ni
+}
+
+// Returns overall information about this node.
+func (n *NodeInfo) Node() *api.Node {
+	if n == nil {
+		return nil
+	}
+	return n.node
 }
 
 // Pods return all pods scheduled (including assumed to be) on this node.
@@ -85,6 +96,7 @@ func (n *NodeInfo) NonZeroRequest() Resource {
 func (n *NodeInfo) Clone() *NodeInfo {
 	pods := append([]*api.Pod(nil), n.pods...)
 	clone := &NodeInfo{
+		node:              n.node,
 		requestedResource: &(*n.requestedResource),
 		nonzeroRequest:    &(*n.nonzeroRequest),
 		pods:              pods,
@@ -151,6 +163,22 @@ func calculateResource(pod *api.Pod) (cpu int64, mem int64, non0_cpu int64, non0
 		non0_mem += non0_mem_req
 	}
 	return
+}
+
+// Sets the overall node information.
+func (n *NodeInfo) SetNode(node *api.Node) error {
+	n.node = node
+	return nil
+}
+
+// Removes the overall information about the node.
+func (n *NodeInfo) RemoveNode(node *api.Node) error {
+	// We don't remove NodeInfo for because there can still be some pods on this node -
+	// this is because notifications about pods are delivered in a different watch,
+	// and thus can potentially be observed later, even though they happened before
+	// node removal. This is handled correctly in cache.go file.
+	n.node = nil
+	return nil
 }
 
 // getPodKey returns the string key of a pod.
