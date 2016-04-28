@@ -96,8 +96,7 @@ func TestListWatchesCanList(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		// TODO: Uncomment when fix #19254
-		// defer server.Close()
+		defer server.Close()
 		client := client.NewOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
@@ -163,8 +162,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		// TODO: Uncomment when fix #19254
-		// defer server.Close()
+		defer server.Close()
 		client := client.NewOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.

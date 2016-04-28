@@ -42,8 +42,7 @@ func TestDoRequestSuccess(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
@@ -88,8 +87,7 @@ func TestDoRequestFailed(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
@@ -127,8 +125,7 @@ func TestDoRequestCreated(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	// TODO: Uncomment when fix #19254
-	// defer testServer.Close()
+	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{

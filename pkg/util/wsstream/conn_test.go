@@ -36,10 +36,8 @@ func newServer(handler websocket.Handler) (*httptest.Server, string) {
 
 func TestRawConn(t *testing.T) {
 	conn := NewConn(ReadWriteChannel, ReadWriteChannel, IgnoreChannel, ReadChannel, WriteChannel)
-	// TODO: Uncomment next two lines and remove third line when fix #19254
-	// s, addr := newServer(conn.handle)
-	// defer s.Close()
-	_, addr := newServer(conn.handle)
+	s, addr := newServer(conn.handle)
+	defer s.Close()
 
 	client, err := websocket.Dial("ws://"+addr, "", "http://localhost/")
 	if err != nil {
@@ -115,10 +113,8 @@ func TestRawConn(t *testing.T) {
 
 func TestBase64Conn(t *testing.T) {
 	conn := NewConn(ReadWriteChannel, ReadWriteChannel)
-	// TODO: Uncomment next two lines and remove third line when fix #19254
-	// s, addr := newServer(conn.handle)
-	// defer s.Close()
-	_, addr := newServer(conn.handle)
+	s, addr := newServer(conn.handle)
+	defer s.Close()
 
 	config, err := websocket.NewConfig("ws://"+addr, "http://localhost/")
 	if err != nil {
