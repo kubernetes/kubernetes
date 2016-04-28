@@ -211,25 +211,30 @@ func TestOutOfDiskNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
-// DaemonSets should not place onto nodes with insufficient free resource
-func TestInsufficentCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	podSpec := api.PodSpec{
-		NodeName: "too-much-mem",
+func resourcePodSpec(nodeName, memory, cpu string) api.PodSpec {
+	return api.PodSpec{
+		NodeName: nodeName,
 		Containers: []api.Container{{
 			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceMemory: resource.MustParse("75M"),
-					api.ResourceCPU:    resource.MustParse("75m"),
-				},
+				Requests: allocatableResources(memory, cpu),
 			},
 		}},
 	}
+}
+
+func allocatableResources(memory, cpu string) api.ResourceList {
+	return api.ResourceList{
+		api.ResourceMemory: resource.MustParse(memory),
+		api.ResourceCPU:    resource.MustParse(cpu),
+	}
+}
+
+// DaemonSets should not place onto nodes with insufficient free resource
+func TestInsufficentCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
+	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 	manager, podControl := newTestController()
 	node := newNode("too-much-mem", nil)
-	node.Status.Allocatable = api.ResourceList{
-		api.ResourceMemory: resource.MustParse("100M"),
-		api.ResourceCPU:    resource.MustParse("200m"),
-	}
+	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
 	manager.podStore.Add(&api.Pod{
 		Spec: podSpec,
@@ -241,23 +246,10 @@ func TestInsufficentCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 }
 
 func TestSufficentCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
-	podSpec := api.PodSpec{
-		NodeName: "too-much-mem",
-		Containers: []api.Container{{
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceMemory: resource.MustParse("75M"),
-					api.ResourceCPU:    resource.MustParse("75m"),
-				},
-			},
-		}},
-	}
+	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 	manager, podControl := newTestController()
 	node := newNode("too-much-mem", nil)
-	node.Status.Allocatable = api.ResourceList{
-		api.ResourceMemory: resource.MustParse("100M"),
-		api.ResourceCPU:    resource.MustParse("200m"),
-	}
+	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
 	manager.podStore.Add(&api.Pod{
 		Spec:   podSpec,
@@ -271,23 +263,10 @@ func TestSufficentCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 
 // DaemonSets should place onto nodes with sufficient free resource
 func TestSufficentCapacityNodeDaemonLaunchesPod(t *testing.T) {
-	podSpec := api.PodSpec{
-		NodeName: "not-too-much-mem",
-		Containers: []api.Container{{
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceMemory: resource.MustParse("75M"),
-					api.ResourceCPU:    resource.MustParse("75m"),
-				},
-			},
-		}},
-	}
+	podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
 	manager, podControl := newTestController()
 	node := newNode("not-too-much-mem", nil)
-	node.Status.Allocatable = api.ResourceList{
-		api.ResourceMemory: resource.MustParse("200M"),
-		api.ResourceCPU:    resource.MustParse("200m"),
-	}
+	node.Status.Allocatable = allocatableResources("200M", "200m")
 	manager.nodeStore.Add(node)
 	manager.podStore.Add(&api.Pod{
 		Spec: podSpec,
