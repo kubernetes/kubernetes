@@ -21,6 +21,7 @@ Writes the JSON out to tests.json.
 
 from __future__ import print_function
 
+import argparse
 import json
 import os
 import re
@@ -28,7 +29,7 @@ import subprocess
 import sys
 import time
 import urllib2
-import xml.etree.ElementTree as ET
+from xml.etree import ElementTree
 import zlib
 
 
@@ -39,6 +40,7 @@ def get_json(url):
         return json.loads(content)
     except urllib2.HTTPError:
         return None
+
 
 def get_jobs(server):
     """Generates all job names running on the server."""
@@ -56,13 +58,15 @@ def get_builds(server, job):
     for build in job_json['builds']:
         yield build['number']
 
+
 def get_build_info(server, job, build):
     """Returns building status along with timestamp for a given build."""
     path = '{}/job/{}/{}/api/json'.format(server, job, str(build))
     build_json = get_json(path)
     if not build_json:
-        return
+        return True, 0
     return build_json['building'], build_json['timestamp']
+
 
 def gcs_ls(path):
     """Lists objects under a path on gcs."""
@@ -81,6 +85,7 @@ def gcs_ls_build(job, build):
     for path in gcs_ls(url):
         yield path
 
+
 def gcs_ls_artifacts(job, build):
     """Lists all artifacts for a build."""
     for path in gcs_ls_build(job, build):
@@ -88,11 +93,13 @@ def gcs_ls_artifacts(job, build):
             for artifact in gcs_ls(path):
                 yield artifact
 
+
 def gcs_ls_junit_paths(job, build):
     """Lists the paths of JUnit XML files for a build."""
     for path in gcs_ls_artifacts(job, build):
-        if re.match('.*/junit.*\.xml$', path):
+        if re.match(r'.*/junit.*\.xml$', path):
             yield path
+
 
 def gcs_get_tests(path):
     """Generates test data out of the provided JUnit path.
@@ -113,13 +120,13 @@ def gcs_get_tests(path):
         pass
 
     try:
-        root = ET.fromstring(data)
-    except ET.ParseError:
+        root = ElementTree.fromstring(data)
+    except ElementTree.ParseError:
         return
 
     for child in root:
         name = child.attrib['name']
-        time = float(child.attrib['time'])
+        ctime = float(child.attrib['time'])
         failed = False
         skipped = False
         for param in child:
@@ -127,7 +134,8 @@ def gcs_get_tests(path):
                 skipped = True
             elif param.tag == 'failure':
                 failed = True
-        yield name, time, failed, skipped
+        yield name, ctime, failed, skipped
+
 
 def get_tests_from_junit_path(path):
     """Generates all tests in a JUnit GCS path."""
@@ -136,17 +144,19 @@ def get_tests_from_junit_path(path):
             continue
         yield test
 
+
 def get_tests_from_build(job, build):
     """Generates all tests for a build."""
     for junit_path in gcs_ls_junit_paths(job, build):
         for test in get_tests_from_junit_path(junit_path):
             yield test
 
-def get_daily_builds(server, prefix):
+
+def get_daily_builds(server, matcher):
     """Generates all (job, build) pairs for the last day."""
     now = time.time()
     for job in get_jobs(server):
-        if not job.startswith(prefix):
+        if not matcher(job):
             continue
         for build in reversed(sorted(get_builds(server, job))):
             building, timestamp = get_build_info(server, job, build)
@@ -158,10 +168,11 @@ def get_daily_builds(server, prefix):
                 break
             yield job, build
 
-def get_tests(server, prefix):
+
+def get_tests(server, matcher):
     """Returns a dictionary of tests to be JSON encoded."""
     tests = {}
-    for job, build in get_daily_builds(server, prefix):
+    for job, build in get_daily_builds(server, matcher):
         print('{}/{}'.format(job, str(build)))
         for name, duration, failed, skipped in get_tests_from_build(job, build):
             if name not in tests:
@@ -177,12 +188,33 @@ def get_tests(server, prefix):
             })
     return tests
 
+
+def main(server, match):
+    """Collect test info in matching jobs."""
+    print('Finding tests in jobs matching {} at server {}'.format(
+        match, server))
+    matcher = re.compile(match)
+    tests = get_tests(server, matcher)
+    with open('tests.json', 'w') as buf:
+        json.dump(tests, buf, sort_keys=True)
+
+
+def get_options(argv):
+    """Process command line arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--server',
+        help='hostname of jenkins server',
+        required=True,
+    )
+    parser.add_argument(
+        '--match',
+        help='filter to job names matching this re',
+        required=True,
+    )
+    return parser.parse_args(argv)
+
+
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print('Usage: {} <server> <prefix>'.format(sys.argv[0]))
-        sys.exit(1)
-    server, prefix = sys.argv[1:]
-    print('Finding tests prefixed with {} at server {}'.format(prefix, server))
-    tests = get_tests(server, prefix)
-    with open('tests.json', 'w') as f:
-        json.dump(tests, f, sort_keys=True)
+    OPTIONS = get_options(sys.argv[1:])
+    main(OPTIONS.server, OPTIONS.match)
