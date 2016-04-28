@@ -44,8 +44,7 @@ func init() {
 
 func TestPersistentVolumeRecycler(t *testing.T) {
 	_, s := framework.RunAMaster(t)
-	// TODO: Uncomment when fix #19254
-	// defer s.Close()
+	defer s.Close()
 
 	deleteAllEtcdKeys()
 	// Use higher QPS and Burst, there is a test for race condition below, which

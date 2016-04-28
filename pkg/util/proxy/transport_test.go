@@ -219,8 +219,7 @@ func TestProxyTransport(t *testing.T) {
 			w.Header().Set("Content-Type", item.contentType)
 			fmt.Fprint(w, item.input)
 		}))
-		// TODO: Uncomment when fix #19254
-		// defer server.Close()
+		defer server.Close()
 
 		// Replace source URL with our test server address.
 		sourceURL := parseURLOrDie(item.sourceURL)

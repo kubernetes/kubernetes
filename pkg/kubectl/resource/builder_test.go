@@ -452,8 +452,7 @@ func TestNamespaceOverride(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test"}})))
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer s.Close()
+	defer s.Close()
 
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, false, s.URL).
@@ -484,8 +483,7 @@ func TestURLBuilder(t *testing.T) {
 		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test"}})))
 		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test1"}})))
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer s.Close()
+	defer s.Close()
 
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, false, s.URL).
@@ -514,8 +512,7 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test"}})))
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer s.Close()
+	defer s.Close()
 
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, false, s.URL).
