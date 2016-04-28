@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	storageerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for namespaces against etcd
@@ -99,13 +101,66 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	namespace := nsObj.(*api.Namespace)
 
+	// Ensure we have a UID precondition
+	if options == nil {
+		options = api.NewDeleteOptions(0)
+	}
+	if options.Preconditions == nil {
+		options.Preconditions = &api.Preconditions{}
+	}
+	if options.Preconditions.UID == nil {
+		options.Preconditions.UID = &namespace.UID
+	} else if *options.Preconditions.UID != namespace.UID {
+		err = apierrors.NewConflict(
+			api.Resource("namespaces"),
+			name,
+			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, namespace.UID),
+		)
+		return nil, err
+	}
+
 	// upon first request to delete, we switch the phase to start namespace termination
+	// TODO: enhance graceful deletion's calls to DeleteStrategy to allow phase change and finalizer patterns
 	if namespace.DeletionTimestamp.IsZero() {
-		now := unversioned.Now()
-		namespace.DeletionTimestamp = &now
-		namespace.Status.Phase = api.NamespaceTerminating
-		result, _, err := r.status.Update(ctx, namespace)
-		return result, err
+		key, err := r.Store.KeyFunc(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+
+		preconditions := storage.Preconditions{UID: options.Preconditions.UID}
+
+		out := r.Store.NewFunc()
+		err = r.Store.Storage.GuaranteedUpdate(
+			ctx, key, out, false, &preconditions,
+			storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
+				existingNamespace, ok := existing.(*api.Namespace)
+				if !ok {
+					// wrong type
+					return nil, fmt.Errorf("expected *api.Namespace, got %v", existing)
+				}
+				// Set the deletion timestamp if needed
+				if existingNamespace.DeletionTimestamp.IsZero() {
+					now := unversioned.Now()
+					existingNamespace.DeletionTimestamp = &now
+				}
+				// Set the namespace phase to terminating, if needed
+				if existingNamespace.Status.Phase != api.NamespaceTerminating {
+					existingNamespace.Status.Phase = api.NamespaceTerminating
+				}
+				return existingNamespace, nil
+			}),
+		)
+
+		if err != nil {
+			err = storageerr.InterpretGetError(err, api.Resource("namespaces"), name)
+			err = storageerr.InterpretUpdateError(err, api.Resource("namespaces"), name)
+			if _, ok := err.(*apierrors.StatusError); !ok {
+				err = apierrors.NewInternalError(err)
+			}
+			return nil, err
+		}
+
+		return out, nil
 	}
 
 	// prior to final deletion, we must ensure that finalizers is empty
@@ -113,7 +168,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
 		return nil, err
 	}
-	return r.Store.Delete(ctx, name, nil)
+	return r.Store.Delete(ctx, name, options)
 }
 
 func (r *StatusREST) New() runtime.Object {
