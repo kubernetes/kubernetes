@@ -98,11 +98,6 @@ func (r *Mock) AttachContainer(containerID ContainerID, stdin io.Reader, stdout,
 	return args.Error(0)
 }
 
-func (r *Mock) RunInContainer(containerID ContainerID, cmd []string) ([]byte, error) {
-	args := r.Called(containerID, cmd)
-	return args.Get(0).([]byte), args.Error(1)
-}
-
 func (r *Mock) GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	args := r.Called(pod, containerID, logOptions, stdout, stderr)
 	return args.Error(0)
