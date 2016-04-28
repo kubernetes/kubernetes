@@ -142,8 +142,8 @@ Creates a deployment or job to manage the created container(s).
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 
 .PP
-\fB\-\-tty\fP=false
-    Allocated a TTY for each container in the pod.  Because \-t is currently shorthand for \-\-template, \-t is not supported for \-\-tty. This shorthand is deprecated and we expect to adopt \-t for \-\-tty soon.
+\fB\-t\fP, \fB\-\-tty\fP=false
+    Allocated a TTY for each container in the pod.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -268,7 +268,7 @@ kubectl run nginx \-\-image=nginx \-\-dry\-run
 kubectl run nginx \-\-image=nginx \-\-overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
 # Start a single instance of busybox and keep it in the foreground, don't restart it if it exits.
-kubectl run \-i \-\-tty busybox \-\-image=busybox \-\-restart=Never
+kubectl run \-i \-t busybox \-\-image=busybox \-\-restart=Never
 
 # Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
 kubectl run nginx \-\-image=nginx \-\- <arg1> <arg2> ... <argN>
