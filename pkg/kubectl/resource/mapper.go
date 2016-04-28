@@ -52,6 +52,9 @@ type Mapper struct {
 func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	versions := &runtime.VersionedObjects{}
 	_, gvk, err := m.Decode(data, nil, versions)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
+	}
 	var obj runtime.Object
 	var versioned runtime.Object
 	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
