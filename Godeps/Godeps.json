@@ -1138,9 +1138,9 @@
 			"Rev": "a83829b6f1293c91addabc89d0571c246397bbf4"
 		},
 		{
-			"ImportPath": "k8s.io/heapster/api/v1/types",
-			"Comment": "v0.19.1-44-g0991ac5",
-			"Rev": "0991ac528ea24aae194e45d6dcf01896cb42cbea"
+			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",
+			"Comment": "v1.1.0-beta1",
+			"Rev": "de510e4bdcdea96722b5bde19ff0b7a142939485"
 		},
 		{
 			"ImportPath": "speter.net/go/exp/math/dec/inf",
