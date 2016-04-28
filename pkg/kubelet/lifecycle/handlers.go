@@ -21,10 +21,12 @@ import (
 	"net"
 	"strconv"
 
+	"bytes"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -50,7 +52,9 @@ func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontain
 func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) error {
 	switch {
 	case handler.Exec != nil:
-		_, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command)
+		var buffer bytes.Buffer
+		output := ioutils.WriteCloserWrapper(&buffer)
+		err := hr.commandRunner.ExecInContainer(containerID, handler.Exec.Command, nil, output, output, false)
 		return err
 	case handler.HTTPGet != nil:
 		return hr.runHTTPHandler(pod, container, handler)
