@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"io/ioutil"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -37,8 +38,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
@@ -276,9 +280,13 @@ func TestObjectFraming(t *testing.T) {
 	f.Fuzz(secret)
 	secret.Data["binary"] = []byte{0x00, 0x10, 0x30, 0x55, 0xff, 0x00}
 	secret.Data["utf8"] = []byte("a string with \u0345 characters")
-	versioned, _ := api.Scheme.ConvertToVersion(secret, "v1")
-	v1secret := versioned.(*v1.Secret)
+	secret.Data["long"] = bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x00}, 1000)
+	converted, _ := api.Scheme.ConvertToVersion(secret, "v1")
+	v1secret := converted.(*v1.Secret)
+	//embedded, _ := api.Codecs.SerializerForMediaType("application/json", nil)
 	s, framer, _, _ := api.Codecs.StreamingSerializerForMediaType("application/json", nil)
+
+	// write a single object through the framer and back out
 	obj := &bytes.Buffer{}
 	if err := s.EncodeToStream(v1secret, obj); err != nil {
 		t.Fatal(err)
@@ -288,8 +296,36 @@ func TestObjectFraming(t *testing.T) {
 	if n, err := w.Write(obj.Bytes()); err != nil || n != len(obj.Bytes()) {
 		t.Fatal(err)
 	}
+	sr := streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
+	res, _, err := sr.Decode(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !api.Semantic.DeepEqual(res, v1secret) {
+		t.Fatalf("objects did not match: %s", diff.ObjectDiff(v1secret, res))
+	}
 
-	r := framer.NewFrameReader(out)
+	// write a watch event through and back out
+	event := &versioned.Event{Type: string(watch.Added)}
+	event.Object.Raw = obj.Bytes()
+	obj = &bytes.Buffer{}
+	if err := s.EncodeToStream(event, obj); err != nil {
+		t.Fatal(err)
+	}
+	out = &bytes.Buffer{}
+	w = framer.NewFrameWriter(out)
+	if n, err := w.Write(obj.Bytes()); err != nil || n != len(obj.Bytes()) {
+		t.Fatal(err)
+	}
+	sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
+	outEvent := &versioned.Event{}
+	res, _, err = sr.Decode(nil, outEvent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("\n%s", outEvent.Object.Raw)
+
+	/*r := framer.NewFrameReader(out)
 	in := make([]byte, len(obj.Bytes())+1)
 	n, err := r.Read(in)
 	if err != nil {
@@ -297,7 +333,8 @@ func TestObjectFraming(t *testing.T) {
 	}
 	result := in[:n]
 
-	t.Logf("\n%s\n%s\n%s", obj.Bytes(), result, hex.Dump(result))
+	t.Logf("\n%s\n%s\n%s", obj.Bytes(), result, hex.Dump(result))*/
+
 }
 
 const benchmarkSeed = 100
