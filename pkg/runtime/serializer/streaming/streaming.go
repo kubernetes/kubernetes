@@ -38,16 +38,18 @@ type Encoder interface {
 type Decoder interface {
 	// Decode will return io.EOF when no more objects are available.
 	Decode(defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error)
+	// Close closes the underlying stream.
+	Close() error
 }
 
 // Serializer is a factory for creating encoders and decoders that work over streams.
 type Serializer interface {
 	NewEncoder(w io.Writer) Encoder
-	NewDecoder(r io.Reader) Decoder
+	NewDecoder(r io.ReadCloser) Decoder
 }
 
 type decoder struct {
-	reader    io.Reader
+	reader    io.ReadCloser
 	decoder   runtime.Decoder
 	buf       []byte
 	maxBytes  int
@@ -57,7 +59,7 @@ type decoder struct {
 // NewDecoder creates a streaming decoder that reads object chunks from r and decodes them with d.
 // The reader is expected to return ErrShortRead if the provided buffer is not large enough to read
 // an entire object.
-func NewDecoder(r io.Reader, d runtime.Decoder) Decoder {
+func NewDecoder(r io.ReadCloser, d runtime.Decoder) Decoder {
 	return &decoder{
 		reader:   r,
 		decoder:  d,
@@ -103,6 +105,10 @@ func (d *decoder) Decode(defaults *unversioned.GroupVersionKind, into runtime.Ob
 		break
 	}
 	return d.decoder.Decode(d.buf[:base], defaults, into)
+}
+
+func (d *decoder) Close() error {
+	return d.reader.Close()
 }
 
 type encoder struct {
