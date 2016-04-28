@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -221,9 +222,17 @@ func (o AnnotateOptions) RunAnnotate() error {
 			return err
 		}
 
-		obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion().String())
-		if err != nil {
-			return err
+		var obj runtime.Object
+		switch info.Object.(type) {
+		case *extensions.ThirdPartyResourceData:
+			// conversion is not supported for 3rd party object
+			obj = info.Object
+		default:
+			var err error
+			obj, err = info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion().String())
+			if err != nil {
+				return err
+			}
 		}
 		name, namespace := info.Name, info.Namespace
 		oldData, err := json.Marshal(obj)
