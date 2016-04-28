@@ -75,7 +75,7 @@ func TestNamespaceStatusStrategy(t *testing.T) {
 	}
 	now := unversioned.Now()
 	oldNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10", DeletionTimestamp: &now},
 		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes"}},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
