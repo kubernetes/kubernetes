@@ -214,7 +214,7 @@ func (jsonFramer) NewFrameWriter(w io.Writer) io.Writer {
 }
 
 // NewFrameReader implements stream framing for this serializer
-func (jsonFramer) NewFrameReader(r io.Reader) io.Reader {
+func (jsonFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser {
 	// we need to extract the JSON chunks of data to pass to Decode()
 	return framer.NewJSONFramedReader(r)
 }
@@ -230,7 +230,7 @@ func (yamlFramer) NewFrameWriter(w io.Writer) io.Writer {
 }
 
 // NewFrameReader implements stream framing for this serializer
-func (yamlFramer) NewFrameReader(r io.Reader) io.Reader {
+func (yamlFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser {
 	// extract the YAML document chunks directly
 	return utilyaml.NewDocumentDecoder(r)
 }

@@ -435,6 +435,6 @@ func (lengthDelimitedFramer) NewFrameWriter(w io.Writer) io.Writer {
 }
 
 // NewFrameReader implements stream framing for this serializer
-func (lengthDelimitedFramer) NewFrameReader(r io.Reader) io.Reader {
+func (lengthDelimitedFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser {
 	return framer.NewLengthDelimitedFrameReader(r)
 }

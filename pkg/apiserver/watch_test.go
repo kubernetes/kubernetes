@@ -239,7 +239,7 @@ func TestWatchRead(t *testing.T) {
 			}
 			objectCodec := api.Codecs.DecoderToVersion(objectSerializer, testInternalGroupVersion)
 
-			var fr io.Reader = r
+			var fr io.ReadCloser = r
 			if !protocol.selfFraming {
 				fr = framer.NewFrameReader(r)
 			}

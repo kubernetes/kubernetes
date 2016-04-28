@@ -82,7 +82,7 @@ type ParameterCodec interface {
 
 // Framer is a factory for creating readers and writers that obey a particular framing pattern.
 type Framer interface {
-	NewFrameReader(r io.Reader) io.Reader
+	NewFrameReader(r io.ReadCloser) io.ReadCloser
 	NewFrameWriter(w io.Writer) io.Writer
 }
 
