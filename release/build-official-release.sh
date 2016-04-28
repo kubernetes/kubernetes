@@ -43,6 +43,7 @@ function sha1() {
 
 declare -r KUBE_GITHUB="https://github.com/kubernetes/kubernetes.git"
 declare -r KUBE_RELEASE_VERSION=${1-}
+declare -r TMPDIR=${TMPDIR:-"/tmp"}
 declare -r KUBE_RELEASE_UMASK=${KUBE_RELEASE_UMASK:-022}
 
 VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
@@ -65,7 +66,7 @@ else
   KUBE_RELEASE_TYPE="stable"
 fi
 
-declare -r KUBE_BUILD_DIR=$(mktemp -d "/tmp/kubernetes-build-release-${KUBE_RELEASE_VERSION}-XXXXXXX")
+declare -r KUBE_BUILD_DIR=$(mktemp -d "${TMPDIR}/kubernetes-build-release-${KUBE_RELEASE_VERSION}-XXXXXXX")
 
 # Set the default umask for the release. This ensures consistency
 # across our release builds.

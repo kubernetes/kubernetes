@@ -92,11 +92,12 @@ function main() {
   local -r release_umask=${release_umask:-022}
   umask "${release_umask}"
 
+  declare -r TMPDIR=${TMPDIR:-"/tmp"}
   local -r github="https://github.com/kubernetes/kubernetes.git"
-  declare -r DIR=$(mktemp -d "/tmp/kubernetes-${release_type}-release-${new_version}-XXXXXXX")
+  declare -r DIR=$(mktemp -d "${TMPDIR}/kubernetes-${release_type}-release-${new_version}-XXXXXXX")
 
   # Start a tmp file that will hold instructions for the user.
-  declare -r INSTRUCTIONS=$(mktemp "/tmp/kubernetes-${release_type}-release-${new_version}-instructions-XXXXXXX")
+  declare -r INSTRUCTIONS=$(mktemp "${TMPDIR}/kubernetes-${release_type}-release-${new_version}-instructions-XXXXXXX")
   if $DRY_RUN; then
     cat > "${INSTRUCTIONS}" <<- EOM
 Success on dry run!  Do
