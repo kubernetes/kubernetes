@@ -214,7 +214,7 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		switch framework.TestContext.OSDistro {
 		case "debian":
 			sshExecAndVerify(sshClient, "sudo TEST_ADDON_CHECK_INTERVAL_SEC=1 /etc/init.d/kube-addons restart")
-		case "trusty":
+		case "trusty", "gci":
 			sshExecAndVerify(sshClient, "sudo initctl restart kube-addons TEST_ADDON_CHECK_INTERVAL_SEC=1")
 		case "coreos":
 			sshExecAndVerify(sshClient, "sudo systemctl set-environment TEST_ADDON_CHECK_INTERVAL_SEC=1")
@@ -230,7 +230,7 @@ var _ = framework.KubeDescribe("Addon update", func() {
 			switch framework.TestContext.OSDistro {
 			case "debian":
 				sshExec(sshClient, "sudo /etc/init.d/kube-addons restart")
-			case "trusty":
+			case "trusty", "gci":
 				sshExec(sshClient, "sudo initctl restart kube-addons")
 			case "coreos":
 				sshExec(sshClient, "sudo systemctl unset-environment TEST_ADDON_CHECK_INTERVAL_SEC")
