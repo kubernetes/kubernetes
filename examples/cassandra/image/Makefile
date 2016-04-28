@@ -14,11 +14,11 @@
 
 # build the cassandra image.
 
-VERSION=v8
+VERSION=v9
 
 all: build
 
-kubernetes-cassandra.jar: ../java/* ../java/src/io/k8s/cassandra/*.java
+kubernetes-cassandra.jar: ../java/* ../java/src/main/java/io/k8s/cassandra/*.java
 	cd ../java && mvn package
 	mv ../java/target/kubernetes-cassandra*.jar kubernetes-cassandra.jar
 	cd ../java && mvn clean
