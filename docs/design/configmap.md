@@ -159,15 +159,15 @@ package api
 type EnvVarSource struct {
   // other fields omitted
 
-  // Specifies a ConfigMap key
-  ConfigMap *ConfigMapSelector `json:"configMap,omitempty"`
+  // Selects a key of a ConfigMap.
+  ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
 }
 
-// ConfigMapSelector selects a key of a ConfigMap.
-type ConfigMapSelector struct {
-  // The name of the ConfigMap to select a key from.
-  ConfigMapName string `json:"configMapName"`
-  // The key of the ConfigMap to select.
+// Selects a key from a ConfigMap.
+type ConfigMapKeySelector struct {
+  // The ConfigMap to select from.
+  LocalObjectReference `json:",inline"`
+  // The key to select.
   Key string `json:"key"`
 }
 ```
@@ -254,28 +254,28 @@ spec:
     env:
     - name: ETCD_NUM_MEMBERS
       valueFrom:
-        configMap:
-          configMapName: etcd-env-config
+        configMapKeyRef:
+          name: etcd-env-config
           key: number-of-members
     - name: ETCD_INITIAL_CLUSTER_STATE
       valueFrom:
-        configMap:
-          configMapName: etcd-env-config
+        configMapKeyRef:
+          name: etcd-env-config
           key: initial-cluster-state
     - name: ETCD_DISCOVERY_TOKEN
       valueFrom:
-        configMap:
-          configMapName: etcd-env-config
+        configMapKeyRef:
+          name: etcd-env-config
           key: discovery-token
     - name: ETCD_DISCOVERY_URL
       valueFrom:
-        configMap:
-          configMapName: etcd-env-config
+        configMapKeyRef:
+          name: etcd-env-config
           key: discovery-url
     - name: ETCDCTL_PEERS
       valueFrom:
-        configMap:
-          configMapName: etcd-env-config
+        configMapKeyRef:
+          name: etcd-env-config
           key: etcdctl-peers
 ```
 
@@ -284,12 +284,12 @@ spec:
 `redis-volume-config` is intended to be used as a volume containing a config file:
 
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: redis-volume-config
 data:
-  redis.conf: "pidfile /var/run/redis.pid\nport6379\ntcp-backlog 511\n databases 1\ntimeout 0\n"
+  redis.conf: "pidfile /var/run/redis.pid\nport 6379\ntcp-backlog 511\ndatabases 1\ntimeout 0\n"
 ```
 
 The following pod consumes the `redis-volume-config` in a volume:
@@ -303,7 +303,7 @@ spec:
   containers:
     - name: redis
       image: kubernetes/redis
-      command: "redis-server /mnt/config-map/etc/redis.conf"
+      command: ["redis-server", "/mnt/config-map/etc/redis.conf"]
       ports:
         - containerPort: 6379
       volumeMounts:
