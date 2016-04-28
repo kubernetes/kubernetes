@@ -34,11 +34,26 @@ Documentation for other releases can be found at
 
 # Scheduler extender
 
-There are three ways to add new scheduling rules (predicates and priority functions) to Kubernetes: (1) by adding these rules to the scheduler and recompiling (described here: https://github.com/kubernetes/kubernetes/blob/master/docs/devel/scheduler.md), (2) implementing your own scheduler process that runs instead of, or alongside of, the standard Kubernetes scheduler, (3) implementing a "scheduler extender" process that the standard Kubernetes scheduler calls out to as a final pass when making scheduling decisions.
+There are three ways to add new scheduling rules (predicates and priority
+functions) to Kubernetes: (1) by adding these rules to the scheduler and
+recompiling (described here:
+https://github.com/kubernetes/kubernetes/blob/master/docs/devel/scheduler.md),
+(2) implementing your own scheduler process that runs instead of, or alongside
+of, the standard Kubernetes scheduler, (3) implementing a "scheduler extender"
+process that the standard Kubernetes scheduler calls out to as a final pass when
+making scheduling decisions.
 
-This document describes the third approach. This approach is needed for use cases where scheduling decisions need to be made on resources not directly managed by the standard Kubernetes scheduler. The extender helps make scheduling decisions based on such resources. (Note that the three approaches are not mutually exclusive.)
+This document describes the third approach. This approach is needed for use
+cases where scheduling decisions need to be made on resources not directly
+managed by the standard Kubernetes scheduler. The extender helps make scheduling
+decisions based on such resources. (Note that the three approaches are not
+mutually exclusive.)
 
-When scheduling a pod, the extender allows an external process to filter and prioritize nodes. Two separate http/https calls are issued to the extender, one for "filter" and one for "prioritize" actions. To use the extender, you must create a scheduler policy configuration file. The configuration specifies how to reach the extender, whether to use http or https and the timeout.
+When scheduling a pod, the extender allows an external process to filter and
+prioritize nodes. Two separate http/https calls are issued to the extender, one
+for "filter" and one for "prioritize" actions. To use the extender, you must
+create a scheduler policy configuration file. The configuration specifies how to
+reach the extender, whether to use http or https and the timeout.
 
 ```go
 // Holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
@@ -94,7 +109,10 @@ A sample scheduler policy file with extender configuration:
 }
 ```
 
-Arguments passed to the FilterVerb endpoint on the extender are the set of nodes filtered through the k8s predicates and the pod. Arguments passed to the PrioritizeVerb endpoint on the extender are the set of nodes filtered through the k8s predicates and extender predicates and the pod.
+Arguments passed to the FilterVerb endpoint on the extender are the set of nodes
+filtered through the k8s predicates and the pod. Arguments passed to the
+PrioritizeVerb endpoint on the extender are the set of nodes filtered through
+the k8s predicates and extender predicates and the pod.
 
 ```go
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize
@@ -107,9 +125,12 @@ type ExtenderArgs struct {
 }
 ```
 
-The "filter" call returns a list of nodes (api.NodeList). The "prioritize" call returns priorities for each node (schedulerapi.HostPriorityList).
+The "filter" call returns a list of nodes (api.NodeList). The "prioritize" call
+returns priorities for each node (schedulerapi.HostPriorityList).
 
-The "filter" call may prune the set of nodes based on its predicates. Scores returned by the "prioritize" call are added to the k8s scores (computed through its priority functions) and used for final host selection.
+The "filter" call may prune the set of nodes based on its predicates. Scores
+returned by the "prioritize" call are added to the k8s scores (computed through
+its priority functions) and used for final host selection.
 
 Multiple extenders can be configured in the scheduler policy.
 
