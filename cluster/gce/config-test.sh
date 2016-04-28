@@ -136,7 +136,7 @@ KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 # Optional: setting it to true denotes this is a testing cluster,
 # so that we can use pulled kubernetes binaries, even if binaries
 # are pre-installed in the image. Note that currently this logic
-# is only supported in trusty nodes.
+# is only supported in trusty or GCI.
 TEST_CLUSTER="${TEST_CLUSTER:-true}"
 
 # OpenContrail networking plugin specific settings
