@@ -18,6 +18,7 @@ package aws
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -30,7 +31,7 @@ import (
 
 const ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
 
-func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB, proxyProtocol bool) (*elb.LoadBalancerDescription, error) {
+func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB, proxyProtocol bool, loadBalancerAttributes *elb.LoadBalancerAttributes) (*elb.LoadBalancerDescription, error) {
 	loadBalancer, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return nil, err
@@ -273,6 +274,33 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 					dirty = true
 				}
 			}
+		}
+	}
+
+	// Whether the ELB was new or existing, sync attributes regardless. This accounts for things
+	// that cannot be specified at the time of creation and can only be modified after the fact,
+	// e.g. idle connection timeout.
+	{
+		describeAttributesRequest := &elb.DescribeLoadBalancerAttributesInput{}
+		describeAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
+		describeAttributesOutput, err := c.elb.DescribeLoadBalancerAttributes(describeAttributesRequest)
+		if err != nil {
+			glog.Warning("Unable to retrieve load balancer attributes during attribute sync")
+			return nil, err
+		}
+
+		foundAttributes := &describeAttributesOutput.LoadBalancerAttributes
+
+		// Update attributes if they're dirty
+		if !reflect.DeepEqual(loadBalancerAttributes, foundAttributes) {
+			modifyAttributesRequest := &elb.ModifyLoadBalancerAttributesInput{}
+			modifyAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
+			modifyAttributesRequest.LoadBalancerAttributes = loadBalancerAttributes
+			_, err = c.elb.ModifyLoadBalancerAttributes(modifyAttributesRequest)
+			if err != nil {
+				return nil, fmt.Errorf("Unable to update load balancer attributes during attribute sync: %v", err)
+			}
+			dirty = true
 		}
 	}
 

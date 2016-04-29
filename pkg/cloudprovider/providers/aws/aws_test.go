@@ -497,6 +497,14 @@ func (elb *FakeELB) SetLoadBalancerPoliciesForBackendServer(*elb.SetLoadBalancer
 	panic("Not implemented")
 }
 
+func (elb *FakeELB) DescribeLoadBalancerAttributes(*elb.DescribeLoadBalancerAttributesInput) (*elb.DescribeLoadBalancerAttributesOutput, error) {
+	panic("Not implemented")
+}
+
+func (elb *FakeELB) ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttributesInput) (*elb.ModifyLoadBalancerAttributesOutput, error) {
+	panic("Not implemented")
+}
+
 type FakeASG struct {
 	aws *FakeAWSServices
 }
