@@ -65,11 +65,13 @@ func ValidateHasLabel(meta api.ObjectMeta, fldPath *field.Path, key, expectedVal
 	allErrs := field.ErrorList{}
 	actualValue, found := meta.Labels[key]
 	if !found {
-		allErrs = append(allErrs, field.Required(fldPath.Child("labels"), key+"="+expectedValue))
+		allErrs = append(allErrs, field.Required(fldPath.Child("labels").Key(key),
+			fmt.Sprintf("must be '%s'", expectedValue)))
 		return allErrs
 	}
 	if actualValue != expectedValue {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("labels"), meta.Labels, "expected "+key+"="+expectedValue))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("labels").Key(key), meta.Labels,
+			fmt.Sprintf("must be '%s'", expectedValue)))
 	}
 	return allErrs
 }
