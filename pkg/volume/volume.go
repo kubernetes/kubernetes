@@ -20,15 +20,18 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // Volume represents a directory used by pods or hosts on a node.
 // All method implementations of methods in the volume interface must be idempotent.
 type Volume interface {
-	// GetPath returns the directory path the volume is mounted to.
+	// GetPath returns the path to which the volume should be
+	// mounted for the pod.
 	GetPath() string
 
 	// MetricsProvider embeds methods for exposing metrics (e.g. used,available space).
@@ -129,12 +132,41 @@ type Deleter interface {
 // Attacher can attach a volume to a node.
 type Attacher interface {
 	Volume
-	Attach() error
+
+	// Attach the volume specified by the given spec to the given host
+	Attach(spec *Spec, hostName string) error
+
+	// WaitForAttach blocks until the device is attached to this
+	// node. If it successfully attaches, the path to the device
+	// is returned. Otherwise, if the device does not attach after
+	// the given timeout period, an error will be returned.
+	WaitForAttach(spec *Spec, timeout time.Duration) (string, error)
+
+	// GetDeviceMountPath returns a path where the device should
+	// be mounted after it is attached. This is a global mount
+	// point which should be bind mounted for individual volumes.
+	GetDeviceMountPath(spec *Spec) string
+
+	// MountDevice mounts the disk to a global path which
+	// individual pods can then bind mount
+	MountDevice(devicePath string, deviceMountPath string, mounter mount.Interface) error
 }
 
 // Detacher can detach a volume from a node.
 type Detacher interface {
-	Detach() error
+
+	// Detach the given volume from the given host.
+	Detach(deviceMountPath string, hostName string) error
+
+	// WaitForDetach blocks until the device is detached from this
+	// node. If the device does not detach within the given timout
+	// period an error is returned.
+	WaitForDetach(devicePath string, timout time.Duration) error
+
+	// UnmountDevice unmounts the global mount of the disk. This
+	// should only be called once all bind mounts have been
+	// unmounted.
+	UnmountDevice(globalMountPath string, mounter mount.Interface) error
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {
