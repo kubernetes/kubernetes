@@ -92,6 +92,14 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	return allErrs
 }
 
+func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsDNS1123Label(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+	return allErrs
+}
+
 func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if annotations[api.AffinityAnnotationKey] != "" {
@@ -102,16 +110,12 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *fiel
 		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
 	}
 
+	// TODO: remove these after we EOL the annotations.
 	if hostname, exists := annotations[utilpod.PodHostnameAnnotation]; exists {
-		for _, msg := range validation.IsDNS1123Label(hostname) {
-			allErrs = append(allErrs, field.Invalid(fldPath, utilpod.PodHostnameAnnotation, msg))
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(hostname, fldPath.Key(utilpod.PodHostnameAnnotation))...)
 	}
-
 	if subdomain, exists := annotations[utilpod.PodSubdomainAnnotation]; exists {
-		for _, msg := range validation.IsDNS1123Label(subdomain) {
-			allErrs = append(allErrs, field.Invalid(fldPath, utilpod.PodSubdomainAnnotation, msg))
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(subdomain, fldPath.Key(utilpod.PodSubdomainAnnotation))...)
 	}
 
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
@@ -121,6 +125,7 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *fiel
 
 func ValidateEndpointsSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	// TODO: remove this after we EOL the annotation.
 	hostnamesMap, exists := annotations[endpoints.PodHostnamesAnnotation]
 	if exists && !isValidHostnamesMap(hostnamesMap) {
 		allErrs = append(allErrs, field.Invalid(fldPath, endpoints.PodHostnamesAnnotation,
@@ -392,15 +397,15 @@ func validateVolumes(volumes []api.Volume, fldPath *field.Path) (sets.String, fi
 	allNames := sets.String{}
 	for i, vol := range volumes {
 		idxPath := fldPath.Index(i)
+		namePath := idxPath.Child("name")
 		el := validateVolumeSource(&vol.VolumeSource, idxPath)
 		if len(vol.Name) == 0 {
-			el = append(el, field.Required(idxPath.Child("name"), ""))
-		} else if msgs := validation.IsDNS1123Label(vol.Name); len(msgs) != 0 {
-			for i := range msgs {
-				el = append(el, field.Invalid(idxPath.Child("name"), vol.Name, msgs[i]))
-			}
-		} else if allNames.Has(vol.Name) {
-			el = append(el, field.Duplicate(idxPath.Child("name"), vol.Name))
+			el = append(el, field.Required(namePath, ""))
+		} else {
+			el = append(el, ValidateDNS1123Label(vol.Name, namePath)...)
+		}
+		if allNames.Has(vol.Name) {
+			el = append(el, field.Duplicate(namePath, vol.Name))
 		}
 		if len(el) == 0 {
 			allNames.Insert(vol.Name)
@@ -1448,14 +1453,14 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 	allNames := sets.String{}
 	for i, ctr := range containers {
 		idxPath := fldPath.Index(i)
+		namePath := idxPath.Child("name")
 		if len(ctr.Name) == 0 {
-			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
-		} else if msgs := validation.IsDNS1123Label(ctr.Name); len(msgs) != 0 {
-			for i := range msgs {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ctr.Name, msgs[i]))
-			}
-		} else if allNames.Has(ctr.Name) {
-			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), ctr.Name))
+			allErrs = append(allErrs, field.Required(namePath, ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(ctr.Name, namePath)...)
+		}
+		if allNames.Has(ctr.Name) {
+			allErrs = append(allErrs, field.Duplicate(namePath, ctr.Name))
 		} else {
 			allNames.Insert(ctr.Name)
 		}
@@ -1644,15 +1649,11 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if len(spec.Hostname) > 0 {
-		for _, msg := range validation.IsDNS1123Label(spec.Hostname) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("hostname"), spec.Hostname, msg))
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(spec.Hostname, fldPath.Child("hostname"))...)
 	}
 
 	if len(spec.Subdomain) > 0 {
-		for _, msg := range validation.IsDNS1123Label(spec.Subdomain) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("subdomain"), spec.Subdomain, msg))
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(spec.Subdomain, fldPath.Child("subdomain"))...)
 	}
 
 	return allErrs
@@ -2167,11 +2168,8 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 	if requireName && len(sp.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if len(sp.Name) != 0 {
-		if msgs := validation.IsDNS1123Label(sp.Name); len(msgs) != 0 {
-			for i := range msgs {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), sp.Name, msgs[i]))
-			}
-		} else if allNames.Has(sp.Name) {
+		allErrs = append(allErrs, ValidateDNS1123Label(sp.Name, fldPath.Child("name"))...)
+		if allNames.Has(sp.Name) {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), sp.Name))
 		} else {
 			allNames.Insert(sp.Name)
@@ -3036,9 +3034,7 @@ func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path) 
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
 	}
 	if len(address.Hostname) > 0 {
-		for _, msg := range validation.IsDNS1123Label(address.Hostname) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("hostname"), address.Hostname, msg))
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
 	}
 	if len(allErrs) > 0 {
 		return allErrs
@@ -3078,9 +3074,7 @@ func validateEndpointPort(port *api.EndpointPort, requireName bool, fldPath *fie
 	if requireName && len(port.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if len(port.Name) != 0 {
-		for _, msg := range validation.IsDNS1123Label(port.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), port.Name, msg))
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(port.Name, fldPath.Child("name"))...)
 	}
 	for _, msg := range validation.IsValidPortNum(int(port.Port)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, msg))
@@ -3164,6 +3158,7 @@ func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus, fldPath *field.P
 	return allErrs
 }
 
+// TODO: remove this after we EOL the annotation that carries it.
 func isValidHostnamesMap(serializedPodHostNames string) bool {
 	if len(serializedPodHostNames) == 0 {
 		return false
