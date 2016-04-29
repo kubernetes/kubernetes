@@ -19,6 +19,7 @@ package runtime
 import (
 	gojson "encoding/json"
 	"io"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/json"
@@ -128,12 +129,24 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 		return err
 	}
 
+	// For typed lists, e.g., a PodList, API server doesn't set each item's
+	// APIVersion and Kind. We need to set it.
+	listAPIVersion := list.GetAPIVersion()
+	listKind := list.GetKind()
+	itemKind := strings.TrimSuffix(listKind, "List")
+
 	delete(list.Object, "items")
 	list.Items = nil
 	for _, i := range dList.Items {
 		unstruct := &Unstructured{}
 		if err := s.decodeToUnstructured([]byte(i), unstruct); err != nil {
 			return err
+		}
+		// This is hacky. Set the item's Kind and APIVersion to those inferred
+		// from the List.
+		if len(unstruct.GetKind()) == 0 && len(unstruct.GetAPIVersion()) == 0 {
+			unstruct.SetKind(itemKind)
+			unstruct.SetAPIVersion(listAPIVersion)
 		}
 		list.Items = append(list.Items, unstruct)
 	}

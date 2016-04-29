@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
@@ -44,14 +46,148 @@ type Monitor struct {
 	Controller *framework.Controller
 }
 
-type GarbageCollector struct {
-	restMapper  meta.RESTMapper
-	clientPool  dynamic.ClientPool
-	dirty_queue *workqueue.Type
-	monitors    []Monitor
+type SelfReference struct {
+	metatypes.OwnerReference
+	// This is needed by the dynamic client
+	Namespace string
 }
 
-func monitorFor(clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (Monitor, error) {
+type node struct {
+	identity   SelfReference
+	dependents []*node
+	// When processing an Update event, we need to compare the updated
+	// ownerReferences with the owners recorded in the graph.
+	owners []metatypes.OwnerReference
+}
+
+type EventType string
+
+const Add EventType = "Add"
+const Update EventType = "Update"
+const Delete EventType = "Delete"
+
+type Event struct {
+	Type   EventType
+	Obj    interface{}
+	OldObj interface{}
+}
+
+type Propagator struct {
+	eventQueue  *workqueue.Type
+	graphLookup map[types.UID]*node
+	gc          *GarbageCollector
+}
+
+func (p *Propagator) addToGraphLookup(n *node) {
+	p.graphLookup[n.identity.UID] = n
+}
+
+func (p *Propagator) removeFromGraphLookup(n *node) {
+	delete(p.graphLookup, n.identity.UID)
+}
+
+func (p *Propagator) updateOwners(n *node) (ownerExists bool) {
+	for _, owner := range n.owners {
+		ownerNode, ok := p.graphLookup[owner.UID]
+		if !ok {
+			continue
+		}
+		ownerExists = true
+		ownerNode.dependents = append(ownerNode.dependents, n)
+	}
+	return ownerExists
+}
+
+// TODO: finish this function.
+func equalReferences(a []metatypes.OwnerReference, b []metatypes.OwnerReference) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	// sort and compare
+	return true
+}
+
+// Dequeue from eventQueue, updating graph, populating dirty_queue.
+func (p *Propagator) processEvent() {
+	key, quit := p.eventQueue.Get()
+	if quit {
+		return
+	}
+	defer p.eventQueue.Done(key)
+	event, ok := key.(Event)
+	if !ok {
+		glog.Errorf("expect an Event, got %v", key)
+		return
+	}
+	obj := event.Obj
+	accessor, err := meta.Accessor(obj)
+	typeAccessor, err := meta.TypeAccessor(obj)
+	if err != nil {
+		glog.Errorf("cannot access obj: %v", err)
+		return
+	}
+	glog.V(6).Infof("Propagator process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.Type)
+	switch event.Type {
+	case Add:
+		// Check if the node already exsits
+		_, ok := p.graphLookup[accessor.GetUID()]
+		if ok {
+			// We can optionally check if the node in the graph is in sync with that in the Store.
+			return
+		}
+		newNode := &node{
+			identity: SelfReference{
+				OwnerReference: metatypes.OwnerReference{
+					APIVersion: typeAccessor.GetAPIVersion(),
+					Kind:       typeAccessor.GetKind(),
+					UID:        accessor.GetUID(),
+					Name:       accessor.GetName(),
+				},
+				Namespace: accessor.GetNamespace(),
+			},
+			owners: accessor.GetOwnerReferences(),
+		}
+		p.addToGraphLookup(newNode)
+		ownerExists := p.updateOwners(newNode)
+		// Push the object to the dirty queue if none of its owners exists in the Graph.
+		if !ownerExists && len(newNode.owners) != 0 {
+			p.gc.dirtyQueue.Add(newNode)
+		}
+
+	case Update:
+		node, ok := p.graphLookup[accessor.GetUID()]
+		if !ok {
+			glog.Errorf("received an update for %v, but cannot find the node in the graph", accessor.GetUID())
+		}
+		// TODO: finalizer: Check if ObjectMeta.DeletionTimestamp is updated from nil to non-nil
+		// We only need to add/remove owner refs for now
+		if !equalReferences(node.owners, accessor.GetOwnerReferences()) {
+			ownerExists := p.updateOwners(node)
+			if !ownerExists && len(node.owners) != 0 {
+				p.gc.dirtyQueue.Add(node)
+			}
+		}
+	case Delete:
+		node, ok := p.graphLookup[accessor.GetUID()]
+		if !ok {
+			glog.V(6).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
+		}
+		p.removeFromGraphLookup(node)
+		for _, dep := range node.dependents {
+			p.gc.dirtyQueue.Add(dep)
+		}
+	}
+}
+
+type GarbageCollector struct {
+	restMapper meta.RESTMapper
+	clientPool dynamic.ClientPool
+	dirtyQueue *workqueue.Type
+	monitors   []Monitor
+	propagator *Propagator
+}
+
+func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (Monitor, error) {
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
 	var monitor Monitor
@@ -79,23 +215,47 @@ func monitorFor(clientPool dynamic.ClientPool, resource unversioned.GroupVersion
 				return client.Resource(&apiResource, api.NamespaceAll).UnversionedWatch(options)
 			},
 		},
-		// TODO: It's impossible to understand every Kind in the cluster.
 		nil,
 		ResourceResyncTime,
-		framework.ResourceEventHandlerFuncs{},
+		framework.ResourceEventHandlerFuncs{
+			// Add the event to the propagator's event queue.
+			AddFunc: func(obj interface{}) {
+				event := Event{
+					Type: Add,
+					Obj:  obj,
+				}
+				p.eventQueue.Add(event)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				event := Event{Update, newObj, oldObj}
+				p.eventQueue.Add(event)
+			},
+			DeleteFunc: func(obj interface{}) {
+				event := Event{
+					Type: Delete,
+					Obj:  obj,
+				}
+				p.eventQueue.Add(event)
+			},
+		},
 	)
 	return monitor, nil
 }
 
 func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
 	gc := &GarbageCollector{
-		clientPool:  clientPool,
-		dirty_queue: workqueue.New(),
+		clientPool: clientPool,
+		dirtyQueue: workqueue.New(),
 		// TODO: should use a dynamic RESTMapper built from the discovery results.
 		restMapper: registered.RESTMapper(),
 	}
+	gc.propagator = &Propagator{
+		eventQueue:  workqueue.New(),
+		graphLookup: make(map[types.UID]*node),
+		gc:          gc,
+	}
 	for _, resource := range resources {
-		monitor, err := monitorFor(gc.clientPool, resource)
+		monitor, err := monitorFor(gc.propagator, gc.clientPool, resource)
 		if err != nil {
 			return nil, err
 		}
@@ -104,31 +264,15 @@ func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.
 	return gc, nil
 }
 
-type itemRef struct {
-	Store cache.Store
-	Key   string
-}
-
-func (gc *GarbageCollector) scanner() {
-	for _, monitor := range gc.monitors {
-		keys := monitor.Store.ListKeys()
-		// TODO: limit the size of the dirty queue
-		for _, key := range keys {
-			glog.V(6).Infof("add key %s to dirty queue", key)
-			gc.dirty_queue.Add(itemRef{monitor.Store, key})
-		}
-	}
-}
-
 func (gc *GarbageCollector) worker() {
-	key, quit := gc.dirty_queue.Get()
+	key, quit := gc.dirtyQueue.Get()
 	if quit {
 		return
 	}
-	defer gc.dirty_queue.Done(key)
-	err := gc.processItem(key.(itemRef))
+	defer gc.dirtyQueue.Done(key)
+	err := gc.processItem(key.(*node))
 	if err != nil {
-		glog.Errorf("Error syncing deployment %v: %v", key, err)
+		glog.Errorf("Error syncing item %v: %v", key, err)
 	}
 }
 func (gc *GarbageCollector) apiResource(apiVersion, kind, namespace string) (*unversioned.APIResource, error) {
@@ -146,64 +290,76 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind, namespace string) (*un
 	return &resource, nil
 }
 
-func (gc *GarbageCollector) deleteObject(typeAccessor meta.Type, accessor meta.Object) error {
-	fqKind := unversioned.FromAPIVersionAndKind(typeAccessor.GetAPIVersion(), typeAccessor.GetKind())
+func (gc *GarbageCollector) deleteObject(item *node) error {
+	fqKind := unversioned.FromAPIVersionAndKind(item.identity.APIVersion, item.identity.Kind)
 	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	resource, err := gc.apiResource(typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace())
+	resource, err := gc.apiResource(item.identity.APIVersion, item.identity.Kind, item.identity.Namespace)
 	if err != nil {
 		return err
 	}
-	uid := accessor.GetUID()
+	uid := item.identity.UID
 	preconditions := v1.Preconditions{UID: &uid}
 	deleteOptions := v1.DeleteOptions{Preconditions: &preconditions}
-	return client.Resource(resource, accessor.GetNamespace()).Delete(accessor.GetName(), &deleteOptions)
+	return client.Resource(resource, item.identity.Namespace).Delete(item.identity.Name, &deleteOptions)
 }
 
-func (gc *GarbageCollector) processItem(storeKey itemRef) error {
-	obj, exists, err := storeKey.Store.GetByKey(storeKey.Key)
+func (gc *GarbageCollector) getObject(item *node) (*runtime.Unstructured, error) {
+	fqKind := unversioned.FromAPIVersionAndKind(item.identity.APIVersion, item.identity.Kind)
+	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
+	resource, err := gc.apiResource(item.identity.APIVersion, item.identity.Kind, item.identity.Namespace)
 	if err != nil {
-		return fmt.Errorf("unable to retrieve object %s from store: %v", storeKey.Key, err)
+		return nil, err
 	}
-	if !exists {
-		return fmt.Errorf("object has been deleted %s", storeKey.Key)
-	}
-	accessor, err := meta.Accessor(obj)
+	return client.Resource(resource, item.identity.Namespace).Get(item.identity.Name)
+}
+
+func (gc *GarbageCollector) processItem(item *node) error {
+	// Get the latest item from the API server
+	latest, err := gc.getObject(item)
 	if err != nil {
-		return fmt.Errorf("unable to access ObjectMeta of object %s: %v", storeKey.Key, err)
+		if errors.IsNotFound(err) {
+			glog.V(6).Infof("item %v not found, ignore it", item.identity)
+			return nil
+		}
+		return err
 	}
-	typeAccessor, err := meta.TypeAccessor(obj)
-	if err != nil {
-		return fmt.Errorf("unable to access TypeMeta of object %s: %v", storeKey.Key, err)
-	}
-	references := accessor.GetOwnerReferences()
-	if len(references) == 0 {
-		glog.V(6).Infof("object %s's doesn't have an owner, continue on next object", storeKey.Key)
+	if latest.GetUID() != item.identity.UID {
+		glog.V(6).Infof("UID doesn't match, item %v not found, ignore it", item.identity)
 		return nil
 	}
-	for i := 0; i < len(references); i++ {
+	ownerReferences := latest.GetOwnerReferences()
+	if len(ownerReferences) == 0 {
+		glog.V(6).Infof("object %s's doesn't have an owner, continue on next item", item.identity)
+		return nil
+	}
+	for _, reference := range ownerReferences {
 		// TODO: need to verify the reference resource is supported by the system.
-		fqKind := unversioned.FromAPIVersionAndKind(references[i].APIVersion, references[i].Kind)
+		fqKind := unversioned.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
 		client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
 		if err != nil {
 			return err
 		}
-		resource, err := gc.apiResource(references[i].APIVersion, references[i].Kind, accessor.GetNamespace())
+		resource, err := gc.apiResource(reference.APIVersion, reference.Kind, item.identity.Namespace)
 		if err != nil {
 			return err
 		}
-		_, err = client.Resource(resource, accessor.GetNamespace()).Get(references[i].Name)
+		owner, err := client.Resource(resource, item.identity.Namespace).Get(reference.Name)
 		// TODO: need to compare the UID.
 		if err == nil {
-			glog.V(6).Infof("object %s has at least an existing owner, will not garbage collect", storeKey.Key)
+			if owner.GetUID() != reference.UID {
+				glog.V(6).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+				continue
+			}
+			glog.V(6).Infof("object %s has at least an existing owner, will not garbage collect", item.identity.UID)
 			return nil
 		} else if errors.IsNotFound(err) {
-			glog.V(6).Infof("object %s's owner %s/%s, %s is not found", storeKey.Key, references[i].APIVersion, references[i].Kind, references[i].Name)
+			glog.V(6).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		} else {
 			return err
 		}
 	}
-	glog.V(6).Infof("none of object %s's owners exist any more, will garbage collect it", storeKey.Key)
-	return gc.deleteObject(typeAccessor, accessor)
+	glog.V(6).Infof("none of object %s's owners exist any more, will garbage collect it", item.identity.UID)
+	return gc.deleteObject(item)
 }
 
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
@@ -211,13 +367,17 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 		go monitor.Controller.Run(stopCh)
 	}
 	// list
-	go wait.Until(gc.scanner, ResourceResyncTime, stopCh)
+	// TODO: remove
+	// go wait.Until(gc.scanner, ResourceResyncTime, stopCh)
 
 	// worker
+	go wait.Until(gc.propagator.processEvent, 0, stopCh)
+
 	for i := 0; i < workers; i++ {
 		go wait.Until(gc.worker, 0, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down garbage collector")
-	gc.dirty_queue.ShutDown()
+	gc.dirtyQueue.ShutDown()
+	gc.propagator.eventQueue.ShutDown()
 }

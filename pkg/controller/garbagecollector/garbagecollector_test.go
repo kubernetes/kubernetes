@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"flag"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,11 +25,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/util/json"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -64,9 +67,24 @@ func newDanglingPod() *v1.Pod {
 }
 
 func TestCheckGarbage(t *testing.T) {
-	testHandler := &fakeActionHandler{statusCode: map[string]int{
-		"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/owner1": 404,
-	}}
+	flag.Set("v", "9")
+	pod := newDanglingPod()
+	podBytes, err := json.Marshal(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/owner1": FakeResponse{
+				404,
+				[]byte{},
+			},
+			"GET" + "/api/v1/namespaces/ns1/pods/ToBeDeletedPod": FakeResponse{
+				200,
+				podBytes,
+			},
+		},
+	}
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
@@ -75,17 +93,28 @@ func TestCheckGarbage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := gc.monitors[0].Store
-	pod := newDanglingPod()
-	store.Add(pod)
-	storeKey := itemRef{store, getKey(pod, t)}
-	err = gc.processItem(storeKey)
+	item := &node{
+		identity: SelfReference{
+			OwnerReference: metatypes.OwnerReference{
+				Kind:       pod.Kind,
+				APIVersion: pod.APIVersion,
+				Name:       pod.Name,
+				UID:        pod.UID,
+			},
+			Namespace: pod.Namespace,
+		},
+		// owners are intentionally left empty. The processItem routine should get the latest item from the server.
+		owners: nil,
+	}
+	err = gc.processItem(item)
 	if err != nil {
 		t.Errorf("Unexpected Error: %v", err)
 	}
 	expectedActionSet := sets.NewString()
 	expectedActionSet.Insert("GET=/api/v1/namespaces/ns1/replicationcontrollers/owner1")
 	expectedActionSet.Insert("DELETE=/api/v1/namespaces/ns1/pods/ToBeDeletedPod")
+	expectedActionSet.Insert("GET=/api/v1/namespaces/ns1/pods/ToBeDeletedPod")
+
 	actualActionSet := sets.NewString()
 	for _, action := range testHandler.actions {
 		actualActionSet.Insert(action.String())
@@ -118,10 +147,15 @@ func (f *fakeAction) String() string {
 	return strings.Join([]string{f.method, f.path}, "=")
 }
 
+type FakeResponse struct {
+	statusCode int
+	content    []byte
+}
+
 // fakeActionHandler holds a list of fakeActions received
 type fakeActionHandler struct {
 	// statusCode returned by this handler for different method + path.
-	statusCode map[string]int
+	response map[string]FakeResponse
 
 	lock    sync.Mutex
 	actions []fakeAction
@@ -133,12 +167,13 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	defer f.lock.Unlock()
 
 	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
-	code, ok := f.statusCode[request.Method+request.URL.Path]
+	fakeResponse, ok := f.response[request.Method+request.URL.Path]
 	if !ok {
-		code = 200
+		fakeResponse.statusCode = 200
+		fakeResponse.content = []byte("{\"kind\": \"List\"}")
 	}
-	response.WriteHeader(code)
-	response.Write([]byte("{\"kind\": \"List\"}"))
+	response.WriteHeader(fakeResponse.statusCode)
+	response.Write(fakeResponse.content)
 }
 
 // testServerAndClientConfig returns a server that listens and a config that can reference it

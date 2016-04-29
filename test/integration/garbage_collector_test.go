@@ -19,6 +19,7 @@ limitations under the License.
 package integration
 
 import (
+	"flag"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -71,7 +72,7 @@ func newOwnerRC() *v1.ReplicationController {
 	return &v1.ReplicationController{}
 }
 
-func observePodDeletion(t *testing.T, w watch.Interface) (deletedPod *v1.Pod) {
+func observePodDeletion(t *testing.T, w watch.Interface) (deletedPod *api.Pod) {
 	deleted := false
 	timeout := false
 	timer := time.After(60 * time.Second)
@@ -79,7 +80,9 @@ func observePodDeletion(t *testing.T, w watch.Interface) (deletedPod *v1.Pod) {
 		select {
 		case event, _ := <-w.ResultChan():
 			if event.Type == watch.Deleted {
-				deletedPod = event.Object.(*v1.Pod)
+				// TODO: used the commented code once we fix the client.
+				// deletedPod = event.Object.(*v1.Pod)
+				deletedPod = event.Object.(*api.Pod)
 				deleted = true
 			}
 		case <-timer:
@@ -93,6 +96,7 @@ func observePodDeletion(t *testing.T, w watch.Interface) (deletedPod *v1.Pod) {
 }
 
 func TestCascadingDeletion(t *testing.T) {
+	flag.Set("v", "9")
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
