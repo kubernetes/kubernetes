@@ -22,14 +22,15 @@ import (
 
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
-	fed_v1a1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
-	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	fed_v1a1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
@@ -82,7 +83,7 @@ func TestRun(t *testing.T) {
 	s.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.ServiceClusterIPRange = *ipNet
-	s.EtcdConfig.ServerList = []string{"http://localhost:4001"}
+	s.StorageConfig.ServerList = []string{"http://localhost:4001"}
 	go func() {
 		if err := Run(s); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
