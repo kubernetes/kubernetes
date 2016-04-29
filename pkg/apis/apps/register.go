@@ -50,6 +50,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&PetSet{},
 		&PetSetList{},
 		&api.ListOptions{},
+		&api.DeleteOptions{},
 	)
 }
 

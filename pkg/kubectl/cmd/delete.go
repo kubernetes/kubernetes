@@ -157,7 +157,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if cmdutil.GetFlagBool(cmd, "cascade") {
 		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), gracePeriod, shortOutput, mapper)
 	}
-	return DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
+	return DeleteResult(r, out, ignoreNotFound, gracePeriod, shortOutput, mapper)
 }
 
 func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, shortOutput bool, mapper meta.RESTMapper) error {
@@ -174,7 +174,7 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 		if err != nil {
 			// If there is no reaper for this resources and the user didn't explicitly ask for stop.
 			if kubectl.IsNoSuchReaperError(err) && isDefaultDelete {
-				return deleteResource(info, out, shortOutput, mapper)
+				return deleteResource(info, out, gracePeriod, shortOutput, mapper)
 			}
 			return cmdutil.AddSourceToErr("reaping", info.Source, err)
 		}
@@ -197,7 +197,7 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 	return nil
 }
 
-func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortOutput bool, mapper meta.RESTMapper) error {
+func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, gracePeriod int, shortOutput bool, mapper meta.RESTMapper) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -207,7 +207,7 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 			return err
 		}
 		found++
-		return deleteResource(info, out, shortOutput, mapper)
+		return deleteResource(info, out, gracePeriod, shortOutput, mapper)
 	})
 	if err != nil {
 		return err
@@ -218,8 +218,8 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 	return nil
 }
 
-func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper) error {
-	if err := resource.NewHelper(info.Client, info.Mapping).Delete(info.Namespace, info.Name); err != nil {
+func deleteResource(info *resource.Info, out io.Writer, gracePeriod int, shortOutput bool, mapper meta.RESTMapper) error {
+	if err := resource.NewHelper(info.Client, info.Mapping).Delete(info.Namespace, info.Name, int64(gracePeriod)); err != nil {
 		return cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 	cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "deleted")

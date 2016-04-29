@@ -146,8 +146,9 @@ func deleteCollection(
 	opCache operationNotSupportedCache,
 	gvr unversioned.GroupVersionResource,
 	namespace string,
+	gracePeriodSeconds *int64,
 ) (bool, error) {
-	glog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
+	glog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v, graceperiod: %#v", namespace, gvr, gracePeriodSeconds)
 
 	key := operationKey{op: operationDeleteCollection, gvr: gvr}
 	if !opCache.isSupported(key) {
@@ -156,7 +157,7 @@ func deleteCollection(
 	}
 
 	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
-	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(nil, v1.ListOptions{})
+	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(&v1.DeleteOptions{GracePeriodSeconds: gracePeriodSeconds}, v1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -224,6 +225,7 @@ func deleteEachItem(
 	opCache operationNotSupportedCache,
 	gvr unversioned.GroupVersionResource,
 	namespace string,
+	gracePeriodSeconds *int64,
 ) error {
 	glog.V(5).Infof("namespace controller - deleteEachItem - namespace: %s, gvr: %v", namespace, gvr)
 
@@ -236,7 +238,7 @@ func deleteEachItem(
 	}
 	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
 	for _, item := range unstructuredList.Items {
-		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.Name, nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.Name, &v1.DeleteOptions{GracePeriodSeconds: gracePeriodSeconds}); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}
@@ -253,6 +255,7 @@ func deleteAllContentForGroupVersionResource(
 	gvr unversioned.GroupVersionResource,
 	namespace string,
 	namespaceDeletedAt unversioned.Time,
+	gracePeriodSeconds *int64,
 ) (int64, error) {
 	glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - namespace: %s, gvr: %v", namespace, gvr)
 
@@ -272,14 +275,14 @@ func deleteAllContentForGroupVersionResource(
 	}
 
 	// first try to delete the entire collection
-	deleteCollectionSupported, err := deleteCollection(dynamicClient, opCache, gvr, namespace)
+	deleteCollectionSupported, err := deleteCollection(dynamicClient, opCache, gvr, namespace, gracePeriodSeconds)
 	if err != nil {
 		return estimate, err
 	}
 
 	// delete collection was not supported, so we list and delete each item...
 	if !deleteCollectionSupported {
-		err = deleteEachItem(dynamicClient, opCache, gvr, namespace)
+		err = deleteEachItem(dynamicClient, opCache, gvr, namespace, gracePeriodSeconds)
 		if err != nil {
 			return estimate, err
 		}
@@ -313,12 +316,13 @@ func deleteAllContent(
 	groupVersionResources []unversioned.GroupVersionResource,
 	namespace string,
 	namespaceDeletedAt unversioned.Time,
+	gracePeriodSeconds *int64,
 ) (int64, error) {
 	estimate := int64(0)
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, gvrs: %v", namespace, groupVersionResources)
 	// iterate over each group version, and attempt to delete all of its resources
 	for _, gvr := range groupVersionResources {
-		gvrEstimate, err := deleteAllContentForGroupVersionResource(kubeClient, clientPool, opCache, gvr, namespace, namespaceDeletedAt)
+		gvrEstimate, err := deleteAllContentForGroupVersionResource(kubeClient, clientPool, opCache, gvr, namespace, namespaceDeletedAt, gracePeriodSeconds)
 		if err != nil {
 			return estimate, err
 		}
@@ -354,7 +358,11 @@ func syncNamespace(
 		return err
 	}
 
-	glog.V(5).Infof("namespace controller - syncNamespace - namespace: %s, finalizerToken: %s", namespace.Name, finalizerToken)
+	gracePeriodSecondsStr := "<nil>"
+	if namespace.DeletionGracePeriodSeconds != nil {
+		gracePeriodSecondsStr = fmt.Sprintf("%d", *namespace.DeletionGracePeriodSeconds)
+	}
+	glog.V(5).Infof("namespace controller - syncNamespace - namespace: %s, finalizerToken: %s, gracePeriodSeconds: %v", namespace.Name, finalizerToken, gracePeriodSecondsStr)
 
 	// ensure that the status is up to date on the namespace
 	// if we get a not found error, we assume the namespace is truly gone
@@ -376,7 +384,7 @@ func syncNamespace(
 	}
 
 	// there may still be content for us to remove
-	estimate, err := deleteAllContent(kubeClient, clientPool, opCache, groupVersionResources, namespace.Name, *namespace.DeletionTimestamp)
+	estimate, err := deleteAllContent(kubeClient, clientPool, opCache, groupVersionResources, namespace.Name, *namespace.DeletionTimestamp, namespace.DeletionGracePeriodSeconds)
 	if err != nil {
 		return err
 	}

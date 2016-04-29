@@ -93,11 +93,15 @@ func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Int
 		Watch()
 }
 
-func (m *Helper) Delete(namespace, name string) error {
-	return m.RESTClient.Delete().
+func (m *Helper) Delete(namespace, name string, gracePeriod int64) error {
+	req := m.RESTClient.Delete().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		Name(name).
+		Name(name)
+	if gracePeriod != -1 {
+		req = req.Body(&api.DeleteOptions{GracePeriodSeconds: &gracePeriod})
+	}
+	return req.
 		Do().
 		Error()
 }
