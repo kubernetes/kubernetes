@@ -23,7 +23,6 @@ import (
 	"os"
 	"path"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"github.com/golang/glog"
@@ -1197,8 +1196,10 @@ func validateConfigMapKeySelector(s *api.ConfigMapKeySelector, fldPath *field.Pa
 	}
 	if len(s.Key) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
-	} else if !IsSecretKey(s.Key) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
+	} else {
+		for _, msg := range validation.IsConfigMapKey(s.Key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, msg))
+		}
 	}
 
 	return allErrs
@@ -1212,8 +1213,10 @@ func validateSecretKeySelector(s *api.SecretKeySelector, fldPath *field.Path) fi
 	}
 	if len(s.Key) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
-	} else if !IsSecretKey(s.Key) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
+	} else {
+		for _, msg := range validation.IsConfigMapKey(s.Key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, msg))
+		}
 	}
 
 	return allErrs
@@ -2617,16 +2620,6 @@ func ValidateServiceAccountUpdate(newServiceAccount, oldServiceAccount *api.Serv
 	return allErrs
 }
 
-const SecretKeyFmt string = "\\.?" + validation.DNS1123LabelFmt + "(\\." + validation.DNS1123LabelFmt + ")*"
-
-var secretKeyRegexp = regexp.MustCompile("^" + SecretKeyFmt + "$")
-
-// IsSecretKey tests for a string that conforms to the definition of a
-// subdomain in DNS (RFC 1123), except that a leading dot is allowed
-func IsSecretKey(value string) bool {
-	return len(value) <= validation.DNS1123SubdomainMaxLength && secretKeyRegexp.MatchString(value)
-}
-
 // ValidateSecret tests if required fields in the Secret are set.
 func ValidateSecret(secret *api.Secret) field.ErrorList {
 	allErrs := ValidateObjectMeta(&secret.ObjectMeta, true, ValidateSecretName, field.NewPath("metadata"))
@@ -2634,8 +2627,8 @@ func ValidateSecret(secret *api.Secret) field.ErrorList {
 	dataPath := field.NewPath("data")
 	totalSize := 0
 	for key, value := range secret.Data {
-		if !IsSecretKey(key) {
-			allErrs = append(allErrs, field.Invalid(dataPath.Key(key), key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
+		for _, msg := range validation.IsConfigMapKey(key) {
+			allErrs = append(allErrs, field.Invalid(dataPath.Key(key), key, msg))
 		}
 		totalSize += len(value)
 	}
@@ -2732,8 +2725,8 @@ func ValidateConfigMap(cfg *api.ConfigMap) field.ErrorList {
 	totalSize := 0
 
 	for key, value := range cfg.Data {
-		if !IsSecretKey(key) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
+		for _, msg := range validation.IsConfigMapKey(key) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, msg))
 		}
 		totalSize += len(value)
 	}
