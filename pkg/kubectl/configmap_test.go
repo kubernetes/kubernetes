@@ -91,6 +91,21 @@ func TestConfigMapGenerate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			params: map[string]interface{}{
+				"name":         "foo",
+				"from-literal": []string{"key1==value1"},
+			},
+			expected: &api.ConfigMap{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string]string{
+					"key1": "=value1",
+				},
+			},
+			expectErr: false,
+		},
 	}
 	generator := ConfigMapGeneratorV1{}
 	for _, test := range tests {
