@@ -103,7 +103,7 @@ func TestHelperDelete(t *testing.T) {
 			RESTClient:      client,
 			NamespaceScoped: true,
 		}
-		err := modifier.Delete("bar", "foo")
+		err := modifier.Delete("bar", "foo", -1)
 		if (err != nil) != test.Err {
 			t.Errorf("unexpected error: %t %v", test.Err, err)
 		}
