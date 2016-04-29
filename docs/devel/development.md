@@ -116,8 +116,11 @@ git remote set-url --push upstream no_push
 
 ### Committing changes to your fork
 
-Before committing any changes, please link/copy these pre-commit hooks into your .git
-directory. This will keep you from accidentally committing non-gofmt'd Go code.
+Before committing any changes, please link/copy the pre-commit hook
+into your .git directory. This will keep you from accidentally
+committing non-gofmt'd Go code. In addition this hook will do a build.
+
+The hook requires both Godep and etcd on your `PATH`.
 
 ```sh
 cd kubernetes/.git/hooks/
