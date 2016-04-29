@@ -1,0 +1,197 @@
+- job:
+    name: kubernetes-pull-test-unit-integration
+    logrotate:
+        daysToKeep: 7
+    properties:
+        - github:
+            url: https://github.com/kubernetes/kubernetes
+        - throttle:
+            max-per-node: 2
+        - raw:
+            xml: |
+                <com.cloudbees.plugins.JobPrerequisites plugin="slave-prerequisites@1.0">
+                    <script>docker version gcloud version</script>
+                    <interpreter>shell script</interpreter>
+                </com.cloudbees.plugins.JobPrerequisites>
+    parameters:
+        - string:
+            name: sha1
+            description: 'sha1 or refname (e.g. origin/pr/N/head) to build'
+    scm:
+        - git:
+            remotes:
+                - remote:
+                    url: https://github.com/kubernetes/kubernetes
+                    refspec: '+refs/heads/*:refs/remotes/upstream/*'
+                - remote:
+                    url: https://github.com/kubernetes/kubernetes
+                    refspec: '+refs/pull/${ghprbPullId}/merge:refs/remotes/origin/pr/${ghprbPullId}/merge'
+            branches:
+                - 'origin/pr/${ghprbPullId}/merge'
+            browser: githubweb
+            browser-url: http://github.com/kubernetes/kubernetes
+            timeout: 20
+            clean:
+                after: true
+            wipe-workspace: false
+            skip-tag: true
+    triggers:
+        - github-pull-request:
+            # This is the Jenkins GHPRB plugin ID, not the actual github token.
+            auth-id: 'f8e31bc1-9abb-460a-a2ca-9c4aae3ca4e8'
+            trigger-phrase: '(?is).*@k8s-bot\s+unit\s+test\s+this.*'
+            cron: 'H/2 * * * *'
+            status-context: Jenkins unit/integration
+            status-url: 'http://pr-test.k8s.io/${ghprbPullId}/${JOB_NAME}/${BUILD_NUMBER}/'
+            admin-list:
+                - a-robinson
+                - alex-mohr
+                - amygdala
+                - aronchick
+                - ArtfulCoder
+                - bgrant0607
+                - bgrant0607-nocc
+                - bprashanth
+                - brendandburns
+                - caesarxuchao
+                - childsb
+                - cjcullen
+                - david-mcmahon
+                - davidopp
+                - dchen1107
+                - deads2k
+                - derekwaynecarr
+                - eparis
+                - erictune
+                - fabioy
+                - fejta
+                - fgrzadkowski
+                - freehan
+                - ghodss
+                - gmarek
+                - goltermann
+                - hurf
+                - ihmccreery
+                - ixdy
+                - jackgr
+                - janetkuo
+                - jbeda
+                - jdef
+                - jlowdermilk
+                - jsafrane
+                - jszczepkowski
+                - justinsb
+                - k8s-merge-robot
+                - karlkfi
+                - kelseyhightower
+                - kevin-wangzefeng
+                - krousey
+                - lavalamp
+                - liggitt
+                - luxas
+                - madhusudancs
+                - maisem
+                - mansoorj
+                - mikedanese
+                - MikeJeffrey
+                - mml
+                - mwielgus
+                - ncdc
+                - nikhiljindal
+                - piosz
+                - pmorie
+                - pwittrock
+                - Q-Lee
+                - quinton-hoole
+                - Random-Liu
+                - rjnagal
+                - rmmh
+                - roberthbailey
+                - saad-ali
+                - sarahnovotny
+                - satnam6502
+                - smarterclayton
+                - spxtr
+                - sttts
+                - swagiaal
+                - thockin
+                - timothysc
+                - timstclair
+                - vishh
+                - vmarmol
+                - wojtek-t
+                - xiang90
+                - yifan-gu
+                - yujuhong
+                - zmerlynn
+            white-list:
+                - abhgupta
+                - AdoHe
+                - AnanyaKumar
+                - andronat
+                - andyzheng0831
+                - apeeyush
+                - aronchick
+                - aveshagarwal
+                - bcbroussard
+                - BenTheElder
+                - burmanm
+                - caseydavenport
+                - chrisleck
+                - csrwng
+                - dalanlan
+                - deads2k
+                - ericchiang
+                - feihujiang
+                - gouyang
+                - HaiyangDING
+                - huangyuqi
+                - imkin
+                - jackgr
+                - jayunit100
+                - jiangyaoguo
+                - jimmidyson
+                - kargakis
+                - luxas
+                - matthewdupre
+                - mfojtik
+                - mikeln
+                - mqliang
+                - ncdc
+                - pweil-
+                - resouer
+                - s-urbaniak
+                - sdminonne
+                - socaa
+                - soltysh
+                - spothanis
+                - stefwalter
+                - timstclair
+                - therc
+                - uluyol
+                - uruddarraju
+                - wonderfly
+                - yifan-gu
+                - zhengguoyong
+            org-list:
+                - kubernetes
+            white-list-target-branches:
+                - master
+                - release-.*
+    wrappers:
+        - sudo-workspace-cleanup
+        - timeout:
+            timeout: 80
+            abort: true
+            fail: true
+        - ansicolor:
+            colormap: xterm
+    builders:
+        - shell: |
+            export KUBE_VERIFY_GIT_BRANCH="${ghprbTargetBranch}"
+            ./hack/jenkins/gotest-dockerized.sh
+    publishers:
+        - junit-publisher
+        - gcs-uploader:
+            credentials-id: kubernetes-jenkins-pull
+        - log-parser

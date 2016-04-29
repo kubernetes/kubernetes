@@ -12,7 +12,8 @@
             ./hack/verify-linkcheck.sh
     publishers:
         - claim-build
-        - gcs-uploader
+        - gcs-uploader:
+            credentials-id: kubernetes-jenkins
         - email-ext:
             recipients: 'xuchao@google.com'
     scm:

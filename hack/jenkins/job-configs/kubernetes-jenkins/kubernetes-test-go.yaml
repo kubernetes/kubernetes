@@ -15,7 +15,8 @@
             {report-rc}
     publishers:
         - claim-build
-        - gcs-uploader
+        - gcs-uploader:
+            credentials-id: kubernetes-jenkins
         - log-parser
         - email-ext
         - xunit:
@@ -54,19 +55,7 @@
             timeout: '{jenkins-timeout}'
             fail: true
         - timestamps
-        - raw:
-            xml: |
-                <hudson.plugins.ws__cleanup.PreBuildCleanup plugin="ws-cleanup@0.28">
-                    <patterns>
-                        <hudson.plugins.ws__cleanup.Pattern>
-                            <pattern>*</pattern>
-                            <type>INCLUDE</type>
-                        </hudson.plugins.ws__cleanup.Pattern>
-                    </patterns>
-                    <deleteDirs>true</deleteDirs>
-                    <cleanupParameter/>
-                    <externalDelete>sudo rm -rf %s</externalDelete>
-                </hudson.plugins.ws__cleanup.PreBuildCleanup>
+        - sudo-workspace-cleanup
 
 - project:
     name: kubernetes-test-go
