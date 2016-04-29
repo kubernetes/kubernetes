@@ -92,6 +92,21 @@ func TestSecretGenerate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			params: map[string]interface{}{
+				"name":         "foo",
+				"from-literal": []string{"key1==value1"},
+			},
+			expected: &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					"key1": []byte("=value1"),
+				},
+			},
+			expectErr: false,
+		},
 	}
 	generator := SecretGeneratorV1{}
 	for _, test := range tests {
