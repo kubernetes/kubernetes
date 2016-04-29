@@ -92,7 +92,7 @@ func Run(s *options.APIServer) error {
 	}
 	glog.Infof("Will report %v as public IP address.", s.AdvertiseAddress)
 
-	if len(s.EtcdConfig.ServerList) == 0 {
+	if len(s.StorageConfig.ServerList) == 0 {
 		glog.Fatalf("--etcd-servers must be specified")
 	}
 
@@ -186,7 +186,7 @@ func Run(s *options.APIServer) error {
 		resourceEncoding.SetVersionEncoding(group, storageEncodingVersion, unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
 	}
 
-	storageFactory := genericapiserver.NewDefaultStorageFactory(s.EtcdConfig, api.Codecs, resourceEncoding, apiResourceConfigSource)
+	storageFactory := genericapiserver.NewDefaultStorageFactory(s.StorageConfig, api.Codecs, resourceEncoding, apiResourceConfigSource)
 	for _, override := range s.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {

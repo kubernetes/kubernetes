@@ -19,8 +19,6 @@ package etcd
 import (
 	"errors"
 	"fmt"
-	"net"
-	"net/http"
 	"path"
 	"reflect"
 	"strings"
@@ -35,89 +33,12 @@ import (
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
 	utilcache "k8s.io/kubernetes/pkg/util/cache"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/watch"
 
 	etcd "github.com/coreos/etcd/client"
-	"github.com/coreos/etcd/pkg/transport"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 )
-
-// storage.Config object for etcd.
-type EtcdStorageConfig struct {
-	Config EtcdConfig
-	Codec  runtime.Codec
-}
-
-// implements storage.Config
-func (c *EtcdStorageConfig) GetType() string {
-	return "etcd"
-}
-
-// implements storage.Config
-func (c *EtcdStorageConfig) NewStorage() (storage.Interface, error) {
-	etcdClient, err := c.Config.newEtcdClient()
-	if err != nil {
-		return nil, err
-	}
-	return NewEtcdStorage(etcdClient, c.Codec, c.Config.Prefix, c.Config.Quorum, c.Config.DeserializationCacheSize), nil
-}
-
-// Configuration object for constructing etcd.Config
-type EtcdConfig struct {
-	Prefix                   string
-	ServerList               []string
-	KeyFile                  string
-	CertFile                 string
-	CAFile                   string
-	Quorum                   bool
-	DeserializationCacheSize int
-}
-
-func (c *EtcdConfig) newEtcdClient() (etcd.Client, error) {
-	t, err := c.newHttpTransport()
-	if err != nil {
-		return nil, err
-	}
-
-	cli, err := etcd.New(etcd.Config{
-		Endpoints: c.ServerList,
-		Transport: t,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return cli, nil
-}
-
-func (c *EtcdConfig) newHttpTransport() (*http.Transport, error) {
-	info := transport.TLSInfo{
-		CertFile: c.CertFile,
-		KeyFile:  c.KeyFile,
-		CAFile:   c.CAFile,
-	}
-	cfg, err := info.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// Copied from etcd.DefaultTransport declaration.
-	// TODO: Determine if transport needs optimization
-	tr := utilnet.SetTransportDefaults(&http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: 10 * time.Second,
-		MaxIdleConnsPerHost: 500,
-		TLSClientConfig:     cfg,
-	})
-
-	return tr, nil
-}
 
 // Creates a new storage interface from the client
 // TODO: deprecate in favor of storage.Config abstraction over time
