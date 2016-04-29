@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"fmt"
-	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -58,9 +57,6 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 }
 
 func Convert_v1alpha1_PetSetSpec_To_apps_PetSetSpec(in *PetSetSpec, out *apps.PetSetSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*PetSetSpec))(in)
-	}
 	if in.Replicas != nil {
 		out.Replicas = int(*in.Replicas)
 	}
@@ -92,9 +88,6 @@ func Convert_v1alpha1_PetSetSpec_To_apps_PetSetSpec(in *PetSetSpec, out *apps.Pe
 }
 
 func Convert_apps_PetSetSpec_To_v1alpha1_PetSetSpec(in *apps.PetSetSpec, out *PetSetSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*apps.PetSetSpec))(in)
-	}
 	out.Replicas = new(int32)
 	*out.Replicas = int32(in.Replicas)
 	if in.Selector != nil {
