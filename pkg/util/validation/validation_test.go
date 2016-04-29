@@ -374,3 +374,31 @@ func TestIsValidPercent(t *testing.T) {
 		}
 	}
 }
+
+func TestIsConfigMapKey(t *testing.T) {
+	successCases := []string{
+		"good",
+		"good-good",
+		"still.good",
+		"this.is.also.good",
+		".so.is.this",
+	}
+
+	for i := range successCases {
+		if errs := IsConfigMapKey(successCases[i]); len(errs) != 0 {
+			t.Errorf("[%d] expected success: %v", i, errs)
+		}
+	}
+
+	failureCases := []string{
+		"bad_bad",
+		"..bad",
+		"bad.",
+	}
+
+	for i := range failureCases {
+		if errs := IsConfigMapKey(failureCases[i]); len(errs) == 0 {
+			t.Errorf("[%d] expected success", i)
+		}
+	}
+}

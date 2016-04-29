@@ -247,6 +247,23 @@ func IsHTTPHeaderName(value string) []string {
 	return nil
 }
 
+const configMapKeyFmt = "\\.?" + DNS1123SubdomainFmt
+
+var configMapKeyRegexp = regexp.MustCompile("^" + configMapKeyFmt + "$")
+
+// IsConfigMapKey tests for a string that conforms to the definition of a
+// subdomain in DNS (RFC 1123), except that a leading dot is allowed
+func IsConfigMapKey(value string) []string {
+	var errs []string
+	if len(value) > DNS1123SubdomainMaxLength {
+		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
+	}
+	if !configMapKeyRegexp.MatchString(value) {
+		errs = append(errs, RegexError(configMapKeyFmt, "key.name"))
+	}
+	return errs
+}
+
 // MaxLenError returns a string explanation of a "string too long" validation
 // failure.
 func MaxLenError(length int) string {
