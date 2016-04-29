@@ -165,6 +165,18 @@ resources:
             "$SOCKS_PROXY": {get_param: socks_proxy }
             "$NO_PROXY": {get_param: no_proxy }
 
+  hostname_hack:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: fragments/hostname-hack.yaml}
+
+  hostname_hack_script:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: fragments/hostname-hack.sh}
+
   kube_user:
     type: OS::Heat::SoftwareConfig
     properties:
@@ -220,6 +232,8 @@ resources:
       parts:
         - config: {get_resource: write_heat_params}
         - config: {get_resource: proxy_config}
+        - config: {get_resource: hostname_hack}
+        - config: {get_resource: hostname_hack_script}
         - config: {get_resource: kube_user}
         - config: {get_resource: provision_network_node}
         - config: {get_resource: deploy_kube_auth_files_node}
