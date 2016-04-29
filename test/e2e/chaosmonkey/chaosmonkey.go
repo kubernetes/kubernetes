@@ -80,6 +80,7 @@ func (cm *chaosmonkey) Do() {
 	stopCh := make(chan struct{})
 
 	for _, test := range cm.tests {
+		test := test
 		sem := newSemaphore(stopCh)
 		sems = append(sems, sem)
 		go func() {
