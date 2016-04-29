@@ -121,8 +121,8 @@
         { "name": "etcopenssl",
         "mountPath": "/etc/openssl",
         "readOnly": true},
-        { "name": "etcpkitls",
-        "mountPath": "/etc/pki/tls",
+        { "name": "etcpki",
+        "mountPath": "/etc/pki",
         "readOnly": true}
       ]
     }
@@ -150,9 +150,9 @@
     "hostPath": {
         "path": "/etc/openssl"}
   },
-  { "name": "etcpkitls",
+  { "name": "etcpki",
     "hostPath": {
-        "path": "/etc/pki/tls"}
+        "path": "/etc/pki"}
   }
 ]
 }}
