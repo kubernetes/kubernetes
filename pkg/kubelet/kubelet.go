@@ -141,6 +141,9 @@ const (
 	ContainerGCPeriod = time.Minute
 	// Period for performing image garbage collection.
 	ImageGCPeriod = 5 * time.Minute
+
+	// Maximum period to wait for pod volume setup operations
+	maxWaitForVolumeOps = 20 * time.Minute
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -2007,10 +2010,26 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 
 			// volume is unmounted.  some volumes also require detachment from the node.
 			if cleaner.Detacher != nil && len(refs) == 1 {
+
 				detacher := *cleaner.Detacher
-				err = detacher.Detach()
+				devicePath, _, err := mount.GetDeviceNameFromMount(kl.mounter, refs[0])
+				if err != nil {
+					glog.Errorf("Could not find device path %v", err)
+				}
+
+				if err = detacher.UnmountDevice(refs[0], kl.mounter); err != nil {
+					glog.Errorf("Could not unmount the global mount for %q: %v", name, err)
+				}
+
+				err = detacher.Detach(refs[0], kl.hostname)
 				if err != nil {
 					glog.Errorf("Could not detach volume %q at %q: %v", name, volumePath, err)
+				}
+
+				// TODO(swagiaal): This will block until the sync loop until device is attached
+				// so all of this should be moved to a mount/unmount manager which does it asynchronously
+				if err = detacher.WaitForDetach(devicePath, maxWaitForVolumeOps); err != nil {
+					glog.Errorf("Error while waiting for detach: %v", err)
 				}
 			}
 		}
