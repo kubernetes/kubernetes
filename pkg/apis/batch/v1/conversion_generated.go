@@ -26,7 +26,6 @@ import (
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	reflect "reflect"
 )
 
 func init() {
@@ -52,9 +51,7 @@ func init() {
 }
 
 func autoConvert_v1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*Job))(in)
-	}
+	SetDefaults_Job(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -76,9 +73,6 @@ func Convert_v1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Scope) er
 }
 
 func autoConvert_batch_Job_To_v1_Job(in *batch.Job, out *Job, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*batch.Job))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -100,9 +94,6 @@ func Convert_batch_Job_To_v1_Job(in *batch.Job, out *Job, s conversion.Scope) er
 }
 
 func autoConvert_v1_JobCondition_To_batch_JobCondition(in *JobCondition, out *batch.JobCondition, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*JobCondition))(in)
-	}
 	out.Type = batch.JobConditionType(in.Type)
 	out.Status = api.ConditionStatus(in.Status)
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
@@ -121,9 +112,6 @@ func Convert_v1_JobCondition_To_batch_JobCondition(in *JobCondition, out *batch.
 }
 
 func autoConvert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *JobCondition, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*batch.JobCondition))(in)
-	}
 	out.Type = JobConditionType(in.Type)
 	out.Status = api_v1.ConditionStatus(in.Status)
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
@@ -142,9 +130,6 @@ func Convert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *
 }
 
 func autoConvert_v1_JobList_To_batch_JobList(in *JobList, out *batch.JobList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*JobList))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -170,9 +155,6 @@ func Convert_v1_JobList_To_batch_JobList(in *JobList, out *batch.JobList, s conv
 }
 
 func autoConvert_batch_JobList_To_v1_JobList(in *batch.JobList, out *JobList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*batch.JobList))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -198,9 +180,6 @@ func Convert_batch_JobList_To_v1_JobList(in *batch.JobList, out *JobList, s conv
 }
 
 func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*JobSpec))(in)
-	}
 	if in.Parallelism != nil {
 		in, out := &in.Parallelism, &out.Parallelism
 		*out = new(int32)
@@ -246,9 +225,6 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 }
 
 func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*batch.JobSpec))(in)
-	}
 	if in.Parallelism != nil {
 		in, out := &in.Parallelism, &out.Parallelism
 		*out = new(int32)
@@ -294,9 +270,6 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 }
 
 func autoConvert_v1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*JobStatus))(in)
-	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]batch.JobCondition, len(*in))
@@ -337,9 +310,6 @@ func Convert_v1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus
 }
 
 func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*batch.JobStatus))(in)
-	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]JobCondition, len(*in))
@@ -380,9 +350,6 @@ func Convert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobStatus
 }
 
 func autoConvert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*LabelSelector))(in)
-	}
 	if in.MatchLabels != nil {
 		in, out := &in.MatchLabels, &out.MatchLabels
 		*out = make(map[string]string, len(*in))
@@ -411,9 +378,6 @@ func Convert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, ou
 }
 
 func autoConvert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.LabelSelector))(in)
-	}
 	if in.MatchLabels != nil {
 		in, out := &in.MatchLabels, &out.MatchLabels
 		*out = make(map[string]string, len(*in))
@@ -442,9 +406,6 @@ func Convert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.Label
 }
 
 func autoConvert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*LabelSelectorRequirement))(in)
-	}
 	out.Key = in.Key
 	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
 	if in.Values != nil {
@@ -462,9 +423,6 @@ func Convert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement
 }
 
 func autoConvert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*unversioned.LabelSelectorRequirement))(in)
-	}
 	out.Key = in.Key
 	out.Operator = LabelSelectorOperator(in.Operator)
 	if in.Values != nil {
