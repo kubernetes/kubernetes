@@ -295,12 +295,9 @@ function detect-node-names {
         "${group}" --zone "${ZONE}" --project "${PROJECT}" \
         --format='value(instance)'))
     done
-    echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]}" >&2
-    echo "NODE_NAMES=${NODE_NAMES[*]}" >&2
-  else
-    echo "INSTANCE_GROUPS=" >&2
-    echo "NODE_NAMES=" >&2
   fi
+  echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]:-}" >&2
+  echo "NODE_NAMES=${NODE_NAMES[*]:-}" >&2
 }
 
 # Detect the information about the minions
