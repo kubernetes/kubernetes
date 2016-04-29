@@ -985,8 +985,7 @@
                 {version-env}
 
 - project:
-    name: kubernetes-e2e-upgrades
-    # TODO add GCE jobs
+    name: kubernetes-e2e-upgrades-gke
     provider: 'gke'
     provider-env: '{gke-provider-env}'
     jobs:
