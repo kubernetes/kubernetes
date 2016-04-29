@@ -116,7 +116,6 @@ func (vh *volumeHost) GetHostName() string {
 func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, error) {
 	podVolumes := make(kubecontainer.VolumeMap)
 	for i := range pod.Spec.Volumes {
-		volSpec := &pod.Spec.Volumes[i]
 		var fsGroup *int64
 		if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
 			fsGroup = pod.Spec.SecurityContext.FSGroup
@@ -128,8 +127,8 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		}
 
 		// Try to use a plugin for this volume.
-		internal := volume.NewSpecFromVolume(volSpec)
-		mounter, err := kl.newVolumeMounterFromPlugins(internal, pod, volume.VolumeOptions{RootContext: rootContext})
+		volSpec := volume.NewSpecFromVolume(&pod.Spec.Volumes[i])
+		mounter, err := kl.newVolumeMounterFromPlugins(volSpec, pod, volume.VolumeOptions{RootContext: rootContext})
 		if err != nil {
 			glog.Errorf("Could not create volume mounter for pod %s: %v", pod.UID, err)
 			return nil, err
@@ -138,14 +137,24 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		// some volumes require attachment before mounter's setup.
 		// The plugin can be nil, but non-nil errors are legitimate errors.
 		// For non-nil plugins, Attachment to a node is required before Mounter's setup.
-		attacher, err := kl.newVolumeAttacherFromPlugins(internal, pod, volume.VolumeOptions{RootContext: rootContext})
+		attacher, err := kl.newVolumeAttacherFromPlugins(volSpec, pod, volume.VolumeOptions{RootContext: rootContext})
 		if err != nil {
 			glog.Errorf("Could not create volume attacher for pod %s: %v", pod.UID, err)
 			return nil, err
 		}
 		if attacher != nil {
-			err = attacher.Attach()
+			err = attacher.Attach(volSpec, kl.hostname)
 			if err != nil {
+				return nil, err
+			}
+
+			devicePath, err := attacher.WaitForAttach(volSpec, maxWaitForVolumeOps)
+			if err != nil {
+				return nil, err
+			}
+
+			deviceMountPath := attacher.GetDeviceMountPath(volSpec)
+			if err = attacher.MountDevice(devicePath, deviceMountPath, kl.mounter); err != nil {
 				return nil, err
 			}
 		}
@@ -154,7 +163,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		if err != nil {
 			return nil, err
 		}
-		podVolumes[volSpec.Name] = kubecontainer.VolumeInfo{Mounter: mounter}
+		podVolumes[volSpec.Volume.Name] = kubecontainer.VolumeInfo{Mounter: mounter}
 	}
 	return podVolumes, nil
 }
