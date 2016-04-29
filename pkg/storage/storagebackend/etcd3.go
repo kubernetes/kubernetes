@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/coreos/etcd/clientv3"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd3"
 )
@@ -36,5 +37,6 @@ func newETCD3Storage(c Config) (storage.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	etcd3.StartCompactor(context.Background(), client)
 	return etcd3.New(client, c.Codec, c.Prefix), nil
 }
