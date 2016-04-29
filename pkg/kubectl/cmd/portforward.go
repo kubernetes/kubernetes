@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"io"
 	"net/url"
 	"os"
 	"os/signal"
@@ -45,14 +46,18 @@ kubectl port-forward mypod :5000
 kubectl port-forward  mypod 0:5000`
 )
 
-func NewCmdPortForward(f *cmdutil.Factory) *cobra.Command {
+func NewCmdPortForward(f *cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "port-forward POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
 		Short:   "Forward one or more local ports to a pod.",
 		Long:    "Forward one or more local ports to a pod.",
 		Example: portforward_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunPortForward(f, cmd, args, &defaultPortForwarder{})
+			pf := &defaultPortForwarder{
+				cmdOut: cmdOut,
+				cmdErr: cmdErr,
+			}
+			err := RunPortForward(f, cmd, args, pf)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -65,14 +70,16 @@ type portForwarder interface {
 	ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error
 }
 
-type defaultPortForwarder struct{}
+type defaultPortForwarder struct {
+	cmdOut, cmdErr io.Writer
+}
 
-func (*defaultPortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error {
+func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error {
 	dialer, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
 	}
-	fw, err := portforward.New(dialer, ports, stopChan)
+	fw, err := portforward.New(dialer, ports, stopChan, f.cmdOut, f.cmdErr)
 	if err != nil {
 		return err
 	}
