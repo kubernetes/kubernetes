@@ -67,6 +67,10 @@ func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
 				fmt.Printf("--output wide is not available in kubectl config view; reset to default output format (%s)\n\n", defaultOutputFormat)
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
+			if outputFormat == "" {
+				fmt.Printf("reset to default output format (%s) as --output is empty", defaultOutputFormat)
+				cmd.Flags().Set("output", defaultOutputFormat)
+			}
 
 			printer, _, err := cmdutil.PrinterForCommand(cmd)
 			cmdutil.CheckErr(err)
