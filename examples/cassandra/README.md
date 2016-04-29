@@ -38,6 +38,7 @@ Documentation for other releases can be found at
 ## Table of Contents
 
   - [Prerequisites](#prerequisites)
+  - [Cassandra Docker](#cassandra-docker)
   - [tl;dr Quickstart](#tldr-quickstart)
   - [Step 1: Create a Cassandra Service](#step-1-create-a-cassandra-service)
   - [Step 2: Use a Replication Controller to create Cassandra node pods](#step-2-use-a-replication-controller-to-create-cassandra-node-pods)
@@ -74,6 +75,38 @@ This example also has a few code and configuration files needed.  To avoid
 typing these out, you can `git clone` the Kubernetes repository to your local
 computer.
 
+## Cassandra Docker
+
+The pods use the [```gcr.io/google-samples/cassandra:v9```](image/Dockerfile)
+image from Google's [container registry](https://cloud.google.com/container-registry/docs/).
+The docker is based on `debian:jessie` and includes OpenJDK 8. This image
+includes a standard Cassandra installation from the Apache Debian repo.
+
+### Custom Seed Provider
+
+A custom [`SeedProvider`](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java)
+is included for running Cassandra on top of Kubernetes.  In Cassandra, a
+`SeedProvider` bootstraps the gossip protocol that Cassandra uses to find other
+Cassandra nodes. Seed addresses are hosts deemed as contact points. Cassandra
+instances use the seed list to find each other and learn the topology of the
+ring. The [`KubernetesSeedProvider`](java/src/main/java/io/k8s/cassandra/KubernetesSeedProvider.java)
+discovers Cassandra seeds IP addresses vis the Kubernetes API, those Cassandra
+instances are defined within the Cassandra Service.
+
+Refer to the custom seed provider [README](java/README.md) for further
+`KubernetesSeedProvider` configurations. For this example you should not need
+to customize the Seed Provider configurations.
+
+See the [image](image/) directory of this example for specifics on
+how the container docker image was built and what it contains.
+
+You may also note that we are setting some Cassandra parameters (`MAX_HEAP_SIZE`
+and `HEAP_NEWSIZE`), and adding information about the
+[namespace](../../docs/user-guide/namespaces.md).
+We also tell Kubernetes that the container exposes
+both the `CQL` and `Thrift` API ports.  Finally, we tell the cluster
+manager that we need 0.1 cpu (0.1 core).
+
 ## tl;dr Quickstart
 
 If you want to jump straight to the commands we will run,
@@ -102,8 +135,6 @@ kubectl create -f examples/cassandra/cassandra-daemonset.yaml --validate=false
 kubectl delete service -l app=cassandra
 kubectl delete daemonset cassandra
 ```
-
-
 
 ## Step 1: Create a Cassandra Service
 
@@ -239,38 +270,24 @@ by the Service."
 The `replicas` attribute specifies the desired number of replicas, in this
 case 2 initially.  We'll scale up to more shortly.
 
-The replica's pods are using the [```gcr.io/google-samples/cassandra:v8```](image/Dockerfile)
-image from Google's [container registry](https://cloud.google.com/container-registry/docs/).
-This is a standard Cassandra installation on top of Debian.  However, it also
-adds a custom
-[`SeedProvider`](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In
-Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra
-uses to find other nodes.
-The [`KubernetesSeedProvider`](java/src/io/k8s/cassandra/KubernetesSeedProvider.java)
-discovers the Kubernetes API Server using the built in Kubernetes
-discovery service, and then uses the Kubernetes API to find new nodes.
-See the [image](image/) directory of this example for specifics on
-how the container image was built and what it contains.
 
-You may also note that we are setting some Cassandra parameters (`MAX_HEAP_SIZE`
-and `HEAP_NEWSIZE`), and adding information about the
-[namespace](../../docs/user-guide/namespaces.md).
-We also tell Kubernetes that the container exposes
-both the `CQL` and `Thrift` API ports.  Finally, we tell the cluster
-manager that we need 0.1 cpu (0.1 core).
 
 Create the Replication Controller:
 
 ```console
+
 $ kubectl create -f examples/cassandra/cassandra-controller.yaml
+
 ```
 
 You can list the new controller:
 
 ```console
+
 $ kubectl get rc -o wide
 NAME        DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)                             SELECTOR
 cassandra   2         2         11s       cassandra      gcr.io/google-samples/cassandra:v8   app=cassandra
+
 ```
 
 Now if you list the pods in your cluster, and filter to the label
@@ -278,10 +295,12 @@ Now if you list the pods in your cluster, and filter to the label
 you see which Kubernetes nodes the pods were scheduled onto.)
 
 ```console
+
 $ kubectl get pods -l="app=cassandra" -o wide
 NAME              READY     STATUS    RESTARTS   AGE       NODE
 cassandra-21qyy   1/1       Running   0          1m        kubernetes-minion-b286
 cassandra-q6sz7   1/1       Running   0          1m        kubernetes-minion-9ye5
+
 ```
 
 Because these pods have the label `app=cassandra`, they map to the service we
@@ -290,6 +309,7 @@ defined in Step 1.
 You can check that the Pods are visible to the Service using the following service endpoints query:
 
 ```console
+
 $ kubectl get endpoints cassandra -o yaml
 apiVersion: v1
 kind: Endpoints
@@ -314,6 +334,7 @@ subsets:
   ports:
   - port: 9042
     protocol: TCP
+
 ```
 
 To show that the `SeedProvider` logic is working as intended, you can use the
@@ -323,6 +344,7 @@ Cassandra pods.  Again, substitute `cassandra-xxxxx` with the actual name of one
 of your pods.
 
 ```console
+
 $ kubectl exec -ti cassandra-xxxxx -- nodetool status
 Datacenter: datacenter1
 =======================
@@ -331,6 +353,7 @@ Status=Up/Down
 --  Address     Load       Tokens  Owns (effective)  Host ID                               Rack
 UN  10.244.0.5  74.09 KB   256     100.0%            86feda0f-f070-4a5b-bda1-2eeb0ad08b77  rack1
 UN  10.244.3.3  51.28 KB   256     100.0%            dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
+
 ```
 
 ## Step 3: Scale up the Cassandra cluster
@@ -339,24 +362,29 @@ Now let's scale our Cassandra cluster to 4 pods.  We do this by telling the
 Replication Controller that we now want 4 replicas.
 
 ```sh
+
 $ kubectl scale rc cassandra --replicas=4
+
 ```
 
 You can see the new pods listed:
 
 ```console
+
 $ kubectl get pods -l="app=cassandra" -o wide
 NAME              READY     STATUS    RESTARTS   AGE       NODE
 cassandra-21qyy   1/1       Running   0          6m        kubernetes-minion-b286
 cassandra-81m2l   1/1       Running   0          47s       kubernetes-minion-b286
 cassandra-8qoyp   1/1       Running   0          47s       kubernetes-minion-9ye5
 cassandra-q6sz7   1/1       Running   0          6m        kubernetes-minion-9ye5
+
 ```
 
 In a few moments, you can examine the Cassandra cluster status again, and see
 that the new pods have been detected by the custom `SeedProvider`:
 
 ```console
+
 $ kubectl exec -ti cassandra-xxxxx -- nodetool status
 Datacenter: datacenter1
 =======================
@@ -367,6 +395,7 @@ UN  10.244.0.6  51.67 KB   256     48.9%             d07b23a5-56a1-4b0b-952d-68a
 UN  10.244.1.5  84.71 KB   256     50.7%             e060df1f-faa2-470c-923d-ca049b0f3f38  rack1
 UN  10.244.1.6  84.71 KB   256     47.0%             83ca1580-4f3c-4ec5-9b38-75036b7a297f  rack1
 UN  10.244.0.5  68.2 KB    256     53.4%             72ca27e2-c72c-402a-9313-1e4b61c2f839  rack1
+
 ```
 
 ## Step 4: Delete the Replication Controller
@@ -374,7 +403,9 @@ UN  10.244.0.5  68.2 KB    256     53.4%             72ca27e2-c72c-402a-9313-1e4
 Before you start Step 5, __delete the replication controller__ you created above:
 
 ```sh
+
 $ kubectl delete rc cassandra
+
 ```
 
 ## Step 5: Use a DaemonSet instead of a Replication Controller
@@ -459,21 +490,27 @@ pod relationship.
 Create this daemonset:
 
 ```console
+
 $ kubectl create -f examples/cassandra/cassandra-daemonset.yaml
+
 ```
 
 You may need to disable config file validation, like so:
 
 ```console
+
 $ kubectl create -f examples/cassandra/cassandra-daemonset.yaml --validate=false
+
 ```
 
 You can see the daemonset running:
 
 ```console
+
 $ kubectl get daemonset
 NAME        DESIRED   CURRENT   NODE-SELECTOR
 cassandra   3         3         <none>
+
 ```
 
 Now, if you list the pods in your cluster, and filter to the label
@@ -481,11 +518,13 @@ Now, if you list the pods in your cluster, and filter to the label
 node in your network.
 
 ```console
+
 $ kubectl get pods -l="app=cassandra" -o wide
 NAME              READY     STATUS    RESTARTS   AGE       NODE
 cassandra-ico4r   1/1       Running   0          4s        kubernetes-minion-rpo1
 cassandra-kitfh   1/1       Running   0          1s        kubernetes-minion-9ye5
 cassandra-tzw89   1/1       Running   0          2s        kubernetes-minion-b286
+
 ```
 
 To prove that this all worked as intended, you can again use the `nodetool`
@@ -493,6 +532,7 @@ command to examine the status of the cluster.  To do this, use the `kubectl
 exec` command to run `nodetool` in one of your newly-launched cassandra pods.
 
 ```console
+
 $ kubectl exec -ti cassandra-xxxxx -- nodetool status
 Datacenter: datacenter1
 =======================
@@ -502,6 +542,7 @@ Status=Up/Down
 UN  10.244.0.5  74.09 KB   256     100.0%            86feda0f-f070-4a5b-bda1-2eeb0ad08b77  rack1
 UN  10.244.4.2  32.45 KB   256     100.0%            0b1be71a-6ffb-4895-ac3e-b9791299c141  rack1
 UN  10.244.3.3  51.28 KB   256     100.0%            dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
+
 ```
 
 **Note**: This example had you delete the cassandra Replication Controller before
@@ -518,14 +559,11 @@ both together by using additional labels and selectors.
 When you are ready to take down your resources, do the following:
 
 ```console
+
 $ kubectl delete service -l app=cassandra
 $ kubectl delete daemonset cassandra
+
 ```
-
-## Seed Provider Source
-
-The Seed Provider source is
-[here](java/src/io/k8s/cassandra/KubernetesSeedProvider.java).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
