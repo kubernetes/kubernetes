@@ -92,6 +92,7 @@ type NodeTestContextType struct {
 	EvictionHard string
 	// ManifestPath is the static pod manifest path.
 	ManifestPath string
+	Scale        int
 }
 
 type CloudConfig struct {
@@ -132,6 +133,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.StringVar(&TestContext.FeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
+	flag.IntVar(&TestContext.Scale, "scale", 1, "Tests can use this parameter to multiply their load on a cluster, where scale = 1 represents a basic relative load of 1.  This is interpreted differently by different tests.  In general should be used only by experts.")
 }
 
 // Register flags specific to the cluster e2e test suite.
