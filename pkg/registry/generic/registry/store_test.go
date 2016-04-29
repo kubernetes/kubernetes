@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -273,7 +274,7 @@ func TestStoreCreate(t *testing.T) {
 }
 
 func updateAndVerify(t *testing.T, ctx api.Context, registry *Store, pod *api.Pod) bool {
-	obj, _, err := registry.Update(ctx, pod)
+	obj, _, err := registry.Update(ctx, pod.Name, rest.DefaultUpdatedObjectInfo(pod, api.Scheme))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return false
@@ -309,7 +310,7 @@ func TestStoreUpdate(t *testing.T) {
 	defer server.Terminate(t)
 
 	// Test1 try to update a non-existing node
-	_, _, err := registry.Update(testContext, podA)
+	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA, api.Scheme))
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -322,7 +323,7 @@ func TestStoreUpdate(t *testing.T) {
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = false
 
 	// Test3 outofDate
-	_, _, err = registry.Update(testContext, podAWithResourceVersion)
+	_, _, err = registry.Update(testContext, podAWithResourceVersion.Name, rest.DefaultUpdatedObjectInfo(podAWithResourceVersion, api.Scheme))
 	if !errors.IsConflict(err) {
 		t.Errorf("Unexpected error updating podAWithResourceVersion: %v", err)
 	}
@@ -369,7 +370,8 @@ func TestNoOpUpdates(t *testing.T) {
 	}
 
 	var updateResult runtime.Object
-	if updateResult, _, err = registry.Update(api.NewDefaultContext(), newPod()); err != nil {
+	p := newPod()
+	if updateResult, _, err = registry.Update(api.NewDefaultContext(), p.Name, rest.DefaultUpdatedObjectInfo(p, api.Scheme)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
@@ -446,8 +448,12 @@ func TestStoreCustomExport(t *testing.T) {
 	if exportedPod.Labels["exact"] != "false" {
 		t.Errorf("expected: exact->false, found: %s", exportedPod.Labels["exact"])
 	}
+	if exportedPod.Labels["prepare_create"] != "true" {
+		t.Errorf("expected: prepare_create->true, found: %s", exportedPod.Labels["prepare_create"])
+	}
 	delete(exportedPod.Labels, "exported")
 	delete(exportedPod.Labels, "exact")
+	delete(exportedPod.Labels, "prepare_create")
 	exportObjectMeta(&podA.ObjectMeta, false)
 	podA.Spec = exportedPod.Spec
 	if !reflect.DeepEqual(&podA, exportedPod) {
@@ -483,6 +489,7 @@ func TestStoreBasicExport(t *testing.T) {
 	if exportedPod.Labels["prepare_create"] != "true" {
 		t.Errorf("expected: prepare_create->true, found: %s", exportedPod.Labels["prepare_create"])
 	}
+	delete(exportedPod.Labels, "prepare_create")
 	exportObjectMeta(&podA.ObjectMeta, false)
 	podA.Spec = exportedPod.Spec
 	if !reflect.DeepEqual(&podA, exportedPod) {

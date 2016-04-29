@@ -91,6 +91,7 @@ type APIGroupVersion struct {
 	Typer     runtime.ObjectTyper
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
+	Copier    runtime.ObjectCopier
 	Linker    runtime.SelfLinker
 
 	Admit   admission.Interface

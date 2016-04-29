@@ -608,7 +608,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	}
 
 	podIn := validChangedPod()
-	_, _, err := storage.Update(ctx, podIn)
+	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(podIn, api.Scheme))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -675,7 +675,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			SecurityContext:               &api.PodSecurityContext{},
 		},
 	}
-	_, _, err = storage.Update(ctx, &podIn)
+	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn, api.Scheme))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -756,7 +756,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	expected.Labels = podIn.Labels
 	expected.Status = podIn.Status
 
-	_, _, err = statusStorage.Update(ctx, &podIn)
+	_, _, err = statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn, api.Scheme))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -765,10 +765,10 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	podOut := obj.(*api.Pod)
-	// Check to verify the Spec, Label, and Status updates match from change above.  Those are the fields changed.
-	if !api.Semantic.DeepEqual(podOut.Spec, podIn.Spec) ||
-		!api.Semantic.DeepEqual(podOut.Labels, podIn.Labels) ||
-		!api.Semantic.DeepEqual(podOut.Status, podIn.Status) {
-		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, podIn))
+	// Check to verify the Label, and Status updates match from change above.  Those are the fields changed.
+	if !api.Semantic.DeepEqual(podOut.Spec, expected.Spec) ||
+		!api.Semantic.DeepEqual(podOut.Labels, expected.Labels) ||
+		!api.Semantic.DeepEqual(podOut.Status, expected.Status) {
+		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, expected))
 	}
 }

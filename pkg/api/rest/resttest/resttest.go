@@ -170,6 +170,8 @@ func (t *Tester) TestUpdate(valid runtime.Object, createFn CreateFunc, getFn Get
 	}
 	t.testUpdateInvokesValidation(copyOrDie(valid), createFn, invalidUpdateFn...)
 	t.testUpdateWithWrongUID(copyOrDie(valid), createFn, getFn)
+	t.testUpdateRetrievesOldObject(copyOrDie(valid), createFn, getFn)
+	t.testUpdatePropagatesUpdatedObjectError(copyOrDie(valid), createFn, getFn)
 }
 
 // Test deleting an object.
@@ -442,7 +444,8 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn
 		t.Errorf("unexpected error: %v", err)
 	}
 	toUpdate = updateFn(toUpdate)
-	updated, created, err := t.storage.(rest.Updater).Update(ctx, toUpdate)
+	toUpdateMeta := t.getObjectMetaOrFail(toUpdate)
+	updated, created, err := t.storage.(rest.Updater).Update(ctx, toUpdateMeta.Name, rest.DefaultUpdatedObjectInfo(toUpdate, api.Scheme))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -482,7 +485,7 @@ func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, createFn Cre
 	olderMeta := t.getObjectMetaOrFail(older)
 	olderMeta.ResourceVersion = "1"
 
-	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), older)
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, api.Scheme))
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if !errors.IsConflict(err) {
@@ -501,7 +504,8 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn Create
 
 	for _, update := range invalidUpdateFn {
 		toUpdate := update(copyOrDie(foo))
-		got, created, err := t.storage.(rest.Updater).Update(t.TestContext(), toUpdate)
+		toUpdateMeta := t.getObjectMetaOrFail(toUpdate)
+		got, created, err := t.storage.(rest.Updater).Update(t.TestContext(), toUpdateMeta.Name, rest.DefaultUpdatedObjectInfo(toUpdate, api.Scheme))
 		if got != nil || created {
 			t.Errorf("expected nil object and no creation for object: %v", toUpdate)
 		}
@@ -522,7 +526,7 @@ func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc,
 	}
 	objectMeta.UID = types.UID("UID1111")
 
-	obj, created, err := t.storage.(rest.Updater).Update(ctx, foo)
+	obj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.Name, rest.DefaultUpdatedObjectInfo(foo, api.Scheme))
 	if created || obj != nil {
 		t.Errorf("expected nil object and no creation for object: %v", foo)
 	}
@@ -531,9 +535,85 @@ func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc,
 	}
 }
 
+func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
+	ctx := t.TestContext()
+	foo := copyOrDie(obj)
+	t.setObjectMeta(foo, t.namer(6))
+	objectMeta := t.getObjectMetaOrFail(foo)
+	objectMeta.Annotations = map[string]string{"A": "1"}
+	if err := createFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	storedFoo, err := getFn(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	storedFooWithUpdates := copyOrDie(storedFoo)
+	objectMeta = t.getObjectMetaOrFail(storedFooWithUpdates)
+	objectMeta.Annotations = map[string]string{"A": "2"}
+
+	// Make sure a custom transform is called, and sees the expected updatedObject and oldObject
+	// This tests the mechanism used to pass the old and new object to admission
+	calledUpdatedObject := 0
+	noopTransform := func(_ api.Context, updatedObject runtime.Object, oldObject runtime.Object) (runtime.Object, error) {
+		if !reflect.DeepEqual(storedFoo, oldObject) {
+			t.Errorf("Expected\n\t%#v\ngot\n\t%#v", storedFoo, oldObject)
+		}
+		if !reflect.DeepEqual(storedFooWithUpdates, updatedObject) {
+			t.Errorf("Expected\n\t%#v\ngot\n\t%#v", storedFooWithUpdates, updatedObject)
+		}
+		calledUpdatedObject++
+		return updatedObject, nil
+	}
+
+	updatedObj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.Name, rest.DefaultUpdatedObjectInfo(storedFooWithUpdates, api.Scheme, noopTransform))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	if created {
+		t.Errorf("expected no creation for object")
+		return
+	}
+	if updatedObj == nil {
+		t.Errorf("expected non-nil object from update")
+		return
+	}
+	if calledUpdatedObject != 1 {
+		t.Errorf("expected UpdatedObject() to be called 1 time, was called %d", calledUpdatedObject)
+		return
+	}
+}
+
+func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
+	ctx := t.TestContext()
+	foo := copyOrDie(obj)
+	name := t.namer(7)
+	t.setObjectMeta(foo, name)
+	if err := createFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	// Make sure our transform is called, and sees the expected updatedObject and oldObject
+	propagateErr := fmt.Errorf("custom updated object error for %v", foo)
+	noopTransform := func(_ api.Context, updatedObject runtime.Object, oldObject runtime.Object) (runtime.Object, error) {
+		return nil, propagateErr
+	}
+
+	_, _, err := t.storage.(rest.Updater).Update(ctx, name, rest.DefaultUpdatedObjectInfo(foo, api.Scheme, noopTransform))
+	if err != propagateErr {
+		t.Errorf("expected propagated error, got %#v", err)
+	}
+}
+
 func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
 	t.setObjectMeta(obj, t.namer(0))
-	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), obj)
+	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj, api.Scheme))
 	if t.createOnUpdate {
 		if err != nil {
 			t.Errorf("creation allowed on updated, but got an error: %v", err)
@@ -563,7 +643,7 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 	objectMeta.Name = t.namer(1)
 	objectMeta.Namespace = "not-default"
 
-	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), obj)
+	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), "foo1", rest.DefaultUpdatedObjectInfo(obj, api.Scheme))
 	if obj != nil || updated {
 		t.Errorf("expected nil object and not updated")
 	}

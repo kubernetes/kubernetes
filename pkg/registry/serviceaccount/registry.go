@@ -69,7 +69,7 @@ func (s *storage) CreateServiceAccount(ctx api.Context, serviceAccount *api.Serv
 }
 
 func (s *storage) UpdateServiceAccount(ctx api.Context, serviceAccount *api.ServiceAccount) error {
-	_, _, err := s.Update(ctx, serviceAccount)
+	_, _, err := s.Update(ctx, serviceAccount.Name, rest.DefaultUpdatedObjectInfo(serviceAccount, api.Scheme))
 	return err
 }
 

@@ -80,7 +80,7 @@ func (s *storage) CreateReplicaSet(ctx api.Context, replicaSet *extensions.Repli
 }
 
 func (s *storage) UpdateReplicaSet(ctx api.Context, replicaSet *extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
-	obj, _, err := s.Update(ctx, replicaSet)
+	obj, _, err := s.Update(ctx, replicaSet.Name, rest.DefaultUpdatedObjectInfo(replicaSet, api.Scheme))
 	if err != nil {
 		return nil, err
 	}
