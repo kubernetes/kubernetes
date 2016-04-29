@@ -226,8 +226,21 @@ func getOwnerReferences(object map[string]interface{}) ([]map[string]interface{}
 		return nil, fmt.Errorf("cannot find field metadata.ownerReferences in %v", object)
 	}
 	ownerReferences, ok := field.([]map[string]interface{})
+	if ok {
+		return ownerReferences, nil
+	}
+	// TODO: This is hacky...
+	interfaces, ok := field.([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("expect metadata.ownerReferences to be a slice in %v", object)
+		return nil, fmt.Errorf("expect metadata.ownerReferences to be a slice in %#v", object)
+	}
+	ownerReferences = make([]map[string]interface{}, 0, len(interfaces))
+	for i := 0; i < len(interfaces); i++ {
+		r, ok := interfaces[i].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("expect element metadata.ownerReferences to be a map[string]interface{} in %#v", object)
+		}
+		ownerReferences = append(ownerReferences, r)
 	}
 	return ownerReferences, nil
 }
