@@ -164,3 +164,79 @@ type JobCondition struct {
 	// Human readable message indicating details about last transition.
 	Message string `json:"message,omitempty"`
 }
+
+// ScheduledJob represents the configuration of a single scheduled job.
+type ScheduledJob struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is a structure defining the expected behavior of a job, including the schedule.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec ScheduledJobSpec `json:"spec,omitempty"`
+
+	// Status is a structure describing current status of a job.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Status ScheduledJobStatus `json:"status,omitempty"`
+}
+
+// ScheduledJobList is a collection of scheduled jobs.
+type ScheduledJobList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of ScheduledJob.
+	Items []ScheduledJob `json:"items"`
+}
+
+// ScheduledJobSpec describes how the job execution will look like and when it will actually run.
+type ScheduledJobSpec struct {
+
+	// Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	Schedule string `json:"schedule"`
+
+	// Optional deadline in seconds for starting the job if it misses scheduled
+	// time for any reason.  Missed jobs executions will be counted as failed ones.
+	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty"`
+
+	// ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
+	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty"`
+
+	// Suspend flag tells the controller to suspend subsequent executions, it does
+	// not apply to already started executions.  Defaults to false.
+	Suspend bool `json:"suspend"`
+
+	// JobTemplate is the object that describes the job that will be created when
+	// executing a ScheduledJob.
+	JobTemplate JobTemplateSpec `json:"jobTemplate"`
+}
+
+// ConcurrencyPolicy describes how the job will be handled.
+// Only one of the following concurrent policies may be specified.
+// If none of the following policies is specified, the default one
+// is AllowConcurrent.
+type ConcurrencyPolicy string
+
+const (
+	// AllowConcurrent allows ScheduledJobs to run concurrently.
+	AllowConcurrent ConcurrencyPolicy = "Allow"
+
+	// ForbidConcurrent forbids concurrent runs, skipping next run if previous
+	// hasn't finished yet.
+	ForbidConcurrent ConcurrencyPolicy = "Forbid"
+
+	// ReplaceConcurrent cancels currently running job and replaces it with a new one.
+	ReplaceConcurrent ConcurrencyPolicy = "Replace"
+)
+
+// ScheduledJobStatus represents the current state of a Job.
+type ScheduledJobStatus struct {
+	// Active holds pointers to currently running jobs.
+	Active []api.ObjectReference `json:"active,omitempty"`
+
+	// LastScheduleTime keeps information of when was the last time the job was successfully scheduled.
+	LastScheduleTime *unversioned.Time `json:"lastScheduleTime,omitempty"`
+}
