@@ -168,8 +168,8 @@
         { "name": "etcopenssl",
         "mountPath": "/etc/openssl",
         "readOnly": true},
-        { "name": "etcpkitls",
-        "mountPath": "/etc/pki/tls",
+        { "name": "etcpki",
+        "mountPath": "/etc/pki",
         "readOnly": true},
         { "name": "srvsshproxy",
         "mountPath": "{{srv_sshproxy_path}}",
@@ -200,9 +200,9 @@
     "hostPath": {
         "path": "/etc/openssl"}
   },
-  { "name": "etcpkitls",
+  { "name": "etcpki",
     "hostPath": {
-        "path": "/etc/pki/tls"}
+        "path": "/etc/pki"}
   },
   { "name": "srvsshproxy",
     "hostPath": {
