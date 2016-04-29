@@ -130,6 +130,32 @@ func BenchmarkEncodeProtobufGeneratedMarshal(b *testing.B) {
 	b.StopTimer()
 }
 
+// BenchmarkDecodeCodecToInternalProtobuf measures the cost of performing a codec decode,
+// including conversions and any type setting. This is a "full" decode.
+func BenchmarkDecodeCodecToInternalProtobuf(b *testing.B) {
+	items := benchmarkItems()
+	width := len(items)
+	s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), "application/arbitrary.content.type")
+	encoder := api.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
+	var encoded [][]byte
+	for i := range items {
+		data, err := runtime.Encode(encoder, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded = append(encoded, data)
+	}
+
+	decoder := api.Codecs.DecoderToVersion(s, api.SchemeGroupVersion)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := runtime.Decode(decoder, encoded[i%width]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
 // BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
 func BenchmarkDecodeIntoProtobuf(b *testing.B) {
 	items := benchmarkItems()
