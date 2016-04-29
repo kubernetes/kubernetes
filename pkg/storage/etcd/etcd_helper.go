@@ -71,6 +71,8 @@ type EtcdConfig struct {
 	KeyFile                  string
 	CertFile                 string
 	CAFile                   string
+	Username                 string
+	Password                 string
 	Quorum                   bool
 	DeserializationCacheSize int
 }
@@ -84,6 +86,8 @@ func (c *EtcdConfig) newEtcdClient() (etcd.Client, error) {
 	cli, err := etcd.New(etcd.Config{
 		Endpoints: c.ServerList,
 		Transport: t,
+		Username:  c.Username,
+		Password:  c.Password,
 	})
 	if err != nil {
 		return nil, err
