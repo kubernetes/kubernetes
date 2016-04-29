@@ -87,6 +87,7 @@ kubectl
 * [kubectl convert](kubectl_convert.md)	 - Convert config files between different API versions
 * [kubectl cordon](kubectl_cordon.md)	 - Mark node as unschedulable
 * [kubectl create](kubectl_create.md)	 - Create a resource by filename or stdin
+* [kubectl daemonset-rolling-update](kubectl_daemonset-rolling-update.md)	 - Perform a rolling update of the given DaemonSet.
 * [kubectl delete](kubectl_delete.md)	 - Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 * [kubectl describe](kubectl_describe.md)	 - Show details of a specific resource or group of resources
 * [kubectl drain](kubectl_drain.md)	 - Drain node in preparation for maintenance
