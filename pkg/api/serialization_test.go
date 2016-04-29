@@ -275,7 +275,13 @@ func benchmarkItems() []v1.Pod {
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
 	items := make([]v1.Pod, 2)
 	for i := range items {
-		apiObjectFuzzer.Fuzz(&items[i])
+		var pod api.Pod
+		apiObjectFuzzer.Fuzz(&pod)
+		out, err := api.Scheme.ConvertToVersion(&pod, "v1")
+		if err != nil {
+			panic(err)
+		}
+		items[i] = *out.(*v1.Pod)
 	}
 	return items
 }
