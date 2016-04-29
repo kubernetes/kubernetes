@@ -271,6 +271,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
+		Copier:    api.Scheme,
 		Typer:     api.Scheme,
 		Linker:    selfLinker,
 		Mapper:    namespaceMapper,
@@ -502,13 +503,16 @@ func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (r
 	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
+	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
+	if err != nil {
+		return nil, false, err
+	}
 	storage.updated = obj.(*apiservertesting.Simple)
 	if err := storage.errors["update"]; err != nil {
 		return nil, false, err
 	}
-	var err error
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
@@ -2022,6 +2026,7 @@ func TestPatch(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
+			UID:       "uid",
 		},
 		Other: "bar",
 	}
@@ -2060,6 +2065,7 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
+			UID:       "uid",
 		},
 		Other: "bar",
 	}
@@ -2399,6 +2405,7 @@ func TestUpdateREST(t *testing.T) {
 			RequestInfoResolver: newTestRequestInfoResolver(),
 			Creater:             api.Scheme,
 			Convertor:           api.Scheme,
+			Copier:              api.Scheme,
 			Typer:               api.Scheme,
 			Linker:              selfLinker,
 
@@ -2483,6 +2490,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		RequestInfoResolver: newTestRequestInfoResolver(),
 		Creater:             api.Scheme,
 		Convertor:           api.Scheme,
+		Copier:              api.Scheme,
 		Typer:               api.Scheme,
 		Linker:              selfLinker,
 
@@ -2514,6 +2522,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		RequestInfoResolver: newTestRequestInfoResolver(),
 		Creater:             api.Scheme,
 		Convertor:           api.Scheme,
+		Copier:              api.Scheme,
 		Typer:               api.Scheme,
 		Linker:              selfLinker,
 
@@ -3211,6 +3220,7 @@ func TestXGSubresource(t *testing.T) {
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
+		Copier:    api.Scheme,
 		Typer:     api.Scheme,
 		Linker:    selfLinker,
 		Mapper:    namespaceMapper,

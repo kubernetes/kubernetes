@@ -862,6 +862,7 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	version.Serializer = apiGroupInfo.NegotiatedSerializer
 	version.Creater = apiGroupInfo.Scheme
 	version.Convertor = apiGroupInfo.Scheme
+	version.Copier = apiGroupInfo.Scheme
 	version.Typer = apiGroupInfo.Scheme
 	version.SubresourceGroupVersionKind = apiGroupInfo.SubresourceGroupVersionKind
 	return version, err

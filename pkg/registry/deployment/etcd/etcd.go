@@ -116,8 +116,8 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, obj)
+func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo)
 }
 
 // RollbackREST implements the REST endpoint for initiating the rollback of a deployment
@@ -205,7 +205,21 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 	return scale, nil
 }
 
-func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	deployment, err := r.registry.GetDeployment(ctx, name)
+	if err != nil {
+		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
+	}
+
+	oldScale, err := scaleFromDeployment(deployment)
+	if err != nil {
+		return nil, false, err
+	}
+
+	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	if err != nil {
+		return nil, false, err
+	}
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
@@ -215,13 +229,9 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	}
 
 	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
+		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), name, errs)
 	}
 
-	deployment, err := r.registry.GetDeployment(ctx, scale.Name)
-	if err != nil {
-		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), scale.Name)
-	}
 	deployment.Spec.Replicas = scale.Spec.Replicas
 	deployment.ResourceVersion = scale.ResourceVersion
 	deployment, err = r.registry.UpdateDeployment(ctx, deployment)

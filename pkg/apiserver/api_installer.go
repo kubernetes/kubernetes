@@ -462,6 +462,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		ParameterCodec: a.group.ParameterCodec,
 		Creater:        a.group.Creater,
 		Convertor:      a.group.Convertor,
+		Copier:         a.group.Copier,
 
 		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
 		Resource:    a.group.GroupVersion.WithResource(resource),
