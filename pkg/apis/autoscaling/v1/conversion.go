@@ -17,8 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"reflect"
-
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -39,9 +37,6 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 }
 
 func Convert_extensions_SubresourceReference_To_v1_CrossVersionObjectReference(in *extensions.SubresourceReference, out *CrossVersionObjectReference, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.SubresourceReference))(in)
-	}
 	out.Kind = in.Kind
 	out.Name = in.Name
 	out.APIVersion = in.APIVersion
@@ -49,9 +44,6 @@ func Convert_extensions_SubresourceReference_To_v1_CrossVersionObjectReference(i
 }
 
 func Convert_v1_CrossVersionObjectReference_To_extensions_SubresourceReference(in *CrossVersionObjectReference, out *extensions.SubresourceReference, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*CrossVersionObjectReference))(in)
-	}
 	out.Kind = in.Kind
 	out.Name = in.Name
 	out.APIVersion = in.APIVersion
@@ -60,9 +52,6 @@ func Convert_v1_CrossVersionObjectReference_To_extensions_SubresourceReference(i
 }
 
 func Convert_extensions_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(in *extensions.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.HorizontalPodAutoscalerSpec))(in)
-	}
 	if err := Convert_extensions_SubresourceReference_To_v1_CrossVersionObjectReference(&in.ScaleRef, &out.ScaleTargetRef, s); err != nil {
 		return err
 	}
@@ -81,9 +70,6 @@ func Convert_extensions_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscale
 }
 
 func Convert_v1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *extensions.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*HorizontalPodAutoscalerSpec))(in)
-	}
 	if err := Convert_v1_CrossVersionObjectReference_To_extensions_SubresourceReference(&in.ScaleTargetRef, &out.ScaleRef, s); err != nil {
 		return err
 	}
