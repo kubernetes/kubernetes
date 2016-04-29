@@ -2809,7 +2809,7 @@ func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisortest.Mock, ro
 	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
 	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
 
-	dsp := DiskSpacePolicy{DockerFreeDiskMB: rootThreshold, RootFreeDiskMB: dockerThreshold}
+	dsp := DiskSpacePolicy{ContainersFreeDiskMB: rootThreshold, RootFreeDiskMB: dockerThreshold}
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
 	if err != nil {
 		return err
