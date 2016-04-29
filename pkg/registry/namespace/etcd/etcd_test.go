@@ -145,7 +145,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 		Spec: api.NamespaceSpec{
 			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
 		},
-		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+		Status: api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
 	if err := storage.Storage.Create(ctx, key, namespace, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)

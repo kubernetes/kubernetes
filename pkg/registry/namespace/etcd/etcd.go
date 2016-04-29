@@ -103,7 +103,8 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// Ensure we have a UID precondition
 	if options == nil {
-		options = api.NewDeleteOptions(0)
+		// By default, let child resources use their default grace period
+		options = &api.DeleteOptions{}
 	}
 	if options.Preconditions == nil {
 		options.Preconditions = &api.Preconditions{}
@@ -119,9 +120,22 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		return nil, err
 	}
 
-	// upon first request to delete, we switch the phase to start namespace termination
+	// Decide whether we need to do an update to set deletion timestamp, termination phase, and (optionally) grace period seconds
+	needsUpdate := false
+	switch {
+	case namespace.DeletionTimestamp.IsZero():
+		needsUpdate = true
+	case namespace.Status.Phase != api.NamespaceTerminating:
+		needsUpdate = true
+	case options.GracePeriodSeconds != nil && (namespace.DeletionGracePeriodSeconds == nil || *namespace.DeletionGracePeriodSeconds > *options.GracePeriodSeconds):
+		// only update in order to shorten grace period seconds if we still have finalizers
+		// otherwise, just pass through to the underlying storage, which will delete immediately
+		needsUpdate = len(namespace.Spec.Finalizers) > 0
+	}
+
+	// set deletion timestamp, termination phase, and (optionally) grace period seconds
 	// TODO: enhance graceful deletion's calls to DeleteStrategy to allow phase change and finalizer patterns
-	if namespace.DeletionTimestamp.IsZero() {
+	if needsUpdate {
 		key, err := r.Store.KeyFunc(ctx, name)
 		if err != nil {
 			return nil, err
@@ -138,12 +152,13 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 					// wrong type
 					return nil, fmt.Errorf("expected *api.Namespace, got %v", existing)
 				}
-				// Set the deletion timestamp if needed
 				if existingNamespace.DeletionTimestamp.IsZero() {
 					now := unversioned.Now()
 					existingNamespace.DeletionTimestamp = &now
 				}
-				// Set the namespace phase to terminating, if needed
+				if options.GracePeriodSeconds != nil && (existingNamespace.DeletionGracePeriodSeconds == nil || *existingNamespace.DeletionGracePeriodSeconds > *options.GracePeriodSeconds) {
+					existingNamespace.DeletionGracePeriodSeconds = options.GracePeriodSeconds
+				}
 				if existingNamespace.Status.Phase != api.NamespaceTerminating {
 					existingNamespace.Status.Phase = api.NamespaceTerminating
 				}
