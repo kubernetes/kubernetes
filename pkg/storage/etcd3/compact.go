@@ -17,12 +17,50 @@ limitations under the License.
 package etcd3
 
 import (
+	"sync"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 )
+
+const compactInterval = 10 * time.Minute
+
+var (
+	endpointsMapMu sync.Mutex
+	endpointsMap   map[string]struct{}
+)
+
+func init() {
+	endpointsMap = make(map[string]struct{})
+}
+
+// StartCompactor starts a compactor in the background in order to compact keys
+// older than fixed time.
+// We need to compact keys because we can't let on disk data grow forever.
+// We save the most recent 10 minutes data. It should be enough for slow watchers and to tolerate burst.
+// TODO: We might keep a longer history (12h) in the future once storage API can take
+//       advantage of multi-version key.
+func StartCompactor(ctx context.Context, client *clientv3.Client) {
+	endpointsMapMu.Lock()
+	defer endpointsMapMu.Unlock()
+
+	// We can't have multiple compaction jobs for the same cluster.
+	// Currently we rely on endpoints to differentiate clusters.
+	var emptyStruct struct{}
+	for _, ep := range client.Endpoints() {
+		if _, ok := endpointsMap[ep]; ok {
+			glog.V(4).Infof("compactor already exists for endpoints %v")
+			return
+		}
+	}
+	for _, ep := range client.Endpoints() {
+		endpointsMap[ep] = emptyStruct
+	}
+
+	go compactor(ctx, client, compactInterval)
+}
 
 // compactor periodically compacts historical versions of keys in etcd.
 // After compaction, old versions of keys set before given interval will be gone.
@@ -43,7 +81,6 @@ func compactor(ctx context.Context, client *clientv3.Client, interval time.Durat
 			glog.Error(err)
 			continue
 		}
-		glog.Infof("compactor: Compacted rev %d", curRev)
 	}
 }
 
@@ -62,5 +99,6 @@ func compact(ctx context.Context, client *clientv3.Client, oldRev int64) (int64,
 	if err != nil {
 		return curRev, err
 	}
+	glog.Infof("etcd: Compacted rev %d, endpoints %v", oldRev, client.Endpoints())
 	return curRev, nil
 }
