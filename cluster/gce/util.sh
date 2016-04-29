@@ -33,7 +33,8 @@ elif [[ "${OS_DISTRIBUTION}" == "gci" ]]; then
   # If the user does not set a GCI image for master, we run both master and nodes
   # using the latest GCI dev image.
   if [[ "${MASTER_IMAGE}" != gci* ]]; then
-    MASTER_IMAGE=$(gcloud compute images list | grep "gci-dev" | cut -d ' ' -f1)
+    gci_images=( $(gcloud compute images list --project google-containers | grep "gci-dev" | cut -d ' ' -f1) )
+    MASTER_IMAGE="${gci_images[0]}"
     NODE_IMAGE="${MASTER_IMAGE}"
     NODE_IMAGE_PROJECT="${MASTER_IMAGE_PROJECT}"
   fi
