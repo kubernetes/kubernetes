@@ -29,6 +29,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have
@@ -82,7 +83,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 			return nil
 		},
 		fakeRecorder,
-		queue.NewBasicWorkQueue(),
+		queue.NewBasicWorkQueue(&util.RealClock{}),
 		time.Second,
 		time.Second,
 		fakeCache,
@@ -216,7 +217,7 @@ func TestFakePodWorkers(t *testing.T) {
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 
-	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(), time.Second, time.Second, fakeCache)
+	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(&util.RealClock{}), time.Second, time.Second, fakeCache)
 	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeCache, t}
 
 	tests := []struct {
