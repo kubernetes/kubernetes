@@ -65,12 +65,14 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ThirdPartyResourceDataList{},
 		&Ingress{},
 		&IngressList{},
-		&api.ListOptions{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
-		&api.ExportOptions{},
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
+
+		&api.ExportOptions{},
+		&api.ListOptions{},
+		&api.DeleteOptions{},
 	)
 }
 

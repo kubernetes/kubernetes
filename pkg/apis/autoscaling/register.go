@@ -51,6 +51,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&extensions.HorizontalPodAutoscaler{},
 		&extensions.HorizontalPodAutoscalerList{},
 		&api.ListOptions{},
+		&api.DeleteOptions{},
 	)
 }
 
