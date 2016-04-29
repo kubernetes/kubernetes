@@ -353,8 +353,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 	}
 	containerName := dockerName.ContainerName
 
-	var containerInfo *labelledContainerInfo
-	containerInfo = getContainerInfoFromLabel(iResult.Config.Labels)
+	containerInfo := getContainerInfoFromLabel(iResult.Config.Labels)
 
 	parseTimestampError := func(label, s string) {
 		glog.Errorf("Failed to parse %q timestamp %q for container %q of pod %q", label, s, id, kubecontainer.BuildPodFullName(podName, podNamespace))
@@ -560,7 +559,7 @@ func (dm *DockerManager) runContainer(
 		// TODO: This is hacky because the Kubelet should be parameterized to encode a specific version
 		//   and needs to be able to migrate this whenever we deprecate v1. Should be a member of DockerManager.
 		if data, err := runtime.Encode(api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"}), pod); err == nil {
-			labels[kubernetesPodLabel] = string(data)
+			labels[podLabel] = string(data)
 		} else {
 			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
 		}
@@ -1194,7 +1193,7 @@ func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (stri
 
 // TODO(random-liu): Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.
 // We can only deprecate this after refactoring kubelet.
-// TODO(random-liu): After using pod status for KillPod(), we can also remove the kubernetesPodLabel, because all the needed information should have
+// TODO(random-liu): After using pod status for KillPod(), we can also remove the podLabel, because all the needed information should have
 // been extract from new labels and stored in pod status.
 func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	result := dm.killPodWithSyncResult(pod, runningPod)
@@ -1394,10 +1393,10 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 	labels := inspect.Config.Labels
 
 	// the pod data may not be set
-	if body, found := labels[kubernetesPodLabel]; found {
+	if body, found := labels[podLabel]; found {
 		pod = &api.Pod{}
 		if err = runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
-			name := labels[kubernetesContainerNameLabel]
+			name := labels[containerNameLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {
 					container = &pod.Spec.Containers[ix]
@@ -1415,7 +1414,7 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 	// attempt to find the default grace period if we didn't commit a pod, but set the generic metadata
 	// field (the one used by kill)
 	if pod == nil {
-		if period, ok := labels[kubernetesPodTerminationGracePeriodLabel]; ok {
+		if period, ok := labels[podTerminationGracePeriodLabel]; ok {
 			if seconds, err := strconv.ParseInt(period, 10, 64); err == nil {
 				pod = &api.Pod{}
 				pod.DeletionGracePeriodSeconds = &seconds

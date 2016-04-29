@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func TestLabels(t *testing.T) {
+func getTestCase() (*api.Pod, *api.Container, int, labelledContainerInfo) {
 	restartCount := 5
 	deletionGracePeriod := int64(10)
 	terminationGracePeriod := int64(10)
@@ -67,7 +67,7 @@ func TestLabels(t *testing.T) {
 			TerminationGracePeriodSeconds: &terminationGracePeriod,
 		},
 	}
-	expected := &labelledContainerInfo{
+	expected := labelledContainerInfo{
 		PodName:                   pod.Name,
 		PodNamespace:              pod.Namespace,
 		PodUID:                    pod.UID,
@@ -79,13 +79,22 @@ func TestLabels(t *testing.T) {
 		TerminationMessagePath: container.TerminationMessagePath,
 		PreStopHandler:         container.Lifecycle.PreStop,
 	}
+	return pod, container, restartCount, expected
+}
 
-	// Test whether we can get right information from label
+// Test whether we can get right information from label
+func TestLabels(t *testing.T) {
+	pod, container, restartCount, expected := getTestCase()
 	labels := newLabels(container, pod, restartCount, false)
 	containerInfo := getContainerInfoFromLabel(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
 	}
+}
+
+// Test whether we can get information from v1.1 labels
+func TestLabelsWithV11Labels(t *testing.T) {
+	pod, container, restartCount, expected := getTestCase()
 
 	// Test when DeletionGracePeriodSeconds, TerminationGracePeriodSeconds and Lifecycle are nil,
 	// the information got from label should also be nil
@@ -97,27 +106,69 @@ func TestLabels(t *testing.T) {
 	expected.PreStopHandler = nil
 	// Because container is changed, the Hash should be updated
 	expected.Hash = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	labels = newLabels(container, pod, restartCount, false)
-	containerInfo = getContainerInfoFromLabel(labels)
+	labels := newLabels(container, pod, restartCount, false)
+	containerInfo := getContainerInfoFromLabel(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
 	}
 
 	// Test when DeletionGracePeriodSeconds, TerminationGracePeriodSeconds and Lifecycle are nil,
-	// but the old label kubernetesPodLabel is set, the information got from label should also be set
-	pod.DeletionGracePeriodSeconds = &deletionGracePeriod
-	pod.Spec.TerminationGracePeriodSeconds = &terminationGracePeriod
-	container.Lifecycle = lifecycle
+	// but the old label kubernetesPodLabels are set.
+	pod, container, _, _ = getTestCase()
 	data, err := runtime.Encode(testapi.Default.Codec(), pod)
 	if err != nil {
 		t.Fatalf("Failed to encode pod %q into string: %v", format.Pod(pod), err)
 	}
-	labels[kubernetesPodLabel] = string(data)
+	labels[podLabel] = string(data)
+	// When the label version is still currentLabelVersion, the information got from label should still
+	// be nil.
+	containerInfo = getContainerInfoFromLabel(labels)
+	if !reflect.DeepEqual(containerInfo, expected) {
+		t.Errorf("expected %v, got %v", expected, containerInfo)
+	}
+	// When the label version is not set (old version label), the information got from label should be set
+	delete(labels, versionLabel)
 	expected.PodDeletionGracePeriod = pod.DeletionGracePeriodSeconds
 	expected.PodTerminationGracePeriod = pod.Spec.TerminationGracePeriodSeconds
 	expected.PreStopHandler = container.Lifecycle.PreStop
 	// Do not update expected.Hash here, because we directly use the labels in last test, so we never
 	// changed the kubernetesContainerHashLabel in this test, the expected.Hash shouldn't be changed.
+	containerInfo = getContainerInfoFromLabel(labels)
+	if !reflect.DeepEqual(containerInfo, expected) {
+		t.Errorf("expected %v, got %v", expected, containerInfo)
+	}
+}
+
+// Test whether we can get information from v1.2 labels
+func TestLabelsWithV12Labels(t *testing.T) {
+	pod, container, restartCount, expected := getTestCase()
+
+	// Test when RestartCount, TerminationMessagePath, DeletionGracePeriodSeconds, TerminationGracePeriodSeconds
+	// and Lifecycle are not set, but corresponding old labels are set.
+	labels := newLabels(container, pod, restartCount, false)
+	labels[oldPodDeletionGracePeriodLabel] = labels[podDeletionGracePeriodLabel]
+	delete(labels, podDeletionGracePeriodLabel)
+	labels[oldPodTerminationGracePeriodLabel] = labels[podTerminationGracePeriodLabel]
+	delete(labels, podTerminationGracePeriodLabel)
+	labels[oldContainerPreStopHandlerLabel] = labels[containerPreStopHandlerLabel]
+	delete(labels, containerPreStopHandlerLabel)
+	labels[oldContainerRestartCountLabel] = labels[containerRestartCountLabel]
+	delete(labels, containerRestartCountLabel)
+	labels[oldContainerTerminationMessagePathLabel] = labels[containerTerminationMessagePathLabel]
+	delete(labels, containerTerminationMessagePathLabel)
+	// When the label version is not set (old version label), the information got from label should be set.
+	delete(labels, versionLabel)
+	containerInfo := getContainerInfoFromLabel(labels)
+	if !reflect.DeepEqual(containerInfo, expected) {
+		t.Errorf("expected %v, got %v", expected, containerInfo)
+	}
+	// When the label version is currentLabelVersion, the information got from label should still be empty.
+	labels[versionLabel] = currentLabelVersion
+	expected.PodDeletionGracePeriod = nil
+	expected.PodTerminationGracePeriod = nil
+	expected.PreStopHandler = nil
+	expected.RestartCount = 0
+	expected.TerminationMessagePath = ""
 	containerInfo = getContainerInfoFromLabel(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
