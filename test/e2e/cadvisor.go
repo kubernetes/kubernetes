@@ -60,11 +60,7 @@ func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 	nodeList, err := c.Nodes().List(api.ListOptions{})
 	framework.ExpectNoError(err)
 	var errors []error
-<<<<<<< 9a92764704417b0ade9b569f59fc56e1632618e8
 	maxRetries, sleepDuration := readConfig()
-=======
-	retries, sleepDuration := readConfig()
->>>>>>> e2e test docs
 	for {
 		errors = []error{}
 		for _, node := range nodeList.Items {

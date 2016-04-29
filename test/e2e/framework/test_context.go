@@ -79,6 +79,7 @@ type TestContextType struct {
 	NodeTestContextType
 
 	// Viper-only parameters.  These will in time replace all flags.
+
 	// Example: Create a file 'e2e.json' with the following:
 	// 	"Cadvisor":{
 	// 		"MaxRetries":"6"
@@ -88,6 +89,11 @@ type TestContextType struct {
 	Cadvisor struct {
 		MaxRetries      int
 		SleepDurationMS int
+	}
+
+	LoggingSoak struct {
+		Scale int
+		SecondsBetweenWaves int
 	}
 }
 
@@ -202,17 +208,6 @@ func RegisterNodeFlags() {
 
 // Enable viper configuration management of flags.
 func ViperizeFlags() {
-<<<<<<< 9a92764704417b0ade9b569f59fc56e1632618e8
-=======
-	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
-
-	// Add viper in a minimal way.
-	// Flag interop isnt possible, since 'go test' coupling to flag.Parse.
-	viper.SetConfigName(TestContext.Viper)
-	viper.AddConfigPath(".")
-	viper.ReadInConfig()
->>>>>>> e2e test docs
-
 	// TODO @jayunit100: Maybe a more elegant viper-flag integration for the future?
 	// For now, we layer it on top, because 'flag' deps of 'go test' make pflag wrappers
 	// fragile, seeming to force 'flag' to have deep awareness of pflag params.
@@ -221,7 +216,6 @@ func ViperizeFlags() {
 
 	flag.Parse()
 
-<<<<<<< be2e1f5d96487e765cb071da7ee6f90d47ff53f6
 	// Add viper in a minimal way.
 	// Flag interop isnt possible, since 'go test' coupling to flag.Parse.
 	// This must be done after common flags are registered, since Viper is a flag option.
@@ -229,8 +223,6 @@ func ViperizeFlags() {
 	viper.AddConfigPath(".")
 	viper.ReadInConfig()
 
-=======
->>>>>>> Viper hierarchichal density configuration
 	viper.Unmarshal(&TestContext)
 
 	/** This can be used to overwrite a flag value.
@@ -245,9 +237,5 @@ func ViperizeFlags() {
 	*	// Each flag that we've declared can be set via viper.
 	*	flag.VisitAll(viperFlagSetter)
 	*
-<<<<<<< be2e1f5d96487e765cb071da7ee6f90d47ff53f6
-=======
-	*
->>>>>>> Viper hierarchichal density configuration
 	 */
 }
