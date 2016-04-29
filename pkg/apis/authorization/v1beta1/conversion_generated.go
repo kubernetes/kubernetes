@@ -24,7 +24,6 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	reflect "reflect"
 )
 
 func init() {
@@ -52,9 +51,6 @@ func init() {
 }
 
 func autoConvert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(in *LocalSubjectAccessReview, out *authorization.LocalSubjectAccessReview, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*LocalSubjectAccessReview))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -72,9 +68,6 @@ func Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAcces
 }
 
 func autoConvert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(in *authorization.LocalSubjectAccessReview, out *LocalSubjectAccessReview, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*authorization.LocalSubjectAccessReview))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -92,9 +85,6 @@ func Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAcces
 }
 
 func autoConvert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(in *NonResourceAttributes, out *authorization.NonResourceAttributes, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*NonResourceAttributes))(in)
-	}
 	out.Path = in.Path
 	out.Verb = in.Verb
 	return nil
@@ -105,9 +95,6 @@ func Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttribute
 }
 
 func autoConvert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(in *authorization.NonResourceAttributes, out *NonResourceAttributes, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*authorization.NonResourceAttributes))(in)
-	}
 	out.Path = in.Path
 	out.Verb = in.Verb
 	return nil
@@ -118,9 +105,6 @@ func Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttribute
 }
 
 func autoConvert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(in *ResourceAttributes, out *authorization.ResourceAttributes, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ResourceAttributes))(in)
-	}
 	out.Namespace = in.Namespace
 	out.Verb = in.Verb
 	out.Group = in.Group
@@ -136,9 +120,6 @@ func Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(in *
 }
 
 func autoConvert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(in *authorization.ResourceAttributes, out *ResourceAttributes, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*authorization.ResourceAttributes))(in)
-	}
 	out.Namespace = in.Namespace
 	out.Verb = in.Verb
 	out.Group = in.Group
@@ -154,9 +135,6 @@ func Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(in *
 }
 
 func autoConvert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview(in *SelfSubjectAccessReview, out *authorization.SelfSubjectAccessReview, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*SelfSubjectAccessReview))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -174,9 +152,6 @@ func Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessR
 }
 
 func autoConvert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(in *authorization.SelfSubjectAccessReview, out *SelfSubjectAccessReview, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*authorization.SelfSubjectAccessReview))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -194,9 +169,6 @@ func Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessR
 }
 
 func autoConvert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *SelfSubjectAccessReviewSpec, out *authorization.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*SelfSubjectAccessReviewSpec))(in)
-	}
 	if in.ResourceAttributes != nil {
 		in, out := &in.ResourceAttributes, &out.ResourceAttributes
 		*out = new(authorization.ResourceAttributes)
@@ -223,9 +195,6 @@ func Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAcc
 }
 
 func autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *authorization.SelfSubjectAccessReviewSpec, out *SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*authorization.SelfSubjectAccessReviewSpec))(in)
-	}
 	if in.ResourceAttributes != nil {
 		in, out := &in.ResourceAttributes, &out.ResourceAttributes
 		*out = new(ResourceAttributes)
@@ -252,9 +221,6 @@ func Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAcc
 }
 
 func autoConvert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in *SubjectAccessReview, out *authorization.SubjectAccessReview, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*SubjectAccessReview))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -272,9 +238,6 @@ func Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in
 }
 
 func autoConvert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in *authorization.SubjectAccessReview, out *SubjectAccessReview, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*authorization.SubjectAccessReview))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -292,9 +255,6 @@ func Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in
 }
 
 func autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in *SubjectAccessReviewSpec, out *authorization.SubjectAccessReviewSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*SubjectAccessReviewSpec))(in)
-	}
 	if in.ResourceAttributes != nil {
 		in, out := &in.ResourceAttributes, &out.ResourceAttributes
 		*out = new(authorization.ResourceAttributes)
@@ -343,9 +303,6 @@ func Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessRevie
 }
 
 func autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in *authorization.SubjectAccessReviewSpec, out *SubjectAccessReviewSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*authorization.SubjectAccessReviewSpec))(in)
-	}
 	if in.ResourceAttributes != nil {
 		in, out := &in.ResourceAttributes, &out.ResourceAttributes
 		*out = new(ResourceAttributes)
@@ -394,9 +351,6 @@ func Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessRevie
 }
 
 func autoConvert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *SubjectAccessReviewStatus, out *authorization.SubjectAccessReviewStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*SubjectAccessReviewStatus))(in)
-	}
 	out.Allowed = in.Allowed
 	out.Reason = in.Reason
 	return nil
@@ -407,9 +361,6 @@ func Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessRev
 }
 
 func autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in *authorization.SubjectAccessReviewStatus, out *SubjectAccessReviewStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*authorization.SubjectAccessReviewStatus))(in)
-	}
 	out.Allowed = in.Allowed
 	out.Reason = in.Reason
 	return nil

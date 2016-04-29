@@ -25,7 +25,6 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	reflect "reflect"
 )
 
 func init() {
@@ -43,9 +42,6 @@ func init() {
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *PodDisruptionBudget, out *policy.PodDisruptionBudget, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*PodDisruptionBudget))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -67,9 +63,6 @@ func Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *PodD
 }
 
 func autoConvert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(in *policy.PodDisruptionBudget, out *PodDisruptionBudget, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*policy.PodDisruptionBudget))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -91,9 +84,6 @@ func Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(in *poli
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*PodDisruptionBudgetSpec))(in)
-	}
 	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.MinAvailable, &out.MinAvailable, s); err != nil {
 		return err
 	}
@@ -115,9 +105,6 @@ func Convert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(
 }
 
 func autoConvert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec(in *policy.PodDisruptionBudgetSpec, out *PodDisruptionBudgetSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*policy.PodDisruptionBudgetSpec))(in)
-	}
 	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.MinAvailable, &out.MinAvailable, s); err != nil {
 		return err
 	}
@@ -139,9 +126,6 @@ func Convert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec(
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*PodDisruptionBudgetStatus))(in)
-	}
 	out.PodDisruptionAllowed = in.PodDisruptionAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
@@ -154,9 +138,6 @@ func Convert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetSta
 }
 
 func autoConvert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *PodDisruptionBudgetStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*policy.PodDisruptionBudgetStatus))(in)
-	}
 	out.PodDisruptionAllowed = in.PodDisruptionAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
