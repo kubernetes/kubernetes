@@ -28,72 +28,78 @@ import (
 
 func addDefaultingFuncs(scheme *runtime.Scheme) {
 	scheme.AddDefaultingFuncs(
-		func(obj *KubeProxyConfiguration) {
-			if obj.BindAddress == "" {
-				obj.BindAddress = "0.0.0.0"
-			}
-			if obj.HealthzPort == 0 {
-				obj.HealthzPort = 10249
-			}
-			if obj.HealthzBindAddress == "" {
-				obj.HealthzBindAddress = "127.0.0.1"
-			}
-			if obj.OOMScoreAdj == nil {
-				temp := int32(qos.KubeProxyOOMScoreAdj)
-				obj.OOMScoreAdj = &temp
-			}
-			if obj.ResourceContainer == "" {
-				obj.ResourceContainer = "/kube-proxy"
-			}
-			if obj.IPTablesSyncPeriod.Duration == 0 {
-				obj.IPTablesSyncPeriod = unversioned.Duration{Duration: 30 * time.Second}
-			}
-			zero := unversioned.Duration{}
-			if obj.UDPIdleTimeout == zero {
-				obj.UDPIdleTimeout = unversioned.Duration{Duration: 250 * time.Millisecond}
-			}
-			if obj.ConntrackMax == 0 {
-				obj.ConntrackMax = 256 * 1024 // 4x default (64k)
-			}
-			if obj.IPTablesMasqueradeBit == nil {
-				temp := int32(14)
-				obj.IPTablesMasqueradeBit = &temp
-			}
-			if obj.ConntrackTCPEstablishedTimeout == zero {
-				obj.ConntrackTCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
-			}
-		},
-		func(obj *KubeSchedulerConfiguration) {
-			if obj.Port == 0 {
-				obj.Port = ports.SchedulerPort
-			}
-			if obj.Address == "" {
-				obj.Address = "0.0.0.0"
-			}
-			if obj.AlgorithmProvider == "" {
-				obj.AlgorithmProvider = "DefaultProvider"
-			}
-			if obj.KubeAPIQPS == 0 {
-				obj.KubeAPIQPS = 50.0
-			}
-			if obj.KubeAPIBurst == 0 {
-				obj.KubeAPIBurst = 100
-			}
-			if obj.SchedulerName == "" {
-				obj.SchedulerName = api.DefaultSchedulerName
-			}
-		},
-		func(obj *LeaderElectionConfiguration) {
-			zero := unversioned.Duration{}
-			if obj.LeaseDuration == zero {
-				obj.LeaseDuration = unversioned.Duration{Duration: 15 * time.Second}
-			}
-			if obj.RenewDeadline == zero {
-				obj.RenewDeadline = unversioned.Duration{Duration: 10 * time.Second}
-			}
-			if obj.RetryPeriod == zero {
-				obj.RetryPeriod = unversioned.Duration{Duration: 2 * time.Second}
-			}
-		},
+		SetDefaults_KubeProxyConfiguration,
+		SetDefaults_KubeSchedulerConfiguration,
+		SetDefaults_LeaderElectionConfiguration,
 	)
+}
+
+func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
+	if obj.BindAddress == "" {
+		obj.BindAddress = "0.0.0.0"
+	}
+	if obj.HealthzPort == 0 {
+		obj.HealthzPort = 10249
+	}
+	if obj.HealthzBindAddress == "" {
+		obj.HealthzBindAddress = "127.0.0.1"
+	}
+	if obj.OOMScoreAdj == nil {
+		temp := int32(qos.KubeProxyOOMScoreAdj)
+		obj.OOMScoreAdj = &temp
+	}
+	if obj.ResourceContainer == "" {
+		obj.ResourceContainer = "/kube-proxy"
+	}
+	if obj.IPTablesSyncPeriod.Duration == 0 {
+		obj.IPTablesSyncPeriod = unversioned.Duration{Duration: 30 * time.Second}
+	}
+	zero := unversioned.Duration{}
+	if obj.UDPIdleTimeout == zero {
+		obj.UDPIdleTimeout = unversioned.Duration{Duration: 250 * time.Millisecond}
+	}
+	if obj.ConntrackMax == 0 {
+		obj.ConntrackMax = 256 * 1024 // 4x default (64k)
+	}
+	if obj.IPTablesMasqueradeBit == nil {
+		temp := int32(14)
+		obj.IPTablesMasqueradeBit = &temp
+	}
+	if obj.ConntrackTCPEstablishedTimeout == zero {
+		obj.ConntrackTCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
+	}
+}
+
+func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
+	if obj.Port == 0 {
+		obj.Port = ports.SchedulerPort
+	}
+	if obj.Address == "" {
+		obj.Address = "0.0.0.0"
+	}
+	if obj.AlgorithmProvider == "" {
+		obj.AlgorithmProvider = "DefaultProvider"
+	}
+	if obj.KubeAPIQPS == 0 {
+		obj.KubeAPIQPS = 50.0
+	}
+	if obj.KubeAPIBurst == 0 {
+		obj.KubeAPIBurst = 100
+	}
+	if obj.SchedulerName == "" {
+		obj.SchedulerName = api.DefaultSchedulerName
+	}
+}
+
+func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
+	zero := unversioned.Duration{}
+	if obj.LeaseDuration == zero {
+		obj.LeaseDuration = unversioned.Duration{Duration: 15 * time.Second}
+	}
+	if obj.RenewDeadline == zero {
+		obj.RenewDeadline = unversioned.Duration{Duration: 10 * time.Second}
+	}
+	if obj.RetryPeriod == zero {
+		obj.RetryPeriod = unversioned.Duration{Duration: 2 * time.Second}
+	}
 }
