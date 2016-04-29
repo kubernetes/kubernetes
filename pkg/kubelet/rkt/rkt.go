@@ -858,9 +858,11 @@ func (r *Runtime) generateRunCommand(pod *api.Pod, uuid string) (string, error) 
 		}
 
 		// TODO(yifan): host domain is not being used.
-		hostname, _ = r.runtimeHelper.GeneratePodHostNameAndDomain(pod)
+		hostname, _, err = r.runtimeHelper.GeneratePodHostNameAndDomain(pod)
+		if err != nil {
+			return "", err
+		}
 	}
-
 	runPrepared = append(runPrepared, fmt.Sprintf("--hostname=%s", hostname))
 	runPrepared = append(runPrepared, uuid)
 	return strings.Join(runPrepared, " "), nil

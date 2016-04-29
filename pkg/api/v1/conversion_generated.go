@@ -1619,6 +1619,7 @@ func autoConvert_v1_EndpointAddress_To_api_EndpointAddress(in *EndpointAddress, 
 		defaulting.(func(*EndpointAddress))(in)
 	}
 	out.IP = in.IP
+	out.Hostname = in.Hostname
 	if in.TargetRef != nil {
 		in, out := &in.TargetRef, &out.TargetRef
 		*out = new(api.ObjectReference)
@@ -1640,6 +1641,7 @@ func autoConvert_api_EndpointAddress_To_v1_EndpointAddress(in *api.EndpointAddre
 		defaulting.(func(*api.EndpointAddress))(in)
 	}
 	out.IP = in.IP
+	out.Hostname = in.Hostname
 	if in.TargetRef != nil {
 		in, out := &in.TargetRef, &out.TargetRef
 		*out = new(ObjectReference)
@@ -5357,6 +5359,8 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	} else {
 		out.ImagePullSecrets = nil
 	}
+	out.Hostname = in.Hostname
+	out.Subdomain = in.Subdomain
 	return nil
 }
 

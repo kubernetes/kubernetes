@@ -164,8 +164,8 @@ func (f *fakeRuntimeHelper) GetClusterDNS(pod *api.Pod) ([]string, []string, err
 	return f.dnsServers, f.dnsSearches, f.err
 }
 
-func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
-	return f.hostName, f.hostDomain
+func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, error) {
+	return f.hostName, f.hostDomain, nil
 }
 
 func (f *fakeRuntimeHelper) GetPodDir(podUID types.UID) string {
