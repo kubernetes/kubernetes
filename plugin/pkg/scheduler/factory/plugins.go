@@ -66,6 +66,8 @@ var (
 
 const (
 	DefaultProvider = "DefaultProvider"
+	MaxUint         = ^uint(0)
+	MaxInt          = int(MaxUint >> 1)
 )
 
 type AlgorithmProviderConfig struct {
@@ -267,6 +269,14 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]al
 			Function: factory.Function(args),
 			Weight:   factory.Weight,
 		})
+	}
+	// verify that total priority is not overflow
+	var totalPriority int
+	for _, config := range configs {
+		totalPriority += config.Weight * 10
+	}
+	if totalPriority > MaxInt {
+		return configs, fmt.Errorf("Total priority of priority functions is bigger than MaxInt %d. You may specify a smaller weight for priority functions", MaxInt)
 	}
 	return configs, nil
 }
