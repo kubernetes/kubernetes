@@ -48,13 +48,13 @@ chosen networking solution.
 ## Implementation
 
 The implmentation in Kubernetes consists of:
-- A v1beta NetworkPolicy API object
+- A v1beta1 NetworkPolicy API object
 - A structure on the `Namespace` object to control policy, to be developed as an annotation for now.
 
 ### Namespace changes
 
 The following objects will be defined on a Namespace Spec.
->NOTE: In v1beta these objects will be implemented as an annotation.
+>NOTE: In v1beta1 these objects will be implemented as an annotation.
 
 ```go
 type IngressIsolationPolicy string
@@ -100,14 +100,14 @@ spec:
       isolation: DefaultDeny
 ```
 
-The above structures will be represented in v1beta as a json encoded annotation like so:
+The above structures will be represented in v1beta1 as a json encoded annotation like so:
 
 ```yaml
 kind: Namespace
 apiVersion: v1
 metadata:
   annotations:
-    net.beta.kubernetes.io/ingress-isolation: DefaultDeny 
+    net.beta.kubernetes.io/network-policy: "{\"ingress\": {\"isolation\": \"DefaultDeny\"}" 
 ```
 
 ### NetworkPolicy Go Definition
@@ -118,7 +118,14 @@ objects (of which there can be multiple in a single namespace).  Pods selected b
 one or more NetworkPolicy objects should allow any incoming connections that match any
 ingress rule on those NetworkPolicy objects, per the network plugin’s capabilities.
 
-If `ingress-isolation` is not specified on a namespace, then all traffic is allowed to pods in that namespace.
+If ingress `isolation` is not specified on a namespace, then all traffic is allowed to pods in that namespace.
+
+NetworkPolicy objects and the above namespace isolation both act on _connections_ rather than packets.  That is to say that if traffic from pod A to pod B is allowed by the configured
+policy, then the return packets for that connection from B -> A are also allowed, even if policy is in place that would prevent 
+B from initiating a connection to A.  If new network policy is applied that would block an existing connection between two endpoints, the enforcer of policy 
+should terminate and block the existing connection as soon as can be expected by the implementation.
+
+We propose adding a new `/apis/networking` API group for the NetworkPolicy object.
 
 ```go
 type NetworkPolicy struct {
@@ -130,37 +137,43 @@ type NetworkPolicy struct {
 }
 
 type NetworkPolicySpec struct {
-  // Selects the pods to which this NetworkPolicy object
-  // applies.  The array of NetworkPolicyIngressRules below 
-  // is applied to any pods selected by this field.
-  // Multiple NetworkPolicy objects can select the same set of pods.  In this case,
-  // the NetworkPolicyRules for each are combined additively.
-  PodSelector *unversioned.LabelSelector `json:"podSelector,omitempty"`
+  // Selects the pods to which this NetworkPolicy object applies.  The array of NetworkPolicyIngressRules below 
+  // is applied to any pods selected by this field. Multiple NetworkPolicy objects can select the 
+  // same set of pods.  In this case, the NetworkPolicyRules for each are combined additively.
+  // This field is NOT optional and follows standard unversioned.LabelSelector semantics.  
+  // An empty PodSelector matches all pods in this namespace.
+  PodSelector unversioned.LabelSelector `json:"podSelector"`
 
   // List of ingress rules to be applied to the selected pods.
   // Traffic is allowed to a pod if Namespace.NetworkPolicy.Ingress.Isolation is undefined, 
-  // OR if the traffic source is the pod's host (for kubelet health checks), 
+  // OR if the traffic source is the pod's local kubelet (for health checks), 
   // OR if Namespace.NetworkPolicy.Ingress.Isolation=DefaultDeny and the traffic matches at least 
   // one NetworkPolicyIngressRule across all of the NetworkPolicy 
-  // objects whose podSelector matches the pod.  If this field is 
-  // empty, this NetworkPolicy has no effect on selected pods.
+  // objects whose podSelector matches the pod.  
+  // If this field is nil, this NetworkPolicy allows all traffic.
+  // If this field is non-nil but contains no rules, this NetworkPolicy allows no traffic.
+  // If this field is non-nil and contains at least one rule, this NetworkPolicy allows any traffic
+  // which matches at least one of the NetworkPolicyIngressRules in this list.
   Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty"`
 }
 
+// This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both Ports AND From. 
 type NetworkPolicyIngressRule struct {
   // List of ports which should be made accessible on the pods selected by PodSelector.  
-  // Each item in this list is combined using a logical OR.  If this field
-  // is empty, then traffic should not be restricted based on port.  If this 
-  // field is not empty, traffic must match at least one NetworkPolicyPort in the list
-  // or else it will be dropped.
+  // Each item in this list is combined using a logical OR.  
+  // If this field is nil, this NetworkPolicyIngressRule matches all ports (traffic not restricted by Port). 
+  // If this field is non-nil but contains no items, this NetworkPolicyIngressRule matches no ports (no traffic matches).
+  // If this field is non-nil and contains at least one item, then this NetworkPolicyIngressRule allows traffic 
+  // only if the traffic matches at least one NetworkPolicyPort in the Ports list. 
   Ports []NetworkPolicyPort `json:"ports,omitempty"`
 
   // List of sources which should be able to access the pods selected by PodSelector.
   // Items in this list are combined using a logical OR operation.
-  // If this field is empty, then traffic should not be restricted based on 
-  // source.  If this field is not empty, traffic must match at least one 
-  // NetworkPolicySource in the list or else it will be dropped.
-  From []NetworkPolicySource `json:"from,omitempty"`
+  // If this field nil, this NetworkPolicyIngressRule matches all sources (traffic not restricted by source).
+  // If this field is non-nil but contains no items, this NetworkPolicyIngressRule matches no sources (no traffic matches). 
+  // If this field is non-nil and contains at least on item, this NetworkPolicyIngressRule allows traffic only if the 
+  // traffic matches at least one NetworkPolicyPeer in the From list. 
+  From []NetworkPolicyPeer `json:"from,omitempty"`
 }
 
 type NetworkPolicyPort struct {
@@ -169,22 +182,28 @@ type NetworkPolicyPort struct {
   Protocol api.Protocol `json:"protocol"`
 
   // If specified, the port on the given protocol.  This can 
-  // either be a numerical or named port.  If not defined,
-  // this NetworkPolicyPort does not restrict based on port number.
-  // If defined, only traffic on the specified protocol AND port
+  // either be a numerical or named port.  If this field is nil,
+  // this NetworkPolicyPort matches all port names and numbers.
+  // If non-nil, only traffic on the specified protocol AND port
   // will be matched by this NetworkPolicyPort.
   Port *intstr.IntOrString `json:"port,omitempty"`
 }
 
-type NetworkPolicySource struct {
+type NetworkPolicyPeer struct {
   // If 'Namespaces' is defined, 'Pods' must not be.
   // This is a label selector which selects Pods in this namespace.
-  // This NetworkPolicySource matches any pods selected by this selector.
+  // This NetworkPolicyPeer matches any pods selected by this selector.
+  // This field follows standard unversioned.LabelSelector semantics.
+  // If nil, this selector selects no pods.
+  // If non-nil but empty, this selector selects all pods in this namespace.
   Pods *unversioned.LabelSelector `json:"pods,omitempty"`
 
   // If 'Pods' is defined, 'Namespaces' must not be.
-  // Selects Kubernetes Namespaces.  This NetworkPolicySource matches 
+  // Selects Kubernetes Namespaces.  This NetworkPolicyPeer matches 
   // all pods in all namespaces selected by this label selector. 
+  // This field follows standard unversioned.LabelSelector semantics.
+  // If nil, this selector selects no namespaces.
+  // If non-nil but empty, this selector selects all namespaces.
   Namespaces *unversioned.LabelSelector `json:"namespaces,omitempty"`
 }
 ```
@@ -201,8 +220,8 @@ def is_traffic_allowed(traffic, pod):
   if not namespace.networkPolicy.ingress.isolation:
     # If ingress isolation is disabled on the Namespace, all traffic is allowed.
     return True 
-  elif traffic.source == pod.node:
-    # Traffic is from the pod's host - this allows for kubelet health checks.
+  elif traffic.source == pod.node.kubelet:
+    # Traffic is from kubelet health checks.
     return True
   else:
     # If namespace ingress isolation is enabled, only allow traffic 
@@ -212,11 +231,15 @@ def is_traffic_allowed(traffic, pod):
         # This policy doesn't select this pod. Try the next one. 
         continue
 
+      # A null ingress list means allow all traffic.
+      if network_policy.ingress == null:
+        return True
+
       # This policy selects this pod.  Check each ingress rule 
       # defined on this policy to see if it allows the traffic.
+      # If at least one does, then the traffic is allowed.
       for ingress_rule in network_policy.ingress:
-        if ingress_rule.from.matches(traffic) and \
-             ingress_rule.ports.matches(traffic):
+        if ingress_rule.matches(traffic): 
           return True 
 
   # Ingress isolation is DefaultDeny and no policies match the given pod and traffic.
@@ -227,7 +250,7 @@ def is_traffic_allowed(traffic, pod):
 
 - A single podSelector per NetworkPolicy may lead to managing a large number of NetworkPolicy objects, each of which is small and easy to understand on its own. However, this may lead for a policy change to require touching several policy objects. Allowing an optional podSelector per ingress rule additionally to the podSelector per NetworkPolicy object would allow the user to group rules into logical segments and define size/complexity ratio where it makes sense. This may lead to a smaller number of objects with more complexity if the user opts in to the additional podSelector.  This increases the complexity of the NetworkPolicy object itself. This proposal has opted to favor a larger number of smaller objects that are easier to understand, with the understanding that additional podSelectors could be added to this design in the future should the requirement become apparent.
 
-- Is the `Namespaces` selector in the `NetworkPolicySource` struct too coarse? Do we need to support the AND combination of `Namespaces` and `Pods`?
+- Is the `Namespaces` selector in the `NetworkPolicyPeer` struct too coarse? Do we need to support the AND combination of `Namespaces` and `Pods`?
 
 ### Examples
 
@@ -239,10 +262,10 @@ apiVersion: v1
 metadata:
   name: myns
   annotations:
-    net.beta.kubernetes.io/ingress-isolation: DefaultDeny
+    net.beta.kubernetes.io/network-policy: "{\"ingress\": {\"isolation\": \"DefaultDeny\"}"
 ---
 kind: NetworkPolicy
-apiVersion: v1beta 
+apiVersion: v1beta1 
 metadata:
   name: allow-frontend
   namespace: myns
@@ -262,7 +285,7 @@ spec:
 
 ```yaml
 kind: NetworkPolicy
-apiVersion: v1beta 
+apiVersion: v1beta1 
 metadata:
   name: allow-tcp-443
 spec:
@@ -281,13 +304,11 @@ spec:
 
 ```yaml
 kind: NetworkPolicy
-apiVersion: v1beta 
+apiVersion: v1beta1 
 metadata:
   name: allow-all
 spec:
   podSelector:            
-  ingress:
-    - {}
 ```
 
 ## References
