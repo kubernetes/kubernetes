@@ -63,6 +63,7 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 	}
 
 	f.RequestReceived = request
+	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(f.StatusCode)
 	response.Write([]byte(f.ResponseBody))
 
