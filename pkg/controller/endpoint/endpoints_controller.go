@@ -213,7 +213,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 	oldPod := cur.(*api.Pod)
 	// Only need to get the old services if the labels changed.
 	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||
-		!hostNameAndDomainAnnotationsAreEqual(newPod.Annotations, oldPod.Annotations) {
+		!hostNameAndDomainAreEqual(newPod, oldPod) {
 		oldServices, err := e.getPodServiceMemberships(oldPod)
 		if err != nil {
 			glog.Errorf("Unable to get pod %v/%v's service memberships: %v", oldPod.Namespace, oldPod.Name, err)
@@ -226,15 +226,29 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 	}
 }
 
-func hostNameAndDomainAnnotationsAreEqual(annotation1, annotation2 map[string]string) bool {
-	if annotation1 == nil {
-		annotation1 = map[string]string{}
+func hostNameAndDomainAreEqual(pod1, pod2 *api.Pod) bool {
+	return getHostname(pod1) == getHostname(pod2) &&
+		getSubdomain(pod1) == getSubdomain(pod2)
+}
+
+func getHostname(pod *api.Pod) string {
+	if len(pod.Spec.Hostname) > 0 {
+		return pod.Spec.Hostname
 	}
-	if annotation2 == nil {
-		annotation2 = map[string]string{}
+	if pod.Annotations != nil {
+		return pod.Annotations[utilpod.PodHostnameAnnotation]
 	}
-	return annotation1[utilpod.PodHostnameAnnotation] == annotation2[utilpod.PodHostnameAnnotation] &&
-		annotation1[utilpod.PodSubdomainAnnotation] == annotation2[utilpod.PodSubdomainAnnotation]
+	return ""
+}
+
+func getSubdomain(pod *api.Pod) string {
+	if len(pod.Spec.Subdomain) > 0 {
+		return pod.Spec.Subdomain
+	}
+	if pod.Annotations != nil {
+		return pod.Annotations[utilpod.PodSubdomainAnnotation]
+	}
+	return ""
 }
 
 // When a pod is deleted, enqueue the services the pod used to be a member of.
@@ -364,16 +378,6 @@ func (e *EndpointController) syncService(key string) {
 				continue
 			}
 
-			hostname := pod.Annotations[utilpod.PodHostnameAnnotation]
-			if len(hostname) > 0 &&
-				pod.Annotations[utilpod.PodSubdomainAnnotation] == service.Name &&
-				service.Namespace == pod.Namespace {
-				hostRecord := endpoints.HostRecord{
-					HostName: hostname,
-				}
-				podHostNames[string(pod.Status.PodIP)] = hostRecord
-			}
-
 			epp := api.EndpointPort{Name: portName, Port: portNum, Protocol: portProto}
 			epa := api.EndpointAddress{
 				IP: pod.Status.PodIP,
@@ -384,6 +388,19 @@ func (e *EndpointController) syncService(key string) {
 					UID:             pod.ObjectMeta.UID,
 					ResourceVersion: pod.ObjectMeta.ResourceVersion,
 				}}
+
+			hostname := getHostname(pod)
+			if len(hostname) > 0 &&
+				getSubdomain(pod) == service.Name &&
+				service.Namespace == pod.Namespace {
+				hostRecord := endpoints.HostRecord{
+					HostName: hostname,
+				}
+				// TODO: stop populating podHostNames annotation in 1.4
+				podHostNames[string(pod.Status.PodIP)] = hostRecord
+				epa.Hostname = hostname
+			}
+
 			if api.IsPodReady(pod) {
 				subsets = append(subsets, api.EndpointSubset{
 					Addresses: []api.EndpointAddress{epa},
@@ -428,12 +445,10 @@ func (e *EndpointController) syncService(key string) {
 		serializedPodHostNames = string(b)
 	}
 
-	podHostNamesAreEqual := verifyPodHostNamesAreEqual(serializedPodHostNames, currentEndpoints.Annotations)
-
 	newAnnotations := make(map[string]string)
 	newAnnotations[endpoints.PodHostnamesAnnotation] = serializedPodHostNames
 	if reflect.DeepEqual(currentEndpoints.Subsets, subsets) &&
-		reflect.DeepEqual(currentEndpoints.Labels, service.Labels) && podHostNamesAreEqual {
+		reflect.DeepEqual(currentEndpoints.Labels, service.Labels) {
 		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return
 	}
@@ -459,14 +474,6 @@ func (e *EndpointController) syncService(key string) {
 		glog.Errorf("Error updating endpoints: %v", err)
 		e.queue.Add(key) // Retry
 	}
-}
-
-func verifyPodHostNamesAreEqual(newPodHostNames string, oldAnnotations map[string]string) bool {
-	oldPodHostNames := ""
-	if oldAnnotations != nil {
-		oldPodHostNames = oldAnnotations[endpoints.PodHostnamesAnnotation]
-	}
-	return oldPodHostNames == newPodHostNames
 }
 
 // checkLeftoverEndpoints lists all currently existing endpoints and adds their
