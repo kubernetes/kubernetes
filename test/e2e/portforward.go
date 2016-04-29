@@ -124,16 +124,16 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	// by the port-forward command. We don't want to hard code the port as we have no
 	// way of guaranteeing we can pick one that isn't in use, particularly on Jenkins.
 	framework.Logf("starting port-forward command and streaming output")
-	_, stderr, err := framework.StartCmdAndStreamOutput(cmd)
+	stdout, _, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
 		framework.Failf("Failed to start port-forward command: %v", err)
 	}
 
 	buf := make([]byte, 128)
 	var n int
-	framework.Logf("reading from `kubectl port-forward` command's stderr")
-	if n, err = stderr.Read(buf); err != nil {
-		framework.Failf("Failed to read from kubectl port-forward stderr: %v", err)
+	framework.Logf("reading from `kubectl port-forward` command's stdout")
+	if n, err = stdout.Read(buf); err != nil {
+		framework.Failf("Failed to read from kubectl port-forward stdout: %v", err)
 	}
 	portForwardOutput := string(buf[:n])
 	match := portForwardRegexp.FindStringSubmatch(portForwardOutput)
