@@ -23,22 +23,24 @@ import (
 
 func addDefaultingFuncs(scheme *runtime.Scheme) {
 	scheme.AddDefaultingFuncs(
-		func(obj *PetSet) {
-			labels := obj.Spec.Template.Labels
-			if labels != nil {
-				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &unversioned.LabelSelector{
-						MatchLabels: labels,
-					}
-				}
-				if len(obj.Labels) == 0 {
-					obj.Labels = labels
-				}
-			}
-			if obj.Spec.Replicas == nil {
-				obj.Spec.Replicas = new(int32)
-				*obj.Spec.Replicas = 1
-			}
-		},
+		SetDefaults_PetSet,
 	)
+}
+
+func SetDefaults_PetSet(obj *PetSet) {
+	labels := obj.Spec.Template.Labels
+	if labels != nil {
+		if obj.Spec.Selector == nil {
+			obj.Spec.Selector = &unversioned.LabelSelector{
+				MatchLabels: labels,
+			}
+		}
+		if len(obj.Labels) == 0 {
+			obj.Labels = labels
+		}
+	}
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
 }
