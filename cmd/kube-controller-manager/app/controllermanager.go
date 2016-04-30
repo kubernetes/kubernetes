@@ -197,9 +197,13 @@ func Run(s *options.CMServer) error {
 func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig *restclient.Config, stop <-chan struct{}) error {
 	podInformer := informers.CreateSharedPodIndexInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "pod-informer")), ResyncPeriod(s)())
 	nodeInformer := informers.CreateSharedNodeIndexInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "node-informer")), ResyncPeriod(s)())
+	pvcInformer := informers.CreateSharedPVCIndexInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "pvc-informer")), ResyncPeriod(s)())
+	pvInformer := informers.CreateSharedPVIndexInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "pv-informer")), ResyncPeriod(s)())
 	informers := map[reflect.Type]framework.SharedIndexInformer{}
 	informers[reflect.TypeOf(&api.Pod{})] = podInformer
 	informers[reflect.TypeOf(&api.Node{})] = nodeInformer
+	informers[reflect.TypeOf(&api.PersistentVolumeClaim{})] = pvcInformer
+	informers[reflect.TypeOf(&api.PersistentVolume{})] = pvInformer
 
 	go endpointcontroller.NewEndpointController(podInformer, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "endpoint-controller"))).
 		Run(int(s.ConcurrentEndpointSyncs), wait.NeverStop)
@@ -391,9 +395,21 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	volumeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	go volume.NewAttachDetachController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "attachdetach-controller")), podInformer, nodeInformer, ResyncPeriod(s)()).
-		Run(wait.NeverStop)
-	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+	attachDetachController, attachDetachControllerErr :=
+		volume.NewAttachDetachController(
+			clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "attachdetach-controller")),
+			podInformer,
+			nodeInformer,
+			pvcInformer,
+			pvInformer,
+			cloud,
+			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
+	if attachDetachControllerErr != nil {
+		glog.Fatalf("Failed to start attach/detach controller: %v", attachDetachControllerErr)
+	} else {
+		go attachDetachController.Run(wait.NeverStop)
+		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+	}
 
 	var rootCA []byte
 

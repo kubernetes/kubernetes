@@ -146,6 +146,7 @@ federated-api-qps
 file-check-frequency
 file-suffix
 file_content_in_loop
+flex-volume-plugin-dir
 forward-services
 framework-name
 framework-store-uri
