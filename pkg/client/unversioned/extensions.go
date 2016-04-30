@@ -74,8 +74,8 @@ func (c *ExtensionsClient) Ingress(namespace string) IngressInterface {
 	return newIngress(c, namespace)
 }
 
-func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResourceInterface {
-	return newThirdPartyResources(c, namespace)
+func (c *ExtensionsClient) ThirdPartyResources() ThirdPartyResourceInterface {
+	return newThirdPartyResources(c)
 }
 
 func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {

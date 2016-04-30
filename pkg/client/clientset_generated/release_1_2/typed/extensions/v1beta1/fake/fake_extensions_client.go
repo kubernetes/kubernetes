@@ -53,6 +53,6 @@ func (c *FakeExtensions) Scales(namespace string) v1beta1.ScaleInterface {
 	return &FakeScales{c, namespace}
 }
 
-func (c *FakeExtensions) ThirdPartyResources(namespace string) v1beta1.ThirdPartyResourceInterface {
-	return &FakeThirdPartyResources{c, namespace}
+func (c *FakeExtensions) ThirdPartyResources() v1beta1.ThirdPartyResourceInterface {
+	return &FakeThirdPartyResources{c}
 }

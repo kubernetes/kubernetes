@@ -28,15 +28,13 @@ import (
 // FakeThirdPartyResources implements ThirdPartyResourceInterface
 type FakeThirdPartyResources struct {
 	Fake *FakeExtensions
-	ns   string
 }
 
 var thirdpartyresourcesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "thirdpartyresources"}
 
 func (c *FakeThirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(thirdpartyresourcesResource, c.ns, thirdPartyResource), &extensions.ThirdPartyResource{})
-
+		Invokes(core.NewRootCreateAction(thirdpartyresourcesResource, thirdPartyResource), &extensions.ThirdPartyResource{})
 	if obj == nil {
 		return nil, err
 	}
@@ -45,8 +43,7 @@ func (c *FakeThirdPartyResources) Create(thirdPartyResource *extensions.ThirdPar
 
 func (c *FakeThirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(thirdpartyresourcesResource, c.ns, thirdPartyResource), &extensions.ThirdPartyResource{})
-
+		Invokes(core.NewRootUpdateAction(thirdpartyresourcesResource, thirdPartyResource), &extensions.ThirdPartyResource{})
 	if obj == nil {
 		return nil, err
 	}
@@ -55,13 +52,12 @@ func (c *FakeThirdPartyResources) Update(thirdPartyResource *extensions.ThirdPar
 
 func (c *FakeThirdPartyResources) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(thirdpartyresourcesResource, c.ns, name), &extensions.ThirdPartyResource{})
-
+		Invokes(core.NewRootDeleteAction(thirdpartyresourcesResource, name), &extensions.ThirdPartyResource{})
 	return err
 }
 
 func (c *FakeThirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction(thirdpartyresourcesResource, c.ns, listOptions)
+	action := core.NewRootDeleteCollectionAction(thirdpartyresourcesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.ThirdPartyResourceList{})
 	return err
@@ -69,8 +65,7 @@ func (c *FakeThirdPartyResources) DeleteCollection(options *api.DeleteOptions, l
 
 func (c *FakeThirdPartyResources) Get(name string) (result *extensions.ThirdPartyResource, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(thirdpartyresourcesResource, c.ns, name), &extensions.ThirdPartyResource{})
-
+		Invokes(core.NewRootGetAction(thirdpartyresourcesResource, name), &extensions.ThirdPartyResource{})
 	if obj == nil {
 		return nil, err
 	}
@@ -79,8 +74,7 @@ func (c *FakeThirdPartyResources) Get(name string) (result *extensions.ThirdPart
 
 func (c *FakeThirdPartyResources) List(opts api.ListOptions) (result *extensions.ThirdPartyResourceList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(thirdpartyresourcesResource, c.ns, opts), &extensions.ThirdPartyResourceList{})
-
+		Invokes(core.NewRootListAction(thirdpartyresourcesResource, opts), &extensions.ThirdPartyResourceList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -101,6 +95,5 @@ func (c *FakeThirdPartyResources) List(opts api.ListOptions) (result *extensions
 // Watch returns a watch.Interface that watches the requested thirdPartyResources.
 func (c *FakeThirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(thirdpartyresourcesResource, c.ns, opts))
-
+		InvokesWatch(core.NewRootWatchAction(thirdpartyresourcesResource, opts))
 }
