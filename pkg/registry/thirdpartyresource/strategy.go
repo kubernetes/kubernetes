@@ -45,7 +45,7 @@ var _ = rest.RESTCreateStrategy(Strategy)
 var _ = rest.RESTUpdateStrategy(Strategy)
 
 func (strategy) NamespaceScoped() bool {
-	return true
+	return false
 }
 
 func (strategy) PrepareForCreate(obj runtime.Object) {
