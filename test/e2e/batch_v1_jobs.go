@@ -46,9 +46,9 @@ const (
 
 var _ = framework.KubeDescribe("V1Job", func() {
 	f := framework.NewDefaultFramework("v1job")
-	parallelism := 2
-	completions := 4
-	lotsOfFailures := 5 // more than completions
+	parallelism := int32(2)
+	completions := int32(4)
+	lotsOfFailures := int32(5) // more than completions
 
 	// Simplest case: all pods succeed promptly
 	It("should run a job to completion when tasks succeed", func() {
@@ -116,8 +116,8 @@ var _ = framework.KubeDescribe("V1Job", func() {
 	})
 
 	It("should scale a job up", func() {
-		startParallelism := 1
-		endParallelism := 2
+		startParallelism := int32(1)
+		endParallelism := int32(2)
 		By("Creating a job")
 		job := newTestV1Job("notTerminate", "scale-up", api.RestartPolicyNever, startParallelism, completions)
 		job, err := createV1Job(f.Client, f.Namespace.Name, job)
@@ -141,8 +141,8 @@ var _ = framework.KubeDescribe("V1Job", func() {
 	})
 
 	It("should scale a job down", func() {
-		startParallelism := 2
-		endParallelism := 1
+		startParallelism := int32(2)
+		endParallelism := int32(1)
 		By("Creating a job")
 		job := newTestV1Job("notTerminate", "scale-down", api.RestartPolicyNever, startParallelism, completions)
 		job, err := createV1Job(f.Client, f.Namespace.Name, job)
@@ -203,7 +203,7 @@ var _ = framework.KubeDescribe("V1Job", func() {
 })
 
 // newTestV1Job returns a job which does one of several testing behaviors.
-func newTestV1Job(behavior, name string, rPol api.RestartPolicy, parallelism, completions int) *batch.Job {
+func newTestV1Job(behavior, name string, rPol api.RestartPolicy, parallelism, completions int32) *batch.Job {
 	job := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -273,7 +273,7 @@ func deleteV1Job(c *client.Client, ns, name string) error {
 }
 
 // Wait for all pods to become Running.  Only use when pods will run for a long time, or it will be racy.
-func waitForAllPodsRunningV1(c *client.Client, ns, jobName string, parallelism int) error {
+func waitForAllPodsRunningV1(c *client.Client, ns, jobName string, parallelism int32) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{v1JobSelectorKey: jobName}))
 	return wait.Poll(framework.Poll, v1JobTimeout, func() (bool, error) {
 		options := api.ListOptions{LabelSelector: label}
@@ -281,7 +281,7 @@ func waitForAllPodsRunningV1(c *client.Client, ns, jobName string, parallelism i
 		if err != nil {
 			return false, err
 		}
-		count := 0
+		count := int32(0)
 		for _, p := range pods.Items {
 			if p.Status.Phase == api.PodRunning {
 				count++
@@ -292,7 +292,7 @@ func waitForAllPodsRunningV1(c *client.Client, ns, jobName string, parallelism i
 }
 
 // Wait for job to reach completions.
-func waitForV1JobFinish(c *client.Client, ns, jobName string, completions int) error {
+func waitForV1JobFinish(c *client.Client, ns, jobName string, completions int32) error {
 	return wait.Poll(framework.Poll, v1JobTimeout, func() (bool, error) {
 		curr, err := c.Batch().Jobs(ns).Get(jobName)
 		if err != nil {

@@ -267,7 +267,7 @@ func TestPodFitsHost(t *testing.T) {
 func newPod(host string, hostPorts ...int) *api.Pod {
 	networkPorts := []api.ContainerPort{}
 	for _, port := range hostPorts {
-		networkPorts = append(networkPorts, api.ContainerPort{HostPort: port})
+		networkPorts = append(networkPorts, api.ContainerPort{HostPort: int32(port)})
 	}
 	return &api.Pod{
 		Spec: api.PodSpec{
@@ -1487,7 +1487,7 @@ func TestPredicatesRegistered(t *testing.T) {
 func newPodWithPort(hostPorts ...int) *api.Pod {
 	networkPorts := []api.ContainerPort{}
 	for _, port := range hostPorts {
-		networkPorts = append(networkPorts, api.ContainerPort{HostPort: port})
+		networkPorts = append(networkPorts, api.ContainerPort{HostPort: int32(port)})
 	}
 	return &api.Pod{
 		Spec: api.PodSpec{

@@ -60,7 +60,7 @@ func NewHollowProxyOrDie(
 ) *HollowProxy {
 	// Create and start Hollow Proxy
 	config := options.NewProxyConfig()
-	config.OOMScoreAdj = util.IntPtr(0)
+	config.OOMScoreAdj = util.Int32Ptr(0)
 	config.ResourceContainer = ""
 	config.NodeRef = &api.ObjectReference{
 		Kind:      "Node",

@@ -72,7 +72,7 @@ func (s *NodeAffinity) CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInf
 
 			for _, node := range nodes.Items {
 				if nodeSelector.Matches(labels.Set(node.Labels)) {
-					counts[node.Name] += preferredSchedulingTerm.Weight
+					counts[node.Name] += int(preferredSchedulingTerm.Weight)
 				}
 
 				if counts[node.Name] > maxCount {

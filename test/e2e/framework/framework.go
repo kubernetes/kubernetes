@@ -410,7 +410,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 		} else {
 			return []api.ServicePort{{
 				Protocol:   "TCP",
-				Port:       svcPort,
+				Port:       int32(svcPort),
 				TargetPort: intstr.FromInt(contPort),
 			}}
 		}

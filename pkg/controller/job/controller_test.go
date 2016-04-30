@@ -37,7 +37,7 @@ import (
 
 var alwaysReady = func() bool { return true }
 
-func newJob(parallelism, completions int) *batch.Job {
+func newJob(parallelism, completions int32) *batch.Job {
 	j := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foobar",
@@ -86,9 +86,9 @@ func getKey(job *batch.Job, t *testing.T) string {
 }
 
 // create count pods with the given phase for the given job
-func newPodList(count int, status api.PodPhase, job *batch.Job) []api.Pod {
+func newPodList(count int32, status api.PodPhase, job *batch.Job) []api.Pod {
 	pods := []api.Pod{}
-	for i := 0; i < count; i++ {
+	for i := int32(0); i < count; i++ {
 		newPod := api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%v", rand.String(10)),
@@ -105,21 +105,21 @@ func newPodList(count int, status api.PodPhase, job *batch.Job) []api.Pod {
 func TestControllerSyncJob(t *testing.T) {
 	testCases := map[string]struct {
 		// job setup
-		parallelism int
-		completions int
+		parallelism int32
+		completions int32
 
 		// pod setup
 		podControllerError error
-		activePods         int
-		succeededPods      int
-		failedPods         int
+		activePods         int32
+		succeededPods      int32
+		failedPods         int32
 
 		// expectations
-		expectedCreations int
-		expectedDeletions int
-		expectedActive    int
-		expectedSucceeded int
-		expectedFailed    int
+		expectedCreations int32
+		expectedDeletions int32
+		expectedActive    int32
+		expectedSucceeded int32
+		expectedFailed    int32
 		expectedComplete  bool
 	}{
 		"job start": {
@@ -237,10 +237,10 @@ func TestControllerSyncJob(t *testing.T) {
 		}
 
 		// validate created/deleted pods
-		if len(fakePodControl.Templates) != tc.expectedCreations {
+		if int32(len(fakePodControl.Templates)) != tc.expectedCreations {
 			t.Errorf("%s: unexpected number of creates.  Expected %d, saw %d\n", name, tc.expectedCreations, len(fakePodControl.Templates))
 		}
-		if len(fakePodControl.DeletePodName) != tc.expectedDeletions {
+		if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
 			t.Errorf("%s: unexpected number of deletes.  Expected %d, saw %d\n", name, tc.expectedDeletions, len(fakePodControl.DeletePodName))
 		}
 		// validate status
@@ -266,21 +266,21 @@ func TestControllerSyncJob(t *testing.T) {
 func TestSyncJobPastDeadline(t *testing.T) {
 	testCases := map[string]struct {
 		// job setup
-		parallelism           int
-		completions           int
+		parallelism           int32
+		completions           int32
 		activeDeadlineSeconds int64
 		startTime             int64
 
 		// pod setup
-		activePods    int
-		succeededPods int
-		failedPods    int
+		activePods    int32
+		succeededPods int32
+		failedPods    int32
 
 		// expectations
-		expectedDeletions int
-		expectedActive    int
-		expectedSucceeded int
-		expectedFailed    int
+		expectedDeletions int32
+		expectedActive    int32
+		expectedSucceeded int32
+		expectedFailed    int32
 	}{
 		"activeDeadlineSeconds less than single pod execution": {
 			1, 1, 10, 15,
@@ -335,10 +335,10 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		}
 
 		// validate created/deleted pods
-		if len(fakePodControl.Templates) != 0 {
+		if int32(len(fakePodControl.Templates)) != 0 {
 			t.Errorf("%s: unexpected number of creates.  Expected 0, saw %d\n", name, len(fakePodControl.Templates))
 		}
-		if len(fakePodControl.DeletePodName) != tc.expectedDeletions {
+		if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
 			t.Errorf("%s: unexpected number of deletes.  Expected %d, saw %d\n", name, tc.expectedDeletions, len(fakePodControl.DeletePodName))
 		}
 		// validate status

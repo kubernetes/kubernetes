@@ -156,7 +156,7 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 			Namespace: namespace,
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: target,
+			Replicas: int32(target),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -194,7 +194,7 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 
 		switch cast := event.Object.(type) {
 		case *api.ReplicationController:
-			if cast.Status.Replicas == target {
+			if int(cast.Status.Replicas) == target {
 				return true, nil
 			}
 		}

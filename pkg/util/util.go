@@ -122,9 +122,24 @@ func IntPtr(i int) *int {
 	return &o
 }
 
+// Int32Ptr returns a pointer to an int32
+func Int32Ptr(i int32) *int32 {
+	o := i
+	return &o
+}
+
 // IntPtrDerefOr dereference the int ptr and returns it i not nil,
 // else returns def.
 func IntPtrDerefOr(ptr *int, def int) int {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
+}
+
+// Int32PtrDerefOr dereference the int32 ptr and returns it i not nil,
+// else returns def.
+func Int32PtrDerefOr(ptr *int32, def int32) int32 {
 	if ptr != nil {
 		return *ptr
 	}

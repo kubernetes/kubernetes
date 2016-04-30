@@ -53,7 +53,7 @@ const (
 	testPort                  = 9376
 )
 
-func resizeGroup(size int) error {
+func resizeGroup(size int32) error {
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 		defer framework.CoreDump(framework.TestContext.ReportDir)
@@ -70,7 +70,7 @@ func resizeGroup(size int) error {
 		return err
 	} else if framework.TestContext.Provider == "aws" {
 		client := autoscaling.New(session.New())
-		return awscloud.ResizeInstanceGroup(client, framework.TestContext.CloudConfig.NodeInstanceGroup, size)
+		return awscloud.ResizeInstanceGroup(client, framework.TestContext.CloudConfig.NodeInstanceGroup, int(size))
 	} else {
 		return fmt.Errorf("Provider does not support InstanceGroups")
 	}
@@ -103,7 +103,7 @@ func groupSize() (int, error) {
 	}
 }
 
-func waitForGroupSize(size int) error {
+func waitForGroupSize(size int32) error {
 	timeout := 10 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		currentSize, err := groupSize()
@@ -111,7 +111,7 @@ func waitForGroupSize(size int) error {
 			framework.Logf("Failed to get node instance group size: %v", err)
 			continue
 		}
-		if currentSize != size {
+		if currentSize != int(size) {
 			framework.Logf("Waiting for node instance group size %d, current size %d", size, currentSize)
 			continue
 		}
@@ -132,7 +132,7 @@ func svcByName(name string, port int) *api.Service {
 				"name": name,
 			},
 			Ports: []api.ServicePort{{
-				Port:       port,
+				Port:       int32(port),
 				TargetPort: intstr.FromInt(port),
 			}},
 		},
@@ -176,22 +176,22 @@ func newPodOnNode(c *client.Client, namespace, podName, nodeName string) error {
 	return err
 }
 
-func rcByName(name string, replicas int, image string, labels map[string]string) *api.ReplicationController {
+func rcByName(name string, replicas int32, image string, labels map[string]string) *api.ReplicationController {
 	return rcByNameContainer(name, replicas, image, labels, api.Container{
 		Name:  name,
 		Image: image,
 	})
 }
 
-func rcByNamePort(name string, replicas int, image string, port int, protocol api.Protocol, labels map[string]string) *api.ReplicationController {
+func rcByNamePort(name string, replicas int32, image string, port int, protocol api.Protocol, labels map[string]string) *api.ReplicationController {
 	return rcByNameContainer(name, replicas, image, labels, api.Container{
 		Name:  name,
 		Image: image,
-		Ports: []api.ContainerPort{{ContainerPort: port, Protocol: protocol}},
+		Ports: []api.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
 	})
 }
 
-func rcByNameContainer(name string, replicas int, image string, labels map[string]string, c api.Container) *api.ReplicationController {
+func rcByNameContainer(name string, replicas int32, image string, labels map[string]string, c api.Container) *api.ReplicationController {
 	// Add "name": name to the labels, overwriting if it exists.
 	labels["name"] = name
 	gracePeriod := int64(0)
@@ -222,13 +222,13 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 }
 
 // newRCByName creates a replication controller with a selector by name of name.
-func newRCByName(c *client.Client, ns, name string, replicas int) (*api.ReplicationController, error) {
+func newRCByName(c *client.Client, ns, name string, replicas int32) (*api.ReplicationController, error) {
 	By(fmt.Sprintf("creating replication controller %s", name))
 	return c.ReplicationControllers(ns).Create(rcByNamePort(
 		name, replicas, serveHostnameImage, 9376, api.ProtocolTCP, map[string]string{}))
 }
 
-func resizeRC(c *client.Client, ns, name string, replicas int) error {
+func resizeRC(c *client.Client, ns, name string, replicas int32) error {
 	rc, err := c.ReplicationControllers(ns).Get(name)
 	if err != nil {
 		return err
@@ -285,7 +285,7 @@ func getNodeExternalIP(node *api.Node) string {
 // At the end (even in case of errors), the network traffic is brought back to normal.
 // This function executes commands on a node so it will work only for some
 // environments.
-func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replicas int, podNameToDisappear string, node *api.Node) {
+func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replicas int32, podNameToDisappear string, node *api.Node) {
 	host := getNodeExternalIP(node)
 	master := getMaster(c)
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
@@ -343,7 +343,7 @@ func expectNodeReadiness(isReady bool, newNode chan *api.Node) {
 
 var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 	f := framework.NewDefaultFramework("resize-nodes")
-	var systemPodsNo int
+	var systemPodsNo int32
 	var c *client.Client
 	var ns string
 	BeforeEach(func() {
@@ -351,7 +351,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 		ns = f.Namespace.Name
 		systemPods, err := c.Pods(api.NamespaceSystem).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		systemPodsNo = len(systemPods.Items)
+		systemPodsNo = int32(len(systemPods.Items))
 	})
 
 	// Slow issue #13323 (8 min)
@@ -371,7 +371,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			}
 
 			By("restoring the original node instance group size")
-			if err := resizeGroup(framework.TestContext.CloudConfig.NumNodes); err != nil {
+			if err := resizeGroup(int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
@@ -386,7 +386,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 				By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
-			if err := waitForGroupSize(framework.TestContext.CloudConfig.NumNodes); err != nil {
+			if err := waitForGroupSize(int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			if err := framework.WaitForClusterSize(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
@@ -404,7 +404,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
-			replicas := framework.TestContext.CloudConfig.NumNodes
+			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
 			newRCByName(c, ns, name, replicas)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
@@ -414,7 +414,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas - 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForClusterSize(c, replicas-1, 10*time.Minute)
+			err = framework.WaitForClusterSize(c, int(replicas-1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying whether the pods from the removed node are recreated")
@@ -428,7 +428,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
 			newSVCByName(c, ns, name)
-			replicas := framework.TestContext.CloudConfig.NumNodes
+			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
 			newRCByName(c, ns, name, replicas)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
@@ -438,7 +438,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = waitForGroupSize(replicas + 1)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForClusterSize(c, replicas+1, 10*time.Minute)
+			err = framework.WaitForClusterSize(c, int(replicas+1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))
@@ -469,7 +469,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 				// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 				name := "my-hostname-net"
 				newSVCByName(c, ns, name)
-				replicas := framework.TestContext.CloudConfig.NumNodes
+				replicas := int32(framework.TestContext.CloudConfig.NumNodes)
 				newRCByName(c, ns, name, replicas)
 				err := framework.VerifyPods(c, ns, name, true, replicas)
 				Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")

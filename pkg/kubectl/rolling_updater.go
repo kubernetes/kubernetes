@@ -114,7 +114,7 @@ type RollingUpdater struct {
 	// cleanup performs post deployment cleanup tasks for newRc and oldRc.
 	cleanup func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error
 	// getReadyPods returns the amount of old and new ready pods.
-	getReadyPods func(oldRc, newRc *api.ReplicationController) (int, int, error)
+	getReadyPods func(oldRc, newRc *api.ReplicationController) (int32, int32, error)
 }
 
 // NewRollingUpdater creates a RollingUpdater from a client.
@@ -169,11 +169,12 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		fmt.Fprintf(out, "Created %s\n", newRc.Name)
 	}
 	// Extract the desired replica count from the controller.
-	desired, err := strconv.Atoi(newRc.Annotations[desiredReplicasAnnotation])
+	desiredAnnotation, err := strconv.Atoi(newRc.Annotations[desiredReplicasAnnotation])
 	if err != nil {
 		return fmt.Errorf("Unable to parse annotation for %s: %s=%s",
 			newRc.Name, desiredReplicasAnnotation, newRc.Annotations[desiredReplicasAnnotation])
 	}
+	desired := int32(desiredAnnotation)
 	// Extract the original replica count from the old controller, adding the
 	// annotation if it doesn't yet exist.
 	_, hasOriginalAnnotation := oldRc.Annotations[originalReplicasAnnotation]
@@ -185,7 +186,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		if existing.Annotations == nil {
 			existing.Annotations = map[string]string{}
 		}
-		existing.Annotations[originalReplicasAnnotation] = strconv.Itoa(existing.Spec.Replicas)
+		existing.Annotations[originalReplicasAnnotation] = strconv.Itoa(int(existing.Spec.Replicas))
 		updated, err := r.c.ReplicationControllers(existing.Namespace).Update(existing)
 		if err != nil {
 			return err
@@ -204,7 +205,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	}
 	// The minumum pods which must remain available througout the update
 	// calculated for internal convenience.
-	minAvailable := integer.IntMax(0, desired-maxUnavailable)
+	minAvailable := int32(integer.IntMax(0, int(desired-maxUnavailable)))
 	// If the desired new scale is 0, then the max unavailable is necessarily
 	// the effective scale of the old RC regardless of the configuration
 	// (equivalent to 100% maxUnavailable).
@@ -258,7 +259,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 // scaleUp scales up newRc to desired by whatever increment is possible given
 // the configured surge threshold. scaleUp will safely no-op as necessary when
 // it detects redundancy or other relevant conditions.
-func (r *RollingUpdater) scaleUp(newRc, oldRc *api.ReplicationController, desired, maxSurge, maxUnavailable int, scaleRetryParams *RetryParams, config *RollingUpdaterConfig) (*api.ReplicationController, error) {
+func (r *RollingUpdater) scaleUp(newRc, oldRc *api.ReplicationController, desired, maxSurge, maxUnavailable int32, scaleRetryParams *RetryParams, config *RollingUpdaterConfig) (*api.ReplicationController, error) {
 	// If we're already at the desired, do nothing.
 	if newRc.Spec.Replicas == desired {
 		return newRc, nil
@@ -291,7 +292,7 @@ func (r *RollingUpdater) scaleUp(newRc, oldRc *api.ReplicationController, desire
 // scaleDown scales down oldRc to 0 at whatever decrement possible given the
 // thresholds defined on the config. scaleDown will safely no-op as necessary
 // when it detects redundancy or other relevant conditions.
-func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desired, minAvailable, maxUnavailable, maxSurge int, config *RollingUpdaterConfig) (*api.ReplicationController, error) {
+func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desired, minAvailable, maxUnavailable, maxSurge int32, config *RollingUpdaterConfig) (*api.ReplicationController, error) {
 	// Already scaled down; do nothing.
 	if oldRc.Spec.Replicas == 0 {
 		return oldRc, nil
@@ -356,10 +357,10 @@ func (r *RollingUpdater) scaleAndWaitWithScaler(rc *api.ReplicationController, r
 // readyPods returns the old and new ready counts for their pods.
 // If a pod is observed as being ready, it's considered ready even
 // if it later becomes notReady.
-func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController) (int, int, error) {
+func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController) (int32, int32, error) {
 	controllers := []*api.ReplicationController{oldRc, newRc}
-	oldReady := 0
-	newReady := 0
+	oldReady := int32(0)
+	newReady := int32(0)
 
 	for i := range controllers {
 		controller := controllers[i]

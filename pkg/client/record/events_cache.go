@@ -236,7 +236,7 @@ func (e *eventLogger) eventObserve(newEvent *api.Event) (*api.Event, []byte, err
 		event.Name = lastObservation.name
 		event.ResourceVersion = lastObservation.resourceVersion
 		event.FirstTimestamp = lastObservation.firstTimestamp
-		event.Count = lastObservation.count + 1
+		event.Count = int32(lastObservation.count) + 1
 
 		eventCopy2 := *event
 		eventCopy2.Count = 0
@@ -251,7 +251,7 @@ func (e *eventLogger) eventObserve(newEvent *api.Event) (*api.Event, []byte, err
 	e.cache.Add(
 		key,
 		eventLog{
-			count:           event.Count,
+			count:           int(event.Count),
 			firstTimestamp:  event.FirstTimestamp,
 			name:            event.Name,
 			resourceVersion: event.ResourceVersion,
@@ -269,7 +269,7 @@ func (e *eventLogger) updateState(event *api.Event) {
 	e.cache.Add(
 		key,
 		eventLog{
-			count:           event.Count,
+			count:           int(event.Count),
 			firstTimestamp:  event.FirstTimestamp,
 			name:            event.Name,
 			resourceVersion: event.ResourceVersion,

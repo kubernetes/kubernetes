@@ -73,7 +73,7 @@ func (m *SchedulerServer) createSchedulerServiceIfNeeded(serviceName string, ser
 			Labels:    map[string]string{"provider": "k8sm", "component": "scheduler"},
 		},
 		Spec: api.ServiceSpec{
-			Ports: []api.ServicePort{{Port: servicePort, Protocol: api.ProtocolTCP}},
+			Ports: []api.ServicePort{{Port: int32(servicePort), Protocol: api.ProtocolTCP}},
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			SessionAffinity: api.ServiceAffinityNone,
@@ -96,7 +96,7 @@ func (m *SchedulerServer) setEndpoints(serviceName string, ip net.IP, port int) 
 	// The setting we want to find.
 	want := []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{{IP: ip.String()}},
-		Ports:     []api.EndpointPort{{Port: port, Protocol: api.ProtocolTCP}},
+		Ports:     []api.EndpointPort{{Port: int32(port), Protocol: api.ProtocolTCP}},
 	}}
 
 	ctx := api.NewDefaultContext()

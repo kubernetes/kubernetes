@@ -94,7 +94,7 @@ func (plugin *awsElasticBlockStorePlugin) newMounterInternal(spec *volume.Spec, 
 	fsType := ebs.FSType
 	partition := ""
 	if ebs.Partition != 0 {
-		partition = strconv.Itoa(ebs.Partition)
+		partition = strconv.Itoa(int(ebs.Partition))
 	}
 
 	return &awsElasticBlockStoreMounter{
