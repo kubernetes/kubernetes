@@ -214,7 +214,6 @@ func newServerTest() *serverTestFramework {
 		true,
 		&kubecontainertesting.Mock{})
 	fw.serverUnderTest = &server
-	// TODO: Close() this when fix #19254
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
 }
@@ -244,6 +243,7 @@ func getPodName(name, namespace string) string {
 
 func TestContainerInfo(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	expectedInfo := &cadvisorapi.ContainerInfo{}
 	podID := "somepod"
 	expectedPodID := getPodName(podID, "")
@@ -272,6 +272,7 @@ func TestContainerInfo(t *testing.T) {
 
 func TestContainerInfoWithUidNamespace(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	expectedInfo := &cadvisorapi.ContainerInfo{}
 	podID := "somepod"
 	expectedNamespace := "custom"
@@ -302,6 +303,7 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 
 func TestContainerNotFound(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	podID := "somepod"
 	expectedNamespace := "custom"
 	expectedContainerName := "slowstartcontainer"
@@ -321,6 +323,7 @@ func TestContainerNotFound(t *testing.T) {
 
 func TestRootInfo(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	expectedInfo := &cadvisorapi.ContainerInfo{
 		ContainerReference: cadvisorapi.ContainerReference{
 			Name: "/",
@@ -349,6 +352,7 @@ func TestRootInfo(t *testing.T) {
 
 func TestSubcontainerContainerInfo(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	const kubeletContainer = "/kubelet"
 	const kubeletSubContainer = "/kubelet/sub"
 	expectedInfo := map[string]*cadvisorapi.ContainerInfo{
@@ -394,6 +398,7 @@ func TestSubcontainerContainerInfo(t *testing.T) {
 
 func TestMachineInfo(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	expectedInfo := &cadvisorapi.MachineInfo{
 		NumCores:       4,
 		MemoryCapacity: 1024,
@@ -419,6 +424,7 @@ func TestMachineInfo(t *testing.T) {
 
 func TestServeLogs(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 
 	content := string(`<pre><a href="kubelet.log">kubelet.log</a><a href="google.log">google.log</a></pre>`)
 
@@ -447,6 +453,7 @@ func TestServeLogs(t *testing.T) {
 
 func TestServeRunInContainer(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
@@ -487,6 +494,7 @@ func TestServeRunInContainer(t *testing.T) {
 
 func TestServeRunInContainerWithUID(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
@@ -531,6 +539,7 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 
 func TestHealthCheck(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
 	}
@@ -563,6 +572,7 @@ type authTestCase struct {
 
 func TestAuthFilters(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 
 	testcases := []authTestCase{}
 
@@ -665,6 +675,7 @@ func TestAuthenticationFailure(t *testing.T) {
 	)
 
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
 		calledAuthenticate = true
 		return nil, false, nil
@@ -702,6 +713,7 @@ func TestAuthorizationSuccess(t *testing.T) {
 	)
 
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
 		calledAuthenticate = true
 		return expectedUser, true, nil
@@ -730,6 +742,7 @@ func TestAuthorizationSuccess(t *testing.T) {
 
 func TestSyncLoopCheck(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
 	}
@@ -746,6 +759,7 @@ func TestSyncLoopCheck(t *testing.T) {
 
 func TestPLEGHealthCheck(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
 	}
@@ -814,6 +828,7 @@ func setGetContainerLogsFunc(fw *serverTestFramework, t *testing.T, expectedPodN
 // TODO: I really want to be a table driven test
 func TestContainerLogs(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
@@ -839,6 +854,7 @@ func TestContainerLogs(t *testing.T) {
 
 func TestContainerLogsWithLimitBytes(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
@@ -865,6 +881,7 @@ func TestContainerLogsWithLimitBytes(t *testing.T) {
 
 func TestContainerLogsWithTail(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
@@ -891,6 +908,7 @@ func TestContainerLogsWithTail(t *testing.T) {
 
 func TestContainerLogsWithLegacyTail(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
@@ -917,6 +935,7 @@ func TestContainerLogsWithLegacyTail(t *testing.T) {
 
 func TestContainerLogsWithTailAll(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
@@ -942,6 +961,7 @@ func TestContainerLogsWithTailAll(t *testing.T) {
 
 func TestContainerLogsWithInvalidTail(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
@@ -961,6 +981,7 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 
 func TestContainerLogsWithFollow(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
@@ -986,6 +1007,7 @@ func TestContainerLogsWithFollow(t *testing.T) {
 
 func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 
 	fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
 		return 100 * time.Millisecond
@@ -1041,6 +1063,7 @@ func testExecAttach(t *testing.T, verb string) {
 
 	for i, test := range tests {
 		fw := newServerTest()
+		defer fw.testHTTPServer.Close()
 
 		fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
 			return 0
@@ -1293,6 +1316,7 @@ func TestServeAttachContainer(t *testing.T) {
 
 func TestServePortForwardIdleTimeout(t *testing.T) {
 	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
 
 	fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
 		return 100 * time.Millisecond
@@ -1351,6 +1375,7 @@ func TestServePortForward(t *testing.T) {
 
 	for i, test := range tests {
 		fw := newServerTest()
+		defer fw.testHTTPServer.Close()
 
 		fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
 			return 0
