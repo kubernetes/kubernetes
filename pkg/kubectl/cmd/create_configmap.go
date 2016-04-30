@@ -40,19 +40,19 @@ symlinks, devices, pipes, etc).
 `
 
 	configMapExample = `  # Create a new configmap named my-config with keys for each file in folder bar
-  kubectl create configmap generic my-config --from-file=path/to/bar
+  kubectl create configmap my-config --from-file=path/to/bar
 
   # Create a new configmap named my-config with specified keys instead of names on disk
-  kubectl create configmap generic my-config --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
+  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt
 
   # Create a new configMap named my-config with key1=config1 and key2=config2
-  kubectl create configmap generic my-config --from-literal=key1=config1 --from-literal=key2=config2`
+  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2`
 )
 
 // ConfigMap is a command to ease creating ConfigMaps.
 func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "configmap NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Use:     "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
 		Short:   "Create a configMap from a local file, directory or literal value.",
 		Long:    configMapLong,
 		Example: configMapExample,
@@ -70,7 +70,7 @@ func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	return cmd
 }
 
-// CreateConfigMap is the implementation of the create configmap generic command.
+// CreateConfigMap is the implementation of the create configmap command.
 func CreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
