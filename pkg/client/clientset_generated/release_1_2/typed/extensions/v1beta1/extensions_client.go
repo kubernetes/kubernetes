@@ -66,8 +66,8 @@ func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
 	return newScales(c, namespace)
 }
 
-func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResourceInterface {
-	return newThirdPartyResources(c, namespace)
+func (c *ExtensionsClient) ThirdPartyResources() ThirdPartyResourceInterface {
+	return newThirdPartyResources(c)
 }
 
 // NewForConfig creates a new ExtensionsClient for the given config.

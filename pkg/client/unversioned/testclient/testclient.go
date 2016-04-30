@@ -374,8 +374,8 @@ func (c *FakeExperimental) Ingress(namespace string) client.IngressInterface {
 	return &FakeIngress{Fake: c, Namespace: namespace}
 }
 
-func (c *FakeExperimental) ThirdPartyResources(namespace string) client.ThirdPartyResourceInterface {
-	return &FakeThirdPartyResources{Fake: c, Namespace: namespace}
+func (c *FakeExperimental) ThirdPartyResources() client.ThirdPartyResourceInterface {
+	return &FakeThirdPartyResources{Fake: c}
 }
 
 func (c *FakeExperimental) ReplicaSets(namespace string) client.ReplicaSetInterface {
