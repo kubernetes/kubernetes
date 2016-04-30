@@ -570,24 +570,12 @@ func TestMetaValues(t *testing.T) {
 	err := s.AddConversionFuncs(
 		func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
 			t.Logf("internal -> external")
-			if e, a := internalGV.String(), scope.Meta().SrcVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := externalGV.String(), scope.Meta().DestVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
 			scope.Convert(&in.TestString, &out.TestString, 0)
 			internalToExternalCalls++
 			return nil
 		},
 		func(in *ExternalSimple, out *InternalSimple, scope conversion.Scope) error {
 			t.Logf("external -> internal")
-			if e, a := externalGV.String(), scope.Meta().SrcVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := internalGV.String(), scope.Meta().DestVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
 			scope.Convert(&in.TestString, &out.TestString, 0)
 			externalToInternalCalls++
 			return nil
@@ -643,12 +631,6 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := s.AddConversionFuncs(
 		func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
-			if e, a := "unknown/unknown", scope.Meta().SrcVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := "unknown/unknown", scope.Meta().DestVersion; e != a {
-				t.Fatalf("Expected '%v', got '%v'", e, a)
-			}
 			scope.Convert(&in.TestString, &out.TestString, 0)
 			internalToExternalCalls++
 			return nil

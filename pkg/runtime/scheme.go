@@ -124,11 +124,8 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 
 // fromScope gets the input version, desired output version, and desired Scheme
 // from a conversion.Scope.
-func (s *Scheme) fromScope(scope conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
-	scheme = s
-	inVersion = scope.Meta().SrcVersion
-	outVersion = scope.Meta().DestVersion
-	return inVersion, outVersion, scheme
+func (s *Scheme) fromScope(scope conversion.Scope) *Scheme {
+	return s
 }
 
 // Converter allows access to the converter for the scheme
@@ -532,10 +529,7 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 
 // generateConvertMeta constructs the meta value we pass to Convert.
 func (s *Scheme) generateConvertMeta(srcGroupVersion, destGroupVersion unversioned.GroupVersion, in interface{}) (conversion.FieldMatchingFlags, *conversion.Meta) {
-	flags, meta := s.converter.DefaultMeta(reflect.TypeOf(in))
-	meta.SrcVersion = srcGroupVersion.String()
-	meta.DestVersion = destGroupVersion.String()
-	return flags, meta
+	return s.converter.DefaultMeta(reflect.TypeOf(in))
 }
 
 func setTargetVersion(obj Object, raw *Scheme, gv unversioned.GroupVersion) {
