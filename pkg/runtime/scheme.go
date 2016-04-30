@@ -523,11 +523,80 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion unversioned.GroupVersion
 	return out, nil
 }
 
+// UnsafeConvertToVersion will convert in to the provided outVersion if such a conversion is possible,
+// but does not guarantee the output object does not share fields with the input object. It attempts to be as
+// efficient as possible when doing conversion.
+func (s *Scheme) UnsafeConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
+	switch t := in.(type) {
+	case *Unknown:
+		t.APIVersion = outVersion.String()
+		return t, nil
+	case *Unstructured:
+		t.SetAPIVersion(outVersion.String())
+		return t, nil
+	case *UnstructuredList:
+		t.SetAPIVersion(outVersion.String())
+		return t, nil
+	}
+
+	// determine the incoming kinds with as few allocations as possible.
+	t := reflect.TypeOf(in)
+	if t.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("only pointer types may be converted: %v", t)
+	}
+	t = t.Elem()
+	if t.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("only pointers to struct types may be converted: %v", t)
+	}
+	kinds, ok := s.typeToGVK[t]
+	if !ok || len(kinds) == 0 {
+		return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, outVersion)
+	}
+
+	// if the Go type is also registered to the destination kind, no conversion is necessary
+	for i := range kinds {
+		if kinds[i].Version == outVersion.Version && kinds[i].Group == outVersion.Group {
+			setTargetKind(in, kinds[i])
+			return in, nil
+		}
+	}
+
+	// type is unversioned, no conversion necessary
+	// it should be possible to avoid this allocation
+	if unversionedKind, ok := s.unversionedTypes[t]; ok {
+		kind := unversionedKind
+		outKind := outVersion.WithKind(kind.Kind)
+		setTargetKind(in, outKind)
+		return in, nil
+	}
+
+	// allocate a new object as the target using the target kind
+	// TODO: this should look in the target group version and find the first kind that matches, rather than the
+	//   first kind registered in typeToGVK
+	kind := kinds[0]
+	kind.Version = outVersion.Version
+	kind.Group = outVersion.Group
+	out, err := s.New(kind)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: try to avoid the allocations here - in fast paths we are not likely to need these flags or meta
+	flags, meta := s.converter.DefaultMeta(t)
+	if err := s.converter.Convert(in, out, flags, meta); err != nil {
+		return nil, err
+	}
+
+	setTargetKind(out, kind)
+	return out, nil
+}
+
 // generateConvertMeta constructs the meta value we pass to Convert.
 func (s *Scheme) generateConvertMeta(srcGroupVersion, destGroupVersion unversioned.GroupVersion, in interface{}) (conversion.FieldMatchingFlags, *conversion.Meta) {
 	return s.converter.DefaultMeta(reflect.TypeOf(in))
 }
 
+// setTargetVersion is deprecated and should be replaced by use of setTargetKind
 func setTargetVersion(obj Object, raw *Scheme, gv unversioned.GroupVersion) {
 	if gv.Version == APIVersionInternal {
 		// internal is a special case
@@ -536,4 +605,15 @@ func setTargetVersion(obj Object, raw *Scheme, gv unversioned.GroupVersion) {
 	}
 	gvk, _ := raw.ObjectKind(obj)
 	obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: gvk.Kind})
+}
+
+// setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.
+func setTargetKind(obj Object, kind unversioned.GroupVersionKind) {
+	if kind.Version == APIVersionInternal {
+		// internal is a special case
+		// TODO: look at removing the need to special case this
+		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+		return
+	}
+	obj.GetObjectKind().SetGroupVersionKind(kind)
 }

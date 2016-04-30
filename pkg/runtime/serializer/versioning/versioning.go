@@ -71,7 +71,7 @@ func NewCodecForScheme(
 	encodeVersion []unversioned.GroupVersion,
 	decodeVersion []unversioned.GroupVersion,
 ) runtime.Codec {
-	return NewCodec(encoder, decoder, scheme, scheme, scheme, runtime.ObjectTyperToTyper(scheme), encodeVersion, decodeVersion)
+	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, runtime.ObjectTyperToTyper(scheme), encodeVersion, decodeVersion)
 }
 
 // NewCodec takes objects in their internal versions and converts them to external versions before
@@ -263,21 +263,19 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 	}
 
 	// Perform a conversion if necessary
-	if gvk.GroupVersion() != targetGV {
-		out, err := c.convertor.ConvertToVersion(obj, targetGV)
-		if err != nil {
-			if ok {
-				return err
-			}
-		} else {
-			obj = out
-		}
-	}
-
 	objectKind := obj.GetObjectKind()
 	old := objectKind.GroupVersionKind()
-	objectKind.SetGroupVersionKind(unversioned.GroupVersionKind{Group: targetGV.Group, Version: targetGV.Version, Kind: gvk.Kind})
+	out, err := c.convertor.ConvertToVersion(obj, targetGV)
+	if err != nil {
+		if ok {
+			return err
+		}
+	} else {
+		obj = out
+	}
+	// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
 	err = c.encoder.EncodeToStream(obj, w, overrides...)
+	// restore the old GVK, in case conversion returned the same object
 	objectKind.SetGroupVersionKind(old)
 	return err
 }
