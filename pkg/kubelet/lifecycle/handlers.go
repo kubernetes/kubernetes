@@ -78,7 +78,7 @@ func resolvePort(portReference intstr.IntOrString, container *api.Container) (in
 	}
 	for _, portSpec := range container.Ports {
 		if portSpec.Name == portName {
-			return portSpec.ContainerPort, nil
+			return int(portSpec.ContainerPort), nil
 		}
 	}
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)

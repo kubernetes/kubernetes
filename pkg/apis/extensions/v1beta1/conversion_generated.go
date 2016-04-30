@@ -184,7 +184,7 @@ func autoConvert_v1beta1_CPUTargetUtilization_To_extensions_CPUTargetUtilization
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*CPUTargetUtilization))(in)
 	}
-	out.TargetPercentage = int(in.TargetPercentage)
+	out.TargetPercentage = in.TargetPercentage
 	return nil
 }
 
@@ -196,7 +196,7 @@ func autoConvert_extensions_CPUTargetUtilization_To_v1beta1_CPUTargetUtilization
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.CPUTargetUtilization))(in)
 	}
-	out.TargetPercentage = int32(in.TargetPercentage)
+	out.TargetPercentage = in.TargetPercentage
 	return nil
 }
 
@@ -508,9 +508,9 @@ func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *Daemo
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonSetStatus))(in)
 	}
-	out.CurrentNumberScheduled = int(in.CurrentNumberScheduled)
-	out.NumberMisscheduled = int(in.NumberMisscheduled)
-	out.DesiredNumberScheduled = int(in.DesiredNumberScheduled)
+	out.CurrentNumberScheduled = in.CurrentNumberScheduled
+	out.NumberMisscheduled = in.NumberMisscheduled
+	out.DesiredNumberScheduled = in.DesiredNumberScheduled
 	return nil
 }
 
@@ -522,9 +522,9 @@ func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *exten
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.DaemonSetStatus))(in)
 	}
-	out.CurrentNumberScheduled = int32(in.CurrentNumberScheduled)
-	out.NumberMisscheduled = int32(in.NumberMisscheduled)
-	out.DesiredNumberScheduled = int32(in.DesiredNumberScheduled)
+	out.CurrentNumberScheduled = in.CurrentNumberScheduled
+	out.NumberMisscheduled = in.NumberMisscheduled
+	out.DesiredNumberScheduled = in.DesiredNumberScheduled
 	return nil
 }
 
@@ -695,10 +695,10 @@ func autoConvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *Dep
 		defaulting.(func(*DeploymentStatus))(in)
 	}
 	out.ObservedGeneration = in.ObservedGeneration
-	out.Replicas = int(in.Replicas)
-	out.UpdatedReplicas = int(in.UpdatedReplicas)
-	out.AvailableReplicas = int(in.AvailableReplicas)
-	out.UnavailableReplicas = int(in.UnavailableReplicas)
+	out.Replicas = in.Replicas
+	out.UpdatedReplicas = in.UpdatedReplicas
+	out.AvailableReplicas = in.AvailableReplicas
+	out.UnavailableReplicas = in.UnavailableReplicas
 	return nil
 }
 
@@ -711,10 +711,10 @@ func autoConvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *ext
 		defaulting.(func(*extensions.DeploymentStatus))(in)
 	}
 	out.ObservedGeneration = in.ObservedGeneration
-	out.Replicas = int32(in.Replicas)
-	out.UpdatedReplicas = int32(in.UpdatedReplicas)
-	out.AvailableReplicas = int32(in.AvailableReplicas)
-	out.UnavailableReplicas = int32(in.UnavailableReplicas)
+	out.Replicas = in.Replicas
+	out.UpdatedReplicas = in.UpdatedReplicas
+	out.AvailableReplicas = in.AvailableReplicas
+	out.UnavailableReplicas = in.UnavailableReplicas
 	return nil
 }
 
@@ -943,12 +943,12 @@ func autoConvert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPod
 	}
 	if in.MinReplicas != nil {
 		in, out := &in.MinReplicas, &out.MinReplicas
-		*out = new(int)
-		**out = int(**in)
+		*out = new(int32)
+		**out = **in
 	} else {
 		out.MinReplicas = nil
 	}
-	out.MaxReplicas = int(in.MaxReplicas)
+	out.MaxReplicas = in.MaxReplicas
 	if in.CPUUtilization != nil {
 		in, out := &in.CPUUtilization, &out.CPUUtilization
 		*out = new(extensions.CPUTargetUtilization)
@@ -975,11 +975,11 @@ func autoConvert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPod
 	if in.MinReplicas != nil {
 		in, out := &in.MinReplicas, &out.MinReplicas
 		*out = new(int32)
-		**out = int32(**in)
+		**out = **in
 	} else {
 		out.MinReplicas = nil
 	}
-	out.MaxReplicas = int32(in.MaxReplicas)
+	out.MaxReplicas = in.MaxReplicas
 	if in.CPUUtilization != nil {
 		in, out := &in.CPUUtilization, &out.CPUUtilization
 		*out = new(CPUTargetUtilization)
@@ -1016,12 +1016,12 @@ func autoConvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalP
 	} else {
 		out.LastScaleTime = nil
 	}
-	out.CurrentReplicas = int(in.CurrentReplicas)
-	out.DesiredReplicas = int(in.DesiredReplicas)
+	out.CurrentReplicas = in.CurrentReplicas
+	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentCPUUtilizationPercentage != nil {
 		in, out := &in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
-		*out = new(int)
-		**out = int(**in)
+		*out = new(int32)
+		**out = **in
 	} else {
 		out.CurrentCPUUtilizationPercentage = nil
 	}
@@ -1052,12 +1052,12 @@ func autoConvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalP
 	} else {
 		out.LastScaleTime = nil
 	}
-	out.CurrentReplicas = int32(in.CurrentReplicas)
-	out.DesiredReplicas = int32(in.DesiredReplicas)
+	out.CurrentReplicas = in.CurrentReplicas
+	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentCPUUtilizationPercentage != nil {
 		in, out := &in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
 		*out = new(int32)
-		**out = int32(**in)
+		**out = **in
 	} else {
 		out.CurrentCPUUtilizationPercentage = nil
 	}
@@ -1655,9 +1655,9 @@ func autoConvert_v1beta1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.
 	} else {
 		out.CompletionTime = nil
 	}
-	out.Active = int(in.Active)
-	out.Succeeded = int(in.Succeeded)
-	out.Failed = int(in.Failed)
+	out.Active = in.Active
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 
@@ -1698,9 +1698,9 @@ func autoConvert_batch_JobStatus_To_v1beta1_JobStatus(in *batch.JobStatus, out *
 	} else {
 		out.CompletionTime = nil
 	}
-	out.Active = int32(in.Active)
-	out.Succeeded = int32(in.Succeeded)
-	out.Failed = int32(in.Failed)
+	out.Active = in.Active
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
 	return nil
 }
 
@@ -2116,8 +2116,8 @@ func autoConvert_v1beta1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in *Rep
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicaSetStatus))(in)
 	}
-	out.Replicas = int(in.Replicas)
-	out.FullyLabeledReplicas = int(in.FullyLabeledReplicas)
+	out.Replicas = in.Replicas
+	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -2130,8 +2130,8 @@ func autoConvert_extensions_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(in *ext
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.ReplicaSetStatus))(in)
 	}
-	out.Replicas = int32(in.Replicas)
-	out.FullyLabeledReplicas = int32(in.FullyLabeledReplicas)
+	out.Replicas = in.Replicas
+	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -2334,7 +2334,7 @@ func autoConvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(in *ScaleSpec, out *e
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ScaleSpec))(in)
 	}
-	out.Replicas = int(in.Replicas)
+	out.Replicas = in.Replicas
 	return nil
 }
 
@@ -2346,7 +2346,7 @@ func autoConvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleS
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.ScaleSpec))(in)
 	}
-	out.Replicas = int32(in.Replicas)
+	out.Replicas = in.Replicas
 	return nil
 }
 

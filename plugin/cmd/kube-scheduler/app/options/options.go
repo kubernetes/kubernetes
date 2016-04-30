@@ -50,7 +50,7 @@ func NewSchedulerServer() *SchedulerServer {
 
 // AddFlags adds flags for a specific SchedulerServer to the specified FlagSet
 func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
-	fs.IntVar(&s.Port, "port", s.Port, "The port that the scheduler's http service runs on")
+	fs.Int32Var(&s.Port, "port", s.Port, "The port that the scheduler's http service runs on")
 	fs.StringVar(&s.Address, "address", s.Address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.AlgorithmProvider, "algorithm-provider", s.AlgorithmProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
 	fs.StringVar(&s.PolicyConfigFile, "policy-config-file", s.PolicyConfigFile, "File with scheduler policy configuration")
@@ -60,12 +60,12 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	var unusedBindPodsQPS float32
 	fs.Float32Var(&unusedBindPodsQPS, "bind-pods-qps", 0, "unused, use --kube-api-qps")
 	fs.MarkDeprecated("bind-pods-qps", "flag is unused and will be removed. Use kube-api-qps instead.")
-	var unusedBindPodsBurst int
-	fs.IntVar(&unusedBindPodsBurst, "bind-pods-burst", 0, "unused, use --kube-api-burst")
+	var unusedBindPodsBurst int32
+	fs.Int32Var(&unusedBindPodsBurst, "bind-pods-burst", 0, "unused, use --kube-api-burst")
 	fs.MarkDeprecated("bind-pods-burst", "flag is unused and will be removed. Use kube-api-burst instead.")
 	fs.StringVar(&s.ContentType, "kube-api-content-type", s.ContentType, "ContentType of requests sent to apiserver. Passing application/vnd.kubernetes.protobuf is an experimental feature now.")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.Int32Var(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.StringVar(&s.SchedulerName, "scheduler-name", s.SchedulerName, "Name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's annotation with key 'scheduler.alpha.kubernetes.io/name'")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }

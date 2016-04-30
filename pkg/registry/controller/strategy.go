@@ -105,7 +105,7 @@ func (rcStrategy) AllowUnconditionalUpdate() bool {
 func ControllerToSelectableFields(controller *api.ReplicationController) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(controller.ObjectMeta, true)
 	controllerSpecificFieldsSet := fields.Set{
-		"status.replicas": strconv.Itoa(controller.Status.Replicas),
+		"status.replicas": strconv.Itoa(int(controller.Status.Replicas)),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, controllerSpecificFieldsSet)
 }

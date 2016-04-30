@@ -41,7 +41,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Name:        "myrc",
 					Subresource: "scale",
 				},
-				MinReplicas:    newInt(1),
+				MinReplicas:    newInt32(1),
 				MaxReplicas:    5,
 				CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 			},
@@ -57,7 +57,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Name:        "myrc",
 					Subresource: "scale",
 				},
-				MinReplicas: newInt(1),
+				MinReplicas: newInt32(1),
 				MaxReplicas: 5,
 			},
 		},
@@ -75,7 +75,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Name:        "myrc",
 					Subresource: "scale",
 				},
-				MinReplicas: newInt(1),
+				MinReplicas: newInt32(1),
 				MaxReplicas: 5,
 			},
 		},
@@ -95,7 +95,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: extensions.HorizontalPodAutoscalerSpec{
 					ScaleRef:       extensions.SubresourceReference{Name: "myrc", Subresource: "scale"},
-					MinReplicas:    newInt(1),
+					MinReplicas:    newInt32(1),
 					MaxReplicas:    5,
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
@@ -107,7 +107,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: extensions.HorizontalPodAutoscalerSpec{
 					ScaleRef:       extensions.SubresourceReference{Kind: "..", Name: "myrc", Subresource: "scale"},
-					MinReplicas:    newInt(1),
+					MinReplicas:    newInt32(1),
 					MaxReplicas:    5,
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
@@ -119,7 +119,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: extensions.HorizontalPodAutoscalerSpec{
 					ScaleRef:       extensions.SubresourceReference{Kind: "ReplicationController", Subresource: "scale"},
-					MinReplicas:    newInt(1),
+					MinReplicas:    newInt32(1),
 					MaxReplicas:    5,
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
@@ -131,7 +131,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: extensions.HorizontalPodAutoscalerSpec{
 					ScaleRef:       extensions.SubresourceReference{Kind: "ReplicationController", Name: "..", Subresource: "scale"},
-					MinReplicas:    newInt(1),
+					MinReplicas:    newInt32(1),
 					MaxReplicas:    5,
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
@@ -143,7 +143,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: extensions.HorizontalPodAutoscalerSpec{
 					ScaleRef:       extensions.SubresourceReference{Kind: "ReplicationController", Name: "myrc", Subresource: ""},
-					MinReplicas:    newInt(1),
+					MinReplicas:    newInt32(1),
 					MaxReplicas:    5,
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
@@ -155,7 +155,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: extensions.HorizontalPodAutoscalerSpec{
 					ScaleRef:       extensions.SubresourceReference{Kind: "ReplicationController", Name: "myrc", Subresource: ".."},
-					MinReplicas:    newInt(1),
+					MinReplicas:    newInt32(1),
 					MaxReplicas:    5,
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
@@ -167,7 +167,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: extensions.HorizontalPodAutoscalerSpec{
 					ScaleRef:       extensions.SubresourceReference{Kind: "ReplicationController", Name: "myrc", Subresource: "randomsubresource"},
-					MinReplicas:    newInt(1),
+					MinReplicas:    newInt32(1),
 					MaxReplicas:    5,
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
 				},
@@ -184,7 +184,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					ScaleRef: extensions.SubresourceReference{
 						Subresource: "scale",
 					},
-					MinReplicas: newInt(-1),
+					MinReplicas: newInt32(-1),
 					MaxReplicas: 5,
 				},
 			},
@@ -200,7 +200,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					ScaleRef: extensions.SubresourceReference{
 						Subresource: "scale",
 					},
-					MinReplicas: newInt(7),
+					MinReplicas: newInt32(7),
 					MaxReplicas: 5,
 				},
 			},
@@ -216,7 +216,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					ScaleRef: extensions.SubresourceReference{
 						Subresource: "scale",
 					},
-					MinReplicas:    newInt(1),
+					MinReplicas:    newInt32(1),
 					MaxReplicas:    5,
 					CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: -70},
 				},
@@ -238,7 +238,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						Name:        "myrc",
 						Subresource: "scale",
 					},
-					MinReplicas: newInt(1),
+					MinReplicas: newInt32(1),
 					MaxReplicas: 5,
 				},
 			},
@@ -259,7 +259,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						Name:        "myrc",
 						Subresource: "scale",
 					},
-					MinReplicas: newInt(1),
+					MinReplicas: newInt32(1),
 					MaxReplicas: 5,
 				},
 			},
@@ -280,7 +280,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						Name:        "myrc",
 						Subresource: "scale",
 					},
-					MinReplicas: newInt(1),
+					MinReplicas: newInt32(1),
 					MaxReplicas: 5,
 				},
 			},
@@ -301,7 +301,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						Name:        "myrc",
 						Subresource: "scale",
 					},
-					MinReplicas: newInt(1),
+					MinReplicas: newInt32(1),
 					MaxReplicas: 5,
 				},
 			},
@@ -1709,8 +1709,8 @@ func TestValidateReplicaSet(t *testing.T) {
 	}
 }
 
-func newInt(val int) *int {
-	p := new(int)
+func newInt32(val int32) *int32 {
+	p := new(int32)
 	*p = val
 	return p
 }

@@ -87,7 +87,7 @@ func makeSimilarEvents(num int, template api.Event, messagePrefix string) []api.
 }
 
 func setCount(event api.Event, count int) api.Event {
-	event.Count = count
+	event.Count = int32(count)
 	return event
 }
 

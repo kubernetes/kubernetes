@@ -137,7 +137,7 @@ func getTransitionTimeForReadyCondition(p *api.Pod) (time.Time, error) {
 func getRestartCount(p *api.Pod) int {
 	count := 0
 	for _, containerStatus := range p.Status.ContainerStatuses {
-		count += containerStatus.RestartCount
+		count += int(containerStatus.RestartCount)
 	}
 	return count
 }

@@ -127,20 +127,20 @@ func (s *CMServer) Run(_ []string) error {
 		}
 		mux.Handle("/metrics", prometheus.Handler())
 		server := &http.Server{
-			Addr:    net.JoinHostPort(s.Address, strconv.Itoa(s.Port)),
+			Addr:    net.JoinHostPort(s.Address, strconv.Itoa(int(s.Port))),
 			Handler: mux,
 		}
 		glog.Fatal(server.ListenAndServe())
 	}()
 
 	endpoints := s.createEndpointController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "endpoint-controller")))
-	go endpoints.Run(s.ConcurrentEndpointSyncs, wait.NeverStop)
+	go endpoints.Run(int(s.ConcurrentEndpointSyncs), wait.NeverStop)
 
-	go replicationcontroller.NewReplicationManagerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replication-controller")), s.resyncPeriod, replicationcontroller.BurstReplicas, s.LookupCacheSizeForRC).
-		Run(s.ConcurrentRCSyncs, wait.NeverStop)
+	go replicationcontroller.NewReplicationManagerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replication-controller")), s.resyncPeriod, replicationcontroller.BurstReplicas, int(s.LookupCacheSizeForRC)).
+		Run(int(s.ConcurrentRCSyncs), wait.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
-		go gc.New(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "garbage-collector")), s.resyncPeriod, s.TerminatedPodGCThreshold).
+		go gc.New(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "garbage-collector")), s.resyncPeriod, int(s.TerminatedPodGCThreshold)).
 			Run(wait.NeverStop)
 	}
 
@@ -154,8 +154,8 @@ func (s *CMServer) Run(_ []string) error {
 	}
 	_, clusterCIDR, _ := net.ParseCIDR(s.ClusterCIDR)
 	nodeController := nodecontroller.NewNodeController(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "node-controller")),
-		s.PodEvictionTimeout.Duration, flowcontrol.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
-		flowcontrol.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
+		s.PodEvictionTimeout.Duration, flowcontrol.NewTokenBucketRateLimiter(s.DeletingPodsQps, int(s.DeletingPodsBurst)),
+		flowcontrol.NewTokenBucketRateLimiter(s.DeletingPodsQps, int(s.DeletingPodsBurst)),
 		s.NodeMonitorGracePeriod.Duration, s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod.Duration)
 
@@ -195,7 +195,7 @@ func (s *CMServer) Run(_ []string) error {
 		ReplenishmentResyncPeriod: s.resyncPeriod,
 		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactoryFromClient(resourceQuotaControllerClient),
 	}
-	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(s.ConcurrentResourceQuotaSyncs, wait.NeverStop)
+	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(int(s.ConcurrentResourceQuotaSyncs), wait.NeverStop)
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
@@ -225,7 +225,7 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
 	}
 	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, groupVersionResources, s.NamespaceSyncPeriod.Duration, api.FinalizerKubernetes)
-	go namespaceController.Run(s.ConcurrentNamespaceSyncs, wait.NeverStop)
+	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), wait.NeverStop)
 
 	groupVersion := "extensions/v1beta1"
 	resources, found := resourceMap[groupVersion]
@@ -248,26 +248,26 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsControllerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), s.resyncPeriod, s.LookupCacheSizeForDaemonSet).
-				Run(s.ConcurrentDaemonSetSyncs, wait.NeverStop)
+			go daemon.NewDaemonSetsControllerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), s.resyncPeriod, int(s.LookupCacheSizeForDaemonSet)).
+				Run(int(s.ConcurrentDaemonSetSyncs), wait.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
 			go job.NewJobControllerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "job-controller")), s.resyncPeriod).
-				Run(s.ConcurrentJobSyncs, wait.NeverStop)
+				Run(int(s.ConcurrentJobSyncs), wait.NeverStop)
 		}
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
 			go deployment.NewDeploymentController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "deployment-controller")), s.resyncPeriod).
-				Run(s.ConcurrentDeploymentSyncs, wait.NeverStop)
+				Run(int(s.ConcurrentDeploymentSyncs), wait.NeverStop)
 		}
 
 		if containsResource(resources, "replicasets") {
 			glog.Infof("Starting ReplicaSet controller")
-			go replicaset.NewReplicaSetController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replicaset-controller")), s.resyncPeriod, replicaset.BurstReplicas, s.LookupCacheSizeForRS).
-				Run(s.ConcurrentRSSyncs, wait.NeverStop)
+			go replicaset.NewReplicaSetController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replicaset-controller")), s.resyncPeriod, replicaset.BurstReplicas, int(s.LookupCacheSizeForRS)).
+				Run(int(s.ConcurrentRSSyncs), wait.NeverStop)
 		}
 	}
 
@@ -286,7 +286,7 @@ func (s *CMServer) Run(_ []string) error {
 	pvRecycler, err := persistentvolumecontroller.NewPersistentVolumeRecycler(
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-recycler")),
 		s.PVClaimBinderSyncPeriod.Duration,
-		s.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.MaximumRetry,
+		int(s.VolumeConfiguration.PersistentVolumeRecyclerConfiguration.MaximumRetry),
 		kubecontrollermanager.ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
 		cloud,
 	)

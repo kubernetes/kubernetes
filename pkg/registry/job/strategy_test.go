@@ -80,7 +80,7 @@ func TestJobStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
-	parallelism := 10
+	parallelism := int32(10)
 	updatedJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.JobSpec{
@@ -173,8 +173,8 @@ func TestJobStatusStrategy(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	oldParallelism := 10
-	newParallelism := 11
+	oldParallelism := int32(10)
+	newParallelism := int32(11)
 	oldJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "myjob",

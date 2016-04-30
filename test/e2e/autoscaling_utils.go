@@ -292,21 +292,21 @@ func (rc *ResourceConsumer) GetReplicas() int {
 		if replicationController == nil {
 			framework.Failf(rcIsNil)
 		}
-		return replicationController.Status.Replicas
+		return int(replicationController.Status.Replicas)
 	case kindDeployment:
 		deployment, err := rc.framework.Client.Deployments(rc.framework.Namespace.Name).Get(rc.name)
 		framework.ExpectNoError(err)
 		if deployment == nil {
 			framework.Failf(deploymentIsNil)
 		}
-		return deployment.Status.Replicas
+		return int(deployment.Status.Replicas)
 	case kindReplicaSet:
 		rs, err := rc.framework.Client.ReplicaSets(rc.framework.Namespace.Name).Get(rc.name)
 		framework.ExpectNoError(err)
 		if rs == nil {
 			framework.Failf(rsIsNil)
 		}
-		return rs.Status.Replicas
+		return int(rs.Status.Replicas)
 	default:
 		framework.Failf(invalidKind)
 	}

@@ -97,14 +97,15 @@ func (HorizontalPodAutoscalerV1Beta1) Generate(genericParams map[string]interfac
 				APIVersion:  params["scaleRef-apiVersion"],
 				Subresource: scaleSubResource,
 			},
-			MaxReplicas: max,
+			MaxReplicas: int32(max),
 		},
 	}
 	if min > 0 {
-		scaler.Spec.MinReplicas = &min
+		v := int32(min)
+		scaler.Spec.MinReplicas = &v
 	}
 	if cpu >= 0 {
-		scaler.Spec.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: cpu}
+		scaler.Spec.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int32(cpu)}
 	}
 	return &scaler, nil
 }

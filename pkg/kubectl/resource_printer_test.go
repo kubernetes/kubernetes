@@ -1342,7 +1342,7 @@ func TestPrintDaemonSet(t *testing.T) {
 }
 
 func TestPrintJob(t *testing.T) {
-	completions := 2
+	completions := int32(2)
 	tests := []struct {
 		job    batch.Job
 		expect string

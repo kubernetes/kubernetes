@@ -150,7 +150,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	var oomAdjuster *oom.OOMAdjuster
 	if config.OOMScoreAdj != nil {
 		oomAdjuster = oom.NewOOMAdjuster()
-		if err := oomAdjuster.ApplyOOMScoreAdj(0, *config.OOMScoreAdj); err != nil {
+		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*config.OOMScoreAdj)); err != nil {
 			glog.V(2).Info(err)
 		}
 	}
@@ -181,7 +181,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	kubeconfig.ContentType = config.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = config.KubeAPIQPS
-	kubeconfig.Burst = config.KubeAPIBurst
+	kubeconfig.Burst = int(config.KubeAPIBurst)
 
 	client, err := kubeclient.New(kubeconfig)
 	if err != nil {
@@ -204,7 +204,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			return nil, fmt.Errorf("Unable to read IPTablesMasqueradeBit from config")
 		}
 
-		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll, *config.IPTablesMasqueradeBit, config.ClusterCIDR)
+		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll, int(*config.IPTablesMasqueradeBit), config.ClusterCIDR)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
@@ -289,7 +289,7 @@ func (s *ProxyServer) Run() error {
 		})
 		configz.InstallHandler(http.DefaultServeMux)
 		go wait.Until(func() {
-			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(s.Config.HealthzPort), nil)
+			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(int(s.Config.HealthzPort)), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
@@ -299,7 +299,7 @@ func (s *ProxyServer) Run() error {
 	// Tune conntrack, if requested
 	if s.Conntracker != nil {
 		if s.Config.ConntrackMax > 0 {
-			if err := s.Conntracker.SetMax(s.Config.ConntrackMax); err != nil {
+			if err := s.Conntracker.SetMax(int(s.Config.ConntrackMax)); err != nil {
 				return err
 			}
 		}

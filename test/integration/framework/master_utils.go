@@ -241,7 +241,7 @@ func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
 }
 
 // ScaleRC scales the given rc to the given replicas.
-func ScaleRC(name, ns string, replicas int, restClient *client.Client) (*api.ReplicationController, error) {
+func ScaleRC(name, ns string, replicas int32, restClient *client.Client) (*api.ReplicationController, error) {
 	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), restClient)
 	if err != nil {
 		return nil, err
@@ -291,7 +291,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 	controller := RCFromManifest(TestRCManifest)
 
 	// Make the rc unique to the given host.
-	controller.Spec.Replicas = numPods
+	controller.Spec.Replicas = int32(numPods)
 	controller.Spec.Template.Spec.NodeName = host
 	controller.Name = controller.Name + host
 	controller.Spec.Selector["host"] = host

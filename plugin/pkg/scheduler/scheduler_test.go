@@ -55,7 +55,7 @@ func podWithID(id, desiredHost string) *api.Pod {
 func podWithPort(id, desiredHost string, port int) *api.Pod {
 	pod := podWithID(id, desiredHost)
 	pod.Spec.Containers = []api.Container{
-		{Name: "ctr", Ports: []api.ContainerPort{{HostPort: port}}},
+		{Name: "ctr", Ports: []api.ContainerPort{{HostPort: int32(port)}}},
 	}
 	return pod
 }

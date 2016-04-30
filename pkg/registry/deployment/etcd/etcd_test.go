@@ -225,7 +225,7 @@ func TestScaleUpdate(t *testing.T) {
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
 	}
-	replicas := 12
+	replicas := int32(12)
 	update := extensions.Scale{
 		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: extensions.ScaleSpec{

@@ -320,7 +320,7 @@ func (e *endpointController) syncService(key string) {
 			}
 
 			// HACK(jdef): use HostIP instead of pod.CurrentState.PodIP for generic mesos compat
-			epp := api.EndpointPort{Name: portName, Port: portNum, Protocol: portProto}
+			epp := api.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 			epa := api.EndpointAddress{IP: pod.Status.HostIP, TargetRef: &api.ObjectReference{
 				Kind:            "Pod",
 				Namespace:       pod.ObjectMeta.Namespace,
@@ -416,7 +416,7 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, int, error) {
 			for _, port := range container.Ports {
 				if port.Name == name && port.Protocol == svcPort.Protocol {
 					hostPort, err := findMappedPortName(pod, port.Protocol, name)
-					return hostPort, port.ContainerPort, err
+					return hostPort, int(port.ContainerPort), err
 				}
 			}
 		}
@@ -429,9 +429,9 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, int, error) {
 		p := portName.IntValue()
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
-				if port.ContainerPort == p && port.Protocol == svcPort.Protocol {
+				if int(port.ContainerPort) == p && port.Protocol == svcPort.Protocol {
 					hostPort, err := findMappedPort(pod, port.Protocol, p)
-					return hostPort, port.ContainerPort, err
+					return hostPort, int(port.ContainerPort), err
 				}
 			}
 		}

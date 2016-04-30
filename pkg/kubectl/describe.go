@@ -1233,7 +1233,7 @@ func (i *IngressDescriber) describeBackend(ns string, backend *extensions.Ingres
 				spName = sp.Name
 			}
 		case intstr.Int:
-			if int(backend.ServicePort.IntVal) == sp.Port {
+			if int32(backend.ServicePort.IntVal) == sp.Port {
 				spName = sp.Name
 			}
 		}

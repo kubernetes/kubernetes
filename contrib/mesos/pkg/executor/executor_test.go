@@ -514,7 +514,7 @@ func NewTestPod(i int) *api.Pod {
 					Name: "foo",
 					Ports: []api.ContainerPort{
 						{
-							ContainerPort: 8000 + i,
+							ContainerPort: int32(8000 + i),
 							Protocol:      api.ProtocolTCP,
 						},
 					},

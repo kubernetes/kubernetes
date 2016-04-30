@@ -105,16 +105,16 @@ var _ = framework.KubeDescribe("Horizontal pod autoscaling (scale resource: CPU)
 
 // HPAScaleTest struct is used by the scale(...) function.
 type HPAScaleTest struct {
-	initPods                    int
-	totalInitialCPUUsage        int
+	initPods                    int32
+	totalInitialCPUUsage        int32
 	perPodCPURequest            int64
-	targetCPUUtilizationPercent int
-	minPods                     int
-	maxPods                     int
-	firstScale                  int
+	targetCPUUtilizationPercent int32
+	minPods                     int32
+	maxPods                     int32
+	firstScale                  int32
 	firstScaleStasis            time.Duration
 	cpuBurst                    int
-	secondScale                 int
+	secondScale                 int32
 	secondScaleStasis           time.Duration
 	useV1                       bool
 }
@@ -125,16 +125,16 @@ type HPAScaleTest struct {
 // The second state change (optional) is due to the CPU burst parameter, which HPA again responds to.
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
 func (scaleTest *HPAScaleTest) run(name, kind string, rc *ResourceConsumer, f *framework.Framework) {
-	rc = NewDynamicResourceConsumer(name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 100, f)
+	rc = NewDynamicResourceConsumer(name, kind, int(scaleTest.initPods), int(scaleTest.totalInitialCPUUsage), 0, 0, scaleTest.perPodCPURequest, 100, f)
 	defer rc.CleanUp()
 	createCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods, scaleTest.useV1)
-	rc.WaitForReplicas(scaleTest.firstScale)
+	rc.WaitForReplicas(int(scaleTest.firstScale))
 	if scaleTest.firstScaleStasis > 0 {
-		rc.EnsureDesiredReplicas(scaleTest.firstScale, scaleTest.firstScaleStasis)
+		rc.EnsureDesiredReplicas(int(scaleTest.firstScale), scaleTest.firstScaleStasis)
 	}
 	if scaleTest.cpuBurst > 0 && scaleTest.secondScale > 0 {
 		rc.ConsumeCPU(scaleTest.cpuBurst)
-		rc.WaitForReplicas(scaleTest.secondScale)
+		rc.WaitForReplicas(int(scaleTest.secondScale))
 	}
 }
 
@@ -170,7 +170,7 @@ func scaleDown(name, kind string, rc *ResourceConsumer, f *framework.Framework) 
 	scaleTest.run(name, kind, rc, f)
 }
 
-func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int, useV1 bool) {
+func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32, useV1 bool) {
 	hpa := &extensions.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      rc.name,
