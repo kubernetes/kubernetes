@@ -359,5 +359,6 @@ func DeepCopy_componentconfig_VolumeConfiguration(in VolumeConfiguration, out *V
 	if err := DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration(in.PersistentVolumeRecyclerConfiguration, &out.PersistentVolumeRecyclerConfiguration, c); err != nil {
 		return err
 	}
+	out.FlexVolumePluginDir = in.FlexVolumePluginDir
 	return nil
 }

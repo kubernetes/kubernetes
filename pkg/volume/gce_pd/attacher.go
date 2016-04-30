@@ -50,6 +50,24 @@ func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	return &gcePersistentDiskAttacher{host: plugin.host}, nil
 }
 
+func (plugin *gcePersistentDiskPlugin) GetUniqueVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a GCE volume type")
+	}
+
+	return fmt.Sprintf("%s/%s:%v", gcePersistentDiskPluginName, volumeSource.PDName, volumeSource.ReadOnly), nil
+}
+
+func (plugin *gcePersistentDiskPlugin) GetDeviceName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a GCE volume type")
+	}
+
+	return volumeSource.PDName, nil
+}
+
 func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName string) error {
 	volumeSource, readOnly := getVolumeSource(spec)
 	pdName := volumeSource.PDName
