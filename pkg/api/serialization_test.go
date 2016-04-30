@@ -284,8 +284,8 @@ func TestObjectWatchFraming(t *testing.T) {
 	converted, _ := api.Scheme.ConvertToVersion(secret, "v1")
 	v1secret := converted.(*v1.Secret)
 	for _, s := range api.Codecs.SupportedStreamingMediaTypes() {
-		s, framer, mediaType, _ := api.Codecs.StreamingSerializerForMediaType(s, nil)
-		embedded, _ := api.Codecs.SerializerForMediaType(mediaType, nil)
+		s, _ := api.Codecs.StreamingSerializerForMediaType(s, nil)
+		framer := s.Framer
 
 		// write a single object through the framer and back out
 		obj := &bytes.Buffer{}
@@ -318,7 +318,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		if n, err := w.Write(obj.Bytes()); err != nil || n != len(obj.Bytes()) {
 			t.Fatal(err)
 		}
-		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), embedded)
+		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s.Embedded)
 		outEvent := &versioned.Event{}
 		res, _, err = sr.Decode(nil, outEvent)
 		if err != nil {
@@ -487,6 +487,30 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	b.StopTimer()
 }
 
+// BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
+func BenchmarkUnmarshalUnstructuredJSON(b *testing.B) {
+	codec := testapi.Default.Codec()
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(codec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj := make(map[string]interface{})
+		if err := json.Unmarshal(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
 // BenchmarkDecodeJSON provides a baseline for codecgen JSON decode performance
 func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	kcodec := testapi.Default.Codec()
@@ -506,6 +530,33 @@ func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := codec.NewDecoderBytes(encoded[i%width], handler).Decode(&obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkDecodeJSON provides a baseline for codecgen JSON decode performance
+func BenchmarkUnmarshalUnstructuredJSONCodecGen(b *testing.B) {
+	kcodec := testapi.Default.Codec()
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(kcodec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+	handler := &codec.JsonHandle{}
+	decoder := codec.NewDecoderBytes(nil, handler)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v interface{}
+		decoder.ResetBytes(encoded[i%width])
+		if err := decoder.Decode(&v); err != nil {
 			b.Fatal(err)
 		}
 	}
