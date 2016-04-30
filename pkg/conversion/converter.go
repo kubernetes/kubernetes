@@ -210,9 +210,6 @@ func (c ConversionFuncs) Merge(other ConversionFuncs) ConversionFuncs {
 
 // Meta is supplied by Scheme, when it calls Convert.
 type Meta struct {
-	SrcVersion  string
-	DestVersion string
-
 	// KeyNameMapping is an optional function which may map the listed key (field name)
 	// into a source and destination value.
 	KeyNameMapping FieldMappingFunc
