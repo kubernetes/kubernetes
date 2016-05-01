@@ -544,7 +544,7 @@ func (dm *DockerManager) runContainer(
 		ContainerName: container.Name,
 	}
 
-	securityOpts, err := dm.defaultSecurityOpt()
+	securityOpts, err := dm.getDefaultSecurityOpt()
 	if err != nil {
 		return kubecontainer.ContainerID{}, err
 	}
@@ -976,7 +976,7 @@ func (dm *DockerManager) checkVersionCompatibility() error {
 	return nil
 }
 
-func (dm *DockerManager) defaultSecurityOpt() ([]string, error) {
+func (dm *DockerManager) getDefaultSecurityOpt() ([]string, error) {
 	version, err := dm.APIVersion()
 	if err != nil {
 		return nil, err
