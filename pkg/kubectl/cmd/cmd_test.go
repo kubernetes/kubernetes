@@ -311,7 +311,6 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		},
 	}
 	rf := cmdutil.NewFactory(nil)
-	f.PodSelectorForObject = rf.PodSelectorForObject
 	f.MapBasedSelectorForObject = rf.MapBasedSelectorForObject
 	f.PortsForObject = rf.PortsForObject
 	f.LabelsForObject = rf.LabelsForObject
