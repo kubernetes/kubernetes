@@ -65,24 +65,12 @@ func TestScheme(t *testing.T) {
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := scheme.AddConversionFuncs(
 		func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
-			if e, a := internalGV.String(), scope.Meta().SrcVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := externalGV.String(), scope.Meta().DestVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
 			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
 			scope.Convert(&in.TestString, &out.TestString, 0)
 			internalToExternalCalls++
 			return nil
 		},
 		func(in *ExternalSimple, out *InternalSimple, scope conversion.Scope) error {
-			if e, a := externalGV.String(), scope.Meta().SrcVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := internalGV.String(), scope.Meta().DestVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
 			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
 			scope.Convert(&in.TestString, &out.TestString, 0)
 			externalToInternalCalls++
@@ -472,10 +460,10 @@ type ExternalInternalSame struct {
 }
 
 func (obj *MyWeirdCustomEmbeddedVersionKindField) GetObjectKind() unversioned.ObjectKind { return obj }
-func (obj *MyWeirdCustomEmbeddedVersionKindField) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+func (obj *MyWeirdCustomEmbeddedVersionKindField) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
 	obj.APIVersion, obj.ObjectKind = gvk.ToAPIVersionAndKind()
 }
-func (obj *MyWeirdCustomEmbeddedVersionKindField) GroupVersionKind() *unversioned.GroupVersionKind {
+func (obj *MyWeirdCustomEmbeddedVersionKindField) GroupVersionKind() unversioned.GroupVersionKind {
 	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.ObjectKind)
 }
 

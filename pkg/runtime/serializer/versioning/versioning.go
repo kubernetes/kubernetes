@@ -227,10 +227,12 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 	}
 
 	if (c.encodeVersion == nil && len(overrides) == 0) || isUnversioned {
-		old := obj.GetObjectKind().GroupVersionKind()
-		obj.GetObjectKind().SetGroupVersionKind(gvk)
-		defer obj.GetObjectKind().SetGroupVersionKind(old)
-		return c.encoder.EncodeToStream(obj, w, overrides...)
+		objectKind := obj.GetObjectKind()
+		old := objectKind.GroupVersionKind()
+		objectKind.SetGroupVersionKind(*gvk)
+		err = c.encoder.EncodeToStream(obj, w, overrides...)
+		objectKind.SetGroupVersionKind(old)
+		return err
 	}
 
 	targetGV, ok := c.encodeVersion[gvk.Group]
@@ -270,13 +272,14 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 		} else {
 			obj = out
 		}
-	} else {
-		old := obj.GetObjectKind().GroupVersionKind()
-		defer obj.GetObjectKind().SetGroupVersionKind(old)
-		obj.GetObjectKind().SetGroupVersionKind(&unversioned.GroupVersionKind{Group: targetGV.Group, Version: targetGV.Version, Kind: gvk.Kind})
 	}
 
-	return c.encoder.EncodeToStream(obj, w, overrides...)
+	objectKind := obj.GetObjectKind()
+	old := objectKind.GroupVersionKind()
+	objectKind.SetGroupVersionKind(unversioned.GroupVersionKind{Group: targetGV.Group, Version: targetGV.Version, Kind: gvk.Kind})
+	err = c.encoder.EncodeToStream(obj, w, overrides...)
+	objectKind.SetGroupVersionKind(old)
+	return err
 }
 
 // promoteOrPrependGroupVersion finds the group version in the provided group versions that has the same group as target.
