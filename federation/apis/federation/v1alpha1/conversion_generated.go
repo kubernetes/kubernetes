@@ -24,7 +24,6 @@ import (
 	federation "k8s.io/kubernetes/federation/apis/federation"
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
@@ -196,18 +195,7 @@ func Convert_federation_ClusterMeta_To_v1alpha1_ClusterMeta(in *federation.Clust
 }
 
 func autoConvert_v1alpha1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out *federation.ClusterSpec, s conversion.Scope) error {
-	if in.ServerAddressByClientCIDRs != nil {
-		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]unversioned.ServerAddressByClientCIDR, len(*in))
-		for i := range *in {
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ServerAddressByClientCIDRs = nil
-	}
+	out.ServerAddressByClientCIDRs = in.ServerAddressByClientCIDRs
 	out.Credential = in.Credential
 	return nil
 }
@@ -217,18 +205,7 @@ func Convert_v1alpha1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out
 }
 
 func autoConvert_federation_ClusterSpec_To_v1alpha1_ClusterSpec(in *federation.ClusterSpec, out *ClusterSpec, s conversion.Scope) error {
-	if in.ServerAddressByClientCIDRs != nil {
-		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]unversioned.ServerAddressByClientCIDR, len(*in))
-		for i := range *in {
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ServerAddressByClientCIDRs = nil
-	}
+	out.ServerAddressByClientCIDRs = in.ServerAddressByClientCIDRs
 	out.Credential = in.Credential
 	return nil
 }

@@ -570,15 +570,7 @@ func autoConvert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback(in 
 		return err
 	}
 	out.Name = in.Name
-	if in.UpdatedAnnotations != nil {
-		in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	} else {
-		out.UpdatedAnnotations = nil
-	}
+	out.UpdatedAnnotations = in.UpdatedAnnotations
 	if err := Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
 		return err
 	}
@@ -594,15 +586,7 @@ func autoConvert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback(in 
 		return err
 	}
 	out.Name = in.Name
-	if in.UpdatedAnnotations != nil {
-		in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	} else {
-		out.UpdatedAnnotations = nil
-	}
+	out.UpdatedAnnotations = in.UpdatedAnnotations
 	if err := Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
 		return err
 	}
@@ -826,13 +810,7 @@ func autoConvert_v1beta1_HorizontalPodAutoscalerSpec_To_extensions_HorizontalPod
 	if err := Convert_v1beta1_SubresourceReference_To_extensions_SubresourceReference(&in.ScaleRef, &out.ScaleRef, s); err != nil {
 		return err
 	}
-	if in.MinReplicas != nil {
-		in, out := &in.MinReplicas, &out.MinReplicas
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.MinReplicas = nil
-	}
+	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
 	if in.CPUUtilization != nil {
 		in, out := &in.CPUUtilization, &out.CPUUtilization
@@ -854,13 +832,7 @@ func autoConvert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPod
 	if err := Convert_extensions_SubresourceReference_To_v1beta1_SubresourceReference(&in.ScaleRef, &out.ScaleRef, s); err != nil {
 		return err
 	}
-	if in.MinReplicas != nil {
-		in, out := &in.MinReplicas, &out.MinReplicas
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.MinReplicas = nil
-	}
+	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
 	if in.CPUUtilization != nil {
 		in, out := &in.CPUUtilization, &out.CPUUtilization
@@ -879,31 +851,11 @@ func Convert_extensions_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAuto
 }
 
 func autoConvert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *extensions.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	if in.ObservedGeneration != nil {
-		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = new(int64)
-		**out = **in
-	} else {
-		out.ObservedGeneration = nil
-	}
-	if in.LastScaleTime != nil {
-		in, out := &in.LastScaleTime, &out.LastScaleTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.LastScaleTime = nil
-	}
+	out.ObservedGeneration = in.ObservedGeneration
+	out.LastScaleTime = in.LastScaleTime
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentCPUUtilizationPercentage != nil {
-		in, out := &in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.CurrentCPUUtilizationPercentage = nil
-	}
+	out.CurrentCPUUtilizationPercentage = in.CurrentCPUUtilizationPercentage
 	return nil
 }
 
@@ -912,31 +864,11 @@ func Convert_v1beta1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAu
 }
 
 func autoConvert_extensions_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *extensions.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	if in.ObservedGeneration != nil {
-		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = new(int64)
-		**out = **in
-	} else {
-		out.ObservedGeneration = nil
-	}
-	if in.LastScaleTime != nil {
-		in, out := &in.LastScaleTime, &out.LastScaleTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.LastScaleTime = nil
-	}
+	out.ObservedGeneration = in.ObservedGeneration
+	out.LastScaleTime = in.LastScaleTime
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentCPUUtilizationPercentage != nil {
-		in, out := &in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
-		*out = new(int32)
-		**out = **in
-	} else {
-		out.CurrentCPUUtilizationPercentage = nil
-	}
+	out.CurrentCPUUtilizationPercentage = in.CurrentCPUUtilizationPercentage
 	return nil
 }
 
@@ -1261,13 +1193,7 @@ func Convert_extensions_IngressStatus_To_v1beta1_IngressStatus(in *extensions.In
 }
 
 func autoConvert_v1beta1_IngressTLS_To_extensions_IngressTLS(in *IngressTLS, out *extensions.IngressTLS, s conversion.Scope) error {
-	if in.Hosts != nil {
-		in, out := &in.Hosts, &out.Hosts
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Hosts = nil
-	}
+	out.Hosts = in.Hosts
 	out.SecretName = in.SecretName
 	return nil
 }
@@ -1277,13 +1203,7 @@ func Convert_v1beta1_IngressTLS_To_extensions_IngressTLS(in *IngressTLS, out *ex
 }
 
 func autoConvert_extensions_IngressTLS_To_v1beta1_IngressTLS(in *extensions.IngressTLS, out *IngressTLS, s conversion.Scope) error {
-	if in.Hosts != nil {
-		in, out := &in.Hosts, &out.Hosts
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Hosts = nil
-	}
+	out.Hosts = in.Hosts
 	out.SecretName = in.SecretName
 	return nil
 }
@@ -1433,24 +1353,8 @@ func autoConvert_v1beta1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.
 	} else {
 		out.Conditions = nil
 	}
-	if in.StartTime != nil {
-		in, out := &in.StartTime, &out.StartTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.StartTime = nil
-	}
-	if in.CompletionTime != nil {
-		in, out := &in.CompletionTime, &out.CompletionTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.CompletionTime = nil
-	}
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -1473,24 +1377,8 @@ func autoConvert_batch_JobStatus_To_v1beta1_JobStatus(in *batch.JobStatus, out *
 	} else {
 		out.Conditions = nil
 	}
-	if in.StartTime != nil {
-		in, out := &in.StartTime, &out.StartTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.StartTime = nil
-	}
-	if in.CompletionTime != nil {
-		in, out := &in.CompletionTime, &out.CompletionTime
-		*out = new(unversioned.Time)
-		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.CompletionTime = nil
-	}
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -1502,15 +1390,7 @@ func Convert_batch_JobStatus_To_v1beta1_JobStatus(in *batch.JobStatus, out *JobS
 }
 
 func autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	if in.MatchLabels != nil {
-		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	} else {
-		out.MatchLabels = nil
-	}
+	out.MatchLabels = in.MatchLabels
 	if in.MatchExpressions != nil {
 		in, out := &in.MatchExpressions, &out.MatchExpressions
 		*out = make([]unversioned.LabelSelectorRequirement, len(*in))
@@ -1530,15 +1410,7 @@ func Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelecto
 }
 
 func autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	if in.MatchLabels != nil {
-		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	} else {
-		out.MatchLabels = nil
-	}
+	out.MatchLabels = in.MatchLabels
 	if in.MatchExpressions != nil {
 		in, out := &in.MatchExpressions, &out.MatchExpressions
 		*out = make([]LabelSelectorRequirement, len(*in))
@@ -1560,13 +1432,7 @@ func Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in *unversioned.
 func autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
 	out.Key = in.Key
 	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
-	if in.Values != nil {
-		in, out := &in.Values, &out.Values
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Values = nil
-	}
+	out.Values = in.Values
 	return nil
 }
 
@@ -1577,13 +1443,7 @@ func Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequir
 func autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
 	out.Key = in.Key
 	out.Operator = LabelSelectorOperator(in.Operator)
-	if in.Values != nil {
-		in, out := &in.Values, &out.Values
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	} else {
-		out.Values = nil
-	}
+	out.Values = in.Values
 	return nil
 }
 

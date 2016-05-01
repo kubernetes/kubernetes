@@ -114,7 +114,7 @@ func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrStrin
 
 func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
 	// Cannot deep copy these, because time.Time has unexported fields.
-	*out = *in
+	out = in
 	return nil
 }
 
@@ -158,7 +158,6 @@ func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conve
 	return nil
 }
 func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
-	// Cannot deep copy these, because inf.Dec has unexported fields.
-	*out = *in.Copy()
+	*out = *in
 	return nil
 }
