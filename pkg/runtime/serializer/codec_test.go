@@ -129,10 +129,10 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 )
 
 func (obj *MyWeirdCustomEmbeddedVersionKindField) GetObjectKind() unversioned.ObjectKind { return obj }
-func (obj *MyWeirdCustomEmbeddedVersionKindField) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+func (obj *MyWeirdCustomEmbeddedVersionKindField) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
 	obj.APIVersion, obj.ObjectKind = gvk.ToAPIVersionAndKind()
 }
-func (obj *MyWeirdCustomEmbeddedVersionKindField) GroupVersionKind() *unversioned.GroupVersionKind {
+func (obj *MyWeirdCustomEmbeddedVersionKindField) GroupVersionKind() unversioned.GroupVersionKind {
 	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.ObjectKind)
 }
 

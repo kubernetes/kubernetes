@@ -30,12 +30,12 @@ import (
 type testDecodable struct {
 	Other string
 	Value int `json:"value"`
-	gvk   *unversioned.GroupVersionKind
+	gvk   unversioned.GroupVersionKind
 }
 
-func (d *testDecodable) GetObjectKind() unversioned.ObjectKind                 { return d }
-func (d *testDecodable) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) { d.gvk = gvk }
-func (d *testDecodable) GroupVersionKind() *unversioned.GroupVersionKind       { return d.gvk }
+func (d *testDecodable) GetObjectKind() unversioned.ObjectKind                { return d }
+func (d *testDecodable) SetGroupVersionKind(gvk unversioned.GroupVersionKind) { d.gvk = gvk }
+func (d *testDecodable) GroupVersionKind() unversioned.GroupVersionKind       { return d.gvk }
 
 func TestDecode(t *testing.T) {
 	gvk1 := &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}

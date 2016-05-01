@@ -35,9 +35,9 @@ func init() {
 }
 
 func (obj *Config) GetObjectKind() unversioned.ObjectKind { return obj }
-func (obj *Config) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+func (obj *Config) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
-func (obj *Config) GroupVersionKind() *unversioned.GroupVersionKind {
+func (obj *Config) GroupVersionKind() unversioned.GroupVersionKind {
 	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }

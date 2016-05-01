@@ -253,10 +253,10 @@ type InternalObject struct {
 }
 
 func (obj *InternalObject) GetObjectKind() unversioned.ObjectKind { return obj }
-func (obj *InternalObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+func (obj *InternalObject) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
 	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
 }
-func (obj *InternalObject) GroupVersionKind() *unversioned.GroupVersionKind {
+func (obj *InternalObject) GroupVersionKind() unversioned.GroupVersionKind {
 	return unversioned.FromAPIVersionAndKind(obj.TypeMeta.APIVersion, obj.TypeMeta.Kind)
 }
 
@@ -610,10 +610,10 @@ type MyAPIObject struct {
 }
 
 func (obj *MyAPIObject) GetObjectKind() unversioned.ObjectKind { return obj }
-func (obj *MyAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+func (obj *MyAPIObject) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
 	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
 }
-func (obj *MyAPIObject) GroupVersionKind() *unversioned.GroupVersionKind {
+func (obj *MyAPIObject) GroupVersionKind() unversioned.GroupVersionKind {
 	return unversioned.FromAPIVersionAndKind(obj.TypeMeta.APIVersion, obj.TypeMeta.Kind)
 }
 

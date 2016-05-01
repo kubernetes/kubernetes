@@ -535,9 +535,9 @@ func (s *Scheme) generateConvertMeta(srcGroupVersion, destGroupVersion unversion
 func setTargetVersion(obj Object, raw *Scheme, gv unversioned.GroupVersion) {
 	if gv.Version == APIVersionInternal {
 		// internal is a special case
-		obj.GetObjectKind().SetGroupVersionKind(nil)
-	} else {
-		gvk, _ := raw.ObjectKind(obj)
-		obj.GetObjectKind().SetGroupVersionKind(&unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: gvk.Kind})
+		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+		return
 	}
+	gvk, _ := raw.ObjectKind(obj)
+	obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: gvk.Kind})
 }

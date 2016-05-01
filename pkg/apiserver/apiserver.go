@@ -264,7 +264,7 @@ func (c stripVersionEncoder) EncodeToStream(obj runtime.Object, w io.Writer, ove
 	}
 	gvk.Group = ""
 	gvk.Version = ""
-	roundTrippedObj.GetObjectKind().SetGroupVersionKind(gvk)
+	roundTrippedObj.GetObjectKind().SetGroupVersionKind(*gvk)
 	return c.serializer.EncodeToStream(roundTrippedObj, w)
 }
 
