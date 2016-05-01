@@ -242,7 +242,82 @@ func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string)
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v)", loadBalancerName, hosts)
 
-	//TODO
+	//init Cloudstack LB client
+	lbService := cloudstack.LoadBalancerService{}
+
+	//Init a new LB configuration
+	lbParams := cloudstack.ListLoadBalancerRulesParams{}
+
+	//Get new list of vms associated with LB of service
+	//Set of member (addresses) that _should_ exist
+	vmIds := getVirtualMachineIds(hosts)
+	vms := map[string]bool{}
+	for _, vmId := range vmIds {
+		vms[vmId] = true
+	}
+
+	//Now get the current list of vms. And then make comparison to update the list.
+	//Public IPaddress associated with LB of service
+	lbIpAddr := service.Spec.LoadBalancerIP
+	if lbIpAddr == nil {
+		return nil, fmt.Errorf("unsupported service without predefined Load Balancer IPaddress")
+	}
+	publicIpId := getPublicIpId(lbIpAddr)
+
+	//list all LB rules associated with this public IPaddress
+	lbParams.SetPublicipid(publicIpId)
+	lbRulesResponse, err := lbService.ListLoadBalancerRules(lbParams)
+	if err != nil {
+		return err
+	}
+	lbRuleId := lbRulesResponse.LoadBalancerRules[0].Id
+	lbInstancesParams := cloudstack.ListLoadBalancerRuleInstancesParams{}
+	lbInstancesParams.SetId(lbRuleId)
+	lbInstancesParams.SetLbvmips(true)
+
+	//TODO - lbInstancesResponse object doesn't fit to real output when making the API call on terminal
+	//lbInstancesResponse.LoadBalancerRuleInstances[0].
+	//OUTPUT: oldvmIds
+	lbInstancesResponse, err := lbService.ListLoadBalancerRuleInstances(lbInstancesParams)
+	if err != nil {
+		return err
+	}
+
+	//Compare two list of vms to thus update LB
+	var removedVmIds []string
+	for _, oldvmId := range oldvmIds {
+		if _, found := vms[oldvmId]; found {
+			delete(vms, oldvmId)
+		} else {
+			removedVmIds = append(removedVmIds, oldvmId)
+		}
+	}
+
+	//remove old vms from all LB rules associated with the public IP
+	removeFromLbRuleParams := cloudstack.RemoveFromLoadBalancerRuleParams{}
+	for _, lbRule := range lbRulesResponse.LoadBalancerRules {
+		removeFromLbRuleParams.SetId(lbRule.Id)
+		removeFromLbRuleParams.SetVirtualmachineids(removedVmIds)
+		_, err := lbService.RemoveFromLoadBalancerRule(removeFromLbRuleParams)
+		if err != nil {
+			return err
+		}
+	}
+
+	//assign new vms (the rest of vms map) to all LB rules associated with the public IP
+	var assignVmIds []string
+	for vm := range vms {
+		assignVmIds = append(assignVmIds, vm)
+	}
+	assignToLbRuleParams := cloudstack.AssignToLoadBalancerRuleParams{}
+	for _, lbRule := range lbRulesResponse.LoadBalancerRules {
+		assignToLbRuleParams.SetId(lbRule.Id)
+		assignToLbRuleParams.SetVirtualmachineids(assignVmIds)
+		_, err := lbService.AssignToLoadBalancerRule(assignToLbRuleParams)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
