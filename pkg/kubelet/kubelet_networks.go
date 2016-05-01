@@ -38,11 +38,12 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-// This just exports required functions from kubelet proper, for use by network
-// plugins.
+// networkHost exports kubelet functions to implement the network.Host interface.
 type networkHost struct {
 	kubelet *Kubelet
 }
+
+var _ network.Host = &networkHost{}
 
 func (nh *networkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
 	return nh.kubelet.GetPodByName(name, namespace)
