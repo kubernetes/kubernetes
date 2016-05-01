@@ -48,7 +48,7 @@ if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
   exit 0
 fi
 
-# create a nice clean place to put our new godeps
+# Create a nice clean place to put our new godeps
 _tmpdir="$(mktemp -d -t gopath.XXXXXX)"
 function cleanup {
   echo "Removing ${_tmpdir}"
@@ -56,39 +56,41 @@ function cleanup {
 }
 trap cleanup EXIT
 
-# build the godep tool
+# Copy the contents of the kube directory into the nice clean place
+_kubetmp="${_tmpdir}/src/k8s.io"
+mkdir -p "${_kubetmp}"
+# should create ${_kubectmp}/kubernetes
+git archive --format=tar --prefix=kubernetes/ $(git write-tree) | (cd "${_kubetmp}" && tar xf -)
+_kubetmp="${_kubetmp}/kubernetes"
+
+# Do all our work in the new GOPATH
 export GOPATH="${_tmpdir}"
+cd "${_kubetmp}"
+
+# Build the godep tool
 go get -u github.com/tools/godep 2>/dev/null
-GODEP="${_tmpdir}/bin/godep"
+GODEP="${GOPATH}/bin/godep"
 pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
   git checkout v53
   "${GODEP}" go install
 popd > /dev/null
 
-# fill out that nice clean place with the kube godeps
+# Fill out that nice clean place with the kube godeps
 echo "Starting to download all kubernetes godeps. This takes a while"
-
 "${GODEP}" restore
 echo "Download finished"
 
-# copy the contents of your kube directory into the nice clean place
-_kubetmp="${_tmpdir}/src/k8s.io"
-mkdir -p "${_kubetmp}"
-#should create ${_kubectmp}/kubernetes
-git archive --format=tar --prefix=kubernetes/ $(git write-tree) | (cd "${_kubetmp}" && tar xf -)
-_kubetmp="${_kubetmp}/kubernetes"
+# Destroy deps in the copy of the kube tree
+rm -rf ./Godeps ./vendor
 
-# destroy godeps in our COPY of the kube tree
-pushd "${_kubetmp}" > /dev/null
-  rm -rf ./Godeps
+# For some reason the kube tree needs to be a git repo for the godep tool to
+# run. Doesn't make sense.
+git init > /dev/null 2>&1
 
-  # for some reason the kube tree needs to be a git repo for the godep tool to run. Doesn't make sense
-  git init > /dev/null 2>&1
+# Recreate the Godeps using the nice clean set we just downloaded
+"${GODEP}" save ./...
 
-  # recreate the Godeps using the nice clean set we just downloaded
-  "${GODEP}" save ./...
-popd > /dev/null
-
+# Test for diffs
 if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
   echo "Your Godeps.json is different:"
   echo "${_out}"
