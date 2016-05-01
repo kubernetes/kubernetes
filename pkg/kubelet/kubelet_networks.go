@@ -17,9 +17,25 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
+	"io"
+	"io/ioutil"
+	"net"
+	"os"
+	"strings"
+
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/util/bandwidth"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // This just exports required functions from kubelet proper, for use by network

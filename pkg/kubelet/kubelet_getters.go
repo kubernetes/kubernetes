@@ -18,21 +18,15 @@ package kubelet
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net"
-	"net/http"
-	"os"
 	"path"
-	"sort"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/golang/glog"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // getRootDir returns the full path to the directory under which kubelet can
