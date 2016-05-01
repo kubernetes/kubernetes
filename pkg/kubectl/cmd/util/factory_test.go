@@ -58,28 +58,6 @@ func TestNewFactoryNoFlagBindings(t *testing.T) {
 	}
 }
 
-func TestPodSelectorForObject(t *testing.T) {
-	f := NewFactory(nil)
-
-	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test"},
-		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"foo": "bar",
-			},
-		},
-	}
-
-	expected := "foo=bar"
-	got, err := f.PodSelectorForObject(svc)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if expected != got {
-		t.Fatalf("Selector mismatch! Expected %s, got %s", expected, got)
-	}
-}
-
 func TestPortsForObject(t *testing.T) {
 	f := NewFactory(nil)
 
