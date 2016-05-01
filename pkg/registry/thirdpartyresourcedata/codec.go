@@ -40,7 +40,7 @@ type thirdPartyObjectConverter struct {
 	converter runtime.ObjectConvertor
 }
 
-func (t *thirdPartyObjectConverter) ConvertToVersion(in runtime.Object, outVersion string) (out runtime.Object, err error) {
+func (t *thirdPartyObjectConverter) ConvertToVersion(in runtime.Object, outVersion unversioned.GroupVersion) (out runtime.Object, err error) {
 	switch in.(type) {
 	// This seems weird, but in this case the ThirdPartyResourceData is really just a wrapper on the raw 3rd party data.
 	// The actual thing printed/sent to server is the actual raw third party resource data, which only has one version.

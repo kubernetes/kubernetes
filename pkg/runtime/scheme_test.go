@@ -530,7 +530,7 @@ func TestKnownTypes(t *testing.T) {
 func TestConvertToVersion(t *testing.T) {
 	s := GetTestScheme()
 	tt := &TestType1{A: "I'm not a pointer object"}
-	other, err := s.ConvertToVersion(tt, "v1")
+	other, err := s.ConvertToVersion(tt, unversioned.GroupVersion{Version: "v1"})
 	if err != nil {
 		t.Fatalf("Failure: %v", err)
 	}
@@ -578,12 +578,12 @@ func TestMetaValues(t *testing.T) {
 
 	s.Log(t)
 
-	out, err := s.ConvertToVersion(simple, externalGV.String())
+	out, err := s.ConvertToVersion(simple, externalGV)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	internal, err := s.ConvertToVersion(out, internalGV.String())
+	internal, err := s.ConvertToVersion(out, internalGV)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

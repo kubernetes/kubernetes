@@ -161,7 +161,7 @@ type StorageSerializer interface {
 // Non-codec interfaces
 
 type ObjectVersioner interface {
-	ConvertToVersion(in Object, outVersion string) (out Object, err error)
+	ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (out Object, err error)
 }
 
 // ObjectConvertor converts an object to a different version.
@@ -171,7 +171,7 @@ type ObjectConvertor interface {
 	Convert(in, out interface{}) error
 	// ConvertToVersion takes the provided object and converts it the provided version. This
 	// method does not guarantee that the in object is not mutated.
-	ConvertToVersion(in Object, outVersion string) (out Object, err error)
+	ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (out Object, err error)
 	ConvertFieldLabel(version, kind, label, value string) (string, string, error)
 }
 
