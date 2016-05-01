@@ -23,24 +23,24 @@ type Config struct {
 		       VerifySSL  string `gcfg:"verify-ssl"`
 		       Region     string
 	       }
-	LoadBalancer LoadBalancerOpts
+	//LoadBalancer LoadBalancerOpts
 }
 
-type LoadBalancerOpts struct {
-	Name			string		`gcfg:"name"`
-	Algorithm		string		`gcfg:"algorithm"`
-	InstancePort		int		`gcfg:"instance-port"`
-	NetworkID		string		`gcfg:"network-id"`
-	Scheme			string 		`gcfg:"scheme"`
-	SourceIPNetworkID	string		`gcfg:"source-ip-network-id"`
-	SourcePort		int		`gcfg:"source-port"`
-}
+//type LoadBalancerOpts struct {
+//	Name			string		`gcfg:"name"`
+//	Algorithm		string		`gcfg:"algorithm"`
+//	InstancePort		int		`gcfg:"instance-port"`
+//	NetworkID		string		`gcfg:"network-id"`
+//	Scheme			string 		`gcfg:"scheme"`
+//	SourceIPNetworkID	string		`gcfg:"source-ip-network-id"`
+//	SourcePort		int		`gcfg:"source-port"`
+//}
 
 // CloudStack is an implementation of cloud provider Interface for CloudStack.
 type CloudStack struct {
 	provider *cloudstack.CloudStackClient
 	region   string
-	lbOpts   LoadBalancerOpts
+	//lbOpts   LoadBalancerOpts
 	// InstanceID of the server where this CloudStack object is instantiated.
 	localInstanceID string
 }
@@ -81,7 +81,7 @@ func newCloudStack(cfg Config) (*CloudStack, error) {
 	cs := CloudStack{
 		provider:        provider,
 		region:          cfg.Global.Region,
-		lbOpts:          cfg.LoadBalancer,
+		//lbOpts:          cfg.LoadBalancer,
 		localInstanceID: id,
 	}
 
