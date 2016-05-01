@@ -420,3 +420,37 @@ func (kl *Kubelet) shapingEnabled() bool {
 	}
 	return true
 }
+
+// syncNetworkStatus updates the network state, ensuring that the network is
+// configured correctly if the kubelet is set to configure cbr0:
+// * handshake flannel helper if the flannel experimental overlay is being used.
+// * ensure that iptables masq rules are setup
+// * reconcile cbr0 with the pod CIDR
+func (kl *Kubelet) syncNetworkStatus() {
+	var err error
+	if kl.configureCBR0 {
+		if kl.flannelExperimentalOverlay {
+			podCIDR, err := kl.flannelHelper.Handshake()
+			if err != nil {
+				glog.Infof("Flannel server handshake failed %v", err)
+				return
+			}
+			kl.updatePodCIDR(podCIDR)
+		}
+		if err := ensureIPTablesMasqRule(kl.nonMasqueradeCIDR); err != nil {
+			err = fmt.Errorf("Error on adding ip table rules: %v", err)
+			glog.Error(err)
+			kl.runtimeState.setNetworkState(err)
+			return
+		}
+		podCIDR := kl.runtimeState.podCIDR()
+		if len(podCIDR) == 0 {
+			err = fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
+			glog.Warning(err)
+		} else if err = kl.reconcileCBR0(podCIDR); err != nil {
+			err = fmt.Errorf("Error configuring cbr0: %v", err)
+			glog.Error(err)
+		}
+	}
+	kl.runtimeState.setNetworkState(err)
+}
