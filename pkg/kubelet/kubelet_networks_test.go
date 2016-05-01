@@ -17,25 +17,18 @@ limitations under the License.
 package kubelet
 
 import (
-	"fmt"
-	"io"
-	"io/ioutil"
 	"net"
-	"os"
+	"reflect"
 	"strings"
+	"testing"
+	"time"
 
-	"github.com/golang/glog"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestNodeIPParam(t *testing.T) {
