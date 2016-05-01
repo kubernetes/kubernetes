@@ -76,6 +76,7 @@ func fuzzPodList(width, variants int) []runtime.Object {
 		}
 		items[i] = list
 	}
+	return items
 }
 
 func benchmarkPodListConversion(b *testing.B, width int) {
