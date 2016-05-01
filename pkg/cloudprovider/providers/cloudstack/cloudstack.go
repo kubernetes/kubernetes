@@ -164,6 +164,9 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		}
 	}
 
+	//init Cloudstack LB client
+	lbService := cloudstack.LoadBalancerService{}
+
 	//Init a new LB configuration
 	lbParams := cloudstack.CreateLoadBalancerRuleParams{}
 
@@ -206,7 +209,6 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		lbParams.SetPrivateport(port.NodePort)
 
 		// create a Load Balancer rule
-		lbService := cloudstack.LoadBalancerService{}
 		createLBRuleResponse, err := lbService.CreateLoadBalancerRule(lbParams)
 		if err != nil {
 			return nil, err
