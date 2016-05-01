@@ -204,7 +204,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 	}
 
 	// Convert if needed.
-	out, err := c.convertor.ConvertToVersion(obj, targetGV.String())
+	out, err := c.convertor.ConvertToVersion(obj, targetGV)
 	if err != nil {
 		return nil, gvk, err
 	}
@@ -264,7 +264,7 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 
 	// Perform a conversion if necessary
 	if gvk.GroupVersion() != targetGV {
-		out, err := c.convertor.ConvertToVersion(obj, targetGV.String())
+		out, err := c.convertor.ConvertToVersion(obj, targetGV)
 		if err != nil {
 			if ok {
 				return err

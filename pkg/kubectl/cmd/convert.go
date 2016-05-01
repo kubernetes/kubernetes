@@ -167,7 +167,7 @@ func (o *ConvertOptions) RunConvert() error {
 		}
 
 		infos := []*resource.Info{info}
-		objects, err := resource.AsVersionedObject(infos, false, o.outputVersion.String(), o.encoder)
+		objects, err := resource.AsVersionedObject(infos, false, o.outputVersion, o.encoder)
 		if err != nil {
 			return err
 		}

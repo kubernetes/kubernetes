@@ -473,16 +473,12 @@ func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, 
 // contain the inKind (or a mapping by name defined with AddKnownTypeWithName). Will also
 // return an error if the conversion does not result in a valid Object being
 // returned. The serializer handles loading/serializing nested objects.
-func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) {
-	gv, err := unversioned.ParseGroupVersion(outVersion)
-	if err != nil {
-		return nil, err
-	}
+func (s *Scheme) ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
 	switch in.(type) {
 	case *Unknown, *Unstructured, *UnstructuredList:
 		old := in.GetObjectKind().GroupVersionKind()
 		defer in.GetObjectKind().SetGroupVersionKind(old)
-		setTargetVersion(in, s, gv)
+		setTargetVersion(in, s, outVersion)
 		return in, nil
 	}
 	t := reflect.TypeOf(in)
@@ -506,7 +502,7 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 		kind = kinds[0]
 	}
 
-	outKind := gv.WithKind(kind.Kind)
+	outKind := outVersion.WithKind(kind.Kind)
 
 	inKind, err := s.ObjectKind(in)
 	if err != nil {
@@ -518,12 +514,12 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 		return nil, err
 	}
 
-	flags, meta := s.generateConvertMeta(inKind.GroupVersion(), gv, in)
+	flags, meta := s.generateConvertMeta(inKind.GroupVersion(), outVersion, in)
 	if err := s.converter.Convert(in, out, flags, meta); err != nil {
 		return nil, err
 	}
 
-	setTargetVersion(out, s, gv)
+	setTargetVersion(out, s, outVersion)
 	return out, nil
 }
 

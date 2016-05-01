@@ -32,7 +32,7 @@ func (fakeConvertor) Convert(in, out interface{}) error {
 	return nil
 }
 
-func (fakeConvertor) ConvertToVersion(in runtime.Object, _ string) (runtime.Object, error) {
+func (fakeConvertor) ConvertToVersion(in runtime.Object, _ unversioned.GroupVersion) (runtime.Object, error) {
 	return in, nil
 }
 
