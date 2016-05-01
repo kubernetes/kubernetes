@@ -6,10 +6,10 @@ import (
 	"github.com/scalingdata/gcfg"
 	"github.com/kubernetes/kubernetes/pkg/cloudprovider"
 	"github.com/xanzy/go-cloudstack/cloudstack"
-	"k8s.io/kubernetes/pkg/api"
-	//"github.com/kubernetes/kubernetes/pkg/api"
-	"k8s.io/kubernetes/kubernetes/pkg/api/service"
-	//"github.com/kubernetes/kubernetes/pkg/api/service"
+	//"k8s.io/kubernetes/pkg/api"
+	"github.com/kubernetes/kubernetes/pkg/api"
+	//"k8s.io/kubernetes/kubernetes/pkg/api/service"
+	"github.com/kubernetes/kubernetes/pkg/api/service"
 	"github.com/golang/glog"
 )
 
@@ -67,7 +67,7 @@ func readConfig(config io.Reader) (Config, error) {
 }
 
 func newCloudStack(cfg Config) (*CloudStack, error) {
-	provider := cloudstack.NewClient(cfg.Global.AuthUrl, cfg.Global.ApiKey, cfg.Global.SecretKey, cfg.Global.VerifySSL)
+	provider := cloudstack.NewAsyncClient(cfg.Global.AuthUrl, cfg.Global.ApiKey, cfg.Global.SecretKey, cfg.Global.VerifySSL)
 	if provider == nil {
 		return nil, nil
 	}
