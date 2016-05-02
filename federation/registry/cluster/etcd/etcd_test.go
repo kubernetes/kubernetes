@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -49,7 +48,7 @@ func validNewCluster() *federation.Cluster {
 			},
 		},
 		Spec: federation.ClusterSpec{
-			ServerAddressByClientCIDRs: []unversioned.ServerAddressByClientCIDR{
+			ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
 				{
 					ClientCIDR:    "0.0.0.0/0",
 					ServerAddress: "localhost:8888",

@@ -21,13 +21,22 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+// ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
+type ServerAddressByClientCIDR struct {
+	// The CIDR with which clients can match their IP to figure out the server address that they should use.
+	ClientCIDR string `json:"clientCIDR" protobuf:"bytes,1,opt,name=clientCIDR"`
+	// Address of this server, suitable for a client that matches the above CIDR.
+	// This can be a hostname, hostname:port, IP or IP:port.
+	ServerAddress string `json:"serverAddress" protobuf:"bytes,2,opt,name=serverAddress"`
+}
+
 // ClusterSpec describes the attributes of a kubernetes cluster.
 type ClusterSpec struct {
 	// A map of client CIDR to server address.
 	// This is to help clients reach servers in the most network-efficient way possible.
 	// Clients can use the appropriate server address as per the CIDR that they match.
 	// In case of multiple matches, clients should use the longest matching CIDR.
-	ServerAddressByClientCIDRs []unversioned.ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" patchStrategy:"merge" patchMergeKey:"clientCIDR"`
+	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" patchStrategy:"merge" patchMergeKey:"clientCIDR"`
 	// the type (e.g. bearer token, client certificate etc) and data of the credential used to access cluster.
 	// It’s used for system routines (not behalf of users)
 	// TODO: string may not enough, https://github.com/kubernetes/kubernetes/pull/23847#discussion_r59301275

@@ -85,7 +85,7 @@ message ClusterSpec {
   // This is to help clients reach servers in the most network-efficient way possible.
   // Clients can use the appropriate server address as per the CIDR that they match.
   // In case of multiple matches, clients should use the longest matching CIDR.
-  repeated k8s.io.kubernetes.pkg.api.unversioned.ServerAddressByClientCIDR serverAddressByClientCIDRs = 1;
+  repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 1;
 
   // the type (e.g. bearer token, client certificate etc) and data of the credential used to access cluster.
   // It’s used for system routines (not behalf of users)
@@ -105,5 +105,15 @@ message ClusterStatus {
   map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> allocatable = 3;
 
   optional ClusterMeta clusterMeta = 4;
+}
+
+// ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
+message ServerAddressByClientCIDR {
+  // The CIDR with which clients can match their IP to figure out the server address that they should use.
+  optional string clientCIDR = 1;
+
+  // Address of this server, suitable for a client that matches the above CIDR.
+  // This can be a hostname, hostname:port, IP or IP:port.
+  optional string serverAddress = 2;
 }
 
