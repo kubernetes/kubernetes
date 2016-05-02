@@ -566,21 +566,7 @@ func getAvailabilityZone(metadata EC2Metadata) (string, error) {
 }
 
 func isRegionValid(region string) bool {
-	regions := [...]string{
-		"us-east-1",
-		"us-west-1",
-		"us-west-2",
-		"eu-west-1",
-		"eu-central-1",
-		"ap-southeast-1",
-		"ap-southeast-2",
-		"ap-northeast-1",
-		"ap-northeast-2",
-		"cn-north-1",
-		"us-gov-west-1",
-		"sa-east-1",
-	}
-	for _, r := range regions {
+	for _, r := range aws_credentials.AWSRegions {
 		if r == region {
 			return true
 		}
