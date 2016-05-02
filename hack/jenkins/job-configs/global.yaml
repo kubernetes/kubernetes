@@ -116,6 +116,48 @@
            set -x
            docker rmi -f {repoName}:{tag}
 
+
+# Implements Git Scm Plugin
+# https://wiki.jenkins-ci.org/display/JENKINS/Git+Plugin
+# From the docs: 'This plugin allows use of Git as a build SCM, including repository browsers for several providers.'
+#
+# While JJB has built in support for the git plugin, it does not correctly set the relativeTargetDir with version 2.4.4
+# of the plugin.
+#
+# url: github project url - e.g. https://github.com/kubernetes/kubernetes
+# branch: branch to checkout - e.g. master
+# basedir: Checkout repo to this directory -  e.g. go/src/k8s.io/kubernetes
+- scm:
+    name: git-2-4-4
+    scm:
+        - raw:
+            xml: |
+              <scm class="hudson.plugins.git.GitSCM" plugin="git@2.4.4">
+                <configVersion>2</configVersion>
+                <userRemoteConfigs>
+                  <hudson.plugins.git.UserRemoteConfig>
+                    <name>origin</name>
+                    <refspec>+refs/heads/*:refs/remotes/origin/*</refspec>
+                    <url>{url}</url>
+                  </hudson.plugins.git.UserRemoteConfig>
+                </userRemoteConfigs>
+                <branches>
+                  <hudson.plugins.git.BranchSpec>
+                    <name>{branch}</name>
+                  </hudson.plugins.git.BranchSpec>
+                </branches>
+                <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+                <browser class="hudson.plugins.git.browser.GithubWeb">
+                  <url>{url}</url>
+                </browser>
+                <submoduleCfg class="list"/>
+                <extensions>
+                  <hudson.plugins.git.extensions.impl.RelativeTargetDirectory>
+                    <relativeTargetDir>{basedir}</relativeTargetDir>
+                  </hudson.plugins.git.extensions.impl.RelativeTargetDirectory>
+                </extensions>
+              </scm>
+
 # Default email recipients are set in Jenkins global config
 - defaults:
     name: global
