@@ -7,44 +7,44 @@ Each stage requires various approvals from various teams.
 You can use the checkboxes below to
 track your progress.  You can delete the text above once you have read it.  Please keep the checklist.
 
-- Before Alpha
+- [ ] Before Alpha
     - [ ] Design Approval
-      - [ ] Propose your feature.  See [Advice for proposing features].  **PROPROSAL-ISSUE-NUMBER**
-      - [ ] Start with a < 1 page description of design in an issue comment below this. [advice for design description]  **1PAGER-ISSUE-NUMBER**
-      - [ ] Initial design review  		     [advice for getting a review from a team]  **DESIGN-REVIEW-ISSUE-NUMBER**
-      - [ ] Initial API review (if API) **API-REVIEW-ISSUE-NUMBER**
-        -  cc @kubernetes/api
-    - [ ] Write (code + tests + docs) then get them merged.  **LIST-OF-PRS**
+      - [ ] < 1 page PR description of the design. [advice for design description]  **PR-NUMBER**
+      - [ ] Design doc under [docs/proposals](https://github.com/kubernetes/kubernetes/docs/proposals).  **PR-NUMBER**
+      - [ ] Initial API review (if API).  Maybe same PR as design doc. **PR-NUMBER**
+        -  Any code that changes an API (`/pkg/apis/...`)
+        -  **cc @kubernetes/api**
+    - [ ] Write (code + tests + docs) then get them merged.  **ALL-PR-NUMBERS**
       - [ ] **Code needs to be disabled by default.**   Verified by code OWNERS
-      - [ ] OWNER approval for code
       - [ ] Minimal testing
       - [ ] Minimal docs
-        - *Glossary Section Item* in the docs repo: kubernetes/kubernetes.github.io
         - cc @kubernetes/docs on docs PR
         - **cc @kubernetes/feature-reviewers on this issue** to get approval before checking this off
+        - New apis: *Glossary Section Item* in the docs repo: kubernetes/kubernetes.github.io
       - [ ] Update release notes
-- Before Beta
+- [ ] Before Beta
   - [ ] Testing is sufficient for beta
   - [ ] User docs with tutorials
         - *Updated walkthrough / tutorial* in the docs repo: kubernetes/kubernetes.github.io
         - cc @kubernetes/docs on docs PR
         - **cc @kubernetes/feature-reviewers on this issue** to get approval before checking this off
   - [ ] Thorough API review
-    - cc @kubernetes/api
-- Before Stable
+    - **cc @kubernetes/api**
+- [ ] Before Stable
+  - [ ] docs/proposals/foo.md moved to docs/design/foo.md 
+        - **cc @kubernetes/feature-reviewers on this issue** to get approval before checking this off
   - [ ] Soak, load testing 			
   - [ ] detailed user docs and examples
     - **cc @kubernetes/docs**
+    - **cc @kubernetes/feature-reviewers on this issue** to get approval before checking this off
 
-*FEATURE_STATUS: INCOMPLETE*
+*FEATURE_STATUS is used for feature tracking and to be updated by @kubernetes/feature-reviewers.*
+**FEATURE_STATUS: IN_DEVELOPMENT**
 
 More advice:
 
 Design
-   - If the feature is not simple, the approver might ask you to write a longer design doc.
-   - If there is a design doc, that goes in a PR under github.com/kubernetes/kubernetes/docs/proposals.  Link that PR on this issue.
-   - Once you get LGTM from a *@kubernetes/feature-reviewers* member, you can check this checkbox, and the reviewer will apply the "feature-lgtm" label.
-   -  If your code changes an API (`/pkg/apis/...`), it needs an API review.
+   - Once you get LGTM from a *@kubernetes/feature-reviewers* member, you can check this checkbox, and the reviewer will apply the "design-complete" label.
  
 Coding
   - Use as many PRs as you need.  Write tests in the same or different PRs, as is convenient for you.
