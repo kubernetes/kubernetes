@@ -82,9 +82,11 @@ or not the job is healthy.
 
 New jobs should be specified as YAML files to be processed by [Jenkins Job
 Builder](http://docs.openstack.org/infra/jenkins-job-builder/). The YAML files
-live in `job-configs` and its subfolders. Jenkins runs Jenkins Job Builder
-in a Docker container defined in `job-builder-image`, and triggers it using
-`update-jobs.sh`. Jenkins Job Builder uses a config file called
+live in `jenkins/job-configs` and its subfolders **in the 
+[kubernetes/test-infra repository](https://github.com/kubernetes/test-infra)**.
+Jenkins runs Jenkins Job Builder in a Docker container defined in
+`job-builder-image`, and triggers it using `update-jobs.sh`. Jenkins Job Builder
+uses a config file called
 [jenkins_jobs.ini](http://docs.openstack.org/infra/jenkins-job-builder/execution.html)
 which contains the location and credentials of the Jenkins server.
 
