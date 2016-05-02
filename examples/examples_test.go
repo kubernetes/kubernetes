@@ -170,9 +170,6 @@ func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error 
 
 func TestExampleObjectSchemas(t *testing.T) {
 	cases := map[string]map[string]runtime.Object{
-		"../cmd/integration": {
-			"v1-controller": &api.ReplicationController{},
-		},
 		"../examples/guestbook": {
 			"frontend-deployment":     &extensions.Deployment{},
 			"redis-slave-deployment":  &extensions.Deployment{},
