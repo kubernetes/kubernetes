@@ -4,7 +4,8 @@
     publishers:
         - claim-build
         - junit-publisher
-        - gcs-uploader
+        - gcs-uploader:
+            credentials-id: kubernetes-jenkins
         - log-parser
         - email-ext:
             recipients: '{recipients}'

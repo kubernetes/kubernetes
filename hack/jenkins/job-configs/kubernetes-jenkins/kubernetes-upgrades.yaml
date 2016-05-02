@@ -79,7 +79,8 @@
     publishers:
         - claim-build
         # No junit-publisher, since we're not running any tests
-        - gcs-uploader
+        - gcs-uploader:
+            credentials-id: kubernetes-jenkins
         - log-parser
         - email-ext:
             recipients: 'ihmccreery@google.com'
@@ -116,7 +117,8 @@
     publishers:
         - claim-build
         - junit-publisher
-        - gcs-uploader
+        - gcs-uploader:
+            credentials-id: kubernetes-jenkins
         - log-parser
         - email-ext:
             recipients: 'ihmccreery@google.com'

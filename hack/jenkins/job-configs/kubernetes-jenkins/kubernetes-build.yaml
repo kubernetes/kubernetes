@@ -13,7 +13,8 @@
         - mail-watcher
     publishers:
         - claim-build
-        - gcs-uploader
+        - gcs-uploader:
+            credentials-id: kubernetes-jenkins
         - log-parser
         - email-ext:
             recipients: $DEFAULT_RECIPIENTS, cloud-kubernetes-team@google.com

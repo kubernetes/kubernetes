@@ -45,7 +45,7 @@
             script-only-if-failed: False
         # Use the plugin for the build log, since it isn't available on Jenkins slaves.
         - google-cloud-storage:
-            credentials-id: kubernetes-jenkins
+            credentials-id: '{credentials-id}'
             uploads:
                 - build-log:
                     log-name: build-log.txt
@@ -115,6 +115,25 @@
            set -e
            set -x
            docker rmi -f {repoName}:{tag}
+
+# Until this change goes in to JJB we need to use raw xml:
+# https://review.openstack.org/#/c/310084/
+- wrapper:
+    name: sudo-workspace-cleanup
+    wrappers:
+        - raw:
+            xml: |
+                <hudson.plugins.ws__cleanup.PreBuildCleanup plugin="ws-cleanup@0.28">
+                    <patterns>
+                        <hudson.plugins.ws__cleanup.Pattern>
+                            <pattern>*</pattern>
+                            <type>INCLUDE</type>
+                        </hudson.plugins.ws__cleanup.Pattern>
+                    </patterns>
+                    <deleteDirs>true</deleteDirs>
+                    <cleanupParameter/>
+                    <externalDelete>sudo rm -rf %s</externalDelete>
+                </hudson.plugins.ws__cleanup.PreBuildCleanup>
 
 # Default email recipients are set in Jenkins global config
 - defaults:

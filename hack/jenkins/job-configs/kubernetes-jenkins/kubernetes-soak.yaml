@@ -19,7 +19,8 @@
                 - 'kubernetes-soak-continuous-e2e-{suffix}'
     publishers:
         - email-ext
-        - gcs-uploader
+        - gcs-uploader:
+            credentials-id: kubernetes-jenkins
     triggers:
         - timed: 'H 0 * * 2'
     wrappers:
@@ -55,7 +56,8 @@
     publishers:
         - claim-build
         - email-ext
-        - gcs-uploader
+        - gcs-uploader:
+            credentials-id: kubernetes-jenkins
         - junit-publisher
         - log-parser
     triggers:
