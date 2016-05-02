@@ -47,13 +47,13 @@
         - 'build':
             branch: 'master'
             timeout: 50
-        - 'build-1.0':
+        - 'build-release-1.0':
             branch: 'release-1.0'
             timeout: 30
-        - 'build-1.1':
+        - 'build-release-1.1':
             branch: 'release-1.1'
             timeout: 30
-        - 'build-1.2':
+        - 'build-release-1.2':
             branch: 'release-1.2'
             timeout: 30
     jobs:

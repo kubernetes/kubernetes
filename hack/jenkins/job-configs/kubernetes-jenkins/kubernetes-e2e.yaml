@@ -253,8 +253,8 @@
         - 'kubernetes-e2e-{suffix}'
 
 - project:
-    name: kubernetes-e2e-gce-1-2
-    trigger-job: 'kubernetes-build-1.2'
+    name: kubernetes-e2e-gce-release-1-2
+    trigger-job: 'kubernetes-build-release-1.2'
     test-owner: 'Build Cop'
     provider-env: |
         {gce-provider-env}
@@ -333,8 +333,8 @@
         - 'kubernetes-e2e-{suffix}'
 
 - project:
-    name: kubernetes-e2e-gke-1-2
-    trigger-job: 'kubernetes-build-1.2'
+    name: kubernetes-e2e-gke-release-1-2
+    trigger-job: 'kubernetes-build-release-1.2'
     test-owner: 'Build Cop'
     provider-env: |
         {gke-provider-env}
@@ -378,7 +378,7 @@
 - project:
     name: kubernetes-e2e-gke-version-pinned
     # TODO(spxtr) This should float with the current release, or something.
-    trigger-job: 'kubernetes-build-1.2'
+    trigger-job: 'kubernetes-build-release-1.2'
     test-owner: 'GKE on-call'
     provider-env: |
         {gke-provider-env}
@@ -449,15 +449,14 @@
         - 'kubernetes-e2e-{suffix}'
 
 - project:
-    name: kubernetes-e2e-gke-1.1
-    trigger-job: 'kubernetes-build-1.1'
+    name: kubernetes-e2e-gke-release-1.1
+    trigger-job: 'kubernetes-build-release-1.1'
     test-owner: 'Build Cop'
-    branch: 'release-1.1'
     jenkins_node: 'master'
     runner: '{old-runner-1-1}'
     post-env: ''
     suffix:
-        - 'gke-1.1':
+        - 'gke-release-1.1':
             timeout: 150
             description: 'Run E2E tests on GKE from the 1.1 release branch.'
             cron-string: 'H */6 * * *'
@@ -466,10 +465,9 @@
 
 
 - project:
-    name: kubernetes-e2e-gce-1.1
-    trigger-job: 'kubernetes-build-1.1'
+    name: kubernetes-e2e-gce-release-1.1
+    trigger-job: 'kubernetes-build-release-1.1'
     test-owner: 'Build Cop'
-    branch: 'release-1.1'
     jenkins_node: 'master'
     runner: '{old-runner-1-1}'
     post-env: ''
@@ -483,9 +481,8 @@
 
 - project:
     name: kubernetes-e2e-1.0
-    trigger-job: 'kubernetes-build-1.0'
+    trigger-job: 'kubernetes-build-release-1.0'
     test-owner: 'Build Cop'
-    branch: 'release-1.0'
     jenkins_node: 'master'
     runner: '{old-runner-1-0}'
     post-env: ''
@@ -593,7 +590,6 @@
     trigger-job: ''
     description: 'Starts and deletes empty 1000 node cluster and runs Density 30 test on it. Does allow few Nodes to fail during startup.'
     timeout: 480
-    branch: 'master'
     suffix: 'gce-enormous-cluster'
     provider-env: '{gce-provider-env}'
     job-env: |
@@ -697,7 +693,7 @@
 
 - project:
     name: kubernetes-e2e-gce-trusty-ci-1-2
-    trigger-job: 'kubernetes-build-1.2'
+    trigger-job: 'kubernetes-build-release-1.2'
     test-owner: 'wonderfly@google.com'
     emails: 'wonderfly@google.com,qzheng@google.com'
     provider-env: |
@@ -755,7 +751,6 @@
 - project:
     name: kubernetes-e2e-gce-trusty-dev
     test-owner: 'wonderfly@google.com'
-    branch: 'release-1.2'
     emails: 'wonderfly@google.com,qzheng@google.com'
     provider-env: |
         {gce-provider-env}
@@ -812,7 +807,6 @@
 - project:
     name: kubernetes-e2e-gce-trusty-1-1
     test-owner: 'wonderfly@google.com'
-    branch: 'release-1.1'
     emails: 'wonderfly@google.com,qzheng@google.com'
     jenkins_node: 'master'
     runner: '{old-runner-1-1}'
@@ -840,7 +834,7 @@
 # the OS dependendent test cases will use Trusty in their assertions.
 - project:
     name: kubernetes-e2e-gke-trusty
-    trigger-job: 'kubernetes-build-1.2'
+    trigger-job: 'kubernetes-build-release-1.2'
     test-owner: 'wonderfly@google.com'
     provider-env: |
         {gke-provider-env}
