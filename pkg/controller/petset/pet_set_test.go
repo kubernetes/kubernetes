@@ -35,7 +35,7 @@ func newFakePetSetController() (*PetSetController, *fakePetClient) {
 		blockingPetStore: newUnHealthyPetTracker(fpc),
 		podStoreSynced:   func() bool { return true },
 		psStore:          cache.StoreToPetSetLister{Store: cache.NewStore(controller.KeyFunc)},
-		podStore:         cache.StoreToPodLister{Store: cache.NewStore(controller.KeyFunc)},
+		podStore:         cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		newSyncer: func(blockingPet *pcb) *petSyncer {
 			return &petSyncer{fpc, blockingPet}
 		},

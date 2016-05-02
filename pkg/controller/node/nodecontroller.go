@@ -193,8 +193,10 @@ func NewNodeController(
 			AddFunc:    nc.maybeDeleteTerminatingPod,
 			UpdateFunc: func(_, obj interface{}) { nc.maybeDeleteTerminatingPod(obj) },
 		},
-		// We don't need to build a index for podStore here
-		cache.Indexers{},
+		// We don't need to build a index for podStore here actually, but build one for consistency.
+		// It will ensure that if people start making use of the podStore in more specific ways,
+		// they'll get the benefits they expect. It will also reserve the name for future refactorings.
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	nc.nodeStore.Store, nc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
