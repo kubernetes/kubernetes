@@ -137,35 +137,41 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return err
 	}
 
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-	if len(infos) > 1 {
-		return fmt.Errorf("multiple resources provided")
-	}
-	info := infos[0]
-	name, namespace := info.Name, info.Namespace
-	mapping := info.ResourceMapping()
-	client, err := f.ClientForMapping(mapping)
-	if err != nil {
-		return err
-	}
-
-	helper := resource.NewHelper(client, mapping)
-	patchedObject, err := helper.Patch(namespace, name, patchType, patchBytes)
-	if err != nil {
-		return err
-	}
-	if cmdutil.ShouldRecord(cmd, info) {
-		if err := cmdutil.RecordChangeCause(patchedObject, f.Command()); err == nil {
-			// don't return an error on failure.  The patch itself succeeded, its only the hint for that change that failed
-			// don't bother checking for failures of this replace, because a failure to indicate the hint doesn't fail the command
-			// also, don't force the replacement.  If the replacement fails on a resourceVersion conflict, then it means this
-			// record hint is likely to be invalid anyway, so avoid the bad hint
-			resource.NewHelper(client, mapping).Replace(namespace, name, false, patchedObject)
+	count := 0
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
 		}
+		name, namespace := info.Name, info.Namespace
+		mapping := info.ResourceMapping()
+		client, err := f.ClientForMapping(mapping)
+		if err != nil {
+			return err
+		}
+
+		helper := resource.NewHelper(client, mapping)
+		patchedObject, err := helper.Patch(namespace, name, patchType, patchBytes)
+		if err != nil {
+			return err
+		}
+		if cmdutil.ShouldRecord(cmd, info) {
+			if err := cmdutil.RecordChangeCause(patchedObject, f.Command()); err == nil {
+				// don't return an error on failure.  The patch itself succeeded, its only the hint for that change that failed
+				// don't bother checking for failures of this replace, because a failure to indicate the hint doesn't fail the command
+				// also, don't force the replacement.  If the replacement fails on a resourceVersion conflict, then it means this
+				// record hint is likely to be invalid anyway, so avoid the bad hint
+				resource.NewHelper(client, mapping).Replace(namespace, name, false, patchedObject)
+			}
+		}
+		count++
+		cmdutil.PrintSuccess(mapper, shortOutput, out, "", name, "patched")
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-	cmdutil.PrintSuccess(mapper, shortOutput, out, "", name, "patched")
+	if count == 0 {
+		return fmt.Errorf("no objects passed to patch")
+	}
 	return nil
 }

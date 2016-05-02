@@ -140,20 +140,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-	if len(infos) > 1 {
-		return fmt.Errorf("multiple resources provided: %v", args)
-	}
-	info := infos[0]
-	mapping := info.ResourceMapping()
-	if err := f.CanBeExposed(mapping.GroupVersionKind.GroupKind()); err != nil {
-		return err
-	}
-	// Get the input object
-	inputObject, err := r.Object()
+	err = r.Err()
 	if err != nil {
 		return err
 	}
@@ -166,101 +153,118 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
 	}
 	names := generator.ParamNames()
-	params := kubectl.MakeParams(cmd, names)
-	name := info.Name
-	if len(name) > validation.DNS952LabelMaxLength {
-		name = name[:validation.DNS952LabelMaxLength]
-	}
-	params["default-name"] = name
 
-	// For objects that need a pod selector, derive it from the exposed object in case a user
-	// didn't explicitly specify one via --selector
-	if s, found := params["selector"]; found && kubectl.IsZero(s) {
-		s, err := f.MapBasedSelectorForObject(inputObject)
-		if err != nil {
-			return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't retrieve selectors via --selector flag or introspection: %s", err))
-		}
-		params["selector"] = s
-	}
-
-	// For objects that need a port, derive it from the exposed object in case a user
-	// didn't explicitly specify one via --port
-	if port, found := params["port"]; found && kubectl.IsZero(port) {
-		ports, err := f.PortsForObject(inputObject)
-		if err != nil {
-			return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find port via --port flag or introspection: %s", err))
-		}
-		switch len(ports) {
-		case 0:
-			return cmdutil.UsageError(cmd, "couldn't find port via --port flag or introspection")
-		case 1:
-			params["port"] = ports[0]
-		default:
-			params["ports"] = strings.Join(ports, ",")
-		}
-	}
-	if kubectl.IsZero(params["labels"]) {
-		labels, err := f.LabelsForObject(inputObject)
+	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
-		params["labels"] = kubectl.MakeLabels(labels)
-	}
-	if err = kubectl.ValidateParams(names, params); err != nil {
-		return err
-	}
-	// Check for invalid flags used against the present generator.
-	if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
-		return err
-	}
 
-	// Generate new object
-	object, err := generator.Generate(params)
-	if err != nil {
-		return err
-	}
+		mapping := info.ResourceMapping()
+		if err := f.CanBeExposed(mapping.GroupVersionKind.GroupKind()); err != nil {
+			return err
+		}
 
-	if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
-		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
-		object, err = cmdutil.Merge(codec, object, inline, mapping.GroupVersionKind.Kind)
+		params := kubectl.MakeParams(cmd, names)
+		name := info.Name
+		if len(name) > validation.DNS952LabelMaxLength {
+			name = name[:validation.DNS952LabelMaxLength]
+		}
+		params["default-name"] = name
+
+		// For objects that need a pod selector, derive it from the exposed object in case a user
+		// didn't explicitly specify one via --selector
+		if s, found := params["selector"]; found && kubectl.IsZero(s) {
+			s, err := f.MapBasedSelectorForObject(info.Object)
+			if err != nil {
+				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't retrieve selectors via --selector flag or introspection: %s", err))
+			}
+			params["selector"] = s
+		}
+
+		// For objects that need a port, derive it from the exposed object in case a user
+		// didn't explicitly specify one via --port
+		if port, found := params["port"]; found && kubectl.IsZero(port) {
+			ports, err := f.PortsForObject(info.Object)
+			if err != nil {
+				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find port via --port flag or introspection: %s", err))
+			}
+			switch len(ports) {
+			case 0:
+				return cmdutil.UsageError(cmd, "couldn't find port via --port flag or introspection")
+			case 1:
+				params["port"] = ports[0]
+			default:
+				params["ports"] = strings.Join(ports, ",")
+			}
+		}
+		if kubectl.IsZero(params["labels"]) {
+			labels, err := f.LabelsForObject(info.Object)
+			if err != nil {
+				return err
+			}
+			params["labels"] = kubectl.MakeLabels(labels)
+		}
+		if err = kubectl.ValidateParams(names, params); err != nil {
+			return err
+		}
+		// Check for invalid flags used against the present generator.
+		if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
+			return err
+		}
+
+		// Generate new object
+		object, err := generator.Generate(params)
 		if err != nil {
 			return err
 		}
-	}
 
-	resourceMapper := &resource.Mapper{
-		ObjectTyper:  typer,
-		RESTMapper:   mapper,
-		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-		Decoder:      f.Decoder(true),
-	}
-	info, err = resourceMapper.InfoForObject(object, nil)
-	if err != nil {
-		return err
-	}
-	if cmdutil.ShouldRecord(cmd, info) {
-		if err := cmdutil.RecordChangeCause(object, f.Command()); err != nil {
+		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
+			codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
+			object, err = cmdutil.Merge(codec, object, inline, mapping.GroupVersionKind.Kind)
+			if err != nil {
+				return err
+			}
+		}
+
+		resourceMapper := &resource.Mapper{
+			ObjectTyper:  typer,
+			RESTMapper:   mapper,
+			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+			Decoder:      f.Decoder(true),
+		}
+		info, err = resourceMapper.InfoForObject(object, nil)
+		if err != nil {
 			return err
 		}
-	}
-	info.Refresh(object, true)
-	// TODO: extract this flag to a central location, when such a location exists.
-	if cmdutil.GetFlagBool(cmd, "dry-run") {
-		return f.PrintObject(cmd, mapper, object, out)
-	}
-	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
-		return err
-	}
+		if cmdutil.ShouldRecord(cmd, info) {
+			if err := cmdutil.RecordChangeCause(object, f.Command()); err != nil {
+				return err
+			}
+		}
+		info.Refresh(object, true)
+		// TODO: extract this flag to a central location, when such a location exists.
+		if cmdutil.GetFlagBool(cmd, "dry-run") {
+			return f.PrintObject(cmd, mapper, object, out)
+		}
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+			return err
+		}
 
-	// Serialize the object with the annotation applied.
-	object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, object)
+		// Serialize the object with the annotation applied.
+		object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, object)
+		if err != nil {
+			return err
+		}
+
+		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
+			return f.PrintObject(cmd, mapper, object, out)
+		}
+
+		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "exposed")
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-
-	if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-		return f.PrintObject(cmd, mapper, object, out)
-	}
-	cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "exposed")
 	return nil
 }
