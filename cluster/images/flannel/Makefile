@@ -20,7 +20,7 @@
 TAG?=0.5.5
 ARCH?=amd64
 REGISTRY?=gcr.io/google_containers
-KUBE_CROSS_TAG=v1.6.0-2
+KUBE_CROSS_TAG=v1.6.2-1
 GOARM=6
 TEMP_DIR:=$(shell mktemp -d)
 BASEIMAGE?=gcr.io/google_containers/debian-iptables-${ARCH}:v2
