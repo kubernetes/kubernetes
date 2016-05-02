@@ -48,6 +48,7 @@ type SharedInformer interface {
 
 type SharedIndexInformer interface {
 	SharedInformer
+	// AddIndexers add indexers to the informer before it starts.
 	AddIndexers(indexers cache.Indexers) error
 	GetIndexer() cache.Indexer
 }
@@ -57,48 +58,26 @@ type SharedIndexInformer interface {
 // be shared amongst all consumers.
 func NewSharedInformer(lw cache.ListerWatcher, objType runtime.Object, resyncPeriod time.Duration) SharedInformer {
 	sharedInformer := &sharedIndexInformer{
-		processor: &sharedProcessor{},
-		indexer:   cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{}),
+		processor:        &sharedProcessor{},
+		indexer:          cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{}),
+		listerWatcher:    lw,
+		objectType:       objType,
+		fullResyncPeriod: resyncPeriod,
 	}
-
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, sharedInformer.indexer)
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    lw,
-		ObjectType:       objType,
-		FullResyncPeriod: resyncPeriod,
-		RetryOnError:     false,
-
-		Process: sharedInformer.HandleDeltas,
-	}
-	sharedInformer.controller = New(cfg)
-
 	return sharedInformer
 }
 
-/// NewSharedIndexInformer creates a new instance for the listwatcher.
+// NewSharedIndexInformer creates a new instance for the listwatcher.
 // TODO: create a cache/factory of these at a higher level for the list all, watch all of a given resource that can
 // be shared amongst all consumers.
 func NewSharedIndexInformer(lw cache.ListerWatcher, objType runtime.Object, resyncPeriod time.Duration, indexers cache.Indexers) SharedIndexInformer {
 	sharedIndexInformer := &sharedIndexInformer{
-		processor: &sharedProcessor{},
-		indexer:   cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
+		processor:        &sharedProcessor{},
+		indexer:          cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
+		listerWatcher:    lw,
+		objectType:       objType,
+		fullResyncPeriod: resyncPeriod,
 	}
-
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, sharedIndexInformer.indexer)
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    lw,
-		ObjectType:       objType,
-		FullResyncPeriod: resyncPeriod,
-		RetryOnError:     false,
-
-		Process: sharedIndexInformer.HandleDeltas,
-	}
-	sharedIndexInformer.controller = New(cfg)
-
 	return sharedIndexInformer
 }
 
@@ -107,6 +86,11 @@ type sharedIndexInformer struct {
 	controller *Controller
 
 	processor *sharedProcessor
+
+	// This block is tracked to handle late initialization of the controller
+	listerWatcher    cache.ListerWatcher
+	objectType       runtime.Object
+	fullResyncPeriod time.Duration
 
 	started     bool
 	startedLock sync.Mutex
@@ -144,6 +128,19 @@ type deleteNotification struct {
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
+	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, s.indexer)
+
+	cfg := &Config{
+		Queue:            fifo,
+		ListerWatcher:    s.listerWatcher,
+		ObjectType:       s.objectType,
+		FullResyncPeriod: s.fullResyncPeriod,
+		RetryOnError:     false,
+
+		Process: s.HandleDeltas,
+	}
+	s.controller = New(cfg)
+
 	func() {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
@@ -172,9 +169,25 @@ func (s *sharedIndexInformer) GetIndexer() cache.Indexer {
 	return s.indexer
 }
 
-// TODO(mqliang): implement this
 func (s *sharedIndexInformer) AddIndexers(indexers cache.Indexers) error {
-	panic("has not implemeted yet")
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.started {
+		return fmt.Errorf("informer has already started")
+	}
+
+	oldIndexers := s.indexer.GetIndexers()
+
+	for name, indexFunc := range oldIndexers {
+		if _, exist := indexers[name]; exist {
+			return fmt.Errorf("there is an index named %s already exist", name)
+		}
+		indexers[name] = indexFunc
+	}
+
+	s.indexer = cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
+	return nil
 }
 
 func (s *sharedIndexInformer) GetController() ControllerInterface {

@@ -91,8 +91,16 @@ func (s storePodsNamespacer) List(selector labels.Selector) (pods api.PodList, e
 	key := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
 	items, err := s.indexer.Index(NamespaceIndex, key)
 	if err != nil {
-		return api.PodList{}, err
+		glog.Warningf("can not retrieve list of objects using index : %v", err)
+		for _, m := range s.indexer.List() {
+			pod := m.(*api.Pod)
+			if s.namespace == pod.Namespace && selector.Matches(labels.Set(pod.Labels)) {
+				list.Items = append(list.Items, *pod)
+			}
+		}
+		return list, err
 	}
+
 	for _, m := range items {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
@@ -200,6 +208,13 @@ func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (c
 	key := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
 	items, err := s.indexer.Index(NamespaceIndex, key)
 	if err != nil {
+		glog.Warningf("can not retrieve list of objects using index : %v", err)
+		for _, m := range s.indexer.List() {
+			rc := *(m.(*api.ReplicationController))
+			if s.namespace == rc.Namespace && selector.Matches(labels.Set(rc.Labels)) {
+				controllers = append(controllers, rc)
+			}
+		}
 		return
 	}
 	for _, m := range items {

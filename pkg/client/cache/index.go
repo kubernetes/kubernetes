@@ -32,6 +32,8 @@ type Indexer interface {
 	ListIndexFuncValues(indexName string) []string
 	// ByIndex lists object that match on the named indexing function with the exact key
 	ByIndex(indexName, indexKey string) ([]interface{}, error)
+	// GetIndexer return the indexers
+	GetIndexers() Indexers
 }
 
 // IndexFunc knows how to provide an indexed value for an object.

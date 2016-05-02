@@ -81,7 +81,7 @@ type PetSetController struct {
 }
 
 // NewPetSetController creates a new petset controller.
-func NewPetSetController(podInformer framework.SharedInformer, kubeClient *client.Client, resyncPeriod time.Duration) *PetSetController {
+func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *client.Client, resyncPeriod time.Duration) *PetSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
@@ -105,7 +105,7 @@ func NewPetSetController(podInformer framework.SharedInformer, kubeClient *clien
 		// lookup petset accounting for deletion tombstones
 		DeleteFunc: psc.deletePod,
 	})
-	psc.podStore.Store = podInformer.GetStore()
+	psc.podStore.Indexer = podInformer.GetIndexer()
 	psc.podController = podInformer.GetController()
 
 	psc.psStore.Store, psc.psController = framework.NewInformer(

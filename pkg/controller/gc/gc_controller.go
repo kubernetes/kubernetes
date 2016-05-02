@@ -77,8 +77,10 @@ func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFun
 		&api.Pod{},
 		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{},
-		// We don't need to build a index for podStore here
-		cache.Indexers{},
+		// We don't need to build a index for podStore here actually, but build one for consistency.
+		// It will ensure that if people start making use of the podStore in more specific ways,
+		// they'll get the benefits they expect. It will also reserve the name for future refactorings.
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	return gcc
 }
