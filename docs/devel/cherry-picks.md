@@ -50,9 +50,12 @@ label changes to the **master** branch PR:
   * Add an appropriate release-note-(!label-needed) label
   * Add an appropriate milestone
   * Add the `cherrypick-candidate` label
-  * The PR title is the **release note** you want published at release time and
-note that PR titles are mutable and should reflect a release note
-friendly message for any `release-note-*` labeled PRs.
+1. `release-note` labeled PRs generate a release note using the PR title by
+   default OR the release-note block in the PR template if filled in.
+  * See the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) for more
+    details.
+  * PR titles and body comments are mutable and can be modified at any time
+    prior to the release to reflect a release note friendly message.
 
 ### How do cherrypick-candidates make it to the release branch?
 
