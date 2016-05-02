@@ -204,7 +204,7 @@ var ValidateReplicationControllerName = NameIsDNSSubdomain
 // ValidateServiceName can be used to check whether the given service name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateServiceName = NameIsDNS952Label
+var ValidateServiceName = NameIsDNS1123Label
 
 // ValidateNodeName can be used to check whether the given node name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -264,6 +264,14 @@ func NameIsDNS952Label(name string, prefix bool) []string {
 		name = maskTrailingDash(name)
 	}
 	return validation.IsDNS952Label(name)
+}
+
+// NameIsDNS1123Label is a ValidateNameFunc for names that must be a DNS 1123 label.
+func NameIsDNS1123Label(name string, prefix bool) []string {
+	if prefix {
+		name = maskTrailingDash(name)
+	}
+	return validation.IsDNS1123Label(name)
 }
 
 // Validates that given value is not negative.

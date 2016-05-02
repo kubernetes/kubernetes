@@ -18,6 +18,7 @@ package envvars
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -39,11 +40,16 @@ func FromServices(services *api.ServiceList) []api.EnvVar {
 			continue
 		}
 
+		prefix := makeEnvVariableName(service.Name)
+		if startsWithInt(prefix) {
+			prefix = "_" + prefix
+		}
+
 		// Host
-		name := makeEnvVariableName(service.Name) + "_SERVICE_HOST"
+		name := prefix + "_SERVICE_HOST"
 		result = append(result, api.EnvVar{Name: name, Value: service.Spec.ClusterIP})
 		// First port - give it the backwards-compatible name
-		name = makeEnvVariableName(service.Name) + "_SERVICE_PORT"
+		name = prefix + "_SERVICE_PORT"
 		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(int(service.Spec.Ports[0].Port))})
 		// All named ports (only the first may be unnamed, checked in validation)
 		for i := range service.Spec.Ports {
@@ -60,15 +66,19 @@ func FromServices(services *api.ServiceList) []api.EnvVar {
 }
 
 func makeEnvVariableName(str string) string {
-	// TODO: If we simplify to "all names are DNS1123Subdomains" this
-	// will need two tweaks:
-	//   1) Handle leading digits
-	//   2) Handle dots
-	return strings.ToUpper(strings.Replace(str, "-", "_", -1))
+	return strings.ToUpper(strings.Replace(strings.Replace(str, ".", "_", -1), "-", "_", -1))
+}
+
+func startsWithInt(str string) bool {
+	match, _ := regexp.MatchString("^[0-9]", str)
+	return match
 }
 
 func makeLinkVariables(service *api.Service) []api.EnvVar {
 	prefix := makeEnvVariableName(service.Name)
+	if startsWithInt(prefix) {
+		prefix = "_" + prefix
+	}
 	all := []api.EnvVar{}
 	for i := range service.Spec.Ports {
 		sp := &service.Spec.Ports[i]
