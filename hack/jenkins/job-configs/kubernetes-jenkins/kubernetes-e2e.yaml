@@ -920,88 +920,87 @@
 
 # End of Trusty jobs
 
-- project:
-    name: kubernetes-e2e-gke-upgrades-experimental
+- job-group:
+    name: 'kubernetes-e2e-{provider}-{version-old}-{version-new}'
     trigger-job: 'kubernetes-build'
     test-owner: 'ihmccreery'
     emails: 'ihmccreery@google.com'
-    provider-env: '{gke-provider-env}'
-    suffix:
-        - 'gke-1.1-1.2-kubectl-skew':
-            description: 'Deploys a cluster at v1.1 and runs the v1.2 Kubectl tests.'
+    jobs:
+        - 'kubernetes-e2e-{suffix}':
+            suffix: '{provider}-{version-old}-{version-new}-kubectl-skew'
+            description: 'Deploys a cluster at v{version-old} and runs the Kubectl tests with v{version-new} kubectl.'
             timeout: 120
             job-env: |
-                export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-1-1-1-2-ctl-skew"
-                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
+                export PROJECT="kube-gke-upg-{version-infix}-ctl-skew"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-{version-old}"
                 export GINKGO_TEST_ARGS="--ginkgo.focus=Kubectl"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-{version-new}"
                 export GINKGO_PARALLEL="y"
                 export E2E_OPT="--check_version_skew=false"
-                # In v1.1, NUM_MINIONS defaults to 2, so we have to override to 3 here.  NUM_MINIONS
-                # was changed to NUM_NODES in v1.2, but we don't need to override for v1.2+.
-                export NUM_MINIONS=3
-                # Similarly, in v1.1, MINION_SIZE defaults to 'n1-standard-1', so we need to
-                # override it here (specifically for HPA tests).  MINION_SIZE was changed to
-                # NODE_SIZE in v1.2, but we don't need to override for v1.2+.
-                export MINION_SIZE='n1-standard-2'
-        - 'gke-1.1-1.2-upgrade-master':
-            description: 'Deploys a cluster at v1.1, upgrades its master to v1.2, and runs v1.1 tests against it.'
+                {version-env}
+        - 'kubernetes-e2e-{suffix}':
+            suffix: '{provider}-{version-old}-{version-new}-upgrade-master'
+            step: 'upgrade-master'
+            description: 'Deploys a cluster at v{version-old}, upgrades the master to v{version-new}, and runs the v{version-old} tests.'
             timeout: 300
             job-env: |
-                export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-1-1-1-2-upg-mas"
-                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
+                export PROJECT="kube-gke-upg-{version-infix}-upg-mas"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-{version-old}"
                 export E2E_UPGRADE_TEST="true"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
-                export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\] --upgrade-target=ci/latest-1.2"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-{version-new}"
+                export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:MasterUpgrade\] --upgrade-target=ci/latest-{version-new}"
                 export JENKINS_USE_OLD_TESTS="true"
                 export E2E_OPT="--check_version_skew=false"
-                export GINKGO_TEST_ARGS="--ginkgo.skip={default-skip-list-1-1}"
-                # In v1.1, NUM_MINIONS defaults to 2, so we have to override to 3 here.  NUM_MINIONS
-                # was changed to NUM_NODES in v1.2, but we don't need to override for v1.2+.
-                export NUM_MINIONS=3
-                # Similarly, in v1.1, MINION_SIZE defaults to 'n1-standard-1', so we need to
-                # override it here (specifically for HPA tests).  MINION_SIZE was changed to
-                # NODE_SIZE in v1.2, but we don't need to override for v1.2+.
-                export MINION_SIZE='n1-standard-2'
-        - 'gke-1.1-1.2-upgrade-cluster':
-            description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.1 tests against it.'
+                # Set legacy skip list, only when testing old version
+                # TODO remove when we no longer care about v1.1
+                {legacy-ginkgo-test-args-env}
+                {version-env}
+        - 'kubernetes-e2e-{suffix}':
+            suffix: '{provider}-{version-old}-{version-new}-upgrade-cluster'
+            description: 'Deploys a cluster at v{version-old}, upgrades the cluster to v{version-new}, and runs the v{version-old} tests.'
             timeout: 300
             job-env: |
-                export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-1-1-1-2-upg-clu"
-                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
+                export PROJECT="kube-gke-upg-{version-infix}-upg-clu"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-{version-old}"
                 export E2E_UPGRADE_TEST="true"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
-                export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-{version-new}"
+                export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-{version-new}"
                 export JENKINS_USE_OLD_TESTS="true"
                 export E2E_OPT="--check_version_skew=false"
-                export GINKGO_TEST_ARGS="--ginkgo.skip={default-skip-list-1-1}"
-                # In v1.1, NUM_MINIONS defaults to 2, so we have to override to 3 here.  NUM_MINIONS
-                # was changed to NUM_NODES in v1.2, but we don't need to override for v1.2+.
-                export NUM_MINIONS=3
-                # Similarly, in v1.1, MINION_SIZE defaults to 'n1-standard-1', so we need to
-                # override it here (specifically for HPA tests).  MINION_SIZE was changed to
-                # NODE_SIZE in v1.2, but we don't need to override for v1.2+.
-                export MINION_SIZE='n1-standard-2'
-        - 'gke-1.1-1.2-upgrade-cluster-new':
-            description: 'Deploys a cluster at v1.1, upgrades the cluster to v1.2, and runs v1.2 tests against it.'
-            timeout: 600
+                # Set legacy skip list, only when testing old version
+                # TODO remove when we no longer care about v1.1
+                {legacy-ginkgo-test-args-env}
+                {version-env}
+        - 'kubernetes-e2e-{suffix}':
+            suffix: '{provider}-{version-old}-{version-new}-upgrade-cluster-new'
+            description: 'Deploys a cluster at v{version-old}, upgrades the cluster to v{version-new}, and runs the v{version-new} tests.'
+            timeout: 300
             job-env: |
-                export PROJECT="kube-jks-gke-upg-experimental"
-                export E2E_NAME="gke-1-1-1-2-upg-clu-new"
-                export JENKINS_PUBLISHED_VERSION="ci/latest-1.1"
+                export PROJECT="kube-gke-upg-{version-infix}-upg-clu-new"
+                export JENKINS_PUBLISHED_VERSION="ci/latest-{version-old}"
                 export E2E_UPGRADE_TEST="true"
-                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-1.2"
-                export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-1.2"
+                export JENKINS_PUBLISHED_TEST_VERSION="ci/latest-{version-new}"
+                export GINKGO_UPGRADE_TEST_ARGS="--ginkgo.focus=\[Feature:ClusterUpgrade\] --upgrade-target=ci/latest-{version-new}"
                 export E2E_OPT="--check_version_skew=false"
-                # In v1.1, NUM_MINIONS defaults to 2, so we have to override to 3 here.  NUM_MINIONS
-                # was changed to NUM_NODES in v1.2, but we don't need to override for v1.2+.
-                export NUM_MINIONS=3
-                # Similarly, in v1.1, MINION_SIZE defaults to 'n1-standard-1', so we need to
-                # override it here (specifically for HPA tests).  MINION_SIZE was changed to
-                # NODE_SIZE in v1.2, but we don't need to override for v1.2+.
-                export MINION_SIZE='n1-standard-2'
+                {version-env}
+
+- project:
+    name: kubernetes-e2e-upgrades-gke
+    provider: 'gke'
+    provider-env: '{gke-provider-env}'
     jobs:
-        - 'kubernetes-e2e-{suffix}'
+        - 'kubernetes-e2e-{provider}-{version-old}-{version-new}'
+            version-old: '1.1'
+            version-new: '1.2'
+            version-infix: '1-1-1-2'
+            version-env: |
+                # In v1.1, NUM_MINIONS defaults to 2, so we have to override to 3 here.  NUM_MINIONS
+                # was changed to NUM_NODES in v1.2, but we don't need to override for v1.2+.
+                export NUM_MINIONS=3
+                # Similarly, in v1.1, MINION_SIZE defaults to 'n1-standard-1', so we need to
+                # override it here (specifically for HPA tests).  MINION_SIZE was changed to
+                # NODE_SIZE in v1.2, but we don't need to override for v1.2+.
+                export MINION_SIZE='n1-standard-2'
+            legacy-ginkgo-test-args-env: |
+                # Set v1.1 default skip so we only run tests we want.
+                export GINKGO_TEST_ARGS="--ginkgo.skip={default-skip-list-1-1}"
