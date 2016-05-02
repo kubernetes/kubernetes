@@ -85,7 +85,7 @@ type NamespaceIngressPolicy struct {
 	// The isolation policy to apply to pods in this namespace.
 	// Currently this field only supports "DefaultDeny", but could 
 	// be extended to support other policies in the future.  When set to DefaultDeny,
-	// pods in this namespace are denied ingress traffic.  When not defined,
+	// pods in this namespace are denied ingress traffic by default.  When not defined,
 	// the cluster default ingress policy is applied (currently allow all). 
 	Isolation *IngressIsolationPolicy `json:"isolation,omitempty"` 
 }
@@ -107,7 +107,7 @@ kind: Namespace
 apiVersion: v1
 metadata:
   annotations:
-    net.beta.kubernetes.io/network-policy: "{\"ingress\": {\"isolation\": \"DefaultDeny\"}" 
+    net.beta.kubernetes.io/network-policy: "{\"ingress\": {\"isolation\": \"DefaultDeny\"}}" 
 ```
 
 ### NetworkPolicy Go Definition
@@ -118,7 +118,7 @@ objects (of which there can be multiple in a single namespace).  Pods selected b
 one or more NetworkPolicy objects should allow any incoming connections that match any
 ingress rule on those NetworkPolicy objects, per the network plugin’s capabilities.
 
-If ingress `isolation` is not specified on a namespace, then all traffic is allowed to pods in that namespace.
+If ingress isolation is not specified on a namespace, then all traffic is allowed to pods in that namespace.
 
 NetworkPolicy objects and the above namespace isolation both act on _connections_ rather than packets.  That is to say that if traffic from pod A to pod B is allowed by the configured
 policy, then the return packets for that connection from B -> A are also allowed, even if policy is in place that would prevent 
@@ -147,10 +147,9 @@ type NetworkPolicySpec struct {
   // List of ingress rules to be applied to the selected pods.
   // Traffic is allowed to a pod if Namespace.NetworkPolicy.Ingress.Isolation is undefined, 
   // OR if the traffic source is the pod's local kubelet (for health checks), 
-  // OR if Namespace.NetworkPolicy.Ingress.Isolation=DefaultDeny and the traffic matches at least 
-  // one NetworkPolicyIngressRule across all of the NetworkPolicy 
+  // OR if the traffic matches at least one NetworkPolicyIngressRule across all of the NetworkPolicy 
   // objects whose podSelector matches the pod.  
-  // If this field is nil, this NetworkPolicy allows all traffic.
+  // If this field is nil, this NetworkPolicy does not affect ingress to the selected pods.
   // If this field is non-nil but contains no rules, this NetworkPolicy allows no traffic.
   // If this field is non-nil and contains at least one rule, this NetworkPolicy allows any traffic
   // which matches at least one of the NetworkPolicyIngressRules in this list.
@@ -217,7 +216,7 @@ def is_traffic_allowed(traffic, pod):
   """
   Returns True if traffic is allowed to this pod, False otherwise.
   """
-  if not namespace.networkPolicy.ingress.isolation:
+  if not namespace.Spec.NetworkPolicy.Ingress.Isolation:
     # If ingress isolation is disabled on the Namespace, all traffic is allowed.
     return True 
   elif traffic.source == pod.node.kubelet:
@@ -227,18 +226,14 @@ def is_traffic_allowed(traffic, pod):
     # If namespace ingress isolation is enabled, only allow traffic 
     # that matches a network policy which selects this pod.
     for network_policy in network_policies(pod.namespace):
-      if not network_policy.podSelector.selects(pod):
+      if not network_policy.Spec.PodSelector.selects(pod):
         # This policy doesn't select this pod. Try the next one. 
         continue
-
-      # A null ingress list means allow all traffic.
-      if network_policy.ingress == null:
-        return True
 
       # This policy selects this pod.  Check each ingress rule 
       # defined on this policy to see if it allows the traffic.
       # If at least one does, then the traffic is allowed.
-      for ingress_rule in network_policy.ingress:
+      for ingress_rule in network_policy.Ingress:
         if ingress_rule.matches(traffic): 
           return True 
 
@@ -246,7 +241,7 @@ def is_traffic_allowed(traffic, pod):
   return False
 ```
 
-### Open Questions
+### Potential Future Work / Questions
 
 - A single podSelector per NetworkPolicy may lead to managing a large number of NetworkPolicy objects, each of which is small and easy to understand on its own. However, this may lead for a policy change to require touching several policy objects. Allowing an optional podSelector per ingress rule additionally to the podSelector per NetworkPolicy object would allow the user to group rules into logical segments and define size/complexity ratio where it makes sense. This may lead to a smaller number of objects with more complexity if the user opts in to the additional podSelector.  This increases the complexity of the NetworkPolicy object itself. This proposal has opted to favor a larger number of smaller objects that are easier to understand, with the understanding that additional podSelectors could be added to this design in the future should the requirement become apparent.
 
