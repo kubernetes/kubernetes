@@ -524,7 +524,10 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		}
 		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
 		fmt.Fprintf(out, "Controllers:\t%s\n", printControllers(pod.Annotations))
-		describeContainers(pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), out, "")
+		if len(pod.Spec.InitContainers) > 0 {
+			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), out, "")
+		}
+		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), out, "")
 		if len(pod.Status.Conditions) > 0 {
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
@@ -782,12 +785,16 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 }
 
 // TODO: Do a better job at indenting, maybe by using a prefix writer
-func describeContainers(containers []api.Container, containerStatuses []api.ContainerStatus, resolverFn EnvVarResolverFunc, out io.Writer, space string) {
+func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus, resolverFn EnvVarResolverFunc, out io.Writer, space string) {
 	statuses := map[string]api.ContainerStatus{}
 	for _, status := range containerStatuses {
 		statuses[status.Name] = status
 	}
-	fmt.Fprintf(out, "%sContainers:\n", space)
+	if len(containers) == 0 {
+		fmt.Fprintf(out, "%s%s: <none>\n", space, label)
+	} else {
+		fmt.Fprintf(out, "%s%s:\n", space, label)
+	}
 	for _, container := range containers {
 		status, ok := statuses[container.Name]
 		nameIndent := ""
@@ -1037,7 +1044,10 @@ func DescribePodTemplate(template *api.PodTemplateSpec, out io.Writer) {
 	if len(template.Spec.ServiceAccountName) > 0 {
 		fmt.Fprintf(out, "  Service Account:\t%s\n", template.Spec.ServiceAccountName)
 	}
-	describeContainers(template.Spec.Containers, nil, nil, out, "  ")
+	if len(template.Spec.InitContainers) > 0 {
+		describeContainers("Init Containers", template.Spec.InitContainers, nil, nil, out, "  ")
+	}
+	describeContainers("Containers", template.Spec.Containers, nil, nil, out, "  ")
 	describeVolumes(template.Spec.Volumes, out, "  ")
 }
 
