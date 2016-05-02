@@ -231,7 +231,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	activePods := 5
 	rc := newReplicationController(activePods)
 	manager.rcStore.Indexer.Add(rc)
-	rc.Status = api.ReplicationControllerStatus{Replicas: activePods}
+	rc.Status = api.ReplicationControllerStatus{Replicas: int32(activePods)}
 	newPodList(manager.podStore.Indexer, activePods, api.PodRunning, rc, "pod")
 
 	fakePodControl := controller.FakePodControl{}
@@ -1015,7 +1015,6 @@ func TestDeletionTimestamp(t *testing.T) {
 	}
 }
 
-/*
 func BenchmarkGetPodControllerMultiNS(b *testing.B) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	manager := NewReplicationManagerFromClient(client, controller.NoResyncPeriodFunc, BurstReplicas, 0)
@@ -1101,4 +1100,3 @@ func BenchmarkGetPodControllerSingleNS(b *testing.B) {
 		}
 	}
 }
-*/

@@ -135,7 +135,7 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 }
 
 func NewJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
-	podInformer := informers.CreateSharedIndexPodInformer(kubeClient, resyncPeriod(), cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, resyncPeriod())
 	jm := NewJobController(podInformer, kubeClient)
 	jm.internalPodInformer = podInformer
 

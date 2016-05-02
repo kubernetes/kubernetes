@@ -160,6 +160,11 @@ func (c *cache) ListKeys() []string {
 	return c.cacheStorage.ListKeys()
 }
 
+// GetIndexers returns the indexers of cache
+func (c *cache) GetIndexers() Indexers {
+	return c.cacheStorage.GetIndexers()
+}
+
 // Index returns a list of items that match on the index function
 // Index is thread-safe so long as you treat all items as immutable
 func (c *cache) Index(indexName string, obj interface{}) ([]interface{}, error) {
