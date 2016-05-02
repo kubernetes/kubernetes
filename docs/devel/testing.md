@@ -141,7 +141,7 @@ is [table driven testing](https://github.com/golang/go/wiki/TableDrivenTests)
   - Example: [TestNamespaceAuthorization](../../test/integration/auth_test.go)
 * Integration tests must run in parallel
   - Each test should create its own master, httpserver and config.
-  - Example: [TestPodUpdateActiveDeadlineSeconds](../../test/integration/pods.go)
+  - Example: [TestPodUpdateActiveDeadlineSeconds](../../test/integration/pods_test.go)
 * See [coding conventions](coding-conventions.md).
 
 ### Install etcd dependency
