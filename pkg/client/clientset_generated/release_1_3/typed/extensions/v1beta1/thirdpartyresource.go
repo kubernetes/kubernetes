@@ -43,7 +43,6 @@ type ThirdPartyResourceInterface interface {
 // thirdPartyResources implements ThirdPartyResourceInterface
 type thirdPartyResources struct {
 	client *ExtensionsClient
-	ns     string
 }
 
 // newThirdPartyResources returns a ThirdPartyResources
