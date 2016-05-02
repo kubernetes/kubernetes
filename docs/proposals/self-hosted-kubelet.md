@@ -31,7 +31,9 @@ Documentation for other releases can be found at
 
 ## Abstract
 
-In a self-hosted Kubernetes deployment, we have the initial bootstrap problem.
+In a self-hosted Kubernetes deployment (see (this
+comment)[https://github.com/kubernetes/kubernetes/issues/246#issuecomment-64533959]
+for background on self hosted kubernetes), we have the initial bootstrap problem.
 When running self-hosted components, there needs to be a mechanism for pivoting
 from the initial bootstrap state to the kubernetes-managed (self-hosted) state.
 In the case of a self-hosted kubelet, this means pivoting from the initial
@@ -40,7 +42,9 @@ to the node.
 
 This proposal presents a solution to the kubelet bootstrap, and assumes a
 functioning control plane (e.g. an apiserver, controller-manager, scheduler, and
-etcd cluster), and a kubelet that can securely contact the API server.
+etcd cluster), and a kubelet that can securely contact the API server. This
+functioning control plane can be temporary, and not necessarily the "production"
+control plane that will be used after the initial pivot / bootstrap.
 
 ## Background and Motivation
 
@@ -71,9 +75,10 @@ explained in detail below.
 ## Proposal
 
 We propose adding a new flag to the kubelet, the `--bootstrap` flag, which is
-assumed to be used in conjunction with the `--lock-file` flag. When the
-`--bootstrap` flag is provided, after the kubelet acquires the file lock, it
-will begin asynchronously waiting on
+assumed to be used in conjunction with the `--lock-file` flag. The `--lock-file`
+flag is used to ensure only a single kubelet is running at any given time during
+this pivot process. When the `--bootstrap` flag is provided, after the kubelet
+acquires the file lock, it will begin asynchronously waiting on
 [inotify](http://man7.org/linux/man-pages/man7/inotify.7.html) events. Once an
 "open" event is received, the kubelet will assume another kubelet is attempting
 to take control and will exit by calling `exit(0)`.
@@ -139,9 +144,10 @@ Various similar approaches have been discussed
 [here](https://github.com/kubernetes/kubernetes/issues/246#issuecomment-64533959)
 and
 [here](https://github.com/kubernetes/kubernetes/issues/23073#issuecomment-198478997).
-This also relies on the kubelet being able to be run inside a container, more
-discussion on that is
-[here](https://github.com/kubernetes/kubernetes/issues/4869).
+Other discussion around the kubelet being able to be run inside a container is
+[here](https://github.com/kubernetes/kubernetes/issues/4869). Note this isn't a
+strict requirement as the kubelet could be run in a chroot jail via rkt fly or
+other such similar approach.
 
 Additionally, [Taints and
 Tolerations](../../docs/design/taint-toleration-dedicated.md), whose design has
