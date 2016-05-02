@@ -434,10 +434,6 @@ TRUSTY_DEFAULT_SKIP_TESTS=(
     "Services.*should\swork\safter\srestarting\skube-proxy"
 )
 
-TRUSTY_BETA_SKIP_TESTS=(
-    "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
-)
-
 TRUSTY_STABLE_SKIP_TESTS=(
     "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
 )
@@ -523,48 +519,6 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-1-1"}
     : ${PROJECT:="kubernetes-jenkins"}
-    ;;
-
-  # Runs non-flaky tests on GCE with Trusty-beta as base image for minions,
-  # sequentially.
-  kubernetes-e2e-gce-trusty-beta-release)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-beta-release"}
-    : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="e2e-gce-trusty-beta-release"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          ${TRUSTY_BETA_SKIP_TESTS[@]:+${TRUSTY_BETA_SKIP_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
-    : ${PROJECT:="k8s-e2e-gce-trusty-beta"}
-    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image "beta")"}
-    : ${KUBE_OS_DISTRIBUTION:="trusty"}
-    : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
-    ;;
-
-  # Runs slow tests on GCE with Trusty-beta as base image for minions,
-  # sequentially.
-  kubernetes-e2e-gce-trusty-beta-slow)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-trusty-beta-slow"}
-    : ${E2E_NETWORK:="e2e-gce-trusty-beta-slow"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-          ) --ginkgo.skip=$(join_regex_allow_empty \
-          ${TRUSTY_BETA_SKIP_TESTS[@]:+${TRUSTY_BETA_SKIP_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-trusty-beta-slow"}
-    : ${PROJECT:="k8s-e2e-gce-trusty-beta-slow"}
-    : ${KUBE_GCE_MINION_PROJECT:="${TRUSTY_IMAGE_PROJECT}"}
-    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image "beta")"}
-    : ${KUBE_OS_DISTRIBUTION:="trusty"}
-    : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
   # Runs non-flaky tests on GCE with Trusty-stable as base image for minions,
@@ -732,59 +686,6 @@ case ${JOB_NAME} in
           ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
-    ;;
-
-  kubernetes-e2e-gke-trusty-prod)
-    # Override GKE default to use prod Cloud SDK and prod endpoint
-    CLOUDSDK_BUCKET=""
-    GKE_API_ENDPOINT="https://container.googleapis.com/"
-    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-prod-trusty"}
-    : ${E2E_NETWORK:="e2e-gke-trusty-prod"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${JENKINS_USE_SERVER_VERSION:=y}
-    : ${PROJECT:="kubekins-e2e-gke-trusty-prod"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${TRUSTY_STABLE_SKIP_TESTS[@]:+${TRUSTY_STABLE_SKIP_TESTS}} \
-          )"}
-    ;;
-
-  kubernetes-e2e-gke-trusty-staging)
-    # Override GKE default to use rc Cloud SDK and staging endpoint
-    CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
-    GKE_API_ENDPOINT="https://staging-container.sandbox.googleapis.com/"
-    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-staging-trusty"}
-    : ${E2E_NETWORK:="e2e-gke-trusty-staging"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${JENKINS_USE_SERVER_VERSION:=y}
-    : ${PROJECT:="e2e-gke-trusty-staging"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${TRUSTY_STABLE_SKIP_TESTS[@]:+${TRUSTY_STABLE_SKIP_TESTS}} \
-          )"}
-    ;;
-
-  kubernetes-e2e-gke-trusty-test)
-    # Override GKE default to use rc Cloud SDK
-    CLOUDSDK_BUCKET="gs://cloud-sdk-testing/rc"
-    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-test-trusty"}
-    : ${E2E_NETWORK:="e2e-gke-trusty-test"}
-    : ${E2E_SET_CLUSTER_API_VERSION:=y}
-    : ${JENKINS_USE_SERVER_VERSION:=y}
-    : ${PROJECT:="kubekins-e2e-gke-trusty-test"}
-    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${TRUSTY_STABLE_SKIP_TESTS[@]:+${TRUSTY_STABLE_SKIP_TESTS}} \
           )"}
     ;;
 
