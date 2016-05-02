@@ -555,6 +555,8 @@ type hijackOptions struct {
 	data           interface{}
 }
 
+// CloseWaiter is an interface with methods for closing the underlying resource
+// and then waiting for it to finish processing.
 type CloseWaiter interface {
 	io.Closer
 	Wait() error

@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"os"
 	"syscall"
 
 	info "github.com/google/cadvisor/info/v1"
@@ -219,10 +220,10 @@ func verifyHeader(msg syscall.NetlinkMessage) error {
 
 // Get load stats for a task group.
 // id: family id for taskstats.
-// fd: fd to path to the cgroup directory under cpu hierarchy.
+// cfd: open file to path to the cgroup directory under cpu hierarchy.
 // conn: open netlink connection used to communicate with kernel.
-func getLoadStats(id uint16, fd uintptr, conn *Connection) (info.LoadStats, error) {
-	msg := prepareCmdMessage(id, fd)
+func getLoadStats(id uint16, cfd *os.File, conn *Connection) (info.LoadStats, error) {
+	msg := prepareCmdMessage(id, cfd.Fd())
 	err := conn.WriteMessage(msg.toRawMsg())
 	if err != nil {
 		return info.LoadStats{}, err
