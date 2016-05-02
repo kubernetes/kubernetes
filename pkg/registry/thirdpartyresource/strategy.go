@@ -33,12 +33,11 @@ import (
 // strategy implements behavior for ThirdPartyResource objects
 type strategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating ThirdPartyResource
 // objects via the REST API.
-var Strategy = strategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = strategy{api.Scheme}
 
 var _ = rest.RESTCreateStrategy(Strategy)
 
@@ -46,6 +45,10 @@ var _ = rest.RESTUpdateStrategy(Strategy)
 
 func (strategy) NamespaceScoped() bool {
 	return false
+}
+
+func (strategy) GenerateName(base string) string {
+	return ""
 }
 
 func (strategy) PrepareForCreate(obj runtime.Object) {

@@ -43,13 +43,26 @@ type Tester struct {
 	createOnUpdate      bool
 	generatesName       bool
 	returnDeletedObject bool
+	namer               func(int) string
 }
 
 func New(t *testing.T, storage rest.Storage) *Tester {
 	return &Tester{
 		T:       t,
 		storage: storage,
+		namer:   defaultNamer,
 	}
+}
+
+func defaultNamer(i int) string {
+	return fmt.Sprintf("foo%d", i)
+}
+
+// Namer allows providing a custom name maker
+// By default "foo%d" is used
+func (t *Tester) Namer(namer func(int) string) *Tester {
+	t.namer = namer
+	return t
 }
 
 func (t *Tester) ClusterScope() *Tester {
@@ -202,14 +215,28 @@ func (t *Tester) TestWatch(
 // =============================================================================
 // Creation tests.
 
+func (t *Tester) delete(ctx api.Context, obj runtime.Object) error {
+	objectMeta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return err
+	}
+	deleter, ok := t.storage.(rest.GracefulDeleter)
+	if !ok {
+		return fmt.Errorf("Expected deleting storage, got %v", t.storage)
+	}
+	_, err = deleter.Delete(ctx, objectMeta.Name, nil)
+	return err
+}
+
 func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, createFn CreateFunc) {
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo1")
+	t.setObjectMeta(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	defer t.delete(ctx, foo)
 
 	_, err := t.storage.(rest.Creater).Create(ctx, foo)
 	if !errors.IsAlreadyExists(err) {
@@ -221,12 +248,13 @@ func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo2")
+	t.setObjectMeta(foo, t.namer(2))
 
 	created, err := t.storage.(rest.Creater).Create(ctx, foo)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	defer t.delete(ctx, created)
 
 	got, err := getFn(ctx, foo)
 	if err != nil {
@@ -254,6 +282,7 @@ func (t *Tester) testCreateDiscardsObjectNamespace(valid runtime.Object) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer t.delete(t.TestContext(), created)
 	createdObjectMeta := t.getObjectMetaOrFail(created)
 	if createdObjectMeta.Namespace != api.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
@@ -265,10 +294,11 @@ func (t *Tester) testCreateGeneratesName(valid runtime.Object) {
 	objectMeta.Name = ""
 	objectMeta.GenerateName = "test-"
 
-	_, err := t.storage.(rest.Creater).Create(t.TestContext(), valid)
+	created, err := t.storage.(rest.Creater).Create(t.TestContext(), valid)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer t.delete(t.TestContext(), created)
 	if objectMeta.Name == "test-" || !strings.HasPrefix(objectMeta.Name, "test-") {
 		t.Errorf("unexpected name: %#v", valid)
 	}
@@ -276,8 +306,7 @@ func (t *Tester) testCreateGeneratesName(valid runtime.Object) {
 
 func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(valid)
-	objectMeta.Name = ""
-	objectMeta.GenerateName = "test-"
+	objectMeta.Name = t.namer(1)
 	objectMeta.Namespace = t.TestNamespace()
 
 	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid)
@@ -287,6 +316,7 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 	if obj == nil {
 		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
+	defer t.delete(t.TestContext(), obj)
 	if !api.HasObjectMetaSystemFieldValues(objectMeta) {
 		t.Errorf("storage did not populate object meta field values")
 	}
@@ -301,6 +331,7 @@ func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer t.delete(ctx, created)
 	createdObjectMeta := t.getObjectMetaOrFail(created)
 	if createdObjectMeta.Namespace != api.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
@@ -319,6 +350,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer t.delete(ctx, created)
 	createdObjectMeta := t.getObjectMetaOrFail(created)
 	if createdObjectMeta.Namespace != api.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
@@ -386,6 +418,7 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	if obj == nil {
 		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
+	defer t.delete(t.TestContext(), obj)
 	if objectMeta.UID == "bad-uid" || objectMeta.CreationTimestamp == now {
 		t.Errorf("ObjectMeta did not reset basic fields: %#v", objectMeta)
 	}
@@ -398,7 +431,7 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo2")
+	t.setObjectMeta(foo, t.namer(2))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -433,7 +466,7 @@ func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, createFn Cre
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo3")
+	t.setObjectMeta(foo, t.namer(3))
 
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -460,7 +493,7 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn Create
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo4")
+	t.setObjectMeta(foo, t.namer(4))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -480,7 +513,7 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn Create
 func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo5")
+	t.setObjectMeta(foo, t.namer(5))
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.UID = types.UID("UID0000")
 	if err := createFn(ctx, foo); err != nil {
@@ -498,7 +531,7 @@ func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc,
 }
 
 func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
-	t.setObjectMeta(obj, "foo")
+	t.setObjectMeta(obj, t.namer(0))
 	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), obj)
 	if t.createOnUpdate {
 		if err != nil {
@@ -520,13 +553,13 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo1")
+	t.setObjectMeta(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	objectMeta := t.getObjectMetaOrFail(obj)
-	objectMeta.Name = "foo1"
+	objectMeta.Name = t.namer(1)
 	objectMeta.Namespace = "not-default"
 
 	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), obj)
@@ -547,7 +580,7 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo1")
+	t.setObjectMeta(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -586,7 +619,7 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo1")
+	t.setObjectMeta(foo, t.namer(1))
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.UID = types.UID("UID0000")
 	if err := createFn(ctx, foo); err != nil {
@@ -623,7 +656,7 @@ func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn Creat
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo1")
+	t.setObjectMeta(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -650,7 +683,7 @@ func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, createFn Create
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo2")
+	t.setObjectMeta(foo, t.namer(2))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -677,7 +710,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo3")
+	t.setObjectMeta(foo, t.namer(3))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -742,7 +775,7 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
-	t.setObjectMeta(foo, "foo5")
+	t.setObjectMeta(foo, t.namer(5))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -766,7 +799,7 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 	}
 
 	objMeta := t.getObjectMetaOrFail(obj)
-	objMeta.Name = "foo5"
+	objMeta.Name = t.namer(5)
 
 	ctx1 := api.WithNamespace(api.NewContext(), "bar3")
 	objMeta.Namespace = api.NamespaceValue(ctx1)
@@ -809,7 +842,7 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 
 func (t *Tester) testGetFound(obj runtime.Object) {
 	ctx := t.TestContext()
-	t.setObjectMeta(obj, "foo1")
+	t.setObjectMeta(obj, t.namer(1))
 
 	existing, err := t.storage.(rest.Creater).Create(ctx, obj)
 	if err != nil {
@@ -817,7 +850,7 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 	}
 	existingMeta := t.getObjectMetaOrFail(existing)
 
-	got, err := t.storage.(rest.Getter).Get(ctx, "foo1")
+	got, err := t.storage.(rest.Getter).Get(ctx, t.namer(1))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -832,13 +865,13 @@ func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 	ctx1 := api.WithNamespace(api.NewContext(), "bar1")
 	ctx2 := api.WithNamespace(api.NewContext(), "bar2")
 	objMeta := t.getObjectMetaOrFail(obj)
-	objMeta.Name = "foo4"
+	objMeta.Name = t.namer(4)
 	objMeta.Namespace = api.NamespaceValue(ctx1)
 	_, err := t.storage.(rest.Creater).Create(ctx1, obj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	_, err = t.storage.(rest.Getter).Get(ctx2, "foo4")
+	_, err = t.storage.(rest.Getter).Get(ctx2, t.namer(4))
 	if t.clusterScope {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -852,12 +885,12 @@ func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 
 func (t *Tester) testGetNotFound(obj runtime.Object) {
 	ctx := t.TestContext()
-	t.setObjectMeta(obj, "foo2")
+	t.setObjectMeta(obj, t.namer(2))
 	_, err := t.storage.(rest.Creater).Create(ctx, obj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	_, err = t.storage.(rest.Getter).Get(ctx, "foo3")
+	_, err = t.storage.(rest.Getter).Get(ctx, t.namer(3))
 	if !errors.IsNotFound(err) {
 		t.Errorf("unexpected error returned: %#v", err)
 	}
@@ -889,9 +922,9 @@ func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 	ctx := t.TestContext()
 
 	foo1 := copyOrDie(obj)
-	t.setObjectMeta(foo1, "foo1")
+	t.setObjectMeta(foo1, t.namer(1))
 	foo2 := copyOrDie(obj)
-	t.setObjectMeta(foo2, "foo2")
+	t.setObjectMeta(foo2, t.namer(2))
 
 	existing := assignFn([]runtime.Object{foo1, foo2})
 
