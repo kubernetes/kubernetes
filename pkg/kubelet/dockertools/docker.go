@@ -52,7 +52,7 @@ const (
 
 	// 100000 is equivalent to 100ms
 	quotaPeriod   = 100000
-	minQuotaPerod = 1000
+	minQuotaPeriod = 1000
 )
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
@@ -324,8 +324,8 @@ func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 	quota = (milliCPU * quotaPeriod) / milliCPUToCPU
 
 	// quota needs to be a minimum of 1ms.
-	if quota < minQuotaPerod {
-		quota = minQuotaPerod
+	if quota < minQuotaPeriod {
+		quota = minQuotaPeriod
 	}
 
 	return
