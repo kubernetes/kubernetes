@@ -79,6 +79,26 @@ func TestFromServices(t *testing.T) {
 					},
 				},
 			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "1337"},
+				Spec: api.ServiceSpec{
+					Selector:  map[string]string{"bar": "baz"},
+					ClusterIP: "1.2.3.4",
+					Ports: []api.ServicePort{
+						{Port: 8080, Protocol: "TCP"},
+					},
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "name.with.dots"},
+				Spec: api.ServiceSpec{
+					Selector:  map[string]string{"bar": "baz"},
+					ClusterIP: "1.2.3.4",
+					Ports: []api.ServicePort{
+						{Port: 8080, Protocol: "TCP"},
+					},
+				},
+			},
 		},
 	}
 	vars := envvars.FromServices(&sl)
@@ -115,6 +135,20 @@ func TestFromServices(t *testing.T) {
 		{Name: "Q_U_U_X_PORT_8083_TCP_PROTO", Value: "tcp"},
 		{Name: "Q_U_U_X_PORT_8083_TCP_PORT", Value: "8083"},
 		{Name: "Q_U_U_X_PORT_8083_TCP_ADDR", Value: "9.8.7.6"},
+		{Name: "_1337_SERVICE_HOST", Value: "1.2.3.4"},
+		{Name: "_1337_SERVICE_PORT", Value: "8080"},
+		{Name: "_1337_PORT", Value: "tcp://1.2.3.4:8080"},
+		{Name: "_1337_PORT_8080_TCP", Value: "tcp://1.2.3.4:8080"},
+		{Name: "_1337_PORT_8080_TCP_PROTO", Value: "tcp"},
+		{Name: "_1337_PORT_8080_TCP_PORT", Value: "8080"},
+		{Name: "_1337_PORT_8080_TCP_ADDR", Value: "1.2.3.4"},
+		{Name: "NAME_WITH_DOTS_SERVICE_HOST", Value: "1.2.3.4"},
+		{Name: "NAME_WITH_DOTS_SERVICE_PORT", Value: "8080"},
+		{Name: "NAME_WITH_DOTS_PORT", Value: "tcp://1.2.3.4:8080"},
+		{Name: "NAME_WITH_DOTS_PORT_8080_TCP", Value: "tcp://1.2.3.4:8080"},
+		{Name: "NAME_WITH_DOTS_PORT_8080_TCP_PROTO", Value: "tcp"},
+		{Name: "NAME_WITH_DOTS_PORT_8080_TCP_PORT", Value: "8080"},
+		{Name: "NAME_WITH_DOTS_PORT_8080_TCP_ADDR", Value: "1.2.3.4"},
 	}
 	if len(vars) != len(expected) {
 		t.Errorf("Expected %d env vars, got: %+v", len(expected), vars)

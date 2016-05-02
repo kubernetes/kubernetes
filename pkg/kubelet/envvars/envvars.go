@@ -18,6 +18,7 @@ package envvars
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -60,11 +61,16 @@ func FromServices(services *api.ServiceList) []api.EnvVar {
 }
 
 func makeEnvVariableName(str string) string {
-	// TODO: If we simplify to "all names are DNS1123Subdomains" this
-	// will need two tweaks:
-	//   1) Handle leading digits
-	//   2) Handle dots
-	return strings.ToUpper(strings.Replace(str, "-", "_", -1))
+	envVarName := strings.ToUpper(strings.Replace(strings.Replace(str, ".", "_", -1), "-", "_", -1))
+	if startsWithInt(envVarName) {
+		envVarName = "_" + envVarName
+	}
+	return envVarName
+}
+
+func startsWithInt(str string) bool {
+	match, _ := regexp.MatchString("^[0-9]", str)
+	return match
 }
 
 func makeLinkVariables(service *api.Service) []api.EnvVar {

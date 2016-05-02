@@ -178,7 +178,7 @@ func ValidateReplicationControllerName(name string, prefix bool) (bool, string) 
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateServiceName(name string, prefix bool) (bool, string) {
-	return NameIsDNS952Label(name, prefix)
+	return NameIsDNS1123Label(name, prefix)
 }
 
 // ValidateNodeName can be used to check whether the given node name is valid.
