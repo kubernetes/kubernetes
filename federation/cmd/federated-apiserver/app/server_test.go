@@ -74,7 +74,7 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 	}
 }
 
-var insecurePort = 8081
+var insecurePort = 8082
 var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
 var groupVersion = fed_v1a1.SchemeGroupVersion
 
