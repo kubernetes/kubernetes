@@ -173,6 +173,7 @@ func (t *Tester) TestUpdate(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testUpdateWithWrongUID(copyOrDie(valid), createFn, getFn)
 	t.testUpdateRetrievesOldObject(copyOrDie(valid), createFn, getFn)
 	t.testUpdatePropagatesUpdatedObjectError(copyOrDie(valid), createFn, getFn)
+	t.testUpdateIgnoreGenerationUpdates(copyOrDie(valid), createFn, getFn)
 }
 
 // Test deleting an object.
@@ -610,6 +611,40 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 	_, _, err := t.storage.(rest.Updater).Update(ctx, name, rest.DefaultUpdatedObjectInfo(foo, api.Scheme, noopTransform))
 	if err != propagateErr {
 		t.Errorf("expected propagated error, got %#v", err)
+	}
+}
+
+func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
+	ctx := t.TestContext()
+
+	foo := copyOrDie(obj)
+	name := t.namer(8)
+	t.setObjectMeta(foo, name)
+
+	if err := createFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	storedFoo, err := getFn(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	older := copyOrDie(storedFoo)
+	olderMeta := t.getObjectMetaOrFail(older)
+	olderMeta.Generation = 2
+
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, api.Scheme))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	updatedFoo, err := getFn(ctx, older)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exp, got := int64(1), t.getObjectMetaOrFail(updatedFoo).Generation; exp != got {
+		t.Errorf("Unexpected generation update: expected %d, got %d", exp, got)
 	}
 }
 

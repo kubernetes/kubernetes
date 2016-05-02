@@ -86,6 +86,12 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 	} else {
 		objectMeta.Namespace = api.NamespaceNone
 	}
+	// Ensure requests cannot update generation
+	oldMeta, err := api.ObjectMetaFor(old)
+	if err != nil {
+		return err
+	}
+	objectMeta.Generation = oldMeta.Generation
 
 	strategy.PrepareForUpdate(obj, old)
 

@@ -330,6 +330,49 @@ func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 	}
 }
 
+func TestObjectMetaGenerationUpdate(t *testing.T) {
+	testcases := map[string]struct {
+		Old          api.ObjectMeta
+		New          api.ObjectMeta
+		ExpectedErrs []string
+	}{
+		"invalid generation change - decremented": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1", Generation: 5},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1", Generation: 4},
+			ExpectedErrs: []string{"field.generation: Invalid value: 4: must not be decremented"},
+		},
+		"valid generation change - incremented by one": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1", Generation: 1},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1", Generation: 2},
+			ExpectedErrs: []string{},
+		},
+		"valid generation field - not updated": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1", Generation: 5},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1", Generation: 5},
+			ExpectedErrs: []string{},
+		},
+	}
+
+	for k, tc := range testcases {
+		errList := []string{}
+		errs := ValidateObjectMetaUpdate(&tc.New, &tc.Old, field.NewPath("field"))
+		if len(errs) != len(tc.ExpectedErrs) {
+			t.Logf("%s: Expected: %#v", k, tc.ExpectedErrs)
+			for _, err := range errs {
+				errList = append(errList, err.Error())
+			}
+			t.Logf("%s: Got: %#v", k, errList)
+			t.Errorf("%s: expected %d errors, got %d", k, len(tc.ExpectedErrs), len(errs))
+			continue
+		}
+		for i := range errList {
+			if errList[i] != tc.ExpectedErrs[i] {
+				t.Errorf("%s: error #%d: expected %q, got %q", k, i, tc.ExpectedErrs[i], errList[i])
+			}
+		}
+	}
+}
+
 // Ensure trailing slash is allowed in generate name
 func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
 	errs := ValidateObjectMeta(
