@@ -28959,18 +28959,17 @@ func (x *ServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 		} else {
 			yysep2 := !z.EncBinary()
 			yy2arr2 := z.EncBasicHandle().StructToArray
-			var yyq2 [8]bool
+			var yyq2 [7]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[0] = x.Type != ""
 			yyq2[3] = x.ClusterIP != ""
 			yyq2[4] = len(x.ExternalIPs) != 0
 			yyq2[5] = x.LoadBalancerIP != ""
-			yyq2[6] = x.LoadBalancerNamePrefix != ""
-			yyq2[7] = x.SessionAffinity != ""
+			yyq2[6] = x.SessionAffinity != ""
 			var yynn2 int
 			if yyr2 || yy2arr2 {
-				r.EncodeArrayStart(8)
+				r.EncodeArrayStart(7)
 			} else {
 				yynn2 = 2
 				for _, b := range yyq2 {
@@ -29136,37 +29135,12 @@ func (x *ServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[6] {
-					yym22 := z.EncBinary()
-					_ = yym22
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.LoadBalancerNamePrefix))
-					}
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
-				}
-			} else {
-				if yyq2[6] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("loadBalancerNamePrefix"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym23 := z.EncBinary()
-					_ = yym23
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.LoadBalancerNamePrefix))
-					}
-				}
-			}
-			if yyr2 || yy2arr2 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2[7] {
 					x.SessionAffinity.CodecEncodeSelf(e)
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2[7] {
+				if yyq2[6] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("sessionAffinity"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -29288,12 +29262,6 @@ func (x *ServiceSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			} else {
 				x.LoadBalancerIP = string(r.DecodeString())
 			}
-		case "loadBalancerNamePrefix":
-			if r.TryDecodeAsNil() {
-				x.LoadBalancerNamePrefix = ""
-			} else {
-				x.LoadBalancerNamePrefix = string(r.DecodeString())
-			}
 		case "sessionAffinity":
 			if r.TryDecodeAsNil() {
 				x.SessionAffinity = ""
@@ -29311,16 +29279,16 @@ func (x *ServiceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj15 int
-	var yyb15 bool
-	var yyhl15 bool = l >= 0
-	yyj15++
-	if yyhl15 {
-		yyb15 = yyj15 > l
+	var yyj14 int
+	var yyb14 bool
+	var yyhl14 bool = l >= 0
+	yyj14++
+	if yyhl14 {
+		yyb14 = yyj14 > l
 	} else {
-		yyb15 = r.CheckBreak()
+		yyb14 = r.CheckBreak()
 	}
-	if yyb15 {
+	if yyb14 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -29330,13 +29298,13 @@ func (x *ServiceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Type = ServiceType(r.DecodeString())
 	}
-	yyj15++
-	if yyhl15 {
-		yyb15 = yyj15 > l
+	yyj14++
+	if yyhl14 {
+		yyb14 = yyj14 > l
 	} else {
-		yyb15 = r.CheckBreak()
+		yyb14 = r.CheckBreak()
 	}
-	if yyb15 {
+	if yyb14 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -29344,21 +29312,21 @@ func (x *ServiceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Ports = nil
 	} else {
-		yyv17 := &x.Ports
-		yym18 := z.DecBinary()
-		_ = yym18
+		yyv16 := &x.Ports
+		yym17 := z.DecBinary()
+		_ = yym17
 		if false {
 		} else {
-			h.decSliceServicePort((*[]ServicePort)(yyv17), d)
+			h.decSliceServicePort((*[]ServicePort)(yyv16), d)
 		}
 	}
-	yyj15++
-	if yyhl15 {
-		yyb15 = yyj15 > l
+	yyj14++
+	if yyhl14 {
+		yyb14 = yyj14 > l
 	} else {
-		yyb15 = r.CheckBreak()
+		yyb14 = r.CheckBreak()
 	}
-	if yyb15 {
+	if yyb14 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -29366,21 +29334,21 @@ func (x *ServiceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Selector = nil
 	} else {
-		yyv19 := &x.Selector
-		yym20 := z.DecBinary()
-		_ = yym20
+		yyv18 := &x.Selector
+		yym19 := z.DecBinary()
+		_ = yym19
 		if false {
 		} else {
-			z.F.DecMapStringStringX(yyv19, false, d)
+			z.F.DecMapStringStringX(yyv18, false, d)
 		}
 	}
-	yyj15++
-	if yyhl15 {
-		yyb15 = yyj15 > l
+	yyj14++
+	if yyhl14 {
+		yyb14 = yyj14 > l
 	} else {
-		yyb15 = r.CheckBreak()
+		yyb14 = r.CheckBreak()
 	}
-	if yyb15 {
+	if yyb14 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -29390,13 +29358,13 @@ func (x *ServiceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.ClusterIP = string(r.DecodeString())
 	}
-	yyj15++
-	if yyhl15 {
-		yyb15 = yyj15 > l
+	yyj14++
+	if yyhl14 {
+		yyb14 = yyj14 > l
 	} else {
-		yyb15 = r.CheckBreak()
+		yyb14 = r.CheckBreak()
 	}
-	if yyb15 {
+	if yyb14 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -29404,21 +29372,21 @@ func (x *ServiceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ExternalIPs = nil
 	} else {
-		yyv22 := &x.ExternalIPs
-		yym23 := z.DecBinary()
-		_ = yym23
+		yyv21 := &x.ExternalIPs
+		yym22 := z.DecBinary()
+		_ = yym22
 		if false {
 		} else {
-			z.F.DecSliceStringX(yyv22, false, d)
+			z.F.DecSliceStringX(yyv21, false, d)
 		}
 	}
-	yyj15++
-	if yyhl15 {
-		yyb15 = yyj15 > l
+	yyj14++
+	if yyhl14 {
+		yyb14 = yyj14 > l
 	} else {
-		yyb15 = r.CheckBreak()
+		yyb14 = r.CheckBreak()
 	}
-	if yyb15 {
+	if yyb14 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -29428,29 +29396,13 @@ func (x *ServiceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.LoadBalancerIP = string(r.DecodeString())
 	}
-	yyj15++
-	if yyhl15 {
-		yyb15 = yyj15 > l
+	yyj14++
+	if yyhl14 {
+		yyb14 = yyj14 > l
 	} else {
-		yyb15 = r.CheckBreak()
+		yyb14 = r.CheckBreak()
 	}
-	if yyb15 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.LoadBalancerNamePrefix = ""
-	} else {
-		x.LoadBalancerNamePrefix = string(r.DecodeString())
-	}
-	yyj15++
-	if yyhl15 {
-		yyb15 = yyj15 > l
-	} else {
-		yyb15 = r.CheckBreak()
-	}
-	if yyb15 {
+	if yyb14 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -29461,17 +29413,17 @@ func (x *ServiceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.SessionAffinity = ServiceAffinity(r.DecodeString())
 	}
 	for {
-		yyj15++
-		if yyhl15 {
-			yyb15 = yyj15 > l
+		yyj14++
+		if yyhl14 {
+			yyb14 = yyj14 > l
 		} else {
-			yyb15 = r.CheckBreak()
+			yyb14 = r.CheckBreak()
 		}
-		if yyb15 {
+		if yyb14 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj15-1, "")
+		z.DecStructFieldNotFound(yyj14-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -52014,7 +51966,7 @@ func (x codecSelfer1234) decSliceService(v *[]Service, d *codec1978.Decoder) {
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 352)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 336)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]

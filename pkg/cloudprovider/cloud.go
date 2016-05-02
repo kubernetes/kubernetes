@@ -54,7 +54,7 @@ type Clusters interface {
 // providers' name length limits.
 func GetLoadBalancerName(service *api.Service) string {
 	//GCE requires that the name of a load balancer starts with a lower case letter.
-	ret := "a" + service.Spec.LoadBalancerNamePrefix + string(service.UID)
+	ret := "a" + string(service.UID)
 	ret = strings.Replace(ret, "-", "", -1)
 	//AWS requires that the name of a load balancer is shorter than 32 bytes.
 	if len(ret) > 32 {

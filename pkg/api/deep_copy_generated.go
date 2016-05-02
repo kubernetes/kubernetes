@@ -2796,7 +2796,6 @@ func DeepCopy_api_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Cl
 		out.ExternalIPs = nil
 	}
 	out.LoadBalancerIP = in.LoadBalancerIP
-	out.LoadBalancerNamePrefix = in.LoadBalancerNamePrefix
 	out.SessionAffinity = in.SessionAffinity
 	return nil
 }
