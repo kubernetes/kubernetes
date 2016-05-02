@@ -26,15 +26,20 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument("filenames", help="list of files to check, all files if unspecified", nargs='*')
-args = parser.parse_args()
 
 rootdir = os.path.dirname(__file__) + "/../../"
 rootdir = os.path.abspath(rootdir)
+parser.add_argument("--root_dir", default=rootdir, help="root directory to examine")
+
+default_boilerplate_dir = os.path.join(rootdir, "hack/boilerplate")
+parser.add_argument("--boilerplate_dir", default=default_boilerplate_dir)
+args = parser.parse_args()
+
 
 def get_refs():
     refs = {}
 
-    for path in glob.glob(os.path.join(rootdir, "hack/boilerplate/boilerplate.*.txt")):
+    for path in glob.glob(os.path.join(args.boilerplate_dir, "boilerplate.*.txt")):
         extension = os.path.basename(path).split(".")[1]
 
         ref_file = open(path, 'r')
@@ -100,7 +105,7 @@ def file_passes(filename, refs, regexs):
 def file_extension(filename):
     return os.path.splitext(filename)[1].split(".")[-1].lower()
 
-skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 'cluster/env.sh']
+skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 'cluster/env.sh', 'vendor']
 def normalize_files(files):
     newfiles = []
     for pathname in files:
@@ -109,7 +114,7 @@ def normalize_files(files):
         newfiles.append(pathname)
     for i, pathname in enumerate(newfiles):
         if not os.path.isabs(pathname):
-            newfiles[i] = os.path.join(rootdir, pathname)
+            newfiles[i] = os.path.join(args.root_dir, pathname)
     return newfiles
 
 def get_files(extensions):
@@ -117,7 +122,7 @@ def get_files(extensions):
     if len(args.filenames) > 0:
         files = args.filenames
     else:
-        for root, dirs, walkfiles in os.walk(rootdir):
+        for root, dirs, walkfiles in os.walk(args.root_dir):
             # don't visit certain dirs. This is just a performance improvement
             # as we would prune these later in normalize_files(). But doing it
             # cuts down the amount of filesystem walking we do and cuts down
