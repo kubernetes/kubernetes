@@ -154,15 +154,32 @@ func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.
 
 // RunConvert implements the generic Convert command
 func (o *ConvertOptions) RunConvert() error {
-	infos, err := o.builder.Do().Infos()
+	r := o.builder.Do()
+	err := r.Err()
 	if err != nil {
 		return err
 	}
 
-	objects, err := resource.AsVersionedObject(infos, false, o.outputVersion.String(), o.encoder)
+	count := 0
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+
+		infos := []*resource.Info{info}
+		objects, err := resource.AsVersionedObject(infos, false, o.outputVersion.String(), o.encoder)
+		if err != nil {
+			return err
+		}
+
+		count++
+		return o.printer.PrintObj(objects, o.out)
+	})
 	if err != nil {
 		return err
 	}
-
-	return o.printer.PrintObj(objects, o.out)
+	if count == 0 {
+		return fmt.Errorf("no objects passed to convert")
+	}
+	return nil
 }
