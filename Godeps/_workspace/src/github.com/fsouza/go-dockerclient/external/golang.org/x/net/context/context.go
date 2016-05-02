@@ -210,13 +210,13 @@ type CancelFunc func()
 // call cancel as soon as the operations running in this Context complete.
 func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 	c := newCancelCtx(parent)
-	propagateCancel(parent, &c)
-	return &c, func() { c.cancel(true, Canceled) }
+	propagateCancel(parent, c)
+	return c, func() { c.cancel(true, Canceled) }
 }
 
 // newCancelCtx returns an initialized cancelCtx.
-func newCancelCtx(parent Context) cancelCtx {
-	return cancelCtx{
+func newCancelCtx(parent Context) *cancelCtx {
+	return &cancelCtx{
 		Context: parent,
 		done:    make(chan struct{}),
 	}
@@ -259,7 +259,7 @@ func parentCancelCtx(parent Context) (*cancelCtx, bool) {
 		case *cancelCtx:
 			return c, true
 		case *timerCtx:
-			return &c.cancelCtx, true
+			return c.cancelCtx, true
 		case *valueCtx:
 			parent = c.Context
 		default:
@@ -377,7 +377,7 @@ func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc) {
 // implement Done and Err.  It implements cancel by stopping its timer then
 // delegating to cancelCtx.cancel.
 type timerCtx struct {
-	cancelCtx
+	*cancelCtx
 	timer *time.Timer // Under cancelCtx.mu.
 
 	deadline time.Time
