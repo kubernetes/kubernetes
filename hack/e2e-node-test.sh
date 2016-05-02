@@ -18,7 +18,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
-focus=${FOCUS}
+focus=${FOCUS:-""}
 skip=${SKIP:-""}
 
 ginkgo=$(kube::util::find-binary "ginkgo")

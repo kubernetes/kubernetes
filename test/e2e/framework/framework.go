@@ -94,14 +94,15 @@ func NewDefaultFramework(baseName string) *Framework {
 		ClientQPS:   20,
 		ClientBurst: 50,
 	}
-	return NewFramework(baseName, options)
+	return NewFramework(baseName, options, nil)
 }
 
-func NewFramework(baseName string, options FrameworkOptions) *Framework {
+func NewFramework(baseName string, options FrameworkOptions, client *client.Client) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
 		AddonResourceConstraints: make(map[string]ResourceConstraint),
 		options:                  options,
+		Client:                   client,
 	}
 
 	BeforeEach(f.BeforeEach)
@@ -116,17 +117,18 @@ func (f *Framework) BeforeEach() {
 	// https://github.com/onsi/ginkgo/issues/222
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 
-	By("Creating a kubernetes client")
-	config, err := LoadConfig()
-	Expect(err).NotTo(HaveOccurred())
-	config.QPS = f.options.ClientQPS
-	config.Burst = f.options.ClientBurst
-	c, err := loadClientFromConfig(config)
-	Expect(err).NotTo(HaveOccurred())
-
-	f.Client = c
-	f.Clientset_1_2 = adapter_1_2.FromUnversionedClient(c)
-	f.Clientset_1_3 = adapter_1_3.FromUnversionedClient(c)
+	if f.Client == nil {
+		By("Creating a kubernetes client")
+		config, err := LoadConfig()
+		Expect(err).NotTo(HaveOccurred())
+		config.QPS = f.options.ClientQPS
+		config.Burst = f.options.ClientBurst
+		c, err := loadClientFromConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+		f.Client = c
+	}
+	f.Clientset_1_2 = adapter_1_2.FromUnversionedClient(f.Client)
+	f.Clientset_1_3 = adapter_1_3.FromUnversionedClient(f.Client)
 
 	By("Building a namespace api object")
 	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
@@ -138,14 +140,14 @@ func (f *Framework) BeforeEach() {
 
 	if TestContext.VerifyServiceAccount {
 		By("Waiting for a default service account to be provisioned in namespace")
-		err = WaitForDefaultServiceAccountInNamespace(c, namespace.Name)
+		err = WaitForDefaultServiceAccountInNamespace(f.Client, namespace.Name)
 		Expect(err).NotTo(HaveOccurred())
 	} else {
 		Logf("Skipping waiting for service account")
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData {
-		f.gatherer, err = NewResourceUsageGatherer(c, ResourceGathererOptions{inKubemark: ProviderIs("kubemark")})
+		f.gatherer, err = NewResourceUsageGatherer(f.Client, ResourceGathererOptions{inKubemark: ProviderIs("kubemark")})
 		if err != nil {
 			Logf("Error while creating NewResourceUsageGatherer: %v", err)
 		} else {
@@ -157,7 +159,7 @@ func (f *Framework) BeforeEach() {
 		f.logsSizeWaitGroup = sync.WaitGroup{}
 		f.logsSizeWaitGroup.Add(1)
 		f.logsSizeCloseChannel = make(chan bool)
-		f.logsSizeVerifier = NewLogsVerifier(c, f.logsSizeCloseChannel)
+		f.logsSizeVerifier = NewLogsVerifier(f.Client, f.logsSizeCloseChannel)
 		go func() {
 			f.logsSizeVerifier.Run()
 			f.logsSizeWaitGroup.Done()
