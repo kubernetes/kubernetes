@@ -136,6 +136,10 @@ function configure-master-addons() {
     evaluate-manifests-dir ${MANIFESTS_DIR}/addons/dashboard ${addon_dir}/dashboard
   fi
 
+  if [[ "${ENABLE_CLUSTER_LOGGING}" == "true" ]]; then
+    evaluate-manifests-dir ${MANIFESTS_DIR}/addons/fluentd-elasticsearch  ${addon_dir}/fluentd-elasticsearch
+  fi
+
   if [[ "${ENABLE_CLUSTER_MONITORING}" == "influxdb" ]]; then
     evaluate-manifests-dir ${MANIFESTS_DIR}/addons/cluster-monitoring/influxdb  ${addon_dir}/cluster-monitoring/influxdb
   elif [[ "${ENABLE_CLUSTER_MONITORING}" == "google" ]]; then
