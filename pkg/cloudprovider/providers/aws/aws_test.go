@@ -1204,54 +1204,54 @@ func TestGetListener(t *testing.T) {
 	tests := []struct {
 		name string
 
-		lbPort       int64
-		instancePort int64
-		annotation   string
+		lbPort                    int64
+		instancePort              int64
+		backendProtocolAnnotation string
+		certAnnotation            string
 
 		expectError      bool
 		lbProtocol       string
 		instanceProtocol string
 		certID           string
-		//listener    *elb.Listener
 	}{
 		{
-			"No annotation, passthrough",
-			80, 8000, "",
+			"No cert or BE protocol annotation, passthrough",
+			80, 8000, "", "",
 			false, "tcp", "tcp", "",
 		},
 		{
-			"Invalid cert annotation, no protocol before equal sign",
-			443, 8000, "=foo",
+			"BE protocol without cert annotation, passthrough",
+			443, 8001, "https", "",
+			false, "tcp", "tcp", "",
+		},
+		{
+			"Invalid cert annotation, bogus backend protocol",
+			443, 8002, "bacon", "foo",
 			true, "tcp", "tcp", "cert",
 		},
 		{
-			"Invalid cert annotation, bogus protocol before equal sign",
-			443, 8000, "bacon=foo",
-			true, "tcp", "tcp", "cert",
-		},
-		{
-			"Invalid cert annotation, too many equal signs",
-			443, 8000, "==",
+			"Invalid cert annotation, protocol followed by equal sign",
+			443, 8003, "http=", "=",
 			true, "tcp", "tcp", "cert",
 		},
 		{
 			"HTTPS->HTTPS",
-			443, 8000, "https=cert",
+			443, 8004, "https", "cert",
 			false, "https", "https", "cert",
 		},
 		{
 			"HTTPS->HTTP",
-			443, 8000, "http=cert",
+			443, 8005, "http", "cert",
 			false, "https", "http", "cert",
 		},
 		{
 			"SSL->SSL",
-			443, 8000, "ssl=cert",
+			443, 8006, "ssl", "cert",
 			false, "ssl", "ssl", "cert",
 		},
 		{
 			"SSL->TCP",
-			443, 8000, "tcp=cert",
+			443, 8007, "tcp", "cert",
 			false, "ssl", "tcp", "cert",
 		},
 	}
@@ -1259,8 +1259,11 @@ func TestGetListener(t *testing.T) {
 	for _, test := range tests {
 		t.Logf("Running test case %s", test.name)
 		annotations := make(map[string]string)
-		if test.annotation != "" {
-			annotations[ServiceAnnotationLoadBalancerCertificate] = test.annotation
+		if test.backendProtocolAnnotation != "" {
+			annotations[ServiceAnnotationLoadBalancerBEProtocol] = test.backendProtocolAnnotation
+		}
+		if test.certAnnotation != "" {
+			annotations[ServiceAnnotationLoadBalancerCertificate] = test.certAnnotation
 		}
 		l, err := getListener(api.ServicePort{
 			NodePort: int(test.instancePort),
@@ -1287,7 +1290,7 @@ func TestGetListener(t *testing.T) {
 					SSLCertificateId: cert,
 				}
 				if !reflect.DeepEqual(l, expected) {
-					t.Errorf("Incorrect listener (%v vs %v) for case: %s",
+					t.Errorf("Incorrect listener (%v vs expected %v) for case: %s",
 						l, expected, test.name)
 				}
 			}

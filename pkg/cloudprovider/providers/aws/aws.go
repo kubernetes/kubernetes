@@ -69,15 +69,20 @@ const TagNameSubnetPublicELB = "kubernetes.io/role/elb"
 // This lets us define more advanced semantics in future.
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-load-balancer-internal"
 
-// Service annotation requesting a secure listener. Value is [InstanceProtocol=]CertARN
-// If InstanceProtocol is `http` (default) or `https`, an HTTPS listener that terminates the connection and parses headers is created.
-// If it is set to `ssl` or `tcp`, a "raw" SSL listener is used.
+// Service annotation requesting a secure listener. Value is a valid certificate ARN.
 // For more, see http://docs.aws.amazon.com/ElasticLoadBalancing/latest/DeveloperGuide/elb-listener-config.html
 // CertARN is an IAM or CM certificate ARN, e.g. arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012
-const ServiceAnnotationLoadBalancerCertificate = "service.beta.kubernetes.io/aws-load-balancer-certarn"
+const ServiceAnnotationLoadBalancerCertificate = "service.beta.kubernetes.io/aws-load-balancer-ssl-cert"
 
-// Maps from instance protocol to ELB protocol
-var protocolMapping = map[string]string{
+// Service annotation specifying the protocol spoken by the backend (pod) behind a secure listener.
+// Only inspected when `aws-load-balancer-ssl-cert` is used.
+// If `http` (default) or `https`, an HTTPS listener that terminates the connection and parses headers is created.
+// If set to `ssl` or `tcp`, a "raw" SSL listener is used.
+
+const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
+
+// Maps from backend protocol to ELB protocol
+var backendProtocolMapping = map[string]string{
 	"https": "https",
 	"http":  "https",
 	"ssl":   "ssl",
@@ -2125,19 +2130,15 @@ func getListener(port api.ServicePort, annotations map[string]string) (*elb.List
 	listener.LoadBalancerPort = &loadBalancerPort
 	certID := annotations[ServiceAnnotationLoadBalancerCertificate]
 	if certID != "" {
-		parts := strings.Split(certID, "=")
-		if len(parts) == 1 {
+		instanceProtocol = annotations[ServiceAnnotationLoadBalancerBEProtocol]
+		if instanceProtocol == "" {
 			protocol = "https"
 			instanceProtocol = "http"
-		} else if len(parts) == 2 {
-			instanceProtocol = strings.ToLower(parts[0])
-			protocol = protocolMapping[instanceProtocol]
-			if protocol == "" {
-				return nil, fmt.Errorf("Invalid protocol %s in %s", instanceProtocol, certID)
-			}
-			certID = parts[1]
 		} else {
-			return nil, fmt.Errorf("Invalid certificate annotation %s", certID)
+			protocol = backendProtocolMapping[instanceProtocol]
+			if protocol == "" {
+				return nil, fmt.Errorf("Invalid backend protocol %s in %s", instanceProtocol, certID)
+			}
 		}
 		listener.SSLCertificateId = &certID
 	}
