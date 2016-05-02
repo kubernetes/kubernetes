@@ -3,13 +3,13 @@
     description: '{description} Test owner: gmarek'
     logrotate:
         daysToKeep: 7
-    node: 'master'
+    node: 'e2e'
     builders:
         - shell: |
             {provider-env}
             {job-env}
             {post-env}
-            timeout -k {kill-timeout}m {timeout}m {legacy-runner} && rc=$? || rc=$?
+            timeout -k {kill-timeout}m {timeout}m {runner} && rc=$? || rc=$?
             {report-rc}
     properties:
         - mail-watcher
@@ -56,6 +56,8 @@
                 export KUBE_GCE_ZONE="us-central1-f"
                 export KUBEMARK_MASTER_SIZE="n1-standard-1"
                 export KUBEMARK_NUM_NODES="5"
+                # The kubemark scripts build a Docker image
+                export JENKINS_ENABLE_DOCKER_IN_DOCKER="y"
         - '100-gce':
             description: 'Run small-ish kubemark cluster to continuously run performance experiments'
             timeout: 240
@@ -74,6 +76,8 @@
                 export KUBE_GCE_ZONE="us-central1-f"
                 export KUBEMARK_MASTER_SIZE="n1-standard-4"
                 export KUBEMARK_NUM_NODES="100"
+                # The kubemark scripts build a Docker image
+                export JENKINS_ENABLE_DOCKER_IN_DOCKER="y"
         - 'high-density-100-gce':
             description: 'Run Kubemark high-density (100 pods/node) test on a fake 100 node cluster.'
             timeout: 160
@@ -92,6 +96,8 @@
                 export KUBE_GCE_ZONE="us-east1-d"
                 export KUBEMARK_MASTER_SIZE="n1-standard-4"
                 export KUBEMARK_NUM_NODES="100"
+                # The kubemark scripts build a Docker image
+                export JENKINS_ENABLE_DOCKER_IN_DOCKER="y"
         - '500-gce':
             description: 'Run Kubemark test on a fake 500 node cluster to test for regressions on bigger clusters'
             timeout: 300
@@ -112,6 +118,8 @@
                 export KUBE_GCE_ZONE="us-central1-f"
                 export KUBEMARK_MASTER_SIZE="n1-standard-16"
                 export KUBEMARK_NUM_NODES="500"
+                # The kubemark scripts build a Docker image
+                export JENKINS_ENABLE_DOCKER_IN_DOCKER="y"
         - 'gce-scale':
             description: 'Run Density test on Kubemark in very large cluster. Currently only scheduled to run every 12 hours so as not to waste too many resources.'
             # 12h - load tests take really, really, really long time.
@@ -136,5 +144,7 @@
                 export KUBEMARK_MASTER_SIZE="n1-standard-16"
                 export KUBEMARK_NUM_NODES="1000"
                 export KUBE_GCE_ZONE="us-central1-f"
+                # The kubemark scripts build a Docker image
+                export JENKINS_ENABLE_DOCKER_IN_DOCKER="y"
     jobs:
         - 'kubernetes-kubemark-{suffix}'
