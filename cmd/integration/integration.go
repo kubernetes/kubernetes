@@ -53,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -382,50 +381,6 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 	}
 }
 
-func runReplicationControllerTest(c *client.Client) {
-	t := time.Now()
-	clientAPIVersion := c.APIVersion().String()
-	data, err := ioutil.ReadFile("cmd/integration/" + clientAPIVersion + "-controller.json")
-	if err != nil {
-		glog.Fatalf("Unexpected error: %v", err)
-	}
-	glog.Infof("Done reading config file, took %v", time.Since(t))
-	t = time.Now()
-	var controller api.ReplicationController
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &controller); err != nil {
-		glog.Fatalf("Unexpected error: %v", err)
-	}
-
-	glog.Infof("Creating replication controllers")
-	updated, err := c.ReplicationControllers("test").Create(&controller)
-	if err != nil {
-		glog.Fatalf("Unexpected error: %v", err)
-	}
-	glog.Infof("Done creating replication controllers, took %v", time.Since(t))
-	t = time.Now()
-
-	// In practice the controller doesn't need 60s to create a handful of pods, but network latencies on CI
-	// systems have been observed to vary unpredictably, so give the controller enough time to create pods.
-	// Our e2e scalability tests will catch controllers that are *actually* slow.
-	if err := wait.Poll(time.Second, longTestTimeout, client.ControllerHasDesiredReplicas(c, updated)); err != nil {
-		glog.Fatalf("FAILED: pods never created %v", err)
-	}
-	glog.Infof("Done creating replicas, took %v", time.Since(t))
-	t = time.Now()
-
-	// Poll till we can retrieve the status of all pods matching the given label selector from their nodes.
-	// This involves 3 operations:
-	//	- The scheduler must assign all pods to a node
-	//	- The assignment must reflect in a `List` operation against the apiserver, for labels matching the selector
-	//  - We need to be able to query the kubelet on that node for information about the pod
-	if err := wait.Poll(
-		time.Second, longTestTimeout, podsOnNodes(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
-		glog.Fatalf("FAILED: pods never started running %v", err)
-	}
-
-	glog.Infof("Pods verified on nodes, took %v", time.Since(t))
-}
-
 func runAPIVersionsTest(c *client.Client) {
 	g, err := c.ServerGroups()
 	clientVersion := c.APIVersion().String()
@@ -723,121 +678,6 @@ func runMasterServiceTest(client *client.Client) {
 	glog.Infof("Master service test passed.")
 }
 
-func runServiceTest(client *client.Client) {
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: "foo",
-			Labels: map[string]string{
-				"name": "thisisalonglabel",
-			},
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:  "c1",
-					Image: "foo",
-					Ports: []api.ContainerPort{
-						{ContainerPort: 1234},
-					},
-					ImagePullPolicy: api.PullIfNotPresent,
-				},
-			},
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-		},
-		Status: api.PodStatus{
-			PodIP: "1.2.3.4",
-		},
-	}
-	pod, err := client.Pods(api.NamespaceDefault).Create(pod)
-	if err != nil {
-		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
-	}
-	if err := wait.Poll(time.Second, longTestTimeout, podExists(client, pod.Namespace, pod.Name)); err != nil {
-		glog.Fatalf("FAILED: pod never started running %v", err)
-	}
-	svc1 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "service1"},
-		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"name": "thisisalonglabel",
-			},
-			Ports: []api.ServicePort{{
-				Port:     8080,
-				Protocol: "TCP",
-			}},
-			SessionAffinity: "None",
-		},
-	}
-	svc1, err = client.Services(api.NamespaceDefault).Create(svc1)
-	if err != nil {
-		glog.Fatalf("Failed to create service: %v, %v", svc1, err)
-	}
-
-	// create an identical service in the non-default namespace
-	svc3 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "service1"},
-		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"name": "thisisalonglabel",
-			},
-			Ports: []api.ServicePort{{
-				Port:     8080,
-				Protocol: "TCP",
-			}},
-			SessionAffinity: "None",
-		},
-	}
-	svc3, err = client.Services("other").Create(svc3)
-	if err != nil {
-		glog.Fatalf("Failed to create service: %v, %v", svc3, err)
-	}
-
-	// TODO Reduce the timeouts in this test when endpoints controller is sped up. See #6045.
-	if err := wait.Poll(time.Second, longTestTimeout, endpointsSet(client, svc1.Namespace, svc1.Name, 1)); err != nil {
-		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
-	}
-	// A second service with the same port.
-	svc2 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "service2"},
-		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"name": "thisisalonglabel",
-			},
-			Ports: []api.ServicePort{{
-				Port:     8080,
-				Protocol: "TCP",
-			}},
-			SessionAffinity: "None",
-		},
-	}
-	svc2, err = client.Services(api.NamespaceDefault).Create(svc2)
-	if err != nil {
-		glog.Fatalf("Failed to create service: %v, %v", svc2, err)
-	}
-	if err := wait.Poll(time.Second, longTestTimeout, endpointsSet(client, svc2.Namespace, svc2.Name, 1)); err != nil {
-		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
-	}
-
-	if err := wait.Poll(time.Second, longTestTimeout, endpointsSet(client, svc3.Namespace, svc3.Name, 0)); err != nil {
-		glog.Fatalf("FAILED: service in other namespace should have no endpoints: %v", err)
-	}
-
-	svcList, err := client.Services(api.NamespaceAll).List(api.ListOptions{})
-	if err != nil {
-		glog.Fatalf("Failed to list services across namespaces: %v", err)
-	}
-	names := sets.NewString()
-	for _, svc := range svcList.Items {
-		names.Insert(fmt.Sprintf("%s/%s", svc.Namespace, svc.Name))
-	}
-	if !names.HasAll("default/kubernetes", "default/service1", "default/service2", "other/service1") {
-		glog.Fatalf("Unexpected service list: %#v", names)
-	}
-
-	glog.Info("Service test passed.")
-}
-
 func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	pod := &api.Pod{
 		Spec: api.PodSpec{
@@ -952,10 +792,8 @@ func main() {
 
 	// Run tests in parallel
 	testFuncs := []testFunc{
-		runReplicationControllerTest,
 		runAtomicPutTest,
 		runPatchTest,
-		runServiceTest,
 		runAPIVersionsTest,
 		runMasterServiceTest,
 		func(c *client.Client) {
@@ -1001,14 +839,13 @@ func main() {
 			createdConts.Insert(p[:n-8])
 		}
 	}
-	// We expect 12: 2 pod infra containers + 2 containers from the replication controller +
+	// We expect 6 containers:
 	//              1 pod infra container + 2 containers from the URL on first Kubelet +
 	//              1 pod infra container + 2 containers from the URL on second Kubelet +
-	//              1 pod infra container + 1 container from the service test.
-	// The total number of container created is 12
+	// The total number of container created is 6
 
-	if len(createdConts) != 12 {
-		glog.Fatalf("Expected 12 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
+	if len(createdConts) != 6 {
+		glog.Fatalf("Expected 6 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created containers: %#v", createdConts.List())
 
