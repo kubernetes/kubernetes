@@ -21,6 +21,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+export REPO_DIR=${REPO_DIR:-$(pwd)}
+export HOST_ARTIFACTS_DIR=${WORKSPACE}/_artifacts
+mkdir -p "${HOST_ARTIFACTS_DIR}"
+
 env -u HOME -u PATH -u PWD -u WORKSPACE >${WORKSPACE}/env.list
 
 # Add all uncommented lines for metadata.google.internal in /etc/hosts to the
@@ -30,6 +34,17 @@ readonly METADATA_SERVER_ADD_HOST_ARGS=($(
   cut -f1 -d' ' |\
   xargs -r printf -- '--add-host="metadata.google.internal:%s"\n'))
 
+docker_extra_args=()
+if [[ "${JENKINS_ENABLE_DOCKER_IN_DOCKER:-}" =~ ^[yY]$ ]]; then
+    docker_extra_args+=(\
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v "$(which docker)":/bin/docker:ro \
+      -v "${REPO_DIR}":/go/src/k8s.io/kubernetes \
+      -e "REPO_DIR=${REPO_DIR}" \
+      -e "HOST_ARTIFACTS_DIR=${HOST_ARTIFACTS_DIR}" \
+    )
+fi
+
 docker run --rm=true -i \
   -v "${WORKSPACE}/_artifacts":/workspace/_artifacts \
   -v /etc/localtime:/etc/localtime:ro \
@@ -37,6 +52,7 @@ docker run --rm=true -i \
   --env-file "${WORKSPACE}/env.list" \
   -e "HOME=/workspace" \
   -e "WORKSPACE=/workspace" \
+  "${docker_extra_args[@]:+${docker_extra_args[@]}}" \
   "${METADATA_SERVER_ADD_HOST_ARGS[@]:+${METADATA_SERVER_ADD_HOST_ARGS[@]}}" \
   gcr.io/google_containers/kubekins-test:0.11 \
   bash -c "bash <(curl -fsS --retry 3 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh')"
