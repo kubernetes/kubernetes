@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	storageerr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -29,6 +30,7 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for namespaces against etcd
@@ -99,12 +101,52 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	namespace := nsObj.(*api.Namespace)
 
 	// upon first request to delete, we switch the phase to start namespace termination
+	// TODO: enhance graceful deletion's calls to DeleteStrategy to allow phase change and finalizer patterns
 	if namespace.DeletionTimestamp.IsZero() {
-		now := unversioned.Now()
-		namespace.DeletionTimestamp = &now
-		namespace.Status.Phase = api.NamespaceTerminating
-		result, _, err := r.status.Update(ctx, namespace)
-		return result, err
+		key, err := r.Etcd.KeyFunc(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+
+		out := r.Etcd.NewFunc()
+		err = r.Etcd.Storage.GuaranteedUpdate(
+			ctx, key, out, false,
+			storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
+				existingNamespace, ok := existing.(*api.Namespace)
+				if !ok {
+					// wrong type
+					return nil, fmt.Errorf("expected *api.Namespace, got %v", existing)
+				}
+				if existingNamespace.UID != namespace.UID {
+					return nil, apierrors.NewConflict(
+						api.Resource("namespaces"),
+						name,
+						fmt.Errorf("UID in precondition: %v, UID in object meta: %v", namespace.UID, existingNamespace.UID),
+					)
+				}
+				// Set the deletion timestamp if needed
+				if existingNamespace.DeletionTimestamp.IsZero() {
+					now := unversioned.Now()
+					existingNamespace.DeletionTimestamp = &now
+				}
+				// Set the namespace phase to terminating, if needed
+				if existingNamespace.Status.Phase != api.NamespaceTerminating {
+					existingNamespace.Status.Phase = api.NamespaceTerminating
+				}
+				return existingNamespace, nil
+			}),
+		)
+
+		if err != nil {
+			err = storageerr.InterpretGetError(err, api.Resource("namespaces"), name)
+			err = storageerr.InterpretUpdateError(err, api.Resource("namespaces"), name)
+			if _, ok := err.(*apierrors.StatusError); !ok {
+				err = apierrors.NewInternalError(err)
+			}
+			return nil, err
+		}
+
+		return out, nil
 	}
 
 	// prior to final deletion, we must ensure that finalizers is empty

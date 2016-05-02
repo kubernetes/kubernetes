@@ -360,8 +360,11 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *api.ObjectMeta, fldPath *field.P
 	}
 
 	// TODO: needs to check if newMeta==nil && oldMeta !=nil after the repair logic is removed.
-	if newMeta.DeletionGracePeriodSeconds != nil && oldMeta.DeletionGracePeriodSeconds != nil && *newMeta.DeletionGracePeriodSeconds != *oldMeta.DeletionGracePeriodSeconds {
+	if newMeta.DeletionGracePeriodSeconds != nil && (oldMeta.DeletionGracePeriodSeconds == nil || *newMeta.DeletionGracePeriodSeconds != *oldMeta.DeletionGracePeriodSeconds) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), newMeta.DeletionGracePeriodSeconds, "field is immutable; may only be changed via deletion"))
+	}
+	if newMeta.DeletionTimestamp != nil && (oldMeta.DeletionTimestamp == nil || !newMeta.DeletionTimestamp.Equal(*oldMeta.DeletionTimestamp)) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionTimestamp"), newMeta.DeletionTimestamp, "field is immutable; may only be changed via deletion"))
 	}
 
 	// Reject updates that don't specify a resource version

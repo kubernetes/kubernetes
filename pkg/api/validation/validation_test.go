@@ -122,6 +122,89 @@ func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 	}
 }
 
+func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
+	now := unversioned.NewTime(time.Unix(1000, 0).UTC())
+	later := unversioned.NewTime(time.Unix(2000, 0).UTC())
+	gracePeriodShort := int64(30)
+	gracePeriodLong := int64(40)
+
+	testcases := map[string]struct {
+		Old          api.ObjectMeta
+		New          api.ObjectMeta
+		ExpectedNew  api.ObjectMeta
+		ExpectedErrs []string
+	}{
+		"valid without deletion fields": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			ExpectedNew:  api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			ExpectedErrs: []string{},
+		},
+		"valid with deletion fields": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &gracePeriodShort},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &gracePeriodShort},
+			ExpectedNew:  api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &gracePeriodShort},
+			ExpectedErrs: []string{},
+		},
+
+		"invalid set deletionTimestamp": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
+			ExpectedNew:  api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
+			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: \"1970-01-01T00:16:40Z\": field is immutable; may only be changed via deletion"},
+		},
+		"invalid clear deletionTimestamp": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			ExpectedNew:  api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
+			ExpectedErrs: []string{}, // no errors, validation copies the old value
+		},
+		"invalid change deletionTimestamp": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &later},
+			ExpectedNew:  api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
+			ExpectedErrs: []string{}, // no errors, validation copies the old value
+		},
+
+		"invalid set deletionGracePeriodSeconds": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
+			ExpectedNew:  api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
+			ExpectedErrs: []string{"field.deletionGracePeriodSeconds: Invalid value: 30: field is immutable; may only be changed via deletion"},
+		},
+		"invalid clear deletionGracePeriodSeconds": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			ExpectedNew:  api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
+			ExpectedErrs: []string{}, // no errors, validation copies the old value
+		},
+		"invalid change deletionGracePeriodSeconds": {
+			Old:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
+			New:          api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodLong},
+			ExpectedNew:  api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodLong},
+			ExpectedErrs: []string{"field.deletionGracePeriodSeconds: Invalid value: 40: field is immutable; may only be changed via deletion"},
+		},
+	}
+
+	for k, tc := range testcases {
+		errs := ValidateObjectMetaUpdate(&tc.New, &tc.Old, field.NewPath("field"))
+		if len(errs) != len(tc.ExpectedErrs) {
+			t.Logf("%s: Expected: %#v", k, tc.ExpectedErrs)
+			t.Logf("%s: Got: %#v", k, errs)
+			t.Errorf("%s: expected %d errors, got %d", k, len(tc.ExpectedErrs), len(errs))
+			continue
+		}
+		for i := range errs {
+			if errs[i].Error() != tc.ExpectedErrs[i] {
+				t.Errorf("%s: error #%d: expected %q, got %q", k, i, tc.ExpectedErrs[i], errs[i].Error())
+			}
+		}
+		if !reflect.DeepEqual(tc.New, tc.ExpectedNew) {
+			t.Errorf("%s: Expected after validation:\n%#v\ngot\n%#v", k, tc.ExpectedNew, tc.New)
+		}
+	}
+}
+
 // Ensure trailing slash is allowed in generate name
 func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
 	errs := ValidateObjectMeta(
@@ -2123,11 +2206,11 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
 				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
 			},
 			true,
@@ -4451,9 +4534,23 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 				Phase: api.NamespaceActive,
 			},
 		}, true},
+		// Cannot set deletionTimestamp via status update
 		{api.Namespace{
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo"}},
+			api.Namespace{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "foo",
+					DeletionTimestamp: &now},
+				Status: api.NamespaceStatus{
+					Phase: api.NamespaceTerminating,
+				},
+			}, false},
+		// Can update phase via status update
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo",
+				DeletionTimestamp: &now}},
 			api.Namespace{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "foo",
