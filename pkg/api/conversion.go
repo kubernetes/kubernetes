@@ -28,6 +28,9 @@ import (
 func init() {
 	Scheme.AddDefaultingFuncs(
 		func(obj *ListOptions) {
+			if obj.MatchedLabels == nil {
+				obj.MatchedLabels = labels.MatchedEverything()
+			}
 			if obj.LabelSelector == nil {
 				obj.LabelSelector = labels.Everything()
 			}
@@ -42,12 +45,14 @@ func init() {
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
 		Convert_unversioned_Time_To_unversioned_Time,
 		Convert_string_slice_To_unversioned_Time,
+		Convert_string_To_labels,
 		Convert_string_To_labels_Selector,
 		Convert_string_To_fields_Selector,
 		Convert_bool_ref_To_bool,
 		Convert_bool_To_bool_ref,
 		Convert_string_ref_To_string,
 		Convert_string_To_string_ref,
+		Convert_labels_To_string,
 		Convert_labels_Selector_To_string,
 		Convert_fields_Selector_To_string,
 		Convert_resource_Quantity_To_resource_Quantity,
@@ -127,6 +132,14 @@ func Convert_string_slice_To_unversioned_Time(input *[]string, out *unversioned.
 	return out.UnmarshalQueryParameter(str)
 }
 
+func Convert_string_To_labels(in *string, out *labels.Labels, s conversion.Scope) error {
+	selector, err := labels.ParseLabels(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
 func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
 	selector, err := labels.Parse(*in)
 	if err != nil {
@@ -141,6 +154,13 @@ func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conve
 		return err
 	}
 	*out = selector
+	return nil
+}
+func Convert_labels_To_string(in *labels.Labels, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
 	return nil
 }
 func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conversion.Scope) error {

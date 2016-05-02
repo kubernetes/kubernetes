@@ -17,6 +17,7 @@ limitations under the License.
 package labels
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -28,6 +29,17 @@ type Labels interface {
 
 	// Get returns the value for the provided label.
 	Get(label string) (value string)
+
+	// String returns a human readable string that represents this labels.
+	String() string
+
+	// Empty returns true if this labels is empty.
+	Empty() bool
+}
+
+// MatchedEverything returns a labels that matches all selectors.
+func MatchedEverything() Labels {
+	return Set{}
 }
 
 // Set is a map of label:value. It implements Labels.
@@ -51,6 +63,11 @@ func (ls Set) Has(label string) bool {
 	return exists
 }
 
+// Empty returns true if this labels is empty.
+func (ls Set) Empty() bool {
+	return len(ls) == 0
+}
+
 // Get returns the value in the map for the provided label.
 func (ls Set) Get(label string) string {
 	return ls[label]
@@ -68,4 +85,22 @@ func FormatLabels(labelMap map[string]string) string {
 		l = "<none>"
 	}
 	return l
+}
+
+func ParseLabels(str string) (Labels, error) {
+	labels := Set{}
+	if str == "" {
+		return labels, nil
+	}
+
+	kvs := strings.Split(str, ",")
+	for _, kv := range kvs {
+		pair := strings.Split(kv, "=")
+		if len(pair) != 2 {
+			return nil, fmt.Errorf("invalid kv pair: %v", kv)
+		}
+		k, v := pair[0], pair[1]
+		labels[k] = v
+	}
+	return labels, nil
 }

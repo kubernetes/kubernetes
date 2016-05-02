@@ -1920,7 +1920,8 @@ type ExportOptions struct {
 // watch calls.
 type ListOptions struct {
 	unversioned.TypeMeta `json:",inline"`
-
+	// Labels for reverse lookup, matched against by pod selectors.
+	MatchedLabels labels.Labels
 	// A selector based on labels
 	LabelSelector labels.Selector
 	// A selector based on fields

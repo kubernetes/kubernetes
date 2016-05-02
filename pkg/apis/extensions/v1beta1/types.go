@@ -791,6 +791,9 @@ type ExportOptions struct {
 type ListOptions struct {
 	unversioned.TypeMeta `json:",inline"`
 
+	// Labels to restrict the list of returned objects by their selector, matched against by pod selectors.
+	// Defaults to match any selector
+	MatchedLabels string `json:"matchedLabels,omitempty"`
 	// A selector to restrict the list of returned objects by their labels.
 	// Defaults to everything.
 	LabelSelector string `json:"labelSelector,omitempty"`
