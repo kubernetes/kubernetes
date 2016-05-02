@@ -142,7 +142,7 @@ start_k8s(){
     sleep 5
     # Set flannel net config
     docker -H unix:///var/run/docker-bootstrap.sock run \
-        --net=host gcr.io/google_containers/etcd:${ETCD_VERSION} \
+        --net=host quay.io/coreos/etcd:v${ETCD_VERSION} \
         etcdctl \
         set /coreos.com/network/config \
             '{ "Network": "10.1.0.0/16", "Backend": {"Type": "vxlan"}}'
