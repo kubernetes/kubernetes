@@ -36,10 +36,12 @@ for APIROOT in ${APIROOTS}; do
   cp -a "${KUBE_ROOT}/${APIROOT}" "${_tmp}/${APIROOT}"
 done
 
-# We would like to use "sudo" when running on Travis and
-# not use "sudo" when running on Jenkins.
-SUDO="sudo"
-sudo -h > /dev/null || SUDO=""
+# If not running as root, we need to use sudo to restore the original generated
+# protobuf files.
+SUDO=""
+if [[ "$(id -u)" != '0' ]]; then
+  SUDO="sudo"
+fi
 
 "${KUBE_ROOT}/hack/update-generated-protobuf.sh"
 for APIROOT in ${APIROOTS}; do
