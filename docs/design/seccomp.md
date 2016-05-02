@@ -113,6 +113,12 @@ should be possible to run these applications unmodified in Kubernetes; this
 implies there should be a way to disable seccomp control in Kubernetes for
 certain containers, or to run with a "no-op" or "unconfined" profile.
 
+Sometimes, applications that link to seccomp can use the default profile for a
+container runtime, and restrict further on top of that.  It is important to
+note here that in this case, applications can only place _further_
+restrictions on themselves.  It is not possible to re-grant the ability of a
+process to make a system call once it has been removed with seccomp.
+
 ### Use Case: Custom profiles
 
 Different applications have different requirements for seccomp profiles; it
@@ -136,7 +142,7 @@ Issues:
 
 * [docker/22109](https://github.com/docker/docker/issues/22109): composable
   seccomp filters
-* [docker/21105](https://github.com/docker/docker/issues/22109): custom
+* [docker/21105](https://github.com/docker/docker/issues/22105): custom
   seccomp filters for builds
 
 #### rkt / appcontainers
@@ -155,8 +161,7 @@ Issues:
 
 #### HyperContainer
 
-[Hyper](https://hyper.sh) uses a hypervisor to run containers, so seccomp is
-not an applicable concept.
+[HyperContainer](https://hypercontainer.io) does not support seccomp.
 
 ### Other platforms and seccomp-like capabilities
 
@@ -192,49 +197,60 @@ type SeccompProfile struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
 
-	Rules         []SeccompRule `json:"syscalls,omitempty"`
+  // The default action that should be taken if there are no rules defined for a system call.
 	DefaultAction SeccompAction `json:"defaultAction"`
+  // The rules for this profile.
+  Rules []SeccompRule `json:"rules,omitempty"`
 }
 
 // A seccomp syscall filter rule.
 type SeccompRule struct {
 	// The name of the system call to use
-	Name   string `json:"name"`
+	Name string `json:"name"`
 	// The action to take
 	Action Action `json:"action"`
 	// The arguments to the filter
-	Args   []*Arg `json:"args"`
+	Args []*Arg `json:"args"`
 }
 
 // An action associated with a seccomp rule.
 type SeccompAction string
 
 const (
-	Kill  SeccompAction = "kill"
-	Errno SeccompAction = "errno"
-	Trap  SeccompAction = "trap"
-	Allow SeccompAction = "allow"
-	Trace SeccompAction = "trace"
+  // The Kill action results in the triggering task being killed if the system call is made.
+	Kill SeccompAction = "Kill"
+  // The Trap action results in the kernel sending a SIGSYS signal to the triggering task
+  // without executing the system call.
+  Trap  SeccompAction = "Trap"
+  // The Errno action results in the lower 16 bits of the return value being passed to
+  // userland as the errno without executing the system call.
+  Errno SeccompAction = "Errno"
+  // The Trap action results in kernel attempting to notify a ptrace()-based tracer prior
+  // to executing the system call.  If there is no tracer present, ENOSYS is returned to
+  // userland and the system call is not executed.
+	Trace SeccompAction = "Trace"
+  // The Allow action results in the system call being executed.
+  Allow SeccompAction = "Allow"
 )
 
 // A comparison operator to be used when matching syscall arguments in Seccomp
 type SeccompOperator string
 
 const (
-	EqualTo              SeccompOperator = "equalTo"
-	NotEqualTo           SeccompOperator = "notEqualTo"
-	GreaterThan          SeccompOperator = "greaterThan"
-	GreaterThanOrEqualTo SeccompOperator = "greaterThanOrEqualTo"
-	LessThan             SeccompOperator = "lessThan"
-	LessThanOrEqualTo    SeccompOperator = "lassThanOrEqualTo"
-	MaskEqualTo          SeccompOperator = "maskEqualTo"
+	EqualTo              SeccompOperator = "EqualTo"
+	NotEqualTo           SeccompOperator = "NotEqualTo"
+	GreaterThan          SeccompOperator = "GreaterThan"
+	GreaterThanOrEqualTo SeccompOperator = "GreaterThanOrEqualTo"
+	LessThan             SeccompOperator = "LessThan"
+	LessThanOrEqualTo    SeccompOperator = "LessThanOrEqualTo"
+	MaskEqualTo          SeccompOperator = "MaskEqualTo"
 )
 
 // Represents a specific syscall argument in a seccomp rule.
 type SeccompArg struct {
-	Index    uint            `json:"index"`
-	Value    uint64          `json:"value"`
-	ValueTwo uint64          `json:"valueTwo"`
+	Index    int             `json:"index"`
+	Value    int64           `json:"value"`
+	ValueTwo int64           `json:"valueTwo"`
 	Op       SeccompOperator `json:"op"`
 }
 ```
@@ -352,11 +368,11 @@ metadata:
 defaultAction: kill
 rules:
   - name: personality
-    action: allow
+    action: Allow
     args:
     - index: 0
       value: 0
-      op: equalTo
+      op: EqualTo
 ```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
