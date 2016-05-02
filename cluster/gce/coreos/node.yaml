@@ -1,7 +1,11 @@
 #cloud-config
 
 coreos:
+  update:
+    reboot-strategy: off
   units:
+    - name: locksmithd.service
+      mask: true
     - name: kube-env.service
       command: start
       content: |
