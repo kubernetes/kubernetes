@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/vishvananda/netlink"
@@ -55,6 +56,7 @@ type kubenetNetworkPlugin struct {
 
 	podCIDRs map[kubecontainer.ContainerID]string
 	MTU      int
+	mu       sync.Mutex //Mutex for protecting podCIDRs map and netConfig
 }
 
 func NewPlugin() network.NetworkPlugin {
@@ -138,6 +140,9 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	if name != network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE {
 		return
 	}
+
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
 
 	podCIDR, ok := details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR].(string)
 	if !ok {
@@ -229,16 +234,9 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		return fmt.Errorf("Error building CNI config: %v", err)
 	}
 
-	glog.V(3).Infof("Calling cni plugins to add container to network with cni runtime: %+v", rt)
-	res, err := plugin.cniConfig.AddNetwork(plugin.netConfig, rt)
-	if err != nil {
-		return fmt.Errorf("Error adding container to network: %v", err)
+	if err = plugin.addContainerToNetwork(id, rt); err != nil {
+		return err
 	}
-	if res.IP4 == nil {
-		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", id)
-	}
-
-	plugin.podCIDRs[id] = res.IP4.IP.String()
 
 	// The first SetUpPod call creates the bridge; ensure shaping is enabled
 	if plugin.shaper == nil {
@@ -288,11 +286,8 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 			}
 		}
 	}
-	delete(plugin.podCIDRs, id)
-
-	glog.V(3).Infof("Calling cni plugins to remove container from network with cni runtime: %+v", rt)
-	if err := plugin.cniConfig.DelNetwork(plugin.netConfig, rt); err != nil {
-		return fmt.Errorf("Error removing container from network: %v", err)
+	if err = plugin.delContainerFromNetwork(id, rt); err != nil {
+		return err
 	}
 
 	return nil
@@ -301,6 +296,8 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
 func (plugin *kubenetNetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
 	cidr, ok := plugin.podCIDRs[id]
 	if !ok {
 		return nil, fmt.Errorf("No IP address found for pod %v", id)
@@ -322,4 +319,31 @@ func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubec
 		NetNS:       podNetnsPath,
 		IfName:      network.DefaultInterfaceName,
 	}
+}
+
+func (plugin *kubenetNetworkPlugin) addContainerToNetwork(id kubecontainer.ContainerID, rt *libcni.RuntimeConf) error {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
+	glog.V(3).Infof("Calling cni plugins to add container to network with cni runtime: %+v", rt)
+	res, err := plugin.cniConfig.AddNetwork(plugin.netConfig, rt)
+	if err != nil {
+		return fmt.Errorf("Error adding container to network: %v", err)
+	}
+	if res.IP4 == nil || res.IP4.IP.String() == "" {
+		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", id)
+	}
+
+	plugin.podCIDRs[id] = res.IP4.IP.String()
+	return nil
+}
+
+func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(id kubecontainer.ContainerID, rt *libcni.RuntimeConf) error {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
+	glog.V(3).Infof("Calling cni plugins to remove container from network with cni runtime: %+v", rt)
+	if err := plugin.cniConfig.DelNetwork(plugin.netConfig, rt); err != nil {
+		return fmt.Errorf("Error removing container from network: %v", err)
+	}
+	delete(plugin.podCIDRs, id)
+	return nil
 }
