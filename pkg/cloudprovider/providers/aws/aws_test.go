@@ -1266,8 +1266,8 @@ func TestGetListener(t *testing.T) {
 			annotations[ServiceAnnotationLoadBalancerCertificate] = test.certAnnotation
 		}
 		l, err := getListener(api.ServicePort{
-			NodePort: int(test.instancePort),
-			Port:     int(test.lbPort),
+			NodePort: int32(test.instancePort),
+			Port:     int32(test.lbPort),
 			Protocol: api.Protocol("tcp"),
 		}, annotations)
 		if test.expectError {
