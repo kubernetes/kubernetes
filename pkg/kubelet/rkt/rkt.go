@@ -1488,6 +1488,11 @@ func podIsActive(pod *rktapi.Pod) bool {
 		pod.State == rktapi.PodState_POD_STATE_RUNNING
 }
 
+// GetNetNS returns the network namespace path for the given container
+func (r *Runtime) GetNetNS(containerID kubecontainer.ContainerID) (string, error) {
+       return "", nil
+}
+
 // GarbageCollect collects the pods/containers.
 // After one GC iteration:
 // - The deleted pods will be removed.
