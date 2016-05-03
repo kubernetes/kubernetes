@@ -19,6 +19,7 @@ limitations under the License.
 package integration
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -75,8 +75,11 @@ func TestQuota(t *testing.T) {
 	}
 	close(initializationCh)
 
+	controllerCh := make(chan struct{})
+	defer close(controllerCh)
+
 	go replicationcontroller.NewReplicationManagerFromClient(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas, 4096).
-		Run(3, wait.NeverStop)
+		Run(3, controllerCh)
 
 	resourceQuotaRegistry := quotainstall.NewRegistry(clientset)
 	groupKindsToReplenish := []unversioned.GroupKind{
@@ -94,7 +97,7 @@ func TestQuota(t *testing.T) {
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactoryFromClient(clientset),
 	}
-	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, wait.NeverStop)
+	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
 
 	startTime := time.Now()
 	scale(t, api.NamespaceDefault, clientset)
@@ -194,6 +197,7 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 
 		switch cast := event.Object.(type) {
 		case *api.ReplicationController:
+			fmt.Printf("Found %v of %v replicas\n", int(cast.Status.Replicas), target)
 			if int(cast.Status.Replicas) == target {
 				return true, nil
 			}
