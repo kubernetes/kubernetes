@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 
-	heapster "k8s.io/heapster/api/v1/types"
+	heapster "k8s.io/heapster/metrics/api/v1/types"
 
 	"github.com/stretchr/testify/assert"
 )

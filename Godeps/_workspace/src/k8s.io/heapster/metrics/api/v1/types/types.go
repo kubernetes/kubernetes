@@ -52,6 +52,8 @@ type TimeseriesSchema struct {
 	PodLabels []LabelDescriptor `json:"pod_labels,omitempty"`
 }
 
+// To maintain stable api for GKE.
+
 type MetricDescriptor struct {
 	// The unique name of the metric.
 	Name string `json:"name,omitempty"`
