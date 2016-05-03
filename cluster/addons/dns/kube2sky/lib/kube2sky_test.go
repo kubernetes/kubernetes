@@ -85,8 +85,8 @@ const (
 	podSubDomain     = "pod"
 )
 
-func newKube2Sky(ec etcdClient) Kube2sky {
-	return Kube2sky{
+func newKube2Sky(ec etcdClient) *Kube2sky {
+	return &Kube2sky{
 		EtcdClient:          ec,
 		Domain:              testDomain,
 		EtcdMutationTimeout: time.Second,
