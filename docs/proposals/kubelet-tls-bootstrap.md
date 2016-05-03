@@ -72,7 +72,7 @@ provisioning script.
 We introduce a new API object to represent PKCS#10 certificate signing
 requests. It will be accessible under:
 
-`/apis/certificates/v1beta1/signingrequests/mycsr`
+`/apis/certificates/v1beta1/certificatesigningrequests/mycsr`
 
 It will have the following structure:
 
