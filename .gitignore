@@ -62,16 +62,16 @@ network_closure.sh
 .tags*
 
 # Web UI
-www/master/node_modules/
-www/master/npm-debug.log
-www/master/shared/config/development.json
+/www/master/node_modules/
+/www/master/npm-debug.log
+/www/master/shared/config/development.json
 
 # Karma output
-www/test_out
+/www/test_out
 
 # precommit temporary directories created by ./hack/verify-generated-docs.sh and ./hack/lib/util.sh
-_tmp/
-doc_tmp/
+/_tmp/
+/doc_tmp/
 
 # Test artifacts produced by Jenkins jobs
 /_artifacts/
@@ -84,13 +84,13 @@ doc_tmp/
 /.gsutil/
 
 # CoreOS stuff
-cluster/libvirt-coreos/coreos_*.img
+/cluster/libvirt-coreos/coreos_*.img
 
 # Juju Stuff
-cluster/juju/charms/*
+/cluster/juju/charms/*
 
 # Downloaded Kubernetes binary release
-kubernetes/
+/kubernetes/
 
 # direnv .envrc files
 .envrc
