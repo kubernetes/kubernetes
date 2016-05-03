@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/spf13/cobra"
 )
@@ -77,30 +76,31 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 		return err
 	}
 
-	infos, err := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		ResourceTypeOrNameArgs(true, args...).
+		ContinueOnError().
 		Latest().
 		Flatten().
-		Do().
-		Infos()
+		Do()
+	err = r.Err()
 	if err != nil {
 		return err
 	}
 
-	errs := []error{}
-	for _, info := range infos {
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		mapping := info.ResourceMapping()
 		historyViewer, err := f.HistoryViewer(mapping)
 		if err != nil {
-			errs = append(errs, err)
-			continue
+			return err
 		}
 		historyInfo, err := historyViewer.History(info.Namespace, info.Name)
 		if err != nil {
-			errs = append(errs, err)
-			continue
+			return err
 		}
 
 		if revisionDetail > 0 {
@@ -115,12 +115,11 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 			// Print all revisions
 			formattedOutput, printErr := kubectl.PrintRolloutHistory(historyInfo, mapping.Resource, info.Name)
 			if printErr != nil {
-				errs = append(errs, printErr)
-				continue
+				return printErr
 			}
 			fmt.Fprintf(out, "%s\n", formattedOutput)
 		}
-	}
-
-	return errors.NewAggregate(errs)
+		return nil
+	})
+	return err
 }
