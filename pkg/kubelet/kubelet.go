@@ -439,6 +439,8 @@ func NewMainKubelet(
 			klet.livenessManager,
 			klet.volumeManager,
 			klet.httpClient,
+			klet.networkPlugin,
+			klet.hairpinMode == componentconfig.HairpinVeth,
 			utilexec.New(),
 			kubecontainer.RealOS{},
 			imageBackOff,
