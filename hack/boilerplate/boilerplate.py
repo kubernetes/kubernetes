@@ -29,10 +29,10 @@ parser.add_argument("filenames", help="list of files to check, all files if unsp
 
 rootdir = os.path.dirname(__file__) + "/../../"
 rootdir = os.path.abspath(rootdir)
-parser.add_argument("--root_dir", default=rootdir, help="root directory to examine")
+parser.add_argument("--rootdir", default=rootdir, help="root directory to examine")
 
 default_boilerplate_dir = os.path.join(rootdir, "hack/boilerplate")
-parser.add_argument("--boilerplate_dir", default=default_boilerplate_dir)
+parser.add_argument("--boilerplate-dir", default=default_boilerplate_dir)
 args = parser.parse_args()
 
 
@@ -114,7 +114,7 @@ def normalize_files(files):
         newfiles.append(pathname)
     for i, pathname in enumerate(newfiles):
         if not os.path.isabs(pathname):
-            newfiles[i] = os.path.join(args.root_dir, pathname)
+            newfiles[i] = os.path.join(args.rootdir, pathname)
     return newfiles
 
 def get_files(extensions):
@@ -122,7 +122,7 @@ def get_files(extensions):
     if len(args.filenames) > 0:
         files = args.filenames
     else:
-        for root, dirs, walkfiles in os.walk(args.root_dir):
+        for root, dirs, walkfiles in os.walk(args.rootdir):
             # don't visit certain dirs. This is just a performance improvement
             # as we would prune these later in normalize_files(). But doing it
             # cuts down the amount of filesystem walking we do and cuts down
