@@ -31,7 +31,24 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-Code conventions
+
+# Coding Conventions
+
+Updated: 5/3/2016
+
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Coding Conventions](#coding-conventions)
+  - [Code conventions](#code-conventions)
+  - [Testing conventions](#testing-conventions)
+  - [Directory and file conventions](#directory-and-file-conventions)
+  - [Coding advice](#coding-advice)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
+## Code conventions
+
   - Bash
     - https://google-styleguide.googlecode.com/svn/trunk/shell.xml
     - Ensure that build, release, test, and cluster-management scripts run on OS X
@@ -58,15 +75,19 @@ Code conventions
     - [Kubectl conventions](kubectl-conventions.md)
     - [Logging conventions](logging.md)
 
-Testing conventions
+## Testing conventions
+
   - All new packages and most new significant functionality must come with unit tests
   - Table-driven tests are preferred for testing multiple scenarios/inputs; for example, see [TestNamespaceAuthorization](../../test/integration/auth_test.go)
   - Significant features should come with integration (test/integration) and/or [end-to-end (test/e2e) tests](e2e-tests.md)
     - Including new kubectl commands and major features of existing commands
   - Unit tests must pass on OS X and Windows platforms - if you use Linux specific features, your test case must either be skipped on windows or compiled out (skipped is better when running Linux specific commands, compiled out is required when your code does not compile on Windows).
+  - Avoid relying on Docker hub (e.g. pull from Docker hub). Use gcr.io instead.
+  - Avoid waiting for a short amount of time (or without waiting) and expect an asynchronous thing to happen (e.g. wait for 1 seconds and expect a Pod to be running). Wait and retry instead.
   - See the [testing guide](testing.md) for additional testing advice.
 
-Directory and file conventions
+## Directory and file conventions
+
   - Avoid package sprawl. Find an appropriate subdirectory for new packages. (See [#4851](http://issues.k8s.io/4851) for discussion.)
     - Libraries with no more appropriate home belong in new package subdirectories of pkg/util
   - Avoid general utility packages. Packages called "util" are suspect. Instead, derive a name that describes your desired function. For example, the utility functions dealing with waiting for operations are in the "wait" package and include functionality like Poll. So the full name is wait.Poll
@@ -85,7 +106,8 @@ Directory and file conventions
     - Third-party code must include licenses
     - This includes modified third-party code and excerpts, as well
 
-Coding advice
+## Coding advice
+
   - Go
     - [Go landmines](https://gist.github.com/lavalamp/4bd23295a9f32706a48f)
 
