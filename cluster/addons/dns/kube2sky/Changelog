@@ -1,6 +1,6 @@
 ## Version 1.16 (May 3 2016 Dan Lorenc<lorenc.d@gmail.com>)
  - No behavior changes since 1.15
- - Refactored kube2sy.go to allow use from other packages.
+ - Refactored kube2sky.go to allow use from other packages.
 ## Version 1.15 (Apr 7 2016 Lucas Käldström <lucas.kaldstrom@hotmail.co.uk>)
  - No code changes since 1.14
  - Built in a dockerized env instead of using go on host to make it more reliable. `1.15` was built with `go1.6`
