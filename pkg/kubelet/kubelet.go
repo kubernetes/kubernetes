@@ -3009,7 +3009,7 @@ func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 	} else {
 		for _, image := range containerImages {
 			imagesOnNode = append(imagesOnNode, api.ContainerImage{
-				Names:     image.RepoTags,
+				Names:     append(image.RepoTags, image.RepoDigests...),
 				SizeBytes: image.Size,
 			})
 		}

@@ -72,12 +72,14 @@ func TestToRuntimeImage(t *testing.T) {
 	original := &dockertypes.Image{
 		ID:          "aeeea",
 		RepoTags:    []string{"abc", "def"},
+		RepoDigests: []string{"123", "456"},
 		VirtualSize: 1234,
 	}
 	expected := &kubecontainer.Image{
-		ID:       "aeeea",
-		RepoTags: []string{"abc", "def"},
-		Size:     1234,
+		ID:          "aeeea",
+		RepoTags:    []string{"abc", "def"},
+		RepoDigests: []string{"123", "456"},
+		Size:        1234,
 	}
 
 	actual, err := toRuntimeImage(original)
