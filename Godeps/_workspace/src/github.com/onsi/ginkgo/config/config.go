@@ -23,15 +23,16 @@ import (
 const VERSION = "1.2.0"
 
 type GinkgoConfigType struct {
-	RandomSeed        int64
-	RandomizeAllSpecs bool
-	FocusString       string
-	SkipString        string
-	SkipMeasurements  bool
-	FailOnPending     bool
-	FailFast          bool
-	EmitSpecProgress  bool
-	DryRun            bool
+	RandomSeed         int64
+	RandomizeAllSpecs  bool
+	RegexScansFilePath bool
+	FocusString        string
+	SkipString         string
+	SkipMeasurements   bool
+	FailOnPending      bool
+	FailFast           bool
+	EmitSpecProgress   bool
+	DryRun             bool
 
 	ParallelNode  int
 	ParallelTotal int
@@ -66,9 +67,14 @@ func Flags(flagSet *flag.FlagSet, prefix string, includeParallelFlags bool) {
 	flagSet.BoolVar(&(GinkgoConfig.SkipMeasurements), prefix+"skipMeasurements", false, "If set, ginkgo will skip any measurement specs.")
 	flagSet.BoolVar(&(GinkgoConfig.FailOnPending), prefix+"failOnPending", false, "If set, ginkgo will mark the test suite as failed if any specs are pending.")
 	flagSet.BoolVar(&(GinkgoConfig.FailFast), prefix+"failFast", false, "If set, ginkgo will stop running a test suite after a failure occurs.")
+
 	flagSet.BoolVar(&(GinkgoConfig.DryRun), prefix+"dryRun", false, "If set, ginkgo will walk the test hierarchy without actually running anything.  Best paired with -v.")
+
 	flagSet.StringVar(&(GinkgoConfig.FocusString), prefix+"focus", "", "If set, ginkgo will only run specs that match this regular expression.")
 	flagSet.StringVar(&(GinkgoConfig.SkipString), prefix+"skip", "", "If set, ginkgo will only run specs that do not match this regular expression.")
+
+	flagSet.BoolVar(&(GinkgoConfig.RegexScansFilePath), prefix+"regexScansFilePath", false, "If set, ginkgo regex matching also will look at the file path (code location).")
+
 	flagSet.BoolVar(&(GinkgoConfig.EmitSpecProgress), prefix+"progress", false, "If set, ginkgo will emit progress information as each spec runs to the GinkgoWriter.")
 
 	if includeParallelFlags {
@@ -140,6 +146,10 @@ func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultRepor
 
 	if ginkgo.SyncHost != "" {
 		result = append(result, fmt.Sprintf("--%sparallel.synchost=%s", prefix, ginkgo.SyncHost))
+	}
+
+	if ginkgo.RegexScansFilePath {
+		result = append(result, fmt.Sprintf("--%sregexScansFilePath", prefix))
 	}
 
 	if reporter.NoColor {
