@@ -149,6 +149,10 @@ function kube-up() {
     "--machine-type=${MACHINE_TYPE}"
   )
 
+  if [[ ! -z "${IMAGE_TYPE:-}" ]]; then
+    create_args+=("--image-type=${IMAGE_TYPE}")
+  fi
+
   # Bring up the cluster.
   "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
 }
