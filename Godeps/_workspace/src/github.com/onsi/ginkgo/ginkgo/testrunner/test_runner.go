@@ -72,7 +72,7 @@ func (t *TestRunner) CompileTo(path string) error {
 		return nil
 	}
 
-	args := []string{"test", "-c", "-i", "-o", path}
+	args := []string{"test", "-c", "-i", "-o", path, t.Suite.Path}
 	if t.race {
 		args = append(args, "-race")
 	}
@@ -88,8 +88,6 @@ func (t *TestRunner) CompileTo(path string) error {
 
 	cmd := exec.Command("go", args...)
 
-	cmd.Dir = t.Suite.Path
-
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -101,7 +99,7 @@ func (t *TestRunner) CompileTo(path string) error {
 	}
 
 	if fileExists(path) == false {
-		compiledFile := filepath.Join(t.Suite.Path, t.Suite.PackageName+".test")
+		compiledFile := t.Suite.PackageName + ".test"
 		if fileExists(compiledFile) {
 			// seems like we are on an old go version that does not support the -o flag on go test
 			// move the compiled test file to the desired location by hand
