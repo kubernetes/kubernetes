@@ -3779,3 +3779,36 @@ func (kl *Kubelet) killPodNow(pod *api.Pod, status api.PodStatus, gracePeriodOve
 		time.Sleep(time.Millisecond * 100)
 	}
 }
+
+// killPodNow kills a pod.
+// The pod status is updated, and then it is killed with the specified grace period.
+// This function must block until either the pod is killed or an error is encountered.
+// Arguments:
+// pod - the pod to kill
+// status - the desired status to associate with the pod (i.e. why its killed)
+// gracePeriodOverride - the grace period override to use instead of what is on the pod spec
+func (kl *Kubelet) killPodNow(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var result error
+	go func() {
+		defer utilruntime.HandleCrash(func(panicReason interface{}) {
+			result = fmt.Errorf("KilLPodNow goroutine panicked: %v", panicReason)
+		})
+		onCompleteFunc := func(err error) {
+			defer wg.Done()
+			result = err
+		}
+		kl.podWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:            pod,
+			UpdateType:     kubetypes.SyncPodSync,
+			OnCompleteFunc: onCompleteFunc,
+			PodStatusFunc: func(p *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
+				return status
+			},
+			PodTerminationGracePeriodSecondsOverride: gracePeriodOverride,
+		})
+	}()
+	wg.Wait()
+	return result
+}
