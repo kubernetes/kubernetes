@@ -286,11 +286,11 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int32) bool {
 	for _, c := range pod.Status.Conditions {
 		// we only care about pod ready conditions
 		if c.Type == api.PodReady && c.Status == api.ConditionTrue {
-			// 2 cases that this ready condition is valid (passed minReadySeconds, i.e. the pod is ready):
-			// 1. minReadySeconds <= 0
+			// 2 cases that this ready condition is valid (passed minReadySeconds, i.e. the pod is available):
+			// 1. minReadySeconds == 0, or
 			// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
 			minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
-			if minReadySeconds <= 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(time.Now()) {
+			if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(time.Now()) {
 				return true
 			}
 		}
