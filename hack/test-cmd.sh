@@ -1073,6 +1073,59 @@ __EOF__
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
 
+  ### Rollback a deployment
+  # Pre-condition: no deployments exist
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  # Create deployments (revision 1) recursively from directory of YAML files
+  ! kubectl create -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx0-deployment:nginx1-deployment:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
+  ## Rollback to revision 1 - should be no-op
+  output_message=$(! kubectl rollout undo -f hack/testdata/recursive/deployment --recursive --to-revision=1 2>&1 "${kube_flags[@]}")
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  ## Pause the deployment
+  output_message=$(! kubectl rollout pause -f hack/testdata/recursive/deployment --recursive 2>&1 "${kube_flags[@]}")
+  kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "true:true:"
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  ## Resume the deployment
+  output_message=$(! kubectl rollout resume -f hack/testdata/recursive/deployment --recursive 2>&1 "${kube_flags[@]}")
+  kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "<no value>:<no value>:"
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  output_message=$(! kubectl rollout history -f hack/testdata/recursive/deployment --recursive 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "nginx0-deployment"
+  kube::test::if_has_string "${output_message}" "nginx1-deployment"
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  # Clean up
+  ! kubectl delete -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}" --grace-period=0
+  sleep 1
+
+  ### Rollback a resource that cannot be rolled back (replication controller)
+  # Pre-condition: no replication controller exists
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  # Create replication controllers (revision 1) recursively from directory of YAML files
+  ! kubectl create -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}"
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
+  # Command
+  ## Rollback to revision 1 - should be no-op
+  output_message=$(! kubectl rollout undo -f hack/testdata/recursive/rc --recursive --to-revision=1 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'no rollbacker has been implemented for {"" "ReplicationController"}'
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  ## Pause the deployment
+  output_message=$(! kubectl rollout pause -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'error when pausing "hack/testdata/recursive/rc/busybox.yaml'
+  kube::test::if_has_string "${output_message}" 'error when pausing "hack/testdata/recursive/rc/rc/busybox.yaml'
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  ## Resume the deployment
+  output_message=$(! kubectl rollout resume -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'error when resuming "hack/testdata/recursive/rc/busybox.yaml'
+  kube::test::if_has_string "${output_message}" 'error when resuming "hack/testdata/recursive/rc/rc/busybox.yaml'
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  # Clean up
+  ! kubectl delete -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}" --grace-period=0
+  sleep 1
 
   ##############
   # Namespaces #
