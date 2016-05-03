@@ -1737,7 +1737,14 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Generate final API pod status with pod and status manager status
-	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
+	// by default, we use the internal status generation func, but we defer to
+	// the override function if specified.  this is used for eviction scenarios
+	// that interacted directly with pod workers to update pod status.
+	generateAPIPodStatus := kl.generateAPIPodStatus
+	if o.podStatusFunc != nil {
+		generateAPIPodStatus = o.podStatusFunc
+	}
+	apiPodStatus := generateAPIPodStatus(pod, podStatus)
 
 	// Record the time it takes for the pod to become running.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
