@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/google/gofuzz"
 )
@@ -223,7 +224,9 @@ func TestHammerController(t *testing.T) {
 	go controller.Run(stop)
 
 	// Let's wait for the controller to do its initial sync
-	time.Sleep(100 * time.Millisecond)
+	wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		return controller.HasSynced(), nil
+	})
 	if !controller.HasSynced() {
 		t.Errorf("Expected HasSynced() to return true after the initial sync")
 	}
@@ -276,6 +279,7 @@ func TestHammerController(t *testing.T) {
 	wg.Wait()
 
 	// Let's wait for the controller to finish processing the things we just added.
+	// TODO: look in the queue to see how many items need to be processed.
 	time.Sleep(100 * time.Millisecond)
 	close(stop)
 
