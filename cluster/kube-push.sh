@@ -23,6 +23,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "kube-push.sh is currently broken; see https://github.com/kubernetes/kubernetes/issues/17397"
+exit 1
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
