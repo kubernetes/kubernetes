@@ -375,6 +375,9 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 
 func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, uint64, error) {
 	ret, ttlPtr, err := userUpdate(st.obj, *st.meta)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	version, err := s.versioner.ObjectResourceVersion(ret)
 	if err != nil {
