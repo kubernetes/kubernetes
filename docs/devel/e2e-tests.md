@@ -34,6 +34,35 @@ Documentation for other releases can be found at
 
 # End-to-End Testing in Kubernetes
 
+Updated: 5/3/2016
+
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [End-to-End Testing in Kubernetes](#end-to-end-testing-in-kubernetes)
+  - [Overview](#overview)
+  - [Building and Running the Tests](#building-and-running-the-tests)
+    - [Cleaning up](#cleaning-up)
+  - [Advanced testing](#advanced-testing)
+    - [Bringing up a cluster for testing](#bringing-up-a-cluster-for-testing)
+    - [Debugging clusters](#debugging-clusters)
+    - [Local clusters](#local-clusters)
+      - [Testing against local clusters](#testing-against-local-clusters)
+  - [Kinds of tests](#kinds-of-tests)
+    - [Conformance tests](#conformance-tests)
+    - [Defining Conformance Subset](#defining-conformance-subset)
+  - [Continuous Integration](#continuous-integration)
+    - [What is CI?](#what-is-ci)
+    - [What runs in CI?](#what-runs-in-ci)
+      - [Non-default tests](#non-default-tests)
+    - [The PR-builder](#the-pr-builder)
+    - [Adding a test to CI](#adding-a-test-to-ci)
+    - [Moving a test out of CI](#moving-a-test-out-of-ci)
+  - [Performance Evaluation](#performance-evaluation)
+  - [One More Thing](#one-more-thing)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## Overview
 
 End-to-end (e2e) tests for Kubernetes provide a mechanism to test end-to-end behavior of the system, and is the last signal to ensure end user operations match developer specifications.  Although unit and integration tests should ideally provide a good signal, the reality is in a distributed system like Kubernetes it is not uncommon that a minor change may pass all unit and integration tests, but cause unforeseen changes at the system level.  e2e testing is very costly, both in time to run tests and difficulty debugging, though: it takes a long time to build, deploy, and exercise a cluster.  Thus, the primary objectives of the e2e tests are to ensure a consistent and reliable behavior of the kubernetes code base, and to catch hard-to-test bugs before users do, when unit and integration tests are insufficient.
@@ -317,6 +346,10 @@ job: {
 ```
 
 Once prometheus is scraping the kubernetes endpoints, that data can then be plotted using promdash, and alerts can be created against the assortment of metrics that kubernetes provides.
+
+## One More Thing
+
+You should also know the [testing conventions](coding-conventions.md#testing-conventions).
 
 **HAPPY TESTING!**
 
