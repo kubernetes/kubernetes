@@ -23,6 +23,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
+# The sort at the end makes sure we feed the topological sort a deterministic
+# list (since there aren't many dependencies).
+
 generated_files=($(
   find . -not \( \
       \( \
@@ -34,7 +37,7 @@ generated_files=($(
         -o -wholename '*/Godeps/*' \
         -o -wholename '*/codecgen-*-1234.generated.go' \
       \) -prune \
-    \) -name '*.generated.go'))
+    \) -name '*.generated.go' | sort -r))
 
 # Register function to be called on EXIT to remove codecgen
 # binary and also to touch the files that should be regenerated
@@ -63,13 +66,17 @@ function depends {
   file=${generated_files[$1]//\.generated\.go/.go}
   deps=$(go list -f "{{.Deps}}" ${file} | tr "[" " " | tr "]" " ")
   candidate=$(readlinkdashf "${generated_files[$2]//\.generated\.go/.go}")
-  result=false
   for dep in ${deps}; do
-    if [[ ${candidate} = *${dep} ]]; then
-      result=true
+    # Only look at dependencies within the kubernetes tree-- otherwise the "io"
+    # package matches the end of one of our directories.
+    if [[ ${dep} = "k8s.io"* ]]; then
+      if [[ ${candidate} = *${dep} ]]; then
+        echo true
+        return
+      fi
     fi
   done
-  echo ${result}
+  echo false
 }
 
 function tsort {
