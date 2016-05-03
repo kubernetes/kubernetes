@@ -267,7 +267,7 @@ func (im *realImageManager) freeSpace(bytesToFree int64, freeTime time.Time) (in
 	spaceFreed := int64(0)
 	for _, image := range images {
 		// Images that are currently in used were given a newer lastUsed.
-		if image.lastUsed.After(freeTime) {
+		if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) {
 			break
 		}
 
