@@ -287,7 +287,7 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 
 	// Get info to hit it with
 	tcpIngressIP := getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
-	svcPort := tcpService.Spec.Ports[0].Port
+	svcPort := int(tcpService.Spec.Ports[0].Port)
 
 	By("creating pod to be part of service " + serviceName)
 	// TODO newRCTemplate only allows for the creation of one replica... that probably won't
