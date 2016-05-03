@@ -42,14 +42,12 @@ depending on the point in the release cycle.
 
 1. Cherrypicks are [managed with labels and milestones]
 (pull-requests.md#release-notes)
-1. All label/milestone accounting happens on PRs on master. There's nothing to
-do on PRs targeted to the release branches.
-1. When you want a PR to be merged to the release branch, make the following
-label changes to the **master** branch PR:
-  * Remove release-note-label-needed
-  * Add an appropriate release-note-(!label-needed) label
-  * Add an appropriate milestone
-  * Add the `cherrypick-candidate` label
+1. To get a PR merged to the release branch, first ensure the following labels
+   are on the original **master** branch PR:
+  * An appropriate milestone (e.g. v1.3)
+  * The `cherrypick-candidate` label
+1. If `release-note-none` is set on the master PR, the cherrypick PR will need
+   to set the same label to confirm that no release note is needed.
 1. `release-note` labeled PRs generate a release note using the PR title by
    default OR the release-note block in the PR template if filled in.
   * See the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) for more
