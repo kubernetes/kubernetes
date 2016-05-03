@@ -1,9 +1,6 @@
 // Copyright 2014 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
-// See https://code.google.com/p/go/source/browse/CONTRIBUTORS
-// Licensed under the same terms as Go itself:
-// https://code.google.com/p/go/source/browse/LICENSE
 
 package http2
 
@@ -60,6 +57,7 @@ func init() {
 		"server",
 		"set-cookie",
 		"strict-transport-security",
+		"trailer",
 		"transfer-encoding",
 		"user-agent",
 		"vary",

@@ -52,7 +52,7 @@ var config = &oauth2.Config{
 	ClientSecret: readFile("client-secret.dat"),
 	Endpoint:     google.Endpoint,
 	Scopes: []string{
-		compute.DevstorageFull_controlScope,
+		compute.DevstorageFullControlScope,
 		compute.ComputeScope,
 		"https://www.googleapis.com/auth/sqlservice",
 		"https://www.googleapis.com/auth/sqlservice.admin",
@@ -165,7 +165,7 @@ func main() {
 			Items: []*compute.MetadataItems{
 				{
 					Key:   "user-data",
-					Value: cloudConfig,
+					Value: &cloudConfig,
 				},
 			},
 		},
@@ -185,7 +185,7 @@ func main() {
 			{
 				Email: "default",
 				Scopes: []string{
-					compute.DevstorageFull_controlScope,
+					compute.DevstorageFullControlScope,
 					compute.ComputeScope,
 				},
 			},

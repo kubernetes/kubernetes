@@ -1,9 +1,8 @@
 // Copyright 2015 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
-// See https://code.google.com/p/go/source/browse/CONTRIBUTORS
-// Licensed under the same terms as Go itself:
-// https://code.google.com/p/go/source/browse/LICENSE
+
+// +build !plan9,!solaris
 
 /*
 The h2i command is an interactive HTTP/2 console.
@@ -45,6 +44,7 @@ import (
 var (
 	flagNextProto = flag.String("nextproto", "h2,h2-14", "Comma-separated list of NPN/ALPN protocol names to negotiate.")
 	flagInsecure  = flag.Bool("insecure", false, "Whether to skip TLS cert validation")
+	flagSettings  = flag.String("settings", "empty", "comma-separated list of KEY=value settings for the initial SETTINGS frame. The magic value 'empty' sends an empty initial settings frame, and the magic value 'omit' causes no initial settings frame to be sent.")
 )
 
 type command struct {
@@ -242,6 +242,18 @@ func (app *h2i) logf(format string, args ...interface{}) {
 }
 
 func (app *h2i) readConsole() error {
+	if s := *flagSettings; s != "omit" {
+		var args []string
+		if s != "empty" {
+			args = strings.Split(s, ",")
+		}
+		_, c, ok := lookupCommand("settings")
+		if !ok {
+			panic("settings command not found")
+		}
+		c.run(app, args)
+	}
+
 	for {
 		line, err := app.term.ReadLine()
 		if err == io.EOF {
