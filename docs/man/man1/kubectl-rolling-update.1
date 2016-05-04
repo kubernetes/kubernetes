@@ -43,6 +43,10 @@ existing replication controller and overwrite at least one (common) label in its
     Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with \-\-filename/\-f
 
 .PP
+\fB\-\-image\-pull\-policy\fP=""
+    Explicit policy for when to pull container images. Required when \-\-image is same as existing image, ignored otherwise.
+
+.PP
 \fB\-\-include\-extended\-apis\fP=true
     If true, include definitions of new APIs via calls to the API server. [default true]
 
