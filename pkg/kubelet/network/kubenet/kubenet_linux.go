@@ -215,9 +215,8 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		return fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
 	}
 
-	// Can't set up pods if we don't have a PodCIDR yet
-	if plugin.netConfig == nil {
-		return fmt.Errorf("Kubenet needs a PodCIDR to set up pods")
+	if err := plugin.Status(); err != nil {
+		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
 	}
 
 	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
@@ -295,7 +294,7 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
-func (plugin *kubenetNetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
+func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
 	cidr, ok := plugin.podCIDRs[id]
@@ -308,6 +307,14 @@ func (plugin *kubenetNetworkPlugin) Status(namespace string, name string, id kub
 		return nil, err
 	}
 	return &network.PodNetworkStatus{IP: ip}, nil
+}
+
+func (plugin *kubenetNetworkPlugin) Status() error {
+	// Can't set up pods if we don't have a PodCIDR yet
+	if plugin.netConfig == nil {
+		return fmt.Errorf("Kubenet does not have netConfig. This is most likely due to lack of PodCIDR")
+	}
+	return nil
 }
 
 func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) *libcni.RuntimeConf {

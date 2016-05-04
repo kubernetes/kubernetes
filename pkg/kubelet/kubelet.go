@@ -443,7 +443,7 @@ func NewMainKubelet(
 	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, volumeStatsAggPeriod, klet.containerRuntime)
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, util.RealClock{})
-	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime, configureCBR0)
+	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.updatePodCIDR(podCIDR)
 
 	// setup containerGC
@@ -3001,8 +3001,13 @@ func (kl *Kubelet) syncNetworkStatus() {
 			err = fmt.Errorf("Error configuring cbr0: %v", err)
 			glog.Error(err)
 		}
+		if err != nil {
+			kl.runtimeState.setNetworkState(err)
+			return
+		}
 	}
-	kl.runtimeState.setNetworkState(err)
+
+	kl.runtimeState.setNetworkState(kl.networkPlugin.Status())
 }
 
 // Set addresses for the node.

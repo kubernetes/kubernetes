@@ -49,6 +49,6 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	return fmt.Errorf("Kubenet is not supported in this build")
 }
 
-func (plugin *kubenetNetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
+func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
 	return nil, fmt.Errorf("Kubenet is not supported in this build")
 }
