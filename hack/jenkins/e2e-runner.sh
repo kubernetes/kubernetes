@@ -339,7 +339,7 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   # If start-kubemark fails, we trigger empty set of tests that would trigger storing logs from the base cluster.
   ./test/kubemark/start-kubemark.sh || dump_cluster_logs_and_exit
   # Similarly, if tests fail, we trigger empty set of tests that would trigger storing logs from the base cluster.
-  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS}" "${KUBEMARK_TEST_ARGS}" || dump_cluster_logs_and_exit
+  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS:-starting\s30\spods}" "${KUBEMARK_TEST_ARGS:-}" || dump_cluster_logs_and_exit
   ./test/kubemark/stop-kubemark.sh
   NUM_NODES=${NUM_NODES_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
