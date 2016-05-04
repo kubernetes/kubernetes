@@ -1335,7 +1335,7 @@
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
-			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
+			"Rev": "c2b278e70f35902fd68b54b69238cd10bb1b7451"
 		},
 		{
 			"ImportPath": "github.com/mistifyio/go-zfs",
@@ -1779,8 +1779,8 @@
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/msg",
-			"Comment": "2.5.1a",
-			"Rev": "1be70b5b8aa07acccd972146d84011b670af88b4"
+			"Comment": "2.5.3a-32-gf7b6fb7",
+			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",

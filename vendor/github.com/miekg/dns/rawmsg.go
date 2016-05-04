@@ -21,7 +21,7 @@ func rawSetQuestionLen(msg []byte, i uint16) bool {
 	return true
 }
 
-// rawSetAnswerLen sets the lenght of the answer section.
+// rawSetAnswerLen sets the length of the answer section.
 func rawSetAnswerLen(msg []byte, i uint16) bool {
 	if len(msg) < 8 {
 		return false
@@ -30,7 +30,7 @@ func rawSetAnswerLen(msg []byte, i uint16) bool {
 	return true
 }
 
-// rawSetsNsLen sets the lenght of the authority section.
+// rawSetsNsLen sets the length of the authority section.
 func rawSetNsLen(msg []byte, i uint16) bool {
 	if len(msg) < 10 {
 		return false
@@ -39,7 +39,7 @@ func rawSetNsLen(msg []byte, i uint16) bool {
 	return true
 }
 
-// rawSetExtraLen sets the lenght of the additional section.
+// rawSetExtraLen sets the length of the additional section.
 func rawSetExtraLen(msg []byte, i uint16) bool {
 	if len(msg) < 12 {
 		return false
