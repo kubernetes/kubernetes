@@ -6,10 +6,10 @@ import (
 	"github.com/scalingdata/gcfg"
 	"github.com/kubernetes/kubernetes/pkg/cloudprovider"
 	"github.com/xanzy/go-cloudstack/cloudstack"
-	//"k8s.io/kubernetes/pkg/api"
-	"github.com/kubernetes/kubernetes/pkg/api"
-	//"k8s.io/kubernetes/kubernetes/pkg/api/service"
-	"github.com/kubernetes/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api"
+	//"github.com/kubernetes/kubernetes/pkg/api"
+	"k8s.io/kubernetes/kubernetes/pkg/api/service"
+	//"github.com/kubernetes/kubernetes/pkg/api/service"
 	"github.com/golang/glog"
 )
 
@@ -17,30 +17,16 @@ const ProviderName = "cloudstack"
 
 type Config struct {
 	Global struct {
-		       AuthUrl    string `gcfg:"auth-url"`
-		       ApiKey     string `gcfg:"api-key"`
+		       APIUrl     string `gcfg:"api-url"`
+		       APIKey     string `gcfg:"api-key"`
 		       SecretKey  string `gcfg:"secret-key"`
 		       VerifySSL  string `gcfg:"verify-ssl"`
-		       Region     string
 	       }
-	//LoadBalancer LoadBalancerOpts
 }
 
-//type LoadBalancerOpts struct {
-//	Name			string		`gcfg:"name"`
-//	Algorithm		string		`gcfg:"algorithm"`
-//	InstancePort		int		`gcfg:"instance-port"`
-//	NetworkID		string		`gcfg:"network-id"`
-//	Scheme			string 		`gcfg:"scheme"`
-//	SourceIPNetworkID	string		`gcfg:"source-ip-network-id"`
-//	SourcePort		int		`gcfg:"source-port"`
-//}
-
-// CloudStack is an implementation of cloud provider Interface for CloudStack.
-type CloudStack struct {
-	provider *cloudstack.CloudStackClient
-	region   string
-	//lbOpts   LoadBalancerOpts
+// CSCloud is an implementation of cloud provider Interface for CloudStack.
+type CSCloud struct {
+	client *cloudstack.CloudStackClient
 	// InstanceID of the server where this CloudStack object is instantiated.
 	localInstanceID string
 }
@@ -51,37 +37,36 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		return newCloudStack(cfg)
+		return newCSCloud(cfg)
 	})
 }
 
 func readConfig(config io.Reader) (Config, error) {
 	if config == nil {
-		err := fmt.Errorf("no CloudStack cloud provider config file given")
-		return Config{}, err
+		err := fmt.Errorf("no cloud provider config given")
+		return nil, err
 	}
 
-	var cfg Config
-	err := gcfg.ReadInto(&cfg, config)
-	return cfg, err
+	cfg := &Config{}
+	if err := gcfg.ReadInto(cfg, config); err != nil {
+		glog.Errorf("Couldn't parse config: %v", err)
+		return nil, err
+	}
+
+	return cfg, nil
 }
 
-func newCloudStack(cfg Config) (*CloudStack, error) {
-	provider := cloudstack.NewAsyncClient(cfg.Global.AuthUrl, cfg.Global.ApiKey, cfg.Global.SecretKey, cfg.Global.VerifySSL)
-	if provider == nil {
-		return nil, nil
-	}
-	fmt.Println(provider)
+// newCSCloud creates a new instance of CSCloud
+func newCSCloud(cfg Config) (*CSCloud, error) {
+	client := cloudstack.NewAsyncClient(cfg.Global.APIUrl, cfg.Global.APIKey, cfg.Global.SecretKey, cfg.Global.VerifySSL)
 
 	id, err := readInstanceID()
 	if err != nil {
 		return nil, err
 	}
 
-	cs := CloudStack{
-		provider:        provider,
-		region:          cfg.Global.Region,
-		//lbOpts:          cfg.LoadBalancer,
+	cs := CSCloud{
+		client:        client,
 		localInstanceID: id,
 	}
 
@@ -94,37 +79,36 @@ func readInstanceID() (string, error) {
 }
 
 // LoadBalancer returns an implementation of LoadBalancer for CloudStack.
-func (cs *CloudStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+func (cs *CSCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	glog.V(4).Info("cloudstack.LoadBalancer() called")
 	return cs, true
 }
 
 // Instances returns an implementation of Instances for CloudStack.
-func (cs *CloudStack) Instances() (cloudprovider.Instances, bool) {
+func (cs *CSCloud) Instances() (cloudprovider.Instances, bool) {
 	glog.V(4).Info("cloudstack.Instances() called")
 	return cs, true
 }
 
 // Routes returns an implementation of Routes for CloudStack.
-func (cs *CloudStack) Routes() (cloudprovider.Routes, bool) {
+func (cs *CSCloud) Routes() (cloudprovider.Routes, bool) {
 	glog.V(4).Info("cloudstack.Routes() called")
 	return cs, true
 }
 
 // Zones returns an implementation of Zones for CloudStack.
-func (cs *CloudStack) Zones() (cloudprovider.Zones, bool) {
+func (cs *CSCloud) Zones() (cloudprovider.Zones, bool) {
 	glog.V(4).Info("cloudstack.Zones() called")
 	return cs, true
 }
 
 type LoadBalancer struct {
-	cs	*CloudStack
+	cs	*CSCloud
 }
 
-func (lb *LoadBalancer) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	loadBalancerService := cloudstack.LoadBalancerService{lb.cs.provider}
-	loadBalancer, _, err := loadBalancerService.GetLoadBalancerByName(loadBalancerName)
+func (lb *LoadBalancer) GetLoadBalancer(apiService *api.Service) (*api.LoadBalancerStatus, bool, error) {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
+	loadBalancer, _, err := lb.cs.client.LoadBalancer.GetLoadBalancerByName(loadBalancerName)
 
 	if err != nil {
 		return nil, false, nil
@@ -146,13 +130,13 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 	}
 
 	if !service.IsAllowAll(sourceRanges) {
-		return nil, fmt.Errorf("Source range restrictions are not supported for cloudstack load balancers")
+		return nil, fmt.Errorf("Source range restrictions are not supported for CloudStack load balancers")
 	}
 
-	glog.V(2).Infof("Checking if cloudstack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
+	glog.V(2).Infof("Checking if CloudStack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
 	_, exists, err := lb.GetLoadBalancer(apiService)
 	if err != nil {
-		return nil, fmt.Errorf("error checking if cloudstack load balancer already exists: %v", err)
+		return nil, fmt.Errorf("error checking if CloudStack load balancer already exists: %v", err)
 	}
 
 	// TODO: Implement a more efficient update strategy for common changes than delete & create
@@ -164,70 +148,63 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		}
 	}
 
-	//init Cloudstack LB client
-	lbService := cloudstack.LoadBalancerService{}
+	//Config algorithm for the new LB
+	var algorithm string
+	switch apiService.Spec.SessionAffinity {
+	case api.ServiceAffinityNone:
+		algorithm = "roundrobin"
+	case api.ServiceAffinityClientIP:
+		algorithm = "source"
+	default:
+		return nil, fmt.Errorf("unsupported load balancer affinity: %v", apiService.Spec.SessionAffinity)
+	}
 
-	//Init a new LB configuration
-	lbParams := cloudstack.CreateLoadBalancerRuleParams{}
-
-	//Config LB IP
+	//Get public IP address will be associated to the new LB
 	lbIpAddr := apiService.Spec.LoadBalancerIP
 	if lbIpAddr == nil {
 		return nil, fmt.Errorf("unsupported service without predefined Load Balancer IPaddress")
 	}
 	publicIpId := getPublicIpId(lbIpAddr)
-	lbParams.SetPublicipid(publicIpId)
-
-	//Config algorithm for new LB
-	affinity := apiService.Spec.SessionAffinity
-	switch affinity {
-	case api.ServiceAffinityNone:
-		lbParams.SetAlgorithm("roundrobin")
-	case api.ServiceAffinityClientIP:
-	// TODO
-	default:
-		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
-	}
 
 	//Config name for new LB
-	if apiService.ObjectMeta.Name != nil {
-		lbParams.SetName(apiService.ObjectMeta.Name)
+	lbName := apiService.ObjectMeta.Name
+	if lbName == "" {
+		return nil, fmt.Errorf("name is a required field for a CloudStack load balancer")
 	}
 
 	ports := apiService.Spec.Ports
 	if len(ports) == 0 {
-		return nil, fmt.Errorf("no ports provided to cloudstack load balancer")
+		return nil, fmt.Errorf("no ports provided to CloudStack load balancer")
 	}
 
 	//support multiple ports
 	for _, port := range ports {
+		//Init a new LB configuration
+		lbParams := lb.cs.client.LoadBalancer.NewCreateLoadBalancerRuleParams(
+			algorithm,
+			lbName,
+			port.NodePort,
+			port.Port,
+		)
+
 		//Config protocol for new LB
 		lbParams.SetProtocol(port.Protocol)
 
-		//Config ports for new LB
-		lbParams.SetPublicport(port.Port)
-		lbParams.SetPrivateport(port.NodePort)
+		//Config LB IP
+		lbParams.SetPublicipid(publicIpId)
 
 		// create a Load Balancer rule
-		createLBRuleResponse, err := lbService.CreateLoadBalancerRule(lbParams)
+		createLBRuleResponse, err := lb.cs.client.LoadBalancer.CreateLoadBalancerRule(lbParams)
 		if err != nil {
 			return nil, err
 		}
 
 		// associate vms to new LB
-		vmIds := getVirtualMachineIds(hosts)
-		lbRuleId := createLBRuleResponse.Id
+		assignLbParams := lb.cs.client.LoadBalancer.NewAssignToLoadBalancerRuleParams(createLBRuleResponse.Id)
+		assignLbParams.SetVirtualmachineids(getVirtualMachineIds(hosts))
+		assignLBRuleResponse, err := lb.cs.client.LoadBalancer.AssignToLoadBalancerRule(assignLbParams)
 
-		assignLbParams := cloudstack.AssignToLoadBalancerRuleParams{}
-		assignLbParams.SetId(lbRuleId)
-		assignLbParams.SetVirtualmachineids(vmIds)
-		assignLBRuleResponse, err := lbService.AssignToLoadBalancerRule(assignLbParams)
-
-		if err != nil {
-			return nil, err
-		}
-
-		if assignLBRuleResponse.Success == false {
+		if err != nil || !assignLBRuleResponse.Success {
 			return nil, err
 		}
 	}
@@ -238,15 +215,11 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 	return status, nil
 }
 
-func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+func (lb *LoadBalancer) UpdateLoadBalancer(apiService *api.Service, hosts []string) error {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v)", loadBalancerName, hosts)
 
-	//init Cloudstack LB client
-	lbService := cloudstack.LoadBalancerService{}
-
-	//Init a new LB configuration
-	lbParams := cloudstack.ListLoadBalancerRulesParams{}
+	lbParams := lb.cs.client.LoadBalancer.NewListLoadBalancerRulesParams()
 
 	//Get new list of vms associated with LB of service
 	//Set of member (addresses) that _should_ exist
@@ -258,27 +231,25 @@ func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string)
 
 	//Now get the current list of vms. And then make comparison to update the list.
 	//Public IPaddress associated with LB of service
-	lbIpAddr := service.Spec.LoadBalancerIP
+	lbIpAddr := apiService.Spec.LoadBalancerIP
 	if lbIpAddr == nil {
 		return nil, fmt.Errorf("unsupported service without predefined Load Balancer IPaddress")
 	}
-	publicIpId := getPublicIpId(lbIpAddr)
 
 	//list all LB rules associated with this public IPaddress
-	lbParams.SetPublicipid(publicIpId)
-	lbRulesResponse, err := lbService.ListLoadBalancerRules(lbParams)
+	lbParams.SetPublicipid(getPublicIpId(lbIpAddr))
+	lbRulesResponse, err := lb.cs.client.LoadBalancer.ListLoadBalancerRules(lbParams)
 	if err != nil {
 		return err
 	}
 	lbRuleId := lbRulesResponse.LoadBalancerRules[0].Id
-	lbInstancesParams := cloudstack.ListLoadBalancerRuleInstancesParams{}
-	lbInstancesParams.SetId(lbRuleId)
+	lbInstancesParams := lb.cs.client.LoadBalancer.NewListLoadBalancerRuleInstancesParams(lbRuleId)
 	lbInstancesParams.SetLbvmips(true)
 
 	//TODO - lbInstancesResponse object doesn't fit to real output when making the API call on terminal
 	//lbInstancesResponse.LoadBalancerRuleInstances[0].
 	//OUTPUT: oldvmIds
-	lbInstancesResponse, err := lbService.ListLoadBalancerRuleInstances(lbInstancesParams)
+	lbInstancesResponse, err := lb.cs.client.LoadBalancer.ListLoadBalancerRuleInstances(lbInstancesParams)
 	if err != nil {
 		return err
 	}
@@ -294,11 +265,10 @@ func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string)
 	}
 
 	//remove old vms from all LB rules associated with the public IP
-	removeFromLbRuleParams := cloudstack.RemoveFromLoadBalancerRuleParams{}
 	for _, lbRule := range lbRulesResponse.LoadBalancerRules {
-		removeFromLbRuleParams.SetId(lbRule.Id)
+		removeFromLbRuleParams := lb.cs.client.LoadBalancer.NewRemoveFromLoadBalancerRuleParams(lbRule.Id)
 		removeFromLbRuleParams.SetVirtualmachineids(removedVmIds)
-		_, err := lbService.RemoveFromLoadBalancerRule(removeFromLbRuleParams)
+		_, err := lb.cs.client.LoadBalancer.RemoveFromLoadBalancerRule(removeFromLbRuleParams)
 		if err != nil {
 			return err
 		}
@@ -309,11 +279,11 @@ func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string)
 	for vm := range vms {
 		assignVmIds = append(assignVmIds, vm)
 	}
-	assignToLbRuleParams := cloudstack.AssignToLoadBalancerRuleParams{}
+
 	for _, lbRule := range lbRulesResponse.LoadBalancerRules {
-		assignToLbRuleParams.SetId(lbRule.Id)
+		assignToLbRuleParams := lb.cs.client.LoadBalancer.NewAssignToLoadBalancerRuleParams(lbRule.Id)
 		assignToLbRuleParams.SetVirtualmachineids(assignVmIds)
-		_, err := lbService.AssignToLoadBalancerRule(assignToLbRuleParams)
+		_, err := lb.cs.client.LoadBalancer.AssignToLoadBalancerRule(assignToLbRuleParams)
 		if err != nil {
 			return err
 		}
@@ -321,23 +291,17 @@ func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string)
 	return nil
 }
 
-func (lb *LoadBalancer) EnsureLoadBalancerDeleted(service *api.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+func (lb *LoadBalancer) EnsureLoadBalancerDeleted(apiService *api.Service) error {
+	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v)", loadBalancerName)
 
-	//init cloudstack LB client
-	lbService := cloudstack.LoadBalancerService{}
 
-	lbParams := cloudstack.DeleteLoadBalancerRuleParams{}
-	lbIpAddr := service.Spec.LoadBalancerIP
+	lbIpAddr := apiService.Spec.LoadBalancerIP
 	if lbIpAddr != nil {
-		//get ID of public ipaddress
-		publicIpId := getPublicIpId(lbIpAddr)
-
 		//list all LB rules associated to this public ipaddress.
-		listLBParams := cloudstack.ListLoadBalancerRulesParams{}
-		listLBParams.SetPublicipid(publicIpId)
-		listLoadBalancerResponse, err := lbService.ListLoadBalancerRules(listLBParams)
+		listLBParams := lb.cs.client.LoadBalancer.NewListLoadBalancerRulesParams()
+		listLBParams.SetPublicipid(getPublicIpId(lbIpAddr))
+		listLoadBalancerResponse, err := lb.cs.client.LoadBalancer.ListLoadBalancerRules(listLBParams)
 		if err != nil {
 			return err
 		}
@@ -345,8 +309,8 @@ func (lb *LoadBalancer) EnsureLoadBalancerDeleted(service *api.Service) error {
 
 		//delete all found load balancer rules associated to this public ipaddress.
 		for _, lbRule := range lbRules {
-			lbParams.SetId(lbRule.Id)
-			_, err := lbService.DeleteLoadBalancerRule(lbParams)
+			lbParams := lb.cs.client.LoadBalancer.NewDeleteLoadBalancerRuleParams(lbRule.Id)
+			_, err := lb.cs.client.LoadBalancer.DeleteLoadBalancerRule(lbParams)
 			if err != nil {
 				return err
 			}
