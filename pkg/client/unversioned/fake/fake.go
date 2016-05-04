@@ -70,7 +70,17 @@ func (c *RESTClient) Delete() *restclient.Request {
 }
 
 func (c *RESTClient) request(verb string) *restclient.Request {
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: c.Codec}, nil, nil)
+	config := restclient.ContentConfig{
+		GroupVersion: testapi.Default.GroupVersion(),
+		Codec:        c.Codec,
+	}
+	serializers := restclient.Serializers{
+		Encoder:             c.Codec,
+		Decoder:             c.Codec,
+		StreamingSerializer: c.Codec,
+		Framer:              runtime.DefaultFramer,
+	}
+	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {

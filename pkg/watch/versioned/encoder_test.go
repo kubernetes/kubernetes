@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package json
+package versioned_test
 
 import (
 	"bytes"
@@ -24,7 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 func TestEncodeDecodeRoundTrip(t *testing.T) {
@@ -52,13 +54,15 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 	for i, testCase := range testCases {
 		buf := &bytes.Buffer{}
 
-		encoder := NewEncoder(buf, testCase.Codec)
+		codec := testCase.Codec
+		encoder := versioned.NewEncoder(streaming.NewEncoder(buf, codec), codec)
 		if err := encoder.Encode(&watch.Event{Type: testCase.Type, Object: testCase.Object}); err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
 
-		decoder := NewDecoder(ioutil.NopCloser(buf), testCase.Codec)
+		rc := ioutil.NopCloser(buf)
+		decoder := versioned.NewDecoder(streaming.NewDecoder(rc, codec), codec)
 		event, obj, err := decoder.Decode()
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)

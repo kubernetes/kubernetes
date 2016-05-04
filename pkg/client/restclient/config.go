@@ -130,9 +130,17 @@ type ContentConfig struct {
 	// a RESTClient directly. When initializing a Client, will be set with the default
 	// code version.
 	GroupVersion *unversioned.GroupVersion
+	// NegotiatedSerializer is used for obtaining encoders and decoders for multiple
+	// supported media types.
+	NegotiatedSerializer runtime.NegotiatedSerializer
+
 	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
 	// to a RESTClient or Client. Required when initializing a RESTClient, optional
 	// when initializing a Client.
+	//
+	// DEPRECATED: Please use NegotiatedSerializer instead.
+	// Codec is currently used only in some tests and will be removed soon.
+	// All production setups should use NegotiatedSerializer.
 	Codec runtime.Codec
 }
 
@@ -144,8 +152,8 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	if config.GroupVersion == nil {
 		return nil, fmt.Errorf("GroupVersion is required when initializing a RESTClient")
 	}
-	if config.Codec == nil {
-		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
+	if config.NegotiatedSerializer == nil {
+		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
 	}
 
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
@@ -163,16 +171,14 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		httpClient = &http.Client{Transport: transport}
 	}
 
-	client := NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
-
-	return client, nil
+	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
 // the config.Version to be empty.
 func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
-	if config.Codec == nil {
-		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
+	if config.NegotiatedSerializer == nil {
+		return nil, fmt.Errorf("NeogitatedSerializer is required when initializing a RESTClient")
 	}
 
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
@@ -196,8 +202,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		versionConfig.GroupVersion = &v
 	}
 
-	client := NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
-	return client, nil
+	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the

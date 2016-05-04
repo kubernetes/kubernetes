@@ -14,56 +14,58 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package json
+package versioned
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Decoder implements the watch.Decoder interface for io.ReadClosers that
-// have contents which consist of a series of watchEvent objects encoded via JSON.
-// It will decode any object registered in the supplied codec.
+// have contents which consist of a series of watchEvent objects encoded
+// with the given streaming decoder. The internal objects will be then
+// decoded by the embedded decoder.
 type Decoder struct {
-	r       io.ReadCloser
-	decoder *json.Decoder
-	codec   runtime.Codec
+	decoder         streaming.Decoder
+	embeddedDecoder runtime.Decoder
 }
 
 // NewDecoder creates an Decoder for the given writer and codec.
-func NewDecoder(r io.ReadCloser, codec runtime.Codec) *Decoder {
+func NewDecoder(decoder streaming.Decoder, embeddedDecoder runtime.Decoder) *Decoder {
 	return &Decoder{
-		r:       r,
-		decoder: json.NewDecoder(r),
-		codec:   codec,
+		decoder:         decoder,
+		embeddedDecoder: embeddedDecoder,
 	}
 }
 
-// Decode blocks until it can return the next object in the writer. Returns an error
-// if the writer is closed or an object can't be decoded.
+// Decode blocks until it can return the next object in the reader. Returns an error
+// if the reader is closed or an object can't be decoded.
 func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
-	var got WatchEvent
-	if err := d.decoder.Decode(&got); err != nil {
+	var got Event
+	res, _, err := d.decoder.Decode(nil, &got)
+	if err != nil {
 		return "", nil, err
 	}
+	if res != &got {
+		return "", nil, fmt.Errorf("unable to decode to versioned.Event")
+	}
 	switch got.Type {
-	case watch.Added, watch.Modified, watch.Deleted, watch.Error:
+	case string(watch.Added), string(watch.Modified), string(watch.Deleted), string(watch.Error):
 	default:
 		return "", nil, fmt.Errorf("got invalid watch event type: %v", got.Type)
 	}
 
-	obj, err := runtime.Decode(d.codec, got.Object.Raw)
+	obj, err := runtime.Decode(d.embeddedDecoder, got.Object.Raw)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to decode watch event: %v", err)
 	}
-	return got.Type, obj, nil
+	return watch.EventType(got.Type), obj, nil
 }
 
 // Close closes the underlying r.
 func (d *Decoder) Close() {
-	d.r.Close()
+	d.decoder.Close()
 }

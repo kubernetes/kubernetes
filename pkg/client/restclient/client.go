@@ -17,6 +17,7 @@ limitations under the License.
 package restclient
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -53,6 +54,9 @@ type RESTClient struct {
 	// contentConfig is the information used to communicate with the server.
 	contentConfig ContentConfig
 
+	// serializers contain all serializers for undelying content type.
+	serializers Serializers
+
 	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
 	Throttle flowcontrol.RateLimiter
 
@@ -60,10 +64,17 @@ type RESTClient struct {
 	Client *http.Client
 }
 
+type Serializers struct {
+	Encoder             runtime.Encoder
+	Decoder             runtime.Decoder
+	StreamingSerializer runtime.Serializer
+	Framer              runtime.Framer
+}
+
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server.
-func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) *RESTClient {
+func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -77,6 +88,10 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	if len(config.ContentType) == 0 {
 		config.ContentType = "application/json"
 	}
+	serializers, err := createSerializers(config)
+	if err != nil {
+		return nil, err
+	}
 
 	var throttle flowcontrol.RateLimiter
 	if maxQPS > 0 && rateLimiter == nil {
@@ -88,9 +103,10 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 		base:             &base,
 		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
+		serializers:      *serializers,
 		Throttle:         throttle,
 		Client:           client,
-	}
+	}, nil
 }
 
 // GetRateLimiter returns rate limier for a given client, or nil if it's called on a nil client
@@ -119,10 +135,38 @@ func readExpBackoffConfig() BackoffManager {
 			time.Duration(backoffDurationInt)*time.Second)}
 }
 
+// createSerializers creates all necessary serializers for given contentType.
+func createSerializers(config ContentConfig) (*Serializers, error) {
+	negotiated := config.NegotiatedSerializer
+	contentType := config.ContentType
+	serializer, ok := negotiated.SerializerForMediaType(contentType, nil)
+	if !ok {
+		return nil, fmt.Errorf("serializer for %s not registered", contentType)
+	}
+	streamingSerializer, framer, _, ok := negotiated.StreamingSerializerForMediaType(contentType, nil)
+	if !ok {
+		return nil, fmt.Errorf("streaming serializer for %s not registered", contentType)
+	}
+	if framer == nil {
+		return nil, fmt.Errorf("no framer for %s", contentType)
+	}
+	internalGV := unversioned.GroupVersion{
+		Group:   config.GroupVersion.Group,
+		Version: runtime.APIVersionInternal,
+	}
+	return &Serializers{
+		Encoder:             negotiated.EncoderForVersion(serializer, *config.GroupVersion),
+		Decoder:             negotiated.DecoderToVersion(serializer, internalGV),
+		StreamingSerializer: streamingSerializer,
+		Framer:              framer,
+	}, nil
+}
+
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
 //
 // Example usage of RESTClient's request building interface:
-// c := NewRESTClient(url, codec)
+// c, err := NewRESTClient(...)
+// if err != nil { ... }
 // resp, err := c.Verb("GET").
 //  Path("pods").
 //  SelectorParam("labels", "area=staging").
@@ -135,9 +179,9 @@ func (c *RESTClient) Verb(verb string) *Request {
 	backoff := readExpBackoffConfig()
 
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, backoff, c.Throttle)
+		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, backoff, c.Throttle)
+	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

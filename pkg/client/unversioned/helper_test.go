@@ -40,8 +40,9 @@ func TestSetKubernetesDefaults(t *testing.T) {
 			restclient.Config{
 				APIPath: "/api",
 				ContentConfig: restclient.ContentConfig{
-					GroupVersion: testapi.Default.GroupVersion(),
-					Codec:        testapi.Default.Codec(),
+					GroupVersion:         testapi.Default.GroupVersion(),
+					Codec:                testapi.Default.Codec(),
+					NegotiatedSerializer: testapi.NegotiatedSerializer,
 				},
 				QPS:   5,
 				Burst: 10,
@@ -125,7 +126,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	got, err := restclient.ServerAPIVersions(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, Codec: testapi.Default.Codec()}})
+	got, err := restclient.ServerAPIVersions(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, NegotiatedSerializer: testapi.NegotiatedSerializer}})
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
