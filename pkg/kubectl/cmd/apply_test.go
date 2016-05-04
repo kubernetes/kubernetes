@@ -41,7 +41,7 @@ import (
 func TestApplyExtraArgsFail(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
-	f, _, _ := NewAPIFactory()
+	f, _, _, _ := NewAPIFactory()
 	c := NewCmdApply(f, buf)
 	if validateApplyArgs(c, []string{"rc"}) == nil {
 		t.Fatalf("unexpected non-error")
@@ -182,10 +182,10 @@ func TestApplyObject(t *testing.T) {
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
@@ -224,10 +224,10 @@ func TestApplyRetry(t *testing.T) {
 	firstPatch := true
 	retry := false
 	getCount := 0
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
@@ -276,10 +276,10 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathNameRC && m == "GET":
@@ -323,10 +323,10 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	nameSVC, currentSVC := readAndAnnotateService(t, filenameSVC)
 	pathSVC := "/namespaces/test/services/" + nameSVC
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":

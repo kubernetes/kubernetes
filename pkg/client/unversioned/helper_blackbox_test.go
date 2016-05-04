@@ -120,11 +120,10 @@ func TestNegotiateVersion(t *testing.T) {
 			statusCode:     http.StatusForbidden,
 		},
 	}
-	codec := testapi.Default.Codec()
 
 	for _, test := range tests {
 		fakeClient := &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp: &http.Response{
 				StatusCode: test.statusCode,
 				Body:       objBody(&uapi.APIVersions{Versions: test.serverVersions}),

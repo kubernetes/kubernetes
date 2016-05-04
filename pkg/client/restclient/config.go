@@ -143,15 +143,6 @@ type ContentConfig struct {
 	// NegotiatedSerializer is used for obtaining encoders and decoders for multiple
 	// supported media types.
 	NegotiatedSerializer runtime.NegotiatedSerializer
-
-	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
-	// to a RESTClient or Client. Required when initializing a RESTClient, optional
-	// when initializing a Client.
-	//
-	// DEPRECATED: Please use NegotiatedSerializer instead.
-	// Codec is currently used only in some tests and will be removed soon.
-	// All production setups should use NegotiatedSerializer.
-	Codec runtime.Codec
 }
 
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
