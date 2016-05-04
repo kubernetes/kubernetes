@@ -16,6 +16,11 @@ limitations under the License.
 
 package runtime
 
+import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/types"
+)
+
 // Note that the types provided in this file are not versioned and are intended to be
 // safe to use from within all versions of every API object.
 
@@ -120,24 +125,257 @@ type Unknown struct {
 // TODO: Make this object have easy access to field based accessors and settors for
 // metadata and field mutatation.
 type Unstructured struct {
-	TypeMeta `json:",inline"`
-
-	// Name is populated from metadata (if present) upon deserialization
-	Name string
-
 	// Object is a JSON compatible map with string, float, int, []interface{}, or map[string]interface{}
 	// children.
 	Object map[string]interface{}
+}
+
+func getNestedField(obj map[string]interface{}, fields ...string) interface{} {
+	var val interface{} = obj
+	for _, field := range fields {
+		if _, ok := val.(map[string]interface{}); !ok {
+			return nil
+		}
+		val = val.(map[string]interface{})[field]
+	}
+	return val
+}
+
+func getNestedString(obj map[string]interface{}, fields ...string) string {
+	if str, ok := getNestedField(obj, fields...).(string); ok {
+		return str
+	}
+	return ""
+}
+
+func getNestedMap(obj map[string]interface{}, fields ...string) map[string]string {
+	if m, ok := getNestedField(obj, fields...).(map[string]interface{}); ok {
+		strMap := make(map[string]string, len(m))
+		for k, v := range m {
+			if str, ok := v.(string); ok {
+				strMap[k] = str
+			}
+		}
+		return strMap
+	}
+	return nil
+}
+
+func setNestedField(obj map[string]interface{}, value interface{}, fields ...string) {
+	m := obj
+	if len(fields) > 1 {
+		for _, field := range fields[0 : len(fields)-1] {
+			if _, ok := m[field].(map[string]interface{}); !ok {
+				m[field] = make(map[string]interface{})
+			}
+			m = m[field].(map[string]interface{})
+		}
+	}
+	m[fields[len(fields)-1]] = value
+}
+
+func setNestedMap(obj map[string]interface{}, value map[string]string, fields ...string) {
+	m := make(map[string]interface{}, len(value))
+	for k, v := range value {
+		m[k] = v
+	}
+	setNestedField(obj, m, fields...)
+}
+
+func (u *Unstructured) setNestedField(value interface{}, fields ...string) {
+	if u.Object == nil {
+		u.Object = make(map[string]interface{})
+	}
+	setNestedField(u.Object, value, fields...)
+}
+
+func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
+	if u.Object == nil {
+		u.Object = make(map[string]interface{})
+	}
+	setNestedMap(u.Object, value, fields...)
+}
+
+func (u *Unstructured) GetAPIVersion() string {
+	return getNestedString(u.Object, "apiVersion")
+}
+
+func (u *Unstructured) SetAPIVersion(version string) {
+	u.setNestedField(version, "apiVersion")
+}
+
+func (u *Unstructured) GetKind() string {
+	return getNestedString(u.Object, "kind")
+}
+
+func (u *Unstructured) SetKind(kind string) {
+	u.setNestedField(kind, "kind")
+}
+
+func (u *Unstructured) GetNamespace() string {
+	return getNestedString(u.Object, "metadata", "namespace")
+}
+
+func (u *Unstructured) SetNamespace(namespace string) {
+	u.setNestedField(namespace, "metadata", "namespace")
+}
+
+func (u *Unstructured) GetName() string {
+	return getNestedString(u.Object, "metadata", "name")
+}
+
+func (u *Unstructured) SetName(name string) {
+	u.setNestedField(name, "metadata", "name")
+}
+
+func (u *Unstructured) GetGenerateName() string {
+	return getNestedString(u.Object, "metadata", "generateName")
+}
+
+func (u *Unstructured) SetGenerateName(name string) {
+	u.setNestedField(name, "metadata", "generateName")
+}
+
+func (u *Unstructured) GetUID() types.UID {
+	return types.UID(getNestedString(u.Object, "metadata", "uid"))
+}
+
+func (u *Unstructured) SetUID(uid types.UID) {
+	u.setNestedField(string(uid), "metadata", "uid")
+}
+
+func (u *Unstructured) GetResourceVersion() string {
+	return getNestedString(u.Object, "metadata", "resourceVersion")
+}
+
+func (u *Unstructured) SetResourceVersion(version string) {
+	u.setNestedField(version, "metadata", "resourceVersion")
+}
+
+func (u *Unstructured) GetSelfLink() string {
+	return getNestedString(u.Object, "metadata", "selfLink")
+}
+
+func (u *Unstructured) SetSelfLink(selfLink string) {
+	u.setNestedField(selfLink, "metadata", "selfLink")
+}
+
+func (u *Unstructured) GetCreationTimestamp() unversioned.Time {
+	var timestamp unversioned.Time
+	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "creationTimestamp"))
+	return timestamp
+}
+
+func (u *Unstructured) SetCreationTimestamp(timestamp unversioned.Time) {
+	ts, _ := timestamp.MarshalQueryParameter()
+	u.setNestedField(ts, "metadata", "creationTimestamp")
+}
+
+func (u *Unstructured) GetDeletionTimestamp() *unversioned.Time {
+	var timestamp unversioned.Time
+	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "deletionTimestamp"))
+	if timestamp.IsZero() {
+		return nil
+	}
+	return &timestamp
+}
+
+func (u *Unstructured) SetDeletionTimestamp(timestamp *unversioned.Time) {
+	ts, _ := timestamp.MarshalQueryParameter()
+	u.setNestedField(ts, "metadata", "deletionTimestamp")
+}
+
+func (u *Unstructured) GetLabels() map[string]string {
+	return getNestedMap(u.Object, "metadata", "labels")
+}
+
+func (u *Unstructured) SetLabels(labels map[string]string) {
+	u.setNestedMap(labels, "metadata", "labels")
+}
+
+func (u *Unstructured) GetAnnotations() map[string]string {
+	return getNestedMap(u.Object, "metadata", "annotations")
+}
+
+func (u *Unstructured) SetAnnotations(annotations map[string]string) {
+	u.setNestedMap(annotations, "metadata", "annotations")
+}
+
+func (u *Unstructured) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	u.SetAPIVersion(gvk.GroupVersion().String())
+	u.SetKind(gvk.Kind)
+}
+
+func (u *Unstructured) GroupVersionKind() *unversioned.GroupVersionKind {
+	gv, err := unversioned.ParseGroupVersion(u.GetAPIVersion())
+	if err != nil {
+		return nil
+	}
+	gvk := gv.WithKind(u.GetKind())
+	return &gvk
 }
 
 // UnstructuredList allows lists that do not have Golang structs
 // registered to be manipulated generically. This can be used to deal
 // with the API lists from a plug-in.
 type UnstructuredList struct {
-	TypeMeta `json:",inline"`
+	Object map[string]interface{}
 
 	// Items is a list of unstructured objects.
 	Items []*Unstructured `json:"items"`
+}
+
+func (u *UnstructuredList) setNestedField(value interface{}, fields ...string) {
+	if u.Object == nil {
+		u.Object = make(map[string]interface{})
+	}
+	setNestedField(u.Object, value, fields...)
+}
+
+func (u *UnstructuredList) GetAPIVersion() string {
+	return getNestedString(u.Object, "apiVersion")
+}
+
+func (u *UnstructuredList) SetAPIVersion(version string) {
+	u.setNestedField(version, "apiVersion")
+}
+
+func (u *UnstructuredList) GetKind() string {
+	return getNestedString(u.Object, "kind")
+}
+
+func (u *UnstructuredList) SetKind(kind string) {
+	u.setNestedField(kind, "kind")
+}
+
+func (u *UnstructuredList) GetResourceVersion() string {
+	return getNestedString(u.Object, "metadata", "resourceVersion")
+}
+
+func (u *UnstructuredList) SetResourceVersion(version string) {
+	u.setNestedField(version, "metadata", "resourceVersion")
+}
+
+func (u *UnstructuredList) GetSelfLink() string {
+	return getNestedString(u.Object, "metadata", "selfLink")
+}
+
+func (u *UnstructuredList) SetSelfLink(selfLink string) {
+	u.setNestedField(selfLink, "metadata", "selfLink")
+}
+
+func (u *UnstructuredList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	u.SetAPIVersion(gvk.GroupVersion().String())
+	u.SetKind(gvk.Kind)
+}
+
+func (u *UnstructuredList) GroupVersionKind() *unversioned.GroupVersionKind {
+	gv, err := unversioned.ParseGroupVersion(u.GetAPIVersion())
+	if err != nil {
+		return nil
+	}
+	gvk := gv.WithKind(u.GetKind())
+	return &gvk
 }
 
 // VersionedObjects is used by Decoders to give callers a way to access all versions
