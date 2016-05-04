@@ -26,6 +26,8 @@ kube::test::clear_all() {
   kubectl delete "${kube_flags[@]}" rc,pods --all --grace-period=0
 }
 
+# Force exact match of a returned result for a object query.  Wrap this with || to support multiple
+# valid return types.
 kube::test::get_object_assert() {
   local object=$1
   local request=$2
