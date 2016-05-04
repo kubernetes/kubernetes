@@ -56,7 +56,7 @@ func ValidatePodTemplateSpecForPetSet(template *api.PodTemplateSpec, selector la
 		// fail. We should really check that the union of the given volumes and volumeClaims match
 		// volume mounts in the containers.
 		// allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
-		allErrs = append(allErrs, apivalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
 		allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("annotations"))...)
 		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, fldPath.Child("annotations"))...)
 	}

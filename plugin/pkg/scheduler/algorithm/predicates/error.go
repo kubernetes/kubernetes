@@ -30,6 +30,7 @@ var (
 	ErrDiskConflict              = newPredicateFailureError("NoDiskConflict")
 	ErrVolumeZoneConflict        = newPredicateFailureError("NoVolumeZoneConflict")
 	ErrNodeSelectorNotMatch      = newPredicateFailureError("MatchNodeSelector")
+	ErrPodAffinityNotMatch       = newPredicateFailureError("MatchInterPodAffinity")
 	ErrPodNotMatchHostName       = newPredicateFailureError("HostName")
 	ErrPodNotFitsHostPorts       = newPredicateFailureError("PodFitsHostPorts")
 	ErrNodeLabelPresenceViolated = newPredicateFailureError("CheckNodeLabelPresence")

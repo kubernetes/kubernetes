@@ -220,6 +220,12 @@ func init() {
 		Convert_api_PersistentVolumeStatus_To_v1_PersistentVolumeStatus,
 		Convert_v1_Pod_To_api_Pod,
 		Convert_api_Pod_To_v1_Pod,
+		Convert_v1_PodAffinity_To_api_PodAffinity,
+		Convert_api_PodAffinity_To_v1_PodAffinity,
+		Convert_v1_PodAffinityTerm_To_api_PodAffinityTerm,
+		Convert_api_PodAffinityTerm_To_v1_PodAffinityTerm,
+		Convert_v1_PodAntiAffinity_To_api_PodAntiAffinity,
+		Convert_api_PodAntiAffinity_To_v1_PodAntiAffinity,
 		Convert_v1_PodAttachOptions_To_api_PodAttachOptions,
 		Convert_api_PodAttachOptions_To_v1_PodAttachOptions,
 		Convert_v1_PodCondition_To_api_PodCondition,
@@ -312,6 +318,8 @@ func init() {
 		Convert_api_VolumeMount_To_v1_VolumeMount,
 		Convert_v1_VolumeSource_To_api_VolumeSource,
 		Convert_api_VolumeSource_To_v1_VolumeSource,
+		Convert_v1_WeightedPodAffinityTerm_To_api_WeightedPodAffinityTerm,
+		Convert_api_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm,
 	); err != nil {
 		// if one of the conversion functions is malformed, detect it immediately.
 		panic(err)
@@ -361,6 +369,24 @@ func autoConvert_v1_Affinity_To_api_Affinity(in *Affinity, out *api.Affinity, s 
 	} else {
 		out.NodeAffinity = nil
 	}
+	if in.PodAffinity != nil {
+		in, out := &in.PodAffinity, &out.PodAffinity
+		*out = new(api.PodAffinity)
+		if err := Convert_v1_PodAffinity_To_api_PodAffinity(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodAffinity = nil
+	}
+	if in.PodAntiAffinity != nil {
+		in, out := &in.PodAntiAffinity, &out.PodAntiAffinity
+		*out = new(api.PodAntiAffinity)
+		if err := Convert_v1_PodAntiAffinity_To_api_PodAntiAffinity(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodAntiAffinity = nil
+	}
 	return nil
 }
 
@@ -380,6 +406,24 @@ func autoConvert_api_Affinity_To_v1_Affinity(in *api.Affinity, out *Affinity, s 
 		}
 	} else {
 		out.NodeAffinity = nil
+	}
+	if in.PodAffinity != nil {
+		in, out := &in.PodAffinity, &out.PodAffinity
+		*out = new(PodAffinity)
+		if err := Convert_api_PodAffinity_To_v1_PodAffinity(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodAffinity = nil
+	}
+	if in.PodAntiAffinity != nil {
+		in, out := &in.PodAntiAffinity, &out.PodAntiAffinity
+		*out = new(PodAntiAffinity)
+		if err := Convert_api_PodAntiAffinity_To_v1_PodAntiAffinity(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodAntiAffinity = nil
 	}
 	return nil
 }
@@ -5010,6 +5054,196 @@ func autoConvert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) er
 	return nil
 }
 
+func autoConvert_v1_PodAffinity_To_api_PodAffinity(in *PodAffinity, out *api.PodAffinity, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PodAffinity))(in)
+	}
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
+		*out = make([]api.PodAffinityTerm, len(*in))
+		for i := range *in {
+			if err := Convert_v1_PodAffinityTerm_To_api_PodAffinityTerm(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
+		*out = make([]api.WeightedPodAffinityTerm, len(*in))
+		for i := range *in {
+			if err := Convert_v1_WeightedPodAffinityTerm_To_api_WeightedPodAffinityTerm(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return nil
+}
+
+func Convert_v1_PodAffinity_To_api_PodAffinity(in *PodAffinity, out *api.PodAffinity, s conversion.Scope) error {
+	return autoConvert_v1_PodAffinity_To_api_PodAffinity(in, out, s)
+}
+
+func autoConvert_api_PodAffinity_To_v1_PodAffinity(in *api.PodAffinity, out *PodAffinity, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PodAffinity))(in)
+	}
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
+		*out = make([]PodAffinityTerm, len(*in))
+		for i := range *in {
+			if err := Convert_api_PodAffinityTerm_To_v1_PodAffinityTerm(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
+		*out = make([]WeightedPodAffinityTerm, len(*in))
+		for i := range *in {
+			if err := Convert_api_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return nil
+}
+
+func Convert_api_PodAffinity_To_v1_PodAffinity(in *api.PodAffinity, out *PodAffinity, s conversion.Scope) error {
+	return autoConvert_api_PodAffinity_To_v1_PodAffinity(in, out, s)
+}
+
+func autoConvert_v1_PodAffinityTerm_To_api_PodAffinityTerm(in *PodAffinityTerm, out *api.PodAffinityTerm, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PodAffinityTerm))(in)
+	}
+	if in.LabelSelector != nil {
+		in, out := &in.LabelSelector, &out.LabelSelector
+		*out = new(unversioned.LabelSelector)
+		// TODO: Inefficient conversion - can we improve it?
+		if err := s.Convert(*in, *out, 0); err != nil {
+			return err
+		}
+	} else {
+		out.LabelSelector = nil
+	}
+	if in.Namespaces != nil {
+		in, out := &in.Namespaces, &out.Namespaces
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Namespaces = nil
+	}
+	out.TopologyKey = in.TopologyKey
+	return nil
+}
+
+func Convert_v1_PodAffinityTerm_To_api_PodAffinityTerm(in *PodAffinityTerm, out *api.PodAffinityTerm, s conversion.Scope) error {
+	return autoConvert_v1_PodAffinityTerm_To_api_PodAffinityTerm(in, out, s)
+}
+
+func autoConvert_api_PodAffinityTerm_To_v1_PodAffinityTerm(in *api.PodAffinityTerm, out *PodAffinityTerm, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PodAffinityTerm))(in)
+	}
+	if in.LabelSelector != nil {
+		in, out := &in.LabelSelector, &out.LabelSelector
+		*out = new(unversioned.LabelSelector)
+		// TODO: Inefficient conversion - can we improve it?
+		if err := s.Convert(*in, *out, 0); err != nil {
+			return err
+		}
+	} else {
+		out.LabelSelector = nil
+	}
+	if in.Namespaces != nil {
+		in, out := &in.Namespaces, &out.Namespaces
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Namespaces = nil
+	}
+	out.TopologyKey = in.TopologyKey
+	return nil
+}
+
+func Convert_api_PodAffinityTerm_To_v1_PodAffinityTerm(in *api.PodAffinityTerm, out *PodAffinityTerm, s conversion.Scope) error {
+	return autoConvert_api_PodAffinityTerm_To_v1_PodAffinityTerm(in, out, s)
+}
+
+func autoConvert_v1_PodAntiAffinity_To_api_PodAntiAffinity(in *PodAntiAffinity, out *api.PodAntiAffinity, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PodAntiAffinity))(in)
+	}
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
+		*out = make([]api.PodAffinityTerm, len(*in))
+		for i := range *in {
+			if err := Convert_v1_PodAffinityTerm_To_api_PodAffinityTerm(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
+		*out = make([]api.WeightedPodAffinityTerm, len(*in))
+		for i := range *in {
+			if err := Convert_v1_WeightedPodAffinityTerm_To_api_WeightedPodAffinityTerm(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return nil
+}
+
+func Convert_v1_PodAntiAffinity_To_api_PodAntiAffinity(in *PodAntiAffinity, out *api.PodAntiAffinity, s conversion.Scope) error {
+	return autoConvert_v1_PodAntiAffinity_To_api_PodAntiAffinity(in, out, s)
+}
+
+func autoConvert_api_PodAntiAffinity_To_v1_PodAntiAffinity(in *api.PodAntiAffinity, out *PodAntiAffinity, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PodAntiAffinity))(in)
+	}
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
+		*out = make([]PodAffinityTerm, len(*in))
+		for i := range *in {
+			if err := Convert_api_PodAffinityTerm_To_v1_PodAffinityTerm(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
+		*out = make([]WeightedPodAffinityTerm, len(*in))
+		for i := range *in {
+			if err := Convert_api_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return nil
+}
+
+func Convert_api_PodAntiAffinity_To_v1_PodAntiAffinity(in *api.PodAntiAffinity, out *PodAntiAffinity, s conversion.Scope) error {
+	return autoConvert_api_PodAntiAffinity_To_v1_PodAntiAffinity(in, out, s)
+}
+
 func autoConvert_v1_PodAttachOptions_To_api_PodAttachOptions(in *PodAttachOptions, out *api.PodAttachOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodAttachOptions))(in)
@@ -7522,4 +7756,34 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 
 func Convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
 	return autoConvert_api_VolumeSource_To_v1_VolumeSource(in, out, s)
+}
+
+func autoConvert_v1_WeightedPodAffinityTerm_To_api_WeightedPodAffinityTerm(in *WeightedPodAffinityTerm, out *api.WeightedPodAffinityTerm, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*WeightedPodAffinityTerm))(in)
+	}
+	out.Weight = int(in.Weight)
+	if err := Convert_v1_PodAffinityTerm_To_api_PodAffinityTerm(&in.PodAffinityTerm, &out.PodAffinityTerm, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_WeightedPodAffinityTerm_To_api_WeightedPodAffinityTerm(in *WeightedPodAffinityTerm, out *api.WeightedPodAffinityTerm, s conversion.Scope) error {
+	return autoConvert_v1_WeightedPodAffinityTerm_To_api_WeightedPodAffinityTerm(in, out, s)
+}
+
+func autoConvert_api_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in *api.WeightedPodAffinityTerm, out *WeightedPodAffinityTerm, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.WeightedPodAffinityTerm))(in)
+	}
+	out.Weight = int32(in.Weight)
+	if err := Convert_api_PodAffinityTerm_To_v1_PodAffinityTerm(&in.PodAffinityTerm, &out.PodAffinityTerm, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in *api.WeightedPodAffinityTerm, out *WeightedPodAffinityTerm, s conversion.Scope) error {
+	return autoConvert_api_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in, out, s)
 }
