@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/labels"
@@ -72,26 +73,6 @@ const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = map[unversioned.GroupVersionKind]struct{}{
 	v1.SchemeGroupVersion.WithKind("Event"): {},
-}
-
-func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if !validation.IsQualifiedName(labelName) {
-		allErrs = append(allErrs, field.Invalid(fldPath, labelName, qualifiedNameErrorMsg))
-	}
-	return allErrs
-}
-
-// ValidateLabels validates that a set of labels are correctly defined.
-func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for k, v := range labels {
-		allErrs = append(allErrs, ValidateLabelName(k, fldPath)...)
-		if !validation.IsValidLabelValue(v) {
-			allErrs = append(allErrs, field.Invalid(fldPath, v, labelValueErrorMsg))
-		}
-	}
-	return allErrs
 }
 
 // ValidateHasLabel requires that api.ObjectMeta has a Label with key and expectedValue
@@ -361,7 +342,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 		}
 	}
 	allErrs = append(allErrs, ValidateNonnegativeField(meta.Generation, fldPath.Child("generation"))...)
-	allErrs = append(allErrs, ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.OwnerReferences, fldPath.Child("ownerReferences"))...)
 
@@ -416,7 +397,7 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *api.ObjectMeta, fldPath *field.P
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.CreationTimestamp, oldMeta.CreationTimestamp, fldPath.Child("creationTimestamp"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.Finalizers, oldMeta.Finalizers, fldPath.Child("finalizers"))...)
 
-	allErrs = append(allErrs, ValidateLabels(newMeta.Labels, fldPath.Child("labels"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(newMeta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.OwnerReferences, fldPath.Child("ownerReferences"))...)
 
@@ -1448,7 +1429,7 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes, fldPath.Child("containers"))...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
-	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
 	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"))...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	if len(spec.ServiceAccountName) > 0 {
@@ -1500,7 +1481,7 @@ func ValidateNodeSelectorRequirement(rq api.NodeSelectorRequirement, fldPath *fi
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), rq.Operator, "not a valid selector operator"))
 	}
-	allErrs = append(allErrs, ValidateLabelName(rq.Key, fldPath.Child("key"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(rq.Key, fldPath.Child("key"))...)
 	return allErrs
 }
 
@@ -1547,6 +1528,87 @@ func ValidatePreferredSchedulingTerms(terms []api.PreferredSchedulingTerm, fldPa
 	return allErrs
 }
 
+// validatePodAffinityTerm tests that the specified podAffinityTerm fields have valid data
+func validatePodAffinityTerm(podAffinityTerm api.PodAffinityTerm, allowEmptyTopologyKey bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
+	for _, name := range podAffinityTerm.Namespaces {
+		if ok, _ := ValidateNamespaceName(name, false); !ok {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, DNS1123LabelErrorMsg))
+		}
+	}
+	if !allowEmptyTopologyKey && len(podAffinityTerm.TopologyKey) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "can only be empty for PreferredDuringScheduling pod anti affinity"))
+	}
+	if len(podAffinityTerm.TopologyKey) != 0 {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(podAffinityTerm.TopologyKey, fldPath.Child("topologyKey"))...)
+	}
+	return allErrs
+}
+
+// validatePodAffinityTerms tests that the specified podAffinityTerms fields have valid data
+func validatePodAffinityTerms(podAffinityTerms []api.PodAffinityTerm, allowEmptyTopologyKey bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, podAffinityTerm := range podAffinityTerms {
+		allErrs = append(allErrs, validatePodAffinityTerm(podAffinityTerm, allowEmptyTopologyKey, fldPath.Index(i))...)
+	}
+	return allErrs
+}
+
+// validateWeightedPodAffinityTerms tests that the specified weightedPodAffinityTerms fields have valid data
+func validateWeightedPodAffinityTerms(weightedPodAffinityTerms []api.WeightedPodAffinityTerm, allowEmptyTopologyKey bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for j, weightedTerm := range weightedPodAffinityTerms {
+		if weightedTerm.Weight <= 0 || weightedTerm.Weight > 100 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(j).Child("weight"), weightedTerm.Weight, "must be in the range 1-100"))
+		}
+		allErrs = append(allErrs, validatePodAffinityTerm(weightedTerm.PodAffinityTerm, allowEmptyTopologyKey, fldPath.Index(j).Child("podAffinityTerm"))...)
+	}
+	return allErrs
+}
+
+// validatePodAntiAffinity tests that the specified podAntiAffinity fields have valid data
+func validatePodAntiAffinity(podAntiAffinity *api.PodAntiAffinity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// TODO:Uncomment below code once RequiredDuringSchedulingRequiredDuringExecution is implemented.
+	// if podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
+	//	allErrs = append(allErrs, validatePodAffinityTerms(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution, false,
+	//		fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+	//}
+	if podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		// empty topologyKey is not allowed for hard pod anti-affinity
+		allErrs = append(allErrs, validatePodAffinityTerms(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, false,
+			fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	if podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		// empty topologyKey is allowed for soft pod anti-affinity
+		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, true,
+			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	return allErrs
+}
+
+// validatePodAffinity tests that the specified podAffinity fields have valid data
+func validatePodAffinity(podAffinity *api.PodAffinity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// TODO:Uncomment below code once RequiredDuringSchedulingRequiredDuringExecution is implemented.
+	// if podAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
+	//	allErrs = append(allErrs, validatePodAffinityTerms(podAffinity.RequiredDuringSchedulingRequiredDuringExecution, false,
+	//		fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+	//}
+	if podAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		// empty topologyKey is not allowed for hard pod affinity
+		allErrs = append(allErrs, validatePodAffinityTerms(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution, false,
+			fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	if podAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		// empty topologyKey is not allowed for soft pod affinity
+		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution, false,
+			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+	}
+	return allErrs
+}
+
 // ValidateAffinityInPodAnnotations tests that the serialized Affinity in Pod.Annotations has valid data
 func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1557,22 +1619,28 @@ func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *fi
 		return allErrs
 	}
 
+	affinityFldPath := fldPath.Child(api.AffinityAnnotationKey)
 	if affinity.NodeAffinity != nil {
 		na := affinity.NodeAffinity
-
+		naFldPath := affinityFldPath.Child("nodeAffinity")
 		// TODO: Uncomment the next three lines once RequiredDuringSchedulingRequiredDuringExecution is implemented.
 		// if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
-		//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+		//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, naFldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
 		// }
 
 		if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+			allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, naFldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
 		}
 
 		if len(na.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
-			allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
-
+			allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, naFldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 		}
+	}
+	if affinity.PodAffinity != nil {
+		allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, affinityFldPath.Child("podAffinity"))...)
+	}
+	if affinity.PodAntiAffinity != nil {
+		allErrs = append(allErrs, validatePodAntiAffinity(affinity.PodAntiAffinity, affinityFldPath.Child("podAntiAffinity"))...)
 	}
 
 	return allErrs
@@ -1749,7 +1817,7 @@ func ValidateService(service *api.Service) field.ErrorList {
 	}
 
 	if service.Spec.Selector != nil {
-		allErrs = append(allErrs, ValidateLabels(service.Spec.Selector, specPath.Child("selector"))...)
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(service.Spec.Selector, specPath.Child("selector"))...)
 	}
 
 	if len(service.Spec.SessionAffinity) == 0 {
@@ -1968,7 +2036,7 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec, fldP
 // ValidatePodTemplateSpec validates the spec of a pod template
 func ValidatePodTemplateSpec(spec *api.PodTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateLabels(spec.Labels, fldPath.Child("labels"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, fldPath.Child("spec"))...)
