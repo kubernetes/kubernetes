@@ -266,8 +266,7 @@ function detect-minions () {
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
-      "${MINION_NAMES[$i]}" --fields networkInterfaces[0].accessConfigs[0].natIP \
-      --format=text | awk '{ print $2 }')
+      "${MINION_NAMES[$i]}" --format='value(networkInterfaces[0].accessConfigs[0].natIP)')
     if [[ -z "${minion_ip-}" ]] ; then
       echo "Did not find ${MINION_NAMES[$i]}" >&2
     else
@@ -294,8 +293,7 @@ function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     KUBE_MASTER_IP=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
-      "${MASTER_NAME}" --fields networkInterfaces[0].accessConfigs[0].natIP \
-      --format=text | awk '{ print $2 }')
+      "${MASTER_NAME}" --format='value(networkInterfaces[0].accessConfigs[0].natIP)')
   fi
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
