@@ -200,14 +200,22 @@ func extractStackCreator() (string, int, bool) {
 // Run starts a goroutine and returns immediately.
 func (r *Reflector) Run() {
 	glog.V(3).Infof("Starting reflector %v (%s) from %s", r.expectedType, r.resyncPeriod, r.name)
-	go wait.Until(func() { r.ListAndWatch(wait.NeverStop) }, r.period, wait.NeverStop)
+	go wait.Until(func() {
+		if err := r.ListAndWatch(wait.NeverStop); err != nil {
+			utilruntime.HandleError(err)
+		}
+	}, r.period, wait.NeverStop)
 }
 
 // RunUntil starts a watch and handles watch events. Will restart the watch if it is closed.
 // RunUntil starts a goroutine and returns immediately. It will exit when stopCh is closed.
 func (r *Reflector) RunUntil(stopCh <-chan struct{}) {
 	glog.V(3).Infof("Starting reflector %v (%s) from %s", r.expectedType, r.resyncPeriod, r.name)
-	go wait.Until(func() { r.ListAndWatch(stopCh) }, r.period, stopCh)
+	go wait.Until(func() {
+		if err := r.ListAndWatch(stopCh); err != nil {
+			utilruntime.HandleError(err)
+		}
+	}, r.period, stopCh)
 }
 
 var (
