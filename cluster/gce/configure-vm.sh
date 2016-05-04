@@ -445,6 +445,7 @@ hairpin_mode: '$(echo "$HAIRPIN_MODE" | sed -e "s/'/''/g")'
 opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
+policy_provider: '$(echo "$POLICY_PROVIDER" | sed -e "s/'/''/g")'
 enable_manifest_url: '$(echo "${ENABLE_MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "${MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "${MANIFEST_URL_HEADER:-}" | sed -e "s/'/''/g")'
@@ -859,7 +860,7 @@ EOF
   if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   kubelet_api_servers: '${KUBELET_APISERVER}'
-  cbr-cidr: 10.123.45.0/30
+  cbr-cidr: 10.123.45.0/29
 EOF
   else
     # If the kubelet is running disconnected from a master, give it a fixed
