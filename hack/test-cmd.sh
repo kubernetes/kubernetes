@@ -1728,6 +1728,21 @@ __EOF__
 
 
   ######################
+  # Lists              #
+  ######################
+
+  kube::log::status "Testing kubectl(${version}:lists)"
+
+  ### Create a List with objects from multiple versions
+  # Command
+  kubectl create -f hack/testdata/list.yaml "${kube_flags[@]}"
+
+  ### Delete the List with objects from multiple versions
+  # Command
+  kubectl delete service/list-service-test deployment/list-deployment-test
+
+
+  ######################
   # Multiple Resources #
   ######################
 
