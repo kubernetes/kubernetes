@@ -46,6 +46,14 @@ func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceLi
 	return c.Resources, nil
 }
 
+func (c *FakeDiscovery) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
+	return nil, nil
+}
+
+func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+	return nil, nil
+}
+
 func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
 	return nil, nil
 }

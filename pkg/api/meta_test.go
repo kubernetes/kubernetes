@@ -17,10 +17,14 @@ limitations under the License.
 package api_test
 
 import (
+	"reflect"
 	"testing"
+
+	"github.com/google/gofuzz"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 )
 
 var _ meta.Object = &api.ObjectMeta{}
@@ -47,5 +51,48 @@ func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	api.FillObjectMetaSystemFields(ctx, &resource)
 	if !api.HasObjectMetaSystemFieldValues(&resource) {
 		t.Errorf("the resource does have all fields populated, but incorrectly reports it does not")
+	}
+}
+
+func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerReferences []metatypes.OwnerReference) {
+	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&objectMeta)
+	references := objectMeta.OwnerReferences
+	metaOwnerReferences = make([]metatypes.OwnerReference, 0)
+	for i := 0; i < len(references); i++ {
+		metaOwnerReferences = append(metaOwnerReferences, metatypes.OwnerReference{
+			Kind:       references[i].Kind,
+			Name:       references[i].Name,
+			UID:        references[i].UID,
+			APIVersion: references[i].APIVersion,
+		})
+	}
+	if len(references) == 0 {
+		objectMeta.OwnerReferences = make([]api.OwnerReference, 0)
+	}
+	return objectMeta, metaOwnerReferences
+}
+
+func testGetOwnerReferences(t *testing.T) {
+	meta, expected := getObjectMetaAndOwnerReferences()
+	refs := meta.GetOwnerReferences()
+	if !reflect.DeepEqual(refs, expected) {
+		t.Errorf("expect %v\n got %v", expected, refs)
+	}
+}
+
+func testSetOwnerReferences(t *testing.T) {
+	expected, newRefs := getObjectMetaAndOwnerReferences()
+	objectMeta := &api.ObjectMeta{}
+	objectMeta.SetOwnerReferences(newRefs)
+	if !reflect.DeepEqual(expected.OwnerReferences, objectMeta.OwnerReferences) {
+		t.Errorf("expect: %#v\n got: %#v", expected.OwnerReferences, objectMeta.OwnerReferences)
+	}
+}
+
+func TestAccessOwnerReferences(t *testing.T) {
+	fuzzIter := 5
+	for i := 0; i < fuzzIter; i++ {
+		testGetOwnerReferences(t)
+		testSetOwnerReferences(t)
 	}
 }
