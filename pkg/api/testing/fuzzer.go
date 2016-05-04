@@ -413,6 +413,37 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				}
 			}
 		},
+		func(r *runtime.RawExtension, c fuzz.Continue) {
+			// Pick an arbitrary type and fuzz it
+			types := []runtime.Object{&api.Pod{}, &extensions.Deployment{}, &api.Service{}}
+			obj := types[c.Rand.Intn(len(types))]
+			c.Fuzz(obj)
+
+			// Find a codec for converting the object to raw bytes.  This is necessary for the
+			// api version and kind to be correctly set be serialization.
+			var codec runtime.Codec
+			switch obj.(type) {
+			case *api.Pod:
+				codec = testapi.Default.Codec()
+			case *extensions.Deployment:
+				codec = testapi.Extensions.Codec()
+			case *api.Service:
+				codec = testapi.Default.Codec()
+			default:
+				t.Errorf("Failed to find codec for object type: %T", obj)
+				return
+			}
+
+			// Convert the object to raw bytes
+			bytes, err := runtime.Encode(codec, obj)
+			if err != nil {
+				t.Errorf("Failed to encode object: %v", err)
+				return
+			}
+
+			// Set the bytes field on the RawExtension
+			r.Raw = bytes
+		},
 	)
 	return f
 }

@@ -815,7 +815,7 @@ func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersio
 	return nil
 }
 
-func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string) (err error) {
+func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string, delegate validation.Schema) (err error) {
 	var schemaData []byte
 	var firstSeen bool
 	fullDir, err := substituteUserHome(cacheDir)
@@ -836,7 +836,7 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 			return err
 		}
 	}
-	schema, err := validation.NewSwaggerSchemaFromBytes(schemaData)
+	schema, err := validation.NewSwaggerSchemaFromBytes(schemaData, delegate)
 	if err != nil {
 		return err
 	}
@@ -849,7 +849,7 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 		if err != nil {
 			return err
 		}
-		schema, err := validation.NewSwaggerSchemaFromBytes(schemaData)
+		schema, err := validation.NewSwaggerSchemaFromBytes(schemaData, delegate)
 		if err != nil {
 			return err
 		}
@@ -888,20 +888,20 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		if c.c.AutoscalingClient == nil {
 			return errors.New("unable to validate: no autoscaling client")
 		}
-		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
+		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
 	if gvk.Group == apps.GroupName {
 		if c.c.AppsClient == nil {
 			return errors.New("unable to validate: no autoscaling client")
 		}
-		return getSchemaAndValidate(c.c.AppsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
+		return getSchemaAndValidate(c.c.AppsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
 
 	if gvk.Group == batch.GroupName {
 		if c.c.BatchClient == nil {
 			return errors.New("unable to validate: no batch client")
 		}
-		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
+		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
 	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 		// Don't attempt to validate third party objects
@@ -911,9 +911,9 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		if c.c.ExtensionsClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}
-		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
+		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
-	return getSchemaAndValidate(c.c.RESTClient, data, "api", gvk.GroupVersion().String(), c.cacheDir)
+	return getSchemaAndValidate(c.c.RESTClient, data, "api", gvk.GroupVersion().String(), c.cacheDir, c)
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
