@@ -1090,12 +1090,19 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 		test.newRc.Spec.Template.Labels[test.deploymentKey] = deploymentHash
 		test.newRc.Name = fmt.Sprintf("%s-%s", test.newRc.Name, deploymentHash)
 
-		updatedRc, err := CreateNewControllerFromCurrentController(fake, codec, "", test.oldRc.ObjectMeta.Name, test.newRc.ObjectMeta.Name, test.image, test.container, test.deploymentKey)
+		config := &NewControllerConfig{
+			OldName:       test.oldRc.ObjectMeta.Name,
+			NewName:       test.newRc.ObjectMeta.Name,
+			Image:         test.image,
+			Container:     test.container,
+			DeploymentKey: test.deploymentKey,
+		}
+		updatedRc, err := CreateNewControllerFromCurrentController(fake, codec, config)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(updatedRc, test.newRc) {
-			t.Errorf("expected:\n%v\ngot:\n%v\n", test.newRc, updatedRc)
+			t.Errorf("expected:\n%#v\ngot:\n%#v\n", test.newRc, updatedRc)
 		}
 	}
 }
