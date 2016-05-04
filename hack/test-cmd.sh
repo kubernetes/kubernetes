@@ -192,6 +192,7 @@ ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
   --public-address-override="127.0.0.1" \
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
+  --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
   --cert-dir="${TMPDIR:-/tmp/}" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
@@ -202,6 +203,7 @@ kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
 kube::log::status "Starting controller-manager"
 "${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
   --port="${CTLRMGR_PORT}" \
+  --kube-api-content-type="${KUBE_TEST_API_TYPE-}" \
   --master="127.0.0.1:${API_PORT}" 1>&2 &
 CTLRMGR_PID=$!
 

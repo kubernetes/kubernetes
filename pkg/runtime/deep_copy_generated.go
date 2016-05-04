@@ -118,3 +118,33 @@ func DeepCopy_runtime_Scheme(in Scheme, out *Scheme, c *conversion.Cloner) error
 	}
 	return nil
 }
+
+func DeepCopy_runtime_SerializerInfo(in SerializerInfo, out *SerializerInfo, c *conversion.Cloner) error {
+	if in.Serializer == nil {
+		out.Serializer = nil
+	} else if newVal, err := c.DeepCopy(in.Serializer); err != nil {
+		return err
+	} else {
+		out.Serializer = newVal.(Serializer)
+	}
+	out.EncodesAsText = in.EncodesAsText
+	out.MediaType = in.MediaType
+	return nil
+}
+
+func DeepCopy_runtime_StreamSerializerInfo(in StreamSerializerInfo, out *StreamSerializerInfo, c *conversion.Cloner) error {
+	if err := DeepCopy_runtime_SerializerInfo(in.SerializerInfo, &out.SerializerInfo, c); err != nil {
+		return err
+	}
+	if in.Framer == nil {
+		out.Framer = nil
+	} else if newVal, err := c.DeepCopy(in.Framer); err != nil {
+		return err
+	} else {
+		out.Framer = newVal.(Framer)
+	}
+	if err := DeepCopy_runtime_SerializerInfo(in.Embedded, &out.Embedded, c); err != nil {
+		return err
+	}
+	return nil
+}

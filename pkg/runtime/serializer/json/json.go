@@ -185,6 +185,10 @@ func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides .
 	return encoder.Encode(obj)
 }
 
+// AccurateRecognizer returns true for JSON (objects must start with {) and false for
+// YAML (a YAML document could start with arbitrary bytes)
+func (s *Serializer) AccurateRecognizer() bool { return !s.yaml }
+
 // RecognizesData implements the RecognizingDecoder interface.
 func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
 	_, ok := utilyaml.GuessJSONStream(peek, 2048)
@@ -192,14 +196,6 @@ func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
 		return !ok, nil
 	}
 	return ok, nil
-}
-
-// EncodesAsText returns true because both JSON and YAML are considered textual representations
-// of data. This is used to determine whether the serialized object should be transmitted over
-// a WebSocket Text or Binary frame. This must remain true for legacy compatibility with v1.1
-// watch over websocket implementations.
-func (s *Serializer) EncodesAsText() bool {
-	return true
 }
 
 // Framer is the default JSON framing behavior, with newlines delimiting individual objects.

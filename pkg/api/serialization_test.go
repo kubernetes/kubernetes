@@ -283,19 +283,9 @@ func TestObjectWatchFraming(t *testing.T) {
 	secret.Data["long"] = bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x00}, 1000)
 	converted, _ := api.Scheme.ConvertToVersion(secret, "v1")
 	v1secret := converted.(*v1.Secret)
-	for _, streamingMediaType := range api.Codecs.SupportedStreamingMediaTypes() {
-		s, framer, mediaType, _ := api.Codecs.StreamingSerializerForMediaType(streamingMediaType, nil)
-		// TODO: remove this when the runtime.SerializerInfo PR lands
-		if mediaType == "application/vnd.kubernetes.protobuf;stream=watch" {
-			mediaType = "application/vnd.kubernetes.protobuf"
-		}
-		embedded, ok := api.Codecs.SerializerForMediaType(mediaType, nil)
-		if !ok {
-			t.Logf("no embedded serializer for %s", mediaType)
-			embedded = s
-		}
-		innerDecode := api.Codecs.DecoderToVersion(embedded, api.SchemeGroupVersion)
-		//innerEncode := api.Codecs.EncoderForVersion(embedded, api.SchemeGroupVersion)
+	for _, s := range api.Codecs.SupportedStreamingMediaTypes() {
+		s, _ := api.Codecs.StreamingSerializerForMediaType(s, nil)
+		framer := s.Framer
 
 		// write a single object through the framer and back out
 		obj := &bytes.Buffer{}
@@ -308,22 +298,15 @@ func TestObjectWatchFraming(t *testing.T) {
 			t.Fatal(err)
 		}
 		sr := streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
-		resultSecret := &v1.Secret{}
-		res, _, err := sr.Decode(nil, resultSecret)
+		res, _, err := sr.Decode(nil, nil)
 		if err != nil {
-			t.Fatalf("%v:\n%s", err, hex.Dump(obj.Bytes()))
+			t.Fatal(err)
 		}
-		resultSecret.Kind = "Secret"
-		resultSecret.APIVersion = "v1"
-		if !api.Semantic.DeepEqual(v1secret, res) {
-			t.Fatalf("objects did not match: %s", diff.ObjectGoPrintDiff(v1secret, res))
+		if !api.Semantic.DeepEqual(res, v1secret) {
+			t.Fatalf("objects did not match: %s", diff.ObjectDiff(v1secret, res))
 		}
 
 		// write a watch event through and back out
-		obj = &bytes.Buffer{}
-		if err := embedded.EncodeToStream(v1secret, obj); err != nil {
-			t.Fatal(err)
-		}
 		event := &versioned.Event{Type: string(watch.Added)}
 		event.Object.Raw = obj.Bytes()
 		obj = &bytes.Buffer{}
@@ -335,21 +318,15 @@ func TestObjectWatchFraming(t *testing.T) {
 		if n, err := w.Write(obj.Bytes()); err != nil || n != len(obj.Bytes()) {
 			t.Fatal(err)
 		}
-		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
+		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s.Embedded)
 		outEvent := &versioned.Event{}
 		res, _, err = sr.Decode(nil, outEvent)
-		if err != nil || outEvent.Type != string(watch.Added) {
-			t.Fatalf("%v: %#v", err, outEvent)
-		}
-		if outEvent.Object.Object == nil && outEvent.Object.Raw != nil {
-			outEvent.Object.Object, err = runtime.Decode(innerDecode, outEvent.Object.Raw)
-			if err != nil {
-				t.Fatalf("%v:\n%s", err, hex.Dump(outEvent.Object.Raw))
-			}
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		if !api.Semantic.DeepEqual(secret, outEvent.Object.Object) {
-			t.Fatalf("%s: did not match after frame decoding: %s", streamingMediaType, diff.ObjectGoPrintDiff(secret, outEvent.Object.Object))
+			t.Fatalf("%s: did not match after frame decoding: %s", s, diff.ObjectDiff(secret, outEvent.Object.Object))
 		}
 	}
 }
@@ -510,6 +487,30 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	b.StopTimer()
 }
 
+// BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
+func BenchmarkUnmarshalUnstructuredJSON(b *testing.B) {
+	codec := testapi.Default.Codec()
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(codec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj := make(map[string]interface{})
+		if err := json.Unmarshal(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
 // BenchmarkDecodeJSON provides a baseline for codecgen JSON decode performance
 func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	kcodec := testapi.Default.Codec()
@@ -529,6 +530,33 @@ func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := codec.NewDecoderBytes(encoded[i%width], handler).Decode(&obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkDecodeJSON provides a baseline for codecgen JSON decode performance
+func BenchmarkUnmarshalUnstructuredJSONCodecGen(b *testing.B) {
+	kcodec := testapi.Default.Codec()
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(kcodec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+	handler := &codec.JsonHandle{}
+	decoder := codec.NewDecoderBytes(nil, handler)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v interface{}
+		decoder.ResetBytes(encoded[i%width])
+		if err := decoder.Decode(&v); err != nil {
 			b.Fatal(err)
 		}
 	}

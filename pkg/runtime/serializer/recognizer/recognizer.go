@@ -17,6 +17,7 @@ limitations under the License.
 package recognizer
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -27,13 +28,27 @@ import (
 
 type RecognizingDecoder interface {
 	runtime.Decoder
+	// AccurateRecognizer should be true if this decoder can unambigously determine
+	// whether the content is known to it. Allows RecognizingDecoders to adjust certainty.
+	AccurateRecognizer() bool
+	// RecognizesData should return true if the input provided in the provided reader
+	// belongs to this decoder, or an error if the data could not be read or is ambiguous.
 	RecognizesData(peek io.Reader) (bool, error)
 }
 
+// NewDecoder creates a decoder that will attempt multiple decoders in an order defined
+// by:
+//
+// 1. The decoder implements RecognizingDecoder and returns true for AccurateRecognizer
+// 2. The decoder implements RecognizingDecoder and returns false for AccurateRecognizer
+// 3. All other decoders
+//
+// The order passed to the constructor is preserved within those priorities. Only the
+// last error encountered will be returned.
 func NewDecoder(decoders ...runtime.Decoder) runtime.Decoder {
 	recognizing, blind := []RecognizingDecoder{}, []runtime.Decoder{}
 	for _, d := range decoders {
-		if r, ok := d.(RecognizingDecoder); ok {
+		if r, ok := d.(RecognizingDecoder); ok && r.AccurateRecognizer() {
 			recognizing = append(recognizing, r)
 		} else {
 			blind = append(blind, d)
@@ -48,6 +63,29 @@ func NewDecoder(decoders ...runtime.Decoder) runtime.Decoder {
 type decoder struct {
 	recognizing []RecognizingDecoder
 	blind       []runtime.Decoder
+}
+
+var _ RecognizingDecoder = &decoder{}
+
+func (d *decoder) AccurateRecognizer() bool {
+	return len(d.recognizing) > 0
+}
+
+func (d *decoder) RecognizesData(peek io.Reader) (bool, error) {
+	var lastErr error
+	data, _ := bufio.NewReaderSize(peek, 1024).Peek(1024)
+	for _, r := range d.recognizing {
+		ok, err := r.RecognizesData(bytes.NewBuffer(data))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if !ok {
+			continue
+		}
+		return true, nil
+	}
+	return false, lastErr
 }
 
 func (d *decoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
