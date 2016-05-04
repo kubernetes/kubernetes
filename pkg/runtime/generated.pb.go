@@ -34,9 +34,6 @@ package runtime
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import _ "github.com/gogo/protobuf/gogoproto"
-import _ "k8s.io/kubernetes/pkg/api/resource"
-import _ "k8s.io/kubernetes/pkg/util/intstr"
 
 import io "io"
 
