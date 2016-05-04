@@ -167,6 +167,7 @@ ignore-daemonsets
 ignore-not-found
 image-gc-high-threshold
 image-gc-low-threshold
+image-pull-policy
 include-extended-apis
 input-base
 input-dirs
