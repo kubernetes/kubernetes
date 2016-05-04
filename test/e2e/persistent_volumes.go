@@ -43,9 +43,7 @@ func persistentVolumeTestCleanup(client *client.Client, config VolumeTestConfig)
 	}
 }
 
-// This test needs privileged containers, which are disabled by default.  Run
-// the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
-var _ = framework.KubeDescribe("PersistentVolumes [Feature:Volumes]", func() {
+var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	f := framework.NewDefaultFramework("pv")
 	var c *client.Client
 	var ns string
