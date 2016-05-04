@@ -28,6 +28,16 @@ import (
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 )
 
+func deepEqualWithoutGeneration(t *testing.T, testcase int, actual, expected *NodeInfo) {
+	// Ignore generation field.
+	if actual != nil {
+		actual.generation = 0
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("#%d: node info get=%s, want=%s", testcase, actual, expected)
+	}
+}
+
 // TestAssumePodScheduled tests that after a pod is assumed, its information is aggregated
 // on node level.
 func TestAssumePodScheduled(t *testing.T) {
@@ -92,9 +102,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			}
 		}
 		n := cache.nodes[nodeName]
-		if !reflect.DeepEqual(n, tt.wNodeInfo) {
-			t.Errorf("#%d: node info get=%s, want=%s", i, n, tt.wNodeInfo)
-		}
+		deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo)
 	}
 }
 
@@ -154,9 +162,7 @@ func TestExpirePod(t *testing.T) {
 		// pods that have assumedTime + ttl < cleanupTime will get expired and removed
 		cache.cleanupAssumedPods(tt.cleanupTime)
 		n := cache.nodes[nodeName]
-		if !reflect.DeepEqual(n, tt.wNodeInfo) {
-			t.Errorf("#%d: node info get=%s, want=%s", i, n, tt.wNodeInfo)
-		}
+		deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo)
 	}
 }
 
@@ -207,9 +213,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 		cache.cleanupAssumedPods(now.Add(2 * ttl))
 		// check after expiration. confirmed pods shouldn't be expired.
 		n := cache.nodes[nodeName]
-		if !reflect.DeepEqual(n, tt.wNodeInfo) {
-			t.Errorf("#%d: node info get=%s, want=%s", i, n, tt.wNodeInfo)
-		}
+		deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo)
 	}
 }
 
@@ -254,9 +258,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 		}
 		// check after expiration. confirmed pods shouldn't be expired.
 		n = cache.nodes[nodeName]
-		if !reflect.DeepEqual(n, tt.wNodeInfo) {
-			t.Errorf("#%d: node info get=%s, want=%s", i, n, tt.wNodeInfo)
-		}
+		deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo)
 	}
 }
 
@@ -317,9 +319,7 @@ func TestUpdatePod(t *testing.T) {
 			}
 			// check after expiration. confirmed pods shouldn't be expired.
 			n := cache.nodes[nodeName]
-			if !reflect.DeepEqual(n, tt.wNodeInfo[i-1]) {
-				t.Errorf("#%d: node info get=%s, want=%s", i-1, n, tt.wNodeInfo)
-			}
+			deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo[i-1])
 		}
 	}
 }
@@ -390,9 +390,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			}
 			// check after expiration. confirmed pods shouldn't be expired.
 			n := cache.nodes[nodeName]
-			if !reflect.DeepEqual(n, tt.wNodeInfo[i-1]) {
-				t.Errorf("#%d: node info get=%s, want=%s", i-1, n, tt.wNodeInfo)
-			}
+			deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo[i-1])
 		}
 	}
 }
@@ -426,9 +424,7 @@ func TestRemovePod(t *testing.T) {
 			t.Fatalf("AddPod failed: %v", err)
 		}
 		n := cache.nodes[nodeName]
-		if !reflect.DeepEqual(n, tt.wNodeInfo) {
-			t.Errorf("#%d: node info get=%s, want=%s", i, n, tt.wNodeInfo)
-		}
+		deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo)
 
 		if err := cache.RemovePod(tt.pod); err != nil {
 			t.Fatalf("RemovePod failed: %v", err)
@@ -438,14 +434,6 @@ func TestRemovePod(t *testing.T) {
 		if n != nil {
 			t.Errorf("#%d: expecting pod deleted and nil node info, get=%s", i, n)
 		}
-	}
-}
-
-func BenchmarkGetNodeNameToInfoMap1kNodes30kPods(b *testing.B) {
-	cache := setupCacheOf1kNodes30kPods(b)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		cache.GetNodeNameToInfoMap()
 	}
 }
 

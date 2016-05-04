@@ -39,6 +39,10 @@ type NodeInfo struct {
 	requestedResource *Resource
 	pods              []*api.Pod
 	nonzeroRequest    *Resource
+
+	// Whenever NodeInfo changes, generation is bumped.
+	// This is used to avoid cloning it if the object didn't change.
+	generation int64
 }
 
 // Resource is a collection of compute resource.
@@ -55,6 +59,7 @@ func NewNodeInfo(pods ...*api.Pod) *NodeInfo {
 	ni := &NodeInfo{
 		requestedResource: &Resource{},
 		nonzeroRequest:    &Resource{},
+		generation:        0,
 	}
 	for _, pod := range pods {
 		ni.addPod(pod)
@@ -101,6 +106,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		requestedResource: &(*n.requestedResource),
 		nonzeroRequest:    &(*n.nonzeroRequest),
 		pods:              pods,
+		generation:        n.generation,
 	}
 	return clone
 }
@@ -123,6 +129,7 @@ func (n *NodeInfo) addPod(pod *api.Pod) {
 	n.nonzeroRequest.MilliCPU += non0_cpu
 	n.nonzeroRequest.Memory += non0_mem
 	n.pods = append(n.pods, pod)
+	n.generation++
 }
 
 // removePod subtracts pod information to this NodeInfo.
@@ -149,6 +156,7 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 			n.requestedResource.NvidiaGPU -= nvidia_gpu
 			n.nonzeroRequest.MilliCPU -= non0_cpu
 			n.nonzeroRequest.Memory -= non0_mem
+			n.generation++
 			return nil
 		}
 	}
@@ -173,6 +181,7 @@ func calculateResource(pod *api.Pod) (cpu int64, mem int64, nvidia_gpu int64, no
 // Sets the overall node information.
 func (n *NodeInfo) SetNode(node *api.Node) error {
 	n.node = node
+	n.generation++
 	return nil
 }
 
@@ -183,6 +192,7 @@ func (n *NodeInfo) RemoveNode(node *api.Node) error {
 	// and thus can potentially be observed later, even though they happened before
 	// node removal. This is handled correctly in cache.go file.
 	n.node = nil
+	n.generation++
 	return nil
 }
 
