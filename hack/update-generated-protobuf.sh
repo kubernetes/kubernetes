@@ -49,6 +49,6 @@ mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
 cp "${KUBE_ROOT}/cmd/libs/go2idl/go-to-protobuf/build-image/Dockerfile" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
 kube::build::update_dockerfile
 kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
-kube::build::run_build_command hack/after-build/update-generated-protobuf.sh "$@"
+kube::build::run_build_command hack/update-generated-protobuf-dockerized.sh "$@"
 
 # ex: ts=2 sw=2 et filetype=sh

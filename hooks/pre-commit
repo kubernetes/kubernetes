@@ -103,7 +103,7 @@ files_need_description=()
 # Check API schema definitions for field descriptions
 for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party"); do
   # Check for files with fields without description tags
-  descriptionless=$(hack/after-build/verify-description.sh "${file}" > /dev/null; echo $?)
+  descriptionless=$(hack/verify-description.sh "${file}" > /dev/null; echo $?)
   if [[ "$descriptionless" -ne "0" ]]; then
     files_need_description+=("${file}")
   fi
@@ -123,7 +123,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for docs that need updating... "
-if ! hack/after-build/verify-generated-docs.sh > /dev/null; then
+if ! hack/verify-generated-docs.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some docs are out of sync between CLI and markdown."
   echo "To regenerate docs, run:"
@@ -135,7 +135,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for swagger type documentation that need updating... "
-if ! hack/after-build/verify-generated-swagger-docs.sh > /dev/null; then
+if ! hack/verify-generated-swagger-docs.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Swagger type documentation needs to be updated."
   echo "To regenerate the spec, run:"
@@ -147,7 +147,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for swagger spec that need updating... "
-if ! hack/after-build/verify-swagger-spec.sh > /dev/null; then
+if ! hack/verify-swagger-spec.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Swagger spec needs to be updated."
   echo "To regenerate the spec, run:"
