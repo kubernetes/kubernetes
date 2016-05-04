@@ -73,17 +73,17 @@ addon-dir-create:
 {% endif %}
 
 {% if pillar.get('enable_cluster_dns', '').lower() == 'true' %}
-/etc/kubernetes/addons/dns/skydns-svc.yaml:
+/etc/kubernetes/addons/dns/kubedns-svc.yaml:
   file.managed:
-    - source: salt://kube-addons/dns/skydns-svc.yaml.in
+    - source: salt://kube-dns/kubedns-svc.yaml.in
     - template: jinja
     - group: root
     - dir_mode: 755
     - makedirs: True
 
-/etc/kubernetes/addons/dns/skydns-rc.yaml:
+/etc/kubernetes/addons/dns/kubedns-rc.yaml:
   file.managed:
-    - source: salt://kube-addons/dns/skydns-rc.yaml.in
+    - source: salt://kube-dns/kubedns-rc.yaml.in
     - template: jinja
     - group: root
     - dir_mode: 755
