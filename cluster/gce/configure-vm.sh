@@ -777,6 +777,13 @@ EOF
 EOF
   fi
 
+  if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
+    cat <<EOF >>/etc/gce.conf
+node-tags = [${NODE_INSTANCE_PREFIX}]
+EOF
+    CLOUD_CONFIG=/etc/gce.conf
+  fi
+
   if [[ -n "${MULTIZONE:-}" ]]; then
     cat <<EOF >>/etc/gce.conf
 multizone = ${MULTIZONE}
