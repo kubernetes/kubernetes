@@ -65,3 +65,19 @@ func String(length int) string {
 	}
 	return string(b)
 }
+
+// A type that satisfies the rand.Shufflable interface can be shuffled
+// by Shuffle. Any sort.Interface will satisfy this interface.
+type Shufflable interface {
+	Len() int
+	Swap(i, j int)
+}
+
+func Shuffle(data Shufflable) {
+	rng.Lock()
+	defer rng.Unlock()
+	for i := 0; i < data.Len(); i++ {
+		j := rng.rand.Intn(i + 1)
+		data.Swap(i, j)
+	}
+}
