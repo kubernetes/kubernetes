@@ -2061,7 +2061,6 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		result.AddSyncResult(startContainerResult)
 
 		// containerChanges.StartInfraContainer causes the containers to be restarted for config reasons
-		// ignore backoff
 		if !containerChanges.StartInfraContainer {
 			isInBackOff, err, msg := dm.doBackOff(pod, container, podStatus, backOff)
 			if isInBackOff {
@@ -2071,13 +2070,12 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			}
 		}
 
-		glog.V(2).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
+		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
 		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
 			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
 			continue
 		}
-		//
 	}
 	return
 }

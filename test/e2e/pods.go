@@ -659,7 +659,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		})
 	})
 
-	It("should invoke init containers on a RestartNever pod [Conformance]", func() {
+	It("should invoke init containers on a RestartNever pod", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
@@ -724,7 +724,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 	})
 
-	It("should invoke init containers on a RestartAlways pod [Conformance]", func() {
+	It("should invoke init containers on a RestartAlways pod", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
@@ -753,7 +753,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 				Containers: []api.Container{
 					{
-						Name:  "nginx",
+						Name:  "run1",
 						Image: "gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
@@ -793,7 +793,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 	})
 
-	It("should not start app containers if init containers fail on a RestartAlways pod [Conformance]", func() {
+	It("should not start app containers if init containers fail on a RestartAlways pod", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
@@ -822,7 +822,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 				Containers: []api.Container{
 					{
-						Name:  "nginx",
+						Name:  "run1",
 						Image: "gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
@@ -908,7 +908,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
 	})
 
-	It("should not start app containers and fail the pod if init containers fail on a RestartNever pod [Conformance]", func() {
+	It("should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
@@ -938,7 +938,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 				Containers: []api.Container{
 					{
-						Name:    "nginx",
+						Name:    "run1",
 						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"/bin/true"},
 						Resources: api.ResourceRequirements{
