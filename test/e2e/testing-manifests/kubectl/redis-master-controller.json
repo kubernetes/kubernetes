@@ -1,0 +1,40 @@
+{
+   "kind":"ReplicationController",
+   "apiVersion":"v1",
+   "metadata":{
+      "name":"redis-master",
+      "labels":{
+         "app":"redis",
+         "role":"master"
+      }
+   },
+   "spec":{
+      "replicas":1,
+      "selector":{
+         "app":"redis",
+         "role":"master"
+      },
+      "template":{
+         "metadata":{
+            "labels":{
+               "app":"redis",
+               "role":"master"
+            }
+         },
+         "spec":{
+            "containers":[
+               {
+                  "name":"redis-master",
+		  "image": "gcr.io/google_containers/redis:e2e",
+                  "ports":[
+                     {
+                        "name":"redis-server",
+                        "containerPort":6379
+                     }
+                  ]
+               }
+            ]
+         }
+      }
+   }
+}
