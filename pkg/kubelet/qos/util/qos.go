@@ -16,10 +16,7 @@ limitations under the License.
 
 package util
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/sets"
-)
+import "k8s.io/kubernetes/pkg/api"
 
 const (
 	Guaranteed = "Guaranteed"
@@ -48,22 +45,48 @@ func isResourceBestEffort(container *api.Container, resource api.ResourceName) b
 }
 
 // GetPodQos returns the QoS class of a pod.
-// The QoS class of a pod is the lowest QoS class for each resource in each container.
+// A pod is besteffort if none of its containers have specified any requests or limits.
+// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
+// A pod is burstable if limits and requests do not match across all containers.
 func GetPodQos(pod *api.Pod) string {
-	qosValues := sets.NewString()
+	requests := map[api.ResourceName]int64{}
+	limits := map[api.ResourceName]int64{}
+	isGuaranteed := true
 	for _, container := range pod.Spec.Containers {
-		qosPerResource := GetQoS(&container)
-		for _, qosValue := range qosPerResource {
-			qosValues.Insert(qosValue)
+		// process requests
+		for name, quantity := range container.Resources.Requests {
+			if quantity.Value() > 0 {
+				requests[name] += quantity.Value()
+			}
+		}
+		// process limits
+		for name, quantity := range container.Resources.Limits {
+			if quantity.Value() > 0 {
+				limits[name] += quantity.Value()
+			}
+		}
+		if len(container.Resources.Limits) != len(supportedComputeResources) {
+			isGuaranteed = false
 		}
 	}
-	if qosValues.Has(BestEffort) {
+	if len(requests) == 0 && len(limits) == 0 {
 		return BestEffort
 	}
-	if qosValues.Has(Burstable) {
-		return Burstable
+	// Check is requests match limits for all resources.
+	if isGuaranteed {
+		for name, req := range requests {
+			if lim, exists := limits[name]; !exists || lim != req {
+				isGuaranteed = false
+				break
+			}
+		}
 	}
-	return Guaranteed
+	if isGuaranteed &&
+		len(requests) == len(limits) &&
+		len(limits) == len(supportedComputeResources) {
+		return Guaranteed
+	}
+	return Burstable
 }
 
 // GetQos returns a mapping of resource name to QoS class of a container
