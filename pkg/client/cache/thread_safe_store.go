@@ -179,6 +179,9 @@ func (c *threadSafeMap) ByIndex(indexName, indexKey string) ([]interface{}, erro
 }
 
 func (c *threadSafeMap) ListIndexFuncValues(indexName string) []string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	index := c.indices[indexName]
 	names := make([]string, 0, len(index))
 	for key := range index {
