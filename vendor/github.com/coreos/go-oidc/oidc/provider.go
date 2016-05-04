@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -618,7 +619,11 @@ func NewHTTPProviderConfigGetter(hc phttp.Client, issuerURL string) *httpProvide
 }
 
 func (r *httpProviderConfigGetter) Get() (cfg ProviderConfig, err error) {
-	req, err := http.NewRequest("GET", r.issuerURL+discoveryConfigPath, nil)
+	// If the Issuer value contains a path component, any terminating / MUST be removed before
+	// appending /.well-known/openid-configuration.
+	// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationRequest
+	discoveryURL := strings.TrimSuffix(r.issuerURL, "/") + discoveryConfigPath
+	req, err := http.NewRequest("GET", discoveryURL, nil)
 	if err != nil {
 		return
 	}
