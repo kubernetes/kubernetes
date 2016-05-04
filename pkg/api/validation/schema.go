@@ -62,27 +62,36 @@ type NullSchema struct{}
 func (NullSchema) ValidateBytes(data []byte) error { return nil }
 
 type SwaggerSchema struct {
-	api swagger.ApiDeclaration
+	api     swagger.ApiDeclaration
+	factory Schema // For delegating to  other api groups
 }
 
-func NewSwaggerSchemaFromBytes(data []byte) (Schema, error) {
+func NewSwaggerSchemaFromBytes(data []byte, factory Schema) (Schema, error) {
 	schema := &SwaggerSchema{}
 	err := json.Unmarshal(data, &schema.api)
 	if err != nil {
 		return nil, err
 	}
+	schema.factory = factory
 	return schema, nil
 }
 
 // validateList unpacks a list and validate every item in the list.
 // It return nil if every item is ok.
 // Otherwise it return an error list contain errors of every item.
+// validateList unpacks a list and validate every item in the list.
+// It return nil if every item is ok.
+// Otherwise it return an error list contain errors of every item.
 func (s *SwaggerSchema) validateList(obj map[string]interface{}) []error {
-	allErrs := []error{}
 	items, exists := obj["items"]
 	if !exists {
-		return append(allErrs, fmt.Errorf("no items field in %#v", obj))
+		return []error{fmt.Errorf("no items field in %#v", obj)}
 	}
+	return s.validateItems(items)
+}
+
+func (s *SwaggerSchema) validateItems(items interface{}) []error {
+	allErrs := []error{}
 	itemList, ok := items.([]interface{})
 	if !ok {
 		return append(allErrs, fmt.Errorf("items isn't a slice"))
@@ -125,6 +134,7 @@ func (s *SwaggerSchema) validateList(obj map[string]interface{}) []error {
 			allErrs = append(allErrs, errs...)
 		}
 	}
+
 	return allErrs
 }
 
@@ -171,6 +181,20 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	allErrs := []error{}
 	models := s.api.Models
 	model, ok := models.At(typeName)
+
+	// Verify the api version matches.  This is required for nested types with differing api versions because
+	// s.api only has schema for 1 api version (the parent object type's version).
+	// e.g. an extensions/v1beta1 Template embedding a /v1 Service requires the schema for the extensions/v1beta1
+	// api to delegate to the schema for the /v1 api.
+	// Only do this for !ok objects so that cross ApiVersion vendored types take precedence.
+	if !ok && s.factory != nil && s.isDifferentApiVersion(obj) {
+		err := s.delegateForApiVersion(obj)
+		if err != nil {
+			allErrs = append(allErrs, err)
+		}
+		return allErrs
+	}
+
 	if !ok {
 		return append(allErrs, TypeNotFoundError(typeName))
 	}
@@ -194,6 +218,17 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	}
 	for key, value := range fields {
 		details, ok := properties.At(key)
+
+		// Special case for runtime.RawExtension and runtime.Objects because they always fail to validate
+		// This is because the actual values will be of some sub-type (e.g. Deployment) not the expected
+		// super-type (RawExtention)
+		if s.isGenericArray(details) {
+			errs := s.validateItems(value)
+			if len(errs) > 0 {
+				allErrs = append(allErrs, errs...)
+			}
+			continue
+		}
 		if !ok {
 			allErrs = append(allErrs, fmt.Errorf("found invalid field %s for %s", key, typeName))
 			continue
@@ -217,6 +252,40 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 		}
 	}
 	return allErrs
+}
+
+// delegateForApiVersion delegates the validation of an object in a different ApiGroup to another SwaggerSchema.
+// Will panic if obj is in the same api group as this SwaggerSchema.
+func (s *SwaggerSchema) delegateForApiVersion(obj interface{}) error {
+	// Sanity check to prevent infinite recursion from delegating to ourselves
+	if !s.isDifferentApiVersion(obj) {
+		panic(fmt.Errorf("Cannot delegate schema for object %+v in same api version: %s", obj, s.api.ApiVersion))
+	}
+
+	// Convert the object back into bytes so that we can pass it to the ValidateBytes function
+	m, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+
+	// Delegate validation of this object to the correct SwaggerSchema for its ApiGroup
+	return s.factory.ValidateBytes(m)
+}
+
+// isDifferentApiVersion Returns true if obj lives in a different ApiVersion than the SwaggerSchema does.
+// The SwaggerSchema will not be able to process objects in different ApiVersions unless they are vendored.
+func (s *SwaggerSchema) isDifferentApiVersion(obj interface{}) bool {
+	groupVersion := obj.(map[string]interface{})["apiVersion"]
+	return groupVersion.(string) != "" && s.api.ApiVersion != groupVersion.(string)
+}
+
+// isGenericArray Returns true if p is an array of generic Objects - either RawExtension or Object.
+func (s *SwaggerSchema) isGenericArray(p swagger.ModelProperty) bool {
+	return p.DataTypeFields.Type != nil &&
+		*p.DataTypeFields.Type == "array" &&
+		p.Items != nil &&
+		p.Items.Ref != nil &&
+		(*p.Items.Ref == "runtime.RawExtension" || *p.Items.Ref == "runtime.Object")
 }
 
 // This matches type name in the swagger spec, such as "v1.Binding".

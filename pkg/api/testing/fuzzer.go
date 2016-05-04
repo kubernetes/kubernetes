@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -428,6 +429,30 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 					},
 				}
 			}
+		},
+		func(r *runtime.RawExtension, c fuzz.Continue) {
+			// Pick an arbitrary type and fuzz it
+			types := []runtime.Object{&api.Pod{}, &extensions.Deployment{}, &api.Service{}}
+			obj := types[c.Rand.Intn(len(types))]
+			c.Fuzz(obj)
+
+			// Find a codec for converting the object to raw bytes.  This is necessary for the
+			// api version and kind to be correctly set be serialization.
+			codec, err := testapi.GetCodecForObject(obj)
+			if err != nil {
+				t.Errorf("Failed to find codec for object: %v", err)
+			}
+
+			// Convert the object to raw bytes
+			var buff bytes.Buffer
+			codec.EncodeToStream(obj, &buff)
+			bytes, err := runtime.Encode(codec, obj)
+			if err != nil {
+				t.Errorf("Failed to encode object: %v", err)
+			}
+
+			// Set the bytes field on the RawExtension
+			r.Raw = bytes
 		},
 	)
 	return f
