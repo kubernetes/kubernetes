@@ -214,6 +214,14 @@ net.ipv4.ip_forward:
 {% set override_deb_sha1='' %}
 {% set override_docker_ver='' %}
 
+{% elif grains.get('cloud', '') == 'gce'
+   and grains.get('os_family', '') == 'Debian'
+   and grains.get('oscodename', '') == 'jessie' -%}
+{% set docker_pkg_name='' %}
+{% set override_deb='' %}
+{% set override_deb_sha1='' %}
+{% set override_docker_ver='' %}
+
 {% elif grains.get('cloud', '') == 'aws'
    and grains.get('os_family', '') == 'Debian'
    and grains.get('oscodename', '') == 'jessie' -%}
