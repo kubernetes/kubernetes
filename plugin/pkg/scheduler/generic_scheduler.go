@@ -62,6 +62,8 @@ type genericScheduler struct {
 	pods              algorithm.PodLister
 	lastNodeIndexLock sync.Mutex
 	lastNodeIndex     uint64
+
+	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -85,13 +87,13 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	}
 
 	// Used for all fit and priority funcs.
-	nodeNameToInfo, err := g.cache.GetNodeNameToInfoMap()
+	err = g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
 	if err != nil {
 		return "", err
 	}
 
 	trace.Step("Computing predicates")
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, nodeNameToInfo, g.predicates, nodes, g.extenders)
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, g.predicates, nodes, g.extenders)
 	if err != nil {
 		return "", err
 	}
@@ -104,7 +106,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	}
 
 	trace.Step("Prioritizing")
-	priorityList, err := PrioritizeNodes(pod, nodeNameToInfo, g.prioritizers, algorithm.FakeNodeLister(filteredNodes), g.extenders)
+	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, g.prioritizers, algorithm.FakeNodeLister(filteredNodes), g.extenders)
 	if err != nil {
 		return "", err
 	}
@@ -329,9 +331,10 @@ func EqualPriority(_ *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInf
 
 func NewGenericScheduler(cache schedulercache.Cache, predicates map[string]algorithm.FitPredicate, prioritizers []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
-		cache:        cache,
-		predicates:   predicates,
-		prioritizers: prioritizers,
-		extenders:    extenders,
+		cache:             cache,
+		predicates:        predicates,
+		prioritizers:      prioritizers,
+		extenders:         extenders,
+		cachedNodeInfoMap: make(map[string]*schedulercache.NodeInfo),
 	}
 }
