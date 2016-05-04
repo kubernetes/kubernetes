@@ -1412,7 +1412,7 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 	return
 }
 
-func (dm *DockerManager) applyOOMScoreAdj(container *api.Container, containerInfo *dockertypes.ContainerJSON) error {
+func (dm *DockerManager) applyOOMScoreAdj(pod *api.Pod, container *api.Container, containerInfo *dockertypes.ContainerJSON) error {
 	if containerInfo.State.Pid == 0 {
 		// Container exited. We cannot do anything about it. Ignore this error.
 		glog.V(2).Infof("Failed to apply OOM score adj on container %q with ID %q. Init process does not exist.", containerInfo.Name, containerInfo.ID)
@@ -1428,7 +1428,7 @@ func (dm *DockerManager) applyOOMScoreAdj(container *api.Container, containerInf
 		}
 		return err
 	}
-	oomScoreAdj := dm.calculateOomScoreAdj(container)
+	oomScoreAdj := dm.calculateOomScoreAdj(pod, container)
 	if err = dm.oomAdjuster.ApplyOOMScoreAdjContainer(cgroupName, oomScoreAdj, 5); err != nil {
 		if err == os.ErrNotExist {
 			// Container exited. We cannot do anything about it. Ignore this error.
@@ -1464,7 +1464,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		utsMode = namespaceModeHost
 	}
 
-	oomScoreAdj := dm.calculateOomScoreAdj(container)
+	oomScoreAdj := dm.calculateOomScoreAdj(pod, container)
 
 	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, restartCount, oomScoreAdj)
 	if err != nil {
@@ -1503,7 +1503,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 
 	// Check if current docker version is higher than 1.10. Otherwise, we have to apply OOMScoreAdj instead of using docker API.
 	// TODO: Remove this logic after we stop supporting docker version < 1.10.
-	if err := dm.applyOOMScoreAdjIfNeeded(container, containerInfo); err != nil {
+	if err = dm.applyOOMScoreAdjIfNeeded(pod, container, containerInfo); err != nil {
 		return kubecontainer.ContainerID{}, err
 	}
 
@@ -1521,7 +1521,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	return id, err
 }
 
-func (dm *DockerManager) applyOOMScoreAdjIfNeeded(container *api.Container, containerInfo *dockertypes.ContainerJSON) error {
+func (dm *DockerManager) applyOOMScoreAdjIfNeeded(pod *api.Pod, container *api.Container, containerInfo *dockertypes.ContainerJSON) error {
 	// Compare current API version with expected api version.
 	result, err := dm.checkDockerAPIVersion(dockerv110APIVersion)
 	if err != nil {
@@ -1529,7 +1529,7 @@ func (dm *DockerManager) applyOOMScoreAdjIfNeeded(container *api.Container, cont
 	}
 	// If current api version is older than OOMScoreAdj requested, use the old way.
 	if result < 0 {
-		if err := dm.applyOOMScoreAdj(container, containerInfo); err != nil {
+		if err := dm.applyOOMScoreAdj(pod, container, containerInfo); err != nil {
 			return fmt.Errorf("Failed to apply oom-score-adj to container %q- %v", err, containerInfo.Name)
 		}
 	}
@@ -1537,7 +1537,7 @@ func (dm *DockerManager) applyOOMScoreAdjIfNeeded(container *api.Container, cont
 	return nil
 }
 
-func (dm *DockerManager) calculateOomScoreAdj(container *api.Container) int {
+func (dm *DockerManager) calculateOomScoreAdj(pod *api.Pod, container *api.Container) int {
 	// Set OOM score of the container based on the priority of the container.
 	// Processes in lower-priority pods should be killed first if the system runs out of memory.
 	// The main pod infrastructure container is considered high priority, since if it is killed the
@@ -1546,7 +1546,7 @@ func (dm *DockerManager) calculateOomScoreAdj(container *api.Container) int {
 	if container.Name == PodInfraContainerName {
 		oomScoreAdj = qos.PodInfraOOMAdj
 	} else {
-		oomScoreAdj = qos.GetContainerOOMScoreAdjust(container, int64(dm.machineInfo.MemoryCapacity))
+		oomScoreAdj = qos.GetContainerOOMScoreAdjust(pod, container, int64(dm.machineInfo.MemoryCapacity))
 
 	}
 
