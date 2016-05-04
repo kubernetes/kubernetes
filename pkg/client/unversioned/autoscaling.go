@@ -72,7 +72,6 @@ func setAutoscalingDefaults(config *restclient.Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
 	config.NegotiatedSerializer = api.Codecs
 	return nil
 }

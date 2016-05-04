@@ -1413,7 +1413,7 @@ func TestUpdateRcWithRetries(t *testing.T) {
 		{StatusCode: 200, Header: header, Body: objBody(codec, rc)},
 	}
 	fakeClient := &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
@@ -1504,7 +1504,7 @@ func TestAddDeploymentHash(t *testing.T) {
 	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			header := http.Header{}
 			header.Set("Content-Type", runtime.ContentTypeJSON)

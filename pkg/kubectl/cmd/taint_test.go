@@ -232,10 +232,10 @@ func TestTaint(t *testing.T) {
 
 		new_node := &api.Node{}
 		tainted := false
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {

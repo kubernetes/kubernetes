@@ -47,9 +47,9 @@ func TestLog(t *testing.T) {
 	}
 	for _, test := range tests {
 		logContent := "test log content"
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
@@ -95,7 +95,7 @@ func testPod() *api.Pod {
 }
 
 func TestValidateLogFlags(t *testing.T) {
-	f, _, _ := NewAPIFactory()
+	f, _, _, _ := NewAPIFactory()
 
 	tests := []struct {
 		name     string

@@ -273,7 +273,6 @@ func (obj NotAnAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind)
 func defaultContentConfig() ContentConfig {
 	return ContentConfig{
 		GroupVersion:         testapi.Default.GroupVersion(),
-		Codec:                testapi.Default.Codec(),
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 	}
 }

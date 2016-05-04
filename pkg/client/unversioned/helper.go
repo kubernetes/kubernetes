@@ -268,9 +268,6 @@ func SetKubernetesDefaults(config *restclient.Config) error {
 	if config.NegotiatedSerializer == nil {
 		config.NegotiatedSerializer = api.Codecs
 	}
-	if config.Codec == nil {
-		config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
-	}
 
 	return restclient.SetKubernetesDefaults(config)
 }

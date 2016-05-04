@@ -380,7 +380,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				gv := gvk.GroupVersion()
 				cfg.GroupVersion = &gv
 				cfg.APIPath = "/apis"
-				cfg.Codec = thirdpartyresourcedata.NewCodec(c.ExtensionsClient.RESTClient.Codec(), gvk)
 				cfg.NegotiatedSerializer = thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, gvk.Kind, gv, gv)
 				return restclient.RESTClientFor(cfg)
 			}
