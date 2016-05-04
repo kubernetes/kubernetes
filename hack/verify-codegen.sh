@@ -23,12 +23,4 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-BUILD_TARGETS=(
-  cmd/libs/go2idl/client-gen
-  cmd/libs/go2idl/conversion-gen
-  cmd/libs/go2idl/deepcopy-gen
-  cmd/libs/go2idl/set-gen
-)
-"${KUBE_ROOT}/hack/build-go.sh" ${BUILD_TARGETS[*]}
-
-"${KUBE_ROOT}/hack/after-build/run-codegen.sh" --verify-only
+"${KUBE_ROOT}/hack/update-codegen.sh" --verify-only

@@ -25,4 +25,4 @@ kube::golang::setup_env
 
 "${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/import-boss
 
-"${KUBE_ROOT}/hack/after-build/run-import-boss.sh" --verify-only
+$(kube::util::find-binary "import-boss") --verify-only

@@ -23,9 +23,28 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/client-gen
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/conversion-gen
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/deepcopy-gen
-"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/set-gen
+BUILD_TARGETS=(
+  cmd/libs/go2idl/client-gen
+  cmd/libs/go2idl/conversion-gen
+  cmd/libs/go2idl/deepcopy-gen
+  cmd/libs/go2idl/set-gen
+)
+"${KUBE_ROOT}/hack/build-go.sh" ${BUILD_TARGETS[*]}
 
-"${KUBE_ROOT}/hack/after-build/run-codegen.sh" "$@"
+clientgen=$(kube::util::find-binary "client-gen")
+conversiongen=$(kube::util::find-binary "conversion-gen")
+deepcopygen=$(kube::util::find-binary "deepcopy-gen")
+setgen=$(kube::util::find-binary "set-gen")
+
+# Please do not add any logic to this shell script. Add logic to the go code
+# that generates the set-gen program.
+#
+# This can be called with one flag, --verify-only, so it works for both the
+# update- and verify- scripts.
+${clientgen} "$@"
+${clientgen} -t "$@"
+${conversiongen} "$@"
+${deepcopygen} "$@"
+${setgen} "$@"
+
+# You may add additional calls of code generators like set-gen above.
