@@ -45,11 +45,6 @@ func getListJSON(version, kind string, items ...[]byte) []byte {
 
 func getObject(version, kind, name string) *runtime.Unstructured {
 	return &runtime.Unstructured{
-		TypeMeta: runtime.TypeMeta{
-			APIVersion: version,
-			Kind:       kind,
-		},
-		Name: name,
 		Object: map[string]interface{}{
 			"apiVersion": version,
 			"kind":       kind,
@@ -88,9 +83,9 @@ func TestList(t *testing.T) {
 				getJSON("vTest", "rTest", "item1"),
 				getJSON("vTest", "rTest", "item2")),
 			want: &runtime.UnstructuredList{
-				TypeMeta: runtime.TypeMeta{
-					APIVersion: "vTest",
-					Kind:       "rTestList",
+				Object: map[string]interface{}{
+					"apiVersion": "vTest",
+					"kind":       "rTestList",
 				},
 				Items: []*runtime.Unstructured{
 					getObject("vTest", "rTest", "item1"),
@@ -106,9 +101,9 @@ func TestList(t *testing.T) {
 				getJSON("vTest", "rTest", "item1"),
 				getJSON("vTest", "rTest", "item2")),
 			want: &runtime.UnstructuredList{
-				TypeMeta: runtime.TypeMeta{
-					APIVersion: "vTest",
-					Kind:       "rTestList",
+				Object: map[string]interface{}{
+					"apiVersion": "vTest",
+					"kind":       "rTestList",
 				},
 				Items: []*runtime.Unstructured{
 					getObject("vTest", "rTest", "item1"),
