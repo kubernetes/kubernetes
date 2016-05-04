@@ -473,58 +473,6 @@ case ${JOB_NAME} in
     NUM_MINIONS=${NUM_MINIONS_PARALLEL}
     ;;
 
-  # Runs the performance/scalability tests on GCE using the latest 1.1 ci
-  # release. A larger cluster is used.
-  kubernetes-e2e-gce-scalability-1.1)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-scalability-1.1"}
-    : ${E2E_NETWORK:="e2e-scalability-1-1"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Performance\ssuite"}
-    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability-1-1"}
-    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="scalability-1.1"}
-    : ${PROJECT:="k8s-e2e-gce-scalability-1-1"}
-    # Override GCE defaults.
-    E2E_ZONE="us-east1-b"
-    MASTER_SIZE="n1-standard-4"
-    MINION_SIZE="n1-standard-2"
-    MINION_DISK_SIZE="50GB"
-    NUM_MINIONS="100"
-    # Reduce logs verbosity
-    TEST_CLUSTER_LOG_LEVEL="--v=2"
-    # Increase resync period to simulate production
-    TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
-    ;;
-
-  # Sets up the GCE soak cluster weekly using the latest 1.1 ci release.
-  kubernetes-soak-weekly-deploy-gce-1.1)
-    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-1.1"}
-    : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="gce-soak-weekly-1-1"}
-    : ${E2E_TEST:="false"}
-    : ${E2E_UP:="true"}
-    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-1-1"}
-    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="soak-1.1"}
-    : ${PROJECT:="kubernetes-jenkins"}
-    ;;
-
-  # Runs tests on GCE soak cluster for latest 1.1 ci release.
-  kubernetes-soak-continuous-e2e-gce-1.1)
-    : ${E2E_CLUSTER_NAME:="gce-soak-weekly-1.1"}
-    : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="gce-soak-weekly-1-1"}
-    : ${E2E_UP:="false"}
-    # Clear out any orphaned namespaces in case previous run was interrupted.
-    : ${E2E_CLEAN_START:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
-          )"}
-    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly-1-1"}
-    : ${PROJECT:="kubernetes-jenkins"}
-    ;;
-
   # Runs non-flaky tests on GCE with Trusty-beta as base image for minions,
   # sequentially.
   kubernetes-e2e-gce-trusty-beta-release)
@@ -629,30 +577,6 @@ case ${JOB_NAME} in
     : ${ENABLE_DEPLOYMENTS:=true}
     ;;
 
-  # Runs "disruptive" tests on GCE on the release candidate branch,
-  # sequentially, against the latest 1.1 ci release.
-  # The autoscaling test is not disruptive, however there is no better suite
-  # to run it.
-  kubernetes-e2e-gce-disruptive-1.1)
-    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-disruptive-1.1"}
-    : ${E2E_DOWN:="false"}
-    : ${E2E_NETWORK:="gce-e2e-disruptive-1-1"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}}\
-          ) --ginkgo.focus=$(join_regex_no_empty \
-          ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
-          "Autoscaling\sSuite.*via\sreplicationController" \
-          "GCE\sL7\sLoadBalancer\sController"
-          )"}
-    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
-    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce-disruptive-1-1"}
-    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="disruptive-1.1"}
-    # TODO: move into its own project
-    : ${PROJECT:="kubernetes-jenkins"}
-    : ${ENABLE_DEPLOYMENTS:=true}
-    : ${ENABLE_DAEMONSETS:=true}
-    ;;
-
   kubernetes-e2e-gke-subnet)
     : ${E2E_CLUSTER_NAME:="jkns-gke-subnet"}
     # auto-subnet manually created - if deleted, it will need to be recreated
@@ -719,7 +643,7 @@ case ${JOB_NAME} in
           )"}
     ;;
 
-  kubernetes-e2e-gke-1.1)
+  kubernetes-e2e-gke-release-1.1)
     : ${E2E_CLUSTER_NAME:="gke-release-1-1"}
     : ${E2E_NETWORK:="gke-release-1-1"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
