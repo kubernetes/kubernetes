@@ -41,6 +41,7 @@ type ApplyOptions struct {
 const (
 	apply_long = `Apply a configuration to a resource by filename or stdin.
 The resource will be created if it doesn't exist yet. 
+To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
 
 JSON and YAML formats are accepted.`
 	apply_example = `# Apply the configuration in pod.json to a pod.

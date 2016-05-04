@@ -1,7 +1,9 @@
 name: apply
 synopsis: Apply a configuration to a resource by filename or stdin
 description: "Apply a configuration to a resource by filename or stdin.\nThe resource
-  will be created if it doesn't exist yet. \n\nJSON and YAML formats are accepted."
+  will be created if it doesn't exist yet. \nTo use 'apply', always create the resource
+  initially with either 'apply' or 'create --save-config'.\n\nJSON and YAML formats
+  are accepted."
 options:
 - name: filename
   shorthand: f
