@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/runtime"
+	runtimeserializer "k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 
@@ -86,7 +87,8 @@ func New(kubeConfigFile string) (*WebhookAuthorizer, error) {
 		return nil, err
 	}
 	serializer := json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), false)
-	clientConfig.ContentConfig.Codec = versioning.NewCodecForScheme(api.Scheme, serializer, serializer, encodeVersions, decodeVersions)
+	codec := versioning.NewCodecForScheme(api.Scheme, serializer, serializer, encodeVersions, decodeVersions)
+	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(codec, codec, json.Framer)
 
 	restClient, err := restclient.UnversionedRESTClientFor(clientConfig)
 	if err != nil {

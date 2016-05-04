@@ -35,9 +35,11 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/json"
+	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/json"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
@@ -859,9 +861,9 @@ func TestWatchOnlyResource(t *testing.T) {
 
 func watchBody(codec runtime.Codec, events []watch.Event) io.ReadCloser {
 	buf := bytes.NewBuffer([]byte{})
-	enc := json.NewEncoder(buf, codec)
+	enc := versioned.NewEncoder(streaming.NewEncoder(buf, codec), codec)
 	for i := range events {
 		enc.Encode(&events[i])
 	}
-	return ioutil.NopCloser(buf)
+	return json.Framer.NewFrameReader(ioutil.NopCloser(buf))
 }
