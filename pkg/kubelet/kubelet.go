@@ -183,6 +183,7 @@ func NewMainKubelet(
 	volumePlugins []volume.VolumePlugin,
 	networkPlugins []network.NetworkPlugin,
 	networkPluginName string,
+	networkPluginDir string,
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
@@ -417,9 +418,15 @@ func NewMainKubelet(
 			Stage1Image:     rktStage1Image,
 			InsecureOptions: "image,ondisk",
 		}
+		netConf := &rkt.NetworkPluginConfig{
+			NetworkPluginName: networkPluginName,
+			NetworkPluginDir:  networkPluginDir,
+			NetworkPlugins:    networkPlugins,
+		}
 		rktRuntime, err := rkt.New(
 			rktAPIEndpoint,
 			conf,
+			netConf,
 			klet,
 			recorder,
 			containerRefManager,

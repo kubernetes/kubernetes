@@ -226,6 +226,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Mounter:                   mounter,
 		NetworkPluginName:         s.NetworkPluginName,
 		NetworkPlugins:            ProbeNetworkPlugins(s.NetworkPluginDir),
+		NetworkPluginDir:          s.NetworkPluginDir,
 		NodeLabels:                s.NodeLabels,
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency.Duration,
 		NonMasqueradeCIDR:         s.NonMasqueradeCIDR,
@@ -739,6 +740,7 @@ type KubeletConfig struct {
 	Mounter                        mount.Interface
 	NetworkPluginName              string
 	NetworkPlugins                 []network.NetworkPlugin
+	NetworkPluginDir               string
 	NodeName                       string
 	NodeLabels                     map[string]string
 	NodeStatusUpdateFrequency      time.Duration
@@ -831,6 +833,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.VolumePlugins,
 		kc.NetworkPlugins,
 		kc.NetworkPluginName,
+		kc.NetworkPluginDir,
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
 		kc.CAdvisorInterface,

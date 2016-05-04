@@ -37,7 +37,7 @@ const (
 	VendorCNIDirTemplate = "%s/opt/%s/bin"
 )
 
-type cniNetworkPlugin struct {
+type CNINetworkPlugin struct {
 	network.NoopNetworkPlugin
 
 	defaultNetwork *cniNetwork
@@ -56,7 +56,7 @@ func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix str
 	if err != nil {
 		return configList
 	}
-	return append(configList, &cniNetworkPlugin{defaultNetwork: network})
+	return append(configList, &CNINetworkPlugin{defaultNetwork: network})
 }
 
 func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
@@ -93,16 +93,16 @@ func getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix string) (*cniNetwork, er
 	return nil, fmt.Errorf("No valid networks found in %s", pluginDir)
 }
 
-func (plugin *cniNetworkPlugin) Init(host network.Host) error {
+func (plugin *CNINetworkPlugin) Init(host network.Host) error {
 	plugin.host = host
 	return nil
 }
 
-func (plugin *cniNetworkPlugin) Name() string {
+func (plugin *CNINetworkPlugin) Name() string {
 	return CNIPluginName
 }
 
-func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *CNINetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
 	if !ok {
 		return fmt.Errorf("CNI execution called on non-docker runtime")
@@ -121,7 +121,7 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 	return err
 }
 
-func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *CNINetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
 	if !ok {
 		return fmt.Errorf("CNI execution called on non-docker runtime")
@@ -136,7 +136,7 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
-func (plugin *cniNetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
+func (plugin *CNINetworkPlugin) Status(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
 	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
 	if !ok {
 		return nil, fmt.Errorf("CNI execution called on non-docker runtime")
@@ -150,6 +150,11 @@ func (plugin *cniNetworkPlugin) Status(namespace string, name string, id kubecon
 		return nil, err
 	}
 	return &network.PodNetworkStatus{IP: ip}, nil
+}
+
+// DefaultNetworkName returns the name of the default CNI network.
+func (plugin *CNINetworkPlugin) DefaultNetworkName() string {
+	return plugin.defaultNetwork.name
 }
 
 func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
