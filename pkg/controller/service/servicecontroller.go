@@ -233,7 +233,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, time.Durati
 		namespacedName.Name = deltaService.Name
 		cachedService = s.cache.getOrCreate(namespacedName.String())
 	}
-	glog.V(2).Infof("Got new %s delta for service: %+v", delta.Type, deltaService)
+	glog.V(2).Infof("Got new %s delta for service: %v", delta.Type, namespacedName)
 
 	// Ensure that no other goroutine will interfere with our processing of the
 	// service.
@@ -250,7 +250,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, time.Durati
 		return err, cachedService.nextRetryDelay()
 	} else if errors.IsNotFound(err) {
 		glog.V(2).Infof("Service %v not found, ensuring load balancer is deleted", namespacedName)
-		s.eventRecorder.Event(service, api.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
+		s.eventRecorder.Event(deltaService, api.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 		err := s.balancer.EnsureLoadBalancerDeleted(s.loadBalancerName(deltaService), s.zone.Region)
 		if err != nil {
 			message := "Error deleting load balancer (will retry): " + err.Error()
