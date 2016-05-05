@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 	var rm *framework.ResourceMonitor
 
 	BeforeEach(func() {
-		nodes := framework.ListSchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)

@@ -178,7 +178,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
 
 		By("Change label of node, check that daemon pod is launched.")
-		nodeList := framework.ListSchedulableNodesOrDie(f.Client)
+		nodeList := framework.GetReadySchedulableNodesOrDie(f.Client)
 		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred(), "error setting labels on node")
@@ -213,7 +213,7 @@ func separateDaemonSetNodeLabels(labels map[string]string) (map[string]string, m
 }
 
 func clearDaemonSetNodeLabels(c *client.Client) error {
-	nodeList := framework.ListSchedulableNodesOrDie(c)
+	nodeList := framework.GetReadySchedulableNodesOrDie(c)
 	for _, node := range nodeList.Items {
 		_, err := setDaemonSetNodeLabels(c, node.Name, map[string]string{})
 		if err != nil {

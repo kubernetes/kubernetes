@@ -47,7 +47,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Feature:ClusterSizeAut
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")
 
-		nodes := framework.ListSchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 		cpu := nodes.Items[0].Status.Capacity[api.ResourceCPU]

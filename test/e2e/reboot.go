@@ -128,7 +128,7 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 
 func testReboot(c *client.Client, rebootCmd string) {
 	// Get all nodes, and kick off the test on each.
-	nodelist := framework.ListSchedulableNodesOrDie(c)
+	nodelist := framework.GetReadySchedulableNodesOrDie(c)
 	result := make([]bool, len(nodelist.Items))
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodelist.Items))

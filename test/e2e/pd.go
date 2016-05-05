@@ -58,7 +58,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.SkipUnlessNodeCountIsAtLeast(2)
 
 		podClient = f.Client.Pods(f.Namespace.Name)
-		nodes := framework.ListSchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
 

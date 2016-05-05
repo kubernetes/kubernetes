@@ -1112,7 +1112,7 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 }
 
 func getNodePublicIps(c *client.Client) ([]string, error) {
-	nodes := framework.ListSchedulableNodesOrDie(c)
+	nodes := framework.GetReadySchedulableNodesOrDie(c)
 
 	ips := collectAddresses(nodes, api.NodeExternalIP)
 	if len(ips) == 0 {
