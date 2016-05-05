@@ -28,7 +28,7 @@ type PodSecurityPoliciesInterface interface {
 
 type PodSecurityPolicyInterface interface {
 	Get(name string) (result *extensions.PodSecurityPolicy, err error)
-	Create(scc *extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
+	Create(psp *extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
 	List(opts api.ListOptions) (*extensions.PodSecurityPolicyList, error)
 	Delete(name string) error
 	Update(*extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
@@ -45,11 +45,11 @@ func newPodSecurityPolicy(c *ExtensionsClient) *podSecurityPolicy {
 	return &podSecurityPolicy{c}
 }
 
-func (s *podSecurityPolicy) Create(scc *extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error) {
+func (s *podSecurityPolicy) Create(psp *extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error) {
 	result := &extensions.PodSecurityPolicy{}
 	err := s.client.Post().
 		Resource("podsecuritypolicies").
-		Body(scc).
+		Body(psp).
 		Do().
 		Into(result)
 
