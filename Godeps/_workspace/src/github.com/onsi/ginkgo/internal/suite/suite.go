@@ -71,6 +71,7 @@ func (suite *Suite) generateSpecs(description string, config config.GinkgoConfig
 	}
 
 	specs := spec.NewSpecs(specsSlice)
+	specs.RegexScansFilePath = config.RegexScansFilePath
 
 	if config.RandomizeAllSpecs {
 		specs.Shuffle(rand.New(rand.NewSource(config.RandomSeed)))
@@ -85,7 +86,6 @@ func (suite *Suite) generateSpecs(description string, config config.GinkgoConfig
 	if config.ParallelTotal > 1 {
 		specs.TrimForParallelization(config.ParallelTotal, config.ParallelNode)
 	}
-
 	return specs
 }
 
