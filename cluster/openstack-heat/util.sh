@@ -91,11 +91,6 @@ function create-stack() {
   echo "[INFO] Execute commands to create Kubernetes cluster"
   # It is required for some cloud provider like CityCloud where swift client has different credentials
   source "${ROOT}/openrc-swift.sh"
-  if [[ -z ${OS_PROJECT_ID+x} ]]; then
-    SWIFT_PROJECT_ID="${OS_TENANT_ID}"
-  else
-    SWIFT_PROJECT_ID="${OS_PROJECT_ID}"
-  fi
   upload-resources
   source "${ROOT}/openrc-default.sh"
 
@@ -168,7 +163,6 @@ function create-glance-image() {
 #   KUBERNETES_KEYPAIR_NAME
 #   DNS_SERVER
 #   SWIFT_SERVER_URL
-#   SWIFT_TENANT_ID
 #   OPENSTACK_IMAGE_NAME
 #   EXTERNAL_NETWORK
 #   IMAGE_ID
@@ -181,7 +175,12 @@ function create-glance-image() {
 function run-heat-script() {
 
   local stack_status=$(openstack stack show ${STACK_NAME})
-  local swift_repo_url="${SWIFT_SERVER_URL}/v1/AUTH_${SWIFT_PROJECT_ID}/kubernetes"
+
+  # Automatically detect swift url if it wasn't specified
+  if [[ -z $SWIFT_SERVER_URL ]]; then
+    SWIFT_SERVER_URL=$(openstack catalog show object-store --format value | egrep -o "publicURL: (.+)$" | cut -d" " -f2)
+  fi
+  local swift_repo_url="${SWIFT_SERVER_URL}/kubernetes"
 
   if [ $CREATE_IMAGE = true ]; then
     echo "[INFO] Retrieve new image ID"
