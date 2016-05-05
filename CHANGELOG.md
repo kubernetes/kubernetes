@@ -56,10 +56,6 @@ binary | sha1 hash | md5 hash
 ------ | --------- | --------
 [kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.0-alpha.3/kubernetes.tar.gz) | `01e0dc68653173614dc99f44875173478f837b38` | `ae22c35f3a963743d21daa17683e0288`
 
-# v1.3.0-alpha.3
-
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
-
 ## Changes since v1.3.0-alpha.2
 
 ### Action Required
