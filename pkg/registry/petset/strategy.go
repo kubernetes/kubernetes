@@ -86,13 +86,9 @@ func (petSetStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (petSetStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	return field.ErrorList{field.Forbidden(field.NewPath("spec"), "updates to petset spec are forbidden.")}
-
-	// TODO: For now we're taking the safe route and disallowing all updates to spec.
-	// Enable on a case by case basis.
-	//validationErrorList := validation.ValidatePetSet(obj.(*apps.PetSet))
-	//updateErrorList := validation.ValidatePetSetUpdate(obj.(*apps.PetSet), old.(*apps.PetSet))
-	//return append(validationErrorList, updateErrorList...)
+	validationErrorList := validation.ValidatePetSet(obj.(*apps.PetSet))
+	updateErrorList := validation.ValidatePetSetUpdate(obj.(*apps.PetSet), old.(*apps.PetSet))
+	return append(validationErrorList, updateErrorList...)
 }
 
 // AllowUnconditionalUpdate is the default update policy for PetSet objects.

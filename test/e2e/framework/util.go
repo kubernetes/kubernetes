@@ -3743,3 +3743,21 @@ func CoreDump(dir string) {
 		Logf("Error running cluster/log-dump.sh: %v", err)
 	}
 }
+
+func UpdatePodWithRetries(client *client.Client, ns, name string, update func(*api.Pod)) (*api.Pod, error) {
+	for i := 0; i < 3; i++ {
+		pod, err := client.Pods(ns).Get(name)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to get pod %q: %v", name, err)
+		}
+		update(pod)
+		pod, err = client.Pods(ns).Update(pod)
+		if err == nil {
+			return pod, nil
+		}
+		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
+			return nil, fmt.Errorf("Failed to update pod %q: %v", name, err)
+		}
+	}
+	return nil, fmt.Errorf("Too many retries updating Pod %q", name)
+}
