@@ -102,6 +102,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&RangeAllocation{},
 		&ConfigMap{},
 		&ConfigMapList{},
+		&APIServerIPInfo{},
+		&APIServerIPInfoList{},
 	)
 
 	// Register Unversioned types under their own special group
@@ -181,3 +183,6 @@ func (obj *ExportOptions) GetObjectKind() unversioned.ObjectKind             { r
 func (obj *ConfigMap) GetObjectMeta() meta.Object                            { return &obj.ObjectMeta }
 func (obj *ConfigMap) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
 func (obj *ConfigMapList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *APIServerIPInfo) GetObjectMeta() meta.Object                      { return &obj.ObjectMeta }
+func (obj *APIServerIPInfo) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *APIServerIPInfoList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }

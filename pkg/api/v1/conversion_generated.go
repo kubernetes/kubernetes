@@ -32,6 +32,8 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedConversionFuncs(
+		Convert_v1_APIServerIPInfo_To_api_APIServerIPInfo,
+		Convert_api_APIServerIPInfo_To_v1_APIServerIPInfo,
 		Convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		Convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
 		Convert_v1_Affinity_To_api_Affinity,
@@ -314,6 +316,42 @@ func init() {
 		// if one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+}
+
+func autoConvert_v1_APIServerIPInfo_To_api_APIServerIPInfo(in *APIServerIPInfo, out *api.APIServerIPInfo, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*APIServerIPInfo))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.ServerIP = in.ServerIP
+	return nil
+}
+
+func Convert_v1_APIServerIPInfo_To_api_APIServerIPInfo(in *APIServerIPInfo, out *api.APIServerIPInfo, s conversion.Scope) error {
+	return autoConvert_v1_APIServerIPInfo_To_api_APIServerIPInfo(in, out, s)
+}
+
+func autoConvert_api_APIServerIPInfo_To_v1_APIServerIPInfo(in *api.APIServerIPInfo, out *APIServerIPInfo, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.APIServerIPInfo))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.ServerIP = in.ServerIP
+	return nil
+}
+
+func Convert_api_APIServerIPInfo_To_v1_APIServerIPInfo(in *api.APIServerIPInfo, out *APIServerIPInfo, s conversion.Scope) error {
+	return autoConvert_api_APIServerIPInfo_To_v1_APIServerIPInfo(in, out, s)
 }
 
 func autoConvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *AWSElasticBlockStoreVolumeSource, out *api.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {

@@ -33,6 +33,8 @@ import (
 
 func init() {
 	if err := Scheme.AddGeneratedDeepCopyFuncs(
+		DeepCopy_api_APIServerIPInfo,
+		DeepCopy_api_APIServerIPInfoList,
 		DeepCopy_api_AWSElasticBlockStoreVolumeSource,
 		DeepCopy_api_Affinity,
 		DeepCopy_api_AzureFileVolumeSource,
@@ -178,6 +180,38 @@ func init() {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
 	}
+}
+
+func DeepCopy_api_APIServerIPInfo(in APIServerIPInfo, out *APIServerIPInfo, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.ServerIP = in.ServerIP
+	return nil
+}
+
+func DeepCopy_api_APIServerIPInfoList(in APIServerIPInfoList, out *APIServerIPInfoList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]APIServerIPInfo, len(in))
+		for i := range in {
+			if err := DeepCopy_api_APIServerIPInfo(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
 }
 
 func DeepCopy_api_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, c *conversion.Cloner) error {

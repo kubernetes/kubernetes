@@ -27,19 +27,55 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
+type fakeLeaseMgr struct {
+	keys map[string]bool
+}
+
+func (mgr *fakeLeaseMgr) ListLeases() ([]string, error) {
+	res := make([]string, 0, len(mgr.keys))
+	for ip := range mgr.keys {
+		res = append(res, ip)
+	}
+	return res, nil
+}
+
+func (mgr *fakeLeaseMgr) UpdateLease(ip string) error {
+	mgr.keys[ip] = true
+	return nil
+}
+
+func (mgr *fakeLeaseMgr) SetLeaseTime(ttl uint64) {
+}
+
+func (mgr *fakeLeaseMgr) setKeys(keys []string) {
+	for _, ip := range keys {
+		mgr.keys[ip] = false
+	}
+}
+
+func (mgr *fakeLeaseMgr) getUpdatedKeys() []string {
+	res := []string{}
+	for ip, updated := range mgr.keys {
+		if updated {
+			res = append(res, ip)
+		}
+	}
+	return res
+}
+
 func TestReconcileEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	om := func(name string) api.ObjectMeta {
 		return api.ObjectMeta{Namespace: ns, Name: name}
 	}
 	reconcile_tests := []struct {
-		testName          string
-		serviceName       string
-		ip                string
-		endpointPorts     []api.EndpointPort
-		additionalMasters int
-		endpoints         *api.EndpointsList
-		expectUpdate      *api.Endpoints // nil means none expected
+		testName      string
+		serviceName   string
+		ip            string
+		endpointPorts []api.EndpointPort
+		endpointKeys  []string
+		endpoints     *api.EndpointsList
+		expectUpdate  *api.Endpoints // nil means none expected
 	}{
 		{
 			testName:      "no existing endpoints",
@@ -60,6 +96,22 @@ func TestReconcileEndpoints(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports:     []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+		},
+		{
+			testName:      "existing endpoints satisfy + refresh existing key",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"1.2.3.4"},
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
 					ObjectMeta: om("foo"),
@@ -93,11 +145,11 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 		},
 		{
-			testName:          "existing endpoints satisfy but too many + extra masters",
-			serviceName:       "foo",
-			ip:                "1.2.3.4",
-			endpointPorts:     []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			additionalMasters: 3,
+			testName:      "existing endpoints satisfy but too many + extra masters",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
 					ObjectMeta: om("foo"),
@@ -127,11 +179,11 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 		},
 		{
-			testName:          "existing endpoints satisfy but too many + extra masters + delete first",
-			serviceName:       "foo",
-			ip:                "4.3.2.4",
-			endpointPorts:     []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			additionalMasters: 3,
+			testName:      "existing endpoints satisfy but too many + extra masters + delete first",
+			serviceName:   "foo",
+			ip:            "4.3.2.4",
+			endpointPorts: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
 					ObjectMeta: om("foo"),
@@ -161,31 +213,11 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 		},
 		{
-			testName:          "existing endpoints satisfy and endpoint addresses length less than master count",
-			serviceName:       "foo",
-			ip:                "4.3.2.2",
-			endpointPorts:     []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			additionalMasters: 3,
-			endpoints: &api.EndpointsList{
-				Items: []api.Endpoints{{
-					ObjectMeta: om("foo"),
-					Subsets: []api.EndpointSubset{{
-						Addresses: []api.EndpointAddress{
-							{IP: "4.3.2.1"},
-							{IP: "4.3.2.2"},
-						},
-						Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				}},
-			},
-			expectUpdate: nil,
-		},
-		{
-			testName:          "existing endpoints current IP missing and address length less than master count",
-			serviceName:       "foo",
-			ip:                "4.3.2.2",
-			endpointPorts:     []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			additionalMasters: 3,
+			testName:      "existing endpoints current IP missing",
+			serviceName:   "foo",
+			ip:            "4.3.2.2",
+			endpointPorts: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"4.3.2.1"},
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
 					ObjectMeta: om("foo"),
@@ -371,7 +403,9 @@ func TestReconcileEndpoints(t *testing.T) {
 		},
 	}
 	for _, test := range reconcile_tests {
-		master := Controller{MasterCount: test.additionalMasters + 1}
+		leaseMgr := &fakeLeaseMgr{keys: make(map[string]bool)}
+		leaseMgr.setKeys(test.endpointKeys)
+		master := Controller{MasterLeases: leaseMgr}
 		registry := &registrytest.EndpointRegistry{
 			Endpoints: test.endpoints,
 		}
@@ -390,16 +424,19 @@ func TestReconcileEndpoints(t *testing.T) {
 		if test.expectUpdate == nil && len(registry.Updates) > 0 {
 			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
 		}
+		if updatedKeys := leaseMgr.getUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
+			t.Errorf("case %q: expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", test.testName, updatedKeys)
+		}
 	}
 
 	non_reconcile_tests := []struct {
-		testName          string
-		serviceName       string
-		ip                string
-		endpointPorts     []api.EndpointPort
-		additionalMasters int
-		endpoints         *api.EndpointsList
-		expectUpdate      *api.Endpoints // nil means none expected
+		testName      string
+		serviceName   string
+		ip            string
+		endpointPorts []api.EndpointPort
+		endpointKeys  []string
+		endpoints     *api.EndpointsList
+		expectUpdate  *api.Endpoints // nil means none expected
 	}{
 		{
 			testName:    "existing endpoints extra service ports missing port no update",
@@ -461,7 +498,9 @@ func TestReconcileEndpoints(t *testing.T) {
 		},
 	}
 	for _, test := range non_reconcile_tests {
-		master := Controller{MasterCount: test.additionalMasters + 1}
+		leaseMgr := &fakeLeaseMgr{keys: make(map[string]bool)}
+		leaseMgr.setKeys(test.endpointKeys)
+		master := Controller{MasterLeases: leaseMgr}
 		registry := &registrytest.EndpointRegistry{
 			Endpoints: test.endpoints,
 		}
@@ -479,6 +518,9 @@ func TestReconcileEndpoints(t *testing.T) {
 		}
 		if test.expectUpdate == nil && len(registry.Updates) > 0 {
 			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
+		}
+		if updatedKeys := leaseMgr.getUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
+			t.Errorf("case %q: expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", test.testName, updatedKeys)
 		}
 	}
 
@@ -519,7 +561,8 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range create_tests {
-		master := Controller{MasterCount: 1}
+		leaseMgr := &fakeLeaseMgr{keys: make(map[string]bool)}
+		master := Controller{MasterLeases: leaseMgr}
 		registry := &registrytest.ServiceRegistry{
 			Err: errors.New("unable to get svc"),
 		}
@@ -794,7 +837,8 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range reconcile_tests {
-		master := Controller{MasterCount: 1}
+		leaseMgr := &fakeLeaseMgr{keys: make(map[string]bool)}
+		master := Controller{MasterLeases: leaseMgr}
 		registry := &registrytest.ServiceRegistry{
 			Service: test.service,
 		}
@@ -846,7 +890,8 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range non_reconcile_tests {
-		master := Controller{MasterCount: 1}
+		leaseMgr := &fakeLeaseMgr{keys: make(map[string]bool)}
+		master := Controller{MasterLeases: leaseMgr}
 		registry := &registrytest.ServiceRegistry{
 			Service: test.service,
 		}
