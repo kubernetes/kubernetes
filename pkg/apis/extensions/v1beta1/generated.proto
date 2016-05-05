@@ -235,6 +235,16 @@ message ExportOptions {
   optional bool exact = 2;
 }
 
+// FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
+message FSGroupStrategyOptions {
+  // Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
+  optional string rule = 1;
+
+  // Ranges are the allowed ranges of fs groups.  If you would like to force a single
+  // fs group then supply a single range with the same start and end.
+  repeated IDRange ranges = 2;
+}
+
 // HTTPIngressPath associates a path regex with a backend. Incoming urls matching
 // the path are forwarded to the backend.
 message HTTPIngressPath {
@@ -641,30 +651,54 @@ message PodSecurityPolicySpec {
   // privileged determines if a pod can request to be run as privileged.
   optional bool privileged = 1;
 
-  // capabilities is a list of capabilities that can be added.
-  repeated string capabilities = 2;
+  // DefaultAddCapabilities is the default set of capabilities that will be added to the container
+  // unless the pod spec specifically drops the capability.  You may not list a capabiility in both
+  // DefaultAddCapabilities and RequiredDropCapabilities.
+  repeated string defaultAddCapabilities = 2;
+
+  // RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
+  // are required to be dropped and cannot be added.
+  repeated string requiredDropCapabilities = 3;
+
+  // AllowedCapabilities is a list of capabilities that can be requested to add to the container.
+  // Capabilities in this field may be added at the pod author's discretion.
+  // You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
+  repeated string allowedCapabilities = 4;
 
   // volumes is a white list of allowed volume plugins.  Empty indicates that all plugins
   // may be used.
-  repeated string volumes = 3;
+  repeated string volumes = 5;
 
   // hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.
-  optional bool hostNetwork = 4;
+  optional bool hostNetwork = 6;
 
   // hostPorts determines which host port ranges are allowed to be exposed.
-  repeated HostPortRange hostPorts = 5;
+  repeated HostPortRange hostPorts = 7;
 
   // hostPID determines if the policy allows the use of HostPID in the pod spec.
-  optional bool hostPID = 6;
+  optional bool hostPID = 8;
 
   // hostIPC determines if the policy allows the use of HostIPC in the pod spec.
-  optional bool hostIPC = 7;
+  optional bool hostIPC = 9;
 
   // seLinux is the strategy that will dictate the allowable labels that may be set.
-  optional SELinuxStrategyOptions seLinux = 8;
+  optional SELinuxStrategyOptions seLinux = 10;
 
   // runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
-  optional RunAsUserStrategyOptions runAsUser = 9;
+  optional RunAsUserStrategyOptions runAsUser = 11;
+
+  // SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
+  optional SupplementalGroupsStrategyOptions supplementalGroups = 12;
+
+  // FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.
+  optional FSGroupStrategyOptions fsGroup = 13;
+
+  // ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file
+  // system.  If the container specifically requests to run with a non-read only root file system
+  // the PSP should deny the pod.
+  // If set to false the container may run with a read only root file system if it wishes but it
+  // will not be forced to.
+  optional bool readOnlyRootFilesystem = 14;
 }
 
 // ReplicaSet represents the configuration of a ReplicaSet.
@@ -834,6 +868,16 @@ message SubresourceReference {
 
   // Subresource name of the referent
   optional string subresource = 4;
+}
+
+// SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
+message SupplementalGroupsStrategyOptions {
+  // Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
+  optional string rule = 1;
+
+  // Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
+  // supplemental group then supply a single range with the same start and end.
+  repeated IDRange ranges = 2;
 }
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
