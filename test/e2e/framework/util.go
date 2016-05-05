@@ -2241,21 +2241,6 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 	return events.Items
 }
 
-// Convenient wrapper around listing nodes supporting retries.
-func ListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
-	var nodes *api.NodeList
-	var err error
-	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		nodes, err = c.Nodes().List(api.ListOptions{FieldSelector: fields.Set{
-			"spec.unschedulable": "false",
-		}.AsSelector()})
-		return err == nil, nil
-	}) != nil {
-		ExpectNoError(err, "Timed out while listing nodes for e2e cluster.")
-	}
-	return nodes
-}
-
 func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	By(fmt.Sprintf("Scaling replication controller %s in namespace %s to %d", name, ns, size))
 	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), c)
@@ -3587,10 +3572,8 @@ func CheckPodHashLabel(pods *api.PodList) error {
 	return nil
 }
 
-// GetReadyNodes retrieves a list of schedulable nodes whose condition
-// is Ready.  An error will be returned if no such nodes are found.
-func GetReadyNodes(f *Framework) (nodes *api.NodeList, err error) {
-	nodes = ListSchedulableNodesOrDie(f.Client)
+func GetReadySchedulableNodes(c *client.Client) (nodes *api.NodeList, err error) {
+	nodes = ListSchedulableNodesOrDie(c)
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	FilterNodes(nodes, func(node api.Node) bool {
@@ -3599,8 +3582,22 @@ func GetReadyNodes(f *Framework) (nodes *api.NodeList, err error) {
 
 	if len(nodes.Items) == 0 {
 		return nil, errors.New("No Ready nodes found.")
+	} else {
+		return nodes, nil
 	}
-	return nodes, nil
+}
+
+// GetReadyNodes retrieves a list of schedulable nodes whose condition
+// is Ready.  An error will be returned if no such nodes are found.
+func GetReadyNodes(f *Framework) (nodes *api.NodeList, err error) {
+	return GetReadySchedulableNodes(f.Client)
+}
+
+// Convenient wrapper around listing nodes supporting retries.
+func ListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
+	nodes, err := GetReadySchedulableNodes(c)
+	ExpectNoError(err)
+	return nodes
 }
 
 // timeout for proxy requests.
