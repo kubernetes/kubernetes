@@ -24,6 +24,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -38,9 +39,10 @@ var _ = Describe("Kubelet Container Manager", func() {
 	Describe("oom score adjusting", func() {
 		namespace := "oom-adj"
 		Context("when scheduling a busybox command that always fails in a pod", func() {
-			podName := "bin-false"
+			var podName string
 
 			BeforeEach(func() {
+				podName = "bin-false" + string(util.NewUUID())
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      podName,
