@@ -28,9 +28,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -117,7 +117,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	if currentAnnotations == nil {
 		currentAnnotations = make(map[string]string)
 	}
-	currentAnnotations[kubectl.LastAppliedConfigAnnotation] = string(original)
+	currentAnnotations[annotations.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
 	current, err := json.Marshal(currentObj)
 	if err != nil {
@@ -151,7 +151,7 @@ func validatePatchApplication(t *testing.T, req *http.Request) {
 	}
 
 	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[kubectl.LastAppliedConfigAnnotation]; !ok {
+	if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
 		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 	}
 

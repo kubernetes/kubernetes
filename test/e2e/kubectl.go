@@ -40,11 +40,11 @@ import (
 	"github.com/ghodss/yaml"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/annotations"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -1432,7 +1432,7 @@ func forEachReplicationController(c *client.Client, ns, selectorKey, selectorVal
 
 func validateReplicationControllerConfiguration(rc api.ReplicationController) {
 	if rc.Name == "redis-master" {
-		if _, ok := rc.Annotations[kubectl.LastAppliedConfigAnnotation]; !ok {
+		if _, ok := rc.Annotations[annotations.LastAppliedConfigAnnotation]; !ok {
 			framework.Failf("Annotation not found in modified configuration:\n%v\n", rc)
 		}
 
