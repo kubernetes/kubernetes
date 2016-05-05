@@ -22,8 +22,8 @@ import (
 	"runtime"
 
 	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/federation/cmd/federated-controller-manager/app"
-	"k8s.io/kubernetes/federation/cmd/federated-controller-manager/app/options"
+	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app"
+	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"

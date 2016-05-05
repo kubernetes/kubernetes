@@ -37,6 +37,7 @@ kube::golang::server_targets() {
     cmd/kubemark
     cmd/hyperkube
     federation/cmd/federated-apiserver
+    federation/cmd/federation-controller-manager
     plugin/cmd/kube-scheduler
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
