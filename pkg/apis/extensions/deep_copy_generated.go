@@ -45,6 +45,7 @@ func init() {
 		DeepCopy_extensions_DeploymentSpec,
 		DeepCopy_extensions_DeploymentStatus,
 		DeepCopy_extensions_DeploymentStrategy,
+		DeepCopy_extensions_FSGroupStrategyOptions,
 		DeepCopy_extensions_HTTPIngressPath,
 		DeepCopy_extensions_HTTPIngressRuleValue,
 		DeepCopy_extensions_HostPortRange,
@@ -72,6 +73,7 @@ func init() {
 		DeepCopy_extensions_Scale,
 		DeepCopy_extensions_ScaleSpec,
 		DeepCopy_extensions_ScaleStatus,
+		DeepCopy_extensions_SupplementalGroupsStrategyOptions,
 		DeepCopy_extensions_ThirdPartyResource,
 		DeepCopy_extensions_ThirdPartyResourceData,
 		DeepCopy_extensions_ThirdPartyResourceDataList,
@@ -311,6 +313,22 @@ func DeepCopy_extensions_DeploymentStrategy(in DeploymentStrategy, out *Deployme
 	return nil
 }
 
+func DeepCopy_extensions_FSGroupStrategyOptions(in FSGroupStrategyOptions, out *FSGroupStrategyOptions, c *conversion.Cloner) error {
+	out.Rule = in.Rule
+	if in.Ranges != nil {
+		in, out := in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(in))
+		for i := range in {
+			if err := DeepCopy_extensions_IDRange(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
+	}
+	return nil
+}
+
 func DeepCopy_extensions_HTTPIngressPath(in HTTPIngressPath, out *HTTPIngressPath, c *conversion.Cloner) error {
 	out.Path = in.Path
 	if err := DeepCopy_extensions_IngressBackend(in.Backend, &out.Backend, c); err != nil {
@@ -502,14 +520,32 @@ func DeepCopy_extensions_PodSecurityPolicyList(in PodSecurityPolicyList, out *Po
 
 func DeepCopy_extensions_PodSecurityPolicySpec(in PodSecurityPolicySpec, out *PodSecurityPolicySpec, c *conversion.Cloner) error {
 	out.Privileged = in.Privileged
-	if in.Capabilities != nil {
-		in, out := in.Capabilities, &out.Capabilities
+	if in.DefaultAddCapabilities != nil {
+		in, out := in.DefaultAddCapabilities, &out.DefaultAddCapabilities
 		*out = make([]api.Capability, len(in))
 		for i := range in {
 			(*out)[i] = in[i]
 		}
 	} else {
-		out.Capabilities = nil
+		out.DefaultAddCapabilities = nil
+	}
+	if in.RequiredDropCapabilities != nil {
+		in, out := in.RequiredDropCapabilities, &out.RequiredDropCapabilities
+		*out = make([]api.Capability, len(in))
+		for i := range in {
+			(*out)[i] = in[i]
+		}
+	} else {
+		out.RequiredDropCapabilities = nil
+	}
+	if in.AllowedCapabilities != nil {
+		in, out := in.AllowedCapabilities, &out.AllowedCapabilities
+		*out = make([]api.Capability, len(in))
+		for i := range in {
+			(*out)[i] = in[i]
+		}
+	} else {
+		out.AllowedCapabilities = nil
 	}
 	if in.Volumes != nil {
 		in, out := in.Volumes, &out.Volumes
@@ -540,6 +576,13 @@ func DeepCopy_extensions_PodSecurityPolicySpec(in PodSecurityPolicySpec, out *Po
 	if err := DeepCopy_extensions_RunAsUserStrategyOptions(in.RunAsUser, &out.RunAsUser, c); err != nil {
 		return err
 	}
+	if err := DeepCopy_extensions_SupplementalGroupsStrategyOptions(in.SupplementalGroups, &out.SupplementalGroups, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_extensions_FSGroupStrategyOptions(in.FSGroup, &out.FSGroup, c); err != nil {
+		return err
+	}
+	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	return nil
 }
 
@@ -687,6 +730,22 @@ func DeepCopy_extensions_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conver
 		}
 	} else {
 		out.Selector = nil
+	}
+	return nil
+}
+
+func DeepCopy_extensions_SupplementalGroupsStrategyOptions(in SupplementalGroupsStrategyOptions, out *SupplementalGroupsStrategyOptions, c *conversion.Cloner) error {
+	out.Rule = in.Rule
+	if in.Ranges != nil {
+		in, out := in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(in))
+		for i := range in {
+			if err := DeepCopy_extensions_IDRange(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
 	}
 	return nil
 }
