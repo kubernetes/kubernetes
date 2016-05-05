@@ -31,7 +31,6 @@ import (
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_extensions_APIVersion,
-		DeepCopy_extensions_CPUTargetUtilization,
 		DeepCopy_extensions_CustomMetricCurrentStatus,
 		DeepCopy_extensions_CustomMetricCurrentStatusList,
 		DeepCopy_extensions_CustomMetricTarget,
@@ -48,10 +47,6 @@ func init() {
 		DeepCopy_extensions_DeploymentStrategy,
 		DeepCopy_extensions_HTTPIngressPath,
 		DeepCopy_extensions_HTTPIngressRuleValue,
-		DeepCopy_extensions_HorizontalPodAutoscaler,
-		DeepCopy_extensions_HorizontalPodAutoscalerList,
-		DeepCopy_extensions_HorizontalPodAutoscalerSpec,
-		DeepCopy_extensions_HorizontalPodAutoscalerStatus,
 		DeepCopy_extensions_HostPortRange,
 		DeepCopy_extensions_IDRange,
 		DeepCopy_extensions_Ingress,
@@ -77,7 +72,6 @@ func init() {
 		DeepCopy_extensions_Scale,
 		DeepCopy_extensions_ScaleSpec,
 		DeepCopy_extensions_ScaleStatus,
-		DeepCopy_extensions_SubresourceReference,
 		DeepCopy_extensions_ThirdPartyResource,
 		DeepCopy_extensions_ThirdPartyResourceData,
 		DeepCopy_extensions_ThirdPartyResourceDataList,
@@ -90,11 +84,6 @@ func init() {
 
 func DeepCopy_extensions_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {
 	out.Name = in.Name
-	return nil
-}
-
-func DeepCopy_extensions_CPUTargetUtilization(in CPUTargetUtilization, out *CPUTargetUtilization, c *conversion.Cloner) error {
-	out.TargetPercentage = in.TargetPercentage
 	return nil
 }
 
@@ -341,96 +330,6 @@ func DeepCopy_extensions_HTTPIngressRuleValue(in HTTPIngressRuleValue, out *HTTP
 		}
 	} else {
 		out.Paths = nil
-	}
-	return nil
-}
-
-func DeepCopy_extensions_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-		return err
-	}
-	if err := DeepCopy_extensions_HorizontalPodAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
-		return err
-	}
-	if err := DeepCopy_extensions_HorizontalPodAutoscalerStatus(in.Status, &out.Status, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func DeepCopy_extensions_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, c *conversion.Cloner) error {
-	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := in.Items, &out.Items
-		*out = make([]HorizontalPodAutoscaler, len(in))
-		for i := range in {
-			if err := DeepCopy_extensions_HorizontalPodAutoscaler(in[i], &(*out)[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func DeepCopy_extensions_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, c *conversion.Cloner) error {
-	if err := DeepCopy_extensions_SubresourceReference(in.ScaleRef, &out.ScaleRef, c); err != nil {
-		return err
-	}
-	if in.MinReplicas != nil {
-		in, out := in.MinReplicas, &out.MinReplicas
-		*out = new(int32)
-		**out = *in
-	} else {
-		out.MinReplicas = nil
-	}
-	out.MaxReplicas = in.MaxReplicas
-	if in.CPUUtilization != nil {
-		in, out := in.CPUUtilization, &out.CPUUtilization
-		*out = new(CPUTargetUtilization)
-		if err := DeepCopy_extensions_CPUTargetUtilization(*in, *out, c); err != nil {
-			return err
-		}
-	} else {
-		out.CPUUtilization = nil
-	}
-	return nil
-}
-
-func DeepCopy_extensions_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, c *conversion.Cloner) error {
-	if in.ObservedGeneration != nil {
-		in, out := in.ObservedGeneration, &out.ObservedGeneration
-		*out = new(int64)
-		**out = *in
-	} else {
-		out.ObservedGeneration = nil
-	}
-	if in.LastScaleTime != nil {
-		in, out := in.LastScaleTime, &out.LastScaleTime
-		*out = new(unversioned.Time)
-		if err := unversioned.DeepCopy_unversioned_Time(*in, *out, c); err != nil {
-			return err
-		}
-	} else {
-		out.LastScaleTime = nil
-	}
-	out.CurrentReplicas = in.CurrentReplicas
-	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentCPUUtilizationPercentage != nil {
-		in, out := in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
-		*out = new(int32)
-		**out = *in
-	} else {
-		out.CurrentCPUUtilizationPercentage = nil
 	}
 	return nil
 }
@@ -789,14 +688,6 @@ func DeepCopy_extensions_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conver
 	} else {
 		out.Selector = nil
 	}
-	return nil
-}
-
-func DeepCopy_extensions_SubresourceReference(in SubresourceReference, out *SubresourceReference, c *conversion.Cloner) error {
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.APIVersion = in.APIVersion
-	out.Subresource = in.Subresource
 	return nil
 }
 
