@@ -98,7 +98,7 @@ function log() {
 function get-object-kind-from-file() {
     # prints to stdout, so log cannot be used
     #WARNING: only yaml is supported
-    cat $1 | ${PYTHON} -c '''
+    cat $1 | python -c '''
 try:
         import pipes,sys,yaml
         y = yaml.load(sys.stdin)
@@ -120,7 +120,7 @@ function get-object-nsname-from-file() {
     # prints to stdout, so log cannot be used
     #WARNING: only yaml is supported
     #addons that do not specify a namespace are assumed to be in "default".
-    cat $1 | ${PYTHON} -c '''
+    cat $1 | python -c '''
 try:
         import pipes,sys,yaml
         y = yaml.load(sys.stdin)

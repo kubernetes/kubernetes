@@ -19,20 +19,10 @@
 # managed result is of that. Start everything below that directory.
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 
-ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-600}
+ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-10}
 
 SYSTEM_NAMESPACE=kube-system
 trusty_master=${TRUSTY_MASTER:-false}
-
-function ensure_python() {
-  if ! python --version > /dev/null 2>&1; then    
-    echo "No python on the machine, will use a python image"
-    local -r PYTHON_IMAGE=gcr.io/google_containers/python:v1
-    export PYTHON="docker run --interactive --rm --net=none ${PYTHON_IMAGE} python"
-  else
-    export PYTHON=python
-  fi
-}
 
 # $1 filename of addon to start.
 # $2 count of tries to start the addon.
@@ -74,10 +64,8 @@ function create-resource-from-string() {
 # managed result is of that. Start everything below that directory.
 echo "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
 
-ensure_python
-
 # Create the namespace that will be used to host the cluster-level add-ons.
-start_addon /etc/kubernetes/addons/namespace.yaml 100 10 "" &
+start_addon /opt/namespace.yaml 100 10 "" &
 
 # Wait for the default service account to be created in the kube-system namespace.
 token_found=""

@@ -11,13 +11,6 @@ addon-dir-create:
     - require:
         - file: addon-dir-delete
 
-/etc/kubernetes/addons/namespace.yaml:
-  file.managed:
-    - source: salt://kube-addons/namespace.yaml
-    - user: root
-    - group: root
-    - file_mode: 644
-
 {% if pillar.get('enable_cluster_monitoring', '').lower() == 'influxdb' %}
 /etc/kubernetes/addons/cluster-monitoring/influxdb:
   file.recurse:
@@ -157,63 +150,9 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
-/etc/kubernetes/kube-addons.sh:
+/etc/kubernetes/manifests/kube-addon-manager.yaml:
   file.managed:
-    - source: salt://kube-addons/kube-addons.sh
+    - source: salt://kube-addons/kube-addon-manager.yaml
     - user: root
     - group: root
     - mode: 755
-
-/etc/kubernetes/kube-addon-update.sh:
-  file.managed:
-    - source: salt://kube-addons/kube-addon-update.sh
-    - user: root
-    - group: root
-    - mode: 755
-
-{% if pillar.get('is_systemd') %}
-
-{{ pillar.get('systemd_system_path') }}/kube-addons.service:
-  file.managed:
-    - source: salt://kube-addons/kube-addons.service
-    - user: root
-    - group: root
-  cmd.wait:
-    - name: /opt/kubernetes/helpers/services bounce kube-addons
-    - watch:
-      - file: {{ pillar.get('systemd_system_path') }}/kube-addons.service
-
-{% else %}
-
-/etc/init.d/kube-addons:
-  file.managed:
-    - source: salt://kube-addons/initd
-    - user: root
-    - group: root
-    - mode: 755
-
-{% endif %}
-
-# Stop kube-addons service each time salt is executed, just in case
-# there was a modification of addons.
-# Actually, this should be handled by watching file changes, but
-# somehow it doesn't work.
-service-kube-addon-stop:
-  service.dead:
-    - name: kube-addons
-
-kube-addons:
-  service.running:
-    - enable: True
-    - require:
-        - service: service-kube-addon-stop
-    - watch:
-{% if pillar.get('is_systemd') %}
-      - file: {{ pillar.get('systemd_system_path') }}/kube-addons.service
-{% else %}
-      - file: /etc/init.d/kube-addons
-{% endif %}
-{% if pillar.get('is_systemd') %}
-    - provider:
-      - service: systemd
-{%- endif %}
