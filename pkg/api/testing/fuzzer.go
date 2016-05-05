@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
@@ -377,15 +378,12 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			c.FuzzNoCustom(s)
 			s.Allocatable = s.Capacity
 		},
-		func(s *extensions.HorizontalPodAutoscalerSpec, c fuzz.Continue) {
+		func(s *autoscaling.HorizontalPodAutoscalerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			minReplicas := int32(c.Rand.Int31())
 			s.MinReplicas = &minReplicas
-			s.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: int32(c.RandUint64())}
-		},
-		func(s *extensions.SubresourceReference, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			s.Subresource = "scale"
+			targetCpu := int32(c.RandUint64())
+			s.TargetCPUUtilizationPercentage = &targetCpu
 		},
 		func(psp *extensions.PodSecurityPolicySpec, c fuzz.Continue) {
 			c.FuzzNoCustom(psp) // fuzz self without calling this function again

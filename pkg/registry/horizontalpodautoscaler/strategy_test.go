@@ -22,15 +22,15 @@ import (
 	_ "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Extensions.GroupVersion().String(),
+		testapi.Autoscaling.GroupVersion().String(),
 		"Autoscaler",
-		labels.Set(AutoscalerToSelectableFields(&extensions.HorizontalPodAutoscaler{})),
+		labels.Set(AutoscalerToSelectableFields(&autoscaling.HorizontalPodAutoscaler{})),
 		nil,
 	)
 }

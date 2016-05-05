@@ -1710,7 +1710,7 @@ type HorizontalPodAutoscalerDescriber struct {
 }
 
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	hpa, err := d.client.Extensions().HorizontalPodAutoscalers(namespace).Get(name)
+	hpa, err := d.client.Autoscaling().HorizontalPodAutoscalers(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -1720,12 +1720,11 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		printLabelsMultiline(out, "Labels", hpa.Labels)
 		printLabelsMultiline(out, "Annotations", hpa.Annotations)
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
-		fmt.Fprintf(out, "Reference:\t%s/%s/%s\n",
-			hpa.Spec.ScaleRef.Kind,
-			hpa.Spec.ScaleRef.Name,
-			hpa.Spec.ScaleRef.Subresource)
-		if hpa.Spec.CPUUtilization != nil {
-			fmt.Fprintf(out, "Target CPU utilization:\t%d%%\n", hpa.Spec.CPUUtilization.TargetPercentage)
+		fmt.Fprintf(out, "Reference:\t%s/%s\n",
+			hpa.Spec.ScaleTargetRef.Kind,
+			hpa.Spec.ScaleTargetRef.Name)
+		if hpa.Spec.TargetCPUUtilizationPercentage != nil {
+			fmt.Fprintf(out, "Target CPU utilization:\t%d%%\n", *hpa.Spec.TargetCPUUtilizationPercentage)
 			fmt.Fprintf(out, "Current CPU utilization:\t")
 			if hpa.Status.CurrentCPUUtilizationPercentage != nil {
 				fmt.Fprintf(out, "%d%%\n", *hpa.Status.CurrentCPUUtilizationPercentage)
@@ -1741,9 +1740,9 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		fmt.Fprintf(out, "Max replicas:\t%d\n", hpa.Spec.MaxReplicas)
 
 		// TODO: switch to scale subresource once the required code is submitted.
-		if strings.ToLower(hpa.Spec.ScaleRef.Kind) == "replicationcontroller" {
+		if strings.ToLower(hpa.Spec.ScaleTargetRef.Kind) == "replicationcontroller" {
 			fmt.Fprintf(out, "ReplicationController pods:\t")
-			rc, err := d.client.ReplicationControllers(hpa.Namespace).Get(hpa.Spec.ScaleRef.Name)
+			rc, err := d.client.ReplicationControllers(hpa.Namespace).Get(hpa.Spec.ScaleTargetRef.Name)
 			if err == nil {
 				fmt.Fprintf(out, "%d current / %d desired\n", rc.Status.Replicas, rc.Spec.Replicas)
 			} else {

@@ -33,7 +33,7 @@ type AutoscalingClient struct {
 }
 
 func (c *AutoscalingClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
-	return newHorizontalPodAutoscalersV1(c, namespace)
+	return newHorizontalPodAutoscalers(c, namespace)
 }
 
 func NewAutoscaling(c *restclient.Config) (*AutoscalingClient, error) {

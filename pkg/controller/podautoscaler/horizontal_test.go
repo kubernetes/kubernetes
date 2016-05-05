@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
@@ -138,25 +139,24 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.Lock()
 		defer tc.Unlock()
 
-		obj := &extensions.HorizontalPodAutoscalerList{
-			Items: []extensions.HorizontalPodAutoscaler{
+		obj := &autoscaling.HorizontalPodAutoscalerList{
+			Items: []autoscaling.HorizontalPodAutoscaler{
 				{
 					ObjectMeta: api.ObjectMeta{
 						Name:      hpaName,
 						Namespace: namespace,
 						SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
 					},
-					Spec: extensions.HorizontalPodAutoscalerSpec{
-						ScaleRef: extensions.SubresourceReference{
-							Kind:        tc.resource.kind,
-							Name:        tc.resource.name,
-							APIVersion:  tc.resource.apiVersion,
-							Subresource: "scale",
+					Spec: autoscaling.HorizontalPodAutoscalerSpec{
+						ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+							Kind:       tc.resource.kind,
+							Name:       tc.resource.name,
+							APIVersion: tc.resource.apiVersion,
 						},
 						MinReplicas: &tc.minReplicas,
 						MaxReplicas: tc.maxReplicas,
 					},
-					Status: extensions.HorizontalPodAutoscalerStatus{
+					Status: autoscaling.HorizontalPodAutoscalerStatus{
 						CurrentReplicas: tc.initialReplicas,
 						DesiredReplicas: tc.initialReplicas,
 					},
@@ -165,7 +165,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		}
 
 		if tc.CPUTarget > 0.0 {
-			obj.Items[0].Spec.CPUUtilization = &extensions.CPUTargetUtilization{TargetPercentage: tc.CPUTarget}
+			obj.Items[0].Spec.TargetCPUUtilizationPercentage = &tc.CPUTarget
 		}
 		if tc.cmTarget != nil {
 			b, err := json.Marshal(tc.cmTarget)
@@ -327,7 +327,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.Lock()
 		defer tc.Unlock()
 
-		obj := action.(core.UpdateAction).GetObject().(*extensions.HorizontalPodAutoscaler)
+		obj := action.(core.UpdateAction).GetObject().(*autoscaling.HorizontalPodAutoscaler)
 		assert.Equal(t, namespace, obj.Namespace)
 		assert.Equal(t, hpaName, obj.Name)
 		assert.Equal(t, tc.desiredReplicas, obj.Status.DesiredReplicas)
@@ -383,7 +383,7 @@ func (tc *testCase) runTest(t *testing.T) {
 		metricsClient:   metricsClient,
 		eventRecorder:   recorder,
 		scaleNamespacer: testClient.Extensions(),
-		hpaNamespacer:   testClient.Extensions(),
+		hpaNamespacer:   testClient.Autoscaling(),
 	}
 
 	store, frameworkController := newInformer(hpaController, time.Minute)
