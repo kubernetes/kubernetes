@@ -18,30 +18,30 @@ package app
 
 import (
 	"github.com/golang/glog"
-
-	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 
-	_ "k8s.io/kubernetes/federation/apis/federation/install"
-	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
+	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/v1"
+	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 )
 
-func installFederationAPIs(s *genericapiserver.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
-	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(createRESTOptionsOrDie(s, g, f, federation.Resource("clusters")))
-	federationResources := map[string]rest.Storage{
-		"clusters":        clusterStorage,
-		"clusters/status": clusterStatusStorage,
+func installCoreAPIs(s *genericapiserver.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
+	serviceStore, serviceStatusStorage := serviceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("service")))
+	coreResources := map[string]rest.Storage{
+		"services":        serviceStore,
+		"services/status": serviceStatusStorage,
 	}
-	federationGroupMeta := registered.GroupOrDie(federation.GroupName)
+	coreGroupMeta := registered.GroupOrDie(api.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
-		GroupMeta: *federationGroupMeta,
+		GroupMeta: *coreGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			"v1alpha1": federationResources,
+			v1.SchemeGroupVersion.Version: coreResources,
 		},
 		OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+		IsLegacyGroup:          true,
 		Scheme:                 api.Scheme,
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,

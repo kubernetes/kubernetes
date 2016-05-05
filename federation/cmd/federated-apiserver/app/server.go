@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -141,7 +142,20 @@ func Run(s *genericapiserver.ServerRunOptions) error {
 	}
 
 	installFederationAPIs(s, m, storageFactory)
+	installCoreAPIs(s, m, storageFactory)
 
 	m.Run(s)
 	return nil
+}
+
+func createRESTOptionsOrDie(s *genericapiserver.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
+	storage, err := f.New(resource)
+	if err != nil {
+		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
+	}
+	return generic.RESTOptions{
+		Storage:                 storage,
+		Decorator:               g.StorageDecorator(),
+		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
+	}
 }
