@@ -325,7 +325,7 @@ type FakeAutoscaling struct {
 }
 
 func (c *FakeAutoscaling) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
-	return &FakeHorizontalPodAutoscalersV1{Fake: c, Namespace: namespace}
+	return &FakeHorizontalPodAutoscalers{Fake: c, Namespace: namespace}
 }
 
 // NewSimpleFakeBatch returns a client that will respond with the provided objects
@@ -352,10 +352,6 @@ type FakeExperimental struct {
 
 func (c *FakeExperimental) DaemonSets(namespace string) client.DaemonSetInterface {
 	return &FakeDaemonSets{Fake: c, Namespace: namespace}
-}
-
-func (c *FakeExperimental) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
-	return &FakeHorizontalPodAutoscalers{Fake: c, Namespace: namespace}
 }
 
 func (c *FakeExperimental) Deployments(namespace string) client.DeploymentInterface {

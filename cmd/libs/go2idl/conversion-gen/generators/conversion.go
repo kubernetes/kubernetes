@@ -70,6 +70,7 @@ func DefaultNameSystem() string {
 var fallbackPackages = []string{
 	"k8s.io/kubernetes/pkg/api/unversioned",
 	"k8s.io/kubernetes/pkg/apis/extensions",
+	"k8s.io/kubernetes/pkg/apis/autoscaling",
 	"k8s.io/kubernetes/pkg/apis/batch",
 }
 
