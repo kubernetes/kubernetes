@@ -15,10 +15,11 @@ import (
 )
 
 func BuildBootstrapCommand() *Command {
-	var agouti, noDot bool
+	var agouti, noDot, internal bool
 	flagSet := flag.NewFlagSet("bootstrap", flag.ExitOnError)
 	flagSet.BoolVar(&agouti, "agouti", false, "If set, bootstrap will generate a bootstrap file for writing Agouti tests")
 	flagSet.BoolVar(&noDot, "nodot", false, "If set, bootstrap will generate a bootstrap file that does not . import ginkgo and gomega")
+	flagSet.BoolVar(&internal, "internal", false, "If set, generate will generate a test file that uses the regular package name")
 
 	return &Command{
 		Name:         "bootstrap",
@@ -29,12 +30,12 @@ func BuildBootstrapCommand() *Command {
 			"Accepts the following flags:",
 		},
 		Command: func(args []string, additionalArgs []string) {
-			generateBootstrap(agouti, noDot)
+			generateBootstrap(agouti, noDot, internal)
 		},
 	}
 }
 
-var bootstrapText = `package {{.Package}}_test
+var bootstrapText = `package {{.Package}}
 
 import (
 	{{.GinkgoImport}}
@@ -49,7 +50,7 @@ func Test{{.FormattedName}}(t *testing.T) {
 }
 `
 
-var agoutiBootstrapText = `package {{.Package}}_test
+var agoutiBootstrapText = `package {{.Package}}
 
 import (
 	{{.GinkgoImport}}
@@ -115,6 +116,14 @@ func prettifyPackageName(name string) string {
 	return name
 }
 
+func determinePackageName(name string, internal bool) string {
+	if internal {
+		return name
+	}
+
+	return name + "_test"
+}
+
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -123,10 +132,10 @@ func fileExists(path string) bool {
 	return false
 }
 
-func generateBootstrap(agouti bool, noDot bool) {
+func generateBootstrap(agouti, noDot, internal bool) {
 	packageName, bootstrapFilePrefix, formattedName := getPackageAndFormattedName()
 	data := bootstrapData{
-		Package:       packageName,
+		Package:       determinePackageName(packageName, internal),
 		FormattedName: formattedName,
 		GinkgoImport:  `. "github.com/onsi/ginkgo"`,
 		GomegaImport:  `. "github.com/onsi/gomega"`,
