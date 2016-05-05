@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -224,17 +225,60 @@ type URLVisitor struct {
 }
 
 func (v *URLVisitor) Visit(fn VisitorFunc) error {
-	res, err := http.Get(v.URL.String())
+	body, err := v.readHttpWithRetries(httpgetImpl, time.Second, v.URL.String())
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		return fmt.Errorf("unable to read URL %q, server reported %d %s", v.URL, res.StatusCode, res.Status)
-	}
-
-	v.StreamVisitor.Reader = res.Body
+	defer body.Close()
+	v.StreamVisitor.Reader = body
 	return v.StreamVisitor.Visit(fn)
+}
+
+// readHttpWithRetries tries to http.Get the v.URL 3 times before giving up.
+func (v *URLVisitor) readHttpWithRetries(get httpget, duration time.Duration, u string) (io.ReadCloser, error) {
+	var err error
+	var body io.ReadCloser
+	for i := 0; i < 3; i++ {
+		var statusCode int
+		var status string
+		if i > 0 {
+			time.Sleep(duration)
+		}
+
+		// Try to get the URL
+		statusCode, status, body, err = get(u)
+
+		// Retry Errors
+		if err != nil {
+			continue
+		}
+
+		// Error - Set the error condition from the StatusCode
+		if statusCode != 200 {
+			err = fmt.Errorf("unable to read URL %q, server reported %d %s", u, statusCode, status)
+		}
+
+		if statusCode >= 500 && statusCode < 600 {
+			// Retry 500's
+			continue
+		} else {
+			// Don't retry other StatusCodes
+			break
+		}
+	}
+	return body, err
+}
+
+// httpget Defines function to retrieve a url and return the results.  Exists for unit test stubbing.
+type httpget func(url string) (int, string, io.ReadCloser, error)
+
+// httpgetImpl Implements a function to retrieve a url and return the results.
+func httpgetImpl(url string) (int, string, io.ReadCloser, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return 0, "", nil, err
+	}
+	return resp.StatusCode, resp.Status, resp.Body, nil
 }
 
 // DecoratedVisitor will invoke the decorators in order prior to invoking the visitor function
