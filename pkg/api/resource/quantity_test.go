@@ -808,3 +808,123 @@ func TestAdd(t *testing.T) {
 		}
 	}
 }
+
+func benchmarkQuantities() []Quantity {
+	return []Quantity{
+		{dec(1024*1024*1024, 0), BinarySI},
+		{dec(1024*1024*1024*1024, 0), BinarySI},
+		{dec(1000000, 3), DecimalSI},
+		{dec(1000000000, 0), DecimalSI},
+		{dec(1, -3), DecimalSI},
+		{dec(80, -3), DecimalSI},
+		{dec(1080, -3), DecimalSI},
+		{dec(0, 0), BinarySI},
+		{dec(1, 9), DecimalExponent},
+		{dec(1, -9), DecimalSI},
+	}
+}
+
+func BenchmarkQuantityString(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	var s string
+	for i := 0; i < b.N; i++ {
+		s = values[i%len(values)].String()
+	}
+	b.StopTimer()
+	if len(s) == 0 {
+		b.Fatal(s)
+	}
+}
+
+func BenchmarkQuantityMarshalJSON(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := values[i%len(values)].MarshalJSON(); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkQuantityUnmarshalJSON(b *testing.B) {
+	values := benchmarkQuantities()
+	var json [][]byte
+	for _, v := range values {
+		data, _ := v.MarshalJSON()
+		json = append(json, data)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var q Quantity
+		if err := q.UnmarshalJSON(json[i%len(values)]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkParseQuantity(b *testing.B) {
+	values := benchmarkQuantities()
+	var strings []string
+	for _, v := range values {
+		strings = append(strings, v.String())
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := ParseQuantity(strings[i%len(values)]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkCanonicalize(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s, _ := values[i%len(values)].Canonicalize()
+		if len(s) == 0 {
+			b.Fatal(s)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkQuantityCopy(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		q := values[i%len(values)].Copy()
+		if q.Amount == nil {
+			b.Fatal(q)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkQuantityAdd(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		q := values[i%len(values)]
+		if err := q.Add(q); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkQuantityRound(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		q := values[i%len(values)]
+		if q.Cmp(q) != 0 {
+			b.Fatal(q)
+		}
+	}
+	b.StopTimer()
+}
