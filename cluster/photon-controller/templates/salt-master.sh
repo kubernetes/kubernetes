@@ -18,10 +18,10 @@
 sed -i -e "s/http.us.debian.org/mirrors.kernel.org/" /etc/apt/sources.list
 
 # Prepopulate the name of the Master
-mkdir -p /etc/salt/minion.d
-echo "master: ${MASTER_NAME}" > /etc/salt/minion.d/master.conf
+mkdir -p /etc/salt/node.d
+echo "master: ${MASTER_NAME}" > /etc/salt/node.d/master.conf
 
-cat <<EOF >/etc/salt/minion.d/grains.conf
+cat <<EOF >/etc/salt/node.d/grains.conf
 grains:
   roles:
     - kubernetes-master
@@ -32,24 +32,24 @@ grains:
   kube_user: $KUBE_USER
 EOF
 
-# Auto accept all keys from minions that try to join
+# Auto accept all keys from nodes that try to join
 mkdir -p /etc/salt/master.d
 cat <<EOF >/etc/salt/master.d/auto-accept.conf
 auto_accept: True
 EOF
 
 cat <<EOF >/etc/salt/master.d/reactor.conf
-# React to new minions starting by running highstate on them.
+# React to new nodes starting by running highstate on them.
 reactor:
-  - 'salt/minion/*/start':
+  - 'salt/node/*/start':
     - /srv/reactor/highstate-new.sls
     - /srv/reactor/highstate-masters.sls
-    - /srv/reactor/highstate-minions.sls
+    - /srv/reactor/highstate-nodes.sls
 EOF
 
 # Install Salt
 #
-# We specify -X to avoid a race condition that can cause minion failure to
+# We specify -X to avoid a race condition that can cause node failure to
 # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
 #
 # -M installs the master

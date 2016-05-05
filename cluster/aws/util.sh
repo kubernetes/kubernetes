@@ -38,7 +38,7 @@ source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 ALLOCATE_NODE_CIDRS=true
 
-NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-node"
 
 # The Auto Scaling Group (ASG) name must be unique, so we include the zone
 ASG_NAME="${NODE_INSTANCE_PREFIX}-group-${ZONE}"
@@ -118,7 +118,7 @@ if [[ -z "${MASTER_INTERNAL_IP-}" ]]; then
 fi
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
-NODE_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
+NODE_SG_NAME="kubernetes-node-${CLUSTER_ID}"
 
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
@@ -239,7 +239,7 @@ function get-master-env() {
 }
 
 
-function query-running-minions () {
+function query-running-nodes () {
   local query=$1
   $AWS_CMD describe-instances \
            --filters Name=instance-state-name,Values=running \
@@ -259,10 +259,10 @@ function detect-node-names () {
 
   NODE_IDS=()
   NODE_NAMES=()
-  for id in $(query-running-minions "Reservations[].Instances[].InstanceId"); do
+  for id in $(query-running-nodes "Reservations[].Instances[].InstanceId"); do
     NODE_IDS+=("${id}")
 
-    # We use the minion ids as the name
+    # We use the node ids as the name
     NODE_NAMES+=("${id}")
   done
 }
@@ -279,18 +279,18 @@ function detect-nodes () {
   # This is inefficient, but we want NODE_NAMES / NODE_IDS to be ordered the same as KUBE_NODE_IP_ADDRESSES
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-    local minion_ip
+    local node_ip
     if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
-      minion_ip=$(get_instance_public_ip ${NODE_NAMES[$i]})
+      node_ip=$(get_instance_public_ip ${NODE_NAMES[$i]})
     else
-      minion_ip=$(get_instance_private_ip ${NODE_NAMES[$i]})
+      node_ip=$(get_instance_private_ip ${NODE_NAMES[$i]})
     fi
-    echo "Found minion ${i}: ${NODE_NAMES[$i]} @ ${minion_ip}"
-    KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
+    echo "Found node ${i}: ${NODE_NAMES[$i]} @ ${node_ip}"
+    KUBE_NODE_IP_ADDRESSES+=("${node_ip}")
   done
 
   if [[ -z "$KUBE_NODE_IP_ADDRESSES" ]]; then
-    echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
+    echo "Could not detect Kubernetes nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
 }
@@ -308,10 +308,10 @@ function detect-security-groups {
   if [[ -z "${NODE_SG_ID-}" ]]; then
     NODE_SG_ID=$(get_security_group_id "${NODE_SG_NAME}")
     if [[ -z "${NODE_SG_ID}" ]]; then
-      echo "Could not detect Kubernetes minion security group.  Make sure you've launched a cluster with 'kube-up.sh'"
+      echo "Could not detect Kubernetes node security group.  Make sure you've launched a cluster with 'kube-up.sh'"
       exit 1
     else
-      echo "Using minion security group: ${NODE_SG_NAME} ${NODE_SG_ID}"
+      echo "Using node security group: ${NODE_SG_NAME} ${NODE_SG_ID}"
     fi
   fi
 }
@@ -726,7 +726,7 @@ function ensure-iam-profiles {
     create-iam-profile ${IAM_PROFILE_MASTER}
   }
   aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_NODE} || {
-    echo "Creating minion IAM profile: ${IAM_PROFILE_NODE}"
+    echo "Creating node IAM profile: ${IAM_PROFILE_NODE}"
     create-iam-profile ${IAM_PROFILE_NODE}
   }
 }
@@ -853,7 +853,7 @@ function kube-up {
   get-tokens
 
   detect-image
-  detect-minion-image
+  detect-node-image
 
   detect-root-device
 
@@ -915,8 +915,8 @@ function kube-up {
   fi
   NODE_SG_ID=$(get_security_group_id "${NODE_SG_NAME}")
   if [[ -z "${NODE_SG_ID}" ]]; then
-    echo "Creating minion security group."
-    create-security-group "${NODE_SG_NAME}" "Kubernetes security group applied to minion nodes"
+    echo "Creating node security group."
+    create-security-group "${NODE_SG_NAME}" "Kubernetes security group applied to nodes"
   fi
 
   detect-security-groups
@@ -924,10 +924,10 @@ function kube-up {
   # Masters can talk to master
   authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
 
-  # Minions can talk to minions
+  # nodes can talk to nodes
   authorize-security-group-ingress "${NODE_SG_ID}" "--source-group ${NODE_SG_ID} --protocol all"
 
-  # Masters and minions can talk to each other
+  # Masters and nodes can talk to each other
   authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${NODE_SG_ID} --protocol all"
   authorize-security-group-ingress "${NODE_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
 
@@ -938,14 +938,14 @@ function kube-up {
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr ${HTTP_API_CIDR}"
 
-  # KUBE_USE_EXISTING_MASTER is used to add minions to an existing master
+  # KUBE_USE_EXISTING_MASTER is used to add nodes to an existing master
   if [[ "${KUBE_USE_EXISTING_MASTER:-}" == "true" ]]; then
     detect-master
     parse-master-env
 
-    # Start minions
-    start-minions
-    wait-minions
+    # Start nodes
+    start-nodes
+    wait-nodes
   else
     # Create the master
     start-master
@@ -953,9 +953,9 @@ function kube-up {
     # Build ~/.kube/config
     build-config
 
-    # Start minions
-    start-minions
-    wait-minions
+    # Start nodes
+    start-nodes
+    wait-nodes
 
     # Wait for the master to be ready
     wait-master
@@ -1091,12 +1091,12 @@ function start-master() {
   done
 }
 
-# Creates an ASG for the minion nodes
-function start-minions() {
-  # Minions don't currently use runtime config, but call it anyway for sanity
+# Creates an ASG for the nodes
+function start-nodes() {
+  # Nodes don't currently use runtime config, but call it anyway for sanity
   build-runtime-config
 
-  echo "Creating minion configuration"
+  echo "Creating node configuration"
 
   write-node-env
 
@@ -1166,8 +1166,8 @@ function start-minions() {
              ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
 }
 
-function wait-minions {
-  # Wait for the minions to be running
+function wait-nodes {
+  # Wait for the nodes to be running
   # TODO(justinsb): This is really not needed any more
   local attempt=0
   local max_attempts=30
@@ -1178,21 +1178,21 @@ function wait-minions {
   while true; do
     detect-node-names > $LOG
     if [[ ${#NODE_IDS[@]} == ${NUM_NODES} ]]; then
-      echo -e " ${color_green}${#NODE_IDS[@]} minions started; ready${color_norm}"
+      echo -e " ${color_green}${#NODE_IDS[@]} nodes started; ready${color_norm}"
       break
     fi
 
     if (( attempt > max_attempts )); then
       echo
-      echo "Expected number of minions did not start in time"
+      echo "Expected number of nodes did not start in time"
       echo
-      echo -e "${color_red}Expected number of minions failed to start.  Your cluster is unlikely" >&2
+      echo -e "${color_red}Expected number of nodes failed to start.  Your cluster is unlikely" >&2
       echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
       echo -e "cluster. (sorry!)${color_norm}" >&2
       exit 1
     fi
 
-    echo -e " ${color_yellow}${#NODE_IDS[@]} minions started; waiting${color_norm}"
+    echo -e " ${color_yellow}${#NODE_IDS[@]} nodes started; waiting${color_norm}"
     attempt=$(($attempt+1))
     sleep 10
   done
@@ -1253,9 +1253,9 @@ function check-cluster() {
       # Make sure docker is installed and working.
       local attempt=0
       while true; do
-        local minion_ip=${KUBE_NODE_IP_ADDRESSES[$i]}
-        echo -n "Attempt $(($attempt+1)) to check Docker on node @ ${minion_ip} ..."
-        local output=`check-minion ${minion_ip}`
+        local node_ip=${KUBE_NODE_IP_ADDRESSES[$i]}
+        echo -n "Attempt $(($attempt+1)) to check Docker on node @ ${node_ip} ..."
+        local output=`check-node ${node_ip}`
         echo $output
         if [[ "${output}" != "working" ]]; then
           if (( attempt > 20 )); then
@@ -1503,7 +1503,7 @@ function test-setup {
   VPC_ID=$(get_vpc_id)
   detect-security-groups
 
-  # Open up port 80 & 8080 so common containers on minions can be reached
+  # Open up port 80 & 8080 so common containers on nodes can be reached
   # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
   authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 80 --cidr 0.0.0.0/0"
   authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 8080 --cidr 0.0.0.0/0"

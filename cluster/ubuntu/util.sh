@@ -364,7 +364,7 @@ function detect-nodes() {
   done
 
   if [[ -z "${KUBE_NODE_IP_ADDRESSES[@]}" ]]; then
-    echo "Could not detect Kubernetes node nodes.\
+    echo "Could not detect Kubernetes nodes.\
     Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
@@ -512,13 +512,13 @@ function provision-node() {
     "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
     ubuntu/reconfDocker.sh \
-    ubuntu/minion/* \
-    ubuntu/binaries/minion \
+    ubuntu/node/* \
+    ubuntu/binaries/node \
     "${1}:~/kube"
 
   if [ -z "$CNI_PLUGIN_CONF" ] || [ -z "$CNI_PLUGIN_EXES" ]; then
     # Prep for Flannel use: copy the flannel binaries and scripts, set reconf flag
-    scp -r $SSH_OPTS ubuntu/minion-flannel/* "${1}:~/kube"
+    scp -r $SSH_OPTS ubuntu/node-flannel/* "${1}:~/kube"
     SERVICE_STARTS="service flanneld start"
     NEED_RECONFIG_DOCKER=true
     CNI_PLUGIN_CONF=''
@@ -573,7 +573,7 @@ function provision-node() {
       cp ~/kube/init_conf/* /etc/init/
       cp ~/kube/init_scripts/* /etc/init.d/
       mkdir -p /opt/bin/
-      cp ~/kube/minion/* /opt/bin
+      cp ~/kube/node/* /opt/bin
       ${SERVICE_STARTS}
       if ${NEED_RECONFIG_DOCKER}; then KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh i; fi
       '" || {
@@ -595,16 +595,16 @@ function provision-masterandnode() {
     easy-rsa.tar.gz \
     "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
-    ubuntu/minion/* \
+    ubuntu/node/* \
     ubuntu/master/* \
     ubuntu/reconfDocker.sh \
     ubuntu/binaries/master/ \
-    ubuntu/binaries/minion \
+    ubuntu/binaries/node \
     "${MASTER}:~/kube"
 
   if [ -z "$CNI_PLUGIN_CONF" ] || [ -z "$CNI_PLUGIN_EXES" ]; then
     # Prep for Flannel use: copy the flannel binaries and scripts, set reconf flag
-    scp -r $SSH_OPTS ubuntu/minion-flannel/* ubuntu/master-flannel/* "${MASTER}:~/kube"
+    scp -r $SSH_OPTS ubuntu/node-flannel/* ubuntu/master-flannel/* "${MASTER}:~/kube"
     NEED_RECONFIG_DOCKER=true
     CNI_PLUGIN_CONF=''
 
@@ -679,7 +679,7 @@ function provision-masterandnode() {
       ${PROXY_SETTING} DEBUG='${DEBUG}' ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
-      cp ~/kube/minion/* /opt/bin/
+      cp ~/kube/node/* /opt/bin/
 
       service etcd start
       if ${NEED_RECONFIG_DOCKER}; then FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh ai; fi
@@ -851,7 +851,7 @@ function push-node() {
   export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
   source "${KUBE_CONFIG_FILE}"
 
-  if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/minion/kubelet" ]]; then
+  if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/node/kubelet" ]]; then
     echo "There is no required release of kubernetes, please check first"
     exit 1
   fi

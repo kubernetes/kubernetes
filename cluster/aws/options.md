@@ -29,7 +29,7 @@ AWS_S3_REGION is useful for people that want to control their data location, bec
 
 **MASTER_SIZE**, **NODE_SIZE**
 
-The instance type to use for creating the master/minion.  Defaults to auto-sizing based on the number of nodes (see below).
+The instance type to use for creating the master/node.  Defaults to auto-sizing based on the number of nodes (see below).
 
 For production usage, we recommend bigger instances, for example:
 
@@ -38,7 +38,7 @@ export MASTER_SIZE=c4.large
 export NODE_SIZE=r3.large
 ```
 
-If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker
+If you don't specify master and node sizes, the scripts will attempt to guess the correct size of the master and worker
 nodes based on `${NUM_NODES}`. See [Getting started on AWS EC2](../../docs/getting-started-guides/aws.md) for details.
 
 Please note: `kube-up` utilizes ephemeral storage available on instances for docker storage. EBS-only instance types do not
@@ -47,12 +47,12 @@ EBS-only instance types include `t2`, `c4`, and `m4`.
 
 **KUBE_ENABLE_NODE_PUBLIC_IP**
 
-Should a public IP automatically assigned to the minions? "true" or "false"  
+Should a public IP automatically assigned to the nodes? "true" or "false"
 Defaults to: "true"
 
 Please note: Do not set this to "false" unless you...
 
-- ... already configured a NAT instance in the kubernetes VPC that will enable internet access for the new minions
+- ... already configured a NAT instance in the kubernetes VPC that will enable internet access for the new nodes
 - ... already configured a route for "0.0.0.0/0" to this NAT instance
 - ... already configured a route for "YOUR_IP/32" to an AWS internet gateway (for the master instance to reach your
   client directly during setup)

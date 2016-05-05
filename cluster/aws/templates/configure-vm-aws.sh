@@ -79,7 +79,7 @@ fix-apt-sources() {
 }
 
 salt-master-role() {
-  cat <<EOF >/etc/salt/minion.d/grains.conf
+  cat <<EOF >/etc/salt/node.d/grains.conf
 grains:
   roles:
     - kubernetes-master
@@ -89,14 +89,14 @@ EOF
   # If the kubelet on the master is enabled, give it the same CIDR range
   # as a generic node.
   if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
+    cat <<EOF >>/etc/salt/node.d/grains.conf
   kubelet_api_servers: '${KUBELET_APISERVER}'
   cbr-cidr: 10.123.45.0/29
 EOF
   else
     # If the kubelet is running disconnected from a master, give it a fixed
     # CIDR range.
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
+    cat <<EOF >>/etc/salt/node.d/grains.conf
   cbr-cidr: ${MASTER_IP_RANGE}
 EOF
   fi
@@ -106,7 +106,7 @@ EOF
 }
 
 salt-node-role() {
-  cat <<EOF >/etc/salt/minion.d/grains.conf
+  cat <<EOF >/etc/salt/node.d/grains.conf
 grains:
   roles:
     - kubernetes-pool

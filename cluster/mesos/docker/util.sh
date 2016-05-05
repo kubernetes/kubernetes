@@ -192,7 +192,7 @@ function detect-master {
   echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
+# Get node IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 # These Mesos slaves MAY host Kublets,
 # but might not have a Kublet running unless a kubernetes task has been scheduled on them.
 function detect-nodes {
@@ -202,8 +202,8 @@ function detect-nodes {
     return 1
   fi
   while read -r docker_id; do
-    local minion_ip=$(docker inspect --format="{{.NetworkSettings.IPAddress}}" "${docker_id}")
-    KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
+    local node_ip=$(docker inspect --format="{{.NetworkSettings.IPAddress}}" "${docker_id}")
+    KUBE_NODE_IP_ADDRESSES+=("${node_ip}")
   done <<< "$docker_ids"
   echo "KUBE_NODE_IP_ADDRESSES: [${KUBE_NODE_IP_ADDRESSES[*]}]" 1>&2
 }
@@ -297,7 +297,7 @@ function kube-up {
 function validate-cluster {
   echo "Validating ${KUBERNETES_PROVIDER} cluster" 1>&2
 
-  # Do not validate cluster size. There will be zero k8s minions until a pod is created.
+  # Do not validate cluster size. There will be zero k8s nodes until a pod is created.
   # TODO(karlkfi): use componentstatuses or equivalent when it supports non-localhost core components
 
   # Validate immediate cluster reachability and responsiveness

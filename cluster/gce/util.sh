@@ -75,7 +75,7 @@ if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   fi
 fi
 
-NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-node"
 NODE_TAGS="${NODE_TAG}"
 
 ALLOCATE_NODE_CIDRS=true
@@ -308,7 +308,7 @@ function upload-server-tars() {
   fi
 }
 
-# Detect minions created in the minion group
+# Detect nodes created in the node group
 #
 # Assumed vars:
 #   NODE_INSTANCE_PREFIX
@@ -334,7 +334,7 @@ function detect-node-names() {
   echo "NODE_NAMES=${NODE_NAMES[*]:-}" >&2
 }
 
-# Detect the information about the minions
+# Detect the information about the nodes
 #
 # Assumed vars:
 #   ZONE
@@ -356,7 +356,7 @@ function detect-nodes() {
     fi
   done
   if [[ -z "${KUBE_NODE_IP_ADDRESSES-}" ]]; then
-    echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
+    echo "Could not detect Kubernetes node nodes.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
 }
@@ -486,9 +486,9 @@ function create-node-template() {
   fi
 
   local attempt=1
-  local preemptible_minions=""
+  local preemptible_nodes=""
   if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
-    preemptible_minions="--preemptible --maintenance-policy TERMINATE"
+    preemptible_nodes="--preemptible --maintenance-policy TERMINATE"
   fi
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
@@ -501,7 +501,7 @@ function create-node-template() {
       --image "${NODE_IMAGE}" \
       --tags "${NODE_TAG}" \
       --network "${NETWORK}" \
-      ${preemptible_minions} \
+      ${preemptible_nodes} \
       $2 \
       --can-ip-forward \
       --metadata-from-file $(echo ${@:3} | tr ' ' ',') >&2; then
@@ -882,7 +882,7 @@ function create-loadbalancer() {
 }
 
 function create-nodes-firewall() {
-  # Create a single firewall rule for all minions.
+  # Create a single firewall rule for all nodes.
   create-firewall-rule "${NODE_TAG}-all" "${CLUSTER_IP_RANGE}" "${NODE_TAG}" &
 
   # Report logging choice (if any).
@@ -897,7 +897,7 @@ function create-nodes-firewall() {
 }
 
 function create-nodes-template() {
-  echo "Creating minions."
+  echo "Creating nodes."
 
   # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
@@ -1254,7 +1254,7 @@ function kube-down() {
         --quiet \
         "${MASTER_NAME}-ip"
     fi
-    # Delete firewall rule for minions.
+    # Delete firewall rule for nodes.
     if gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-all" &>/dev/null; then
       gcloud compute firewall-rules delete  \
         --project "${PROJECT}" \
@@ -1264,22 +1264,22 @@ function kube-down() {
   fi
 
   if [[ "${KUBE_DELETE_NODES:-}" != "false" ]]; then
-    # Find out what minions are running.
-    local -a minions
-    minions=( $(gcloud compute instances list \
+    # Find out what nodes are running.
+    local -a nodes
+    nodes=( $(gcloud compute instances list \
                   --project "${PROJECT}" --zones "${ZONE}" \
                   --regexp "${NODE_INSTANCE_PREFIX}-.+" \
                   --format='value(name)') )
-    # If any minions are running, delete them in batches.
-    while (( "${#minions[@]}" > 0 )); do
-      echo Deleting nodes "${minions[*]::${batch}}"
+    # If any nodes are running, delete them in batches.
+    while (( "${#nodes[@]}" > 0 )); do
+      echo Deleting nodes "${nodes[*]::${batch}}"
       gcloud compute instances delete \
         --project "${PROJECT}" \
         --quiet \
         --delete-disks boot \
         --zone "${ZONE}" \
-        "${minions[@]::${batch}}"
-      minions=( "${minions[@]:${batch}}" )
+        "${nodes[@]::${batch}}"
+      nodes=( "${nodes[@]:${batch}}" )
     done
   fi
 
@@ -1432,14 +1432,14 @@ function check-resources() {
     return 1
   fi
 
-  # Find out what minions are running.
-  local -a minions
-  minions=( $(gcloud compute instances list \
+  # Find out what nodes are running.
+  local -a nodes
+  nodes=( $(gcloud compute instances list \
                 --project "${PROJECT}" --zones "${ZONE}" \
                 --regexp "${NODE_INSTANCE_PREFIX}-.+" \
                 --format='value(name)') )
-  if (( "${#minions[@]}" > 0 )); then
-    KUBE_RESOURCE_FOUND="${#minions[@]} matching matching ${NODE_INSTANCE_PREFIX}-.+"
+  if (( "${#nodes[@]}" > 0 )); then
+    KUBE_RESOURCE_FOUND="${#nodes[@]} matching matching ${NODE_INSTANCE_PREFIX}-.+"
     return 1
   fi
 
@@ -1455,9 +1455,9 @@ function check-resources() {
 
   local -a routes
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-    --regexp "${INSTANCE_PREFIX}-minion-.{4}" --format='value(name)') )
+    --regexp "${INSTANCE_PREFIX}-node-.{4}" --format='value(name)') )
   if (( "${#routes[@]}" > 0 )); then
-    KUBE_RESOURCE_FOUND="${#routes[@]} routes matching ${INSTANCE_PREFIX}-minion-.{4}"
+    KUBE_RESOURCE_FOUND="${#routes[@]} routes matching ${INSTANCE_PREFIX}-node-.{4}"
     return 1
   fi
 
@@ -1636,7 +1636,7 @@ function test-setup() {
     "${KUBE_ROOT}/cluster/kube-up.sh"
   fi
 
-  # Open up port 80 & 8080 so common containers on minions can be reached
+  # Open up port 80 & 8080 so common containers on nodes can be reached
   # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
   local start=`date +%s`
   gcloud compute firewall-rules create \

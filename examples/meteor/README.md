@@ -180,7 +180,7 @@ You will have to open up port 80 if it's not open yet in your
 environment. On Google Compute Engine, you may run the below command.
 
 ```
-gcloud compute firewall-rules create meteor-80 --allow=tcp:80 --target-tags kubernetes-minion
+gcloud compute firewall-rules create meteor-80 --allow=tcp:80 --target-tags kubernetes-node
 ```
 
 What is going on?

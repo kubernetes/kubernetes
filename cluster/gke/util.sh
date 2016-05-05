@@ -225,7 +225,7 @@ function test-setup() {
   NODE_TAG=$($GCLOUD compute instances describe ${NODE_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" --format='value(tags.items)' | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node")
   OLD_NODE_TAG="k8s-${CLUSTER_NAME}-node"
 
-  # Open up port 80 & 8080 so common containers on minions can be reached.
+  # Open up port 80 & 8080 so common containers on nodes can be reached.
   "${GCLOUD}" compute firewall-rules create \
     "${CLUSTER_NAME}-http-alt" \
     --allow tcp:80,tcp:8080 \
@@ -272,7 +272,7 @@ function detect-nodes() {
   detect-node-names
 }
 
-# Detect minions created in the minion group
+# Detect nodes created in the node group
 #
 # Note that this will only select nodes in the same zone as the
 # cluster, meaning that it won't include all nodes in a multi-zone cluster.

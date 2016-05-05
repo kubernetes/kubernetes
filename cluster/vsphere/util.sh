@@ -416,7 +416,7 @@ function kube-up {
       echo "KUBE_MASTER=${KUBE_MASTER}"
       echo "KUBE_MASTER_IP=${KUBE_MASTER_IP}"
       echo "NODE_IP_RANGE=$NODE_IP_RANGES"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/salt-minion.sh"
+      grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/salt-node.sh"
     ) > "${KUBE_TEMP}/node-start-${i}.sh"
 
     (
@@ -446,8 +446,8 @@ function kube-up {
 
   local i
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-    printf "Waiting for salt-minion to be up on ${NODE_NAMES[$i]} ....\n"
-    remote-pgrep ${KUBE_NODE_IP_ADDRESSES[$i]} "salt-minion"
+    printf "Waiting for salt-node to be up on ${NODE_NAMES[$i]} ....\n"
+    remote-pgrep ${KUBE_NODE_IP_ADDRESSES[$i]} "salt-node"
     printf "Waiting for all salt packages to be installed on ${NODE_NAMES[$i]} .... \n"
     kube-check  ${KUBE_MASTER_IP} 'sudo salt '"${NODE_NAMES[$i]}"' state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
     printf " OK\n"

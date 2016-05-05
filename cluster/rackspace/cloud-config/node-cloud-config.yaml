@@ -89,7 +89,7 @@ coreos:
 
   fleet:
     public-ip: $private_ipv4
-    metadata: kubernetes_role=minion
+    metadata: kubernetes_role=node
 
   update:
     reboot-strategy: etcd-lock

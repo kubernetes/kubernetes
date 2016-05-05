@@ -573,7 +573,7 @@ func Example_printPodWithWideFormat() {
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
-	nodeName := "kubernetes-minion-abcd"
+	nodeName := "kubernetes-node-abcd"
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -600,7 +600,7 @@ func Example_printPodWithWideFormat() {
 	}
 	// Output:
 	// NAME      READY     STATUS     RESTARTS   AGE       IP         NODE
-	// test1     1/2       podPhase   6          10y       10.1.1.3   kubernetes-minion-abcd
+	// test1     1/2       podPhase   6          10y       10.1.1.3   kubernetes-node-abcd
 }
 
 func Example_printPodWithShowLabels() {
@@ -613,7 +613,7 @@ func Example_printPodWithShowLabels() {
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
-	nodeName := "kubernetes-minion-abcd"
+	nodeName := "kubernetes-node-abcd"
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -647,7 +647,7 @@ func Example_printPodWithShowLabels() {
 }
 
 func newAllPhasePodList() *api.PodList {
-	nodeName := "kubernetes-minion-abcd"
+	nodeName := "kubernetes-node-abcd"
 	return &api.PodList{
 		Items: []api.Pod{
 			{

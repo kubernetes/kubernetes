@@ -1182,7 +1182,7 @@ than capitalization of the initial letter, the two should almost always match.
 No underscores nor dashes in either.
 * Field and resource names should be declarative, not imperative (DoSomething,
 SomethingDoer, DoneBy, DoneAt).
-* `Minion` has been deprecated in favor of `Node`. Use `Node` where referring to
+* Use `Node` where referring to
 the node resource in the context of the cluster. Use `Host` where referring to
 properties of the individual physical/virtual system, such as `hostname`,
 `hostPath`, `hostNetwork`, etc.

@@ -31,7 +31,7 @@ base:
     - kube-node-unpacker
     - kubelet
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
-    - opencontrail-networking-minion
+    - opencontrail-networking-node
 {% else %}
     - kube-proxy
 {% endif %}

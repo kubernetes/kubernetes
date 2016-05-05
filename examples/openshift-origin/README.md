@@ -59,7 +59,7 @@ $ vi cluster/saltbase/pillar/privilege.sls
 allow_privileged: true
 ```
 
-Now spin up a cluster using your preferred KUBERNETES_PROVIDER. Remember that `kube-up.sh` may start other pods on your minion nodes, so ensure that you have enough resources to run the five pods for this example.
+Now spin up a cluster using your preferred KUBERNETES_PROVIDER. Remember that `kube-up.sh` may start other pods on your nodes, so ensure that you have enough resources to run the five pods for this example.
 
 
 ```sh

@@ -28,7 +28,7 @@ trap cleanup SIGHUP SIGINT SIGTERM
 
 pushd $(dirname $0)
 mkdir -p binaries/master
-mkdir -p binaries/minion
+mkdir -p binaries/node
 
 # flannel
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
@@ -37,7 +37,7 @@ grep -q "^${FLANNEL_VERSION}\$" binaries/.flannel 2>/dev/null || {
   curl -L  https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz -o flannel.tar.gz
   tar xzf flannel.tar.gz
   cp flannel-${FLANNEL_VERSION}/flanneld binaries/master
-  cp flannel-${FLANNEL_VERSION}/flanneld binaries/minion
+  cp flannel-${FLANNEL_VERSION}/flanneld binaries/node
   echo ${FLANNEL_VERSION} > binaries/.flannel
 }
 
@@ -80,7 +80,7 @@ grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
      kubernetes/server/kubernetes/server/bin/kube-controller-manager \
      kubernetes/server/kubernetes/server/bin/kube-scheduler binaries/master
   cp kubernetes/server/kubernetes/server/bin/kubelet \
-     kubernetes/server/kubernetes/server/bin/kube-proxy binaries/minion
+     kubernetes/server/kubernetes/server/bin/kube-proxy binaries/node
   cp kubernetes/server/kubernetes/server/bin/kubectl binaries/
   echo ${KUBE_VERSION} > binaries/.kubernetes
 }
