@@ -2095,6 +2095,11 @@ func (config *RCConfig) start() error {
 // Simplified version of RunRC, that does not create RC, but creates plain Pods.
 // optionally waits for pods to start running (if waitForRunning == true)
 func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix string, pod api.Pod, waitForRunning bool) {
+	// no pod to start
+	if replicas < 1 {
+		Logf("No pod to start, skipping...")
+		return
+	}
 	startPodsID := string(util.NewUUID()) // So that we can label and find them
 	for i := 0; i < replicas; i++ {
 		podName := fmt.Sprintf("%v-%v", podNamePrefix, i)
