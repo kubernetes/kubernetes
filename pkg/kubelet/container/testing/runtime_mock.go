@@ -118,6 +118,11 @@ func (r *Mock) IsImagePresent(image ImageSpec) (bool, error) {
 	return args.Get(0).(bool), args.Error(1)
 }
 
+func (r *Mock) GetImagePullProgress(image ImageSpec, watch bool, w io.Writer) error {
+	args := r.Called(image, watch, w)
+	return args.Error(0)
+}
+
 func (r *Mock) ListImages() ([]Image, error) {
 	args := r.Called()
 	return args.Get(0).([]Image), args.Error(1)

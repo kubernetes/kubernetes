@@ -1774,3 +1774,8 @@ func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecont
 func (r *Runtime) ImageStats() (*kubecontainer.ImageStats, error) {
 	return &kubecontainer.ImageStats{}, nil
 }
+
+// FIXME: I need to be implemented
+func (r *Runtime) GetImagePullProgress(image kubecontainer.ImageSpec, watch bool, w io.Writer) error {
+	return nil
+}

@@ -25,6 +25,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"io"
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -422,7 +423,7 @@ func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 
 // PullImage is a test-spy implementation of DockerInterface.PullImage.
 // It adds an entry "pull" to the internal method call record.
-func (f *FakeDockerClient) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
+func (f *FakeDockerClient) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) (io.ReadCloser, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "pull")
@@ -431,7 +432,7 @@ func (f *FakeDockerClient) PullImage(imageID string, auth dockertypes.AuthConfig
 		authJson, _ := json.Marshal(auth)
 		f.pulled = append(f.pulled, fmt.Sprintf("%s:%s using %s", imageID, opts.Tag, string(authJson)))
 	}
-	return err
+	return nil, err
 }
 
 func (f *FakeDockerClient) Version() (*dockertypes.Version, error) {
@@ -551,4 +552,10 @@ func (f *FakeDockerClient) InjectImageHistory(data map[string][]dockertypes.Imag
 // dockerTimestampToString converts the timestamp to string
 func dockerTimestampToString(t time.Time) string {
 	return t.Format(time.RFC3339Nano)
+}
+
+func (f *FakeDockerPuller) GetPullProgress(image string, watch bool, out io.Writer) error {
+	f.Lock()
+	defer f.Unlock()
+	return nil
 }

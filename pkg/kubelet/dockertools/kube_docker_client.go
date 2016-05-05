@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"time"
 
-	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
@@ -171,35 +170,22 @@ func base64EncodeAuth(auth dockertypes.AuthConfig) (string, error) {
 	return base64.URLEncoding.EncodeToString(buf.Bytes()), nil
 }
 
-func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
+func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) (io.ReadCloser, error) {
 	// RegistryAuth is the base64 encoded credentials for the registry
 	base64Auth, err := base64EncodeAuth(auth)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	opts.ImageID = image
 	opts.RegistryAuth = base64Auth
 	resp, err := d.client.ImagePull(getDefaultContext(), opts, nil)
 	if err != nil {
-		return err
+		if resp != nil {
+			resp.Close()
+		}
+		return nil, err
 	}
-	defer resp.Close()
-	// TODO(random-liu): Use the image pulling progress information.
-	decoder := json.NewDecoder(resp)
-	for {
-		var msg dockermessage.JSONMessage
-		err := decoder.Decode(&msg)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		if msg.Error != nil {
-			return msg.Error
-		}
-	}
-	return nil
+	return resp, nil
 }
 
 func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {

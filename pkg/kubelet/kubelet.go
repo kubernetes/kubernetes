@@ -2861,6 +2861,30 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 	return kl.containerRuntime.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
 }
 
+func (kl *Kubelet) GetKubeletContainerImageProgress(namespace, podName, containerName string, watch bool, w io.Writer) error {
+	pod, ok := kl.GetPodByName(namespace, podName)
+	if !ok {
+		return fmt.Errorf("unable to find pod %q in namespace %q", podName, namespace)
+	}
+
+	var container *api.Container
+	container = nil
+	for _, c := range(pod.Spec.Containers) {
+		if c.Name == containerName {
+			container = &c
+			break
+		}
+	}
+	if container == nil {
+		return fmt.Errorf("unable to find container %q in pod %q in namespace %q", containerName, podName, namespace)
+	}
+
+	img := kubecontainer.ImageSpec {
+		Image: container.Image,
+	}
+	return kl.containerRuntime.GetImagePullProgress(img, watch, w)
+}
+
 // GetHostname Returns the hostname as the kubelet sees it.
 func (kl *Kubelet) GetHostname() string {
 	return kl.hostname
