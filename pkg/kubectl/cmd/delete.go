@@ -34,8 +34,7 @@ import (
 // DeleteOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type DeleteOptions struct {
-	Filenames []string
-	Recursive bool
+	FilenameParams resource.FilenameParamOptions
 }
 
 const (
@@ -96,8 +95,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: argAliases,
 	}
 	usage := "Filename, directory, or URL to a file containing the resource to delete."
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	cmdutil.AddFilenameParamFlags(cmd, &options.FilenameParams, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
 	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
@@ -120,7 +118,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameParams).
 		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
 		SelectAllParam(deleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).

@@ -39,7 +39,7 @@ import (
 // RollingUpdateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type RollingUpdateOptions struct {
-	Filenames []string
+	FilenameParams resource.FilenameParamOptions
 }
 
 const (
@@ -91,7 +91,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Duration("poll-interval", pollInterval, `Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().Duration("timeout", timeout, `Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	usage := "Filename or URL to file to use to create the new replication controller."
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddFilenameParamFlagsNoRecurse(cmd, &options.FilenameParams, usage)
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().String("image", "", "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f")
 	cmd.MarkFlagRequired("image")
@@ -143,7 +143,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if len(os.Args) > 1 && os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}
-	err := validateArguments(cmd, options.Filenames, args)
+	err := validateArguments(cmd, options.FilenameParams.Filenames, args)
 	if err != nil {
 		return err
 	}
@@ -161,8 +161,8 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	container := cmdutil.GetFlagString(cmd, "container")
 
-	if len(options.Filenames) > 0 {
-		filename = options.Filenames[0]
+	if len(options.FilenameParams.Filenames) > 0 {
+		filename = options.FilenameParams.Filenames[0]
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -204,7 +204,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		request := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 			Schema(schema).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
-			FilenameParam(enforceNamespace, false, filename).
+			FilenameParam(enforceNamespace, &options.FilenameParams).
 			Do()
 		obj, err := request.Object()
 		if err != nil {

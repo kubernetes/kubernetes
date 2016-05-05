@@ -34,8 +34,7 @@ import (
 // ExposeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ExposeOptions struct {
-	Filenames []string
-	Recursive bool
+	FilenameParams resource.FilenameParamOptions
 }
 
 const (
@@ -119,10 +118,10 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
 
 	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	cmdutil.AddFilenameParamFlags(cmd, &options.FilenameParams, usage)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
+
 	return cmd
 }
 
@@ -136,7 +135,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameParams).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()

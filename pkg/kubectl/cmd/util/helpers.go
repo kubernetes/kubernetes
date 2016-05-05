@@ -332,8 +332,22 @@ func AddValidateFlags(cmd *cobra.Command) {
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 
-func AddRecursiveFlag(cmd *cobra.Command, value *bool) {
-	cmd.Flags().BoolVarP(value, "recursive", "R", *value, "If true, process directory recursively.")
+func addRecursiveFlag(cmd *cobra.Command, options *resource.FilenameParamOptions) {
+	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "If true, process directory recursively.")
+}
+
+func addFlagJsonFilenameFlag(cmd *cobra.Command, options *resource.FilenameParamOptions, usage string) {
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+}
+
+func AddFilenameParamFlags(cmd *cobra.Command, options *resource.FilenameParamOptions, usage string) {
+	addFlagJsonFilenameFlag(cmd, options, usage)
+	addRecursiveFlag(cmd, options)
+}
+
+func AddFilenameParamFlagsNoRecurse(cmd *cobra.Command, options *resource.FilenameParamOptions, usage string) {
+	addFlagJsonFilenameFlag(cmd, options, usage)
+	options.Recursive = false
 }
 
 func AddApplyAnnotationFlags(cmd *cobra.Command) {

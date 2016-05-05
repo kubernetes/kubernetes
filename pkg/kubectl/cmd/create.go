@@ -34,8 +34,7 @@ import (
 // CreateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type CreateOptions struct {
-	Filenames []string
-	Recursive bool
+	FilenameParams resource.FilenameParamOptions
 }
 
 const (
@@ -58,7 +57,7 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    create_long,
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(options.Filenames) == 0 {
+			if len(options.FilenameParams.Filenames) == 0 {
 				cmd.Help()
 				return
 			}
@@ -69,10 +68,9 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	usage := "Filename, directory, or URL to file to use to create the resource"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddFilenameParamFlags(cmd, &options.FilenameParams, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -109,7 +107,7 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameParams).
 		Flatten().
 		Do()
 	err = r.Err()

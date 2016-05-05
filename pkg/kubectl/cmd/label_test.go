@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 func TestValidateLabels(t *testing.T) {
@@ -359,7 +360,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)
 	options := &LabelOptions{
-		Filenames: []string{"../../../examples/cassandra/cassandra-controller.yaml"},
+		FilenameParams: resource.FilenameParamOptions{Filenames: []string{"../../../examples/cassandra/cassandra-controller.yaml"}},
 	}
 
 	err := RunLabel(f, buf, cmd, []string{"a=b"}, options)

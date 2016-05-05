@@ -34,8 +34,7 @@ import (
 // ReplaceOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ReplaceOptions struct {
-	Filenames []string
-	Recursive bool
+	FilenameParams resource.FilenameParamOptions
 }
 
 const (
@@ -76,14 +75,13 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	usage := "Filename, directory, or URL to file to use to replace the resource."
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddFilenameParamFlags(cmd, &options.FilenameParams, usage)
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().Bool("force", false, "Delete and re-create the specified resource")
 	cmd.Flags().Bool("cascade", false, "Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).")
 	cmd.Flags().Int("grace-period", -1, "Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object")
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -107,7 +105,7 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	}
 
 	force := cmdutil.GetFlagBool(cmd, "force")
-	if len(options.Filenames) == 0 {
+	if len(options.FilenameParams.Filenames) == 0 {
 		return cmdutil.UsageError(cmd, "Must specify --filename to replace")
 	}
 
@@ -121,7 +119,7 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameParams).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -168,7 +166,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		return err
 	}
 
-	for i, filename := range options.Filenames {
+	for i, filename := range options.FilenameParams.Filenames {
 		if filename == "-" {
 			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
 			if err != nil {
@@ -180,7 +178,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 			if err != nil {
 				return err
 			}
-			options.Filenames[i] = tempFilename
+			options.FilenameParams.Filenames[i] = tempFilename
 		}
 	}
 
@@ -188,7 +186,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameParams).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
 		Do()
@@ -213,7 +211,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameParams).
 		Flatten().
 		Do()
 	err = r.Err()

@@ -33,8 +33,7 @@ import (
 // GetOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type GetOptions struct {
-	Filenames []string
-	Recursive bool
+	FilenameParams resource.FilenameParamOptions
 }
 
 const (
@@ -103,8 +102,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag statements like -L label1 -L label2...")
 	cmd.Flags().Bool("export", false, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	cmdutil.AddFilenameParamFlags(cmd, &options.FilenameParams, usage)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
@@ -125,7 +123,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		enforceNamespace = false
 	}
 
-	if len(args) == 0 && len(options.Filenames) == 0 {
+	if len(args) == 0 && len(options.FilenameParams.Filenames) == 0 {
 		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
@@ -135,7 +133,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	if err != nil {
 		return err
 	}
-	if len(options.Filenames) > 0 || argsHasNames {
+	if len(options.FilenameParams.Filenames) > 0 || argsHasNames {
 		cmd.Flag("show-all").Value.Set("true")
 	}
 	export := cmdutil.GetFlagBool(cmd, "export")
@@ -145,7 +143,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	if isWatch || isWatchOnly {
 		r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
-			FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+			FilenameParam(enforceNamespace, &options.FilenameParams).
 			SelectorParam(selector).
 			ExportParam(export).
 			ResourceTypeOrNameArgs(true, args...).
@@ -200,7 +198,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, &options.FilenameParams).
 		SelectorParam(selector).
 		ExportParam(export).
 		ResourceTypeOrNameArgs(true, args...).
