@@ -1,4 +1,5 @@
 Vagrantfile:      node_ip = $node_ips[n]
+cluster/addons/addon-manager/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
 cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
 cluster/addons/registry/images/Dockerfile:CMD ["/usr/bin/run_proxy"]
 cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to the full EC2 private dns name
@@ -31,7 +32,6 @@ cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id
 cluster/photon-controller/util.sh:  local cert_dir="/srv/kubernetes"
 cluster/photon-controller/util.sh:  node_name=${1}
 cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
-cluster/saltbase/salt/kube-addons/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
