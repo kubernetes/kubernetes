@@ -14,5 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package cluster contains code for syncing cluster
 package cluster
+
+import (
+	federation_v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	kubeCache "k8s.io/kubernetes/pkg/client/cache"
+)
+
+// StoreToClusterLister makes a Store have the List method of the unversioned.ClusterInterface
+// The Store must contain (only) clusters.
+type StoreToClusterLister struct {
+	kubeCache.Store
+}
+
+func (s *StoreToClusterLister) List() (clusters federation_v1alpha1.ClusterList, err error) {
+	for _, m := range s.Store.List() {
+		clusters.Items = append(clusters.Items, *(m.(*federation_v1alpha1.Cluster)))
+	}
+	return clusters, nil
+}

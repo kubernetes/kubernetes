@@ -17,15 +17,16 @@ limitations under the License.
 package cluster
 
 import (
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"net"
+	"strings"
 
-	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	federation_v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"strings"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 const (
@@ -35,53 +36,87 @@ const (
 )
 
 type ClusterClient struct {
-	clientSet       clientset.Interface
 	discoveryClient *discovery.DiscoveryClient
 }
 
-func NewClusterClientSet(c *federation.Cluster) (*ClusterClient, error) {
-	//TODO:How to get cluster IP(huangyuqi)
-	var clusterClientSet = ClusterClient{}
-	clusterConfig, err := clientcmd.BuildConfigFromFlags(c.Spec.ServerAddressByClientCIDRs[0].ServerAddress, "")
+func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error) {
+	var serverAddress string
+	hostIP, err := utilnet.ChooseHostInterface()
 	if err != nil {
 		return nil, err
 	}
-	//	clusterConfig.ContentConfig.GroupVersion.Version = "extensions"
+
+	for _, item := range c.Spec.ServerAddressByClientCIDRs {
+		_, cidrnet, err := net.ParseCIDR(item.ClientCIDR)
+		if err != nil {
+			return nil, err
+		}
+		myaddr := net.ParseIP(hostIP.String())
+		if cidrnet.Contains(myaddr) == true {
+			serverAddress = item.ServerAddress
+			break
+		}
+	}
+
+	var clusterClientSet = ClusterClient{}
+	clusterConfig, err := clientcmd.BuildConfigFromFlags(serverAddress, "")
+	if err != nil {
+		return nil, err
+	}
 	clusterConfig.QPS = KubeAPIQPS
 	clusterConfig.Burst = KubeAPIBurst
-	clusterClientSet.clientSet = clientset.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, UserAgentName))
 	clusterClientSet.discoveryClient = discovery.NewDiscoveryClientForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
+	if clusterClientSet.discoveryClient == nil {
+		return nil, nil
+	}
 	return &clusterClientSet, err
 }
 
-// GetReplicaSetFromCluster get the replicaset from the kubernetes cluster
-func (self *ClusterClient) GetReplicaSetFromCluster(subRsName string, subRsNameSpace string) (*extensions.ReplicaSet, error) {
-	return self.clientSet.Extensions().ReplicaSets(subRsNameSpace).Get(subRsName)
-}
-
-// CreateReplicaSetToCluster create replicaset to the kubernetes cluster
-func (self *ClusterClient) CreateReplicaSetToCluster(subRs *extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
-	return self.clientSet.Extensions().ReplicaSets(subRs.Namespace).Create(subRs)
-}
-
-// UpdateReplicaSetToCluster update replicaset to the kubernetes cluster
-func (self *ClusterClient) UpdateReplicaSetToCluster(subRs *extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
-	return self.clientSet.Extensions().ReplicaSets(subRs.Namespace).Update(subRs)
-}
-
-// DeleteReplicasetFromCluster delete the replicaset from the kubernetes cluster
-func (self *ClusterClient) DeleteReplicasetFromCluster(subRs *extensions.ReplicaSet) error {
-	return self.clientSet.Extensions().ReplicaSets(subRs.Namespace).Delete(subRs.Name, &api.DeleteOptions{})
-}
-
-// GetClusterHealthStatus get the kubernetes cluster health status
-func (self *ClusterClient) GetClusterHealthStatus() federation.ClusterPhase {
+// GetClusterHealthStatus get the kubernetes cluster health status by requesting "/healthz"
+func (self *ClusterClient) GetClusterHealthStatus() *federation_v1alpha1.ClusterStatus {
+	clusterStatus := federation_v1alpha1.ClusterStatus{}
+	currentTime := unversioned.Now()
+	newClusterReadyCondition := federation_v1alpha1.ClusterCondition{
+		Type:               federation_v1alpha1.ClusterReady,
+		Status:             v1.ConditionTrue,
+		Reason:             "federate cluster is ready",
+		Message:            "federate cluster response the '/healthz' with 'OK' ",
+		LastProbeTime:      currentTime,
+		LastTransitionTime: currentTime,
+	}
+	newClusterNotReadyCondition := federation_v1alpha1.ClusterCondition{
+		Type:               federation_v1alpha1.ClusterReady,
+		Status:             v1.ConditionFalse,
+		Reason:             "federate cluster is not ready",
+		Message:            "federate cluster response the '/healthz' request without 'OK' ",
+		LastProbeTime:      currentTime,
+		LastTransitionTime: currentTime,
+	}
+	newNodeOfflineCondition := federation_v1alpha1.ClusterCondition{
+		Type:               federation_v1alpha1.ClusterOffline,
+		Status:             v1.ConditionTrue,
+		Reason:             "federate cluster is not reachable",
+		Message:            "federate cluster can not reach",
+		LastProbeTime:      currentTime,
+		LastTransitionTime: currentTime,
+	}
+	newNodeNotOfflineCondition := federation_v1alpha1.ClusterCondition{
+		Type:               federation_v1alpha1.ClusterOffline,
+		Status:             v1.ConditionFalse,
+		Reason:             "federate cluster is reachable",
+		Message:            "federate cluster can reach",
+		LastProbeTime:      currentTime,
+		LastTransitionTime: currentTime,
+	}
 	body, err := self.discoveryClient.Get().AbsPath("/healthz").Do().Raw()
 	if err != nil {
-		return federation.ClusterOffline
+		clusterStatus.Conditions = append(clusterStatus.Conditions, newNodeOfflineCondition)
+	} else {
+		if !strings.EqualFold(string(body), "ok") {
+			clusterStatus.Conditions = append(clusterStatus.Conditions, newClusterNotReadyCondition, newNodeNotOfflineCondition)
+		} else {
+			clusterStatus.Conditions = append(clusterStatus.Conditions, newClusterReadyCondition)
+		}
 	}
-	if !strings.EqualFold(string(body), "ok") {
-		return federation.ClusterPending
-	}
-	return federation.ClusterRunning
+	return &clusterStatus
 }

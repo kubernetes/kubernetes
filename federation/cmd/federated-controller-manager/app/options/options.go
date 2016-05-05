@@ -15,9 +15,7 @@ limitations under the License.
 */
 
 // Package options provides the flags used for the controller manager.
-//
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/controllermanager/controllermanager.go
+
 package options
 
 import (
@@ -42,10 +40,10 @@ type ControllerManagerConfiguration struct {
 	ConcurrentSubRCSyncs int `json:"concurrentSubRCSyncs"`
 	// clusterMonitorPeriod is the period for syncing ClusterStatus in cluster controller.
 	ClusterMonitorPeriod unversioned.Duration `json:"clusterMonitorPeriod"`
-	// uberAPIQPS is the QPS to use while talking with ubernetes apiserver.
-	UberAPIQPS float32 `json:"uberAPIQPS"`
-	// uberAPIBurst is the burst to use while talking with ubernetes apiserver.
-	UberAPIBurst int `json:"uberAPIBurst"`
+	// federatedAPIQPS is the QPS to use while talking with ubernetes apiserver.
+	FederatedAPIQPS float32 `json:"federatedAPIQPS"`
+	// federatedAPIBurst is the burst to use while talking with ubernetes apiserver.
+	FederatedAPIBurst int `json:"federatedAPIBurst"`
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool `json:"enableProfiling"`
 	// leaderElection defines the configuration of leader election client.
@@ -55,27 +53,26 @@ type ControllerManagerConfiguration struct {
 // CMServer is the main context object for the controller manager.
 type CMServer struct {
 	ControllerManagerConfiguration
-
 	Master          string
 	ApiServerconfig string
 }
 
 const (
-	// UberControllerManagerPort is the default port for the ubernetes controller manager status server.
+	// FederatedControllerManagerPort is the default port for the ubernetes controller manager status server.
 	// May be overridden by a flag at startup.
-	UberControllerManagerPort = 10252
+	FederatedControllerManagerPort = 10252
 )
 
 // NewCMServer creates a new CMServer with a default config.
 func NewCMServer() *CMServer {
 	s := CMServer{
 		ControllerManagerConfiguration: ControllerManagerConfiguration{
-			Port:                 UberControllerManagerPort,
+			Port:                 FederatedControllerManagerPort,
 			Address:              "0.0.0.0",
 			ConcurrentSubRCSyncs: 5,
 			ClusterMonitorPeriod: unversioned.Duration{40 * time.Second},
-			UberAPIQPS:           20.0,
-			UberAPIBurst:         30,
+			FederatedAPIQPS:      20.0,
+			FederatedAPIBurst:    30,
 			LeaderElection:       leaderelection.DefaultLeaderElectionConfiguration(),
 		},
 	}
@@ -91,8 +88,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ClusterMonitorPeriod.Duration, "cluster-monitor-period", s.ClusterMonitorPeriod.Duration, "The period for syncing ClusterStatus in ClusterController.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.StringVar(&s.ApiServerconfig, "uberconfig", s.ApiServerconfig, "Path to ApiServerconfig file with authorization and master location information.")
-	fs.Float32Var(&s.UberAPIQPS, "uber-api-qps", s.UberAPIQPS, "QPS to use while talking with ubernetes apiserver")
-	fs.IntVar(&s.UberAPIBurst, "uber-api-burst", s.UberAPIBurst, "Burst to use while talking with ubernetes apiserver")
+	fs.StringVar(&s.ApiServerconfig, "federatedconfig", s.ApiServerconfig, "Path to ApiServerconfig file with authorization and master location information.")
+	fs.Float32Var(&s.FederatedAPIQPS, "federated-api-qps", s.FederatedAPIQPS, "QPS to use while talking with ubernetes apiserver")
+	fs.IntVar(&s.FederatedAPIBurst, "federated-api-burst", s.FederatedAPIBurst, "Burst to use while talking with ubernetes apiserver")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }
