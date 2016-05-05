@@ -48,7 +48,10 @@ fi
 docker run --rm=true -i \
   -v "${WORKSPACE}/_artifacts":/workspace/_artifacts \
   -v /etc/localtime:/etc/localtime:ro \
-  -v /var/lib/jenkins/gce_keys:/workspace/.ssh:ro \
+  -v /var/lib/jenkins/gce_keys:/workspace/.ssh:ro `# TODO(ixdy): remove when all jobs are using JENKINS_GCE_SSH_KEYFILE` \
+  ${JENKINS_GCE_SSH_KEY_FILE:+-v "${JENKINS_GCE_SSH_KEY_FILE}:/workspace/.ssh/google_compute_engine:ro"} \
+  ${JENKINS_AWS_SSH_KEY_FILE:+-v "${JENKINS_AWS_SSH_KEY_FILE}:/workspace/.ssh/kube_aws_rsa:ro"} \
+  ${JENKINS_AWS_CREDENTIALS_FILE:+-v "${JENKINS_AWS_CREDENTIALS_FILE}:/workspace/.aws/credentials:ro"} \
   --env-file "${WORKSPACE}/env.list" \
   -e "HOME=/workspace" \
   -e "WORKSPACE=/workspace" \
