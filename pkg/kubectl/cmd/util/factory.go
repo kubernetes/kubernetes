@@ -349,6 +349,15 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			if mapping.GroupVersionKind.Group == federation.GroupName {
+				fedClientSet, err := clients.FederationClientSetForVersion(&mappingVersion)
+				if err != nil {
+					return nil, err
+				}
+				if mapping.GroupVersionKind.Kind == "Cluster" {
+					return &kubectl.ClusterDescriber{fedClientSet}, nil
+				}
+			}
 			client, err := clients.ClientForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
