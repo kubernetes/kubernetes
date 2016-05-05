@@ -109,7 +109,13 @@ func (x *TestType) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[0] {
 					yy4 := &x.ObjectMeta
-					yy4.CodecEncodeSelf(e)
+					yym5 := z.EncBinary()
+					_ = yym5
+					if false {
+					} else if z.HasExtensions() && z.EncExt(yy4) {
+					} else {
+						z.EncFallback(yy4)
+					}
 				} else {
 					r.EncodeNil()
 				}
@@ -119,7 +125,13 @@ func (x *TestType) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					yy6 := &x.ObjectMeta
-					yy6.CodecEncodeSelf(e)
+					yym7 := z.EncBinary()
+					_ = yym7
+					if false {
+					} else if z.HasExtensions() && z.EncExt(yy6) {
+					} else {
+						z.EncFallback(yy6)
+					}
 				}
 			}
 			if yyr2 || yy2arr2 {
@@ -255,14 +267,20 @@ func (x *TestType) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.ObjectMeta = pkg2_api.ObjectMeta{}
 			} else {
 				yyv4 := &x.ObjectMeta
-				yyv4.CodecDecodeSelf(d)
+				yym5 := z.DecBinary()
+				_ = yym5
+				if false {
+				} else if z.HasExtensions() && z.DecExt(yyv4) {
+				} else {
+					z.DecFallback(yyv4, false)
+				}
 			}
 		case "status":
 			if r.TryDecodeAsNil() {
 				x.Status = TestTypeStatus{}
 			} else {
-				yyv5 := &x.Status
-				yyv5.CodecDecodeSelf(d)
+				yyv6 := &x.Status
+				yyv6.CodecDecodeSelf(d)
 			}
 		case "kind":
 			if r.TryDecodeAsNil() {
@@ -287,16 +305,16 @@ func (x *TestType) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj8 int
-	var yyb8 bool
-	var yyhl8 bool = l >= 0
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
+	var yyj9 int
+	var yyb9 bool
+	var yyhl9 bool = l >= 0
+	yyj9++
+	if yyhl9 {
+		yyb9 = yyj9 > l
 	} else {
-		yyb8 = r.CheckBreak()
+		yyb9 = r.CheckBreak()
 	}
-	if yyb8 {
+	if yyb9 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -304,16 +322,22 @@ func (x *TestType) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ObjectMeta = pkg2_api.ObjectMeta{}
 	} else {
-		yyv9 := &x.ObjectMeta
-		yyv9.CodecDecodeSelf(d)
+		yyv10 := &x.ObjectMeta
+		yym11 := z.DecBinary()
+		_ = yym11
+		if false {
+		} else if z.HasExtensions() && z.DecExt(yyv10) {
+		} else {
+			z.DecFallback(yyv10, false)
+		}
 	}
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
+	yyj9++
+	if yyhl9 {
+		yyb9 = yyj9 > l
 	} else {
-		yyb8 = r.CheckBreak()
+		yyb9 = r.CheckBreak()
 	}
-	if yyb8 {
+	if yyb9 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -321,16 +345,16 @@ func (x *TestType) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Status = TestTypeStatus{}
 	} else {
-		yyv10 := &x.Status
-		yyv10.CodecDecodeSelf(d)
+		yyv12 := &x.Status
+		yyv12.CodecDecodeSelf(d)
 	}
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
+	yyj9++
+	if yyhl9 {
+		yyb9 = yyj9 > l
 	} else {
-		yyb8 = r.CheckBreak()
+		yyb9 = r.CheckBreak()
 	}
-	if yyb8 {
+	if yyb9 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -340,13 +364,13 @@ func (x *TestType) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj8++
-	if yyhl8 {
-		yyb8 = yyj8 > l
+	yyj9++
+	if yyhl9 {
+		yyb9 = yyj9 > l
 	} else {
-		yyb8 = r.CheckBreak()
+		yyb9 = r.CheckBreak()
 	}
-	if yyb8 {
+	if yyb9 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -357,17 +381,17 @@ func (x *TestType) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.APIVersion = string(r.DecodeString())
 	}
 	for {
-		yyj8++
-		if yyhl8 {
-			yyb8 = yyj8 > l
+		yyj9++
+		if yyhl9 {
+			yyb9 = yyj9 > l
 		} else {
-			yyb8 = r.CheckBreak()
+			yyb9 = r.CheckBreak()
 		}
-		if yyb8 {
+		if yyb9 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj8-1, "")
+		z.DecStructFieldNotFound(yyj9-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
