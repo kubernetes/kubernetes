@@ -312,6 +312,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		localZone:                zone,
 		managedZones:             managedZones,
 		networkURL:               networkURL,
+		nodeTags:                 nodeTags,
 		useMetadataServer:        useMetadataServer,
 		operationPollRateLimiter: operationPollRateLimiter,
 	}, nil
