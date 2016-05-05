@@ -17,6 +17,7 @@ limitations under the License.
 package meta
 
 import (
+	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -57,6 +58,14 @@ type Object interface {
 	SetLabels(labels map[string]string)
 	GetAnnotations() map[string]string
 	SetAnnotations(annotations map[string]string)
+	GetOwnerReferences() []metatypes.OwnerReference
+	SetOwnerReferences([]metatypes.OwnerReference)
+}
+
+var _ Object = &runtime.Unstructured{}
+
+type ListMetaAccessor interface {
+	GetListMeta() List
 }
 
 // List lets you work with list metadata from any of the versioned or
@@ -177,5 +186,3 @@ type RESTMapper interface {
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
 }
-
-var _ Object = &runtime.Unstructured{}

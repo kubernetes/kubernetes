@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -89,3 +90,32 @@ func (meta *ObjectMeta) GetLabels() map[string]string                 { return m
 func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }
 func (meta *ObjectMeta) GetAnnotations() map[string]string            { return meta.Annotations }
 func (meta *ObjectMeta) SetAnnotations(annotations map[string]string) { meta.Annotations = annotations }
+
+func setMetaOwnerReference(dest *metatypes.OwnerReference, reference *OwnerReference) {
+	dest.Kind = reference.Kind
+	dest.Name = reference.Name
+	dest.UID = reference.UID
+	dest.APIVersion = reference.APIVersion
+}
+func (meta *ObjectMeta) GetOwnerReferences() []metatypes.OwnerReference {
+	ret := make([]metatypes.OwnerReference, len(meta.OwnerReferences))
+	for i := 0; i < len(meta.OwnerReferences); i++ {
+		setMetaOwnerReference(&ret[i], &meta.OwnerReferences[i])
+	}
+	return ret
+}
+
+func setOwnerReference(dest *OwnerReference, reference *metatypes.OwnerReference) {
+	dest.Kind = reference.Kind
+	dest.Name = reference.Name
+	dest.UID = reference.UID
+	dest.APIVersion = reference.APIVersion
+}
+
+func (meta *ObjectMeta) SetOwnerReferences(references []metatypes.OwnerReference) {
+	newReferences := make([]OwnerReference, len(references))
+	for i := 0; i < len(references); i++ {
+		setOwnerReference(&newReferences[i], &references[i])
+	}
+	meta.OwnerReferences = newReferences
+}
