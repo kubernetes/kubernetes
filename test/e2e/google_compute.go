@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
 
 // TODO: These should really just use the GCE API client library or at least use
@@ -36,13 +38,17 @@ func createGCEStaticIP(name string) (string, error) {
 	// NAME           REGION      ADDRESS       STATUS
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
-	glog.Infof("Creating static IP with name %q in project %q", name, testContext.CloudConfig.ProjectID)
 	var outputBytes []byte
 	var err error
+	region, err := gce.GetGCERegion(testContext.CloudConfig.Zone)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert zone to region: %v", err)
+	}
+	glog.Infof("Creating static IP with name %q in project %q in region %q", name, testContext.CloudConfig.ProjectID, region)
 	for attempts := 0; attempts < 4; attempts++ {
 		outputBytes, err = exec.Command("gcloud", "compute", "addresses", "create",
 			name, "--project", testContext.CloudConfig.ProjectID,
-			"--region", "us-central1", "-q").CombinedOutput()
+			"--region", region, "-q").CombinedOutput()
 		if err == nil {
 			break
 		}
@@ -75,9 +81,14 @@ func deleteGCEStaticIP(name string) error {
 	// NAME           REGION      ADDRESS       STATUS
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
+	region, err := gce.GetGCERegion(testContext.CloudConfig.Zone)
+	if err != nil {
+		return fmt.Errorf("failed to convert zone to region: %v", err)
+	}
+	glog.Infof("Deleting static IP with name %q in project %q in region %q", name, testContext.CloudConfig.ProjectID, region)
 	outputBytes, err := exec.Command("gcloud", "compute", "addresses", "delete",
 		name, "--project", testContext.CloudConfig.ProjectID,
-		"--region", "us-central1", "-q").CombinedOutput()
+		"--region", region, "-q").CombinedOutput()
 	if err != nil {
 		// Ditch the error, since the stderr in the output is what actually contains
 		// any useful info.
