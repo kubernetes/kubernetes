@@ -436,7 +436,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 
 // CreatePodsPerNodeForSimpleApp Creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
 func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n api.Node) api.PodSpec, maxCount int) map[string]string {
-	nodes := ListSchedulableNodesOrDie(f.Client)
+	nodes := GetReadySchedulableNodesOrDie(f.Client)
 	labels := map[string]string{
 		"app": appName + "-pod",
 	}

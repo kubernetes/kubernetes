@@ -94,7 +94,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 	var resourceMonitor *framework.ResourceMonitor
 
 	BeforeEach(func() {
-		nodes := framework.ListSchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		numNodes = len(nodes.Items)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
