@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -913,7 +913,7 @@ func setNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 //       See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
 func skipCopyAnnotation(key string) bool {
 	// Skip apply annotations and revision annotations.
-	return key == kubectl.LastAppliedConfigAnnotation || key == deploymentutil.RevisionAnnotation
+	return key == annotations.LastAppliedConfigAnnotation || key == deploymentutil.RevisionAnnotation
 }
 
 func getSkippedAnnotations(annotations map[string]string) map[string]string {
