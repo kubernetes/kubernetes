@@ -527,7 +527,7 @@ func normalizeStatus(status *api.PodStatus) *api.PodStatus {
 		normalizeTimeStamp(&condition.LastTransitionTime)
 	}
 
-	// update ƒcontainer statuses
+	// update container statuses
 	for i := range status.ContainerStatuses {
 		cstatus := &status.ContainerStatuses[i]
 		normalizeContainerState(&cstatus.State)

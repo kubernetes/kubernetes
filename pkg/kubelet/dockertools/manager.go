@@ -2022,7 +2022,6 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		result.AddSyncResult(startContainerResult)
 
 		// containerChanges.StartInfraContainer causes the containers to be restarted for config reasons
-		// ignore backoff
 		if !containerChanges.StartInfraContainer {
 			isInBackOff, err, msg := dm.doBackOff(pod, container, podStatus, backOff)
 			if isInBackOff {
