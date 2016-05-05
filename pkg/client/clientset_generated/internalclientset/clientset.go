@@ -18,6 +18,7 @@ package internalclientset
 
 import (
 	"github.com/golang/glog"
+	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned"
 	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
@@ -30,6 +31,7 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Core() unversionedcore.CoreInterface
 	Extensions() unversionedextensions.ExtensionsInterface
+	Autoscaling() unversionedautoscaling.AutoscalingInterface
 	Batch() unversionedbatch.BatchInterface
 }
 
@@ -39,6 +41,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	*unversionedcore.CoreClient
 	*unversionedextensions.ExtensionsClient
+	*unversionedautoscaling.AutoscalingClient
 	*unversionedbatch.BatchClient
 }
 
@@ -56,6 +59,14 @@ func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
 		return nil
 	}
 	return c.ExtensionsClient
+}
+
+// Autoscaling retrieves the AutoscalingClient
+func (c *Clientset) Autoscaling() unversionedautoscaling.AutoscalingInterface {
+	if c == nil {
+		return nil
+	}
+	return c.AutoscalingClient
 }
 
 // Batch retrieves the BatchClient
@@ -87,6 +98,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return &clientset, err
 	}
+	clientset.AutoscalingClient, err = unversionedautoscaling.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return &clientset, err
+	}
 	clientset.BatchClient, err = unversionedbatch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return &clientset, err
@@ -105,6 +120,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = unversionedcore.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = unversionedextensions.NewForConfigOrDie(c)
+	clientset.AutoscalingClient = unversionedautoscaling.NewForConfigOrDie(c)
 	clientset.BatchClient = unversionedbatch.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -116,6 +132,7 @@ func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = unversionedcore.New(c)
 	clientset.ExtensionsClient = unversionedextensions.New(c)
+	clientset.AutoscalingClient = unversionedautoscaling.New(c)
 	clientset.BatchClient = unversionedbatch.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
