@@ -17,10 +17,12 @@ limitations under the License.
 package api_test
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 )
 
 var _ meta.Object = &api.ObjectMeta{}
@@ -47,5 +49,40 @@ func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	api.FillObjectMetaSystemFields(ctx, &resource)
 	if !api.HasObjectMetaSystemFieldValues(&resource) {
 		t.Errorf("the resource does have all fields populated, but incorrectly reports it does not")
+	}
+}
+
+func getObjectMetaAndOwnerReferneces() (api.ObjectMeta, []metatypes.OwnerReference) {
+	return api.ObjectMeta{
+			OwnerReferences: []api.OwnerReference{
+				{UID: "1"},
+				{UID: "2"},
+				{UID: "3"},
+				{UID: "4"},
+				{UID: "5"},
+			},
+		}, []metatypes.OwnerReference{
+			{UID: "1"},
+			{UID: "2"},
+			{UID: "3"},
+			{UID: "4"},
+			{UID: "5"},
+		}
+}
+
+func TestObjectMetaGetOwnerReferences(t *testing.T) {
+	meta, expected := getObjectMetaAndOwnerReferneces()
+	refs := meta.GetOwnerReferences()
+	if !reflect.DeepEqual(refs, expected) {
+		t.Errorf("expect %v\n got %v", expected, refs)
+	}
+}
+
+func TestObjectMetaSetOwnerReferences(t *testing.T) {
+	expected, newRefs := getObjectMetaAndOwnerReferneces()
+	objectMeta := &api.ObjectMeta{}
+	objectMeta.SetOwnerReferences(newRefs)
+	if !reflect.DeepEqual(expected.OwnerReferences, objectMeta.OwnerReferences) {
+		t.Errorf("expect: %#v\n got: %#v", expected.OwnerReferences, objectMeta.OwnerReferences)
 	}
 }
