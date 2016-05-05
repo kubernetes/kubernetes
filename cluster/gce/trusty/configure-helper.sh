@@ -140,15 +140,13 @@ install_additional_packages() {
 # variable that will be used as the kubelet command line flags
 #   KUBELET_CMD_FLAGS
 assemble_kubelet_flags() {
-  KUBELET_CMD_FLAGS="--v=2"
+  log_level="--v=2"
   if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
-    KUBELET_CMD_FLAGS="${KUBELET_TEST_LOG_LEVEL}"
+    log_level="${KUBELET_TEST_LOG_LEVEL}"
   fi
+  KUBELET_CMD_FLAGS="${log_level} ${KUBELET_TEST_ARGS:-}"
   if [ -n "${KUBELET_PORT:-}" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --port=${KUBELET_PORT}"
-  fi
-  if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} ${KUBELET_TEST_ARGS}"
   fi
   if [ "${KUBERNETES_MASTER:-}" = "true" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --enable-debugging-handlers=false --hairpin-mode=none"
@@ -415,7 +413,7 @@ start_kube_apiserver() {
   timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-apiserver.tar
 
   # Calculate variables and assemble the command line.
-  params="--cloud-provider=gce --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001 --tls-cert-file=/etc/srv/kubernetes/server.cert --tls-private-key-file=/etc/srv/kubernetes/server.key --secure-port=443 --client-ca-file=/etc/srv/kubernetes/ca.crt --token-auth-file=/etc/srv/kubernetes/known_tokens.csv --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv --allow-privileged=true --authorization-mode=ABAC --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl --etcd-servers-overrides=/events#http://127.0.0.1:4002"
+  params="--cloud-provider=gce --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001 --tls-cert-file=/etc/srv/kubernetes/server.cert --tls-private-key-file=/etc/srv/kubernetes/server.key --secure-port=443 --client-ca-file=/etc/srv/kubernetes/ca.crt --token-auth-file=/etc/srv/kubernetes/known_tokens.csv --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv --allow-privileged=true --authorization-mode=ABAC --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl --etcd-servers-overrides=/events#http://127.0.0.1:4002 ${APISERVER_TEST_ARGS:-}"
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
@@ -427,9 +425,6 @@ start_kube_apiserver() {
   fi
   if [ -n "${RUNTIME_CONFIG:-}" ]; then
     params="${params} --runtime-config=${RUNTIME_CONFIG}"
-  fi
-  if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
-    params="${params} ${APISERVER_TEST_ARGS}"
   fi
   log_level="--v=2"
   if [ -n "${API_SERVER_TEST_LOG_LEVEL:-}" ]; then
@@ -478,7 +473,7 @@ start_kube_controller_manager() {
   timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-controller-manager.tar
 
   # Calculate variables and assemble the command line.
-  params="--master=127.0.0.1:8080 --cloud-provider=gce --root-ca-file=/etc/srv/kubernetes/ca.crt --service-account-private-key-file=/etc/srv/kubernetes/server.key"
+  params="--master=127.0.0.1:8080 --cloud-provider=gce --root-ca-file=/etc/srv/kubernetes/ca.crt --service-account-private-key-file=/etc/srv/kubernetes/server.key ${CONTROLLER_MANAGER_TEST_ARGS:-}"
   if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
     params="${params} --cloud-config=/etc/gce.conf"
   fi
@@ -499,9 +494,6 @@ start_kube_controller_manager() {
     log_level="${CONTROLLER_MANAGER_TEST_LOG_LEVEL}"
   fi
   params="${params} ${log_level}"
-  if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
-    params="${params} ${CONTROLLER_MANAGER_TEST_ARGS}"
-  fi
   readonly kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
 
   src_file="/home/kubernetes/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
@@ -532,15 +524,11 @@ start_kube_scheduler() {
   timeout 30 docker load -i "${kube_home}/kube-docker-files/kube-scheduler.tar"
 
   # Calculate variables and set them in the manifest.
-  params=""
   log_level="--v=2"
   if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
     log_level="${SCHEDULER_TEST_LOG_LEVEL}"
   fi
-  params="${params} ${log_level}"
-  if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
-    params="${params} ${SCHEDULER_TEST_ARGS}"
-  fi
+  params="${log_level} ${SCHEDULER_TEST_ARGS:-}"
   readonly kube_scheduler_docker_tag=$(cat "${kube_home}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values
@@ -626,6 +614,9 @@ prepare_kube_addons() {
   cp "${addon_src_dir}/namespace.yaml" "${addon_dst_dir}"
   if [ "${ENABLE_L7_LOADBALANCING:-}" = "glbc" ]; then
     setup_addon_manifests "addons" "cluster-loadbalancing/glbc"
+    glbc_yaml="${addon_dst_dir}/cluster-loadbalancing/glbc/glbc.yaml"
+    remove_salt_config_comments "${glbc_yaml}"
+    sed -i -e "s@{{ *kube_uid *}}@${KUBE_UID:-}@g" "${glbc_yaml}"
   fi
   if [ "${ENABLE_CLUSTER_DNS:-}" = "true" ]; then
     setup_addon_manifests "addons" "dns"
