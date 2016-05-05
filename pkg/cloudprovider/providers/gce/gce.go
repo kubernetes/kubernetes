@@ -79,17 +79,19 @@ type GCECloud struct {
 	localZone                string   // The zone in which we are running
 	managedZones             []string // List of zones we are spanning (for Ubernetes-Lite, primarily when running on master)
 	networkURL               string
+	nodeTags                 []string // List of tags to use on firewall rules for load balancers
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
 }
 
 type Config struct {
 	Global struct {
-		TokenURL    string `gcfg:"token-url"`
-		TokenBody   string `gcfg:"token-body"`
-		ProjectID   string `gcfg:"project-id"`
-		NetworkName string `gcfg:"network-name"`
-		Multizone   bool   `gcfg:"multizone"`
+		TokenURL    string   `gcfg:"token-url"`
+		TokenBody   string   `gcfg:"token-body"`
+		ProjectID   string   `gcfg:"project-id"`
+		NetworkName string   `gcfg:"network-name"`
+		NodeTags    []string `gcfg:"node-tags"`
+		Multizone   bool     `gcfg:"multizone"`
 	}
 }
 
@@ -222,12 +224,14 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	managedZones := []string{zone}
 
 	tokenSource := google.ComputeTokenSource("")
+	var nodeTags []string
 	if config != nil {
 		var cfg Config
 		if err := gcfg.ReadInto(&cfg, config); err != nil {
 			glog.Errorf("Couldn't read config: %v", err)
 			return nil, err
 		}
+		glog.Infof("Using GCE provider config %+v", cfg)
 		if cfg.Global.ProjectID != "" {
 			projectID = cfg.Global.ProjectID
 		}
@@ -241,19 +245,20 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		if cfg.Global.TokenURL != "" {
 			tokenSource = newAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
 		}
+		nodeTags = cfg.Global.NodeTags
 		if cfg.Global.Multizone {
 			managedZones = nil // Use all zones in region
 		}
 	}
 
-	return CreateGCECloud(projectID, region, zone, managedZones, networkURL, tokenSource, true /* useMetadataServer */)
+	return CreateGCECloud(projectID, region, zone, managedZones, networkURL, nodeTags, tokenSource, true /* useMetadataServer */)
 }
 
 // Creates a GCECloud object using the specified parameters.
 // If no networkUrl is specified, loads networkName via rest call.
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
-func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
+func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL string, nodeTags []string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
 	if tokenSource == nil {
 		var err error
 		tokenSource, err = google.DefaultTokenSource(
@@ -802,8 +807,8 @@ func makeFirewallName(name string) string {
 }
 
 func makeFirewallDescription(serviceName, ipAddress string) string {
-	return fmt.Sprintf(`{"kubernetes.io/service-ip":"%s", "kubernetes.io/service-name":"%s"}`,
-		ipAddress, serviceName)
+	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s", "kubernetes.io/service-ip":"%s"}`,
+		serviceName, ipAddress)
 }
 
 func slicesEqual(x, y []string) bool {
@@ -937,11 +942,17 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 	return firewall, nil
 }
 
-// We grab all tags from all instances being added to the pool.
+// If the node tags to be used for this cluster have been predefined in the
+// provider config, just use them. Otherwise, grab all tags from all relevant
+// instances:
 // * The longest tag that is a prefix of the instance name is used
 // * If any instance has a prefix tag, all instances must
 // * If no instances have a prefix tag, no tags are used
 func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
+	if len(gce.nodeTags) > 0 {
+		return gce.nodeTags, nil
+	}
+
 	// TODO: We could store the tags in gceInstance, so we could have already fetched it
 	hostNamesByZone := make(map[string][]string)
 	for _, host := range hosts {
