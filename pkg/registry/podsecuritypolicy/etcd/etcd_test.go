@@ -49,6 +49,12 @@ func validNewPodSecurityPolicy() *extensions.PodSecurityPolicy {
 			RunAsUser: extensions.RunAsUserStrategyOptions{
 				Rule: extensions.RunAsUserStrategyRunAsAny,
 			},
+			FSGroup: extensions.FSGroupStrategyOptions{
+				Rule: extensions.FSGroupStrategyRunAsAny,
+			},
+			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+				Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+			},
 		},
 	}
 }
@@ -57,11 +63,11 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	test := registrytest.New(t, storage.Store).ClusterScope()
-	scc := validNewPodSecurityPolicy()
-	scc.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
+	psp := validNewPodSecurityPolicy()
+	psp.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
 	test.TestCreate(
 		// valid
-		scc,
+		psp,
 		// invalid
 		&extensions.PodSecurityPolicy{
 			ObjectMeta: api.ObjectMeta{Name: "name with spaces"},
