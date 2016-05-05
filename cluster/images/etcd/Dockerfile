@@ -15,5 +15,6 @@
 FROM BASEIMAGE
 MAINTAINER Dawn Chen <dawnchen@google.com>
 
+EXPOSE 2379 2380 4001 7001
 COPY etcd /usr/local/bin/
 COPY etcdctl /usr/local/bin/
