@@ -706,7 +706,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	framework.Logf("Creating deployment %s", deploymentName)
 	d := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)
-	createAnnotation := map[string]string{"action": "create", "author": "minion"}
+	createAnnotation := map[string]string{"action": "create", "author": "node"}
 	d.Annotations = createAnnotation
 	deploy, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())

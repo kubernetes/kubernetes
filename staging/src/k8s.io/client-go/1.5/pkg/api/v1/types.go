@@ -2666,7 +2666,7 @@ type ResourceList map[ResourceName]resource.Quantity
 // +genclient=true
 // +nonNamespaced=true
 
-// Node is a worker node in Kubernetes, formerly known as minion.
+// Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
 type Node struct {
 	unversioned.TypeMeta `json:",inline"`

@@ -16760,7 +16760,7 @@
    },
    "v1.Node": {
     "id": "v1.Node",
-    "description": "Node is a worker node in Kubernetes, formerly known as minion. Each node will have a unique identifier in the cache (i.e. in etcd).",
+    "description": "Node is a worker node in Kubernetes. Each node will have a unique identifier in the cache (i.e. in etcd).",
     "properties": {
      "kind": {
       "type": "string",

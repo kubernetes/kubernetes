@@ -143,12 +143,12 @@ kubectl get -o template po wildfly-rc-w2kk5 --template={{.status.podIP}}
 10.246.1.23
 ```
 
-Log in to minion and access the application:
+Log in to node and access the application:
 
 ```sh
-vagrant ssh minion-1
+vagrant ssh node-1
 Last login: Thu Jul 16 00:24:36 2015 from 10.0.2.2
-[vagrant@kubernetes-minion-1 ~]$ curl http://10.246.1.23:8080/employees/resources/employees/
+[vagrant@kubernetes-node-1 ~]$ curl http://10.246.1.23:8080/employees/resources/employees/
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?><collection><employee><id>1</id><name>Penny</name></employee><employee><id>2</id><name>Sheldon</name></employee><employee><id>3</id><name>Amy</name></employee><employee><id>4</id><name>Leonard</name></employee><employee><id>5</id><name>Bernadette</name></employee><employee><id>6</id><name>Raj</name></employee><employee><id>7</id><name>Howard</name></employee><employee><id>8</id><name>Priya</name></employee></collection>
 ```
 

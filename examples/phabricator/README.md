@@ -160,7 +160,7 @@ phabricator-controller-9vy68   1/1       Running   0          1m
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
 ```sh
-me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-minion-2
+me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-node-2
 
 $ sudo docker ps
 CONTAINER ID        IMAGE                             COMMAND     CREATED       STATUS      PORTS   NAMES
@@ -230,10 +230,10 @@ and then visit port 80 of that IP address.
 
 **Note**: Provisioning of the external IP address may take few minutes.
 
-**Note**: You may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+**Note**: You may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-node`:
 
 ```sh
-$ gcloud compute firewall-rules create phabricator-node-80 --allow=tcp:80 --target-tags kubernetes-minion
+$ gcloud compute firewall-rules create phabricator-node-80 --allow=tcp:80 --target-tags kubernetes-node
 ```
 
 ### Step Six: Cleanup

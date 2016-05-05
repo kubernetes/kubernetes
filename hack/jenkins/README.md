@@ -70,7 +70,7 @@ gs://kubernetes-jenkins/logs/kubernetes-e2e-gce/
       gcp-resources-{before, after}.txt
       junit_{00, 01, ...}.xml
       jenkins-e2e-master/{kube-apiserver.log, ...}
-      jenkins-e2e-minion-abcd/{kubelet.log, ...}
+      jenkins-e2e-node-abcd/{kubelet.log, ...}
   12344/
     ...
 ```

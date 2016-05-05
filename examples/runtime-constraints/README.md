@@ -79,13 +79,13 @@ $ cluster/kubectl.sh run cpuhog \
     -- md5sum /dev/urandom
 ```
 
-This will create a single pod on your minion that requests 1/10 of a CPU, but it has no limit on how much CPU it may actually consume
+This will create a single pod on your node that requests 1/10 of a CPU, but it has no limit on how much CPU it may actually consume
 on the node.
 
 To demonstrate this, if you SSH into your machine, you will see it is consuming as much CPU as possible on the node.
 
 ```
-$ vagrant ssh minion-1
+$ vagrant ssh node-1
 $ sudo docker stats $(sudo docker ps -q)
 CONTAINER           CPU %               MEM USAGE/LIMIT     MEM %               NET I/O
 6b593b1a9658        0.00%               1.425 MB/1.042 GB   0.14%               1.038 kB/738 B
@@ -150,7 +150,7 @@ $ cluster/kubectl.sh run cpuhog \
 Let's SSH into the node, and look at usage stats.
 
 ```
-$ vagrant ssh minion-1
+$ vagrant ssh node-1
 $ sudo su
 $ docker stats $(docker ps -q)
 CONTAINER           CPU %               MEM USAGE/LIMIT     MEM %               NET I/O
