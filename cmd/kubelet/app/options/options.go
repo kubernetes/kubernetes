@@ -116,6 +116,7 @@ func NewKubeletServer() *KubeletServer {
 			NodeLabels:                  make(map[string]string),
 			OOMScoreAdj:                 int32(qos.KubeletOOMScoreAdj),
 			LockFilePath:                "",
+			ExitOnLockContention:        false,
 			PodInfraContainerImage:      GetDefaultPodInfraContainerImage(),
 			Port:                             ports.KubeletPort,
 			ReadOnlyPort:                     ports.KubeletReadOnlyPort,
@@ -220,6 +221,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CgroupRoot, "cgroup-root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 	fs.StringVar(&s.LockFilePath, "lock-file", s.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
+	fs.BoolVar(&s.ExitOnLockContention, "exit-on-lock-contention", s.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'.")
 	fs.StringVar(&s.RktAPIEndpoint, "rkt-api-endpoint", s.RktAPIEndpoint, "The endpoint of the rkt API service to communicate with. Only used if --container-runtime='rkt'.")
 	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used.")
