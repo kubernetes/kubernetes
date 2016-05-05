@@ -21,7 +21,7 @@ package kubenet
 import (
 	"fmt"
 	"net"
-	"strings"
+
 	"sync"
 	"syscall"
 
@@ -36,6 +36,7 @@ import (
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	"strings"
 )
 
 const (
@@ -49,20 +50,22 @@ const (
 type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
 
-	host      network.Host
-	netConfig *libcni.NetworkConfig
-	cniConfig *libcni.CNIConfig
-	shaper    bandwidth.BandwidthShaper
-
-	podCIDRs map[kubecontainer.ContainerID]string
-	MTU      int
-	mu       sync.Mutex //Mutex for protecting podCIDRs map and netConfig
+	host        network.Host
+	netConfig   *libcni.NetworkConfig
+	cniConfig   *libcni.CNIConfig
+	shaper      bandwidth.BandwidthShaper
+	podCIDRs    map[kubecontainer.ContainerID]string
+	MTU         int
+	mu          sync.Mutex //Mutex for protecting podCIDRs map and netConfig
+	execer      utilexec.Interface
+	nsenterPath string
 }
 
 func NewPlugin() network.NetworkPlugin {
 	return &kubenetNetworkPlugin{
 		podCIDRs: make(map[kubecontainer.ContainerID]string),
 		MTU:      1460,
+		execer:   utilexec.New(),
 	}
 }
 
@@ -85,7 +88,7 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
 	// This will return an error on older kernel version (< 3.18) as the module
 	// was built-in, we simply ignore the error here. A better thing to do is
 	// to check the kernel version in the future.
-	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
+	plugin.execer.Command("modprobe", "br-netfilter").CombinedOutput()
 	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
 	}
@@ -297,15 +300,41 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
-	cidr, ok := plugin.podCIDRs[id]
-	if !ok {
-		return nil, fmt.Errorf("No IP address found for pod %v", id)
+	// Assuming the ip of pod does not change. Try to retrieve ip from kubenet map first.
+	if cidr, ok := plugin.podCIDRs[id]; ok {
+		ip, _, err := net.ParseCIDR(strings.Trim(cidr, "\n"))
+		if err == nil {
+			return &network.PodNetworkStatus{IP: ip}, nil
+		}
 	}
-
-	ip, _, err := net.ParseCIDR(strings.Trim(cidr, "\n"))
+	// TODO: remove type conversion once kubenet supports multiple runtime
+	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
+	if !ok {
+		return nil, fmt.Errorf("Kubenet execution called on non-docker runtime")
+	}
+	netnsPath, err := runtime.GetNetNS(id)
+	if err != nil {
+		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
+	}
+	nsenterPath, err := plugin.getNsenterPath()
 	if err != nil {
 		return nil, err
 	}
+	// Try to retrieve ip inside container netwrok namespace
+	output, err := plugin.execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
+		"ip", "-o", "-4", "addr", "show", "dev", network.DefaultInterfaceName).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("Unexpected command output %s with error: %v", output, err)
+	}
+	fields := strings.Fields(string(output))
+	if len(fields) < 4 {
+		return nil, fmt.Errorf("Unexpected command output %s ", output)
+	}
+	ip, _, err := net.ParseCIDR(fields[3])
+	if err != nil {
+		return nil, fmt.Errorf("Kubenet failed to parse ip from output %s due to %v", output, err)
+	}
+	plugin.podCIDRs[id] = ip.String()
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
@@ -353,4 +382,15 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(id kubecontainer.Con
 	}
 	delete(plugin.podCIDRs, id)
 	return nil
+}
+
+func (plugin *kubenetNetworkPlugin) getNsenterPath() (string, error) {
+	if plugin.nsenterPath == "" {
+		nsenterPath, err := plugin.execer.LookPath("nsenter")
+		if err != nil {
+			return "", err
+		}
+		plugin.nsenterPath = nsenterPath
+	}
+	return plugin.nsenterPath, nil
 }
