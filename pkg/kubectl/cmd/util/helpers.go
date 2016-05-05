@@ -47,6 +47,7 @@ import (
 
 const (
 	ApplyAnnotationsFlag = "save-config"
+	FilenameHttpRetries  = "filename-http-retries"
 )
 
 type debugError interface {
@@ -336,6 +337,10 @@ func addRecursiveFlag(cmd *cobra.Command, options *resource.FilenameParamOptions
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "If true, process directory recursively.")
 }
 
+func addHttpRetryFlag(cmd *cobra.Command, options *resource.FilenameParamOptions) {
+	cmd.Flags().IntVar(&options.FilenameHttpRetries, FilenameHttpRetries, 1, "Retry failed http requests for urls passed to '-f' flags this many times.")
+}
+
 func addFlagJsonFilenameFlag(cmd *cobra.Command, options *resource.FilenameParamOptions, usage string) {
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 }
@@ -343,11 +348,13 @@ func addFlagJsonFilenameFlag(cmd *cobra.Command, options *resource.FilenameParam
 func AddFilenameParamFlags(cmd *cobra.Command, options *resource.FilenameParamOptions, usage string) {
 	addFlagJsonFilenameFlag(cmd, options, usage)
 	addRecursiveFlag(cmd, options)
+	addHttpRetryFlag(cmd, options)
 }
 
 func AddFilenameParamFlagsNoRecurse(cmd *cobra.Command, options *resource.FilenameParamOptions, usage string) {
 	addFlagJsonFilenameFlag(cmd, options, usage)
 	options.Recursive = false
+	addHttpRetryFlag(cmd, options)
 }
 
 func AddApplyAnnotationFlags(cmd *cobra.Command) {

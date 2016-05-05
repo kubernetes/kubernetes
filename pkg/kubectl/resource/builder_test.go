@@ -249,7 +249,7 @@ var aRC string = `
 `
 
 func NewFilenameParams(recursive bool, filenames string) *FilenameParamOptions {
-	return &FilenameParamOptions{recursive, []string{filenames}}
+	return &FilenameParamOptions{recursive, []string{filenames}, 1}
 }
 
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {

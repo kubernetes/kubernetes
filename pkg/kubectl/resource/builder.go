@@ -74,7 +74,6 @@ type Builder struct {
 	schema validation.Schema
 }
 
-
 type resourceTuple struct {
 	Resource string
 	Name     string
@@ -94,8 +93,9 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 }
 
 type FilenameParamOptions struct {
-	Recursive bool
-	Filenames []string
+	Recursive           bool
+	Filenames           []string
+	FilenameHttpRetries int
 }
 
 // FilenameParam groups input in two categories: URLs and files (files, directories, STDIN)
@@ -115,7 +115,7 @@ func (b *Builder) FilenameParam(enforceNamespace bool, params *FilenameParamOpti
 				b.errs = append(b.errs, fmt.Errorf("the URL passed to filename %q is not valid: %v", s, err))
 				continue
 			}
-			b.URL(url)
+			b.URL(params.FilenameHttpRetries, url)
 		default:
 			b.Path(params.Recursive, s)
 		}
@@ -129,11 +129,12 @@ func (b *Builder) FilenameParam(enforceNamespace bool, params *FilenameParamOpti
 }
 
 // URL accepts a number of URLs directly.
-func (b *Builder) URL(urls ...*url.URL) *Builder {
+func (b *Builder) URL(filenameHttpRetries int, urls ...*url.URL) *Builder {
 	for _, u := range urls {
 		b.paths = append(b.paths, &URLVisitor{
-			URL:           u,
-			StreamVisitor: NewStreamVisitor(nil, b.mapper, u.String(), b.schema),
+			URL:                 u,
+			StreamVisitor:       NewStreamVisitor(nil, b.mapper, u.String(), b.schema),
+			FilenameHttpRetries: filenameHttpRetries,
 		})
 	}
 	return b
