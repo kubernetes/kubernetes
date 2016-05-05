@@ -282,7 +282,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase == api.PodRunning {
-				framework.Logf("Pod %v requesting resource %v on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
+				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
 		}
@@ -290,7 +290,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		var podsNeededForSaturation int
 		milliCpuPerPod := int64(500)
 		for name, leftCapacity := range nodeToCapacityMap {
-			framework.Logf("Node: %v has capacity: %v", name, leftCapacity)
+			framework.Logf("Node: %v has cpu capacity: %vm", name, leftCapacity)
 			podsNeededForSaturation += (int)(leftCapacity / milliCpuPerPod)
 		}
 
