@@ -70,7 +70,7 @@ func (autoscalerStrategy) AllowCreateOnUpdate() bool {
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (autoscalerStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newHPA := obj.(*extensions.HorizontalPodAutoscaler)
-	oldHPA := obj.(*extensions.HorizontalPodAutoscaler)
+	oldHPA := old.(*extensions.HorizontalPodAutoscaler)
 	// Update is not allowed to set status
 	newHPA.Status = oldHPA.Status
 }
