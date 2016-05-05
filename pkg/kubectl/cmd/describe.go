@@ -48,7 +48,7 @@ var (
 
 	describe_example = dedent.Dedent(`
 		# Describe a node
-		kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
+		kubectl describe nodes kubernetes-node-emt8.c.myproject.internal
 
 		# Describe a pod
 		kubectl describe pods/nginx

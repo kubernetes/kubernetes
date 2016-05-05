@@ -322,7 +322,7 @@ You can get information about a pod, including the machine that it is running on
 ```console
 $ kubectl describe pods redis-master-2353460263-1ecey
 Name:		redis-master-2353460263-1ecey
-Node:		kubernetes-minion-m0k7/10.240.0.5
+Node:		kubernetes-node-m0k7/10.240.0.5
 ...
 Labels:		app=redis,pod-template-hash=2353460263,role=master,tier=backend
 Status:		Running
@@ -337,7 +337,7 @@ Containers:
 ...
 ```
 
-The `Node` is the name and IP of the machine, e.g. `kubernetes-minion-m0k7` in the example above. You can find more details about this node with `kubectl describe nodes kubernetes-minion-m0k7`.
+The `Node` is the name and IP of the machine, e.g. `kubernetes-node-m0k7` in the example above. You can find more details about this node with `kubectl describe nodes kubernetes-node-m0k7`.
 
 If you want to view the container logs for a given pod, you can run:
 
@@ -356,7 +356,7 @@ me@workstation$ gcloud compute ssh <NODE-NAME>
 Then, you can look at the Docker containers on the remote machine.  You should see something like this (the specifics of the IDs will be different):
 
 ```console
-me@kubernetes-minion-krxw:~$ sudo docker ps
+me@kubernetes-node-krxw:~$ sudo docker ps
 CONTAINER ID        IMAGE                                 COMMAND                 CREATED              STATUS              PORTS                   NAMES
 ...
 0ffef9649265        redis:latest                          "/entrypoint.sh redi"   About a minute ago   Up About a minute                           k8s_master.869d22f3_redis-master-dz33o_default_1449a58a-5ead-11e5-a104-688f84ef8ef6_d74cb2b5
@@ -718,10 +718,10 @@ NAME                  REGION      IP_ADDRESS     IP_PROTOCOL TARGET
 frontend              us-central1 130.211.188.51 TCP         us-central1/targetPools/frontend
 ```
 
-In Google Compute Engine, you also may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion` (replace with your tags as appropriate):
+In Google Compute Engine, you also may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-node` (replace with your tags as appropriate):
 
 ```console
-$ gcloud compute firewall-rules create --allow=tcp:80 --target-tags=kubernetes-minion kubernetes-minion-80
+$ gcloud compute firewall-rules create --allow=tcp:80 --target-tags=kubernetes-node kubernetes-node-80
 ```
 
 For GCE Kubernetes startup details, see the [Getting started on Google Compute Engine](../../docs/getting-started-guides/gce.md)

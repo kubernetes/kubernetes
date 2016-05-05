@@ -2085,7 +2085,7 @@ func (gce *GCECloud) GetInstanceGroup(name string, zone string) (*compute.Instan
 
 // Take a GCE instance 'hostname' and break it down to something that can be fed
 // to the GCE API client library.  Basically this means reducing 'kubernetes-
-// minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
+// node-2.c.my-proj.internal' to 'kubernetes-node-2' if necessary.
 func canonicalizeInstanceName(name string) string {
 	ix := strings.Index(name, ".")
 	if ix != -1 {
