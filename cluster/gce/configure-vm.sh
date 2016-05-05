@@ -778,7 +778,7 @@ EOF
 
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
     cat <<EOF >>/etc/gce.conf
-node-tags = [${NODE_INSTANCE_PREFIX}]
+node-tags = ${NODE_INSTANCE_PREFIX}
 EOF
     CLOUD_CONFIG=/etc/gce.conf
   fi
