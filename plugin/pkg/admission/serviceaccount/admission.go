@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/fields"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
@@ -199,6 +200,9 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 
 	if s.MountServiceAccountToken {
 		if err := s.mountServiceAccountToken(serviceAccount, pod); err != nil {
+			if _, ok := err.(errors.APIStatus); ok {
+				return err
+			}
 			return admission.NewForbidden(a, err)
 		}
 	}
@@ -357,8 +361,9 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 		// We don't have an API token to mount, so return
 		if s.RequireAPIToken {
 			// If a token is required, this is considered an error
-			// TODO: convert to a ServerTimeout error (or other error that sends a Retry-After header)
-			return fmt.Errorf("no API token found for service account %s/%s, retry after the token is automatically created and added to the service account", serviceAccount.Namespace, serviceAccount.Name)
+			err := errors.NewServerTimeout(unversioned.GroupResource{Resource: "serviceaccounts"}, "create pod", 1)
+			err.ErrStatus.Message = fmt.Sprintf("No API token found for service account %q, retry after the token is automatically created and added to the service account", serviceAccount.Name)
+			return err
 		}
 		return nil
 	}
