@@ -197,7 +197,7 @@ func getKubemarkMasterComponentsResourceUsage() ResourceUsagePerContainer {
 		if name != "" {
 			// Gatherer expects pod_name/container_name format
 			fullName := name + "/" + name
-			result[fullName] = &ContainerResourceUsage{Name: fullName, MemoryWorkingSetInBytes: mem, CPUUsageInCores: cpu}
+			result[fullName] = &ContainerResourceUsage{Name: fullName, MemoryWorkingSetInBytes: mem * 1024, CPUUsageInCores: cpu / 100}
 		}
 	}
 	return result
