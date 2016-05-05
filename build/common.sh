@@ -558,7 +558,7 @@ function kube::build::ensure_data_container() {
 # already been built.  This will sync out all output data from the build.
 function kube::build::run_build_command() {
   kube::log::status "Running build command...."
-  [[ $# != 0 ]] || { echo "Invalid input." >&2; return 4; }
+  [[ $# != 0 ]] || { echo "Invalid input - please specify a command to run." >&2; return 4; }
 
   kube::build::ensure_data_container
   kube::build::prepare_output
