@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.policy.v1alpha1;
 
+import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
@@ -46,8 +47,8 @@ message PodDisruptionBudgetSpec {
   // can be either an integer or a string specifying a percentage, e.g. "28%".
   optional k8s.io.kubernetes.pkg.util.intstr.IntOrString minAvailable = 1;
 
-  // Selector is a label query over pods whose evictions are managed by the
-  // disruption budget.
+  // Label query over pods whose evictions are managed by the disruption
+  // budget.
   optional k8s.io.kubernetes.pkg.api.unversioned.LabelSelector selector = 2;
 }
 
