@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Handlers for pod lifecycle events.
+// Handlers for pod lifecycle events and interfaces to integrate
+// with kubelet admission, synchronization, and eviction of pods.
 package lifecycle
