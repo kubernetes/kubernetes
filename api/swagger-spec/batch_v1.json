@@ -2036,6 +2036,10 @@
      "mountPath": {
       "type": "string",
       "description": "Path within the container at which the volume should be mounted.  Must not contain ':'."
+     },
+     "subPath": {
+      "type": "string",
+      "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root)."
      }
     }
    },

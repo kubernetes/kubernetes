@@ -2610,6 +2610,10 @@ message VolumeMount {
   // Path within the container at which the volume should be mounted.  Must
   // not contain ':'.
   optional string mountPath = 3;
+
+  // Path within the volume from which the container's volume should be mounted.
+  // Defaults to "" (volume's root).
+  optional string subPath = 4;
 }
 
 // Represents the source of a volume to mount.
