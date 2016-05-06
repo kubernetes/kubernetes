@@ -1981,23 +1981,24 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 		if _, ok := desiredVolumes[name]; !ok {
 			parts := strings.Split(name, "/")
 			if runningSet.Has(parts[0]) {
-				glog.Infof("volume %q, still has a container running %q, skipping teardown", name, parts[0])
+				glog.Infof("volume %q, still has a container running (%q), skipping teardown", name, parts[0])
 				continue
 			}
 			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
 			//to be deleted and volumes that are leftover after a crash.
-			glog.Warningf("Orphaned volume %q found, tearing down volume", name)
+			glog.V(3).Infof("Orphaned volume %q found, tearing down volume", name)
 			// TODO(yifan): Refactor this hacky string manipulation.
 			kl.volumeManager.DeleteVolumes(types.UID(parts[0]))
 			// Get path reference count
-			refs, err := mount.GetMountRefs(kl.mounter, cleaner.Unmounter.GetPath())
+			volumePath := cleaner.Unmounter.GetPath()
+			refs, err := mount.GetMountRefs(kl.mounter, volumePath)
 			if err != nil {
-				return fmt.Errorf("Could not get mount path references %v", err)
+				glog.Errorf("Could not get mount path references for %q: %v", volumePath, err)
 			}
 			//TODO (jonesdl) This should not block other kubelet synchronization procedures
 			err = cleaner.Unmounter.TearDown()
 			if err != nil {
-				glog.Errorf("Could not tear down volume %q: %v", name, err)
+				glog.Errorf("Could not tear down volume %q at %q: %v", name, volumePath, err)
 			}
 
 			// volume is unmounted.  some volumes also require detachment from the node.
@@ -2005,7 +2006,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 				detacher := *cleaner.Detacher
 				err = detacher.Detach()
 				if err != nil {
-					glog.Errorf("Could not detach volume %q: %v", name, err)
+					glog.Errorf("Could not detach volume %q at %q: %v", name, volumePath, err)
 				}
 			}
 		}
