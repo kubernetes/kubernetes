@@ -1372,14 +1372,22 @@ func ExpectNoError(err error, explain ...interface{}) {
 }
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
-func Cleanup(filePath string, ns string, selectors ...string) {
+func Cleanup(filePath, ns string, selectors ...string) {
 	By("using delete to clean up resources")
 	var nsArg string
 	if ns != "" {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
 	}
 	RunKubectlOrDie("delete", "--grace-period=0", "-f", filePath, nsArg)
+	AssertCleanup(ns, selectors...)
+}
 
+// Asserts that cleanup of a namespace wrt selectors occured.
+func AssertCleanup(ns string, selectors ...string) {
+	var nsArg string
+	if ns != "" {
+		nsArg = fmt.Sprintf("--namespace=%s", ns)
+	}
 	for _, selector := range selectors {
 		resources := RunKubectlOrDie("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
 		if resources != "" {
@@ -1564,8 +1572,8 @@ func RunKubectl(args ...string) (string, error) {
 	return NewKubectlCommand(args...).Exec()
 }
 
-// runKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
-func runKubectlOrDieInput(data string, args ...string) string {
+// RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
+func RunKubectlOrDieInput(data string, args ...string) string {
 	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
 }
 
