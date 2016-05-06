@@ -17,10 +17,12 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -412,6 +414,36 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 					},
 				}
 			}
+		},
+		func(r *runtime.RawExtension, c fuzz.Continue) {
+			// Pick an arbitrary type and fuzz it
+			types := []runtime.Object{&api.Pod{}, &extensions.Deployment{}, &api.Service{}}
+			obj := types[c.Rand.Intn(len(types))]
+
+			// Find a codec for converting the object to raw bytes.  This is necessary for the
+			// api version and kind to be correctly set be serialization.
+			codec, err := testapi.GetCodecForObject(obj)
+			if err != nil {
+				t.Errorf("Failed to find codec for object: %v", err)
+				return
+			}
+			c.Fuzz(obj)
+
+			// Convert the object to raw bytes
+			var buff bytes.Buffer
+			codec.EncodeToStream(obj, &buff)
+			raw, err := runtime.Encode(codec, obj)
+			if err != nil {
+				t.Errorf("Failed to encode object: %v", err)
+				return
+			}
+
+			// Strip the newline at the end of the encoded bytes since it will be stripped in the
+			// round-trip and cause serialization_test.go to fail
+			raw = []byte(strings.TrimSpace(string(raw)))
+
+			// Set the bytes field on the RawExtension
+			r.Raw = raw
 		},
 	)
 	return f

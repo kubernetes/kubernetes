@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -817,4 +818,65 @@ type PodSecurityPolicyList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []PodSecurityPolicy `json:"items"`
+}
+
+// Template contains the inputs needed to produce a Config.
+type Template struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+
+	Spec TemplateSpec `json:"spec,omitempty"`
+}
+
+type TemplateSpec struct {
+	// Optional: Parameters is an array of Parameters used during the
+	// Template to Config transformation.
+	Parameters []Parameter `json:"parameters,omitempty"`
+
+	// Required: A yaml config list of resources to create
+	Items []runtime.RawExtension `json:"items,omitempty"`
+
+	// Optional: ObjectLabels is a set of labels that are applied to every
+	// object during the Template to Config transformation
+	ObjectLabels map[string]string `json:"objectLabels,omitempty"`
+}
+
+// TemplateList is a list of Template objects.
+type TemplateList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
+	Items                []Template `json:"items,omitempty"`
+}
+
+type ParameterType string
+
+const (
+	String  = "String"
+	Int	= "Int"
+	Bool	= "Bool"
+	Base64	= "Base64"
+)
+
+// Parameter defines a name/value variable that is to be processed during
+// the Template to Config transformation.
+type Parameter struct {
+	// Required: Parameter name must be set and it can be referenced in Template
+	// Items using ${PARAMETER_NAME}
+	Name string `json:"name"`
+
+	// Optional: The name that will show in UI instead of parameter 'Name'
+	DisplayName string `json:"displayName,omitempty"`
+
+	// Optional: Parameter can have description
+	Description string `json:"description,omitempty"`
+
+	// Optional: Value holds the Parameter data. If specified, the generator
+	// will be ignored. The value replaces all occurrences of the Parameter
+	// ${Name} expression during the Template to Config transformation.
+	Value string `json:"value,omitempty"`
+
+	// Optional: Indicates the parameter must have a value.  Defaults to false.
+	Required bool `json:"required,omitempty"`
+
+	Type ParameterType `json:"type,omitempty"`
 }

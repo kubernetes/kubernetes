@@ -76,6 +76,7 @@ import (
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
+	templateetcd "k8s.io/kubernetes/pkg/registry/template/etcd"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
@@ -800,6 +801,12 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 		storage["replicasets/status"] = replicaSetStorage.Status
 		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}
+
+//	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("templates")) {
+		templatesStorage := templateetcd.NewREST(restOptions("templates"))
+		storage["templates"] = templatesStorage
+//		storage["templates/process"] = templateProcess
+//	}
 
 	return storage
 }

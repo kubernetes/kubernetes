@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -1035,4 +1036,67 @@ type PodSecurityPolicyList struct {
 
 	// Items is a list of schema objects.
 	Items []PodSecurityPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// Template contains the inputs needed to produce a Config.
+type Template struct {
+	unversioned.TypeMeta `json:",inline"`
+	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	Spec TemplateSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+type TemplateSpec struct {
+	// Optional: Parameters is an array of Parameters used during the
+	// Template to Config transformation.
+	Parameters []Parameter `json:"parameters,omitempty" protobuf:"bytes,2,rep,name=parameters"`
+
+	// Required: A yaml config list of resources to create
+	Items []runtime.RawExtension `json:"items,omitempty" protobuf:"bytes,3,opt,name=objects"`
+
+	// Optional: ObjectLabels is a set of labels that are applied to every
+	// object during the Template to Config transformation
+	ObjectLabels map[string]string `json:"objectLabels,omitempty" protobuf:"bytes,4,rep,name=objectLabels"`
+}
+
+// TemplateList is a list of Template objects.
+type TemplateList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items                []Template `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+}
+
+type ParameterType string
+
+const (
+	String  = "String"
+	Int	= "Int"
+	Bool	= "Bool"
+	Base64	= "Base64"
+)
+
+// Parameter defines a name/value variable that is to be processed during
+// the Template to Config transformation.
+type Parameter struct {
+	// Required: Parameter name must be set and it can be referenced in Template
+	// Items using ${PARAMETER_NAME}
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// Optional: The name that will show in UI instead of parameter 'Name'
+	DisplayName string `json:"displayName,omitempty" protobuf:"bytes,2,opt,name=displayName"`
+
+	// Optional: Parameter can have description
+	Description string `json:"description,omitempty" protobuf:"bytes,3,opt,name=description"`
+
+	// Optional: Value holds the Parameter data.
+	// The value replaces all occurrences of the Parameter $(Name) or
+	// $((Name)) expression during the Template to Config transformation.
+	Value string `json:"value,omitempty" protobuf:"bytes,4,opt,name=value"`
+
+	// Optional: Indicates the parameter must have a value.  Defaults to false.
+	Required bool `json:"required,omitempty" protobuf:"varint,7,opt,name=required"`
+
+	// Optional: Type-value of the parameter (one of string, int, bool, or base64)
+	// Used by clients to provide validation of user input and guide users.
+	Type ParameterType `json:"type,omitempty"`
 }
