@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	gruntime "runtime"
 	"strings"
 
@@ -227,7 +227,7 @@ outter:
 
 			// launch the editor
 			editedDiff := edited
-			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", path.Base(os.Args[0])), ext, buf)
+			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), ext, buf)
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
@@ -350,7 +350,7 @@ outter:
 			// 3. invalid: retry those on the spot by looping ie. reloading the editor
 			if results.retryable > 0 {
 				fmt.Fprintln(errOut, errorMsg)
-				fmt.Fprintf(errOut, "You can run `%s replace -f %s` to try this update again.\n", path.Base(os.Args[0]), file)
+				fmt.Fprintf(errOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
 				continue outter
 			}
 			if results.notfound > 0 {
