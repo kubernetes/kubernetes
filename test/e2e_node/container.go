@@ -23,17 +23,22 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/types"
 )
 
-//One pod one container
+// One pod one container
 type ConformanceContainer struct {
-	Container api.Container
-	Client    *client.Client
-	Phase     api.PodPhase
-	NodeName  string
+	Container     api.Container
+	Client        *client.Client
+	RestartPolicy api.RestartPolicy
+	Volumes       []api.Volume
+	NodeName      string
+	Namespace     string
+
+	podName string
 }
 
 type ConformanceContainerEqualMatcher struct {
@@ -63,36 +68,37 @@ func (matcher *ConformanceContainerEqualMatcher) NegatedFailureMessage(actual in
 }
 
 func (cc *ConformanceContainer) Create() error {
+	cc.podName = cc.Container.Name + string(util.NewUUID())
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			//Same with the container name
-			Name:      cc.Container.Name,
-			Namespace: api.NamespaceDefault,
+			Name:      cc.podName,
+			Namespace: cc.Namespace,
 		},
 		Spec: api.PodSpec{
 			NodeName:      cc.NodeName,
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: cc.RestartPolicy,
 			Containers: []api.Container{
 				cc.Container,
 			},
+			Volumes: cc.Volumes,
 		},
 	}
 
-	_, err := cc.Client.Pods(api.NamespaceDefault).Create(pod)
+	_, err := cc.Client.Pods(cc.Namespace).Create(pod)
 	return err
 }
 
 //Same with 'delete'
 func (cc *ConformanceContainer) Stop() error {
-	return cc.Client.Pods(api.NamespaceDefault).Delete(cc.Container.Name, &api.DeleteOptions{})
+	return cc.Client.Pods(cc.Namespace).Delete(cc.podName, &api.DeleteOptions{})
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.Client.Pods(api.NamespaceDefault).Delete(cc.Container.Name, &api.DeleteOptions{})
+	return cc.Client.Pods(cc.Namespace).Delete(cc.podName, &api.DeleteOptions{})
 }
 
 func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
-	pod, err := cc.Client.Pods(api.NamespaceDefault).Get(cc.Container.Name)
+	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
 	if err != nil {
 		return ConformanceContainer{}, err
 	}
@@ -101,15 +107,51 @@ func (cc *ConformanceContainer) Get() (ConformanceContainer, error) {
 	if containers == nil || len(containers) != 1 {
 		return ConformanceContainer{}, errors.New("Failed to get container")
 	}
-	return ConformanceContainer{containers[0], cc.Client, pod.Status.Phase, pod.Spec.NodeName}, nil
+	return ConformanceContainer{containers[0], cc.Client, pod.Spec.RestartPolicy, pod.Spec.Volumes, pod.Spec.NodeName, cc.Namespace, cc.podName}, nil
+}
+
+func (cc *ConformanceContainer) GetStatus() (api.ContainerStatus, api.PodPhase, error) {
+	pod, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
+	if err != nil {
+		return api.ContainerStatus{}, api.PodUnknown, err
+	}
+
+	statuses := pod.Status.ContainerStatuses
+	if len(statuses) != 1 {
+		return api.ContainerStatus{}, api.PodUnknown, errors.New("Failed to get container status")
+	}
+	return statuses[0], pod.Status.Phase, nil
 }
 
 func (cc *ConformanceContainer) Present() (bool, error) {
-	_, err := cc.Client.Pods(api.NamespaceDefault).Get(cc.Container.Name)
+	_, err := cc.Client.Pods(cc.Namespace).Get(cc.podName)
 	if err == nil {
 		return true, nil
-	} else if err != nil && apierrs.IsNotFound(err) {
+	}
+	if apierrs.IsNotFound(err) {
 		return false, nil
 	}
 	return false, err
+}
+
+type ContainerState uint32
+
+const (
+	ContainerStateWaiting ContainerState = 1 << iota
+	ContainerStateRunning
+	ContainerStateTerminated
+	ContainerStateUnknown
+)
+
+func GetContainerState(state api.ContainerState) ContainerState {
+	if state.Waiting != nil {
+		return ContainerStateWaiting
+	}
+	if state.Running != nil {
+		return ContainerStateRunning
+	}
+	if state.Terminated != nil {
+		return ContainerStateTerminated
+	}
+	return ContainerStateUnknown
 }
