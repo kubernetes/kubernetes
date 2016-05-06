@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os/exec"
 	"strings"
@@ -57,6 +58,11 @@ var _ = BeforeSuite(func() {
 		}
 		*nodeName = strings.TrimSpace(fmt.Sprintf("%s", output))
 	}
+
+	// TODO(yifan): Temporary workaround to disable coreos from auto restart
+	// by masking the locksmithd.
+	// We should mask locksmithd when provisioning the machine.
+	maskLocksmithdOnCoreos()
 
 	if *startServices {
 		e2es = newE2eService(*nodeName)
@@ -110,4 +116,17 @@ func (lr *LogReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 	}
 	b.WriteString("******************************************************\n")
 	glog.Infof(b.String())
+}
+
+func maskLocksmithdOnCoreos() {
+	data, err := ioutil.ReadFile("/etc/os-release")
+	if err != nil {
+		glog.Fatalf("Could not read /etc/os-release: %v", err)
+	}
+	if bytes.Contains(data, []byte("ID=coreos")) {
+		if output, err := exec.Command("sudo", "systemctl", "mask", "--now", "locksmithd").CombinedOutput(); err != nil {
+			glog.Fatalf("Could not mask locksmithd: %v, output: %q", err, string(output))
+		}
+	}
+	glog.Infof("Locksmithd is masked successfully")
 }
