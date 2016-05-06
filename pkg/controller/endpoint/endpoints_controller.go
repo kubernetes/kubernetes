@@ -20,6 +20,7 @@ package endpoint
 
 import (
 	"reflect"
+	"strconv"
 	"time"
 
 	"encoding/json"
@@ -53,6 +54,14 @@ const (
 	// We must avoid syncing service until the pod store has synced. If it hasn't synced, to
 	// avoid a hot loop, we'll wait this long between checks.
 	PodStoreSyncedPollPeriod = 100 * time.Millisecond
+
+	// An annotation on the Service denoting if the endpoints controller should
+	// go ahead and create endpoints for unready pods. This annotation is
+	// currently only used by PetSets, where we need the pet to be DNS
+	// resolvable during initialization. In this situation we create a headless
+	// service just for the PetSet, and clients shouldn't be using this Service
+	// for anything so unready endpoints don't matter.
+	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
 var (
@@ -356,6 +365,16 @@ func (e *EndpointController) syncService(key string) {
 	subsets := []api.EndpointSubset{}
 	podHostNames := map[string]endpoints.HostRecord{}
 
+	var tolerateUnreadyEndpoints bool
+	if v, ok := service.Annotations[TolerateUnreadyEndpointsAnnotation]; ok {
+		b, err := strconv.ParseBool(v)
+		if err == nil {
+			tolerateUnreadyEndpoints = b
+		} else {
+			glog.Errorf("Failed to parse annotation %v: %v", TolerateUnreadyEndpointsAnnotation, err)
+		}
+	}
+
 	for i := range pods.Items {
 		pod := &pods.Items[i]
 
@@ -401,7 +420,7 @@ func (e *EndpointController) syncService(key string) {
 				epa.Hostname = hostname
 			}
 
-			if api.IsPodReady(pod) {
+			if tolerateUnreadyEndpoints || api.IsPodReady(pod) {
 				subsets = append(subsets, api.EndpointSubset{
 					Addresses: []api.EndpointAddress{epa},
 					Ports:     []api.EndpointPort{epp},
