@@ -32,15 +32,19 @@ type traceStep struct {
 type Trace struct {
 	name      string
 	startTime time.Time
-	steps     []*traceStep
+	steps     []traceStep
 }
 
 func NewTrace(name string) *Trace {
-	return &Trace{name, time.Now(), make([]*traceStep, 0)}
+	return &Trace{name, time.Now(), nil}
 }
 
 func (t *Trace) Step(msg string) {
-	t.steps = append(t.steps, &traceStep{time.Now(), msg})
+	if t.steps == nil {
+		// traces almost always have less than 6 steps, do this to avoid more than a single allocation
+		t.steps = make([]traceStep, 0, 6)
+	}
+	t.steps = append(t.steps, traceStep{time.Now(), msg})
 }
 
 func (t *Trace) Log() {
