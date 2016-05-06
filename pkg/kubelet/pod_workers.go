@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
@@ -31,14 +33,62 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+// OnCompleteFunc is a function that is invoked when an operation completes.
+// If err is non-nil, the operation did not complete successfully.
+type OnCompleteFunc func(err error)
+
+// PodStatusFunc is a function that is invoked to generate a pod status.
+type PodStatusFunc func(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus
+
+// KillPodOptions are options when performing a pod update whose update type is kill.
+type KillPodOptions struct {
+	// PodStatusFunc is the function to invoke to set pod status in response to a kill request.
+	PodStatusFunc PodStatusFunc
+	// PodTerminationGracePeriodSecondsOverride is optional override to use if a pod is being killed as part of kill operation.
+	PodTerminationGracePeriodSecondsOverride *int64
+}
+
+// UpdatePodOptions is an options struct to pass to a UpdatePod operation.
+type UpdatePodOptions struct {
+	// pod to update
+	Pod *api.Pod
+	// the mirror pod for the pod to update, if it is a static pod
+	MirrorPod *api.Pod
+	// the type of update (create, update, sync, kill)
+	UpdateType kubetypes.SyncPodType
+	// optional callback function when operation completes
+	// this callback is not guaranteed to be completed since a pod worker may
+	// drop update requests if it was fulfilling a previous request.  this is
+	// only guaranteed to be invoked in response to a kill pod request which is
+	// always delivered.
+	OnCompleteFunc OnCompleteFunc
+	// if update type is kill, use the specified options to kill the pod.
+	KillPodOptions *KillPodOptions
+}
+
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
-	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kubetypes.SyncPodType, updateComplete func())
+	UpdatePod(options *UpdatePodOptions)
 	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
 	ForgetWorker(uid types.UID)
 }
 
-type syncPodFnType func(*api.Pod, *api.Pod, *kubecontainer.PodStatus, kubetypes.SyncPodType) error
+// syncPodOptions provides the arguments to a SyncPod operation.
+type syncPodOptions struct {
+	// the mirror pod for the pod to sync, if it is a static pod
+	mirrorPod *api.Pod
+	// pod to sync
+	pod *api.Pod
+	// the type of update (create, update, sync)
+	updateType kubetypes.SyncPodType
+	// the current status
+	podStatus *kubecontainer.PodStatus
+	// if update type is kill, use the specified options to kill the pod.
+	killPodOptions *KillPodOptions
+}
+
+// the function to invoke to perform a sync.
+type syncPodFnType func(options syncPodOptions) error
 
 const (
 	// jitter factor for resyncInterval
@@ -54,14 +104,14 @@ type podWorkers struct {
 
 	// Tracks all running per-pod goroutines - per-pod goroutine will be
 	// processing updates received through its corresponding channel.
-	podUpdates map[types.UID]chan workUpdate
+	podUpdates map[types.UID]chan UpdatePodOptions
 	// Track the current state of per-pod goroutines.
 	// Currently all update request for a given pod coming when another
 	// update of this pod is being processed are ignored.
 	isWorking map[types.UID]bool
 	// Tracks the last undelivered work item for this pod - a work item is
 	// undelivered if it comes in while the worker is working.
-	lastUndeliveredWorkUpdate map[types.UID]workUpdate
+	lastUndeliveredWorkUpdate map[types.UID]UpdatePodOptions
 
 	workQueue queue.WorkQueue
 
@@ -83,26 +133,12 @@ type podWorkers struct {
 	podCache kubecontainer.Cache
 }
 
-type workUpdate struct {
-	// The pod state to reflect.
-	pod *api.Pod
-
-	// The mirror pod of pod; nil if it does not exist.
-	mirrorPod *api.Pod
-
-	// Function to call when the update is complete.
-	updateCompleteFn func()
-
-	// A string describing the type of this update, eg: create
-	updateType kubetypes.SyncPodType
-}
-
 func newPodWorkers(syncPodFn syncPodFnType, recorder record.EventRecorder, workQueue queue.WorkQueue,
 	resyncInterval, backOffPeriod time.Duration, podCache kubecontainer.Cache) *podWorkers {
 	return &podWorkers{
-		podUpdates:                map[types.UID]chan workUpdate{},
+		podUpdates:                map[types.UID]chan UpdatePodOptions{},
 		isWorking:                 map[types.UID]bool{},
-		lastUndeliveredWorkUpdate: map[types.UID]workUpdate{},
+		lastUndeliveredWorkUpdate: map[types.UID]UpdatePodOptions{},
 		syncPodFn:                 syncPodFn,
 		recorder:                  recorder,
 		workQueue:                 workQueue,
@@ -112,40 +148,52 @@ func newPodWorkers(syncPodFn syncPodFnType, recorder record.EventRecorder, workQ
 	}
 }
 
-func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
+func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 	var lastSyncTime time.Time
-	for newWork := range podUpdates {
+	for update := range podUpdates {
 		err := func() error {
-			podID := newWork.pod.UID
+			podUID := update.Pod.UID
 			// This is a blocking call that would return only if the cache
 			// has an entry for the pod that is newer than minRuntimeCache
 			// Time. This ensures the worker doesn't start syncing until
 			// after the cache is at least newer than the finished time of
 			// the previous sync.
-			status, err := p.podCache.GetNewerThan(podID, lastSyncTime)
+			status, err := p.podCache.GetNewerThan(podUID, lastSyncTime)
 			if err != nil {
 				return err
 			}
-			err = p.syncPodFn(newWork.pod, newWork.mirrorPod, status, newWork.updateType)
+			err = p.syncPodFn(syncPodOptions{
+				mirrorPod:      update.MirrorPod,
+				pod:            update.Pod,
+				podStatus:      status,
+				killPodOptions: update.KillPodOptions,
+				updateType:     update.UpdateType,
+			})
 			lastSyncTime = time.Now()
 			if err != nil {
 				return err
 			}
-			newWork.updateCompleteFn()
 			return nil
 		}()
-		if err != nil {
-			glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
-			p.recorder.Eventf(newWork.pod, api.EventTypeWarning, kubecontainer.FailedSync, "Error syncing pod, skipping: %v", err)
+		// notify the call-back function if the operation succeeded or not
+		if update.OnCompleteFunc != nil {
+			update.OnCompleteFunc(err)
 		}
-		p.wrapUp(newWork.pod.UID, err)
+		if err != nil {
+			glog.Errorf("Error syncing pod %s, skipping: %v", update.Pod.UID, err)
+			p.recorder.Eventf(update.Pod, api.EventTypeWarning, kubecontainer.FailedSync, "Error syncing pod, skipping: %v", err)
+		}
+		p.wrapUp(update.Pod.UID, err)
 	}
 }
 
-// Apply the new setting to the specified pod. updateComplete is called when the update is completed.
-func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kubetypes.SyncPodType, updateComplete func()) {
+// Apply the new setting to the specified pod.
+// If the options provide an OnCompleteFunc, the function is invoked if the update is accepted.
+// Update requests are ignored if a kill pod request is pending.
+func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
+	pod := options.Pod
 	uid := pod.UID
-	var podUpdates chan workUpdate
+	var podUpdates chan UpdatePodOptions
 	var exists bool
 
 	p.podLock.Lock()
@@ -155,7 +203,7 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kube
 		// puts an update into channel is called from the same goroutine where
 		// the channel is consumed. However, it is guaranteed that in such case
 		// the channel is empty, so buffer of size 1 is enough.
-		podUpdates = make(chan workUpdate, 1)
+		podUpdates = make(chan UpdatePodOptions, 1)
 		p.podUpdates[uid] = podUpdates
 
 		// Creating a new pod worker either means this is a new pod, or that the
@@ -169,18 +217,12 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kube
 	}
 	if !p.isWorking[pod.UID] {
 		p.isWorking[pod.UID] = true
-		podUpdates <- workUpdate{
-			pod:              pod,
-			mirrorPod:        mirrorPod,
-			updateCompleteFn: updateComplete,
-			updateType:       updateType,
-		}
+		podUpdates <- *options
 	} else {
-		p.lastUndeliveredWorkUpdate[pod.UID] = workUpdate{
-			pod:              pod,
-			mirrorPod:        mirrorPod,
-			updateCompleteFn: updateComplete,
-			updateType:       updateType,
+		// if a request to kill a pod is pending, we do not let anything overwrite that request.
+		update, found := p.lastUndeliveredWorkUpdate[pod.UID]
+		if !found || update.UpdateType != kubetypes.SyncPodKill {
+			p.lastUndeliveredWorkUpdate[pod.UID] = *options
 		}
 	}
 }
@@ -234,5 +276,55 @@ func (p *podWorkers) checkForUpdates(uid types.UID) {
 		delete(p.lastUndeliveredWorkUpdate, uid)
 	} else {
 		p.isWorking[uid] = false
+	}
+}
+
+// killPodNow returns a KillPodFunc that can be used to kill a pod.
+// It is intended to be injected into other modules that need to kill a pod.
+func killPodNow(podWorkers PodWorkers) eviction.KillPodFunc {
+	return func(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error {
+		// determine the grace period to use when killing the pod
+		gracePeriod := int64(0)
+		if gracePeriodOverride != nil {
+			gracePeriod = *gracePeriodOverride
+		} else if pod.Spec.TerminationGracePeriodSeconds != nil {
+			gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+		}
+
+		// we timeout and return an error if we dont get a callback within a reasonable time.
+		// the default timeout is relative to the grace period (we settle on 2s to wait for kubelet->runtime traffic to complete in sigkill)
+		timeout := int64(gracePeriod + (gracePeriod / 2))
+		minTimeout := int64(2)
+		if timeout < minTimeout {
+			timeout = minTimeout
+		}
+		timeoutDuration := time.Duration(timeout) * time.Second
+
+		// open a channel we block against until we get a result
+		type response struct {
+			err error
+		}
+		ch := make(chan response)
+		podWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodKill,
+			OnCompleteFunc: func(err error) {
+				ch <- response{err: err}
+			},
+			KillPodOptions: &KillPodOptions{
+				PodStatusFunc: func(p *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
+					return status
+				},
+				PodTerminationGracePeriodSecondsOverride: gracePeriodOverride,
+			},
+		})
+
+		// wait for either a response, or a timeout
+		select {
+		case r := <-ch:
+			return r.err
+		case <-time.After(timeoutDuration):
+			return fmt.Errorf("timeout waiting to kill pod")
+		}
 	}
 }

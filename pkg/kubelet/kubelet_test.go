@@ -3024,7 +3024,11 @@ func TestCreateMirrorPod(t *testing.T) {
 		pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 		pods := []*api.Pod{pod}
 		kl.podManager.SetPods(pods)
-		err := kl.syncPod(pod, nil, &kubecontainer.PodStatus{}, updateType)
+		err := kl.syncPod(syncPodOptions{
+			pod:        pod,
+			podStatus:  &kubecontainer.PodStatus{},
+			updateType: updateType,
+		})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -3065,7 +3069,12 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*api.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, mirrorPod, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kl.syncPod(syncPodOptions{
+		pod:        pod,
+		mirrorPod:  mirrorPod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3223,7 +3232,11 @@ func TestHostNetworkAllowed(t *testing.T) {
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3248,7 +3261,11 @@ func TestHostNetworkDisallowed(t *testing.T) {
 	})
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 
-	err := kubelet.syncPod(pod, nil, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
@@ -3269,7 +3286,11 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 	})
 
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3289,7 +3310,11 @@ func TestPrivilegeContainerDisallowed(t *testing.T) {
 		},
 	})
 
-	err := kubelet.syncPod(pod, nil, &kubecontainer.PodStatus{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
@@ -4258,5 +4283,46 @@ func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 	}
 	if apiStatus.Message != "because" {
 		t.Fatalf("Expected message %v, but got %v", "because", apiStatus.Message)
+	}
+}
+
+func TestSyncPodKillPod(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kl := testKubelet.kubelet
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "foo",
+		},
+	}
+	pods := []*api.Pod{pod}
+	kl.podManager.SetPods(pods)
+	gracePeriodOverride := int64(0)
+	err := kl.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodKill,
+		killPodOptions: &KillPodOptions{
+			PodStatusFunc: func(p *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
+				return api.PodStatus{
+					Phase:   api.PodFailed,
+					Reason:  "reason",
+					Message: "message",
+				}
+			},
+			PodTerminationGracePeriodSecondsOverride: &gracePeriodOverride,
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Check pod status stored in the status map.
+	status, found := kl.statusManager.GetPodStatus(pod.UID)
+	if !found {
+		t.Fatalf("status of pod %q is not found in the status map", pod.UID)
+	}
+	if status.Phase != api.PodFailed {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
 	}
 }

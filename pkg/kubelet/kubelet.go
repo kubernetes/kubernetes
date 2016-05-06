@@ -1698,7 +1698,30 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 //
 // If any step if this workflow errors, the error is returned, and is repeated
 // on the next syncPod call.
-func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecontainer.PodStatus, updateType kubetypes.SyncPodType) error {
+func (kl *Kubelet) syncPod(o syncPodOptions) error {
+	// pull out the required options
+	pod := o.pod
+	mirrorPod := o.mirrorPod
+	podStatus := o.podStatus
+	updateType := o.updateType
+
+	// if we want to kill a pod, do it now!
+	if updateType == kubetypes.SyncPodKill {
+		killPodOptions := o.killPodOptions
+		if killPodOptions == nil || killPodOptions.PodStatusFunc == nil {
+			return fmt.Errorf("kill pod options are required if update type is kill")
+		}
+		apiPodStatus := killPodOptions.PodStatusFunc(pod, podStatus)
+		kl.statusManager.SetPodStatus(pod, apiPodStatus)
+		// we kill the pod with the specified grace period since this is a termination
+		if err := kl.killPod(pod, nil, podStatus, killPodOptions.PodTerminationGracePeriodSecondsOverride); err != nil {
+			// there was an error killing the pod, so we return that error directly
+			utilruntime.HandleError(err)
+			return err
+		}
+		return nil
+	}
+
 	// Latency measurements for the main workflow are relative to the
 	// (first time the pod was seen by the API server.
 	var firstSeenTime time.Time
@@ -1733,8 +1756,11 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 	// Kill pod if it should not be running
 	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
 		if err := kl.killPod(pod, nil, podStatus, nil); err != nil {
+			// there was an error killing the pod, so we return that error directly
 			utilruntime.HandleError(err)
+			return err
 		}
+		// there was no error killing the pod, but the pod cannot be run, so we return that err (if any)
 		return err
 	}
 
@@ -2570,8 +2596,15 @@ func (kl *Kubelet) dispatchWork(pod *api.Pod, syncType kubetypes.SyncPodType, mi
 		return
 	}
 	// Run the sync in an async worker.
-	kl.podWorkers.UpdatePod(pod, mirrorPod, syncType, func() {
-		metrics.PodWorkerLatency.WithLabelValues(syncType.String()).Observe(metrics.SinceInMicroseconds(start))
+	kl.podWorkers.UpdatePod(&UpdatePodOptions{
+		Pod:        pod,
+		MirrorPod:  mirrorPod,
+		UpdateType: syncType,
+		OnCompleteFunc: func(err error) {
+			if err != nil {
+				metrics.PodWorkerLatency.WithLabelValues(syncType.String()).Observe(metrics.SinceInMicroseconds(start))
+			}
+		},
 	})
 	// Note the number of containers for new pods.
 	if syncType == kubetypes.SyncPodCreate {
