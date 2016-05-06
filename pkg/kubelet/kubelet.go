@@ -2501,12 +2501,6 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			break
 		}
 		glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
-		// Force the container runtime cache to update.
-		if err := kl.runtimeCache.ForceUpdateIfOlder(kl.clock.Now()); err != nil {
-			glog.Errorf("SyncLoop: unable to update runtime cache")
-			// TODO (yujuhong): should we delay the sync until container
-			// runtime can be updated?
-		}
 		handler.HandlePodSyncs([]*api.Pod{pod})
 	case <-syncCh:
 		// Sync pods waiting for sync
