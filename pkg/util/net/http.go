@@ -26,6 +26,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
+	"golang.org/x/net/http2"
 )
 
 // IsProbableEOF returns true if the given error resembles a connection termination
@@ -53,9 +56,9 @@ func IsProbableEOF(err error) bool {
 
 var defaultTransport = http.DefaultTransport.(*http.Transport)
 
-// SetTransportDefaults applies the defaults from http.DefaultTransport
+// SetOldTransportDefaults applies the defaults from http.DefaultTransport
 // for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
-func SetTransportDefaults(t *http.Transport) *http.Transport {
+func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 	if t.Proxy == nil || isDefault(t.Proxy) {
 		// http.ProxyFromEnvironment doesn't respect CIDRs and that makes it impossible to exclude things like pod and service IPs from proxy settings
 		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
@@ -66,6 +69,19 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	}
 	if t.TLSHandshakeTimeout == 0 {
 		t.TLSHandshakeTimeout = defaultTransport.TLSHandshakeTimeout
+	}
+	return t
+}
+
+// SetTransportDefaults applies the defaults from http.DefaultTransport
+// for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
+func SetTransportDefaults(t *http.Transport) *http.Transport {
+	t = SetOldTransportDefaults(t)
+	// Allow HTTP2 clients but default off for now
+	if s := os.Getenv("ENABLE_HTTP2"); len(s) > 0 {
+		if err := http2.ConfigureTransport(t); err != nil {
+			glog.Warningf("Transport failed http2 configuration: %v", err)
+		}
 	}
 	return t
 }
