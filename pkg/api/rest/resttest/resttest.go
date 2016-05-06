@@ -139,6 +139,7 @@ func (t *Tester) TestCreate(valid runtime.Object, createFn CreateFunc, getFn Get
 		t.testCreateDiscardsObjectNamespace(copyOrDie(valid))
 		t.testCreateIgnoresContextNamespace(copyOrDie(valid))
 		t.testCreateIgnoresMismatchedNamespace(copyOrDie(valid))
+		t.testCreateResetsUserData(copyOrDie(valid))
 	} else {
 		t.testCreateRejectsMismatchedNamespace(copyOrDie(valid))
 	}
