@@ -52,6 +52,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -777,6 +778,16 @@ type Kubelet struct {
 
 	// handlers called during the tryUpdateNodeStatus cycle
 	setNodeStatusFuncs []func(*api.Node) error
+
+	// TODO: think about moving this to be centralized in PodWorkers in follow-on.
+	// the list of handlers to call during pod admission.
+	lifecycle.PodAdmitHandlers
+
+	// the list of handlers to call during pod sync loop.
+	lifecycle.PodSyncLoopHandlers
+
+	// the list of handlers to call during pod sync.
+	lifecycle.PodSyncHandlers
 }
 
 // Validate given node IP belongs to the current host
@@ -1722,7 +1733,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// Kill pod if it should not be running
-	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil {
+	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
 		if err := kl.killPod(pod, nil, podStatus); err != nil {
 			utilruntime.HandleError(err)
 		}
@@ -2025,6 +2036,7 @@ func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
 // Get pods which should be resynchronized. Currently, the following pod should be resynchronized:
 //   * pod whose work is ready.
 //   * pod past the active deadline.
+//   * internal modules that request sync of a pod.
 func (kl *Kubelet) getPodsToSync() []*api.Pod {
 	allPods := kl.podManager.GetPods()
 	podUIDs := kl.workQueue.GetWork()
@@ -2034,6 +2046,7 @@ func (kl *Kubelet) getPodsToSync() []*api.Pod {
 	}
 	var podsToSync []*api.Pod
 	for _, pod := range allPods {
+		// TODO: move active deadline code into a sync/evict pattern
 		if kl.pastActiveDeadline(pod) {
 			// The pod has passed the active deadline
 			podsToSync = append(podsToSync, pod)
@@ -2042,6 +2055,13 @@ func (kl *Kubelet) getPodsToSync() []*api.Pod {
 		if podUIDSet.Has(string(pod.UID)) {
 			// The work of the pod is ready
 			podsToSync = append(podsToSync, pod)
+			continue
+		}
+		for _, podSyncLoopHandler := range kl.PodSyncLoopHandlers {
+			if podSyncLoopHandler.ShouldSync(pod) {
+				podsToSync = append(podsToSync, pod)
+				break
+			}
 		}
 	}
 	return podsToSync
@@ -2337,6 +2357,18 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 			otherPods = append(otherPods, p)
 		}
 	}
+
+	// the kubelet will invoke each pod admit handler in sequence
+	// if any handler rejects, the pod is rejected.
+	// TODO: move predicate check into a pod admitter
+	// TODO: move out of disk check into a pod admitter
+	// TODO: out of resource eviction should have a pod admitter call-out
+	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: otherPods}
+	for _, podAdmitHandler := range kl.PodAdmitHandlers {
+		if result := podAdmitHandler.Admit(attrs); !result.Admit {
+			return false, result.Reason, result.Message
+		}
+	}
 	nodeInfo := schedulercache.NewNodeInfo(otherPods...)
 	nodeInfo.SetNode(node)
 	fit, err := predicates.GeneralPredicates(pod, nodeInfo)
@@ -2364,6 +2396,7 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), "predicate fails due to isOutOfDisk")
 		return false, "OutOfDisk", "cannot be started due to lack of disk space."
 	}
+
 	return true, "", ""
 }
 
@@ -3286,7 +3319,20 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 // internal pod status.
 func (kl *Kubelet) generateAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
 	glog.V(3).Infof("Generating status for %q", format.Pod(pod))
+
+	// check if an internal module has requested the pod is evicted.
+	for _, podSyncHandler := range kl.PodSyncHandlers {
+		if result := podSyncHandler.ShouldEvict(pod); result.Evict {
+			return api.PodStatus{
+				Phase:   api.PodFailed,
+				Reason:  result.Reason,
+				Message: result.Message,
+			}
+		}
+	}
+
 	// TODO: Consider include the container information.
+	// TODO: move this into a sync/evictor
 	if kl.pastActiveDeadline(pod) {
 		reason := "DeadlineExceeded"
 		kl.recorder.Eventf(pod, api.EventTypeNormal, reason, "Pod was active on the node longer than specified deadline")
