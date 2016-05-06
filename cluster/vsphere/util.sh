@@ -368,6 +368,7 @@ function kube-up {
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-node'"
     echo "readonly NODE_IP_RANGES='${NODE_IP_RANGES}'"
     echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
+    echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
     echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
     echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
@@ -426,7 +427,7 @@ function kube-up {
   remote-pgrep ${KUBE_MASTER_IP} "salt-master"
 
   printf "Waiting for all packages to be installed on ${KUBE_MASTER} ...\n"
-  kube-check  ${KUBE_MASTER_IP} 'sudo salt "kubernetes-master" state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
+  kube-check  ${KUBE_MASTER_IP} 'sudo salt '"${KUBE_MASTER}"' state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
 
   local i
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
