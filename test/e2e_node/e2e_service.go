@@ -173,7 +173,7 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 	go func() {
 		err := cmd.Run()
 		if err != nil {
-			cmdErrorChan <- fmt.Errorf("%s Failed with error \"%v\".  Command output:\n%v", cmd, err, *cmd.OutputBuffer)
+			cmdErrorChan <- fmt.Errorf("%s Failed with error \"%v\".  Command output:\n%s", cmd, err, cmd.OutputBuffer)
 		}
 		close(cmdErrorChan)
 	}()
