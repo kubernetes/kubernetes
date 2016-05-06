@@ -498,12 +498,24 @@ const (
 	ClaimBound PersistentVolumeClaimPhase = "Bound"
 )
 
+type PropagationMode string
+
+const (
+	PropagationPrivate  PropagationMode = "private"
+	PropagationRPrivate PropagationMode = "rprivate"
+	PropagationSlave    PropagationMode = "slave"
+	PropagationRSlave   PropagationMode = "rslave"
+	PropagationShared   PropagationMode = "shared"
+	PropagationRShared  PropagationMode = "rshared"
+)
+
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {
 	// Path of the directory on the host.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath
-	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
+	Path        string          `json:"path" protobuf:"bytes,1,opt,name=path"`
+	Propagation PropagationMode `json:"propagation,omitempty"`
 }
 
 // Represents an empty directory for a pod.

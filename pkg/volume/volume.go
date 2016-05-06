@@ -33,6 +33,9 @@ type Volume interface {
 
 	// MetricsProvider embeds methods for exposing metrics (e.g. used,available space).
 	MetricsProvider
+
+	// GetPropagationMode returns the propagation mode the volume is mounted to.
+	GetPropagationMode() api.PropagationMode
 }
 
 // MetricsProvider exposes metrics (e.g. used,available space) related to a Volume.

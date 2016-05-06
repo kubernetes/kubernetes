@@ -403,10 +403,22 @@ const (
 	ClaimBound PersistentVolumeClaimPhase = "Bound"
 )
 
+type PropagationMode string
+
+const (
+	PropagationPrivate  PropagationMode = "private"
+	PropagationRPrivate PropagationMode = "rprivate"
+	PropagationSlave    PropagationMode = "slave"
+	PropagationRSlave   PropagationMode = "rslave"
+	PropagationShared   PropagationMode = "shared"
+	PropagationRShared  PropagationMode = "rshared"
+)
+
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {
-	Path string `json:"path"`
+	Path        string          `json:"path"`
+	Propagation PropagationMode `json:"propagation,omitempty"`
 }
 
 // Represents an empty directory for a pod.

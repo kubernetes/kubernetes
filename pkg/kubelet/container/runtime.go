@@ -336,6 +336,8 @@ type Mount struct {
 	ReadOnly bool
 	// Whether the mount needs SELinux relabeling
 	SELinuxRelabel bool
+	// Mount propagation mode of the volume
+	Propagation api.PropagationMode
 }
 
 type PortMapping struct {
