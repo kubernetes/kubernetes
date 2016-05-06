@@ -22,9 +22,9 @@
 source "${KUBE_ROOT}/cluster/gce/config-common.sh"
 
 GCLOUD=gcloud
-ZONE=${KUBE_GCE_ZONE:-us-central1-b}
-NUM_NODES=${NUM_NODES:-100}
-MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
+ZONE=${KUBE_GCE_ZONE:-europe-west1-b}
+NUM_NODES=${NUM_NODES:-1000}
+MASTER_SIZE=${MASTER_SIZE:-n1-standard-16}
 MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}

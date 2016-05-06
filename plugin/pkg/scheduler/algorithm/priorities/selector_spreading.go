@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -82,25 +82,23 @@ func getZoneKey(node *api.Node) string {
 // pods which match the same service selectors or RC selectors as the pod being scheduled.
 // Where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
 func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	selectors := make([]labels.Selector, 0)
-	services, err := s.serviceLister.GetPodServices(pod)
-	if err == nil {
-		for _, service := range services {
-			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
+	refs := make([]*api.ObjectReference, 0)
+	if services, err := s.serviceLister.GetPodServices(pod); err == nil {
+		for _, s := range services {
+			ref := &api.ObjectReference{Kind: "Service", Namespace: s.Namespace, Name: s.Name}
+			refs = append(refs, ref)
 		}
 	}
-	rcs, err := s.controllerLister.GetPodControllers(pod)
-	if err == nil {
+	if rcs, err := s.controllerLister.GetPodControllers(pod); err == nil {
 		for _, rc := range rcs {
-			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
+			ref := &api.ObjectReference{Kind: "ReplicationController", Namespace: rc.Namespace, Name: rc.Name}
+			refs = append(refs, ref)
 		}
 	}
-	rss, err := s.replicaSetLister.GetPodReplicaSets(pod)
-	if err == nil {
+	if rss, err := s.replicaSetLister.GetPodReplicaSets(pod); err == nil {
 		for _, rs := range rss {
-			if selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
-				selectors = append(selectors, selector)
-			}
+			ref := &api.ObjectReference{Kind: "ReplicaSet", Namespace: rs.Namespace, Name: rs.Name}
+			refs = append(refs, ref)
 		}
 	}
 
@@ -113,61 +111,26 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 	countsByNodeName := map[string]int{}
 	countsByNodeNameLock := sync.Mutex{}
 
-	if len(selectors) > 0 {
-		// Create a number of go-routines that will be computing number
-		// of "similar" pods for given nodes.
-		workers := 16
-		toProcess := make(chan string, len(nodes.Items))
-		for i := range nodes.Items {
-			toProcess <- nodes.Items[i].Name
-		}
-		close(toProcess)
-
-		wg := sync.WaitGroup{}
-		wg.Add(workers)
-		for i := 0; i < workers; i++ {
-			go func() {
-				defer utilruntime.HandleCrash()
-				defer wg.Done()
-				for {
-					nodeName, ok := <-toProcess
-					if !ok {
-						return
+	if len(refs) > 0 {
+		compute := func(i int) {
+			nodeName := nodes.Items[i].Name
+			count := 0
+			if nodeInfo, ok := nodeNameToInfo[nodeName]; ok {
+				for _, ref := range refs {
+					if refCount, ok := nodeInfo.References(ref); ok {
+						// TODO: Do NOT count pods with DeletionTimestamp set.
+						// This requires changing in the cache.
+						count += refCount
 					}
-					count := 0
-					for _, nodePod := range nodeNameToInfo[nodeName].Pods() {
-						if pod.Namespace != nodePod.Namespace {
-							continue
-						}
-						// When we are replacing a failed pod, we often see the previous
-						// deleted version while scheduling the replacement.
-						// Ignore the previous deleted version for spreading purposes
-						// (it can still be considered for resource restrictions etc.)
-						if nodePod.DeletionTimestamp != nil {
-							glog.V(4).Infof("skipping pending-deleted pod: %s/%s", nodePod.Namespace, nodePod.Name)
-							continue
-						}
-						matches := false
-						for _, selector := range selectors {
-							if selector.Matches(labels.Set(nodePod.ObjectMeta.Labels)) {
-								matches = true
-								break
-							}
-						}
-						if matches {
-							count++
-						}
-					}
-
-					func() {
-						countsByNodeNameLock.Lock()
-						defer countsByNodeNameLock.Unlock()
-						countsByNodeName[nodeName] = count
-					}()
 				}
-			}()
+			}
+
+			countsByNodeNameLock.Lock()
+			defer countsByNodeNameLock.Unlock()
+			countsByNodeName[nodeName] = count
 		}
-		wg.Wait()
+
+		workqueue.Parallelize(16, len(nodes.Items), compute)
 	}
 
 	// Aggregate by-node information

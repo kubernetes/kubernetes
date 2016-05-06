@@ -16,7 +16,10 @@ limitations under the License.
 
 package schedulercache
 
-import "k8s.io/kubernetes/pkg/api"
+import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
+)
 
 // CreateNodeNameToInfoMap obtains a list of pods and pivots that list into a map where the keys are node names
 // and the values are the aggregated information for that node.
@@ -32,4 +35,26 @@ func CreateNodeNameToInfoMap(pods []*api.Pod) map[string]*NodeInfo {
 		nodeInfo.addPod(pod)
 	}
 	return nodeNameToInfo
+}
+
+type ReferenceWithSelector struct {
+	Reference *api.ObjectReference
+	Selector  labels.Selector
+}
+
+// CreateNodeNameToInfoMapWithGroupingObjects objects calls CreateNodeNameToInfoMap and additionally
+// updates references in NodeInfo structs based on the given pairs of references and selectors.
+func CreateNodeNameToInfoMapWithGroupingObjects(pods []*api.Pod, refs []*ReferenceWithSelector) map[string]*NodeInfo {
+	result := CreateNodeNameToInfoMap(pods)
+	for _, ref := range refs {
+		for _, pod := range pods {
+			if pod.Namespace != ref.Reference.Namespace {
+				continue
+			}
+			if ref.Selector.Matches(labels.Set(pod.Labels)) {
+				result[pod.Spec.NodeName].AddReference(ref.Reference)
+			}
+		}
+	}
+	return result
 }

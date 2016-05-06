@@ -39,6 +39,10 @@ type NodeInfo struct {
 	requestedResource *Resource
 	pods              []*api.Pod
 	nonzeroRequest    *Resource
+
+	// Mapping from a grouping object to number of pods on that node being
+	// groupped by this object.
+	references map[api.ObjectReference]int
 }
 
 // Resource is a collection of compute resource.
@@ -93,13 +97,19 @@ func (n *NodeInfo) NonZeroRequest() Resource {
 	return *n.nonzeroRequest
 }
 
+// Note that this is NOT a deep-copy.
 func (n *NodeInfo) Clone() *NodeInfo {
 	pods := append([]*api.Pod(nil), n.pods...)
+	refs := make(map[api.ObjectReference]int)
+	for k, v := range n.references {
+		refs[k] = v
+	}
 	clone := &NodeInfo{
 		node:              n.node,
 		requestedResource: &(*n.requestedResource),
 		nonzeroRequest:    &(*n.nonzeroRequest),
 		pods:              pods,
+		references:        refs,
 	}
 	return clone
 }
@@ -150,6 +160,28 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 		}
 	}
 	return fmt.Errorf("no corresponding pod in pods")
+}
+
+func (n *NodeInfo) AddReference(ref *api.ObjectReference) {
+	if n.references == nil {
+		n.references = make(map[api.ObjectReference]int)
+	}
+	n.references[*ref]++
+}
+
+func (n *NodeInfo) RemoveReference(ref *api.ObjectReference) {
+	n.references[*ref]--
+	if n.references[*ref] == 0 {
+		delete(n.references, *ref)
+	}
+}
+
+func (n *NodeInfo) References(ref *api.ObjectReference) (int, bool) {
+	if n.references == nil {
+		return 0, false
+	}
+	count, ok := n.references[*ref]
+	return count, ok
 }
 
 func calculateResource(pod *api.Pod) (cpu int64, mem int64, non0_cpu int64, non0_mem int64) {

@@ -17,6 +17,7 @@ limitations under the License.
 package priorities
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -25,10 +26,34 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	wellknownlabels "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
+
+func computeReferences(t *testing.T, rcs []api.ReplicationController, rss []extensions.ReplicaSet, services []api.Service) []*schedulercache.ReferenceWithSelector {
+	result := []*schedulercache.ReferenceWithSelector{}
+	for _, rc := range rcs {
+		ref := &api.ObjectReference{Kind: "ReplicationController", Namespace: rc.Namespace, Name: rc.Name}
+		selector := labels.SelectorFromSet(rc.Spec.Selector)
+		result = append(result, &schedulercache.ReferenceWithSelector{ref, selector})
+	}
+	for _, rs := range rss {
+		ref := &api.ObjectReference{Kind: "ReplicaSet", Namespace: rs.Namespace, Name: rs.Name}
+		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		if err != nil {
+			t.Fatalf("invalid selector: %v", rs.Spec.Selector)
+		}
+		result = append(result, &schedulercache.ReferenceWithSelector{ref, selector})
+	}
+	for _, s := range services {
+		ref := &api.ObjectReference{Kind: "Service", Namespace: s.Namespace, Name: s.Name}
+		selector := labels.SelectorFromSet(s.Spec.Selector)
+		result = append(result, &schedulercache.ReferenceWithSelector{ref, selector})
+	}
+	return result
+}
 
 func TestSelectorSpreadPriority(t *testing.T) {
 	labels1 := map[string]string{
@@ -177,7 +202,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// "baz=blah" matches both labels1 and labels2, and "foo=bar" matches only labels 1. This means that we assume that we want to
 			// do spreading between all pods. The result should be exactly as above.
-			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 5}},
+			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 3}},
 			test:         "service with partial pod label matches with service and replication controller",
 		},
 		{
@@ -191,7 +216,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			rss:      []extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
-			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 5}},
+			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 3}},
 			test:         "service with partial pod label matches with service and replication controller",
 		},
 		{
@@ -276,7 +301,19 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		// Set Name in ObjectMeta to make ObjectReferences for different object different.
+		for i := range test.rcs {
+			test.rcs[i].ObjectMeta.Name = fmt.Sprintf("rc%d", i)
+		}
+		for i := range test.rss {
+			test.rss[i].ObjectMeta.Name = fmt.Sprintf("rs%d", i)
+		}
+		for i := range test.services {
+			test.services[i].ObjectMeta.Name = fmt.Sprintf("sv%d", i)
+		}
+
+		references := computeReferences(t, test.rcs, test.rss, test.services)
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMapWithGroupingObjects(test.pods, references)
 		selectorSpread := SelectorSpread{podLister: algorithm.FakePodLister(test.pods), serviceLister: algorithm.FakeServiceLister(test.services), controllerLister: algorithm.FakeControllerLister(test.rcs), replicaSetLister: algorithm.FakeReplicaSetLister(test.rss)}
 		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if err != nil {
@@ -477,7 +514,19 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		// Set Name in ObjectMeta to make ObjectReferences for different object different.
+		for i := range test.rcs {
+			test.rcs[i].ObjectMeta.Name = fmt.Sprintf("rc%d", i)
+		}
+		for i := range test.rss {
+			test.rss[i].ObjectMeta.Name = fmt.Sprintf("rs%d", i)
+		}
+		for i := range test.services {
+			test.services[i].ObjectMeta.Name = fmt.Sprintf("sv%d", i)
+		}
+
+		references := computeReferences(t, test.rcs, test.rss, test.services)
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMapWithGroupingObjects(test.pods, references)
 		selectorSpread := SelectorSpread{podLister: algorithm.FakePodLister(test.pods), serviceLister: algorithm.FakeServiceLister(test.services), controllerLister: algorithm.FakeControllerLister(test.rcs), replicaSetLister: algorithm.FakeReplicaSetLister(test.rss)}
 		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(makeLabeledNodeList(labeledNodes)))
 		if err != nil {

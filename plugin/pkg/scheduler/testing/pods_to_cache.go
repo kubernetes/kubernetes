@@ -53,3 +53,13 @@ func (p PodsToCache) List(s labels.Selector) (selected []*api.Pod, err error) {
 	}
 	return selected, nil
 }
+
+func (p PodsToCache) AddGroupingObject(ref *api.ObjectReference, selector labels.Selector) error {
+	return nil
+}
+
+func (p PodsToCache) UpdateGroupingObject(ref *api.ObjectReference, oldSelector, newSelector labels.Selector) error {
+	return nil
+}
+
+func (p PodsToCache) DeleteGroupingObject(ref *api.ObjectReference) error { return nil }
