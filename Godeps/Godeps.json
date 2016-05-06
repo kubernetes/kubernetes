@@ -414,13 +414,13 @@
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/digest",
-			"Comment": "v2.4.0-rc.1-22-g55f1b76",
-			"Rev": "55f1b7651f6242617133312ff8af5c2e4e3628ea"
+			"Comment": "v2.4.0-rc.1-38-gcd27f17",
+			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/reference",
-			"Comment": "v2.4.0-rc.1-22-g55f1b76",
-			"Rev": "55f1b7651f6242617133312ff8af5c2e4e3628ea"
+			"Comment": "v2.4.0-rc.1-38-gcd27f17",
+			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/jsonmessage",
@@ -459,13 +459,13 @@
 		},
 		{
 			"ImportPath": "github.com/docker/engine-api/client",
-			"Comment": "v0.2.2-173-g26cdffe",
-			"Rev": "26cdffeca716ae4df98070051a852b3198d7d153"
+			"Comment": "v0.3.1-62-g3d72d39",
+			"Rev": "3d72d392d07bece8d7d7b2a3b6b2e57c2df376a2"
 		},
 		{
 			"ImportPath": "github.com/docker/engine-api/types",
-			"Comment": "v0.2.2-173-g26cdffe",
-			"Rev": "26cdffeca716ae4df98070051a852b3198d7d153"
+			"Comment": "v0.3.1-62-g3d72d39",
+			"Rev": "3d72d392d07bece8d7d7b2a3b6b2e57c2df376a2"
 		},
 		{
 			"ImportPath": "github.com/docker/go-connections/nat",

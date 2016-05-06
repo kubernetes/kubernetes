@@ -8,7 +8,7 @@ import "time"
 type ThrottlingData struct {
 	// Number of periods with throttling active
 	Periods uint64 `json:"periods"`
-	// Number of periods when the container hit its throttling limit.
+	// Number of periods when the container hits its throttling limit.
 	ThrottledPeriods uint64 `json:"throttled_periods"`
 	// Aggregate time the container was throttled for in nanoseconds.
 	ThrottledTime uint64 `json:"throttled_time"`
@@ -91,6 +91,9 @@ type NetworkStats struct {
 type PidsStats struct {
 	// Current is the number of pids in the cgroup
 	Current uint64 `json:"current,omitempty"`
+	// Limit is the hard limit on the number of pids in the cgroup.
+	// A "Limit" of 0 means that there is no limit.
+	Limit uint64 `json:"limit,omitempty"`
 }
 
 // Stats is Ultimate struct aggregating all types of stats of one container

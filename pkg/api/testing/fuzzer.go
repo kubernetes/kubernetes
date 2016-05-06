@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"testing"
 
-	docker "github.com/fsouza/go-dockerclient"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -189,21 +188,6 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				t := types[c.Rand.Intn(len(types))]
 				c.Fuzz(t)
 				*j = t
-			}
-		},
-		func(pb map[docker.Port][]docker.PortBinding, c fuzz.Continue) {
-			// This is necessary because keys with nil values get omitted.
-			// TODO: Is this a bug?
-			pb[docker.Port(c.RandString())] = []docker.PortBinding{
-				{c.RandString(), c.RandString()},
-				{c.RandString(), c.RandString()},
-			}
-		},
-		func(pm map[string]docker.PortMapping, c fuzz.Continue) {
-			// This is necessary because keys with nil values get omitted.
-			// TODO: Is this a bug?
-			pm[c.RandString()] = docker.PortMapping{
-				c.RandString(): c.RandString(),
 			}
 		},
 		func(q *api.ResourceRequirements, c fuzz.Continue) {

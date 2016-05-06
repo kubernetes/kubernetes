@@ -46,8 +46,7 @@ func (cli *Client) postHijacked(ctx context.Context, path string, query url.Valu
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Upgrade", "tcp")
 
-	tlsConfig := cli.transport.TLSConfig()
-	conn, err := dial(cli.proto, cli.addr, tlsConfig)
+	conn, err := dial(cli.proto, cli.addr, cli.transport.TLSConfig())
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return types.HijackedResponse{}, fmt.Errorf("Cannot connect to the Docker daemon. Is 'docker daemon' running on this host?")
@@ -69,11 +68,11 @@ func (cli *Client) postHijacked(ctx context.Context, path string, query url.Valu
 	defer clientconn.Close()
 
 	// Server hijacks the connection, error 'connection closed' expected
-	clientconn.Do(req)
+	_, err = clientconn.Do(req)
 
 	rwc, br := clientconn.Hijack()
 
-	return types.HijackedResponse{Conn: rwc, Reader: br}, nil
+	return types.HijackedResponse{Conn: rwc, Reader: br}, err
 }
 
 func tlsDial(network, addr string, config *tls.Config) (net.Conn, error) {
@@ -124,6 +123,21 @@ func tlsDialWithDialer(dialer *net.Dialer, network, addr string, config *tls.Con
 	if tcpConn, ok := rawConn.(*net.TCPConn); ok {
 		tcpConn.SetKeepAlive(true)
 		tcpConn.SetKeepAlivePeriod(30 * time.Second)
+	}
+
+	colonPos := strings.LastIndex(addr, ":")
+	if colonPos == -1 {
+		colonPos = len(addr)
+	}
+	hostname := addr[:colonPos]
+
+	// If no ServerName is set, infer the ServerName
+	// from the hostname we're connecting to.
+	if config.ServerName == "" {
+		// Make a copy to avoid polluting argument or default.
+		c := *config
+		c.ServerName = hostname
+		config = &c
 	}
 
 	conn := tls.Client(rawConn, config)
