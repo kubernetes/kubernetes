@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 
@@ -30,7 +30,7 @@ import (
 
 // APIServer runs a kubernetes api server.
 type APIServer struct {
-	*genericapiserver.ServerRunOptions
+	*genericoptions.ServerRunOptions
 	AllowPrivileged             bool
 	EventTTL                    time.Duration
 	KubeletConfig               kubeletclient.KubeletClientConfig
@@ -45,7 +45,7 @@ type APIServer struct {
 // NewAPIServer creates a new APIServer object with default parameters
 func NewAPIServer() *APIServer {
 	s := APIServer{
-		ServerRunOptions: genericapiserver.NewServerRunOptions(),
+		ServerRunOptions: genericoptions.NewServerRunOptions(),
 		EventTTL:         1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:        ports.KubeletPort,

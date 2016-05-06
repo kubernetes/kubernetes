@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
 )
 
 func TestGenerateStorageVersionMap(t *testing.T) {
@@ -66,7 +67,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		s := ServerRunOptions{
+		s := options.ServerRunOptions{
 			DeprecatedStorageVersion: test.legacyVersion,
 			StorageVersions:          test.storageVersions,
 			DefaultStorageVersions:   test.defaultVersions,
