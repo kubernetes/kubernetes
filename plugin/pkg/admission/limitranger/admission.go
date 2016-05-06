@@ -465,7 +465,7 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 				// take max(sum_containers, any_init_container)
 				for k, v := range container.Resources.Requests {
 					if v2, ok := podRequests[k]; ok {
-						if v.Value() > v2.Value() {
+						if v.Cmp(v2) > 0 {
 							podRequests[k] = v
 						}
 					} else {
@@ -474,7 +474,7 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 				}
 				for k, v := range container.Resources.Limits {
 					if v2, ok := podLimits[k]; ok {
-						if v.Value() > v2.Value() {
+						if v.Cmp(v2) > 0 {
 							podLimits[k] = v
 						}
 					} else {
