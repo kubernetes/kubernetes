@@ -138,6 +138,16 @@ type ObjectMeta struct {
 	// objects.  Annotation keys have the same formatting restrictions as Label keys. See the
 	// comments on Labels for details.
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// List of objects depended by this object. If ALL objects in the list have
+	// been deleted, this object will be garbage collected.
+	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty"`
+
+	// Must be empty before the object is deleted from the registry. Each entry
+	// is an identifier for the responsible component that will remove the entry
+	// from the list. If the deletionTimestamp of the object is non-nil, entries
+	// in this list can only be removed.
+	Finalizers []string `json:"finalizers,omitempty"`
 }
 
 const (
@@ -1925,6 +1935,10 @@ type DeleteOptions struct {
 	// Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
 	// returned.
 	Preconditions *Preconditions `json:"preconditions,omitempty"`
+
+	// Should the dependent objects be orphaned. If true/false, the "orphan"
+	// finalizer will be added to/removed from the object's finalizers list.
+	OrphanDependents *bool `json:"orphanDependents,omitempty"`
 }
 
 // ExportOptions is the query options to the standard REST get call.
@@ -2055,6 +2069,23 @@ type ServiceProxyOptions struct {
 	// http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy.
 	// Path is _search?q=user:kimchy.
 	Path string
+}
+
+// OwnerReference contains enough information to let you identify an owning
+// object. Currently, an owning object must be in the same namespace, so there
+// is no namespace field.
+type OwnerReference struct {
+	// API version of the referent.
+	APIVersion string `json:"apiVersion"`
+	// Kind of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	Kind string `json:"kind"`
+	// Name of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	Name string `json:"name"`
+	// UID of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
+	UID types.UID `json:"uid"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
