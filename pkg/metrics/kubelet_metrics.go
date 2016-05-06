@@ -18,6 +18,8 @@ package metrics
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"time"
 
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -71,7 +73,9 @@ var NecessaryKubeletMetrics = map[string][]string{
 	"kubelet_containers_per_pod_count":                       {"quantile"},
 	"kubelet_containers_per_pod_count_count":                 {},
 	"kubelet_containers_per_pod_count_sum":                   {},
-	"kubelet_docker_errors":                                  {"operation_type"},
+	"kubelet_docker_operations":                              {"operation_type"},
+	"kubelet_docker_operations_errors":                       {"operation_type"},
+	"kubelet_docker_operations_timeout":                      {"operation_type"},
 	"kubelet_docker_operations_latency_microseconds":         {"operation_type", "quantile"},
 	"kubelet_docker_operations_latency_microseconds_count":   {"operation_type"},
 	"kubelet_docker_operations_latency_microseconds_sum":     {"operation_type"},
@@ -124,6 +128,22 @@ func NewKubeletMetrics() KubeletMetrics {
 		result[metric] = make(model.Samples, 0)
 	}
 	return KubeletMetrics(result)
+}
+
+// GrabKubeletMetricsWithoutProxy retrieve metrics from the kubelet on the given node using a simple GET over http.
+// Currently only used in integration tests.
+func GrabKubeletMetricsWithoutProxy(nodeName string) (KubeletMetrics, error) {
+	metricsEndpoint := "http://%s/metrics"
+	resp, err := http.Get(fmt.Sprintf(metricsEndpoint, nodeName))
+	if err != nil {
+		return KubeletMetrics{}, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return KubeletMetrics{}, err
+	}
+	return parseKubeletMetrics(string(body))
 }
 
 func parseKubeletMetrics(data string) (KubeletMetrics, error) {
