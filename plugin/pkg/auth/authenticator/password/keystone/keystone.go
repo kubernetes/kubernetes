@@ -30,6 +30,8 @@ import (
 // The keystone endpoint is passed during apiserver startup
 type KeystoneAuthenticator struct {
 	authURL string
+        domainID string
+        domainName string
 }
 
 // AuthenticatePassword checks the username, password via keystone call
@@ -39,6 +41,15 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(usernam
 		Username:         username,
 		Password:         password,
 	}
+
+        // At most one of DomainID and DomainName must be provided if using Username
+        // with Identity V3. Otherwise, either are optional.
+        if keystoneAuthenticator.domainID != "" {
+                opts.DomainID = keystoneAuthenticator.domainID
+        }
+        if keystoneAuthenticator.domainName != "" {
+                opts.DomainName = keystoneAuthenticator.domainName
+        }
 
 	_, err := openstack.AuthenticatedClient(opts)
 	if err != nil {
@@ -50,7 +61,7 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(usernam
 }
 
 // NewKeystoneAuthenticator returns a password authenticator that validates credentials using openstack keystone
-func NewKeystoneAuthenticator(authURL string) (*KeystoneAuthenticator, error) {
+func NewKeystoneAuthenticator(authURL, domainID, domainName string) (*KeystoneAuthenticator, error) {
 	if !strings.HasPrefix(authURL, "https") {
 		return nil, errors.New("Auth URL should be secure and start with https")
 	}
@@ -58,5 +69,5 @@ func NewKeystoneAuthenticator(authURL string) (*KeystoneAuthenticator, error) {
 		return nil, errors.New("Auth URL is empty")
 	}
 
-	return &KeystoneAuthenticator{authURL}, nil
+	return &KeystoneAuthenticator{authURL, domainID, domainName}, nil
 }

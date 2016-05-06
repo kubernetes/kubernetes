@@ -225,6 +225,8 @@ func Run(s *options.APIServer) error {
 		ServiceAccountLookup:      s.ServiceAccountLookup,
 		ServiceAccountTokenGetter: serviceAccountGetter,
 		KeystoneURL:               s.KeystoneURL,
+                KeystoneDomainID:          s.KeystoneDomainID,
+                KeystoneDomainName:        s.KeystoneDomainName,
 	})
 
 	if err != nil {
