@@ -62,34 +62,26 @@ result=""
 for (( i=0; i<number; i++ )); do
   visited[${i}]=false
 done
-echo "DBG: found $number generated files"
-for f in $(echo "${generated_files[@]}" | sort); do
-    echo "DBG:   $f"
-done
+###echo "DBG: found $number generated files"
+###for f in $(echo "${generated_files[@]}" | sort); do
+###    echo "DBG:   $f"
+###done
 
 # NOTE: depends function assumes that the whole repository is under
 # $my_prefix - it will NOT work if that is not true.
 function depends {
   file="${generated_files[$1]/\.generated\.go/.go}"
   rhs="$(dirname ${generated_files[$2]/#./${my_prefix}})"
-  echo "DBG: does ${file} depend on ${rhs}?"
+  ###echo "DBG: does ${file} depend on ${rhs}?"
   deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ${file} | grep "^${my_prefix}")
-  candidate=$(readlinkdashf "${generated_files[$2]/\.generated\.go/.go}")
   for dep in ${deps}; do
-    echo "DBG:   checking against $dep"
-    # Only look at dependencies within the kubernetes tree-- otherwise the "io"
-    # package matches the end of one of our directories.
-    if [[ ${dep} = "k8s.io"* ]]; then
-      if [[ ${candidate} = *${dep} ]]; then
-	echo "DBG: old logic said yes"
-      fi
-    fi
+    ###echo "DBG:   checking against $dep"
     if [[ "${dep}" == "${rhs}" ]]; then
-      echo "DBG: = yes"
+      ###echo "DBG: = yes"
       return 0
     fi
   done
-  echo "DBG: = no"
+  ###echo "DBG: = no"
   return 1
 }
 
@@ -105,10 +97,11 @@ function tsort {
   done
   result="${result} $1"
 }
+echo "Building dependencies"
 for (( i=0; i<number; i++ )); do
-  echo "DBG: considering ${generated_files[${i}]}"
+  ###echo "DBG: considering ${generated_files[${i}]}"
   if ! ${visited[${i}]}; then
-    echo "DBG: tsorting ${generated_files[${i}]}"
+    ###echo "DBG: tsorting ${generated_files[${i}]}"
     tsort ${i}
   fi
 done
@@ -122,6 +115,7 @@ if [[ -z ${haveindex} ]]; then
   exit 1
 fi
 
+echo "Building codecgen"
 CODECGEN="${PWD}/codecgen_binary"
 godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
@@ -146,7 +140,7 @@ for current in "${index[@]}"; do
   base_generated_file=$(basename "${generated_file}")
   # We use '-d 1234' flag to have a deterministic output every time.
   # The constant was just randomly chosen.
-  echo "DBG: running ${CODECGEN} -d 1234 -o ${base_generated_file} ${base_file}"
+  ###echo "DBG: running ${CODECGEN} -d 1234 -o ${base_generated_file} ${base_file}"
   ${CODECGEN} -d 1234 -o "${base_generated_file}" "${base_file}"
   # Add boilerplate at the beginning of the generated file.
   sed 's/YEAR/2015/' "${initial_dir}/hack/boilerplate/boilerplate.go.txt" > "${base_generated_file}.tmp"
