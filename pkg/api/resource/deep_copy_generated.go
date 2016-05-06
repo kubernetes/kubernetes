@@ -22,34 +22,26 @@ package resource
 
 import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	inf "speter.net/go/exp/math/dec/inf"
 )
 
 func DeepCopy_resource_Quantity(in Quantity, out *Quantity, c *conversion.Cloner) error {
-	if in.Amount != nil {
-		in, out := in.Amount, &out.Amount
-		*out = new(inf.Dec)
-		if newVal, err := c.DeepCopy(*in); err != nil {
-			return err
-		} else {
-			**out = newVal.(inf.Dec)
-		}
+	if newVal, err := c.DeepCopy(in.i); err != nil {
+		return err
 	} else {
-		out.Amount = nil
+		out.i = newVal.(int64Amount)
 	}
-	out.Format = in.Format
-	return nil
-}
-
-func DeepCopy_resource_QuantityProto(in QuantityProto, out *QuantityProto, c *conversion.Cloner) error {
-	out.Format = in.Format
-	out.Scale = in.Scale
-	if in.Bigint != nil {
-		in, out := in.Bigint, &out.Bigint
+	if newVal, err := c.DeepCopy(in.d); err != nil {
+		return err
+	} else {
+		out.d = newVal.(infDecAmount)
+	}
+	if in.s != nil {
+		in, out := in.s, &out.s
 		*out = make([]byte, len(in))
 		copy(*out, in)
 	} else {
-		out.Bigint = nil
+		out.s = nil
 	}
+	out.Format = in.Format
 	return nil
 }
