@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -743,6 +744,74 @@ func TestEventNotCreated(t *testing.T) {
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.4"), resource.MustParse("0.4")},
 		verifyEvents:        true,
 	}
+	tc.runTest(t)
+}
+
+// TestComputedToleranceAlgImplementation is a regression test which
+// back-calculates a minimal percentage for downscaling based on a small percentage
+// increase in pod utilization which is calibrated against the tolerance value.
+func TestComputedToleranceAlgImplementation(t *testing.T) {
+
+	startPods := int32(10)
+	// 150 mCPU per pod.
+	totalUsedCPUOfAllPods := uint64(startPods * 150)
+	// Each pod starts out asking for 2X what is really needed.
+	// This means we will have a 50% ratio of used/requested
+	totalRequestedCPUOfAllPods := int32(2 * totalUsedCPUOfAllPods)
+	requestedToUsed := float64(totalRequestedCPUOfAllPods / int32(totalUsedCPUOfAllPods))
+	// Spread the amount we ask over 10 pods.  We can add some jitter later in reportedLevels.
+	perPodRequested := totalRequestedCPUOfAllPods / startPods
+
+	// Force a minimal scaling event by satisfying  (tolerance < 1 - resourcesUsedRatio).
+	target := math.Abs(1/(requestedToUsed*(1-tolerance))) + .01
+	finalCpuPercentTarget := int32(target * 100)
+	resourcesUsedRatio := float64(totalUsedCPUOfAllPods) / float64(float64(totalRequestedCPUOfAllPods)*target)
+
+	// i.e. .60 * 20 -> scaled down expectation.
+	finalPods := int32(math.Ceil(resourcesUsedRatio * float64(startPods)))
+
+	// To breach tolerance we will create a utilization ratio difference of tolerance to usageRatioToleranceValue)
+	tc := testCase{
+		minReplicas:     0,
+		maxReplicas:     1000,
+		initialReplicas: startPods,
+		desiredReplicas: finalPods,
+		CPUTarget:       finalCpuPercentTarget,
+		reportedLevels: []uint64{
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+		},
+		reportedCPURequests: []resource.Quantity{
+			resource.MustParse(fmt.Sprint(perPodRequested+100) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-100) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+10) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-10) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+2) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-2) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+1) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-1) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
+		},
+	}
+
+	tc.runTest(t)
+
+	// Reuse the data structure above, now testing "unscaling".
+	// Now, we test that no scaling happens if we are in a very close margin to the tolerance
+	target = math.Abs(1/(requestedToUsed*(1-tolerance))) + .004
+	finalCpuPercentTarget = int32(target * 100)
+	tc.CPUTarget = finalCpuPercentTarget
+	tc.initialReplicas = startPods
+	tc.desiredReplicas = startPods
 	tc.runTest(t)
 }
 
