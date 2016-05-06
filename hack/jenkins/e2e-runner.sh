@@ -184,9 +184,9 @@ if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
 fi
 
 # We get the image project and name for Trusty dynamically.
-if [[ "${JENKINS_USE_TRUSTY_IMAGES:-}" =~ ^[yY]$ ]]; then
+if [[ -n "${JENKINS_TRUSTY_IMAGE_TYPE:-}" ]]; then
   trusty_image_project="$(get_trusty_image_project)"
-  trusty_image="$(get_latest_trusty_image "${trusty_image_project}" "dev")"
+  trusty_image="$(get_latest_trusty_image "${trusty_image_project}" "${JENKINS_TRUSTY_IMAGE_TYPE}")"
   export KUBE_GCE_MASTER_PROJECT="${trusty_image_project}"
   export KUBE_GCE_MASTER_IMAGE="${trusty_image}"
   export KUBE_OS_DISTRIBUTION="trusty"
