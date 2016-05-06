@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.api.unversioned;
 
+import "k8s.io/kubernetes/pkg/runtime/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".

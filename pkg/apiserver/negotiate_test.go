@@ -41,27 +41,34 @@ func (n *fakeNegotiater) SupportedStreamingMediaTypes() []string {
 	return n.streamTypes
 }
 
-func (n *fakeNegotiater) SerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, bool) {
+func (n *fakeNegotiater) SerializerForMediaType(mediaType string, options map[string]string) (runtime.SerializerInfo, bool) {
 	n.mediaType = mediaType
 	if len(options) > 0 {
 		n.options = options
 	}
-	return n.serializer, n.serializer != nil
+	return runtime.SerializerInfo{Serializer: n.serializer, MediaType: n.mediaType, EncodesAsText: true}, n.serializer != nil
 }
 
-func (n *fakeNegotiater) StreamingSerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, runtime.Framer, string, bool) {
+func (n *fakeNegotiater) StreamingSerializerForMediaType(mediaType string, options map[string]string) (runtime.StreamSerializerInfo, bool) {
 	n.streamMediaType = mediaType
 	if len(options) > 0 {
 		n.streamOptions = options
 	}
-	return n.streamSerializer, n.framer, mediaType, n.streamSerializer != nil
+	return runtime.StreamSerializerInfo{
+		SerializerInfo: runtime.SerializerInfo{
+			Serializer:    n.serializer,
+			MediaType:     mediaType,
+			EncodesAsText: true,
+		},
+		Framer: n.framer,
+	}, n.streamSerializer != nil
 }
 
-func (n *fakeNegotiater) EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
+func (n *fakeNegotiater) EncoderForVersion(serializer runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
 	return n.serializer
 }
 
-func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder {
+func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
 	return n.serializer
 }
 
@@ -228,7 +235,7 @@ func TestNegotiate(t *testing.T) {
 			req = &http.Request{Header: http.Header{}}
 			req.Header.Set("Accept", test.accept)
 		}
-		s, contentType, err := negotiateOutputSerializer(req, test.ns)
+		s, err := negotiateOutputSerializer(req, test.ns)
 		switch {
 		case err == nil && test.errFn != nil:
 			t.Errorf("%d: failed: expected error", i)
@@ -251,11 +258,11 @@ func TestNegotiate(t *testing.T) {
 			}
 			continue
 		}
-		if test.contentType != contentType {
-			t.Errorf("%d: unexpected %s %s", i, test.contentType, contentType)
+		if test.contentType != s.MediaType {
+			t.Errorf("%d: unexpected %s %s", i, test.contentType, s.MediaType)
 		}
-		if s != test.serializer {
-			t.Errorf("%d: unexpected %s %s", i, test.serializer, s)
+		if s.Serializer != test.serializer {
+			t.Errorf("%d: unexpected %s %s", i, test.serializer, s.Serializer)
 		}
 		if !reflect.DeepEqual(test.params, test.ns.options) {
 			t.Errorf("%d: unexpected %#v %#v", i, test.params, test.ns.options)

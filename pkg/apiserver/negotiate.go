@@ -50,31 +50,31 @@ func negotiateOutput(req *http.Request, supported []string) (string, map[string]
 	return mediaType, accept.Params, nil
 }
 
-func negotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.Serializer, string, error) {
+func negotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	supported := ns.SupportedMediaTypes()
 	mediaType, params, err := negotiateOutput(req, supported)
 	if err != nil {
-		return nil, "", err
+		return runtime.SerializerInfo{}, err
 	}
 	if s, ok := ns.SerializerForMediaType(mediaType, params); ok {
-		return s, mediaType, nil
+		return s, nil
 	}
-	return nil, "", errNotAcceptable{supported}
+	return runtime.SerializerInfo{}, errNotAcceptable{supported}
 }
 
-func negotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.Serializer, runtime.Framer, string, string, error) {
+func negotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.StreamSerializerInfo, error) {
 	supported := ns.SupportedMediaTypes()
 	mediaType, params, err := negotiateOutput(req, supported)
 	if err != nil {
-		return nil, nil, "", "", err
+		return runtime.StreamSerializerInfo{}, err
 	}
-	if s, f, exactMediaType, ok := ns.StreamingSerializerForMediaType(mediaType, params); ok {
-		return s, f, mediaType, exactMediaType, nil
+	if s, ok := ns.StreamingSerializerForMediaType(mediaType, params); ok {
+		return s, nil
 	}
-	return nil, nil, "", "", errNotAcceptable{supported}
+	return runtime.StreamSerializerInfo{}, errNotAcceptable{supported}
 }
 
-func negotiateInputSerializer(req *http.Request, s runtime.NegotiatedSerializer) (runtime.Serializer, error) {
+func negotiateInputSerializer(req *http.Request, s runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	supported := s.SupportedMediaTypes()
 	mediaType := req.Header.Get("Content-Type")
 	if len(mediaType) == 0 {
@@ -82,11 +82,11 @@ func negotiateInputSerializer(req *http.Request, s runtime.NegotiatedSerializer)
 	}
 	mediaType, options, err := mime.ParseMediaType(mediaType)
 	if err != nil {
-		return nil, errUnsupportedMediaType{supported}
+		return runtime.SerializerInfo{}, errUnsupportedMediaType{supported}
 	}
 	out, ok := s.SerializerForMediaType(mediaType, options)
 	if !ok {
-		return nil, errUnsupportedMediaType{supported}
+		return runtime.SerializerInfo{}, errUnsupportedMediaType{supported}
 	}
 	return out, nil
 }
