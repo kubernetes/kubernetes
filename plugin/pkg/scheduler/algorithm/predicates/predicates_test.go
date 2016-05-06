@@ -162,7 +162,7 @@ func TestPodFitsResources(t *testing.T) {
 		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}}
 		test.nodeInfo.SetNode(&node)
 
-		fits, err := PodFitsResources(test.pod, "machine", test.nodeInfo)
+		fits, err := PodFitsResources(test.pod, test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -207,7 +207,7 @@ func TestPodFitsResources(t *testing.T) {
 		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1)}}
 		test.nodeInfo.SetNode(&node)
 
-		fits, err := PodFitsResources(test.pod, "machine", test.nodeInfo)
+		fits, err := PodFitsResources(test.pod, test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -220,13 +220,13 @@ func TestPodFitsResources(t *testing.T) {
 func TestPodFitsHost(t *testing.T) {
 	tests := []struct {
 		pod  *api.Pod
-		node string
+		node *api.Node
 		fits bool
 		test string
 	}{
 		{
 			pod:  &api.Pod{},
-			node: "foo",
+			node: &api.Node{},
 			fits: true,
 			test: "no host specified",
 		},
@@ -236,7 +236,11 @@ func TestPodFitsHost(t *testing.T) {
 					NodeName: "foo",
 				},
 			},
-			node: "foo",
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
 			fits: true,
 			test: "host matches",
 		},
@@ -246,14 +250,20 @@ func TestPodFitsHost(t *testing.T) {
 					NodeName: "bar",
 				},
 			},
-			node: "foo",
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
 			fits: false,
 			test: "host doesn't match",
 		},
 	}
 
 	for _, test := range tests {
-		result, err := PodFitsHost(test.pod, test.node, schedulercache.NewNodeInfo())
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(test.node)
+		result, err := PodFitsHost(test.pod, nodeInfo)
 		if !reflect.DeepEqual(err, ErrPodNotMatchHostName) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -326,7 +336,7 @@ func TestPodFitsHostPorts(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		fits, err := PodFitsHostPorts(test.pod, "machine", test.nodeInfo)
+		fits, err := PodFitsHostPorts(test.pod, test.nodeInfo)
 		if !reflect.DeepEqual(err, ErrPodNotFitsHostPorts) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -411,7 +421,7 @@ func TestDiskConflicts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
+		ok, err := NoDiskConflict(test.pod, test.nodeInfo)
 		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -463,7 +473,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
+		ok, err := NoDiskConflict(test.pod, test.nodeInfo)
 		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -521,7 +531,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
+		ok, err := NoDiskConflict(test.pod, test.nodeInfo)
 		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -999,7 +1009,7 @@ func TestPodFitsSelector(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
-		fits, err := PodSelectorMatches(test.pod, "machine", nodeInfo)
+		fits, err := PodSelectorMatches(test.pod, nodeInfo)
 		if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1064,7 +1074,7 @@ func TestNodeLabelPresence(t *testing.T) {
 		nodeInfo.SetNode(&node)
 
 		labelChecker := NodeLabelChecker{test.labels, test.presence}
-		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, "machine", nodeInfo)
+		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, nodeInfo)
 		if !reflect.DeepEqual(err, ErrNodeLabelPresenceViolated) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1104,28 +1114,28 @@ func TestServiceAffinity(t *testing.T) {
 		pod      *api.Pod
 		pods     []*api.Pod
 		services []api.Service
-		node     string
+		node     *api.Node
 		labels   []string
 		fits     bool
 		test     string
 	}{
 		{
 			pod:    new(api.Pod),
-			node:   "machine1",
+			node:   &node1,
 			fits:   true,
 			labels: []string{"region"},
 			test:   "nothing scheduled",
 		},
 		{
 			pod:    &api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r1"}}},
-			node:   "machine1",
+			node:   &node1,
 			fits:   true,
 			labels: []string{"region"},
 			test:   "pod with region label match",
 		},
 		{
 			pod:    &api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r2"}}},
-			node:   "machine1",
+			node:   &node1,
 			fits:   false,
 			labels: []string{"region"},
 			test:   "pod with region label mismatch",
@@ -1133,7 +1143,7 @@ func TestServiceAffinity(t *testing.T) {
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
-			node:     "machine1",
+			node:     &node1,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
 			labels:   []string{"region"},
@@ -1142,7 +1152,7 @@ func TestServiceAffinity(t *testing.T) {
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
-			node:     "machine1",
+			node:     &node1,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
 			labels:   []string{"region"},
@@ -1151,7 +1161,7 @@ func TestServiceAffinity(t *testing.T) {
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
-			node:     "machine1",
+			node:     &node1,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
 			labels:   []string{"region"},
@@ -1160,7 +1170,7 @@ func TestServiceAffinity(t *testing.T) {
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
-			node:     "machine1",
+			node:     &node1,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns2"}}},
 			fits:     true,
 			labels:   []string{"region"},
@@ -1169,7 +1179,7 @@ func TestServiceAffinity(t *testing.T) {
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
-			node:     "machine1",
+			node:     &node1,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
 			fits:     true,
 			labels:   []string{"region"},
@@ -1178,7 +1188,7 @@ func TestServiceAffinity(t *testing.T) {
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
-			node:     "machine1",
+			node:     &node1,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
 			fits:     false,
 			labels:   []string{"region"},
@@ -1187,7 +1197,7 @@ func TestServiceAffinity(t *testing.T) {
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
-			node:     "machine1",
+			node:     &node1,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
 			labels:   []string{"region", "zone"},
@@ -1196,7 +1206,7 @@ func TestServiceAffinity(t *testing.T) {
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
 			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
-			node:     "machine4",
+			node:     &node4,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
 			labels:   []string{"region", "zone"},
@@ -1207,7 +1217,9 @@ func TestServiceAffinity(t *testing.T) {
 	for _, test := range tests {
 		nodes := []api.Node{node1, node2, node3, node4, node5}
 		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
-		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, test.node, schedulercache.NewNodeInfo())
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(test.node)
+		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, nodeInfo)
 		if !reflect.DeepEqual(err, ErrServiceAffinityViolated) && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1430,7 +1442,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
-		fits, err := pred(test.newPod, "some-node", schedulercache.NewNodeInfo(test.existingPods...))
+		fits, err := pred(test.newPod, schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil && !reflect.DeepEqual(err, ErrMaxVolumeCountExceeded) {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1505,7 +1517,6 @@ func newPodWithPort(hostPorts ...int) *api.Pod {
 func TestRunGeneralPredicates(t *testing.T) {
 	resourceTests := []struct {
 		pod      *api.Pod
-		nodeName string
 		nodeInfo *schedulercache.NodeInfo
 		node     *api.Node
 		fits     bool
@@ -1513,21 +1524,25 @@ func TestRunGeneralPredicates(t *testing.T) {
 		wErr     error
 	}{
 		{
-			pod:      &api.Pod{},
-			nodeName: "machine1",
+			pod: &api.Pod{},
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
-			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}},
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "machine1"},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)},
+			},
 			fits: true,
 			wErr: nil,
 			test: "no resources/port/host requested always fits",
 		},
 		{
-			pod:      newResourcePod(resourceRequest{milliCPU: 8, memory: 10}),
-			nodeName: "machine1",
+			pod: newResourcePod(resourceRequest{milliCPU: 8, memory: 10}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
-			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}},
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "machine1"},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)},
+			},
 			fits: false,
 			wErr: newInsufficientResourceError("CPU", 8, 5, 10),
 			test: "not enough cpu resource",
@@ -1538,26 +1553,30 @@ func TestRunGeneralPredicates(t *testing.T) {
 					NodeName: "machine2",
 				},
 			},
-			nodeName: "machine1",
 			nodeInfo: schedulercache.NewNodeInfo(),
-			node:     &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}},
-			fits:     false,
-			wErr:     ErrPodNotMatchHostName,
-			test:     "host not match",
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "machine1"},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)},
+			},
+			fits: false,
+			wErr: ErrPodNotMatchHostName,
+			test: "host not match",
 		},
 		{
 			pod:      newPodWithPort(123),
-			nodeName: "machine1",
 			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
-			node:     &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}},
-			fits:     false,
-			wErr:     ErrPodNotFitsHostPorts,
-			test:     "hostport conflict",
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "machine1"},
+				Status:     api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)},
+			},
+			fits: false,
+			wErr: ErrPodNotFitsHostPorts,
+			test: "hostport conflict",
 		},
 	}
 	for _, test := range resourceTests {
 		test.nodeInfo.SetNode(test.node)
-		fits, err := GeneralPredicates(test.pod, test.nodeName, test.nodeInfo)
+		fits, err := GeneralPredicates(test.pod, test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
@@ -1578,13 +1597,13 @@ func TestInterPodAffinity(t *testing.T) {
 	tests := []struct {
 		pod  *api.Pod
 		pods []*api.Pod
-		node api.Node
+		node *api.Node
 		fits bool
 		test string
 	}{
 		{
 			pod:  new(api.Pod),
-			node: node1,
+			node: &node1,
 			fits: true,
 			test: "A pod that has no required pod affinity scheduling rules can schedule onto a node with no existing pods",
 		},
@@ -1610,7 +1629,7 @@ func TestInterPodAffinity(t *testing.T) {
 				},
 			},
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel}}},
-			node: node1,
+			node: &node1,
 			fits: true,
 			test: "satisfies with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using In operator that matches the existing pod",
 		},
@@ -1636,7 +1655,7 @@ func TestInterPodAffinity(t *testing.T) {
 				},
 			},
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel}}},
-			node: node1,
+			node: &node1,
 			fits: true,
 			test: "satisfies the pod with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using not in operator in labelSelector that matches the existing pod",
 		},
@@ -1662,7 +1681,7 @@ func TestInterPodAffinity(t *testing.T) {
 				},
 			},
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel, Namespace: "ns"}}},
-			node: node1,
+			node: &node1,
 			fits: false,
 			test: "Does not satisfy the PodAffinity with labelSelector because of diff Namespace",
 		},
@@ -1687,7 +1706,7 @@ func TestInterPodAffinity(t *testing.T) {
 				},
 			},
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel}}},
-			node: node1,
+			node: &node1,
 			fits: false,
 			test: "Doesn't satisfy the PodAffinity because of unmatching labelSelector with the existing pod",
 		},
@@ -1730,7 +1749,7 @@ func TestInterPodAffinity(t *testing.T) {
 				},
 			},
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel}}},
-			node: node1,
+			node: &node1,
 			fits: true,
 			test: "satisfies the PodAffinity with different label Operators in multiple RequiredDuringSchedulingIgnoredDuringExecution ",
 		},
@@ -1773,7 +1792,7 @@ func TestInterPodAffinity(t *testing.T) {
 				},
 			},
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel}}},
-			node: node1,
+			node: &node1,
 			fits: false,
 			test: "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node becasue one of the matchExpression item don't match.",
 		},
@@ -1811,7 +1830,7 @@ func TestInterPodAffinity(t *testing.T) {
 				},
 			},
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel}}},
-			node: node1,
+			node: &node1,
 			fits: true,
 			test: "satisfies the PodAffinity and PodAntiAffinity with the existing pod",
 		},
@@ -1855,7 +1874,7 @@ func TestInterPodAffinity(t *testing.T) {
 		//		},
 		//	},
 		//	pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podlabel}}},
-		//	node: node1,
+		//	node: &node1,
 		//	fits: true,
 		//	test: "satisfies the PodAffinity with different Label Operators in multiple RequiredDuringSchedulingRequiredDuringExecution ",
 		//},
@@ -1910,7 +1929,7 @@ func TestInterPodAffinity(t *testing.T) {
 						}}`,
 					}},
 			}},
-			node: node1,
+			node: &node1,
 			fits: true,
 			test: "satisfies the PodAffinity and PodAntiAffinity and PodAntiAffinity symmetry with the existing pod",
 		},
@@ -1948,7 +1967,7 @@ func TestInterPodAffinity(t *testing.T) {
 				},
 			},
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: podLabel}}},
-			node: node1,
+			node: &node1,
 			fits: false,
 			test: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
 		},
@@ -2003,7 +2022,7 @@ func TestInterPodAffinity(t *testing.T) {
 						}}`,
 					}},
 			}},
-			node: node1,
+			node: &node1,
 			fits: false,
 			test: "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfies PodAntiAffinity symmetry with the existing pod",
 		},
@@ -2029,7 +2048,7 @@ func TestInterPodAffinity(t *testing.T) {
 				},
 			},
 			pods: []*api.Pod{{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: podLabel}}},
-			node: node1,
+			node: &node1,
 			fits: false,
 			test: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
 		},
@@ -2044,11 +2063,13 @@ func TestInterPodAffinity(t *testing.T) {
 		}
 
 		fit := PodAffinityChecker{
-			info:           FakeNodeInfo(node),
+			info:           FakeNodeInfo(*node),
 			podLister:      algorithm.FakePodLister(test.pods),
 			failureDomains: priorityutil.Topologies{DefaultKeys: strings.Split(api.DefaultFailureDomains, ",")},
 		}
-		fits, err := fit.InterPodAffinityMatches(test.pod, test.node.Name, schedulercache.NewNodeInfo(podsOnNode...))
+		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
+		nodeInfo.SetNode(test.node)
+		fits, err := fit.InterPodAffinityMatches(test.pod, nodeInfo)
 		if !reflect.DeepEqual(err, ErrPodAffinityNotMatch) && err != nil {
 			t.Errorf("%s: unexpected error %v", test.test, err)
 		}
@@ -2212,7 +2233,9 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				podLister:      algorithm.FakePodLister(test.pods),
 				failureDomains: priorityutil.Topologies{DefaultKeys: strings.Split(api.DefaultFailureDomains, ",")},
 			}
-			fits, err := testFit.InterPodAffinityMatches(test.pod, node.Name, schedulercache.NewNodeInfo(podsOnNode...))
+			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
+			nodeInfo.SetNode(&node)
+			fits, err := testFit.InterPodAffinityMatches(test.pod, nodeInfo)
 			if !reflect.DeepEqual(err, ErrPodAffinityNotMatch) && err != nil {
 				t.Errorf("%s: unexpected error %v", test.test, err)
 			}
@@ -2223,7 +2246,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			if affinity.NodeAffinity != nil {
 				nodeInfo := schedulercache.NewNodeInfo()
 				nodeInfo.SetNode(&node)
-				fits2, err := PodSelectorMatches(test.pod, node.Name, nodeInfo)
+				fits2, err := PodSelectorMatches(test.pod, nodeInfo)
 				if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
