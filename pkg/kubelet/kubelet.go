@@ -480,7 +480,7 @@ func NewMainKubelet(
 	}
 	klet.runtimeCache = runtimeCache
 	klet.reasonCache = NewReasonCache()
-	klet.workQueue = queue.NewBasicWorkQueue()
+	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
 	klet.podWorkers = newPodWorkers(klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)

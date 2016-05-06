@@ -195,7 +195,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 			api.ResourceMemory: resource.MustParse(testReservationMemory),
 		},
 	}
-	kubelet.workQueue = queue.NewBasicWorkQueue()
+	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, util.RealClock{})
 	kubelet.clock = fakeClock
@@ -4264,16 +4264,12 @@ func TestExtractBandwidthResources(t *testing.T) {
 func TestGetPodsToSync(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
+	clock := testKubelet.fakeClock
 	pods := newTestPods(5)
-	podUIDs := []types.UID{}
-	for _, pod := range pods {
-		podUIDs = append(podUIDs, pod.UID)
-	}
 
 	exceededActiveDeadlineSeconds := int64(30)
 	notYetActiveDeadlineSeconds := int64(120)
-	now := unversioned.Now()
-	startTime := unversioned.NewTime(now.Time.Add(-1 * time.Minute))
+	startTime := unversioned.NewTime(clock.Now())
 	pods[0].Status.StartTime = &startTime
 	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
 	pods[1].Status.StartTime = &startTime
@@ -4283,34 +4279,30 @@ func TestGetPodsToSync(t *testing.T) {
 
 	kubelet.podManager.SetPods(pods)
 	kubelet.workQueue.Enqueue(pods[2].UID, 0)
-	kubelet.workQueue.Enqueue(pods[3].UID, 0)
-	kubelet.workQueue.Enqueue(pods[4].UID, time.Hour)
+	kubelet.workQueue.Enqueue(pods[3].UID, 30*time.Second)
+	kubelet.workQueue.Enqueue(pods[4].UID, 2*time.Minute)
 
-	expectedPodsUID := []types.UID{pods[0].UID, pods[2].UID, pods[3].UID}
+	clock.Step(1 * time.Minute)
+
+	expectedPods := []*api.Pod{pods[0], pods[2], pods[3]}
 
 	podsToSync := kubelet.getPodsToSync()
 
-	if len(podsToSync) == len(expectedPodsUID) {
-		var rightNum int
-		for _, podUID := range expectedPodsUID {
-			for _, podToSync := range podsToSync {
-				if podToSync.UID == podUID {
-					rightNum++
+	if len(podsToSync) == len(expectedPods) {
+		for _, expect := range expectedPods {
+			var found bool
+			for _, got := range podsToSync {
+				if expect.UID == got.UID {
+					found = true
 					break
 				}
 			}
-		}
-		if rightNum != len(expectedPodsUID) {
-			// Just for report error
-			podsToSyncUID := []types.UID{}
-			for _, podToSync := range podsToSync {
-				podsToSyncUID = append(podsToSyncUID, podToSync.UID)
+			if !found {
+				t.Errorf("expected pod not found: %+v", expect)
 			}
-			t.Errorf("expected pods %v to sync, got %v", expectedPodsUID, podsToSyncUID)
 		}
-
 	} else {
-		t.Errorf("expected %d pods to sync, got %d", 3, len(podsToSync))
+		t.Errorf("expected %d pods to sync, got %d", len(expectedPods), len(podsToSync))
 	}
 }
 
