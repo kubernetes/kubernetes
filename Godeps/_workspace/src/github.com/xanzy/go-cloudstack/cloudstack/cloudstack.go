@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,10 +28,24 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 )
+
+// UnlimitedResourceID is a special ID to define an unlimited resource
+const UnlimitedResourceID = "-1"
+
+var idRegex = regexp.MustCompile(`^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|-1)$`)
+
+// IsID return true if the passed ID is either a UUID or a UnlimitedResourceID
+func IsID(id string) bool {
+	return idRegex.MatchString(id)
+}
+
+// OptionFunc can be passed to the courtesy helper functions to set additional parameters
+type OptionFunc func(*CloudStackClient, interface{}) error
 
 type CSError struct {
 	ErrorCode   int    `json:"errorcode"`
@@ -367,6 +381,34 @@ func getRawValue(b json.RawMessage) (json.RawMessage, error) {
 		return v, nil
 	}
 	return nil, fmt.Errorf("Unable to extract the raw value from:\n\n%s\n\n", string(b))
+}
+
+// ProjectIDSetter is an interface that every type that can set a project ID must implement
+type ProjectIDSetter interface {
+	SetProjectid(string)
+}
+
+// WithProject takes either a project name or ID and sets the `projectid` parameter
+func WithProject(project string) OptionFunc {
+	return func(cs *CloudStackClient, p interface{}) error {
+		ps, ok := p.(ProjectIDSetter)
+
+		if !ok || project == "" {
+			return nil
+		}
+
+		if !IsID(project) {
+			id, err := cs.Project.GetProjectID(project)
+			if err != nil {
+				return err
+			}
+			project = id
+		}
+
+		ps.SetProjectid(project)
+
+		return nil
+	}
 }
 
 type APIDiscoveryService struct {

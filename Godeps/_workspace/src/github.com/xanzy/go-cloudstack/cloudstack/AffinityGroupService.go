@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -427,25 +427,21 @@ func (s *AffinityGroupService) NewListAffinityGroupsParams() *ListAffinityGroups
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AffinityGroupService) GetAffinityGroupID(name string) (string, error) {
+func (s *AffinityGroupService) GetAffinityGroupID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListAffinityGroupsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
 
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
+
 	l, err := s.ListAffinityGroups(p)
 	if err != nil {
 		return "", err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListAffinityGroups(p)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	if l.Count == 0 {
@@ -467,13 +463,13 @@ func (s *AffinityGroupService) GetAffinityGroupID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AffinityGroupService) GetAffinityGroupByName(name string) (*AffinityGroup, int, error) {
-	id, err := s.GetAffinityGroupID(name)
+func (s *AffinityGroupService) GetAffinityGroupByName(name string, opts ...OptionFunc) (*AffinityGroup, int, error) {
+	id, err := s.GetAffinityGroupID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetAffinityGroupByID(id)
+	r, count, err := s.GetAffinityGroupByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -481,11 +477,17 @@ func (s *AffinityGroupService) GetAffinityGroupByName(name string) (*AffinityGro
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AffinityGroupService) GetAffinityGroupByID(id string) (*AffinityGroup, int, error) {
+func (s *AffinityGroupService) GetAffinityGroupByID(id string, opts ...OptionFunc) (*AffinityGroup, int, error) {
 	p := &ListAffinityGroupsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListAffinityGroups(p)
 	if err != nil {
@@ -495,21 +497,6 @@ func (s *AffinityGroupService) GetAffinityGroupByID(id string) (*AffinityGroup, 
 			return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
 		}
 		return nil, -1, err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListAffinityGroups(p)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf(
-				"Invalid parameter id value=%s due to incorrect long value format, "+
-					"or entity does not exist", id)) {
-				return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
-			}
-			return nil, -1, err
-		}
 	}
 
 	if l.Count == 0 {

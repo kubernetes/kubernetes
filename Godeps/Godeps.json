@@ -2123,7 +2123,7 @@
 		},
 		{
 			"ImportPath": "github.com/xanzy/go-cloudstack",
-			"Rev": "6e28220a0503ff25e2c1480791e23d12872140ac"
+			"Rev": "9811b0fde6c3d16da1b7f66bdcab47a3464e7d80"
 		}
 	]
 }

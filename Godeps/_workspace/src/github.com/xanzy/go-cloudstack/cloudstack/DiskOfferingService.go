@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -562,11 +562,17 @@ func (s *DiskOfferingService) NewListDiskOfferingsParams() *ListDiskOfferingsPar
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *DiskOfferingService) GetDiskOfferingID(name string) (string, error) {
+func (s *DiskOfferingService) GetDiskOfferingID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListDiskOfferingsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListDiskOfferings(p)
 	if err != nil {
@@ -592,13 +598,13 @@ func (s *DiskOfferingService) GetDiskOfferingID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *DiskOfferingService) GetDiskOfferingByName(name string) (*DiskOffering, int, error) {
-	id, err := s.GetDiskOfferingID(name)
+func (s *DiskOfferingService) GetDiskOfferingByName(name string, opts ...OptionFunc) (*DiskOffering, int, error) {
+	id, err := s.GetDiskOfferingID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetDiskOfferingByID(id)
+	r, count, err := s.GetDiskOfferingByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -606,11 +612,17 @@ func (s *DiskOfferingService) GetDiskOfferingByName(name string) (*DiskOffering,
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *DiskOfferingService) GetDiskOfferingByID(id string) (*DiskOffering, int, error) {
+func (s *DiskOfferingService) GetDiskOfferingByID(id string, opts ...OptionFunc) (*DiskOffering, int, error) {
 	p := &ListDiskOfferingsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListDiskOfferings(p)
 	if err != nil {

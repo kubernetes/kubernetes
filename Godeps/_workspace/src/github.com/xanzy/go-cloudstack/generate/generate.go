@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -206,7 +206,7 @@ func (as *allServices) GeneralCode() ([]byte, error) {
 		p(format+"\n", args...)
 	}
 	pn("//")
-	pn("// Copyright 2014, Sander van Harmelen")
+	pn("// Copyright 2016, Sander van Harmelen")
 	pn("//")
 	pn("// Licensed under the Apache License, Version 2.0 (the \"License\");")
 	pn("// you may not use this file except in compliance with the License.")
@@ -223,9 +223,18 @@ func (as *allServices) GeneralCode() ([]byte, error) {
 	pn("")
 	pn("package %s", pkg)
 	pn("")
-	pn("import (")
-	pn("  \t%q", "fmt")
-	pn(")")
+	pn("// UnlimitedResourceID is a special ID to define an unlimited resource")
+	pn("const UnlimitedResourceID = \"-1\"")
+	pn("")
+	pn("var idRegex = regexp.MustCompile(`^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|-1)$`)")
+	pn("")
+	pn("// IsID return true if the passed ID is either a UUID or a UnlimitedResourceID")
+	pn("func IsID(id string) bool {")
+	pn("	return idRegex.MatchString(id)")
+	pn("}")
+	pn("")
+	pn("// OptionFunc can be passed to the courtesy helper functions to set additional parameters")
+	pn("type OptionFunc func(*CloudStackClient, interface{}) error")
 	pn("")
 	pn("type CSError struct {")
 	pn("	ErrorCode   int    `json:\"errorcode\"`")
@@ -443,6 +452,34 @@ func (as *allServices) GeneralCode() ([]byte, error) {
 	pn("	return nil, fmt.Errorf(\"Unable to extract the raw value from:\\n\\n%%s\\n\\n\", string(b))")
 	pn("}")
 	pn("")
+	pn("// ProjectIDSetter is an interface that every type that can set a project ID must implement")
+	pn("type ProjectIDSetter interface {")
+	pn("	SetProjectid(string)")
+	pn("}")
+	pn("")
+	pn("// WithProject takes either a project name or ID and sets the `projectid` parameter")
+	pn("func WithProject(project string) OptionFunc {")
+	pn("	return func(cs *CloudStackClient, p interface{}) error {")
+	pn("		ps, ok := p.(ProjectIDSetter)")
+	pn("")
+	pn("		if !ok || project == \"\" {")
+	pn("			return nil")
+	pn("		}")
+	pn("")
+	pn("		if !IsID(project) {")
+	pn("			id, err := cs.Project.GetProjectID(project)")
+	pn("			if err != nil {")
+	pn("				return err")
+	pn("			}")
+	pn("			project = id")
+	pn("		}")
+	pn("")
+	pn("		ps.SetProjectid(project)")
+	pn("")
+	pn("		return nil")
+	pn("	}")
+	pn("}")
+	pn("")
 	for _, s := range as.services {
 		pn("type %s struct {", s.name)
 		pn("  cs *CloudStackClient")
@@ -491,7 +528,7 @@ func (s *service) GenerateCode() ([]byte, error) {
 	pn := s.pn
 
 	pn("//")
-	pn("// Copyright 2014, Sander van Harmelen")
+	pn("// Copyright 2016, Sander van Harmelen")
 	pn("//")
 	pn("// Licensed under the Apache License, Version 2.0 (the \"License\");")
 	pn("// you may not use this file except in compliance with the License.")
@@ -507,10 +544,6 @@ func (s *service) GenerateCode() ([]byte, error) {
 	pn("//")
 	pn("")
 	pn("package %s", pkg)
-	pn("")
-	pn("import (")
-	pn("	\t%q", "fmt")
-	pn(")")
 	pn("")
 	if s.name == "FirewallService" {
 		pn("// Helper function for maintaining backwards compatibility")
@@ -734,16 +767,13 @@ func (s *service) generateHelperFuncs(a *API) {
 					p("%s %s, ", s.parseParamName(ap.Name), mapType(ap.Type))
 				}
 			}
-
-			// Add an addition (needed) parameters for the GetTemplateID and
-			// GetIsoID helper functions
 			if parseSingular(ln) == "Iso" {
 				p("isofilter string, ")
 			}
 			if parseSingular(ln) == "Template" || parseSingular(ln) == "Iso" {
 				p("zoneid string, ")
 			}
-			pn(") (string, error) {")
+			pn("opts ...OptionFunc) (string, error) {")
 
 			// Generate the function body
 			pn("	p := &List%sParams{}", ln)
@@ -755,9 +785,6 @@ func (s *service) generateHelperFuncs(a *API) {
 					pn("	p.p[\"%s\"] = %s", s.parseParamName(ap.Name), s.parseParamName(ap.Name))
 				}
 			}
-
-			// Assign the additional parameters for the GetTemplateID and
-			// GetIsoID helper functions
 			if parseSingular(ln) == "Iso" {
 				pn("	p.p[\"isofilter\"] = isofilter")
 			}
@@ -765,26 +792,17 @@ func (s *service) generateHelperFuncs(a *API) {
 				pn("	p.p[\"zoneid\"] = zoneid")
 			}
 			pn("")
+			pn("	for _, fn := range opts {")
+			pn("		if err := fn(s.cs, p); err != nil {")
+			pn("			return \"\", err")
+			pn("		}")
+			pn("	}")
+			pn("")
 			pn("	l, err := s.List%s(p)", ln)
 			pn("	if err != nil {")
 			pn("		return \"\", err")
 			pn("	}")
 			pn("")
-
-			// If we have a function that also has a projectid parameter, add some logic
-			// that will also search in all existing projects if no match was found
-			if hasProjectIDParamField(a.Params) {
-				pn("	if l.Count == 0 {")
-				pn("		// If no matches, search all projects")
-				pn("		p.p[\"projectid\"] = \"-1\"")
-				pn("")
-				pn("		l, err = s.List%s(p)", ln)
-				pn("		if err != nil {")
-				pn("			return \"\", err")
-				pn("		}")
-				pn("	}")
-				pn("")
-			}
 			pn("	if l.Count == 0 {")
 			pn("	  return \"\", fmt.Errorf(\"No match found for %%s: %%+v\", %s, l)", v)
 			pn("	}")
@@ -813,16 +831,13 @@ func (s *service) generateHelperFuncs(a *API) {
 						p("%s %s, ", s.parseParamName(ap.Name), mapType(ap.Type))
 					}
 				}
-
-				// Add an addition (needed) parameter for the GetTemplateID and
-				// GetIsoID helper functions
 				if parseSingular(ln) == "Iso" {
 					p("isofilter string, ")
 				}
 				if parseSingular(ln) == "Template" || parseSingular(ln) == "Iso" {
 					p("zoneid string, ")
 				}
-				pn(") (*%s, int, error) {", parseSingular(ln))
+				pn("opts ...OptionFunc) (*%s, int, error) {", parseSingular(ln))
 
 				// Generate the function body
 				p("  id, err := s.Get%sID(name, ", parseSingular(ln))
@@ -831,16 +846,13 @@ func (s *service) generateHelperFuncs(a *API) {
 						p("%s, ", s.parseParamName(ap.Name))
 					}
 				}
-
-				// Assign the additional parameter for the GetTemplateID and
-				// GetIsoID helper functions
 				if parseSingular(ln) == "Iso" {
 					p("isofilter, ")
 				}
 				if parseSingular(ln) == "Template" || parseSingular(ln) == "Iso" {
-					p("zoneid")
+					p("zoneid, ")
 				}
-				pn(")")
+				pn("opts...)")
 				pn("  if err != nil {")
 				pn("    return nil, -1, err")
 				pn("  }")
@@ -851,7 +863,7 @@ func (s *service) generateHelperFuncs(a *API) {
 						p("%s, ", s.parseParamName(ap.Name))
 					}
 				}
-				pn(")")
+				pn("opts...)")
 				pn("  if err != nil {")
 				pn("    return nil, count, err")
 				pn("  }")
@@ -872,7 +884,7 @@ func (s *service) generateHelperFuncs(a *API) {
 					p("%s %s, ", s.parseParamName(ap.Name), mapType(ap.Type))
 				}
 			}
-			pn(") (*%s, int, error) {", parseSingular(ln))
+			pn("opts ...OptionFunc) (*%s, int, error) {", parseSingular(ln))
 
 			// Generate the function body
 			pn("	p := &List%sParams{}", ln)
@@ -885,6 +897,12 @@ func (s *service) generateHelperFuncs(a *API) {
 				}
 			}
 			pn("")
+			pn("	for _, fn := range opts {")
+			pn("		if err := fn(s.cs, p); err != nil {")
+			pn("			return nil, -1, err")
+			pn("		}")
+			pn("	}")
+			pn("")
 			pn("	l, err := s.List%s(p)", ln)
 			pn("	if err != nil {")
 			pn("		if strings.Contains(err.Error(), fmt.Sprintf(")
@@ -895,26 +913,6 @@ func (s *service) generateHelperFuncs(a *API) {
 			pn("		return nil, -1, err")
 			pn("	}")
 			pn("")
-
-			// If we have a function that also has a projectid parameter, add some logic
-			// that will also search in all existing projects if no match was found
-			if hasProjectIDParamField(a.Params) {
-				pn("	if l.Count == 0 {")
-				pn("		// If no matches, search all projects")
-				pn("		p.p[\"projectid\"] = \"-1\"")
-				pn("")
-				pn("		l, err = s.List%s(p)", ln)
-				pn("		if err != nil {")
-				pn("			if strings.Contains(err.Error(), fmt.Sprintf(")
-				pn("				\"Invalid parameter id value=%%s due to incorrect long value format, \"+")
-				pn("				\"or entity does not exist\", id)) {")
-				pn("				return nil, 0, fmt.Errorf(\"No match found for %%s: %%+v\", id, l)")
-				pn("			}")
-				pn("			return nil, -1, err")
-				pn("		}")
-				pn("	}")
-				pn("")
-			}
 			pn("	if l.Count == 0 {")
 			pn("	  return nil, l.Count, fmt.Errorf(\"No match found for %%s: %%+v\", id, l)")
 			pn("	}")
@@ -947,15 +945,6 @@ func hasNameOrKeywordParamField(params APIParams) (v string, found bool) {
 func hasIDParamField(params APIParams) bool {
 	for _, p := range params {
 		if p.Name == "id" && mapType(p.Type) == "string" {
-			return true
-		}
-	}
-	return false
-}
-
-func hasProjectIDParamField(params APIParams) bool {
-	for _, p := range params {
-		if p.Name == "projectid" && mapType(p.Type) == "string" {
 			return true
 		}
 	}
@@ -1092,6 +1081,8 @@ func (s *service) generateResponseType(a *API) {
 			pn("	%s []*%s `json:\"%s\"`", ln, parseSingular(ln), "asyncjobs")
 		case "listEgressFirewallRules":
 			pn("	%s []*%s `json:\"%s\"`", ln, parseSingular(ln), "firewallrule")
+		case "listLoadBalancerRuleInstances":
+			pn("	%s []*%s `json:\"%s\"`", ln, parseSingular(ln), "lbrulevmidip")
 		case "registerTemplate":
 			pn("	%s []*%s `json:\"%s\"`", ln, parseSingular(ln), "template")
 		default:
@@ -1237,6 +1228,9 @@ func mapType(t string) string {
 		return "map[string]string"
 	case "responseobject":
 		return "json.RawMessage"
+	case "uservmresponse":
+		// This is a really specific abnormaly of the API
+		return "*VirtualMachine"
 	default:
 		return "string"
 	}

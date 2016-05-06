@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -448,11 +448,17 @@ func (s *DomainService) NewListDomainsParams() *ListDomainsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *DomainService) GetDomainID(name string) (string, error) {
+func (s *DomainService) GetDomainID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListDomainsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListDomains(p)
 	if err != nil {
@@ -478,13 +484,13 @@ func (s *DomainService) GetDomainID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *DomainService) GetDomainByName(name string) (*Domain, int, error) {
-	id, err := s.GetDomainID(name)
+func (s *DomainService) GetDomainByName(name string, opts ...OptionFunc) (*Domain, int, error) {
+	id, err := s.GetDomainID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetDomainByID(id)
+	r, count, err := s.GetDomainByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -492,11 +498,17 @@ func (s *DomainService) GetDomainByName(name string) (*Domain, int, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *DomainService) GetDomainByID(id string) (*Domain, int, error) {
+func (s *DomainService) GetDomainByID(id string, opts ...OptionFunc) (*Domain, int, error) {
 	p := &ListDomainsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListDomains(p)
 	if err != nil {
@@ -687,11 +699,17 @@ func (s *DomainService) NewListDomainChildrenParams() *ListDomainChildrenParams 
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *DomainService) GetDomainChildrenID(name string) (string, error) {
+func (s *DomainService) GetDomainChildrenID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListDomainChildrenParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListDomainChildren(p)
 	if err != nil {
@@ -717,13 +735,13 @@ func (s *DomainService) GetDomainChildrenID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *DomainService) GetDomainChildrenByName(name string) (*DomainChildren, int, error) {
-	id, err := s.GetDomainChildrenID(name)
+func (s *DomainService) GetDomainChildrenByName(name string, opts ...OptionFunc) (*DomainChildren, int, error) {
+	id, err := s.GetDomainChildrenID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetDomainChildrenByID(id)
+	r, count, err := s.GetDomainChildrenByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -731,11 +749,17 @@ func (s *DomainService) GetDomainChildrenByName(name string) (*DomainChildren, i
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *DomainService) GetDomainChildrenByID(id string) (*DomainChildren, int, error) {
+func (s *DomainService) GetDomainChildrenByID(id string, opts ...OptionFunc) (*DomainChildren, int, error) {
 	p := &ListDomainChildrenParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListDomainChildren(p)
 	if err != nil {

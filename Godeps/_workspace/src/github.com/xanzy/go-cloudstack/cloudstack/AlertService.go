@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -113,11 +113,17 @@ func (s *AlertService) NewListAlertsParams() *ListAlertsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AlertService) GetAlertID(name string) (string, error) {
+func (s *AlertService) GetAlertID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListAlertsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListAlerts(p)
 	if err != nil {
@@ -143,13 +149,13 @@ func (s *AlertService) GetAlertID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AlertService) GetAlertByName(name string) (*Alert, int, error) {
-	id, err := s.GetAlertID(name)
+func (s *AlertService) GetAlertByName(name string, opts ...OptionFunc) (*Alert, int, error) {
+	id, err := s.GetAlertID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetAlertByID(id)
+	r, count, err := s.GetAlertByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -157,11 +163,17 @@ func (s *AlertService) GetAlertByName(name string) (*Alert, int, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AlertService) GetAlertByID(id string) (*Alert, int, error) {
+func (s *AlertService) GetAlertByID(id string, opts ...OptionFunc) (*Alert, int, error) {
 	p := &ListAlertsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListAlerts(p)
 	if err != nil {

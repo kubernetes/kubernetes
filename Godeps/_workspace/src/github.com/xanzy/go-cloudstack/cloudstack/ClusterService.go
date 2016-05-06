@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -636,11 +636,17 @@ func (s *ClusterService) NewListClustersParams() *ListClustersParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ClusterService) GetClusterID(name string) (string, error) {
+func (s *ClusterService) GetClusterID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListClustersParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListClusters(p)
 	if err != nil {
@@ -666,13 +672,13 @@ func (s *ClusterService) GetClusterID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ClusterService) GetClusterByName(name string) (*Cluster, int, error) {
-	id, err := s.GetClusterID(name)
+func (s *ClusterService) GetClusterByName(name string, opts ...OptionFunc) (*Cluster, int, error) {
+	id, err := s.GetClusterID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetClusterByID(id)
+	r, count, err := s.GetClusterByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -680,11 +686,17 @@ func (s *ClusterService) GetClusterByName(name string) (*Cluster, int, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ClusterService) GetClusterByID(id string) (*Cluster, int, error) {
+func (s *ClusterService) GetClusterByID(id string, opts ...OptionFunc) (*Cluster, int, error) {
 	p := &ListClustersParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListClusters(p)
 	if err != nil {

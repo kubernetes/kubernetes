@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1134,11 +1134,17 @@ func (s *AutoScaleService) NewListCountersParams() *ListCountersParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AutoScaleService) GetCounterID(name string) (string, error) {
+func (s *AutoScaleService) GetCounterID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListCountersParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListCounters(p)
 	if err != nil {
@@ -1164,13 +1170,13 @@ func (s *AutoScaleService) GetCounterID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AutoScaleService) GetCounterByName(name string) (*Counter, int, error) {
-	id, err := s.GetCounterID(name)
+func (s *AutoScaleService) GetCounterByName(name string, opts ...OptionFunc) (*Counter, int, error) {
+	id, err := s.GetCounterID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetCounterByID(id)
+	r, count, err := s.GetCounterByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -1178,11 +1184,17 @@ func (s *AutoScaleService) GetCounterByName(name string) (*Counter, int, error) 
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AutoScaleService) GetCounterByID(id string) (*Counter, int, error) {
+func (s *AutoScaleService) GetCounterByID(id string, opts ...OptionFunc) (*Counter, int, error) {
 	p := &ListCountersParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListCounters(p)
 	if err != nil {
@@ -1366,11 +1378,17 @@ func (s *AutoScaleService) NewListConditionsParams() *ListConditionsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AutoScaleService) GetConditionByID(id string) (*Condition, int, error) {
+func (s *AutoScaleService) GetConditionByID(id string, opts ...OptionFunc) (*Condition, int, error) {
 	p := &ListConditionsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListConditions(p)
 	if err != nil {
@@ -1570,11 +1588,17 @@ func (s *AutoScaleService) NewListAutoScalePoliciesParams() *ListAutoScalePolici
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AutoScaleService) GetAutoScalePolicyByID(id string) (*AutoScalePolicy, int, error) {
+func (s *AutoScaleService) GetAutoScalePolicyByID(id string, opts ...OptionFunc) (*AutoScalePolicy, int, error) {
 	p := &ListAutoScalePoliciesParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListAutoScalePolicies(p)
 	if err != nil {
@@ -1808,11 +1832,17 @@ func (s *AutoScaleService) NewListAutoScaleVmProfilesParams() *ListAutoScaleVmPr
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AutoScaleService) GetAutoScaleVmProfileByID(id string) (*AutoScaleVmProfile, int, error) {
+func (s *AutoScaleService) GetAutoScaleVmProfileByID(id string, opts ...OptionFunc) (*AutoScaleVmProfile, int, error) {
 	p := &ListAutoScaleVmProfilesParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListAutoScaleVmProfiles(p)
 	if err != nil {
@@ -1822,21 +1852,6 @@ func (s *AutoScaleService) GetAutoScaleVmProfileByID(id string) (*AutoScaleVmPro
 			return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
 		}
 		return nil, -1, err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListAutoScaleVmProfiles(p)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf(
-				"Invalid parameter id value=%s due to incorrect long value format, "+
-					"or entity does not exist", id)) {
-				return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
-			}
-			return nil, -1, err
-		}
 	}
 
 	if l.Count == 0 {
@@ -2064,11 +2079,17 @@ func (s *AutoScaleService) NewListAutoScaleVmGroupsParams() *ListAutoScaleVmGrou
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AutoScaleService) GetAutoScaleVmGroupByID(id string) (*AutoScaleVmGroup, int, error) {
+func (s *AutoScaleService) GetAutoScaleVmGroupByID(id string, opts ...OptionFunc) (*AutoScaleVmGroup, int, error) {
 	p := &ListAutoScaleVmGroupsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListAutoScaleVmGroups(p)
 	if err != nil {
@@ -2078,21 +2099,6 @@ func (s *AutoScaleService) GetAutoScaleVmGroupByID(id string) (*AutoScaleVmGroup
 			return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
 		}
 		return nil, -1, err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListAutoScaleVmGroups(p)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf(
-				"Invalid parameter id value=%s due to incorrect long value format, "+
-					"or entity does not exist", id)) {
-				return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
-			}
-			return nil, -1, err
-		}
 	}
 
 	if l.Count == 0 {

@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -724,11 +724,17 @@ func (s *ZoneService) NewListZonesParams() *ListZonesParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ZoneService) GetZoneID(name string) (string, error) {
+func (s *ZoneService) GetZoneID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListZonesParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListZones(p)
 	if err != nil {
@@ -754,13 +760,13 @@ func (s *ZoneService) GetZoneID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ZoneService) GetZoneByName(name string) (*Zone, int, error) {
-	id, err := s.GetZoneID(name)
+func (s *ZoneService) GetZoneByName(name string, opts ...OptionFunc) (*Zone, int, error) {
+	id, err := s.GetZoneID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetZoneByID(id)
+	r, count, err := s.GetZoneByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -768,11 +774,17 @@ func (s *ZoneService) GetZoneByName(name string) (*Zone, int, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ZoneService) GetZoneByID(id string) (*Zone, int, error) {
+func (s *ZoneService) GetZoneByID(id string, opts ...OptionFunc) (*Zone, int, error) {
 	p := &ListZonesParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListZones(p)
 	if err != nil {

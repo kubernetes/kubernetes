@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1314,7 +1314,7 @@ func (s *TemplateService) NewListTemplatesParams(templatefilter string) *ListTem
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *TemplateService) GetTemplateID(name string, templatefilter string, zoneid string) (string, error) {
+func (s *TemplateService) GetTemplateID(name string, templatefilter string, zoneid string, opts ...OptionFunc) (string, error) {
 	p := &ListTemplatesParams{}
 	p.p = make(map[string]interface{})
 
@@ -1322,19 +1322,15 @@ func (s *TemplateService) GetTemplateID(name string, templatefilter string, zone
 	p.p["templatefilter"] = templatefilter
 	p.p["zoneid"] = zoneid
 
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
+
 	l, err := s.ListTemplates(p)
 	if err != nil {
 		return "", err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListTemplates(p)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	if l.Count == 0 {
@@ -1356,13 +1352,13 @@ func (s *TemplateService) GetTemplateID(name string, templatefilter string, zone
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *TemplateService) GetTemplateByName(name string, templatefilter string, zoneid string) (*Template, int, error) {
-	id, err := s.GetTemplateID(name, templatefilter, zoneid)
+func (s *TemplateService) GetTemplateByName(name string, templatefilter string, zoneid string, opts ...OptionFunc) (*Template, int, error) {
+	id, err := s.GetTemplateID(name, templatefilter, zoneid, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetTemplateByID(id, templatefilter)
+	r, count, err := s.GetTemplateByID(id, templatefilter, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -1370,12 +1366,18 @@ func (s *TemplateService) GetTemplateByName(name string, templatefilter string, 
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *TemplateService) GetTemplateByID(id string, templatefilter string) (*Template, int, error) {
+func (s *TemplateService) GetTemplateByID(id string, templatefilter string, opts ...OptionFunc) (*Template, int, error) {
 	p := &ListTemplatesParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
 	p.p["templatefilter"] = templatefilter
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListTemplates(p)
 	if err != nil {
@@ -1385,21 +1387,6 @@ func (s *TemplateService) GetTemplateByID(id string, templatefilter string) (*Te
 			return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
 		}
 		return nil, -1, err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListTemplates(p)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf(
-				"Invalid parameter id value=%s due to incorrect long value format, "+
-					"or entity does not exist", id)) {
-				return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
-			}
-			return nil, -1, err
-		}
 	}
 
 	if l.Count == 0 {
@@ -1636,12 +1623,18 @@ func (s *TemplateService) NewListTemplatePermissionsParams(id string) *ListTempl
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *TemplateService) GetTemplatePermissionByID(id string) (*TemplatePermission, int, error) {
+func (s *TemplateService) GetTemplatePermissionByID(id string, opts ...OptionFunc) (*TemplatePermission, int, error) {
 	p := &ListTemplatePermissionsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListTemplatePermissions(p)
 	if err != nil {

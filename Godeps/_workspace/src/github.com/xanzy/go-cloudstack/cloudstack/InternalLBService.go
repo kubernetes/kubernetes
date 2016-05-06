@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -273,11 +273,17 @@ func (s *InternalLBService) NewListInternalLoadBalancerElementsParams() *ListInt
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *InternalLBService) GetInternalLoadBalancerElementByID(id string) (*InternalLoadBalancerElement, int, error) {
+func (s *InternalLBService) GetInternalLoadBalancerElementByID(id string, opts ...OptionFunc) (*InternalLoadBalancerElement, int, error) {
 	p := &ListInternalLoadBalancerElementsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListInternalLoadBalancerElements(p)
 	if err != nil {
@@ -825,25 +831,21 @@ func (s *InternalLBService) NewListInternalLoadBalancerVMsParams() *ListInternal
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *InternalLBService) GetInternalLoadBalancerVMID(name string) (string, error) {
+func (s *InternalLBService) GetInternalLoadBalancerVMID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListInternalLoadBalancerVMsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
 
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
+
 	l, err := s.ListInternalLoadBalancerVMs(p)
 	if err != nil {
 		return "", err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListInternalLoadBalancerVMs(p)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	if l.Count == 0 {
@@ -865,13 +867,13 @@ func (s *InternalLBService) GetInternalLoadBalancerVMID(name string) (string, er
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *InternalLBService) GetInternalLoadBalancerVMByName(name string) (*InternalLoadBalancerVM, int, error) {
-	id, err := s.GetInternalLoadBalancerVMID(name)
+func (s *InternalLBService) GetInternalLoadBalancerVMByName(name string, opts ...OptionFunc) (*InternalLoadBalancerVM, int, error) {
+	id, err := s.GetInternalLoadBalancerVMID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetInternalLoadBalancerVMByID(id)
+	r, count, err := s.GetInternalLoadBalancerVMByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -879,11 +881,17 @@ func (s *InternalLBService) GetInternalLoadBalancerVMByName(name string) (*Inter
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *InternalLBService) GetInternalLoadBalancerVMByID(id string) (*InternalLoadBalancerVM, int, error) {
+func (s *InternalLBService) GetInternalLoadBalancerVMByID(id string, opts ...OptionFunc) (*InternalLoadBalancerVM, int, error) {
 	p := &ListInternalLoadBalancerVMsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListInternalLoadBalancerVMs(p)
 	if err != nil {
@@ -893,21 +901,6 @@ func (s *InternalLBService) GetInternalLoadBalancerVMByID(id string) (*InternalL
 			return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
 		}
 		return nil, -1, err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListInternalLoadBalancerVMs(p)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf(
-				"Invalid parameter id value=%s due to incorrect long value format, "+
-					"or entity does not exist", id)) {
-				return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
-			}
-			return nil, -1, err
-		}
 	}
 
 	if l.Count == 0 {

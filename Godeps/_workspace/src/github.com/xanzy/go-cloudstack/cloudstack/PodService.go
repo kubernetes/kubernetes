@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -463,11 +463,17 @@ func (s *PodService) NewListPodsParams() *ListPodsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *PodService) GetPodID(name string) (string, error) {
+func (s *PodService) GetPodID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListPodsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListPods(p)
 	if err != nil {
@@ -493,13 +499,13 @@ func (s *PodService) GetPodID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *PodService) GetPodByName(name string) (*Pod, int, error) {
-	id, err := s.GetPodID(name)
+func (s *PodService) GetPodByName(name string, opts ...OptionFunc) (*Pod, int, error) {
+	id, err := s.GetPodID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetPodByID(id)
+	r, count, err := s.GetPodByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -507,11 +513,17 @@ func (s *PodService) GetPodByName(name string) (*Pod, int, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *PodService) GetPodByID(id string) (*Pod, int, error) {
+func (s *PodService) GetPodByID(id string, opts ...OptionFunc) (*Pod, int, error) {
 	p := &ListPodsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListPods(p)
 	if err != nil {

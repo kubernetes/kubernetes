@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -572,11 +572,17 @@ func (s *SystemVMService) NewListSystemVmsParams() *ListSystemVmsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *SystemVMService) GetSystemVmID(name string) (string, error) {
+func (s *SystemVMService) GetSystemVmID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListSystemVmsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListSystemVms(p)
 	if err != nil {
@@ -602,13 +608,13 @@ func (s *SystemVMService) GetSystemVmID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *SystemVMService) GetSystemVmByName(name string) (*SystemVm, int, error) {
-	id, err := s.GetSystemVmID(name)
+func (s *SystemVMService) GetSystemVmByName(name string, opts ...OptionFunc) (*SystemVm, int, error) {
+	id, err := s.GetSystemVmID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetSystemVmByID(id)
+	r, count, err := s.GetSystemVmByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -616,11 +622,17 @@ func (s *SystemVMService) GetSystemVmByName(name string) (*SystemVm, int, error)
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *SystemVMService) GetSystemVmByID(id string) (*SystemVm, int, error) {
+func (s *SystemVMService) GetSystemVmByID(id string, opts ...OptionFunc) (*SystemVm, int, error) {
 	p := &ListSystemVmsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListSystemVms(p)
 	if err != nil {

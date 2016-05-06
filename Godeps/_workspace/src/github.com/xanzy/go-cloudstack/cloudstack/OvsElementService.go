@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -205,11 +205,17 @@ func (s *OvsElementService) NewListOvsElementsParams() *ListOvsElementsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *OvsElementService) GetOvsElementByID(id string) (*OvsElement, int, error) {
+func (s *OvsElementService) GetOvsElementByID(id string, opts ...OptionFunc) (*OvsElement, int, error) {
 	p := &ListOvsElementsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListOvsElements(p)
 	if err != nil {

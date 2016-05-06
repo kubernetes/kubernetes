@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -419,11 +419,17 @@ func (s *ImageStoreService) NewListImageStoresParams() *ListImageStoresParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ImageStoreService) GetImageStoreID(name string) (string, error) {
+func (s *ImageStoreService) GetImageStoreID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListImageStoresParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListImageStores(p)
 	if err != nil {
@@ -449,13 +455,13 @@ func (s *ImageStoreService) GetImageStoreID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ImageStoreService) GetImageStoreByName(name string) (*ImageStore, int, error) {
-	id, err := s.GetImageStoreID(name)
+func (s *ImageStoreService) GetImageStoreByName(name string, opts ...OptionFunc) (*ImageStore, int, error) {
+	id, err := s.GetImageStoreID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetImageStoreByID(id)
+	r, count, err := s.GetImageStoreByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -463,11 +469,17 @@ func (s *ImageStoreService) GetImageStoreByName(name string) (*ImageStore, int, 
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ImageStoreService) GetImageStoreByID(id string) (*ImageStore, int, error) {
+func (s *ImageStoreService) GetImageStoreByID(id string, opts ...OptionFunc) (*ImageStore, int, error) {
 	p := &ListImageStoresParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListImageStores(p)
 	if err != nil {
@@ -789,11 +801,17 @@ func (s *ImageStoreService) NewListSecondaryStagingStoresParams() *ListSecondary
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ImageStoreService) GetSecondaryStagingStoreID(name string) (string, error) {
+func (s *ImageStoreService) GetSecondaryStagingStoreID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListSecondaryStagingStoresParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListSecondaryStagingStores(p)
 	if err != nil {
@@ -819,13 +837,13 @@ func (s *ImageStoreService) GetSecondaryStagingStoreID(name string) (string, err
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ImageStoreService) GetSecondaryStagingStoreByName(name string) (*SecondaryStagingStore, int, error) {
-	id, err := s.GetSecondaryStagingStoreID(name)
+func (s *ImageStoreService) GetSecondaryStagingStoreByName(name string, opts ...OptionFunc) (*SecondaryStagingStore, int, error) {
+	id, err := s.GetSecondaryStagingStoreID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetSecondaryStagingStoreByID(id)
+	r, count, err := s.GetSecondaryStagingStoreByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -833,11 +851,17 @@ func (s *ImageStoreService) GetSecondaryStagingStoreByName(name string) (*Second
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ImageStoreService) GetSecondaryStagingStoreByID(id string) (*SecondaryStagingStore, int, error) {
+func (s *ImageStoreService) GetSecondaryStagingStoreByID(id string, opts ...OptionFunc) (*SecondaryStagingStore, int, error) {
 	p := &ListSecondaryStagingStoresParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListSecondaryStagingStores(p)
 	if err != nil {

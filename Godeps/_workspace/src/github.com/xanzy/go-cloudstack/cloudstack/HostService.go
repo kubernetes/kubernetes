@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1037,11 +1037,17 @@ func (s *HostService) NewListHostsParams() *ListHostsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *HostService) GetHostID(name string) (string, error) {
+func (s *HostService) GetHostID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListHostsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListHosts(p)
 	if err != nil {
@@ -1067,13 +1073,13 @@ func (s *HostService) GetHostID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *HostService) GetHostByName(name string) (*Host, int, error) {
-	id, err := s.GetHostID(name)
+func (s *HostService) GetHostByName(name string, opts ...OptionFunc) (*Host, int, error) {
+	id, err := s.GetHostID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetHostByID(id)
+	r, count, err := s.GetHostByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -1081,11 +1087,17 @@ func (s *HostService) GetHostByName(name string) (*Host, int, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *HostService) GetHostByID(id string) (*Host, int, error) {
+func (s *HostService) GetHostByID(id string, opts ...OptionFunc) (*Host, int, error) {
 	p := &ListHostsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListHosts(p)
 	if err != nil {
@@ -1243,11 +1255,17 @@ func (s *HostService) NewListHostTagsParams() *ListHostTagsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *HostService) GetHostTagID(keyword string) (string, error) {
+func (s *HostService) GetHostTagID(keyword string, opts ...OptionFunc) (string, error) {
 	p := &ListHostTagsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["keyword"] = keyword
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListHostTags(p)
 	if err != nil {

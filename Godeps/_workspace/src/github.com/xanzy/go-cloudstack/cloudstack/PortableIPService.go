@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -319,11 +319,17 @@ func (s *PortableIPService) NewListPortableIpRangesParams() *ListPortableIpRange
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *PortableIPService) GetPortableIpRangeByID(id string) (*PortableIpRange, int, error) {
+func (s *PortableIPService) GetPortableIpRangeByID(id string, opts ...OptionFunc) (*PortableIpRange, int, error) {
 	p := &ListPortableIpRangesParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListPortableIpRanges(p)
 	if err != nil {

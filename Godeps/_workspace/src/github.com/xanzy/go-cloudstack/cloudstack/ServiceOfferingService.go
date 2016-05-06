@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -717,11 +717,17 @@ func (s *ServiceOfferingService) NewListServiceOfferingsParams() *ListServiceOff
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ServiceOfferingService) GetServiceOfferingID(name string) (string, error) {
+func (s *ServiceOfferingService) GetServiceOfferingID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListServiceOfferingsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListServiceOfferings(p)
 	if err != nil {
@@ -747,13 +753,13 @@ func (s *ServiceOfferingService) GetServiceOfferingID(name string) (string, erro
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ServiceOfferingService) GetServiceOfferingByName(name string) (*ServiceOffering, int, error) {
-	id, err := s.GetServiceOfferingID(name)
+func (s *ServiceOfferingService) GetServiceOfferingByName(name string, opts ...OptionFunc) (*ServiceOffering, int, error) {
+	id, err := s.GetServiceOfferingID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetServiceOfferingByID(id)
+	r, count, err := s.GetServiceOfferingByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -761,11 +767,17 @@ func (s *ServiceOfferingService) GetServiceOfferingByName(name string) (*Service
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *ServiceOfferingService) GetServiceOfferingByID(id string) (*ServiceOffering, int, error) {
+func (s *ServiceOfferingService) GetServiceOfferingByID(id string, opts ...OptionFunc) (*ServiceOffering, int, error) {
 	p := &ListServiceOfferingsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListServiceOfferings(p)
 	if err != nil {

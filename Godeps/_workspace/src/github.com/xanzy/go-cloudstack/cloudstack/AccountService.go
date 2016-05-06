@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1130,11 +1130,17 @@ func (s *AccountService) NewListAccountsParams() *ListAccountsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AccountService) GetAccountID(name string) (string, error) {
+func (s *AccountService) GetAccountID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListAccountsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListAccounts(p)
 	if err != nil {
@@ -1160,13 +1166,13 @@ func (s *AccountService) GetAccountID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AccountService) GetAccountByName(name string) (*Account, int, error) {
-	id, err := s.GetAccountID(name)
+func (s *AccountService) GetAccountByName(name string, opts ...OptionFunc) (*Account, int, error) {
+	id, err := s.GetAccountID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetAccountByID(id)
+	r, count, err := s.GetAccountByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -1174,11 +1180,17 @@ func (s *AccountService) GetAccountByName(name string) (*Account, int, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AccountService) GetAccountByID(id string) (*Account, int, error) {
+func (s *AccountService) GetAccountByID(id string, opts ...OptionFunc) (*Account, int, error) {
 	p := &ListAccountsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListAccounts(p)
 	if err != nil {
@@ -1716,26 +1728,22 @@ func (s *AccountService) NewListProjectAccountsParams(projectid string) *ListPro
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *AccountService) GetProjectAccountID(keyword string, projectid string) (string, error) {
+func (s *AccountService) GetProjectAccountID(keyword string, projectid string, opts ...OptionFunc) (string, error) {
 	p := &ListProjectAccountsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["keyword"] = keyword
 	p.p["projectid"] = projectid
 
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
+
 	l, err := s.ListProjectAccounts(p)
 	if err != nil {
 		return "", err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListProjectAccounts(p)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	if l.Count == 0 {

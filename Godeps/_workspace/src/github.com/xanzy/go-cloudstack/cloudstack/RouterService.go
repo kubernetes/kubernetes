@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -952,25 +952,21 @@ func (s *RouterService) NewListRoutersParams() *ListRoutersParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *RouterService) GetRouterID(name string) (string, error) {
+func (s *RouterService) GetRouterID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListRoutersParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
 
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
+
 	l, err := s.ListRouters(p)
 	if err != nil {
 		return "", err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListRouters(p)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	if l.Count == 0 {
@@ -992,13 +988,13 @@ func (s *RouterService) GetRouterID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *RouterService) GetRouterByName(name string) (*Router, int, error) {
-	id, err := s.GetRouterID(name)
+func (s *RouterService) GetRouterByName(name string, opts ...OptionFunc) (*Router, int, error) {
+	id, err := s.GetRouterID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetRouterByID(id)
+	r, count, err := s.GetRouterByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -1006,11 +1002,17 @@ func (s *RouterService) GetRouterByName(name string) (*Router, int, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *RouterService) GetRouterByID(id string) (*Router, int, error) {
+func (s *RouterService) GetRouterByID(id string, opts ...OptionFunc) (*Router, int, error) {
 	p := &ListRoutersParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListRouters(p)
 	if err != nil {
@@ -1020,21 +1022,6 @@ func (s *RouterService) GetRouterByID(id string) (*Router, int, error) {
 			return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
 		}
 		return nil, -1, err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListRouters(p)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf(
-				"Invalid parameter id value=%s due to incorrect long value format, "+
-					"or entity does not exist", id)) {
-				return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
-			}
-			return nil, -1, err
-		}
 	}
 
 	if l.Count == 0 {
@@ -1227,11 +1214,17 @@ func (s *RouterService) NewListVirtualRouterElementsParams() *ListVirtualRouterE
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *RouterService) GetVirtualRouterElementByID(id string) (*VirtualRouterElement, int, error) {
+func (s *RouterService) GetVirtualRouterElementByID(id string, opts ...OptionFunc) (*VirtualRouterElement, int, error) {
 	p := &ListVirtualRouterElementsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListVirtualRouterElements(p)
 	if err != nil {

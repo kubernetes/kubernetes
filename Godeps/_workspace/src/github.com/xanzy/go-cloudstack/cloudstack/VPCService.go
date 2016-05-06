@@ -1,5 +1,5 @@
 //
-// Copyright 2014, Sander van Harmelen
+// Copyright 2016, Sander van Harmelen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -578,25 +578,21 @@ func (s *VPCService) NewListVPCsParams() *ListVPCsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *VPCService) GetVPCID(name string) (string, error) {
+func (s *VPCService) GetVPCID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListVPCsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
 
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
+
 	l, err := s.ListVPCs(p)
 	if err != nil {
 		return "", err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListVPCs(p)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	if l.Count == 0 {
@@ -618,13 +614,13 @@ func (s *VPCService) GetVPCID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *VPCService) GetVPCByName(name string) (*VPC, int, error) {
-	id, err := s.GetVPCID(name)
+func (s *VPCService) GetVPCByName(name string, opts ...OptionFunc) (*VPC, int, error) {
+	id, err := s.GetVPCID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetVPCByID(id)
+	r, count, err := s.GetVPCByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -632,11 +628,17 @@ func (s *VPCService) GetVPCByName(name string) (*VPC, int, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *VPCService) GetVPCByID(id string) (*VPC, int, error) {
+func (s *VPCService) GetVPCByID(id string, opts ...OptionFunc) (*VPC, int, error) {
 	p := &ListVPCsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListVPCs(p)
 	if err != nil {
@@ -646,21 +648,6 @@ func (s *VPCService) GetVPCByID(id string) (*VPC, int, error) {
 			return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
 		}
 		return nil, -1, err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListVPCs(p)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf(
-				"Invalid parameter id value=%s due to incorrect long value format, "+
-					"or entity does not exist", id)) {
-				return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
-			}
-			return nil, -1, err
-		}
 	}
 
 	if l.Count == 0 {
@@ -1831,11 +1818,17 @@ func (s *VPCService) NewListVPCOfferingsParams() *ListVPCOfferingsParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *VPCService) GetVPCOfferingID(name string) (string, error) {
+func (s *VPCService) GetVPCOfferingID(name string, opts ...OptionFunc) (string, error) {
 	p := &ListVPCOfferingsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["name"] = name
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return "", err
+		}
+	}
 
 	l, err := s.ListVPCOfferings(p)
 	if err != nil {
@@ -1861,13 +1854,13 @@ func (s *VPCService) GetVPCOfferingID(name string) (string, error) {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *VPCService) GetVPCOfferingByName(name string) (*VPCOffering, int, error) {
-	id, err := s.GetVPCOfferingID(name)
+func (s *VPCService) GetVPCOfferingByName(name string, opts ...OptionFunc) (*VPCOffering, int, error) {
+	id, err := s.GetVPCOfferingID(name, opts...)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	r, count, err := s.GetVPCOfferingByID(id)
+	r, count, err := s.GetVPCOfferingByID(id, opts...)
 	if err != nil {
 		return nil, count, err
 	}
@@ -1875,11 +1868,17 @@ func (s *VPCService) GetVPCOfferingByName(name string) (*VPCOffering, int, error
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *VPCService) GetVPCOfferingByID(id string) (*VPCOffering, int, error) {
+func (s *VPCService) GetVPCOfferingByID(id string, opts ...OptionFunc) (*VPCOffering, int, error) {
 	p := &ListVPCOfferingsParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListVPCOfferings(p)
 	if err != nil {
@@ -2296,11 +2295,17 @@ func (s *VPCService) NewListPrivateGatewaysParams() *ListPrivateGatewaysParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *VPCService) GetPrivateGatewayByID(id string) (*PrivateGateway, int, error) {
+func (s *VPCService) GetPrivateGatewayByID(id string, opts ...OptionFunc) (*PrivateGateway, int, error) {
 	p := &ListPrivateGatewaysParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListPrivateGateways(p)
 	if err != nil {
@@ -2310,21 +2315,6 @@ func (s *VPCService) GetPrivateGatewayByID(id string) (*PrivateGateway, int, err
 			return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
 		}
 		return nil, -1, err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListPrivateGateways(p)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf(
-				"Invalid parameter id value=%s due to incorrect long value format, "+
-					"or entity does not exist", id)) {
-				return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
-			}
-			return nil, -1, err
-		}
 	}
 
 	if l.Count == 0 {
@@ -2776,11 +2766,17 @@ func (s *VPCService) NewListStaticRoutesParams() *ListStaticRoutesParams {
 }
 
 // This is a courtesy helper function, which in some cases may not work as expected!
-func (s *VPCService) GetStaticRouteByID(id string) (*StaticRoute, int, error) {
+func (s *VPCService) GetStaticRouteByID(id string, opts ...OptionFunc) (*StaticRoute, int, error) {
 	p := &ListStaticRoutesParams{}
 	p.p = make(map[string]interface{})
 
 	p.p["id"] = id
+
+	for _, fn := range opts {
+		if err := fn(s.cs, p); err != nil {
+			return nil, -1, err
+		}
+	}
 
 	l, err := s.ListStaticRoutes(p)
 	if err != nil {
@@ -2790,21 +2786,6 @@ func (s *VPCService) GetStaticRouteByID(id string) (*StaticRoute, int, error) {
 			return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
 		}
 		return nil, -1, err
-	}
-
-	if l.Count == 0 {
-		// If no matches, search all projects
-		p.p["projectid"] = "-1"
-
-		l, err = s.ListStaticRoutes(p)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf(
-				"Invalid parameter id value=%s due to incorrect long value format, "+
-					"or entity does not exist", id)) {
-				return nil, 0, fmt.Errorf("No match found for %s: %+v", id, l)
-			}
-			return nil, -1, err
-		}
 	}
 
 	if l.Count == 0 {
