@@ -69,3 +69,14 @@ type PodDisruptionBudgetList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 	Items                []PodDisruptionBudget `json:"items"`
 }
+
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+type Eviction struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// ObjectMeta describes the object that is being evicted.
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// DeleteOptions may be provided
+	DeleteOptions *api.DeleteOptions `json:"deleteOptions,omitempty"`
+}
