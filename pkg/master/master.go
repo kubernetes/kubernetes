@@ -172,7 +172,7 @@ func New(c *Config) (*Master, error) {
 
 	// TODO: Attempt clean shutdown?
 	if m.enableCoreControllers {
-		m.NewBootstrapController().Start()
+		m.NewBootstrapController(c).Start()
 	}
 
 	return m, nil
@@ -494,11 +494,14 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master.
-func (m *Master) NewBootstrapController() *Controller {
+func (m *Master) NewBootstrapController(c *Config) *Controller {
+	leaseStorage, err := c.StorageFactory.New(api.Resource("apiServerIPInfo"))
+	if err != nil {
+		glog.Fatalf(err.Error())
+	}
 	return &Controller{
 		NamespaceRegistry: m.namespaceRegistry,
 		ServiceRegistry:   m.serviceRegistry,
-		MasterCount:       m.MasterCount,
 
 		EndpointRegistry: m.endpointRegistry,
 		EndpointInterval: 10 * time.Second,
@@ -519,6 +522,8 @@ func (m *Master) NewBootstrapController() *Controller {
 		ExtraEndpointPorts:        m.ExtraEndpointPorts,
 		PublicServicePort:         m.PublicReadWritePort,
 		KubernetesServiceNodePort: m.KubernetesServiceNodePort,
+
+		MasterLeases: NewMasterLeaseManager(leaseStorage, "/masterleaseinfo/"),
 	}
 }
 

@@ -2991,6 +2991,29 @@ type RangeAllocation struct {
 	Data []byte `json:"data" protobuf:"bytes,3,opt,name=data"`
 }
 
+// APIServerIPInfo is not a public type.
+type APIServerIPInfo struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// ServerIP the IP address of available API server
+	ServerIP string `json:"serverIP" protobuf:"bytes,2,name=serverIP`
+}
+
+// APIServerIPInfoList is not a public type.
+type APIServerIPInfoList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// List of pods.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pods.md
+	Items []APIServerIPInfoList `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
 const (
 	// "default-scheduler" is the name of default scheduler.
 	DefaultSchedulerName = "default-scheduler"

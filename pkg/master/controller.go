@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/service/portallocator/controller"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -38,14 +40,84 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+// MasterLeaseManager is an interface which assists in managing the set of active masters
+type MasterLeaseManager interface {
+	// ListLeases retreives a list of the current master IPs
+	ListLeases() ([]string, error)
+
+	// UpdateLease adds or refreshes a master's lease
+	UpdateLease(ip string) error
+
+	// SetLeaseTime configures base lease time
+	SetLeaseTime(ttl uint64)
+}
+
+type storageMasterLeaseManager struct {
+	storage   storage.Interface
+	baseKey   string
+	leaseTime uint64
+}
+
+// ListLeases retrieves a list of the current master IPs from storage
+func (mgr *storageMasterLeaseManager) ListLeases() ([]string, error) {
+	ipInfoList := &api.APIServerIPInfoList{}
+	if err := mgr.storage.List(api.NewDefaultContext(), mgr.baseKey, "0", storage.Everything, ipInfoList); err != nil {
+		return nil, err
+	}
+
+	ipList := make([]string, len(ipInfoList.Items))
+	for i, ip := range ipInfoList.Items {
+		ipList[i] = ip.ServerIP
+	}
+
+	glog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
+
+	return ipList, nil
+}
+
+// UpdateLease resets the TTL on a master IP in storage
+func (mgr *storageMasterLeaseManager) UpdateLease(ip string) error {
+	return mgr.storage.GuaranteedUpdate(api.NewDefaultContext(), mgr.baseKey+"/"+ip, &api.APIServerIPInfo{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
+		// just make sure we've got the right IP set, and then refresh the TTL
+		existing := input.(*api.APIServerIPInfo)
+		existing.ServerIP = ip
+		leaseTime := mgr.leaseTime
+
+		// NB: GuaranteedUpdate helpfully does not perform the store operation unless something
+		// changed between load and store (not including resource version), meaning we can't
+		// refresh the TTL without actually changing a field.
+		existing.Generation += 1
+
+		glog.V(6).Infof("Resetting TTL on master IP %q listed in storage to %v", ip, leaseTime)
+
+		// NB: GuaranteedUpdate helpfull does not perform the set unless something has changed,
+		// meaning we can't refresh the TTL without changing a field.
+
+		return existing, &leaseTime, nil
+	})
+}
+
+// SetLeaseTTL configures the base TTL to use when resetting the TTL in UpdateLease
+func (mgr *storageMasterLeaseManager) SetLeaseTime(ttl uint64) {
+	mgr.leaseTime = ttl + 2 // give ourselves some wiggle room
+}
+
+// NewMasterLeaseManager creates a new etcd-based MasterLeaseManager.
+// It is expected that the lease time will be set later with SetLeaseTime
+func NewMasterLeaseManager(storage storage.Interface, baseKey string) MasterLeaseManager {
+	return &storageMasterLeaseManager{
+		storage:   storage,
+		baseKey:   baseKey,
+		leaseTime: 0, // expected to be updated later
+	}
+}
+
 // Controller is the controller manager for the core bootstrap Kubernetes controller
 // loops, which manage creating the "kubernetes" service, the "default"
 // namespace, and provide the IP repair check on service IPs
 type Controller struct {
 	NamespaceRegistry namespace.Registry
 	ServiceRegistry   service.Registry
-	// TODO: MasterCount is yucky
-	MasterCount int
 
 	ServiceClusterIPRegistry service.RangeRegistry
 	ServiceClusterIPInterval time.Duration
@@ -67,7 +139,8 @@ type Controller struct {
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
-	runner *util.Runner
+	runner       *util.Runner
+	MasterLeases MasterLeaseManager
 }
 
 // Start begins the core controller loops that must exist for bootstrapping
@@ -79,6 +152,9 @@ func (c *Controller) Start() {
 
 	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceRegistry, c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
+
+	// Initialize the Endpoints lease manager
+	c.MasterLeases.SetLeaseTime(uint64(c.EndpointInterval.Seconds()))
 
 	// run all of the controllers once prior to returning from Start.
 	if err := repairClusterIPs.RunOnce(); err != nil {
@@ -226,19 +302,19 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 }
 
 // ReconcileEndpoints sets the endpoints for the given apiserver service (ro or rw).
-// ReconcileEndpoints expects that the endpoints objects it manages will all be
-// managed only by ReconcileEndpoints; therefore, to understand this, you need only
-// understand the requirements and the body of this function.
-//
-// Requirements:
-//  * All apiservers MUST use the same ports for their {rw, ro} services.
-//  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
-//      endpoints for their {rw, ro} services.
-//  * All apiservers MUST know and agree on the number of apiservers expected
-//      to be running (c.masterCount).
-//  * ReconcileEndpoints is called periodically from all apiservers.
-//
+// It does this by listing keys in an etcd directory.  Each key is expected to have a
+// TTL of R+n, where R is the refresh interval at which this function is called, and
+// n is some small value.  If an apiserver goes down, it will fail to refresh its key's
+// TTL and the key will expire.  ReconcileEndpoints will notice that the endpoints object
+// is different from the directory listing, and update the endpoints object accordingly.
 func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
+
+	// First, refresh the TTL on our key
+	if err := c.MasterLeases.UpdateLease(ip.String()); err != nil {
+		return err
+	}
+
+	// Then, retrive the current list of endpoints...
 	ctx := api.NewDefaultContext()
 	e, err := c.EndpointRegistry.GetEndpoints(ctx, serviceName)
 	if err != nil {
@@ -250,50 +326,48 @@ func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointP
 		}
 	}
 
-	// First, determine if the endpoint is in the format we expect (one
-	// subset, ports matching endpointPorts, N IP addresses).
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, c.MasterCount, reconcilePorts)
+	// ... and the list of master IP keys from etcd
+	masterIPs, err := c.MasterLeases.ListLeases()
+	if err != nil {
+		return err
+	}
+
+	// assume that no endpoints being listed in storage is an invalid state (we just listed our own IP),
+	// and thus we should not update based on the results
+	if len(masterIPs) == 0 {
+		return fmt.Errorf("No master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
+	}
+
+	// Next, we compare the the current list of endpoints with the list of master IP keys
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, masterIPs, endpointPorts, reconcilePorts)
+	if formatCorrect && ipCorrect && portsCorrect {
+		return nil
+	}
+
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
 		e.Subsets = []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: ip.String()}},
+			Addresses: []api.EndpointAddress{},
 			Ports:     endpointPorts,
 		}}
-		glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
-		return c.EndpointRegistry.UpdateEndpoints(ctx, e)
 	}
-	if ipCorrect && portsCorrect {
-		return nil
-	}
-	if !ipCorrect {
-		// We *always* add our own IP address.
-		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, api.EndpointAddress{IP: ip.String()})
+
+	if !formatCorrect || !ipCorrect {
+		// repopulate the addresses according to the expected IPs from etcd
+		e.Subsets[0].Addresses = make([]api.EndpointAddress, len(masterIPs))
+		for ind, ip := range masterIPs {
+			e.Subsets[0].Addresses[ind] = api.EndpointAddress{IP: ip}
+		}
 
 		// Lexicographic order is retained by this step.
 		e.Subsets = endpoints.RepackSubsets(e.Subsets)
-
-		// If too many IP addresses, remove the ones lexicographically after our
-		// own IP address.  Given the requirements stated at the top of
-		// this function, this should cause the list of IP addresses to
-		// become eventually correct.
-		if addrs := &e.Subsets[0].Addresses; len(*addrs) > c.MasterCount {
-			// addrs is a pointer because we're going to mutate it.
-			for i, addr := range *addrs {
-				if addr.IP == ip.String() {
-					for len(*addrs) > c.MasterCount {
-						// wrap around if necessary.
-						remove := (i + 1) % len(*addrs)
-						*addrs = append((*addrs)[:remove], (*addrs)[remove+1:]...)
-					}
-					break
-				}
-			}
-		}
 	}
+
 	if !portsCorrect {
 		// Reset ports.
 		e.Subsets[0].Ports = endpointPorts
 	}
+
 	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
 	return c.EndpointRegistry.UpdateEndpoints(ctx, e)
 }
@@ -302,11 +376,10 @@ func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointP
 //
 // Return values:
 // * formatCorrect is true if exactly one subset is found.
-// * ipCorrect is true when current master's IP is found and the number
-//     of addresses is less than or equal to the master count.
+// * ipCorrect when the addresses in the endpoints match the expected addresses list
 // * portsCorrect is true when endpoint ports exactly match provided ports.
 //     portsCorrect is only evaluated when reconcilePorts is set to true.
-func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
+func checkEndpointSubsetFormat(e *api.Endpoints, expectedIPs []string, ports []api.EndpointPort, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
 		return false, false, false
 	}
@@ -323,12 +396,30 @@ func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.Endpoint
 			}
 		}
 	}
-	for _, addr := range sub.Addresses {
-		if addr.IP == ip {
-			ipCorrect = len(sub.Addresses) <= count
-			break
+
+	ipCorrect = true
+	if len(sub.Addresses) != len(expectedIPs) {
+		ipCorrect = false
+	} else {
+		// check the actual content of the addresses
+		// present addrs is used as a set (the keys) and to indicate if a
+		// value was already found (the values)
+		presentAddrs := make(map[string]bool, len(expectedIPs))
+		for _, ip := range expectedIPs {
+			presentAddrs[ip] = false
+		}
+
+		// currentAddrs == expectedAddr iff (len(ca) == len(ea) && ca <= ea && ca has no duplicates)
+		for _, addr := range sub.Addresses {
+			if alreadySeen, ok := presentAddrs[addr.IP]; alreadySeen || !ok {
+				ipCorrect = false
+				break
+			}
+
+			presentAddrs[addr.IP] = true
 		}
 	}
+
 	return true, ipCorrect, portsCorrect
 }
 
