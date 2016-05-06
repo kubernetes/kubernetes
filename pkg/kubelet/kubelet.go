@@ -3715,3 +3715,60 @@ func (kl *Kubelet) shapingEnabled() bool {
 	}
 	return true
 }
+
+// killPodNow kills a pod.
+// The pod status is updated, and then it is killed with the specified grace period.
+// This function blocks until the pod is killed, an error is encountered, or a timeout is determined.
+// Arguments:
+// pod - the pod to kill
+// status - the desired status to associate with the pod (i.e. why its killed)
+// gracePeriodOverride - the grace period override to use instead of what is on the pod spec
+func (kl *Kubelet) killPodNow(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error {
+	// we timeout and return an error if we dont get a callback within a reasonable time.
+	start := kl.clock.Now()
+	gracePeriod := int64(0)
+	if gracePeriodOverride != nil {
+		gracePeriod = *gracePeriodOverride
+	} else if pod.Spec.TerminationGracePeriodSeconds != nil {
+		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+	}
+	timeout := int64(gracePeriod + (gracePeriod / 2))
+	// the default timeout is relative to the grace period (we settle on 2s to wait for kubelet->runtime traffic to complete in sigkill)
+	minTimeout := int64(2)
+	if timeout < minTimeout {
+		timeout = minTimeout
+	}
+	timeoutDuration := time.Duration(timeout) * time.Second
+
+	// invoke the pod worker
+	var result error
+	onCompleteDone := false
+	onCompleteFunc := func(err error) {
+		onCompleteDone = true
+		result = err
+	}
+	kl.podWorkers.UpdatePod(&UpdatePodOptions{
+		Pod:            pod,
+		UpdateType:     kubetypes.SyncPodKill,
+		OnCompleteFunc: onCompleteFunc,
+		KillPodOptions: &KillPodOptions{
+			PodStatusFunc: func(p *api.Pod, podStatus *kubecontainer.PodStatus) api.PodStatus {
+				return status
+			},
+			PodTerminationGracePeriodSecondsOverride: gracePeriodOverride,
+		},
+	})
+	// ensure we got a callback, or error if timeout exceeded
+	for {
+		if onCompleteDone {
+			return result
+		}
+		duration := kl.clock.Since(start)
+		if duration >= timeoutDuration {
+			result = fmt.Errorf("timeout waiting to kill pod")
+			return result
+		}
+		// pause
+		time.Sleep(time.Millisecond * 100)
+	}
+}
