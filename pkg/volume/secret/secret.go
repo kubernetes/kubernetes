@@ -18,8 +18,6 @@ package secret
 
 import (
 	"fmt"
-	"os"
-	"path"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -74,9 +72,9 @@ func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts vol
 			plugin.host.GetWriter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPathFromHost(plugin.host, pod.UID, spec.Name()))),
 		},
-		secretName: spec.Volume.Secret.SecretName,
-		pod:        *pod,
-		opts:       &opts,
+		source: *spec.Volume.Secret,
+		pod:    *pod,
+		opts:   &opts,
 	}, nil
 }
 
@@ -117,9 +115,9 @@ func getPathFromHost(host volume.VolumeHost, podUID types.UID, volName string) s
 type secretVolumeMounter struct {
 	*secretVolume
 
-	secretName string
-	pod        api.Pod
-	opts       *volume.VolumeOptions
+	source api.SecretVolumeSource
+	pod    api.Pod
+	opts   *volume.VolumeOptions
 }
 
 var _ volume.Mounter = &secretVolumeMounter{}
@@ -135,24 +133,7 @@ func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *secretVolumeMounter) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, strings.EscapeQualifiedNameForDisk(secretPluginName)), b.volName)
-}
-
 func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	// Getting an os.IsNotExist err from is a contingency; the directory
-	// may not exist yet, in which case, setup should run.
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	// If the plugin readiness file is present for this volume and
-	// the setup dir is a mountpoint, this volume is already ready.
-	if volumeutil.IsReady(b.getMetaDir()) && !notMnt {
-		return nil
-	}
-
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
@@ -169,34 +150,66 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", b.volName)
 	}
 
-	secret, err := kubeClient.Core().Secrets(b.pod.Namespace).Get(b.secretName)
+	secret, err := kubeClient.Core().Secrets(b.pod.Namespace).Get(b.source.SecretName)
 	if err != nil {
-		glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.secretName)
+		glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.source.SecretName)
 		return err
-	} else {
-		totalBytes := totalSecretBytes(secret)
-		glog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
-			b.pod.Namespace,
-			b.secretName,
-			len(secret.Data),
-			totalBytes)
 	}
 
-	for name, data := range secret.Data {
-		hostFilePath := path.Join(dir, name)
-		glog.V(3).Infof("Writing secret data %v/%v/%v (%v bytes) to host file %v", b.pod.Namespace, b.secretName, name, len(data), hostFilePath)
-		err := b.writer.WriteFile(hostFilePath, data, 0444)
-		if err != nil {
-			glog.Errorf("Error writing secret data to host path: %v, %v", hostFilePath, err)
-			return err
+	totalBytes := totalSecretBytes(secret)
+	glog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
+		b.pod.Namespace,
+		b.source.SecretName,
+		len(secret.Data),
+		totalBytes)
+
+	payload, err := makePayload(b.source.Items, secret)
+	if err != nil {
+		return err
+	}
+
+	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
+	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
+	if err != nil {
+		glog.Errorf("Error creating atomic writer: %v", err)
+		return err
+	}
+
+	err = writer.Write(payload)
+	if err != nil {
+		glog.Errorf("Error writing payload to dir: %v", err)
+		return err
+	}
+
+	err = volume.SetVolumeOwnership(b, fsGroup)
+	if err != nil {
+		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		return err
+	}
+
+	return nil
+}
+
+func makePayload(mappings []api.KeyToPath, secret *api.Secret) (map[string][]byte, error) {
+	payload := make(map[string][]byte, len(secret.Data))
+
+	if len(mappings) == 0 {
+		for name, data := range secret.Data {
+			payload[name] = []byte(data)
+		}
+	} else {
+		for _, ktp := range mappings {
+			content, ok := secret.Data[ktp.Key]
+			if !ok {
+				glog.Errorf("references non-existent secret key")
+				return nil, fmt.Errorf("references non-existent secret key")
+			}
+
+			payload[ktp.Path] = []byte(content)
 		}
 	}
 
-	volume.SetVolumeOwnership(b, fsGroup)
-
-	volumeutil.SetReady(b.getMetaDir())
-
-	return nil
+	return payload, nil
 }
 
 func totalSecretBytes(secret *api.Secret) int {
