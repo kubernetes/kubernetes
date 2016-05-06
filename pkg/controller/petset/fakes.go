@@ -253,6 +253,9 @@ func (f *fakePetClient) setHealthy(index int) error {
 	}
 	f.pets[index].pod.Status.Phase = api.PodRunning
 	f.pets[index].pod.Annotations[PetSetInitAnnotation] = "true"
+	f.pets[index].pod.Status.Conditions = []api.PodCondition{
+		{Type: api.PodReady, Status: api.ConditionTrue},
+	}
 	return nil
 }
 
