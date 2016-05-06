@@ -93,6 +93,11 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			},
 		},
 	}
+
+	// Caution: StartPods requires at least one pod to replicate.
+	// Based on the callers, replicas is always positive number: zoneCount >= 0 implies (2*zoneCount)+1 > 0.
+	// Thus, no need to test for it. Once the precondition changes to zero number of replicas,
+	// test for replicaCount > 0. Otherwise, StartPods panics.
 	framework.StartPods(f.Client, replicaCount, f.Namespace.Name, serviceName, *podSpec, false)
 
 	// Wait for all of them to be scheduled
