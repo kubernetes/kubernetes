@@ -282,67 +282,6 @@ func TestValidateObjectMetaUpdateDisallowsUpdatingFinalizers(t *testing.T) {
 	}
 }
 
-func TestValidateLabels(t *testing.T) {
-	successCases := []map[string]string{
-		{"simple": "bar"},
-		{"now-with-dashes": "bar"},
-		{"1-starts-with-num": "bar"},
-		{"1234": "bar"},
-		{"simple/simple": "bar"},
-		{"now-with-dashes/simple": "bar"},
-		{"now-with-dashes/now-with-dashes": "bar"},
-		{"now.with.dots/simple": "bar"},
-		{"now-with.dashes-and.dots/simple": "bar"},
-		{"1-num.2-num/3-num": "bar"},
-		{"1234/5678": "bar"},
-		{"1.2.3.4/5678": "bar"},
-		{"UpperCaseAreOK123": "bar"},
-		{"goodvalue": "123_-.BaR"},
-	}
-	for i := range successCases {
-		errs := ValidateLabels(successCases[i], field.NewPath("field"))
-		if len(errs) != 0 {
-			t.Errorf("case[%d] expected success, got %#v", i, errs)
-		}
-	}
-
-	labelNameErrorCases := []map[string]string{
-		{"nospecialchars^=@": "bar"},
-		{"cantendwithadash-": "bar"},
-		{"only/one/slash": "bar"},
-		{strings.Repeat("a", 254): "bar"},
-	}
-	for i := range labelNameErrorCases {
-		errs := ValidateLabels(labelNameErrorCases[i], field.NewPath("field"))
-		if len(errs) != 1 {
-			t.Errorf("case[%d] expected failure", i)
-		} else {
-			detail := errs[0].Detail
-			if detail != qualifiedNameErrorMsg {
-				t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
-			}
-		}
-	}
-
-	labelValueErrorCases := []map[string]string{
-		{"toolongvalue": strings.Repeat("a", 64)},
-		{"backslashesinvalue": "some\\bad\\value"},
-		{"nocommasallowed": "bad,value"},
-		{"strangecharsinvalue": "?#$notsogood"},
-	}
-	for i := range labelValueErrorCases {
-		errs := ValidateLabels(labelValueErrorCases[i], field.NewPath("field"))
-		if len(errs) != 1 {
-			t.Errorf("case[%d] expected failure", i)
-		} else {
-			detail := errs[0].Detail
-			if detail != labelValueErrorMsg {
-				t.Errorf("error detail %s should be equal %s", detail, labelValueErrorMsg)
-			}
-		}
-	}
-}
-
 func TestValidateAnnotations(t *testing.T) {
 	successCases := []map[string]string{
 		{"simple": "bar"},
@@ -1969,52 +1908,6 @@ func TestValidatePod(t *testing.T) {
 				NodeName: "foobar",
 			},
 		},
-		{ // Serialized affinity requirements in annotations.
-			ObjectMeta: api.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				// TODO: Uncomment and move this block into Annotations map once
-				// RequiredDuringSchedulingRequiredDuringExecution is implemented
-				//					"requiredDuringSchedulingRequiredDuringExecution": {
-				//						"nodeSelectorTerms": [{
-				//							"matchExpressions": [{
-				//								"key": "key1",
-				//								"operator": "Exists"
-				//							}]
-				//						}]
-				//					},
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"nodeAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						},
-						"preferredDuringSchedulingIgnoredDuringExecution": [
-							{
-								"weight": 10,
-								"preference": {"matchExpressions": [
-									{
-										"key": "foo",
-										"operator": "In", "values": ["bar"]
-									}
-								]}
-							}
-						]
-					}}`,
-				},
-			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
-		},
 	}
 	for _, pod := range successCases {
 		if errs := ValidatePod(&pod); len(errs) != 0 {
@@ -2059,7 +1952,177 @@ func TestValidatePod(t *testing.T) {
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			},
 		},
-		"invalid json of affinity in pod annotations": {
+	}
+	for k, v := range errorCases {
+		if errs := ValidatePod(&v); len(errs) == 0 {
+			t.Errorf("expected failure for %q", k)
+		}
+	}
+}
+
+func TestValidateAffinity(t *testing.T) {
+	successCases := []api.Pod{
+		{ // Serialized affinity requirements in annotations.
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				// TODO: Uncomment and move this block into Annotations map once
+				// RequiredDuringSchedulingRequiredDuringExecution is implemented
+				//		"requiredDuringSchedulingRequiredDuringExecution": {
+				//			"nodeSelectorTerms": [{
+				//				"matchExpressions": [{
+				//					"key": "key1",
+				//					"operator": "Exists"
+				//				}]
+				//			}]
+				//		},
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"nodeAffinity": {
+						"requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							}]
+						},
+						"preferredDuringSchedulingIgnoredDuringExecution": [
+							{
+								"weight": 10,
+								"preference": {"matchExpressions": [
+									{
+										"key": "foo",
+										"operator": "In", "values": ["bar"]
+									}
+								]}
+							}
+						]
+					}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // Serialized pod affinity in affinity requirements in annotations.
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				// TODO: Uncomment and move this block into Annotations map once
+				// RequiredDuringSchedulingRequiredDuringExecution is implemented
+				//		"requiredDuringSchedulingRequiredDuringExecution": [{
+				//			"labelSelector": {
+				//				"matchExpressions": [{
+				//					"key": "key2",
+				//					"operator": "In",
+				//					"values": ["value1", "value2"]
+				//				}]
+				//			},
+				//			"namespaces":["ns"],
+				//			"topologyKey": "zone"
+				//		}]
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"podAffinity": {
+						"requiredDuringSchedulingIgnoredDuringExecution": [{
+							"labelSelector": {
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							},
+							"topologyKey": "zone",
+							"namespaces": ["ns"]
+						}],
+						"preferredDuringSchedulingIgnoredDuringExecution": [{
+							"weight": 10,
+							"podAffinityTerm": {
+								"labelSelector": {
+									"matchExpressions": [{
+										"key": "key2",
+										"operator": "NotIn",
+										"values": ["value1", "value2"]
+									}]
+								},
+								"namespaces": ["ns"],
+								"topologyKey": "region"
+							}
+						 }]
+					}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // Serialized pod anti affinity with different Label Operators in affinity requirements in annotations.
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				// TODO: Uncomment and move this block into Annotations map once
+				// RequiredDuringSchedulingRequiredDuringExecution is implemented
+				//		"requiredDuringSchedulingRequiredDuringExecution": [{
+				//			"labelSelector": {
+				//				"matchExpressions": [{
+				//					"key": "key2",
+				//					"operator": "In",
+				//					"values": ["value1", "value2"]
+				//				}]
+				//			},
+				//			"namespaces":["ns"],
+				//			"topologyKey": "zone"
+				//		}]
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"podAntiAffinity": {
+						"requiredDuringSchedulingIgnoredDuringExecution": [{
+							"labelSelector": {
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "Exists"
+								}]
+							},
+							"topologyKey": "zone",
+							"namespaces": ["ns"]
+						}],
+						"preferredDuringSchedulingIgnoredDuringExecution": [{
+							"weight": 10,
+							"podAffinityTerm": {
+								"labelSelector": {
+									"matchExpressions": [{
+										"key": "key2",
+										"operator": "DoesNotExist"
+									}]
+								},
+								"namespaces": ["ns"],
+								"topologyKey": "region"
+							}
+						}]
+					}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+	}
+	for _, pod := range successCases {
+		if errs := ValidatePod(&pod); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]api.Pod{
+		"invalid json of node affinity in pod annotations": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
@@ -2077,7 +2140,7 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
-		"invalid node selector requirement in affinity in pod annotations, operator can't be null": {
+		"invalid node selector requirement in node affinity in pod annotations, operator can't be null": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
@@ -2098,7 +2161,7 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
-		"invalid preferredSchedulingTerm in affinity in pod annotations, weight should be in range 1-100": {
+		"invalid preferredSchedulingTerm in node affinity in pod annotations, weight should be in range 1-100": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
@@ -2156,6 +2219,209 @@ func TestValidatePod(t *testing.T) {
 							}]
 						},
 					}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid weight in preferredDuringSchedulingIgnoredDuringExecution in pod affinity annotations, weight should be in range 1-100": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"podAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
+						"weight": 109,
+						"podAffinityTerm":
+						{
+							"labelSelector": {
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "NotIn",
+									"values": ["value1", "value2"]
+								}]
+							},
+							"namespaces": ["ns"],
+							"topologyKey": "region"
+						}
+					}]}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be empty if the operator is Exists": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"podAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
+						"weight": 10,
+						"podAffinityTerm":
+						{
+							"labelSelector": {
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "Exists",
+									"values": ["value1", "value2"]
+								}]
+							},
+							"namespaces": ["ns"],
+							"topologyKey": "region"
+						}
+					}]}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, name space shouldbe valid": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"podAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
+						"weight": 10,
+						"podAffinityTerm":
+						{
+							"labelSelector": {
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "Exists",
+									"values": ["value1", "value2"]
+								}]
+							},
+							"namespaces": ["INVALID_NAMESPACE"],
+							"topologyKey": "region"
+						}
+					}]}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid labelOperator in preferredDuringSchedulingIgnoredDuringExecution in podantiaffinity annotations, labelOperator should be proper": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"podAntiAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
+						"weight": 10,
+						"podAffinityTerm":
+						{
+							"labelSelector": {
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "WrongOp",
+									"values": ["value1", "value2"]
+								}]
+							},
+							"namespaces": ["ns"],
+							"topologyKey": "region"
+						}
+					}]}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid pod affinity, empty topologyKey is not allowed for hard pod affinity": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"podAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": [{
+						"weight": 10,
+						"podAffinityTerm":
+						{
+							"labelSelector": {
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							},
+							"namespaces": ["ns"],
+							"topologyKey": ""
+						}
+					}]}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid pod anti-affinity, empty topologyKey is not allowed for hard pod anti-affinity": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"podAntiAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": [{
+						"weight": 10,
+						"podAffinityTerm":
+						{
+							"labelSelector": {
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							},
+							"namespaces": ["ns"],
+							"topologyKey": ""
+						}
+					}]}}`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid pod anti-affinity, empty topologyKey is not allowed for soft pod affinity": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.AffinityAnnotationKey: `
+					{"podAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{
+						"weight": 10,
+						"podAffinityTerm":
+						{
+							"labelSelector": {
+								"matchExpressions": [{
+									"key": "key2",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							},
+							"namespaces": ["ns"],
+							"topologyKey": ""
+						}
+					}]}}`,
 				},
 			},
 			Spec: api.PodSpec{

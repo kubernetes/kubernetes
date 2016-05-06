@@ -16,7 +16,12 @@ limitations under the License.
 
 package unversioned
 
-const LabelHostname = "kubernetes.io/hostname"
-const LabelZoneFailureDomain = "failure-domain.beta.kubernetes.io/zone"
-const LabelZoneRegion = "failure-domain.beta.kubernetes.io/region"
-const LabelInstanceType = "beta.kubernetes.io/instance-type"
+const (
+	// If you add a new topology domain here, also consider adding it to the set of default values
+	// for the scheduler's --failure-domain command-line argument.
+	LabelHostname          = "kubernetes.io/hostname"
+	LabelZoneFailureDomain = "failure-domain.beta.kubernetes.io/zone"
+	LabelZoneRegion        = "failure-domain.beta.kubernetes.io/region"
+
+	LabelInstanceType = "beta.kubernetes.io/instance-type"
+)

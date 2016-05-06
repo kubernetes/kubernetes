@@ -98,6 +98,8 @@ func DeepCopy_v1alpha1_KubeSchedulerConfiguration(in KubeSchedulerConfiguration,
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = in.KubeAPIBurst
 	out.SchedulerName = in.SchedulerName
+	out.HardPodAffinitySymmetricWeight = in.HardPodAffinitySymmetricWeight
+	out.FailureDomains = in.FailureDomains
 	if err := DeepCopy_v1alpha1_LeaderElectionConfiguration(in.LeaderElection, &out.LeaderElection, c); err != nil {
 		return err
 	}

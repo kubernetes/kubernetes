@@ -89,6 +89,12 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 	if obj.SchedulerName == "" {
 		obj.SchedulerName = api.DefaultSchedulerName
 	}
+	if obj.HardPodAffinitySymmetricWeight == 0 {
+		obj.HardPodAffinitySymmetricWeight = api.DefaultHardPodAffinitySymmetricWeight
+	}
+	if obj.FailureDomains == "" {
+		obj.FailureDomains = api.DefaultFailureDomains
+	}
 }
 
 func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {

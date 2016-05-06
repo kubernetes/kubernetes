@@ -32,8 +32,10 @@ import (
 	"github.com/golang/glog"
 )
 
-// GCE instances can have up to 16 PD volumes attached.
-const DefaultMaxGCEPDVolumes = 16
+const (
+	// GCE instances can have up to 16 PD volumes attached.
+	DefaultMaxGCEPDVolumes = 16
+)
 
 // getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
 func getMaxVols(defaultVal int) int {
@@ -71,7 +73,7 @@ func init() {
 		},
 	)
 	// PodFitsPorts has been replaced by PodFitsHostPorts for better user understanding.
-	// For backwards compatibility with 1.0, PodFitsPorts is regitered as well.
+	// For backwards compatibility with 1.0, PodFitsPorts is registered as well.
 	factory.RegisterFitPredicate("PodFitsPorts", predicates.PodFitsHostPorts)
 	// ImageLocalityPriority prioritizes nodes based on locality of images requested by a pod. Nodes with larger size
 	// of already-installed packages required by the pod will be preferred over nodes with no already-installed
@@ -125,6 +127,13 @@ func defaultPredicates() sets.String {
 		// GeneralPredicates are the predicates that are enforced by all Kubernetes components
 		// (e.g. kubelet and all schedulers)
 		factory.RegisterFitPredicate("GeneralPredicates", predicates.GeneralPredicates),
+		// Fit is determined by inter-pod affinity.
+		factory.RegisterFitPredicateFactory(
+			"MatchInterPodAffinity",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.FailureDomains)
+			},
+		),
 	)
 }
 
@@ -149,6 +158,17 @@ func defaultPriorities() sets.String {
 			factory.PriorityConfigFactory{
 				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
 					return priorities.NewNodeAffinityPriority(args.NodeLister)
+				},
+				Weight: 1,
+			},
+		),
+		//pods should be placed in the same topological domain (e.g. same node, same rack, same zone, same power domain, etc.)
+		//as some other pods, or, conversely, should not be placed in the same topological domain as some other pods.
+		factory.RegisterPriorityConfigFactory(
+			"InterPodAffinityPriority",
+			factory.PriorityConfigFactory{
+				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
+					return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight, args.FailureDomains)
 				},
 				Weight: 1,
 			},
