@@ -179,8 +179,8 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 }
 
 // newAuthenticatorFromTokenFile returns an authenticator.Request or an error
-func newAuthenticatorFromKeystoneURL(keystoneConfigFile string) (authenticator.Request, error) {
-	keystoneAuthenticator, err := keystone.NewKeystoneAuthenticator(keystoneConfigFile)
+func newAuthenticatorFromKeystoneURL(keystoneURL string) (authenticator.Request, error) {
+	keystoneAuthenticator, err := keystone.NewKeystoneAuthenticator(keystoneURL)
 	if err != nil {
 		return nil, err
 	}
