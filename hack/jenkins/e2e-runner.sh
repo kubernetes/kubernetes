@@ -139,10 +139,20 @@ function install_google_cloud_sdk_tarball() {
     export PATH=${install_dir}/google-cloud-sdk/bin:${PATH}
 }
 
+# Only call after attempting to bring the cluster up. Don't call after
+# bringing the cluster down.
 function dump_cluster_logs_and_exit() {
     local -r exit_status=$?
     if [[ -x "cluster/log-dump.sh"  ]]; then
         ./cluster/log-dump.sh "${ARTIFACTS}"
+    fi
+    if [[ "${E2E_DOWN,,}" == "true" ]]; then
+      # If we tried to bring the cluster up, make a courtesy attempt
+      # to bring the cluster down so we're not leaving resources
+      # around. Unlike later, don't sleep beforehand, though. (We're
+      # just trying to tear down as many resources as we can as fast
+      # as possible and don't even know if we brought the master up.)
+      go run ./hack/e2e.go ${E2E_OPT:-} -v --down || true
     fi
     exit ${exit_status}
 }
