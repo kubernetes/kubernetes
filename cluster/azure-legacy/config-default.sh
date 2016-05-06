@@ -15,20 +15,23 @@
 # limitations under the License.
 
 INSTANCE_PREFIX=kubernetes
-AZ_LOCATION='West US'
+AZ_LOCATION='westus'
 TAG=testing
 AZ_CS_PREFIX=kube
 AZ_VNET=${AZ_VNET:-MyVnet}
+AZ_VNET_PREFIX="10.0.0.0/8"
+AZ_SUBNET_PREFIX="10.0.0.0/24"
 AZ_SUBNET=${AZ_SUBNET:-Subnet-1}
-AZ_IMAGE=b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04_1-LTS-amd64-server-20140927-en-us-30GB
+AZ_IMAGE=canonical:ubuntuserver:14.04.4-DAILY-LTS:14.04.201603231
 AZ_CS="" # is set in azure-legacy/util.sh verify-prereqs
+AZ_RMG='kubetest'
 
 AZ_SSH_KEY=$HOME/.ssh/azure_rsa
 AZ_SSH_CERT=$HOME/.ssh/azure.pem
 
 NUM_MINIONS=${NUM_MINIONS:-4}
-MASTER_SIZE='Medium'
-MINION_SIZE='Medium'
+MASTER_SIZE='Standard_A2'
+MINION_SIZE='Standard_A2'
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
@@ -48,8 +51,8 @@ ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup 
-#   influxdb - Heapster, InfluxDB, and Grafana 
+#   none     - No cluster monitoring setup
+#   influxdb - Heapster, InfluxDB, and Grafana
 #   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
