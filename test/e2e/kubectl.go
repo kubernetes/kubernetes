@@ -408,20 +408,20 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				framework.Failf("Unable to upload kubectl binary to remote exec server. /uploads/ not in response. Response: %s", uploadBinaryName)
 			}
 
+			By("Starting goproxy pod")
+			goproxyPodPath := filepath.Join(framework.TestContext.RepoRoot, "test/images/goproxy/pod.yaml")
+			framework.RunKubectlOrDie("create", "-f", goproxyPodPath, fmt.Sprintf("--namespace=%v", ns))
+			framework.CheckPodsRunningReady(c, ns, []string{goproxyContainer}, framework.PodStartTimeout)
+
+			// get the proxy address
+			goproxyPod, err := c.Pods(ns).Get(goproxyContainer)
+			if err != nil {
+				framework.Failf("Unable to get the goproxy pod. Error: %s", err)
+			}
+			proxyAddr := fmt.Sprintf("http://%s:8080", goproxyPod.Status.PodIP)
+
 			for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
 				By("Running kubectl in netexec via an HTTP proxy using " + proxyVar)
-				// start the proxy container
-				goproxyPodPath := filepath.Join(framework.TestContext.RepoRoot, "test/images/goproxy/pod.yaml")
-				framework.RunKubectlOrDie("create", "-f", goproxyPodPath, fmt.Sprintf("--namespace=%v", ns))
-				framework.CheckPodsRunningReady(c, ns, []string{goproxyContainer}, framework.PodStartTimeout)
-
-				// get the proxy address
-				goproxyPod, err := c.Pods(ns).Get(goproxyContainer)
-				if err != nil {
-					framework.Failf("Unable to get the goproxy pod. Error: %s", err)
-				}
-				proxyAddr := fmt.Sprintf("http://%s:8080", goproxyPod.Status.PodIP)
-
 				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container",
 					proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
 				framework.Logf("About to remote exec: %v", shellCommand)
@@ -473,9 +473,9 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				if !strings.Contains(proxyLog, expectedProxyLog) {
 					framework.Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
 				}
-				// Clean up the goproxyPod
-				framework.Cleanup(goproxyPodPath, ns, goproxyPodSelector)
 			}
+			// Clean up the goproxyPod
+			framework.Cleanup(goproxyPodPath, ns, goproxyPodSelector)
 		})
 
 		It("should support inline execution and attach", func() {
