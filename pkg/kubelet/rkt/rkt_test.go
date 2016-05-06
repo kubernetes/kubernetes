@@ -19,6 +19,7 @@ package rkt
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"sort"
 	"testing"
@@ -35,6 +36,8 @@ import (
 	containertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
 	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_os"
 	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_rkt"
 	"k8s.io/kubernetes/pkg/types"
@@ -68,8 +71,7 @@ func mustRktHash(hash string) *appctypes.Hash {
 }
 
 func makeRktPod(rktPodState rktapi.PodState,
-	rktPodID, podUID, podName, podNamespace,
-	podIP string, podCreatedAt, podStartedAt int64,
+	rktPodID, podUID, podName, podNamespace string, podCreatedAt, podStartedAt int64,
 	podRestartCount string, appNames, imgIDs, imgNames,
 	containerHashes []string, appStates []rktapi.AppState,
 	exitcodes []int32) *rktapi.Pod {
@@ -149,7 +151,6 @@ func makeRktPod(rktPodState rktapi.PodState,
 	return &rktapi.Pod{
 		Id:        rktPodID,
 		State:     rktPodState,
-		Networks:  []*rktapi.Network{{Name: defaultNetworkName, Ipv4: podIP}},
 		Apps:      apps,
 		Manifest:  mustMarshalPodManifest(podManifest),
 		StartedAt: podStartedAt,
@@ -367,7 +368,7 @@ func TestGetPods(t *testing.T) {
 			[]*rktapi.Pod{
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING,
 					"uuid-4002", "42", "guestbook", "default",
-					"10.10.10.42", ns(10), ns(10), "7",
+					ns(10), ns(10), "7",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -405,7 +406,7 @@ func TestGetPods(t *testing.T) {
 			[]*rktapi.Pod{
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING,
 					"uuid-4002", "42", "guestbook", "default",
-					"10.10.10.42", ns(10), ns(20), "7",
+					ns(10), ns(20), "7",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -415,7 +416,7 @@ func TestGetPods(t *testing.T) {
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
 					"uuid-4003", "43", "guestbook", "default",
-					"10.10.10.43", ns(30), ns(40), "7",
+					ns(30), ns(40), "7",
 					[]string{"app-11", "app-22"},
 					[]string{"img-id-11", "img-id-22"},
 					[]string{"img-name-11", "img-name-22"},
@@ -425,7 +426,7 @@ func TestGetPods(t *testing.T) {
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
 					"uuid-4004", "43", "guestbook", "default",
-					"10.10.10.44", ns(50), ns(60), "8",
+					ns(50), ns(60), "8",
 					[]string{"app-11", "app-22"},
 					[]string{"img-id-11", "img-id-22"},
 					[]string{"img-name-11", "img-name-22"},
@@ -557,8 +558,11 @@ func TestGetPodsFilters(t *testing.T) {
 }
 
 func TestGetPodStatus(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
+	fnp := mock_network.NewMockNetworkPlugin(ctrl)
 	fos := &containertesting.FakeOS{}
 	frh := &fakeRuntimeHelper{}
 	r := &Runtime{
@@ -566,6 +570,7 @@ func TestGetPodStatus(t *testing.T) {
 		systemd:       fs,
 		runtimeHelper: frh,
 		os:            fos,
+		networkPlugin: fnp,
 	}
 
 	ns := func(seconds int64) int64 {
@@ -586,7 +591,7 @@ func TestGetPodStatus(t *testing.T) {
 			[]*rktapi.Pod{
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING,
 					"uuid-4002", "42", "guestbook", "default",
-					"10.10.10.42", ns(10), ns(20), "7",
+					ns(10), ns(20), "7",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -634,7 +639,7 @@ func TestGetPodStatus(t *testing.T) {
 			[]*rktapi.Pod{
 				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
 					"uuid-4002", "42", "guestbook", "default",
-					"10.10.10.42", ns(10), ns(20), "7",
+					ns(10), ns(20), "7",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -644,7 +649,7 @@ func TestGetPodStatus(t *testing.T) {
 				),
 				makeRktPod(rktapi.PodState_POD_STATE_RUNNING, // The latest pod is running.
 					"uuid-4003", "42", "guestbook", "default",
-					"10.10.10.42", ns(10), ns(20), "10",
+					ns(10), ns(20), "10",
 					[]string{"app-1", "app-2"},
 					[]string{"img-id-1", "img-id-2"},
 					[]string{"img-name-1", "img-name-2"},
@@ -716,9 +721,6 @@ func TestGetPodStatus(t *testing.T) {
 		},
 	}
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
 		fr.pods = tt.pods
@@ -736,6 +738,14 @@ func TestGetPodStatus(t *testing.T) {
 			mockFI := mock_os.NewMockFileInfo(ctrl)
 			mockFI.EXPECT().ModTime().Return(podTime)
 			return mockFI, nil
+		}
+
+		if tt.result.IP != "" {
+			fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", kubecontainer.ContainerID{ID: "42"}).
+				Return(&network.PodNetworkStatus{IP: net.ParseIP(tt.result.IP)}, nil)
+		} else {
+			fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", kubecontainer.ContainerID{ID: "42"}).
+				Return(nil, fmt.Errorf("no such network"))
 		}
 
 		status, err := r.GetPodStatus("42", "guestbook", "default")
@@ -1692,7 +1702,7 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 		hint := fmt.Sprintf("case #%d", i)
 		mockVolumeGetter.EXPECT().GetVolumes(gomock.Any()).Return(kubecontainer.VolumeMap{}, true)
 
-		result, err := r.makePodManifest(testCase.in, []api.Secret{})
+		result, err := r.makePodManifest(testCase.in, "", []api.Secret{})
 		assert.Equal(t, err, testCase.outerr, hint)
 		if err == nil {
 			sort.Sort(annotationsByName(result.Annotations))
