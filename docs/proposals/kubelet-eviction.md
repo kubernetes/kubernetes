@@ -155,6 +155,25 @@ The following node conditions are defined that correspond to the specified evict
 The `kubelet` will continue to report node status updates at the frequency specified by
 `--node-status-update-frequency` which defaults to `10s`.
 
+### Oscillation of node conditions
+
+If a node is oscillating above and below a soft eviction threshold, but not exceeding
+its associated grace period, it would cause the corresponding node condition to
+constantly oscillate between true and false, and could cause poor scheduling decisions
+as a consequence.
+
+To protect against this oscillation, the following flag is defined to control how
+long the `kubelet` must wait before transitioning out of a pressure condition.
+
+```
+--eviction-pressure-transition-period=5m0s: Duration for which the kubelet has to wait
+before transitioning out of an eviction pressure condition.
+```
+
+The `kubelet` would ensure that it has not observed an eviction threshold being met
+for the specified pressure condition for the period specified before toggling the
+condition back to `false`.
+
 ## Eviction scenario
 
 Let's assume the operator started the `kubelet` with the following:
