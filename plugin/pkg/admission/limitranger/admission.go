@@ -208,81 +208,54 @@ func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.Resour
 	return requirements
 }
 
+// mergeContainerResources handles defaulting all of the resources on a container.
+func mergeContainerResources(container *api.Container, defaultRequirements *api.ResourceRequirements, annotationPrefix string, annotations []string) []string {
+	setRequests := []string{}
+	setLimits := []string{}
+	if container.Resources.Limits == nil {
+		container.Resources.Limits = api.ResourceList{}
+	}
+	if container.Resources.Requests == nil {
+		container.Resources.Requests = api.ResourceList{}
+	}
+	for k, v := range defaultRequirements.Limits {
+		_, found := container.Resources.Limits[k]
+		if !found {
+			container.Resources.Limits[k] = *v.Copy()
+			setLimits = append(setLimits, string(k))
+		}
+	}
+	for k, v := range defaultRequirements.Requests {
+		_, found := container.Resources.Requests[k]
+		if !found {
+			container.Resources.Requests[k] = *v.Copy()
+			setRequests = append(setRequests, string(k))
+		}
+	}
+	if len(setRequests) > 0 {
+		sort.Strings(setRequests)
+		a := strings.Join(setRequests, ", ") + fmt.Sprintf(" request for %s %s", annotationPrefix, container.Name)
+		annotations = append(annotations, a)
+	}
+	if len(setLimits) > 0 {
+		sort.Strings(setLimits)
+		a := strings.Join(setLimits, ", ") + fmt.Sprintf(" limit for %s %s", annotationPrefix, container.Name)
+		annotations = append(annotations, a)
+	}
+	return annotations
+}
+
 // mergePodResourceRequirements merges enumerated requirements with default requirements
 // it annotates the pod with information about what requirements were modified
 func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.ResourceRequirements) {
 	annotations := []string{}
 
 	for i := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[i]
-		setRequests := []string{}
-		setLimits := []string{}
-		if container.Resources.Limits == nil {
-			container.Resources.Limits = api.ResourceList{}
-		}
-		if container.Resources.Requests == nil {
-			container.Resources.Requests = api.ResourceList{}
-		}
-		for k, v := range defaultRequirements.Limits {
-			_, found := container.Resources.Limits[k]
-			if !found {
-				container.Resources.Limits[k] = *v.Copy()
-				setLimits = append(setLimits, string(k))
-			}
-		}
-		for k, v := range defaultRequirements.Requests {
-			_, found := container.Resources.Requests[k]
-			if !found {
-				container.Resources.Requests[k] = *v.Copy()
-				setRequests = append(setRequests, string(k))
-			}
-		}
-		if len(setRequests) > 0 {
-			sort.Strings(setRequests)
-			a := strings.Join(setRequests, ", ") + " request for container " + container.Name
-			annotations = append(annotations, a)
-		}
-		if len(setLimits) > 0 {
-			sort.Strings(setLimits)
-			a := strings.Join(setLimits, ", ") + " limit for container " + container.Name
-			annotations = append(annotations, a)
-		}
+		annotations = mergeContainerResources(&pod.Spec.Containers[i], defaultRequirements, "container", annotations)
 	}
 
 	for i := range pod.Spec.InitContainers {
-		container := &pod.Spec.InitContainers[i]
-		setRequests := []string{}
-		setLimits := []string{}
-		if container.Resources.Limits == nil {
-			container.Resources.Limits = api.ResourceList{}
-		}
-		if container.Resources.Requests == nil {
-			container.Resources.Requests = api.ResourceList{}
-		}
-		for k, v := range defaultRequirements.Limits {
-			_, found := container.Resources.Limits[k]
-			if !found {
-				container.Resources.Limits[k] = *v.Copy()
-				setLimits = append(setLimits, string(k))
-			}
-		}
-		for k, v := range defaultRequirements.Requests {
-			_, found := container.Resources.Requests[k]
-			if !found {
-				container.Resources.Requests[k] = *v.Copy()
-				setRequests = append(setRequests, string(k))
-			}
-		}
-		if len(setRequests) > 0 {
-			sort.Strings(setRequests)
-			a := strings.Join(setRequests, ", ") + " request for init container " + container.Name
-			annotations = append(annotations, a)
-		}
-		if len(setLimits) > 0 {
-			sort.Strings(setLimits)
-			a := strings.Join(setLimits, ", ") + " limit for init container " + container.Name
-			annotations = append(annotations, a)
-		}
+		annotations = mergeContainerResources(&pod.Spec.InitContainers[i], defaultRequirements, "init container", annotations)
 	}
 
 	if len(annotations) > 0 {
