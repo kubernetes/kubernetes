@@ -39,6 +39,9 @@ generated_files=($(
       \) -prune \
     \) -name '*.generated.go' | sort -r))
 
+# We only work for deps within this prefix.
+my_prefix="k8s.io/kubernetes"
+
 # Register function to be called on EXIT to remove codecgen
 # binary and also to touch the files that should be regenerated
 # since they are first removed.
@@ -55,28 +58,31 @@ trap cleanup EXIT
 
 # Sort all files in the dependency order.
 number=${#generated_files[@]}
+result=""
 for (( i=0; i<number; i++ )); do
   visited[${i}]=false
 done
-result=""
+###echo "DBG: found $number generated files"
+###for f in $(echo "${generated_files[@]}" | sort); do
+###    echo "DBG:   $f"
+###done
 
 # NOTE: depends function assumes that the whole repository is under
-# */k8s.io/kubernetes directory - it will NOT work if that is not true.
+# $my_prefix - it will NOT work if that is not true.
 function depends {
-  file=${generated_files[$1]//\.generated\.go/.go}
-  deps=$(go list -f "{{.Deps}}" ${file} | tr "[" " " | tr "]" " ")
-  candidate=$(readlinkdashf "${generated_files[$2]//\.generated\.go/.go}")
+  file="${generated_files[$1]/\.generated\.go/.go}"
+  rhs="$(dirname ${generated_files[$2]/#./${my_prefix}})"
+  ###echo "DBG: does ${file} depend on ${rhs}?"
+  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ${file} | grep "^${my_prefix}")
   for dep in ${deps}; do
-    # Only look at dependencies within the kubernetes tree-- otherwise the "io"
-    # package matches the end of one of our directories.
-    if [[ ${dep} = "k8s.io"* ]]; then
-      if [[ ${candidate} = *${dep} ]]; then
-        echo true
-        return
-      fi
+    ###echo "DBG:   checking against $dep"
+    if [[ "${dep}" == "${rhs}" ]]; then
+      ###echo "DBG: = yes"
+      return 0
     fi
   done
-  echo false
+  ###echo "DBG: = no"
+  return 1
 }
 
 function tsort {
@@ -84,15 +90,18 @@ function tsort {
   local j=0
   for (( j=0; j<number; j++ )); do
     if ! ${visited[${j}]}; then
-      if $(depends "$1" ${j}); then
+      if depends "$1" ${j}; then
         tsort $j
       fi
     fi
   done
   result="${result} $1"
 }
+echo "Building dependencies"
 for (( i=0; i<number; i++ )); do
+  ###echo "DBG: considering ${generated_files[${i}]}"
   if ! ${visited[${i}]}; then
+    ###echo "DBG: tsorting ${generated_files[${i}]}"
     tsort ${i}
   fi
 done
@@ -106,6 +115,7 @@ if [[ -z ${haveindex} ]]; then
   exit 1
 fi
 
+echo "Building codecgen"
 CODECGEN="${PWD}/codecgen_binary"
 godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
@@ -121,8 +131,8 @@ done
 for current in "${index[@]}"; do
   generated_file=${generated_files[${current}]}
   initial_dir=${PWD}
-  file=${generated_file//\.generated\.go/.go}
-  echo "codecgen processing ${file}"
+  file=${generated_file/\.generated\.go/.go}
+  echo "processing ${file}"
   # codecgen work only if invoked from directory where the file
   # is located.
   pushd "$(dirname ${file})" > /dev/null
@@ -130,12 +140,11 @@ for current in "${index[@]}"; do
   base_generated_file=$(basename "${generated_file}")
   # We use '-d 1234' flag to have a deterministic output every time.
   # The constant was just randomly chosen.
-  echo Running ${CODECGEN} -d 1234 -o  "${base_generated_file}" "${base_file}"
+  ###echo "DBG: running ${CODECGEN} -d 1234 -o ${base_generated_file} ${base_file}"
   ${CODECGEN} -d 1234 -o "${base_generated_file}" "${base_file}"
   # Add boilerplate at the beginning of the generated file.
   sed 's/YEAR/2015/' "${initial_dir}/hack/boilerplate/boilerplate.go.txt" > "${base_generated_file}.tmp"
   cat "${base_generated_file}" >> "${base_generated_file}.tmp"
   mv "${base_generated_file}.tmp" "${base_generated_file}"
-  echo "${generated_file} is regenerated."
   popd > /dev/null
 done
