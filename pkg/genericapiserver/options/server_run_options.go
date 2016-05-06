@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package options
 
 import (
 	"net"
@@ -38,6 +38,9 @@ import (
 )
 
 const (
+	DefaultEtcdPathPrefix           = "/registry"
+	DefaultDeserializationCacheSize = 50000
+
 	// TODO: This can be tightened up. It still matches objects named watch or proxy.
 	defaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs?|portforward|exec|attach)/?$)"
 )

@@ -31,11 +31,11 @@ import (
 	fed_v1a1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
-	regexp := regexp.MustCompile(genericapiserver.NewServerRunOptions().LongRunningRequestRE)
+	regexp := regexp.MustCompile(options.NewServerRunOptions().LongRunningRequestRE)
 	dontMatch := []string{
 		"/api/v1/watch-namespace/",
 		"/api/v1/namespace-proxy/",
@@ -82,7 +82,7 @@ var groupVersions = []unversioned.GroupVersion{
 }
 
 func TestRun(t *testing.T) {
-	s := genericapiserver.NewServerRunOptions()
+	s := options.NewServerRunOptions()
 	s.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.ServiceClusterIPRange = *ipNet
