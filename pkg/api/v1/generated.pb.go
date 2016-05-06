@@ -6989,6 +6989,10 @@ func (m *VolumeMount) MarshalTo(data []byte) (int, error) {
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.MountPath)))
 	i += copy(data[i:], m.MountPath)
+	data[i] = 0x22
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.SubPath)))
+	i += copy(data[i:], m.SubPath)
 	return i, nil
 }
 
@@ -9459,6 +9463,8 @@ func (m *VolumeMount) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	n += 2
 	l = len(m.MountPath)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.SubPath)
 	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
@@ -31575,6 +31581,35 @@ func (m *VolumeMount) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.MountPath = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SubPath", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SubPath = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
