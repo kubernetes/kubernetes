@@ -229,7 +229,12 @@ func parseFileSource(source string) (keyName, filePath string, err error) {
 
 // parseLiteralSource parses the source key=val pair
 func parseLiteralSource(source string) (keyName, value string, err error) {
-	items := strings.Split(source, "=")
+	// leading equal is invalid
+	if strings.Index(source, "=") == 0 {
+		return "", "", fmt.Errorf("invalid literal source %v, expected key=value", source)
+	}
+	// split after the first equal (so values can have the = character)
+	items := strings.SplitN(source, "=", 2)
 	if len(items) != 2 {
 		return "", "", fmt.Errorf("invalid literal source %v, expected key=value", source)
 	}
