@@ -394,6 +394,7 @@ static-pods-config
 stats-port
 stop-services
 storage-backend
+storage-media-type
 storage-version
 storage-versions
 streaming-connection-idle-timeout

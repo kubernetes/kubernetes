@@ -17,6 +17,7 @@ limitations under the License.
 package recognizer
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -27,51 +28,98 @@ import (
 
 type RecognizingDecoder interface {
 	runtime.Decoder
-	RecognizesData(peek io.Reader) (bool, error)
+	// RecognizesData should return true if the input provided in the provided reader
+	// belongs to this decoder, or an error if the data could not be read or is ambiguous.
+	// Unknown is true if the data could not be determined to match the decoder type.
+	// Decoders should assume that they can read as much of peek as they need (as the caller
+	// provides) and may return unknown if the data provided is not sufficient to make a
+	// a determination. When peek returns EOF that may mean the end of the input or the
+	// end of buffered input - recognizers should return the best guess at that time.
+	RecognizesData(peek io.Reader) (ok, unknown bool, err error)
 }
 
+// NewDecoder creates a decoder that will attempt multiple decoders in an order defined
+// by:
+//
+// 1. The decoder implements RecognizingDecoder and identifies the data
+// 2. All other decoders, and any decoder that returned true for unknown.
+//
+// The order passed to the constructor is preserved within those priorities.
 func NewDecoder(decoders ...runtime.Decoder) runtime.Decoder {
-	recognizing, blind := []RecognizingDecoder{}, []runtime.Decoder{}
-	for _, d := range decoders {
-		if r, ok := d.(RecognizingDecoder); ok {
-			recognizing = append(recognizing, r)
-		} else {
-			blind = append(blind, d)
-		}
-	}
 	return &decoder{
-		recognizing: recognizing,
-		blind:       blind,
+		decoders: decoders,
 	}
 }
 
 type decoder struct {
-	recognizing []RecognizingDecoder
-	blind       []runtime.Decoder
+	decoders []runtime.Decoder
+}
+
+var _ RecognizingDecoder = &decoder{}
+
+func (d *decoder) RecognizesData(peek io.Reader) (bool, bool, error) {
+	var (
+		lastErr    error
+		anyUnknown bool
+	)
+	data, _ := bufio.NewReaderSize(peek, 1024).Peek(1024)
+	for _, r := range d.decoders {
+		switch t := r.(type) {
+		case RecognizingDecoder:
+			ok, unknown, err := t.RecognizesData(bytes.NewBuffer(data))
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			anyUnknown = anyUnknown || unknown
+			if !ok {
+				continue
+			}
+			return true, false, nil
+		}
+	}
+	return false, anyUnknown, lastErr
 }
 
 func (d *decoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
-	var lastErr error
-	for _, r := range d.recognizing {
-		buf := bytes.NewBuffer(data)
-		ok, err := r.RecognizesData(buf)
-		if err != nil {
-			lastErr = err
-			continue
+	var (
+		lastErr error
+		skipped []runtime.Decoder
+	)
+
+	// try recognizers, record any decoders we need to give a chance later
+	for _, r := range d.decoders {
+		switch t := r.(type) {
+		case RecognizingDecoder:
+			buf := bytes.NewBuffer(data)
+			ok, unknown, err := t.RecognizesData(buf)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if unknown {
+				skipped = append(skipped, t)
+				continue
+			}
+			if !ok {
+				continue
+			}
+			return r.Decode(data, gvk, into)
+		default:
+			skipped = append(skipped, t)
 		}
-		if !ok {
-			continue
-		}
-		return r.Decode(data, gvk, into)
 	}
-	for _, d := range d.blind {
-		out, actual, err := d.Decode(data, gvk, into)
+
+	// try recognizers that returned unknown or didn't recognize their data
+	for _, r := range skipped {
+		out, actual, err := r.Decode(data, gvk, into)
 		if err != nil {
 			lastErr = err
 			continue
 		}
 		return out, actual, nil
 	}
+
 	if lastErr == nil {
 		lastErr = fmt.Errorf("no serialization format matched the provided data")
 	}

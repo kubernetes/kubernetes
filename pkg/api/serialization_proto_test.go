@@ -17,6 +17,7 @@ limitations under the License.
 package api_test
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/rand"
 	"testing"
@@ -37,8 +38,30 @@ import (
 func init() {
 	codecsToTest = append(codecsToTest, func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error) {
 		s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), "application/arbitrary.content.type")
-		return api.Codecs.CodecForVersions(s, testapi.ExternalGroupVersions(), nil), nil
+		return api.Codecs.CodecForVersions(s, s, testapi.ExternalGroupVersions(), nil), nil
 	})
+}
+
+func TestUniversalDeserializer(t *testing.T) {
+	expected := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "test"}}
+	d := api.Codecs.UniversalDeserializer()
+	for _, mediaType := range []string{"application/json", "application/yaml", "application/vnd.kubernetes.protobuf"} {
+		e, ok := api.Codecs.SerializerForMediaType(mediaType, nil)
+		if !ok {
+			t.Fatal(mediaType)
+		}
+		buf := &bytes.Buffer{}
+		if err := e.EncodeToStream(expected, buf); err != nil {
+			t.Fatalf("%s: %v", mediaType, err)
+		}
+		obj, _, err := d.Decode(buf.Bytes(), &unversioned.GroupVersionKind{Kind: "Pod", Version: "v1"}, nil)
+		if err != nil {
+			t.Fatalf("%s: %v", mediaType, err)
+		}
+		if !api.Semantic.DeepEqual(expected, obj) {
+			t.Fatalf("%s: %#v", mediaType, obj)
+		}
+	}
 }
 
 func TestProtobufRoundTrip(t *testing.T) {

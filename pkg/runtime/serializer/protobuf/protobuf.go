@@ -419,12 +419,6 @@ func (s *RawSerializer) EncodeToStream(obj runtime.Object, w io.Writer, override
 	}
 }
 
-// RecognizesData implements the RecognizingDecoder interface - objects encoded with this serializer
-// have no innate identifying information and so cannot be recognized.
-func (s *RawSerializer) RecognizesData(peek io.Reader) (bool, error) {
-	return false, nil
-}
-
 var LengthDelimitedFramer = lengthDelimitedFramer{}
 
 type lengthDelimitedFramer struct{}

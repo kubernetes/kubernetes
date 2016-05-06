@@ -55,7 +55,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	var obj runtime.Object
 	var versioned runtime.Object
 	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
-		obj, err = runtime.Decode(thirdpartyresourcedata.NewCodec(nil, gvk.Kind), data)
+		obj, err = runtime.Decode(thirdpartyresourcedata.NewDecoder(nil, gvk.Kind), data)
 		versioned = obj
 	} else {
 		obj, versioned = versions.Last(), versions.First()

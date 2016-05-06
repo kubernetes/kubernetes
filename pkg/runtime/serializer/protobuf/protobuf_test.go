@@ -297,6 +297,18 @@ func TestDecodeObjects(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	unk2 := &runtime.Unknown{
+		TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: "v1"},
+	}
+	wire2 := make([]byte, len(wire1)*2)
+	n, err := unk2.NestedMarshalTo(wire2, obj1, uint64(obj1.Size()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != len(wire1) || !bytes.Equal(wire1, wire2[:n]) {
+		t.Fatalf("unexpected wire:\n%s", hex.Dump(wire2[:n]))
+	}
+
 	wire1 = append([]byte{0x6b, 0x38, 0x73, 0x00}, wire1...)
 
 	testCases := []struct {

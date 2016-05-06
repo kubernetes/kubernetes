@@ -215,7 +215,7 @@ func TestStream(t *testing.T) {
 			url, _ := url.ParseRequestURI(server.URL)
 			config := restclient.ContentConfig{
 				GroupVersion:         &unversioned.GroupVersion{Group: "x"},
-				NegotiatedSerializer: testapi.NegotiatedSerializer,
+				NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			}
 			c, err := restclient.NewRESTClient(url, "", config, -1, -1, nil, nil)
 			if err != nil {

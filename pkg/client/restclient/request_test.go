@@ -247,7 +247,7 @@ func defaultContentConfig() ContentConfig {
 	return ContentConfig{
 		GroupVersion:         testapi.Default.GroupVersion(),
 		Codec:                testapi.Default.Codec(),
-		NegotiatedSerializer: testapi.NegotiatedSerializer,
+		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 	}
 }
 
@@ -549,6 +549,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
+				serializers: defaultSerializers(),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, io.EOF
 				}),
@@ -558,6 +559,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
+				serializers: defaultSerializers(),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, &url.Error{Err: io.EOF}
 				}),
@@ -567,6 +569,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
+				serializers: defaultSerializers(),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("http: can't write HTTP request on broken connection")
 				}),
@@ -576,6 +579,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
+				serializers: defaultSerializers(),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("foo: connection reset by peer")
 				}),

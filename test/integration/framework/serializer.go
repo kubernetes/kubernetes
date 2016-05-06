@@ -23,7 +23,7 @@ import (
 )
 
 // NewSingleContentTypeSerializer wraps a serializer in a NegotiatedSerializer that handles one content type
-func NewSingleContentTypeSerializer(scheme *runtime.Scheme, serializer runtime.Serializer, contentType string) runtime.NegotiatedSerializer {
+func NewSingleContentTypeSerializer(scheme *runtime.Scheme, serializer runtime.Serializer, contentType string) runtime.StorageSerializer {
 	return &wrappedSerializer{
 		scheme:      scheme,
 		serializer:  serializer,
@@ -37,29 +37,31 @@ type wrappedSerializer struct {
 	contentType string
 }
 
-var _ runtime.NegotiatedSerializer = &wrappedSerializer{}
+var _ runtime.StorageSerializer = &wrappedSerializer{}
 
 func (s *wrappedSerializer) SupportedMediaTypes() []string {
 	return []string{s.contentType}
 }
-func (s *wrappedSerializer) SerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, bool) {
+func (s *wrappedSerializer) SerializerForMediaType(mediaType string, options map[string]string) (runtime.SerializerInfo, bool) {
 	if mediaType != s.contentType {
-		return nil, false
+		return runtime.SerializerInfo{}, false
 	}
 
-	return s.serializer, true
-}
-func (s *wrappedSerializer) SupportedStreamingMediaTypes() []string {
-	return nil
-}
-func (s *wrappedSerializer) StreamingSerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, runtime.Framer, string, bool) {
-	return nil, nil, "", false
+	return runtime.SerializerInfo{
+		Serializer:    s.serializer,
+		MediaType:     mediaType,
+		EncodesAsText: true, // TODO: this should be parameterized
+	}, true
 }
 
-func (s *wrappedSerializer) EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
-	return versioning.NewCodec(s.serializer, s.serializer, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), []unversioned.GroupVersion{gv}, nil)
+func (s *wrappedSerializer) UniversalDeserializer() runtime.Decoder {
+	return s.serializer
 }
 
-func (s *wrappedSerializer) DecoderToVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder {
-	return versioning.NewCodec(s.serializer, s.serializer, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), nil, []unversioned.GroupVersion{gv})
+func (s *wrappedSerializer) EncoderForVersion(encoder runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
+	return versioning.NewCodec(encoder, nil, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), []unversioned.GroupVersion{gv}, nil)
+}
+
+func (s *wrappedSerializer) DecoderToVersion(decoder runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
+	return versioning.NewCodec(nil, decoder, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), nil, []unversioned.GroupVersion{gv})
 }
