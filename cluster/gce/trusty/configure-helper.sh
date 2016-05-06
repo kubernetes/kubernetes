@@ -276,14 +276,6 @@ mount_master_pd() {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
-# A helper function that adds an entry to a token file.
-# $1: account information
-# $2: token file
-add_token_entry() {
-  current_token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  echo "${current_token},$1,$1" >> $2
-}
-
 # After the first boot and on upgrade, these files exists on the master-pd
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.)
@@ -310,16 +302,6 @@ create_master_auth() {
     echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
     echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${known_tokens_csv}"
     echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${known_tokens_csv}"
-
-    # Generate tokens for other "service accounts".  Append to known_tokens.
-    #
-    # NB: If this list ever changes, this script actually has to
-    # change to detect the existence of this file, kill any deleted
-    # old tokens and add any new tokens (to handle the upgrade case).
-    add_token_entry "system:scheduler" "${known_tokens_csv}"
-    add_token_entry "system:controller_manager" "${known_tokens_csv}"
-    add_token_entry "system:logging" "${known_tokens_csv}"
-    add_token_entry "system:monitoring" "${known_tokens_csv}"
   fi
 
   if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
@@ -433,8 +415,7 @@ start_kube_apiserver() {
   timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-apiserver.tar
 
   # Calculate variables and assemble the command line.
-  params="--cloud-provider=gce --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001 --tls-cert-file=/etc/srv/kubernetes/server.cert --tls-private-key-file=/etc/srv/kubernetes/server.key --secure-port=443 --client-ca-file=/etc/srv/kubernetes/ca.crt --token-auth-file=/etc/srv/kubernetes/known_tokens.csv --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv --allow-privileged=true"
-  params="${params} --etcd-servers-overrides=/events#http://127.0.0.1:4002"
+  params="--cloud-provider=gce --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001 --tls-cert-file=/etc/srv/kubernetes/server.cert --tls-private-key-file=/etc/srv/kubernetes/server.key --secure-port=443 --client-ca-file=/etc/srv/kubernetes/ca.crt --token-auth-file=/etc/srv/kubernetes/known_tokens.csv --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv --allow-privileged=true --authorization-mode=ABAC --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl --etcd-servers-overrides=/events#http://127.0.0.1:4002"
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
@@ -462,7 +443,9 @@ start_kube_apiserver() {
   fi
   readonly kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
 
-  src_file="/home/kubernetes/kube-manifests/kubernetes/gci-trusty/kube-apiserver.manifest"
+  src_dir="/home/kubernetes/kube-manifests/kubernetes/gci-trusty"
+  cp "${src_dir}/abac-authz-policy.jsonl" /etc/srv/kubernetes/
+  src_file="${src_dir}/kube-apiserver.manifest"
   remove_salt_config_comments "${src_file}"
   # Evaluate variables
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
