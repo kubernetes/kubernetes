@@ -189,6 +189,7 @@ func verifyCPULimits(expected framework.ContainersCPUSummary, actual framework.N
 var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 	var nodeNames sets.String
 	f := framework.NewDefaultFramework("kubelet-perf")
+	var om *framework.RuntimeOperationMonitor
 	var rm *framework.ResourceMonitor
 
 	BeforeEach(func() {
@@ -197,12 +198,15 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
 		}
+		om = framework.NewRuntimeOperationMonitor(f.Client)
 		rm = framework.NewResourceMonitor(f.Client, framework.TargetContainers(), containerStatsPollingPeriod)
 		rm.Start()
 	})
 
 	AfterEach(func() {
 		rm.Stop()
+		result := om.GetLatestRuntimeOperationErrorRate()
+		framework.Logf("runtime operation error metrics:\n%s", framework.FormatRuntimeOperationErrorRate(result))
 	})
 	framework.KubeDescribe("regular resource usage tracking", func() {
 		// We assume that the scheduler will make reasonable scheduling choices
