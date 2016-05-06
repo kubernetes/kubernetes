@@ -1649,14 +1649,14 @@ func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []s
 
 // One of the following aruguements must be non-nil: runningPod, status.
 // TODO: Modify containerRuntime.KillPod() to accept the right arguments.
-func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus) error {
+func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
 	var p kubecontainer.Pod
 	if runningPod != nil {
 		p = *runningPod
 	} else if status != nil {
 		p = kubecontainer.ConvertPodStatusToRunningPod(status)
 	}
-	return kl.containerRuntime.KillPod(pod, p)
+	return kl.containerRuntime.KillPod(pod, p, gracePeriodOverride)
 }
 
 // makePodDataDirs creates the dirs for the pod datas.
@@ -1734,7 +1734,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 
 	// Kill pod if it should not be running
 	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
-		if err := kl.killPod(pod, nil, podStatus); err != nil {
+		if err := kl.killPod(pod, nil, podStatus, nil); err != nil {
 			utilruntime.HandleError(err)
 		}
 		return err
@@ -2258,7 +2258,7 @@ func (kl *Kubelet) podKiller() {
 					ch <- runningPod.ID
 				}()
 				glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
-				err := kl.killPod(apiPod, runningPod, nil)
+				err := kl.killPod(apiPod, runningPod, nil, nil)
 				if err != nil {
 					glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
 				}
