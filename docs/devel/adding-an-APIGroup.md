@@ -87,7 +87,9 @@ gen-conversion script.
 2. Generate files for Ugorji codec:
 
     1. Touch types.generated.go in pkg/apis/`<group>`{/, `<version>`};
-    2. Run hack/update-codecgen.sh.
+    2. Add the file to the `ordered_list` inside hack/update-codecgen.sh, after
+       any dependencies it might have.
+    3. Run hack/update-codecgen.sh.
 
 3. Generate protobuf objects:
 

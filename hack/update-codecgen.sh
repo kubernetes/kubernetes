@@ -23,10 +23,35 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-# The sort at the end makes sure we feed the topological sort a deterministic
-# list (since there aren't many dependencies).
+# This list is kept in the order in which files ought to be processed. You must
+# add new entries *after* any of their dependencies!
+ordered_list=(\
+  "./pkg/api/types.generated.go" \
+  "./pkg/storage/testing/types.generated.go" \
+  "./pkg/kubectl/testing/types.generated.go" \
+  "./pkg/api/v1/types.generated.go" \
+  "./pkg/apis/metrics/v1alpha1/types.generated.go" \
+  "./pkg/apis/metrics/types.generated.go" \
+  "./pkg/apis/extensions/v1beta1/types.generated.go" \
+  "./pkg/apis/extensions/types.generated.go" \
+  "./pkg/apiserver/testing/types.generated.go" \
+  "./pkg/apis/componentconfig/types.generated.go" \
+  "./pkg/apis/batch/v1/types.generated.go" \
+  "./pkg/apis/batch/types.generated.go" \
+  "./pkg/apis/autoscaling/v1/types.generated.go" \
+  "./pkg/apis/autoscaling/types.generated.go" \
+  "./pkg/apis/authorization/v1beta1/types.generated.go" \
+  "./pkg/apis/authorization/types.generated.go" \
+  "./pkg/apis/apps/v1alpha1/types.generated.go" \
+  "./pkg/apis/apps/types.generated.go" \
+  "./federation/apis/federation/v1alpha1/types.generated.go" \
+  "./federation/apis/federation/types.generated.go" \
+  "./cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io/v1/types.generated.go" \
+  "./cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io/types.generated.go")
 
-generated_files=($(
+# To be helpful, find any new .generated.go files and tell users they need to
+# add them to the above list.
+found_files=($(
   find . -not \( \
       \( \
         -wholename './output' \
@@ -39,6 +64,21 @@ generated_files=($(
       \) -prune \
     \) -name '*.generated.go' | sort -r))
 
+# Sort, then check against the list of files we found to make sure that it
+# hasn't changed.
+readarray -t sorted_list < <(for a in "${ordered_list[@]}"; do echo "$a"; done | sort -r)
+gCount=${#found_files[@]}
+sCount=${#sorted_list[@]}
+entriesToCheck=$(($gCount>$sCount?$gCount:$sCount))
+for (( i=0; i<${entriesToCheck}; i++ )); do
+  if [[ "${found_files[${i}]}" != "${sorted_list[${i}]}" ]]; then
+    echo "found '${found_files[${i}]}', but expected '${sorted_list[${i}]}'."
+    echo "You probably added or removed a types.go file. Please update hack/update-codecgen.sh"
+    echo "and add or remove the file in the ordered_list variable."
+    exit 1
+  fi
+done
+
 # Register function to be called on EXIT to remove codecgen
 # binary and also to touch the files that should be regenerated
 # since they are first removed.
@@ -46,65 +86,13 @@ generated_files=($(
 function cleanup {
   rm -f "${CODECGEN:-}"
   pushd "${KUBE_ROOT}" > /dev/null
-  for (( i=0; i < number; i++ )); do
-    touch "${generated_files[${i}]}" || true
+  for generated_file in "${ordered_list[@]}"; do
+    touch "${generated_file}" || true
   done
   popd > /dev/null
 }
 trap cleanup EXIT
 
-# Sort all files in the dependency order.
-number=${#generated_files[@]}
-for (( i=0; i<number; i++ )); do
-  visited[${i}]=false
-done
-result=""
-
-# NOTE: depends function assumes that the whole repository is under
-# */k8s.io/kubernetes directory - it will NOT work if that is not true.
-function depends {
-  file=${generated_files[$1]//\.generated\.go/.go}
-  deps=$(go list -f "{{.Deps}}" ${file} | tr "[" " " | tr "]" " ")
-  candidate=$(readlinkdashf "${generated_files[$2]//\.generated\.go/.go}")
-  for dep in ${deps}; do
-    # Only look at dependencies within the kubernetes tree-- otherwise the "io"
-    # package matches the end of one of our directories.
-    if [[ ${dep} = "k8s.io"* ]]; then
-      if [[ ${candidate} = *${dep} ]]; then
-        echo true
-        return
-      fi
-    fi
-  done
-  echo false
-}
-
-function tsort {
-  visited[$1]=true
-  local j=0
-  for (( j=0; j<number; j++ )); do
-    if ! ${visited[${j}]}; then
-      if $(depends "$1" ${j}); then
-        tsort $j
-      fi
-    fi
-  done
-  result="${result} $1"
-}
-for (( i=0; i<number; i++ )); do
-  if ! ${visited[${i}]}; then
-    tsort ${i}
-  fi
-done
-index=(${result})
-
-haveindex=${index:-}
-if [[ -z ${haveindex} ]]; then
-  echo No files found for $0
-  echo A previous run of $0 may have deleted all the files and then crashed.
-  echo Use 'touch' to create files named 'types.generated.go' listed as deleted in 'git status'
-  exit 1
-fi
 
 CODECGEN="${PWD}/codecgen_binary"
 godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
@@ -113,13 +101,12 @@ godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 # Thus (since all the files are completely auto-generated and
 # not required for the code to be compilable, we first remove
 # them and the regenerate them.
-for (( i=0; i < number; i++ )); do
-  rm -f "${generated_files[${i}]}"
+for generated_file in "${ordered_list[@]}"; do
+  rm -f "${generated_file}"
 done
 
 # Generate files in the dependency order.
-for current in "${index[@]}"; do
-  generated_file=${generated_files[${current}]}
+for generated_file in "${ordered_list[@]}"; do
   initial_dir=${PWD}
   file=${generated_file//\.generated\.go/.go}
   echo "codecgen processing ${file}"
