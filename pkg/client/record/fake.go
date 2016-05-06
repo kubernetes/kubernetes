@@ -23,18 +23,32 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// FakeRecorder is used as a fake during tests.
+// FakeRecorder is used as a fake during tests. It is thread safe. It is usable
+// when created manually and not by NewFakeRecorder, however all events may be
+// thrown away in this case.
 type FakeRecorder struct {
-	Events []string
+	Events chan string
 }
 
 func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
-	f.Events = append(f.Events, fmt.Sprintf("%s %s %s", eventtype, reason, message))
+	if f.Events != nil {
+		f.Events <- fmt.Sprintf("%s %s %s", eventtype, reason, message)
+	}
 }
 
 func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.Events = append(f.Events, fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...))
+	if f.Events != nil {
+		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...)
+	}
 }
 
 func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{}) {
+}
+
+// NewFakeRecorder creates new fake event recorder with event channel with
+// buffer of given size.
+func NewFakeRecorder(bufferSize int) *FakeRecorder {
+	return &FakeRecorder{
+		Events: make(chan string, bufferSize),
+	}
 }
