@@ -38,6 +38,7 @@ KUBE_GCS_PUBLISH_VERSION="${KUBE_RELEASE_VERSION}"
 
 KUBE_DOCKER_REGISTRY="gcr.io/google_containers"
 KUBE_DOCKER_IMAGE_TAG="${KUBE_RELEASE_VERSION}"
+KUBE_GCLOUD_PRODUCTION_ACCOUNT="k8s.production.user@gmail.com"
 
 KUBE_ROOT="$(dirname "${BASH_SOURCE}")/.."
 source "${KUBE_ROOT}/build/common.sh"
@@ -47,8 +48,8 @@ if "${KUBE_ROOT}/cluster/kubectl.sh" 'version' | grep 'Client' | grep 'dirty'; t
   exit 1
 fi
 
-if ! kube::release::has_gcloud_account k8s.production.user@gmail.com; then
-  kube::log::error "Pushing images to gcr.io/google_containers requires credentials for account k8s.production.user@gmail.com"
+if ! kube::release::gcloud_account_is_active "${KUBE_GCLOUD_PRODUCTION_ACCOUNT}"; then
+  kube::log::error "Pushing images to gcr.io/google_containers requires being logged in as ${KUBE_GCLOUD_PRODUCTION_ACCOUNT}"
   return 1
 fi
 
