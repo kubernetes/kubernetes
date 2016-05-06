@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
-
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -69,4 +68,15 @@ type PodDisruptionBudgetList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items                []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+type Eviction struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// ObjectMeta describes the object that is being evicted.
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// DeleteOptions may be provided
+	DeleteOptions *v1.DeleteOptions `json:"deleteOptions,omitempty"`
 }
