@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -899,6 +900,64 @@ var _ = framework.KubeDescribe("Services", func() {
 		service.Spec.Ports[0].NodePort = nodePort
 		service, err = t.CreateService(service)
 		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create endpoints for unready pods", func() {
+		serviceName := "never-ready"
+		ns := f.Namespace.Name
+
+		t := NewServerTest(c, ns, serviceName)
+		defer func() {
+			defer GinkgoRecover()
+			errs := t.Cleanup()
+			if len(errs) != 0 {
+				framework.Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		service := t.BuildServiceSpec()
+		service.Annotations = map[string]string{endpoint.TolerateUnreadyEndpointsAnnotation: "true"}
+		rcSpec := rcByNameContainer(t.name, 1, t.image, t.Labels, api.Container{
+			Name:  t.name,
+			Image: t.image,
+			Ports: []api.ContainerPort{{ContainerPort: int32(80), Protocol: api.ProtocolTCP}},
+			ReadinessProbe: &api.Probe{
+				Handler: api.Handler{
+					Exec: &api.ExecAction{
+						Command: []string{"/bin/false"},
+					},
+				},
+			},
+		})
+
+		By(fmt.Sprintf("createing RC %v with selectors %v", rcSpec.Name, rcSpec.Spec.Selector))
+		_, err := t.createRC(rcSpec)
+		ExpectNoError(err)
+
+		By(fmt.Sprintf("creating Service %v with selectors %v", service.Name, service.Spec.Selector))
+		_, err = t.CreateService(service)
+		ExpectNoError(err)
+
+		By("Verifying pods for RC " + t.name)
+		ExpectNoError(framework.VerifyPods(t.Client, t.Namespace, t.name, false, 1))
+
+		svcName := fmt.Sprintf("%v.%v", serviceName, f.Namespace.Name)
+		By("waiting for endpoints of Service with DNS name " + svcName)
+
+		createExecPodOrFail(f.Client, f.Namespace.Name, "exec")
+		cmd := fmt.Sprintf("wget -qO- %v", svcName)
+		var stdout string
+		if pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
+			var err error
+			stdout, err = framework.RunHostCmd(f.Namespace.Name, "exec", cmd)
+			if err != nil {
+				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.name, stdout, err)
+				return false, nil
+			}
+			return true, nil
+		}); pollErr != nil {
+			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.name, kubeProxyLagTimeout, stdout)
+		}
 	})
 })
 
