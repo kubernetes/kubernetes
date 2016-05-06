@@ -18,20 +18,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Ginkgo will build the e2e tests, so we need to make sure that the environment
-# is set up correctly (including Godeps, etc).
-kube::golang::setup_env
 # Find the ginkgo binary build as part of the release.
 ginkgo=$(kube::util::find-binary "ginkgo")
 e2e_test=$(kube::util::find-binary "e2e.test")
 
 # --- Setup some env vars.
+
+GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
 
 : ${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
