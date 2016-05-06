@@ -26,9 +26,10 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 
+	"strings"
+
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
-	"strings"
 )
 
 var (
@@ -105,12 +106,12 @@ func main() {
 
 	if *test {
 		arguments.InputDirs = append(dependencies, []string{
-			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io",
+			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io",
 		}...)
 		arguments.CustomArgs = clientgenargs.Args{
 			GroupVersions: []unversioned.GroupVersion{{Group: "testgroup.k8s.io", Version: ""}},
 			GroupVersionToInputPath: map[unversioned.GroupVersion]string{
-				unversioned.GroupVersion{Group: "testgroup.k8s.io", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io",
+				unversioned.GroupVersion{Group: "testgroup.k8s.io", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io",
 			},
 			ClientsetName:       "test_internalclientset",
 			ClientsetOutputPath: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
