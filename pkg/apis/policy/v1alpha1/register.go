@@ -39,6 +39,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&PodDisruptionBudget{},
 		&PodDisruptionBudgetList{},
+		&Eviction{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 	)
