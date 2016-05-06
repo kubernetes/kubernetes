@@ -30,17 +30,17 @@ func (cli *Client) ContainerStatPath(ctx context.Context, containerID, path stri
 }
 
 // CopyToContainer copies content into the container filesystem.
-func (cli *Client) CopyToContainer(ctx context.Context, options types.CopyToContainerOptions) error {
+func (cli *Client) CopyToContainer(ctx context.Context, container, path string, content io.Reader, options types.CopyToContainerOptions) error {
 	query := url.Values{}
-	query.Set("path", filepath.ToSlash(options.Path)) // Normalize the paths used in the API.
+	query.Set("path", filepath.ToSlash(path)) // Normalize the paths used in the API.
 	// Do not allow for an existing directory to be overwritten by a non-directory and vice versa.
 	if !options.AllowOverwriteDirWithFile {
 		query.Set("noOverwriteDirNonDir", "true")
 	}
 
-	path := fmt.Sprintf("/containers/%s/archive", options.ContainerID)
+	apiPath := fmt.Sprintf("/containers/%s/archive", container)
 
-	response, err := cli.putRaw(ctx, path, query, options.Content, nil)
+	response, err := cli.putRaw(ctx, apiPath, query, content, nil)
 	if err != nil {
 		return err
 	}
@@ -53,13 +53,13 @@ func (cli *Client) CopyToContainer(ctx context.Context, options types.CopyToCont
 	return nil
 }
 
-// CopyFromContainer get the content from the container and return it as a Reader
+// CopyFromContainer gets the content from the container and returns it as a Reader
 // to manipulate it in the host. It's up to the caller to close the reader.
-func (cli *Client) CopyFromContainer(ctx context.Context, containerID, srcPath string) (io.ReadCloser, types.ContainerPathStat, error) {
+func (cli *Client) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, types.ContainerPathStat, error) {
 	query := make(url.Values, 1)
 	query.Set("path", filepath.ToSlash(srcPath)) // Normalize the paths used in the API.
 
-	apiPath := fmt.Sprintf("/containers/%s/archive", containerID)
+	apiPath := fmt.Sprintf("/containers/%s/archive", container)
 	response, err := cli.get(ctx, apiPath, query, nil)
 	if err != nil {
 		return nil, types.ContainerPathStat{}, err

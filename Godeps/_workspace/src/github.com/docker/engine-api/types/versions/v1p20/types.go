@@ -27,7 +27,7 @@ type ContainerConfig struct {
 	VolumeDriver string
 }
 
-// StatsJSON is a backcompatibility struct used in Stats for API prior to 1.21
+// StatsJSON is a backcompatibility struct used in Stats for APIs prior to 1.21
 type StatsJSON struct {
 	types.Stats
 	Network types.NetworkStats `json:"network,omitempty"`

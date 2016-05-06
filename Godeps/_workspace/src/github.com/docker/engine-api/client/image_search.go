@@ -12,14 +12,14 @@ import (
 
 // ImageSearch makes the docker host to search by a term in a remote registry.
 // The list of results is not sorted in any fashion.
-func (cli *Client) ImageSearch(ctx context.Context, options types.ImageSearchOptions, privilegeFunc RequestPrivilegeFunc) ([]registry.SearchResult, error) {
+func (cli *Client) ImageSearch(ctx context.Context, term string, options types.ImageSearchOptions) ([]registry.SearchResult, error) {
 	var results []registry.SearchResult
 	query := url.Values{}
-	query.Set("term", options.Term)
+	query.Set("term", term)
 
 	resp, err := cli.tryImageSearch(ctx, query, options.RegistryAuth)
 	if resp.statusCode == http.StatusUnauthorized {
-		newAuthHeader, privilegeErr := privilegeFunc()
+		newAuthHeader, privilegeErr := options.PrivilegeFunc()
 		if privilegeErr != nil {
 			return results, privilegeErr
 		}

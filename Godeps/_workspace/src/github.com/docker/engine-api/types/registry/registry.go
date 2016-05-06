@@ -82,7 +82,7 @@ type SearchResult struct {
 	IsOfficial bool `json:"is_official"`
 	// Name is the name of the repository
 	Name string `json:"name"`
-	// IsOfficial indicates whether the result is trusted
+	// IsTrusted indicates whether the result is trusted
 	IsTrusted bool `json:"is_trusted"`
 	// IsAutomated indicates whether the result is automated
 	IsAutomated bool `json:"is_automated"`
