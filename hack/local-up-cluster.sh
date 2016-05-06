@@ -424,6 +424,10 @@ To start using your cluster, open up another terminal/tab and run:
   cluster/kubectl.sh config set-context local --cluster=local
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
+
+Don't forget to remove ~/.kube/schema directory if you have regenerated swagger schemas.
+Otherwise you can get validation errors when running kubectl create and alike commands.
+Checkout --schema-cache-dir="~/.kube/schema" flag of kubectl create.
 EOF
 }
 
