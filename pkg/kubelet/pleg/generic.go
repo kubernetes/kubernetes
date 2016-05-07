@@ -60,6 +60,9 @@ type GenericPLEG struct {
 	cache kubecontainer.Cache
 	// For testability.
 	clock util.Clock
+	// Pods that failed to have their status retrieved during a relist. These pods will be
+	// retried during the next relisting.
+	podsToReinspect map[types.UID]*kubecontainer.Pod
 }
 
 // plegContainerState has a one-to-one mapping to the
@@ -210,6 +213,11 @@ func (g *GenericPLEG) relist() {
 		}
 	}
 
+	var needsReinspection map[types.UID]*kubecontainer.Pod
+	if g.cacheEnabled() {
+		needsReinspection = make(map[types.UID]*kubecontainer.Pod)
+	}
+
 	// If there are events associated with a pod, we should update the
 	// podCache.
 	for pid, events := range eventsByPodID {
@@ -226,7 +234,16 @@ func (g *GenericPLEG) relist() {
 			// parallelize if needed.
 			if err := g.updateCache(pod, pid); err != nil {
 				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
+
+				// make sure we try to reinspect the pod during the next relisting
+				needsReinspection[pid] = pod
+
 				continue
+			} else if _, found := g.podsToReinspect[pid]; found {
+				// this pod was in the list to reinspect and we did so because it had events, so remove it
+				// from the list (we don't want the reinspection code below to inspect it a second time in
+				// this relist execution)
+				delete(g.podsToReinspect, pid)
 			}
 		}
 		// Update the internal storage and send out the events.
@@ -241,10 +258,24 @@ func (g *GenericPLEG) relist() {
 	}
 
 	if g.cacheEnabled() {
+		// reinspect any pods that failed inspection during the previous relist
+		if len(g.podsToReinspect) > 0 {
+			glog.V(5).Infof("GenericPLEG: Reinspecting pods that previously failed inspection")
+			for pid, pod := range g.podsToReinspect {
+				if err := g.updateCache(pod, pid); err != nil {
+					glog.Errorf("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
+					needsReinspection[pid] = pod
+				}
+			}
+		}
+
 		// Update the cache timestamp.  This needs to happen *after*
 		// all pods have been properly updated in the cache.
 		g.cache.UpdateTime(timestamp)
 	}
+
+	// make sure we retain the list of pods that need reinspecting the next time relist is called
+	g.podsToReinspect = needsReinspection
 }
 
 func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Container {
