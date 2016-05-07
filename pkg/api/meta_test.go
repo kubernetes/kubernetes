@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 var _ meta.Object = &api.ObjectMeta{}
@@ -41,6 +42,14 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 		t.Errorf("resource.CreationTimestamp is zero")
 	} else if len(resource.UID) == 0 {
 		t.Errorf("resource.UID missing")
+	}
+	// verify we can inject a UID
+	uid := util.NewUUID()
+	ctx = api.WithUID(ctx, uid)
+	resource = api.ObjectMeta{}
+	api.FillObjectMetaSystemFields(ctx, &resource)
+	if resource.UID != uid {
+		t.Errorf("resource.UID expected: %v, actual: %v", uid, resource.UID)
 	}
 }
 
