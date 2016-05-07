@@ -61,6 +61,10 @@ func TestLabels(t *testing.T) {
 			Namespace: "test_pod_namespace",
 			UID:       "test_pod_uid",
 			DeletionGracePeriodSeconds: &deletionGracePeriod,
+			Labels: map[string]string{
+				"foo":               "bar",
+				"x-kubernetes.io/y": "z",
+			},
 		},
 		Spec: api.PodSpec{
 			Containers:                    []api.Container{*container},
@@ -80,8 +84,17 @@ func TestLabels(t *testing.T) {
 		PreStopHandler:         container.Lifecycle.PreStop,
 	}
 
-	// Test whether we can get right information from label
 	labels := newLabels(container, pod, restartCount, false)
+
+	// Test whether pod labels are added
+	if v, ok := labels["foo"]; !ok || v != "bar" {
+		t.Errorf("expected labels[%v] to be %v but was %v", "foo", "bar", v)
+	}
+	if _, ok := labels["x-kubernetes.io/y"]; ok {
+		t.Errorf("expected labels to not have label %v but it did", "x-kubernetes.io/y")
+	}
+
+	// Test whether we can get right information from label
 	containerInfo := getContainerInfoFromLabel(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
