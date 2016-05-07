@@ -25,7 +25,7 @@ import (
 // ThirdPartyResourcesGetter has a method to return a ThirdPartyResourceInterface.
 // A group's client should implement this interface.
 type ThirdPartyResourcesGetter interface {
-	ThirdPartyResources(namespace string) ThirdPartyResourceInterface
+	ThirdPartyResources() ThirdPartyResourceInterface
 }
 
 // ThirdPartyResourceInterface has methods to work with ThirdPartyResource resources.
@@ -43,14 +43,12 @@ type ThirdPartyResourceInterface interface {
 // thirdPartyResources implements ThirdPartyResourceInterface
 type thirdPartyResources struct {
 	client *ExtensionsClient
-	ns     string
 }
 
 // newThirdPartyResources returns a ThirdPartyResources
-func newThirdPartyResources(c *ExtensionsClient, namespace string) *thirdPartyResources {
+func newThirdPartyResources(c *ExtensionsClient) *thirdPartyResources {
 	return &thirdPartyResources{
 		client: c,
-		ns:     namespace,
 	}
 }
 
@@ -58,7 +56,6 @@ func newThirdPartyResources(c *ExtensionsClient, namespace string) *thirdPartyRe
 func (c *thirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("thirdpartyresources").
 		Body(thirdPartyResource).
 		Do().
@@ -70,7 +67,6 @@ func (c *thirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyRe
 func (c *thirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("thirdpartyresources").
 		Name(thirdPartyResource.Name).
 		Body(thirdPartyResource).
@@ -82,7 +78,6 @@ func (c *thirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyRe
 // Delete takes name of the thirdPartyResource and deletes it. Returns an error if one occurs.
 func (c *thirdPartyResources) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("thirdpartyresources").
 		Name(name).
 		Body(options).
@@ -93,7 +88,6 @@ func (c *thirdPartyResources) Delete(name string, options *api.DeleteOptions) er
 // DeleteCollection deletes a collection of objects.
 func (c *thirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("thirdpartyresources").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
@@ -105,7 +99,6 @@ func (c *thirdPartyResources) DeleteCollection(options *api.DeleteOptions, listO
 func (c *thirdPartyResources) Get(name string) (result *extensions.ThirdPartyResource, err error) {
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("thirdpartyresources").
 		Name(name).
 		Do().
@@ -117,7 +110,6 @@ func (c *thirdPartyResources) Get(name string) (result *extensions.ThirdPartyRes
 func (c *thirdPartyResources) List(opts api.ListOptions) (result *extensions.ThirdPartyResourceList, err error) {
 	result = &extensions.ThirdPartyResourceList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("thirdpartyresources").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
@@ -129,7 +121,6 @@ func (c *thirdPartyResources) List(opts api.ListOptions) (result *extensions.Thi
 func (c *thirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
-		Namespace(c.ns).
 		Resource("thirdpartyresources").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()

@@ -169,7 +169,7 @@ type HorizontalPodAutoscalerList struct {
 	Items []HorizontalPodAutoscaler `json:"items"`
 }
 
-// +genclient=true
+// +genclient=true,nonNamespaced=true
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.

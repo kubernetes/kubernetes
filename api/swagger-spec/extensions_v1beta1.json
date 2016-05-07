@@ -5619,14 +5619,14 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/thirdpartyresources",
+    "path": "/apis/extensions/v1beta1/thirdpartyresources",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
       "type": "v1beta1.ThirdPartyResourceList",
       "method": "GET",
       "summary": "list or watch objects of kind ThirdPartyResource",
-      "nickname": "listNamespacedThirdPartyResource",
+      "nickname": "listThirdPartyResource",
       "parameters": [
        {
         "type": "string",
@@ -5675,14 +5675,6 @@
         "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -5705,7 +5697,7 @@
       "type": "v1beta1.ThirdPartyResource",
       "method": "POST",
       "summary": "create a ThirdPartyResource",
-      "nickname": "createNamespacedThirdPartyResource",
+      "nickname": "createThirdPartyResource",
       "parameters": [
        {
         "type": "string",
@@ -5720,14 +5712,6 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
        }
@@ -5752,7 +5736,7 @@
       "type": "unversioned.Status",
       "method": "DELETE",
       "summary": "delete collection of ThirdPartyResource",
-      "nickname": "deletecollectionNamespacedThirdPartyResource",
+      "nickname": "deletecollectionThirdPartyResource",
       "parameters": [
        {
         "type": "string",
@@ -5800,14 +5784,6 @@
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
         "allowMultiple": false
        }
       ],
@@ -5830,14 +5806,14 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/thirdpartyresources",
+    "path": "/apis/extensions/v1beta1/watch/thirdpartyresources",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ThirdPartyResource",
-      "nickname": "watchNamespacedThirdPartyResourceList",
+      "nickname": "watchThirdPartyResourceList",
       "parameters": [
        {
         "type": "string",
@@ -5885,14 +5861,6 @@
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
         "allowMultiple": false
        }
       ],
@@ -5916,14 +5884,14 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/thirdpartyresources/{name}",
+    "path": "/apis/extensions/v1beta1/thirdpartyresources/{name}",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
       "type": "v1beta1.ThirdPartyResource",
       "method": "GET",
       "summary": "read the specified ThirdPartyResource",
-      "nickname": "readNamespacedThirdPartyResource",
+      "nickname": "readThirdPartyResource",
       "parameters": [
        {
         "type": "string",
@@ -5947,14 +5915,6 @@
         "name": "exact",
         "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -5986,7 +5946,7 @@
       "type": "v1beta1.ThirdPartyResource",
       "method": "PUT",
       "summary": "replace the specified ThirdPartyResource",
-      "nickname": "replaceNamespacedThirdPartyResource",
+      "nickname": "replaceThirdPartyResource",
       "parameters": [
        {
         "type": "string",
@@ -6001,14 +5961,6 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
        },
@@ -6041,7 +5993,7 @@
       "type": "v1beta1.ThirdPartyResource",
       "method": "PATCH",
       "summary": "partially update the specified ThirdPartyResource",
-      "nickname": "patchNamespacedThirdPartyResource",
+      "nickname": "patchThirdPartyResource",
       "parameters": [
        {
         "type": "string",
@@ -6056,14 +6008,6 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
        },
@@ -6098,7 +6042,7 @@
       "type": "unversioned.Status",
       "method": "DELETE",
       "summary": "delete a ThirdPartyResource",
-      "nickname": "deleteNamespacedThirdPartyResource",
+      "nickname": "deleteThirdPartyResource",
       "parameters": [
        {
         "type": "string",
@@ -6113,14 +6057,6 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
        },
@@ -6152,14 +6088,14 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/thirdpartyresources/{name}",
+    "path": "/apis/extensions/v1beta1/watch/thirdpartyresources/{name}",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ThirdPartyResource",
-      "nickname": "watchNamespacedThirdPartyResource",
+      "nickname": "watchThirdPartyResource",
       "parameters": [
        {
         "type": "string",
@@ -6207,14 +6143,6 @@
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -6223,161 +6151,6 @@
         "name": "name",
         "description": "name of the ThirdPartyResource",
         "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "*versioned.Event"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/json;stream=watch",
-       "application/vnd.kubernetes.protobuf",
-       "application/vnd.kubernetes.protobuf;stream=watch"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/apis/extensions/v1beta1/thirdpartyresources",
-    "description": "API at /apis/extensions/v1beta1",
-    "operations": [
-     {
-      "type": "v1beta1.ThirdPartyResourceList",
-      "method": "GET",
-      "summary": "list or watch objects of kind ThirdPartyResource",
-      "nickname": "listNamespacedThirdPartyResource",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.ThirdPartyResourceList"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/apis/extensions/v1beta1/watch/thirdpartyresources",
-    "description": "API at /apis/extensions/v1beta1",
-    "operations": [
-     {
-      "type": "*versioned.Event",
-      "method": "GET",
-      "summary": "watch individual changes to a list of ThirdPartyResource",
-      "nickname": "watchNamespacedThirdPartyResourceList",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
-        "required": false,
         "allowMultiple": false
        }
       ],
