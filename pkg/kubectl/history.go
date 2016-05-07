@@ -76,7 +76,10 @@ func (h *DeploymentHistoryViewer) History(namespace, name string) (HistoryInfo, 
 	if err != nil {
 		return historyInfo, fmt.Errorf("failed to retrieve new replica set from deployment %s: %v", name, err)
 	}
-	allRSs := append(allOldRSs, newRS)
+	allRSs := allOldRSs
+	if newRS != nil {
+		allRSs = append(allRSs, newRS)
+	}
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
