@@ -705,7 +705,7 @@ func getClusterServiceConditionPredicate() cache.ClusterServiceConditionPredicat
 		for _, cond := range clusterService.Status.Conditions {
 			// We consider the cluster service for inclusion in DNS records only when its ServiceReady condition status
 			// is ConditionTrue
-			// TODO: quinton: Check up on exactly how service status works, and fix.
+			// TODO: quinton: Check up on exactly how service status works, and fix.  Service is deemed healthy when it has at least one healthy backend.
 			if cond.Type == api.ServiceReady && cond.Status != api.ConditionTrue {
 				glog.V(4).Infof("Ignoring cluster service %v with %v condition status %v", clusterService.Name, cond.Type, cond.Status)
 				return false
@@ -717,7 +717,7 @@ func getClusterServiceConditionPredicate() cache.ClusterServiceConditionPredicat
 
 // clusterServiceSyncLoop handles updating the load balancers pointed to by all federated service DNS Records
 // whenever the set of cluster services in the federation changes.
-// TODO: quinton: Assumed that cluster service load balancers have host (i.e. DNS) names (and IP's?).  Verify and fix as necessary.
+// TODOd: quinton: Assumed that cluster service load balancers have host (i.e. DNS) names (and IP's?).  Verify and fix as necessary.
 //                Also the logic here bundles all hos/DNS names of all services in the federation together - need to handle service one separately.  Rewrite.
 func (s *ServiceController) clusterServiceSyncLoop(period time.Duration) {
 	var prevHostNames []string
