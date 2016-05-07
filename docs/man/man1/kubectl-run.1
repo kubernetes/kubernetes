@@ -64,7 +64,7 @@ Creates a deployment or job to manage the created container(s).
 
 .PP
 \fB\-\-limits\fP=""
-    The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'
+    The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.
 
 .PP
 \fB\-\-no\-headers\fP=false
@@ -98,7 +98,7 @@ Creates a deployment or job to manage the created container(s).
 
 .PP
 \fB\-\-requests\fP=""
-    The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'
+    The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.
 
 .PP
 \fB\-\-restart\fP="Always"

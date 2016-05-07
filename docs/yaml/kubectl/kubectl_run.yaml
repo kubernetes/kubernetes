@@ -45,7 +45,7 @@ options:
     If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.
 - name: limits
   usage: |
-    The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'
+    The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.
 - name: no-headers
   default_value: "false"
   usage: When using the default output, don't print headers.
@@ -73,7 +73,7 @@ options:
     Number of replicas to create for this container. Default is 1.
 - name: requests
   usage: |
-    The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'
+    The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.
 - name: restart
   default_value: Always
   usage: |
