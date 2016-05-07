@@ -456,6 +456,8 @@ type PersistentVolumeClaimSpec struct {
 	// AccessModes contains the desired access modes the volume should have.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	// A label query over volumes to consider for binding.
+	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 	// Resources represents the minimum resources the volume should have.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
