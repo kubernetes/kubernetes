@@ -50,8 +50,8 @@ func (c *FakeExtensions) Scales(namespace string) unversioned.ScaleInterface {
 	return &FakeScales{c, namespace}
 }
 
-func (c *FakeExtensions) ThirdPartyResources(namespace string) unversioned.ThirdPartyResourceInterface {
-	return &FakeThirdPartyResources{c, namespace}
+func (c *FakeExtensions) ThirdPartyResources() unversioned.ThirdPartyResourceInterface {
+	return &FakeThirdPartyResources{c}
 }
 
 // GetRESTClient returns a RESTClient that is used to communicate

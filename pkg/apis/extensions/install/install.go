@@ -92,6 +92,7 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
 	rootScoped := sets.NewString(
 		"PodSecurityPolicy",
+		"ThirdPartyResource",
 	)
 
 	ignoredKinds := sets.NewString()
