@@ -228,8 +228,8 @@ func TestAllPossibleAccessModes(t *testing.T) {
 
 	// the mock PVs creates contain 2 types of accessmodes:   RWO+ROX and RWO+ROW+RWX
 	possibleModes := index.allPossibleMatchingAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce})
-	if len(possibleModes) != 2 {
-		t.Errorf("Expected 2 arrays of modes that match RWO, but got %v", len(possibleModes))
+	if len(possibleModes) != 3 {
+		t.Errorf("Expected 3 arrays of modes that match RWO, but got %v", len(possibleModes))
 	}
 	for _, m := range possibleModes {
 		if !contains(m, api.ReadWriteOnce) {
