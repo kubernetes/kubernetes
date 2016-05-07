@@ -95,6 +95,14 @@ function test_docker {
     fi
 }
 
+function test_openssl_installed {
+    openssl version >& /dev/null
+    if [ "$?" != "0" ]; then
+      echo "Failed to run openssl. Please ensure openssl is installed"
+      exit 1
+    fi
+}
+
 # Shut down anyway if there's an error.
 set +e
 
@@ -429,6 +437,7 @@ EOF
 
 test_docker
 test_apiserver_off
+test_openssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then
