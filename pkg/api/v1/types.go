@@ -453,7 +453,7 @@ type PersistentVolumeClaimSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// PersistentVolumeSelector is a selector which must be true for the claim to bind to a volume
-	PersistentVolumeSelector *unversioned.LabelSelector `json:"persistentVolumeSelector,omitempty"`
+	PersistentVolumeSelector *unversioned.LabelSelector `json:"persistentVolumeSelector,omitempty" protobuf:"bytes,4,opt,name=persistentVolumeSelector"`
 	// Resources represents the minimum resources the volume should have.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`

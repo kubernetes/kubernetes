@@ -2330,6 +2330,10 @@
       },
       "description": "AccessModes contains the desired access modes the volume should have. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1"
      },
+     "persistentVolumeSelector": {
+      "$ref": "unversioned.LabelSelector",
+      "description": "PersistentVolumeSelector is a selector which must be true for the claim to bind to a volume"
+     },
      "resources": {
       "$ref": "v1.ResourceRequirements",
       "description": "Resources represents the minimum resources the volume should have. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources"

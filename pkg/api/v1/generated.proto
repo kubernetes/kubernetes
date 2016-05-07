@@ -1567,6 +1567,9 @@ message PersistentVolumeClaimSpec {
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1
   repeated string accessModes = 1;
 
+  // PersistentVolumeSelector is a selector which must be true for the claim to bind to a volume
+  optional k8s.io.kubernetes.pkg.api.unversioned.LabelSelector persistentVolumeSelector = 4;
+
   // Resources represents the minimum resources the volume should have.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources
   optional ResourceRequirements resources = 2;
