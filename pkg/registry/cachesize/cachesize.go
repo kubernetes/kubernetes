@@ -34,6 +34,7 @@ const (
 	Endpoints                Resource = "endpoints"
 	HorizontalPodAutoscalers Resource = "horizontalpodautoscalers"
 	Ingress                  Resource = "ingress"
+	PodDisruptionBudget      Resource = "poddisruptionbudgets"
 	PetSet                   Resource = "petset"
 	Jobs                     Resource = "jobs"
 	LimitRanges              Resource = "limitranges"
@@ -61,6 +62,7 @@ func init() {
 	watchCacheSizes[HorizontalPodAutoscalers] = 100
 	watchCacheSizes[Ingress] = 100
 	watchCacheSizes[PetSet] = 100
+	watchCacheSizes[PodDisruptionBudget] = 100
 	watchCacheSizes[Jobs] = 100
 	watchCacheSizes[LimitRanges] = 100
 	watchCacheSizes[Namespaces] = 100

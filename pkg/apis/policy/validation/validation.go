@@ -17,11 +17,32 @@ limitations under the License.
 package validation
 
 import (
+	"reflect"
+
 	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
 	extensionsvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
+
+func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
+	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
+	return allErrs
+}
+
+func ValidatePodDisruptionBudgetUpdate(pdb, oldPdb *policy.PodDisruptionBudget) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	restoreGeneration := pdb.Generation
+	pdb.Generation = oldPdb.Generation
+
+	if !reflect.DeepEqual(pdb, oldPdb) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to poddisruptionbudget spec are forbidden."))
+	}
+
+	pdb.Generation = restoreGeneration
+	return allErrs
+}
 
 func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}

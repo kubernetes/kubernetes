@@ -30,6 +30,7 @@ import (
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_policy_PodDisruptionBudget,
+		DeepCopy_policy_PodDisruptionBudgetList,
 		DeepCopy_policy_PodDisruptionBudgetSpec,
 		DeepCopy_policy_PodDisruptionBudgetStatus,
 	); err != nil {
@@ -50,6 +51,27 @@ func DeepCopy_policy_PodDisruptionBudget(in PodDisruptionBudget, out *PodDisrupt
 	}
 	if err := DeepCopy_policy_PodDisruptionBudgetStatus(in.Status, &out.Status, c); err != nil {
 		return err
+	}
+	return nil
+}
+
+func DeepCopy_policy_PodDisruptionBudgetList(in PodDisruptionBudgetList, out *PodDisruptionBudgetList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]PodDisruptionBudget, len(in))
+		for i := range in {
+			if err := DeepCopy_policy_PodDisruptionBudget(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }

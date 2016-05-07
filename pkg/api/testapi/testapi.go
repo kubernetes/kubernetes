@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
 
@@ -44,6 +45,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
+	_ "k8s.io/kubernetes/pkg/apis/policy/install"
 )
 
 var (
@@ -53,6 +55,7 @@ var (
 	Batch       TestGroup
 	Extensions  TestGroup
 	Apps        TestGroup
+	Policy      TestGroup
 	Federation  TestGroup
 
 	serializer        runtime.SerializerInfo
@@ -174,6 +177,13 @@ func init() {
 			internalTypes:         api.Scheme.KnownTypes(extensions.SchemeGroupVersion),
 		}
 	}
+	if _, ok := Groups[policy.GroupName]; !ok {
+		Groups[policy.GroupName] = TestGroup{
+			externalGroupVersions: []unversioned.GroupVersion{{Group: policy.GroupName, Version: registered.GroupOrDie(policy.GroupName).GroupVersion.Version}},
+			internalGroupVersion:  policy.SchemeGroupVersion,
+			internalTypes:         api.Scheme.KnownTypes(policy.SchemeGroupVersion),
+		}
+	}
 	if _, ok := Groups[federation.GroupName]; !ok {
 		Groups[federation.GroupName] = TestGroup{
 			externalGroupVersions: []unversioned.GroupVersion{{Group: federation.GroupName, Version: registered.GroupOrDie(federation.GroupName).GroupVersion.Version}},
@@ -186,6 +196,7 @@ func init() {
 	Autoscaling = Groups[autoscaling.GroupName]
 	Batch = Groups[batch.GroupName]
 	Apps = Groups[apps.GroupName]
+	Policy = Groups[policy.GroupName]
 	Extensions = Groups[extensions.GroupName]
 	Federation = Groups[federation.GroupName]
 }
