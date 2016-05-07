@@ -41,6 +41,13 @@ message PodDisruptionBudget {
   optional PodDisruptionBudgetStatus status = 3;
 }
 
+// PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
+message PodDisruptionBudgetList {
+  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+
+  repeated PodDisruptionBudget items = 2;
+}
+
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 message PodDisruptionBudgetSpec {
   // The minimum number of pods that must be available simultaneously.  This
