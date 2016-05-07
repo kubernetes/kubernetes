@@ -53,7 +53,8 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		ns = f.Namespace.Name
 	})
 
-	It("NFS volume can be created, bound, retrieved, unbound, and used by a pod", func() {
+	// Flaky issue: #25294
+	It("NFS volume can be created, bound, retrieved, unbound, and used by a pod [Flaky]", func() {
 		config := VolumeTestConfig{
 			namespace:   ns,
 			prefix:      "nfs",
