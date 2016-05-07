@@ -52,6 +52,10 @@ type SelfReference struct {
 	Namespace string
 }
 
+func (s SelfReference) String() string {
+	return fmt.Sprintf("%s/%s, namespace: %s, name: %s, uid: %s", s.APIVersion, s.Kind, s.Namespace, s.Name, s.UID)
+}
+
 type node struct {
 	identity   SelfReference
 	dependents []*node
@@ -79,19 +83,25 @@ type Propagator struct {
 }
 
 func (p *Propagator) addToGraphLookup(n *node) {
+	fmt.Println("CHAO: add to graph:", n.identity)
 	p.graphLookup[n.identity.UID] = n
 }
 
 func (p *Propagator) removeFromGraphLookup(n *node) {
+	fmt.Println("CHAO: remove from graph:", n.identity)
 	delete(p.graphLookup, n.identity.UID)
 }
 
 func (p *Propagator) updateOwners(n *node) (ownerExists bool) {
+	fmt.Println("CHAO: in updateOwners, graphLookUp:", p.graphLookup)
 	for _, owner := range n.owners {
+		fmt.Println("CHAO: in updateOwners, lookup for:", owner.UID)
 		ownerNode, ok := p.graphLookup[owner.UID]
 		if !ok {
+			fmt.Println("CHAO: lookup not found")
 			continue
 		}
+		fmt.Println("CHAO: lookup found")
 		ownerExists = true
 		ownerNode.dependents = append(ownerNode.dependents, n)
 	}
@@ -151,6 +161,7 @@ func (p *Propagator) processEvent() {
 		ownerExists := p.updateOwners(newNode)
 		// Push the object to the dirty queue if none of its owners exists in the Graph.
 		if !ownerExists && len(newNode.owners) != 0 {
+			fmt.Println("CHAO: directly added to dirty queue: ", newNode.identity)
 			p.gc.dirtyQueue.Add(newNode)
 		}
 
@@ -220,6 +231,7 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 		framework.ResourceEventHandlerFuncs{
 			// Add the event to the propagator's event queue.
 			AddFunc: func(obj interface{}) {
+				fmt.Println("CHAO: AddFunc: obj=", obj)
 				event := Event{
 					Type: Add,
 					Obj:  obj,
@@ -242,6 +254,13 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 	return monitor, nil
 }
 
+var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
+	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}: struct{}{},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                              struct{}{},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                     struct{}{},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                struct{}{},
+}
+
 func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
 	gc := &GarbageCollector{
 		clientPool: clientPool,
@@ -255,6 +274,10 @@ func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.
 		gc:          gc,
 	}
 	for _, resource := range resources {
+		if _, ok := ignoredResources[resource]; ok {
+			glog.V(6).Infof("ignore resource %#v", resource)
+			continue
+		}
 		monitor, err := monitorFor(gc.propagator, gc.clientPool, resource)
 		if err != nil {
 			return nil, err
@@ -347,7 +370,7 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		// TODO: need to compare the UID.
 		if err == nil {
 			if owner.GetUID() != reference.UID {
-				glog.V(6).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+				glog.V(6).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 				continue
 			}
 			glog.V(6).Infof("object %s has at least an existing owner, will not garbage collect", item.identity.UID)

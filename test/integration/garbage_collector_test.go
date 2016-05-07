@@ -38,6 +38,7 @@ import (
 )
 
 const podName = "test.pod.1"
+const rcName = "test.rc.1"
 
 func newDanglingPod() *v1.Pod {
 	return &v1.Pod{
@@ -51,8 +52,7 @@ func newDanglingPod() *v1.Pod {
 			OwnerReferences: []v1.OwnerReference{
 				{
 					Kind:       "ReplicationController",
-					Name:       "non-exist-owner",
-					UID:        "123",
+					Name:       rcName,
 					APIVersion: "v1",
 				},
 			},
@@ -69,7 +69,32 @@ func newDanglingPod() *v1.Pod {
 }
 
 func newOwnerRC() *v1.ReplicationController {
-	return &v1.ReplicationController{}
+	return &v1.ReplicationController{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "ReplicationController",
+			APIVersion: "v1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      rcName,
+			Namespace: framework.TestNS,
+		},
+		Spec: v1.ReplicationControllerSpec{
+			Selector: map[string]string{"name": "test"},
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{"name": "test"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func observePodDeletion(t *testing.T, w watch.Interface) (deletedPod *api.Pod) {
@@ -95,7 +120,92 @@ func observePodDeletion(t *testing.T, w watch.Interface) (deletedPod *api.Pod) {
 	return
 }
 
+// This test simulates the cascading deletion.
 func TestCascadingDeletion(t *testing.T) {
+	flag.Set("v", "9")
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
+
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("Error in bringing up the master: %v", err)
+	}
+
+	framework.DeleteAllEtcdKeys()
+	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+	groupVersionResources, err := garbagecollector.ServerPreferredGroupVersionResources(clientSet.Discovery())
+	if err != nil {
+		t.Fatalf("Failed to get supported resources from server: %v", err)
+	}
+	clientPool := dynamic.NewClientPool(&restclient.Config{Host: s.URL}, dynamic.LegacyAPIPathResolverFunc)
+	gc, err := garbagecollector.NewGarbageCollector(clientPool, groupVersionResources)
+	if err != nil {
+		t.Fatalf("Failed to create garbage collector")
+	}
+
+	rcClient := clientSet.Core().ReplicationControllers(framework.TestNS)
+	rc, err := rcClient.Create(newOwnerRC())
+	if err != nil {
+		t.Fatalf("Failed to create replication controller: %v", err)
+	}
+	rcs, err := rcClient.List(api.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list replication controllers: %v", err)
+	}
+	if len(rcs.Items) != 1 {
+		t.Fatalf("Expect only 1 replication controller")
+	}
+
+	podClient := clientSet.Core().Pods(framework.TestNS)
+	pod := newDanglingPod()
+	pod.ObjectMeta.OwnerReferences[0].UID = rc.ObjectMeta.UID
+	_, err = podClient.Create(pod)
+	if err != nil {
+		t.Fatalf("Failed to create Pod: %v", err)
+	}
+
+	// set up watch
+	pods, err := podClient.List(api.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list pods: %v", err)
+	}
+	if len(pods.Items) != 1 {
+		t.Fatalf("Expect only 1 pod")
+	}
+	options := api.ListOptions{
+		ResourceVersion: pods.ListMeta.ResourceVersion,
+	}
+	w, err := podClient.Watch(options)
+	if err != nil {
+		t.Fatalf("Failed to set up watch: %v", err)
+	}
+	stopCh := make(chan struct{})
+	go gc.Run(5, stopCh)
+	defer close(stopCh)
+	if err := rcClient.Delete(rcName, nil); err != nil {
+		t.Fatalf("failed to delete replication controller: %v", err)
+	}
+
+	deletedPod := observePodDeletion(t, w)
+	if deletedPod == nil {
+		t.Fatalf("empty deletedPod")
+	}
+	if deletedPod.Name != podName {
+		t.Fatalf("deleted unexpected pod: %v", *deletedPod)
+	}
+}
+
+// This test simulates the case where an object is created with an owner that
+// doesn't exist. It verifies the GC will delete such delete such an object.
+func TestCreateWithNonExisitentOwner(t *testing.T) {
 	flag.Set("v", "9")
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
