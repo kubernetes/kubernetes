@@ -27,9 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// CreateSharedPodInformer returns a SharedInformer that lists and watches all pods
-func CreateSharedPodInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedInformer {
-	sharedInformer := framework.NewSharedInformer(
+// CreateSharedPodInformer returns a SharedIndexInformer that lists and watches all pods
+func CreateSharedPodInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+	sharedInformer := framework.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return client.Core().Pods(api.NamespaceAll).List(options)
@@ -38,7 +38,29 @@ func CreateSharedPodInformer(client clientset.Interface, resyncPeriod time.Durat
 				return client.Core().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
-		&api.Pod{}, resyncPeriod)
+		&api.Pod{},
+		resyncPeriod,
+		cache.Indexers{},
+	)
 
 	return sharedInformer
+}
+
+// CreateSharedPodIndexInformer returns a SharedIndexInformer that lists and watches all pods
+func CreateSharedPodIndexInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+	sharedIndexInformer := framework.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().Pods(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().Pods(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.Pod{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+
+	return sharedIndexInformer
 }

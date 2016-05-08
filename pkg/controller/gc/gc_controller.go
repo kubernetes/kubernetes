@@ -63,7 +63,7 @@ func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFun
 
 	terminatedSelector := fields.ParseSelectorOrDie("status.phase!=" + string(api.PodPending) + ",status.phase!=" + string(api.PodRunning) + ",status.phase!=" + string(api.PodUnknown))
 
-	gcc.podStore.Store, gcc.podStoreSyncer = framework.NewInformer(
+	gcc.podStore.Indexer, gcc.podStoreSyncer = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = terminatedSelector
@@ -77,6 +77,10 @@ func New(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFun
 		&api.Pod{},
 		resyncPeriod(),
 		framework.ResourceEventHandlerFuncs{},
+		// We don't need to build a index for podStore here actually, but build one for consistency.
+		// It will ensure that if people start making use of the podStore in more specific ways,
+		// they'll get the benefits they expect. It will also reserve the name for future refactorings.
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	return gcc
 }

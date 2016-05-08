@@ -193,7 +193,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	eventBroadcaster.StartRecordingToSink(cl.Events(""))
 	scheduler.New(schedulerConfig).Run()
 
-	podInformer := informers.CreateSharedPodInformer(clientset, controller.NoResyncPeriodFunc())
+	podInformer := informers.CreateSharedPodIndexInformer(clientset, controller.NoResyncPeriodFunc())
 
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
 	go endpointcontroller.NewEndpointController(podInformer, clientset).

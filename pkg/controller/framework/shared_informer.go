@@ -48,8 +48,8 @@ type SharedInformer interface {
 
 type SharedIndexInformer interface {
 	SharedInformer
-
-	AddIndexer(indexer cache.Indexer) error
+	// AddIndexers add indexers to the informer before it starts.
+	AddIndexers(indexers cache.Indexers) error
 	GetIndexer() cache.Indexer
 }
 
@@ -57,32 +57,40 @@ type SharedIndexInformer interface {
 // TODO: create a cache/factory of these at a higher level for the list all, watch all of a given resource that can
 // be shared amongst all consumers.
 func NewSharedInformer(lw cache.ListerWatcher, objType runtime.Object, resyncPeriod time.Duration) SharedInformer {
-	sharedInformer := &sharedInformer{
-		processor: &sharedProcessor{},
-		store:     cache.NewStore(DeletionHandlingMetaNamespaceKeyFunc),
+	sharedInformer := &sharedIndexInformer{
+		processor:        &sharedProcessor{},
+		indexer:          cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{}),
+		listerWatcher:    lw,
+		objectType:       objType,
+		fullResyncPeriod: resyncPeriod,
 	}
-
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, sharedInformer.store)
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    lw,
-		ObjectType:       objType,
-		FullResyncPeriod: resyncPeriod,
-		RetryOnError:     false,
-
-		Process: sharedInformer.HandleDeltas,
-	}
-	sharedInformer.controller = New(cfg)
-
 	return sharedInformer
 }
 
-type sharedInformer struct {
-	store      cache.Store
+// NewSharedIndexInformer creates a new instance for the listwatcher.
+// TODO: create a cache/factory of these at a higher level for the list all, watch all of a given resource that can
+// be shared amongst all consumers.
+func NewSharedIndexInformer(lw cache.ListerWatcher, objType runtime.Object, resyncPeriod time.Duration, indexers cache.Indexers) SharedIndexInformer {
+	sharedIndexInformer := &sharedIndexInformer{
+		processor:        &sharedProcessor{},
+		indexer:          cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
+		listerWatcher:    lw,
+		objectType:       objType,
+		fullResyncPeriod: resyncPeriod,
+	}
+	return sharedIndexInformer
+}
+
+type sharedIndexInformer struct {
+	indexer    cache.Indexer
 	controller *Controller
 
 	processor *sharedProcessor
+
+	// This block is tracked to handle late initialization of the controller
+	listerWatcher    cache.ListerWatcher
+	objectType       runtime.Object
+	fullResyncPeriod time.Duration
 
 	started     bool
 	startedLock sync.Mutex
@@ -94,7 +102,7 @@ type sharedInformer struct {
 // Because returning information back is always asynchronous, the legacy callers shouldn't
 // notice any change in behavior.
 type dummyController struct {
-	informer *sharedInformer
+	informer *sharedIndexInformer
 }
 
 func (v *dummyController) Run(stopCh <-chan struct{}) {
@@ -117,8 +125,21 @@ type deleteNotification struct {
 	oldObj interface{}
 }
 
-func (s *sharedInformer) Run(stopCh <-chan struct{}) {
+func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, s.indexer)
+
+	cfg := &Config{
+		Queue:            fifo,
+		ListerWatcher:    s.listerWatcher,
+		ObjectType:       s.objectType,
+		FullResyncPeriod: s.fullResyncPeriod,
+		RetryOnError:     false,
+
+		Process: s.HandleDeltas,
+	}
+	s.controller = New(cfg)
 
 	func() {
 		s.startedLock.Lock()
@@ -130,25 +151,50 @@ func (s *sharedInformer) Run(stopCh <-chan struct{}) {
 	s.controller.Run(stopCh)
 }
 
-func (s *sharedInformer) isStarted() bool {
+func (s *sharedIndexInformer) isStarted() bool {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 	return s.started
 }
 
-func (s *sharedInformer) HasSynced() bool {
+func (s *sharedIndexInformer) HasSynced() bool {
 	return s.controller.HasSynced()
 }
 
-func (s *sharedInformer) GetStore() cache.Store {
-	return s.store
+func (s *sharedIndexInformer) GetStore() cache.Store {
+	return s.indexer
 }
 
-func (s *sharedInformer) GetController() ControllerInterface {
+func (s *sharedIndexInformer) GetIndexer() cache.Indexer {
+	return s.indexer
+}
+
+func (s *sharedIndexInformer) AddIndexers(indexers cache.Indexers) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.started {
+		return fmt.Errorf("informer has already started")
+	}
+
+	oldIndexers := s.indexer.GetIndexers()
+
+	for name, indexFunc := range oldIndexers {
+		if _, exist := indexers[name]; exist {
+			return fmt.Errorf("there is an index named %s already exist", name)
+		}
+		indexers[name] = indexFunc
+	}
+
+	s.indexer = cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
+	return nil
+}
+
+func (s *sharedIndexInformer) GetController() ControllerInterface {
 	return &dummyController{informer: s}
 }
 
-func (s *sharedInformer) AddEventHandler(handler ResourceEventHandler) error {
+func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) error {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -161,24 +207,24 @@ func (s *sharedInformer) AddEventHandler(handler ResourceEventHandler) error {
 	return nil
 }
 
-func (s *sharedInformer) HandleDeltas(obj interface{}) error {
+func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	// from oldest to newest
 	for _, d := range obj.(cache.Deltas) {
 		switch d.Type {
 		case cache.Sync, cache.Added, cache.Updated:
-			if old, exists, err := s.store.Get(d.Object); err == nil && exists {
-				if err := s.store.Update(d.Object); err != nil {
+			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
+				if err := s.indexer.Update(d.Object); err != nil {
 					return err
 				}
 				s.processor.distribute(updateNotification{oldObj: old, newObj: d.Object})
 			} else {
-				if err := s.store.Add(d.Object); err != nil {
+				if err := s.indexer.Add(d.Object); err != nil {
 					return err
 				}
 				s.processor.distribute(addNotification{newObj: d.Object})
 			}
 		case cache.Deleted:
-			if err := s.store.Delete(d.Object); err != nil {
+			if err := s.indexer.Delete(d.Object); err != nil {
 				return err
 			}
 			s.processor.distribute(deleteNotification{oldObj: d.Object})
