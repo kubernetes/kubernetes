@@ -18,6 +18,7 @@ package persistent_claim
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -38,6 +39,7 @@ var _ volume.VolumePlugin = &persistentClaimPlugin{}
 
 const (
 	persistentClaimPluginName = "kubernetes.io/persistent-claim"
+	volumeGidAnnotationKey    = "pv.beta.kubernetes.io/gid"
 )
 
 func (plugin *persistentClaimPlugin) Init(host volume.VolumeHost) error {
@@ -78,6 +80,19 @@ func (plugin *persistentClaimPlugin) NewMounter(spec *volume.Spec, pod *api.Pod,
 	if pv.Spec.ClaimRef.UID != claim.UID {
 		glog.Errorf("Expected volume.Spec.ClaimRef.UID %+v but have %+v", pv.Spec.ClaimRef.UID, claim.UID)
 		return nil, err
+	}
+
+	// If a GID annotation is provided set the GID attribute.
+	if volumeGid, ok := pv.Annotations[volumeGidAnnotationKey]; ok {
+		gid, err := strconv.ParseInt(volumeGid, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid value for %s %v", volumeGidAnnotationKey, err)
+		}
+
+		if pod.Spec.SecurityContext == nil {
+			pod.Spec.SecurityContext = &api.PodSecurityContext{}
+		}
+		pod.Spec.SecurityContext.SupplementalGroups = append(pod.Spec.SecurityContext.SupplementalGroups, gid)
 	}
 
 	mounter, err := plugin.host.NewWrapperMounter(claim.Spec.VolumeName, *volume.NewSpecFromPersistentVolume(pv, spec.ReadOnly), pod, opts)
