@@ -379,6 +379,7 @@ save-config
 scheduler-config
 scheduler-name
 schema-cache-dir
+seccomp-profile-root
 secure-port
 serialize-image-pulls
 server-start-timeout
