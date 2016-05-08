@@ -91,31 +91,24 @@ func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Lab
 func (meta *ObjectMeta) GetAnnotations() map[string]string            { return meta.Annotations }
 func (meta *ObjectMeta) SetAnnotations(annotations map[string]string) { meta.Annotations = annotations }
 
-func setMetaOwnerReference(dest *metatypes.OwnerReference, reference *OwnerReference) {
-	dest.Kind = reference.Kind
-	dest.Name = reference.Name
-	dest.UID = reference.UID
-	dest.APIVersion = reference.APIVersion
-}
 func (meta *ObjectMeta) GetOwnerReferences() []metatypes.OwnerReference {
 	ret := make([]metatypes.OwnerReference, len(meta.OwnerReferences))
 	for i := 0; i < len(meta.OwnerReferences); i++ {
-		setMetaOwnerReference(&ret[i], &meta.OwnerReferences[i])
+		ret[i].Kind = meta.OwnerReferences[i].Kind
+		ret[i].Name = meta.OwnerReferences[i].Name
+		ret[i].UID = meta.OwnerReferences[i].UID
+		ret[i].APIVersion = meta.OwnerReferences[i].APIVersion
 	}
 	return ret
-}
-
-func setOwnerReference(dest *OwnerReference, reference *metatypes.OwnerReference) {
-	dest.Kind = reference.Kind
-	dest.Name = reference.Name
-	dest.UID = reference.UID
-	dest.APIVersion = reference.APIVersion
 }
 
 func (meta *ObjectMeta) SetOwnerReferences(references []metatypes.OwnerReference) {
 	newReferences := make([]OwnerReference, len(references))
 	for i := 0; i < len(references); i++ {
-		setOwnerReference(&newReferences[i], &references[i])
+		newReferences[i].Kind = references[i].Kind
+		newReferences[i].Name = references[i].Name
+		newReferences[i].UID = references[i].UID
+		newReferences[i].APIVersion = references[i].APIVersion
 	}
 	meta.OwnerReferences = newReferences
 }

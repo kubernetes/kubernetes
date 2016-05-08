@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/gofuzz"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
@@ -52,25 +54,33 @@ func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	}
 }
 
-func getObjectMetaAndOwnerReferneces() (api.ObjectMeta, []metatypes.OwnerReference) {
-	return api.ObjectMeta{
-			OwnerReferences: []api.OwnerReference{
-				{UID: "1"},
-				{UID: "2"},
-				{UID: "3"},
-				{UID: "4"},
-				{UID: "5"},
-			},
-		}, []metatypes.OwnerReference{
-			{UID: "1"},
-			{UID: "2"},
-			{UID: "3"},
-			{UID: "4"},
-			{UID: "5"},
-		}
+func getObjectMetaAndOwnerRefereneces() (objectMeta api.ObjectMeta, metaOwnerReferences []metatypes.OwnerReference) {
+	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&myAPIObject2)
+	references := objectMeta.OwnerReferences
+	metaOwnerReferences = make([]metatypes.OwnerReference, 0)
+	for i := 0; i < len(references); i++ {
+		metaOwnerReferences = append(metaOwnerReferences, metatypes.OwnerReference{
+			Kind:       references[i].Kind,
+			Name:       references[i].Name,
+			UID:        references[i].UID,
+			APIVersion: references[i].APIVersion,
+		})
+	}
+	if len(references) == 0 {
+		objectMeta.OwnerReferences = make([]api.OwnerReference, 0)
+	}
+	return objectMeta, metaOwnerReferences
 }
 
-func TestObjectMetaGetOwnerReferences(t *testing.T) {
+func TestAccessOwnerReferences(t *testing.T) {
+	fuzzIter := 5
+	for i := 0; i < fuzzIter; i++ {
+		testGetOwnerReferences(t)
+		testSetOwnerReferences(t)
+	}
+}
+
+func testGetOwnerReferences(t *testing.T) {
 	meta, expected := getObjectMetaAndOwnerReferneces()
 	refs := meta.GetOwnerReferences()
 	if !reflect.DeepEqual(refs, expected) {
@@ -78,7 +88,7 @@ func TestObjectMetaGetOwnerReferences(t *testing.T) {
 	}
 }
 
-func TestObjectMetaSetOwnerReferences(t *testing.T) {
+func testSetOwnerReferences(t *testing.T) {
 	expected, newRefs := getObjectMetaAndOwnerReferneces()
 	objectMeta := &api.ObjectMeta{}
 	objectMeta.SetOwnerReferences(newRefs)

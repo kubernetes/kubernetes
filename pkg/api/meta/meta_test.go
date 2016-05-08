@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/gofuzz"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
@@ -734,49 +736,54 @@ type MyAPIObject2 struct {
 	v1.ObjectMeta
 }
 
-func getObjectMetaAndOwnerReferneces() (MyAPIObject2, []metatypes.OwnerReference) {
-	return MyAPIObject2{
-			ObjectMeta: v1.ObjectMeta{
-				OwnerReferences: []v1.OwnerReference{
-					{UID: "1"},
-					{UID: "2"},
-					{UID: "3"},
-					{UID: "4"},
-					{UID: "5"},
-				},
-			},
-		},
-		[]metatypes.OwnerReference{
-			{UID: "1"},
-			{UID: "2"},
-			{UID: "3"},
-			{UID: "4"},
-			{UID: "5"},
-		}
+func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metatypes.OwnerReference) {
+	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&myAPIObject2)
+	references := myAPIObject2.ObjectMeta.OwnerReferences
+	metaOwnerReferences = make([]metatypes.OwnerReference, 0)
+	for i := 0; i < len(references); i++ {
+		metaOwnerReferences = append(metaOwnerReferences, metatypes.OwnerReference{
+			Kind:       references[i].Kind,
+			Name:       references[i].Name,
+			UID:        references[i].UID,
+			APIVersion: references[i].APIVersion,
+		})
+	}
+	if len(references) == 0 {
+		myAPIObject2.ObjectMeta.OwnerReferences = make([]v1.OwnerReference, 0)
+	}
+	return myAPIObject2, metaOwnerReferences
 }
 
-func TestGetOwnerReferences(t *testing.T) {
-	obj, expected := getObjectMetaAndOwnerReferneces()
+func TestAccessOwnerReferences(t *testing.T) {
+	fuzzIter := 5
+	for i := 0; i < fuzzIter; i++ {
+		testGetOwnerReferences(t)
+		testSetOwnerReferences(t)
+	}
+}
+
+func testGetOwnerReferences(t *testing.T) {
+	obj, expected := getObjectMetaAndOwnerRefereneces()
 	accessor, err := meta.Accessor(&obj)
 	if err != nil {
 		t.Error(err)
 	}
 	references := accessor.GetOwnerReferences()
 	if !reflect.DeepEqual(references, expected) {
-		t.Errorf("expect %v, got %v", expected, references)
+		t.Errorf("expect %#v\n got %#v", expected, references)
 	}
 }
 
-func TestSetOwnerReferences(t *testing.T) {
-	expected, references := getObjectMetaAndOwnerReferneces()
+func testSetOwnerReferences(t *testing.T) {
+	expected, references := getObjectMetaAndOwnerRefereneces()
 	obj := MyAPIObject2{}
 	accessor, err := meta.Accessor(&obj)
 	if err != nil {
 		t.Error(err)
 	}
 	accessor.SetOwnerReferences(references)
-	if !reflect.DeepEqual(obj, expected) {
-		t.Errorf("expect %v, got %v", expected, obj)
+	if !reflect.DeepEqual(obj.ObjectMeta.OwnerReferences, expected.ObjectMeta.OwnerReferences) {
+		t.Errorf("expect %#v\n got %#v", expected.ObjectMeta.OwnerReferences, obj.ObjectMeta.OwnerReferences)
 	}
 }
 

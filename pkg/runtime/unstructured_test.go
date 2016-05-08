@@ -144,10 +144,16 @@ func TestUnstructuredGetters(t *testing.T) {
 				},
 				"ownerReferences": []map[string]interface{}{
 					{
-						"uid": "1",
+						"kind":       "Pod",
+						"name":       "poda",
+						"apiVersion": "v1",
+						"uid":        "1",
 					},
 					{
-						"uid": "2",
+						"kind":       "Pod",
+						"name":       "podb",
+						"apiVersion": "v1",
+						"uid":        "2",
 					},
 				},
 			},
@@ -202,7 +208,21 @@ func TestUnstructuredGetters(t *testing.T) {
 		t.Errorf("GetAnnotations() = %s, want %s", got, want)
 	}
 	refs := unstruct.GetOwnerReferences()
-	if got, want := refs, []metatypes.OwnerReference{{UID: "1"}, {UID: "2"}}; !reflect.DeepEqual(got, want) {
+	expectedOwnerReferences := []metatypes.OwnerReference{
+		{
+			Kind:       "Pod",
+			Name:       "poda",
+			APIVersion: "v1",
+			UID:        "1",
+		},
+		{
+			Kind:       "Pod",
+			Name:       "podb",
+			APIVersion: "v1",
+			UID:        "2",
+		},
+	}
+	if got, want := refs, expectedOwnerReferences; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetOwnerReference()=%v, want %v", got, want)
 	}
 }
@@ -231,15 +251,15 @@ func TestUnstructuredSetters(t *testing.T) {
 				},
 				"ownerReferences": []map[string]interface{}{
 					{
-						"kind":       "",
-						"name":       "",
-						"apiVersion": "",
+						"kind":       "Pod",
+						"name":       "poda",
+						"apiVersion": "v1",
 						"uid":        "1",
 					},
 					{
-						"kind":       "",
-						"name":       "",
-						"apiVersion": "",
+						"kind":       "Pod",
+						"name":       "podb",
+						"apiVersion": "v1",
 						"uid":        "2",
 					},
 				},
@@ -260,7 +280,21 @@ func TestUnstructuredSetters(t *testing.T) {
 	unstruct.SetDeletionTimestamp(&date)
 	unstruct.SetLabels(map[string]string{"test_label": "test_value"})
 	unstruct.SetAnnotations(map[string]string{"test_annotation": "test_value"})
-	unstruct.SetOwnerReferences([]metatypes.OwnerReference{{UID: "1"}, {UID: "2"}})
+	newOwnerReferences := []metatypes.OwnerReference{
+		{
+			Kind:       "Pod",
+			Name:       "poda",
+			APIVersion: "v1",
+			UID:        "1",
+		},
+		{
+			Kind:       "Pod",
+			Name:       "podb",
+			APIVersion: "v1",
+			UID:        "2",
+		},
+	}
+	unstruct.SetOwnerReferences(newOwnerReferences)
 
 	if !reflect.DeepEqual(unstruct, want) {
 		t.Errorf("Wanted: \n%s\n Got:\n%s", want, unstruct)

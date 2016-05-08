@@ -30,14 +30,14 @@ import (
 )
 
 func ListAccessor(obj interface{}) (List, error) {
-	if oi, ok := obj.(ListMetaAccessor); ok {
-		if om := oi.GetListMeta(); om != nil {
+	if listMetaAccessor, ok := obj.(ListMetaAccessor); ok {
+		if om := listMetaAccessor.GetListMeta(); om != nil {
 			return om, nil
 		}
 	}
 	// we may get passed an object that is directly portable to List
-	if oi, ok := obj.(List); ok {
-		return oi, nil
+	if list, ok := obj.(List); ok {
+		return list, nil
 	}
 	glog.V(4).Infof("Calling ListAccessor on non-internal object: %v", reflect.TypeOf(obj))
 	// legacy path for objects that do not implement List and ListMetaAccessor via
@@ -68,14 +68,14 @@ func ListAccessor(obj interface{}) (List, error) {
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
 func Accessor(obj interface{}) (Object, error) {
-	if oi, ok := obj.(ObjectMetaAccessor); ok {
-		if om := oi.GetObjectMeta(); om != nil {
+	if objectMetaAccessor, ok := obj.(ObjectMetaAccessor); ok {
+		if om := objectMetaAccessor.GetObjectMeta(); om != nil {
 			return om, nil
 		}
 	}
 	// we may get passed an object that is directly portable to Object
-	if oi, ok := obj.(Object); ok {
-		return oi, nil
+	if object, ok := obj.(Object); ok {
+		return object, nil
 	}
 
 	glog.V(4).Infof("Calling Accessor on non-internal object: %v", reflect.TypeOf(obj))
@@ -613,10 +613,10 @@ func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
 	}
 	ownerReferences := v.FieldByName("OwnerReferences")
 	if !ownerReferences.IsValid() {
-		return fmt.Errorf("struct %v lacks OwnerReferences type", v)
+		return fmt.Errorf("struct %#v lacks OwnerReferences type", v)
 	}
 	if ownerReferences.Kind() != reflect.Slice {
-		return fmt.Errorf("expcet %v to be a slice", ownerReferences.Kind())
+		return fmt.Errorf("expect %v to be a slice", ownerReferences.Kind())
 	}
 	a.ownerReferences = ownerReferences.Addr()
 	return nil
