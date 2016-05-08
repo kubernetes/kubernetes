@@ -178,7 +178,7 @@ func NewNodeController(
 		nodeExistsInCloudProvider: func(nodeName string) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
 	}
 
-	nc.podStore.Store, nc.podController = framework.NewInformer(
+	nc.podStore.Indexer, nc.podController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return nc.kubeClient.Core().Pods(api.NamespaceAll).List(options)
@@ -193,6 +193,10 @@ func NewNodeController(
 			AddFunc:    nc.maybeDeleteTerminatingPod,
 			UpdateFunc: func(_, obj interface{}) { nc.maybeDeleteTerminatingPod(obj) },
 		},
+		// We don't need to build a index for podStore here actually, but build one for consistency.
+		// It will ensure that if people start making use of the podStore in more specific ways,
+		// they'll get the benefits they expect. It will also reserve the name for future refactorings.
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	nc.nodeStore.Store, nc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
