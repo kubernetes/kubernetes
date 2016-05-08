@@ -19,14 +19,17 @@ package util
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/user"
 	"path"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -36,9 +39,13 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
@@ -369,6 +376,202 @@ func TestSubstitueUser(t *testing.T) {
 		}
 		if output != test.expected {
 			t.Errorf("expected: %s, saw: %s", test.expected, output)
+		}
+	}
+}
+
+func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *api.PodList {
+	pods := []api.Pod{}
+	for i := 0; i < count; i++ {
+		newPod := api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:              fmt.Sprintf("pod-%d", i+1),
+				Namespace:         api.NamespaceDefault,
+				CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, i, 0, time.UTC),
+				Labels:            labels,
+			},
+			Status: api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Status: api.ConditionTrue,
+						Type:   api.PodReady,
+					},
+				},
+			},
+		}
+		pods = append(pods, newPod)
+	}
+	if isUnready > -1 && isUnready < count {
+		pods[isUnready].Status.Conditions[0].Status = api.ConditionFalse
+	}
+	if isUnhealthy > -1 && isUnhealthy < count {
+		pods[isUnhealthy].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 5}}
+	}
+	return &api.PodList{
+		Items: pods,
+	}
+}
+
+func TestGetFirstPod(t *testing.T) {
+	labelSet := map[string]string{"test": "selector"}
+	tests := []struct {
+		name string
+
+		podList  *api.PodList
+		watching []watch.Event
+		sortBy   func([]*api.Pod) sort.Interface
+
+		expected    *api.Pod
+		expectedNum int
+		expectedErr bool
+	}{
+		{
+			name:    "kubectl logs - two ready pods",
+			podList: newPodList(2, -1, -1, labelSet),
+			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) },
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "pod-2",
+					Namespace:         api.NamespaceDefault,
+					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
+					Labels:            map[string]string{"test": "selector"},
+				},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Status: api.ConditionTrue,
+							Type:   api.PodReady,
+						},
+					},
+				},
+			},
+			expectedNum: 2,
+		},
+		{
+			name:    "kubectl logs - one unhealthy, one healthy",
+			podList: newPodList(2, -1, 1, labelSet),
+			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ActivePods(pods) },
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "pod-2",
+					Namespace:         api.NamespaceDefault,
+					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
+					Labels:            map[string]string{"test": "selector"},
+				},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Status: api.ConditionTrue,
+							Type:   api.PodReady,
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{{RestartCount: 5}},
+				},
+			},
+			expectedNum: 2,
+		},
+		{
+			name:    "kubectl attach - two ready pods",
+			podList: newPodList(2, -1, -1, labelSet),
+			sortBy:  func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "pod-1",
+					Namespace:         api.NamespaceDefault,
+					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+					Labels:            map[string]string{"test": "selector"},
+				},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Status: api.ConditionTrue,
+							Type:   api.PodReady,
+						},
+					},
+				},
+			},
+			expectedNum: 2,
+		},
+		{
+			name:    "kubectl attach - wait for ready pod",
+			podList: newPodList(1, 1, -1, labelSet),
+			watching: []watch.Event{
+				{
+					Type: watch.Modified,
+					Object: &api.Pod{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "pod-1",
+							Namespace:         api.NamespaceDefault,
+							CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+							Labels:            map[string]string{"test": "selector"},
+						},
+						Status: api.PodStatus{
+							Conditions: []api.PodCondition{
+								{
+									Status: api.ConditionTrue,
+									Type:   api.PodReady,
+								},
+							},
+						},
+					},
+				},
+			},
+			sortBy: func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "pod-1",
+					Namespace:         api.NamespaceDefault,
+					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+					Labels:            map[string]string{"test": "selector"},
+				},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Status: api.ConditionTrue,
+							Type:   api.PodReady,
+						},
+					},
+				},
+			},
+			expectedNum: 1,
+		},
+	}
+
+	for i := range tests {
+		test := tests[i]
+		client := &testclient.Fake{}
+		client.PrependReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+			return true, test.podList, nil
+		})
+		if len(test.watching) > 0 {
+			watcher := watch.NewFake()
+			for _, event := range test.watching {
+				switch event.Type {
+				case watch.Added:
+					go watcher.Add(event.Object)
+				case watch.Modified:
+					go watcher.Modify(event.Object)
+				}
+			}
+			client.PrependWatchReactor("pods", testclient.DefaultWatchReactor(watcher, nil))
+		}
+		selector := labels.Set(labelSet).AsSelector()
+
+		pod, numPods, err := GetFirstPod(client, api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
+		if !test.expectedErr && err != nil {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+			continue
+		}
+		if test.expectedErr && err == nil {
+			t.Errorf("%s: expected an error", test.name)
+			continue
+		}
+		if test.expectedNum != numPods {
+			t.Errorf("%s: expected %d pods, got %d", test.name, test.expectedNum, numPods)
+			continue
+		}
+		if !reflect.DeepEqual(test.expected, pod) {
+			t.Errorf("%s:\nexpected pod:\n%#v\ngot:\n%#v\n\n", test.name, test.expected, pod)
 		}
 	}
 }
