@@ -107,7 +107,7 @@ func (sv *configMapVolume) GetAttributes() volume.Attributes {
 
 // This is the spec for the volume that this plugin wraps.
 var wrappedVolumeSpec = volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 }
 
 func (b *configMapVolumeMounter) SetUp(fsGroup *int64) error {
