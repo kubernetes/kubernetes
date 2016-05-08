@@ -141,7 +141,7 @@ func TestCascadingDeletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	groupVersionResources, err := garbagecollector.ServerPreferredGroupVersionResources(clientSet.Discovery())
+	groupVersionResources, err := clientSet.Discovery().ServerPreferredResources()
 	if err != nil {
 		t.Fatalf("Failed to get supported resources from server: %v", err)
 	}
