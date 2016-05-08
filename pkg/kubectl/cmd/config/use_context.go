@@ -22,8 +22,8 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 type useContextOptions struct {
@@ -42,13 +42,8 @@ func NewCmdConfigUseContext(out io.Writer, configAccess ConfigAccess) *cobra.Com
 			if !options.complete(cmd) {
 				return
 			}
-
-			err := options.run()
-			if err != nil {
-				fmt.Fprintf(out, "%v\n", err)
-			} else {
-				fmt.Fprintf(out, "switched to context %q.\n", options.contextName)
-			}
+			cmdutil.CheckErr(options.run())
+			fmt.Fprintf(out, "switched to context %q.\n", options.contextName)
 		},
 	}
 
