@@ -75,9 +75,7 @@ cmd/libs/go2idl/ tool.
 1. Generate conversions and deep-copies:
 
     1. Add your "group/" or "group/version" into
-hack/after-build/{update-generated-conversions.sh,
-update-generated-deep-copies.sh, verify-generated-conversions.sh,
-verify-generated-deep-copies.sh};
+cmd/libs/go2idl/{conversion-gen, deep-copy-gen}/main.go;
     2. Make sure your pkg/apis/`<group>`/`<version>` directory has a doc.go file
 with the comment `// +genconversion=true`, to catch the attention of our
 gen-conversion script.
