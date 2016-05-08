@@ -337,6 +337,34 @@ func TestFreeSpaceImagesAlsoDoesLookupByRepoTags(t *testing.T) {
 	assert.Len(fakeRuntime.ImageList, 1)
 }
 
+func TestFreeSpaceImagesAlsoDoesLookupByRepoDigests(t *testing.T) {
+	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
+		makeImage(0, 1024),
+		{
+			ID:          "5678",
+			RepoDigests: []string{"potato", "salad"},
+			Size:        2048,
+		},
+	}
+	fakeRuntime.AllPodList = []*container.Pod{
+		{
+			Containers: []*container.Container{
+				{
+					ID:    container.ContainerID{Type: "test", ID: "c5678"},
+					Image: "salad",
+				},
+			},
+		},
+	}
+
+	spaceFreed, err := manager.freeSpace(1024, time.Now())
+	assert := assert.New(t)
+	require.NoError(t, err)
+	assert.EqualValues(1024, spaceFreed)
+	assert.Len(fakeRuntime.ImageList, 1)
+}
+
 func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
