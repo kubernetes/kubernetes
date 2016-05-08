@@ -883,6 +883,9 @@ type VolumeMount struct {
 	// Path within the container at which the volume should be mounted.  Must
 	// not contain ':'.
 	MountPath string `json:"mountPath" protobuf:"bytes,3,opt,name=mountPath"`
+	// Path within the volume from which the container's volume should be mounted.
+	// Defaults to "" (volume's root).
+	SubPath string `json:"subPath,omitempty" protobuf:"bytes,4,opt,name=subPath"`
 }
 
 // EnvVar represents an environment variable present in a Container.
