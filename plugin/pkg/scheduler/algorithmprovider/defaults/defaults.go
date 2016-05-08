@@ -93,6 +93,24 @@ func init() {
 	factory.RegisterFitPredicate("HostName", predicates.PodFitsHost)
 	// Fit is determined by node selector query.
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
+	// Fit is determined by inter-pod affinity.
+	factory.RegisterFitPredicateFactory(
+		"MatchInterPodAffinity",
+		func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+			return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.FailureDomains)
+		},
+	)
+	//pods should be placed in the same topological domain (e.g. same node, same rack, same zone, same power domain, etc.)
+	//as some other pods, or, conversely, should not be placed in the same topological domain as some other pods.
+	factory.RegisterPriorityConfigFactory(
+		"InterPodAffinityPriority",
+		factory.PriorityConfigFactory{
+			Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
+				return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight, args.FailureDomains)
+			},
+			Weight: 1,
+		},
+	)
 }
 
 func defaultPredicates() sets.String {
@@ -127,13 +145,6 @@ func defaultPredicates() sets.String {
 		// GeneralPredicates are the predicates that are enforced by all Kubernetes components
 		// (e.g. kubelet and all schedulers)
 		factory.RegisterFitPredicate("GeneralPredicates", predicates.GeneralPredicates),
-		// Fit is determined by inter-pod affinity.
-		factory.RegisterFitPredicateFactory(
-			"MatchInterPodAffinity",
-			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.FailureDomains)
-			},
-		),
 	)
 }
 
@@ -158,17 +169,6 @@ func defaultPriorities() sets.String {
 			factory.PriorityConfigFactory{
 				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
 					return priorities.NewNodeAffinityPriority(args.NodeLister)
-				},
-				Weight: 1,
-			},
-		),
-		//pods should be placed in the same topological domain (e.g. same node, same rack, same zone, same power domain, etc.)
-		//as some other pods, or, conversely, should not be placed in the same topological domain as some other pods.
-		factory.RegisterPriorityConfigFactory(
-			"InterPodAffinityPriority",
-			factory.PriorityConfigFactory{
-				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-					return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight, args.FailureDomains)
 				},
 				Weight: 1,
 			},
