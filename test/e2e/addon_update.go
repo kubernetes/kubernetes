@@ -207,37 +207,10 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		var err error
 		sshClient, err = getMasterSSHClient()
 		Expect(err).NotTo(HaveOccurred())
-
-		// Reduce the addon update intervals so that we have faster response
-		// to changes in the addon directory.
-		// do not use "service" command because it clears the environment variables
-		switch framework.TestContext.OSDistro {
-		case "debian":
-			sshExecAndVerify(sshClient, "sudo TEST_ADDON_CHECK_INTERVAL_SEC=1 /etc/init.d/kube-addons restart")
-		case "trusty", "gci":
-			sshExecAndVerify(sshClient, "sudo initctl restart kube-addons TEST_ADDON_CHECK_INTERVAL_SEC=1")
-		case "coreos":
-			sshExecAndVerify(sshClient, "sudo systemctl set-environment TEST_ADDON_CHECK_INTERVAL_SEC=1")
-			sshExecAndVerify(sshClient, "sudo systemctl restart kubernetes-addons")
-		default:
-			framework.Failf("Unsupported OS distro type %s", framework.TestContext.OSDistro)
-		}
 	})
 
 	AfterEach(func() {
 		if sshClient != nil {
-			// restart addon_update with the default options
-			switch framework.TestContext.OSDistro {
-			case "debian":
-				sshExec(sshClient, "sudo /etc/init.d/kube-addons restart")
-			case "trusty", "gci":
-				sshExec(sshClient, "sudo initctl restart kube-addons")
-			case "coreos":
-				sshExec(sshClient, "sudo systemctl unset-environment TEST_ADDON_CHECK_INTERVAL_SEC")
-				sshExec(sshClient, "sudo systemctl restart kubernetes-addons")
-			default:
-				framework.Failf("Unsupported OS distro type %s", framework.TestContext.OSDistro)
-			}
 			sshClient.Close()
 		}
 	})

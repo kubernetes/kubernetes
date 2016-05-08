@@ -912,9 +912,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${dst_dir}"
-  cp "${salt_dir}/kube-addons/namespace.yaml" "${dst_dir}"
-  cp "${salt_dir}/kube-addons/kube-addons.sh" "${dst_dir}"
-  cp "${salt_dir}/kube-addons/kube-addon-update.sh" "${dst_dir}"
+  cp "${salt_dir}/kube-addons/kube-addon-manager.yaml" "${dst_dir}"
   cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${dst_dir}"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${dst_dir}"
   local objects
