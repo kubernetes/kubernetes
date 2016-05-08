@@ -1187,10 +1187,14 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName,
 			vol.SELinuxLabeled = true
 			relabelVolume = true
 		}
+		hostPath := vol.Mounter.GetPath()
+		if mount.SubPath != "" {
+			hostPath = filepath.Join(hostPath, mount.SubPath)
+		}
 		mounts = append(mounts, kubecontainer.Mount{
 			Name:           mount.Name,
 			ContainerPath:  mount.MountPath,
-			HostPath:       vol.Mounter.GetPath(),
+			HostPath:       hostPath,
 			ReadOnly:       mount.ReadOnly,
 			SELinuxRelabel: relabelVolume,
 		})
