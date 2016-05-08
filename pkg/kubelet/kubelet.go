@@ -151,6 +151,9 @@ const (
 
 	// Maximum period to wait for pod volume setup operations
 	maxWaitForVolumeOps = 20 * time.Minute
+
+	// maxImagesInStatus is the number of max images we store in image status.
+	maxImagesInNodeStatus = 50
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -3096,6 +3099,12 @@ func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 	if err != nil {
 		glog.Errorf("Error getting image list: %v", err)
 	} else {
+		// sort the images from max to min, and only set top N images into the node status.
+		sort.Sort(ByImageSize(containerImages))
+		if maxImagesInNodeStatus < len(containerImages) {
+			containerImages = containerImages[0 : maxImagesInNodeStatus-1]
+		}
+
 		for _, image := range containerImages {
 			imagesOnNode = append(imagesOnNode, api.ContainerImage{
 				Names:     append(image.RepoTags, image.RepoDigests...),
@@ -3111,6 +3120,15 @@ func (kl *Kubelet) setNodeStatusGoRuntime(node *api.Node) {
 	node.Status.NodeInfo.OperatingSystem = goRuntime.GOOS
 	node.Status.NodeInfo.Architecture = goRuntime.GOARCH
 }
+
+type ByImageSize []kubecontainer.Image
+
+// Sort from max to min
+func (a ByImageSize) Less(i, j int) bool {
+	return a[i].Size > a[j].Size
+}
+func (a ByImageSize) Len() int      { return len(a) }
+func (a ByImageSize) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 // Set status for the node.
 func (kl *Kubelet) setNodeStatusInfo(node *api.Node) {

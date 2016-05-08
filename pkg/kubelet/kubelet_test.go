@@ -2436,12 +2436,12 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					SizeBytes: 123,
-				},
-				{
 					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
 					SizeBytes: 456,
+				},
+				{
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 			},
 		},
@@ -2685,14 +2685,15 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
 				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
 			},
+			// images will be sorted from max to min in node status.
 			Images: []api.ContainerImage{
-				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					SizeBytes: 123,
-				},
 				{
 					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
 					SizeBytes: 456,
+				},
+				{
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 			},
 		},
@@ -2970,12 +2971,12 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			},
 			Images: []api.ContainerImage{
 				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
-					SizeBytes: 123,
-				},
-				{
 					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
 					SizeBytes: 456,
+				},
+				{
+					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					SizeBytes: 123,
 				},
 			},
 		},
