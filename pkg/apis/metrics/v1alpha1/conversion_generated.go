@@ -24,7 +24,6 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	metrics "k8s.io/kubernetes/pkg/apis/metrics"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	reflect "reflect"
 )
 
 func init() {
@@ -40,9 +39,6 @@ func init() {
 }
 
 func autoConvert_v1alpha1_RawNode_To_metrics_RawNode(in *RawNode, out *metrics.RawNode, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*RawNode))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -54,9 +50,6 @@ func Convert_v1alpha1_RawNode_To_metrics_RawNode(in *RawNode, out *metrics.RawNo
 }
 
 func autoConvert_metrics_RawNode_To_v1alpha1_RawNode(in *metrics.RawNode, out *RawNode, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*metrics.RawNode))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -68,9 +61,6 @@ func Convert_metrics_RawNode_To_v1alpha1_RawNode(in *metrics.RawNode, out *RawNo
 }
 
 func autoConvert_v1alpha1_RawPod_To_metrics_RawPod(in *RawPod, out *metrics.RawPod, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*RawPod))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -82,9 +72,6 @@ func Convert_v1alpha1_RawPod_To_metrics_RawPod(in *RawPod, out *metrics.RawPod, 
 }
 
 func autoConvert_metrics_RawPod_To_v1alpha1_RawPod(in *metrics.RawPod, out *RawPod, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*metrics.RawPod))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
