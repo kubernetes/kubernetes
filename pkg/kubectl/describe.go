@@ -54,7 +54,13 @@ import (
 // if the output could not be generated. Implementers typically
 // abstract the retrieval of the named object from a remote server.
 type Describer interface {
-	Describe(namespace, name string) (output string, err error)
+	Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error)
+}
+
+// DescriberSettings holds display configuration for each object
+// describer to control what is printed.
+type DescriberSettings struct {
+	ShowEvents bool
 }
 
 // ObjectDescriber is an interface for displaying arbitrary objects with extra
@@ -151,7 +157,7 @@ type NamespaceDescriber struct {
 	client.Interface
 }
 
-func (d *NamespaceDescriber) Describe(namespace, name string) (string, error) {
+func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	ns, err := d.Namespaces().Get(name)
 	if err != nil {
 		return "", err
@@ -307,7 +313,7 @@ type LimitRangeDescriber struct {
 	client.Interface
 }
 
-func (d *LimitRangeDescriber) Describe(namespace, name string) (string, error) {
+func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	lr := d.LimitRanges(namespace)
 
 	limitRange, err := lr.Get(name)
@@ -394,7 +400,7 @@ type ResourceQuotaDescriber struct {
 	client.Interface
 }
 
-func (d *ResourceQuotaDescriber) Describe(namespace, name string) (string, error) {
+func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	rq := d.ResourceQuotas(namespace)
 
 	resourceQuota, err := rq.Get(name)
@@ -463,29 +469,33 @@ type PodDescriber struct {
 	client.Interface
 }
 
-func (d *PodDescriber) Describe(namespace, name string) (string, error) {
+func (d *PodDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	pod, err := d.Pods(namespace).Get(name)
 	if err != nil {
-		eventsInterface := d.Events(namespace)
-		selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
-		options := api.ListOptions{FieldSelector: selector}
-		events, err2 := eventsInterface.List(options)
-		if err2 == nil && len(events.Items) > 0 {
-			return tabbedString(func(out io.Writer) error {
-				fmt.Fprintf(out, "Pod '%v': error '%v', but found events.\n", name, err)
-				DescribeEvents(events, out)
-				return nil
-			})
+		if describerSettings.ShowEvents {
+			eventsInterface := d.Events(namespace)
+			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
+			options := api.ListOptions{FieldSelector: selector}
+			events, err2 := eventsInterface.List(options)
+			if describerSettings.ShowEvents && err2 == nil && len(events.Items) > 0 {
+				return tabbedString(func(out io.Writer) error {
+					fmt.Fprintf(out, "Pod '%v': error '%v', but found events.\n", name, err)
+					DescribeEvents(events, out)
+					return nil
+				})
+			}
 		}
 		return "", err
 	}
 
 	var events *api.EventList
-	if ref, err := api.GetReference(pod); err != nil {
-		glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
-	} else {
-		ref.Kind = ""
-		events, _ = d.Events(namespace).Search(ref)
+	if describerSettings.ShowEvents {
+		if ref, err := api.GetReference(pod); err != nil {
+			glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
+		} else {
+			ref.Kind = ""
+			events, _ = d.Events(namespace).Search(ref)
+		}
 	}
 
 	return describePod(pod, events)
@@ -692,7 +702,7 @@ type PersistentVolumeDescriber struct {
 	client.Interface
 }
 
-func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, error) {
+func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.PersistentVolumes()
 
 	pv, err := c.Get(name)
@@ -742,7 +752,7 @@ type PersistentVolumeClaimDescriber struct {
 	client.Interface
 }
 
-func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (string, error) {
+func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.PersistentVolumeClaims(namespace)
 
 	pvc, err := c.Get(name)
@@ -970,7 +980,7 @@ type ReplicationControllerDescriber struct {
 	client.Interface
 }
 
-func (d *ReplicationControllerDescriber) Describe(namespace, name string) (string, error) {
+func (d *ReplicationControllerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	rc := d.ReplicationControllers(namespace)
 	pc := d.Pods(namespace)
 
@@ -984,7 +994,10 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
-	events, _ := d.Events(namespace).Search(controller)
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Events(namespace).Search(controller)
+	}
 
 	return describeReplicationController(controller, events, running, waiting, succeeded, failed)
 }
@@ -1033,7 +1046,7 @@ type ReplicaSetDescriber struct {
 	client.Interface
 }
 
-func (d *ReplicaSetDescriber) Describe(namespace, name string) (string, error) {
+func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	rsc := d.Extensions().ReplicaSets(namespace)
 	pc := d.Pods(namespace)
 
@@ -1052,7 +1065,10 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	events, _ := d.Events(namespace).Search(rs)
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Events(namespace).Search(rs)
+	}
 
 	return describeReplicaSet(rs, events, running, waiting, succeeded, failed)
 }
@@ -1079,13 +1095,16 @@ type JobDescriber struct {
 	client *client.Client
 }
 
-func (d *JobDescriber) Describe(namespace, name string) (string, error) {
+func (d *JobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	job, err := d.client.Extensions().Jobs(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}
 
-	events, _ := d.client.Events(namespace).Search(job)
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.client.Events(namespace).Search(job)
+	}
 
 	return describeJob(job, events)
 }
@@ -1124,7 +1143,7 @@ type DaemonSetDescriber struct {
 	client.Interface
 }
 
-func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
+func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	dc := d.Extensions().DaemonSets(namespace)
 	pc := d.Pods(namespace)
 
@@ -1142,7 +1161,10 @@ func (d *DaemonSetDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	events, _ := d.Events(namespace).Search(daemon)
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Events(namespace).Search(daemon)
+	}
 
 	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
 }
@@ -1175,7 +1197,7 @@ type SecretDescriber struct {
 	client.Interface
 }
 
-func (d *SecretDescriber) Describe(namespace, name string) (string, error) {
+func (d *SecretDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.Secrets(namespace)
 
 	secret, err := c.Get(name)
@@ -1213,13 +1235,13 @@ type IngressDescriber struct {
 	client.Interface
 }
 
-func (i *IngressDescriber) Describe(namespace, name string) (string, error) {
+func (i *IngressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := i.Extensions().Ingress(namespace)
 	ing, err := c.Get(name)
 	if err != nil {
 		return "", err
 	}
-	return i.describeIngress(ing)
+	return i.describeIngress(ing, describerSettings)
 }
 
 func (i *IngressDescriber) describeBackend(ns string, backend *extensions.IngressBackend) string {
@@ -1242,7 +1264,7 @@ func (i *IngressDescriber) describeBackend(ns string, backend *extensions.Ingres
 	return formatEndpoints(endpoints, sets.NewString(spName))
 }
 
-func (i *IngressDescriber) describeIngress(ing *extensions.Ingress) (string, error) {
+func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSettings DescriberSettings) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%v\n", ing.Name)
 		fmt.Fprintf(out, "Namespace:\t%v\n", ing.Namespace)
@@ -1275,9 +1297,11 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress) (string, err
 		}
 		describeIngressAnnotations(out, ing.Annotations)
 
-		events, _ := i.Events(ing.Namespace).Search(ing)
-		if events != nil {
-			DescribeEvents(events, out)
+		if describerSettings.ShowEvents {
+			events, _ := i.Events(ing.Namespace).Search(ing)
+			if events != nil {
+				DescribeEvents(events, out)
+			}
 		}
 		return nil
 	})
@@ -1314,7 +1338,7 @@ type ServiceDescriber struct {
 	client.Interface
 }
 
-func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
+func (d *ServiceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.Services(namespace)
 
 	service, err := c.Get(name)
@@ -1323,8 +1347,10 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	}
 
 	endpoints, _ := d.Endpoints(namespace).Get(name)
-	events, _ := d.Events(namespace).Search(service)
-
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Events(namespace).Search(service)
+	}
 	return describeService(service, endpoints, events)
 }
 
@@ -1385,7 +1411,7 @@ type EndpointsDescriber struct {
 	client.Interface
 }
 
-func (d *EndpointsDescriber) Describe(namespace, name string) (string, error) {
+func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.Endpoints(namespace)
 
 	ep, err := c.Get(name)
@@ -1393,7 +1419,10 @@ func (d *EndpointsDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	events, _ := d.Events(namespace).Search(ep)
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Events(namespace).Search(ep)
+	}
 
 	return describeEndpoints(ep, events)
 }
@@ -1455,7 +1484,7 @@ type ServiceAccountDescriber struct {
 	client.Interface
 }
 
-func (d *ServiceAccountDescriber) Describe(namespace, name string) (string, error) {
+func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.ServiceAccounts(namespace)
 
 	serviceAccount, err := c.Get(name)
@@ -1536,7 +1565,7 @@ type NodeDescriber struct {
 	client.Interface
 }
 
-func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
+func (d *NodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	mc := d.Nodes()
 	node, err := mc.Get(name)
 	if err != nil {
@@ -1559,12 +1588,14 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	}
 
 	var events *api.EventList
-	if ref, err := api.GetReference(node); err != nil {
-		glog.Errorf("Unable to construct reference to '%#v': %v", node, err)
-	} else {
-		// TODO: We haven't decided the namespace for Node object yet.
-		ref.UID = types.UID(ref.Name)
-		events, _ = d.Events("").Search(ref)
+	if describerSettings.ShowEvents {
+		if ref, err := api.GetReference(node); err != nil {
+			glog.Errorf("Unable to construct reference to '%#v': %v", node, err)
+		} else {
+			// TODO: We haven't decided the namespace for Node object yet.
+			ref.UID = types.UID(ref.Name)
+			events, _ = d.Events("").Search(ref)
+		}
 	}
 
 	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods)
@@ -1635,7 +1666,7 @@ type PetSetDescriber struct {
 	client *client.Client
 }
 
-func (p *PetSetDescriber) Describe(namespace, name string) (string, error) {
+func (p *PetSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	ps, err := p.client.Apps().PetSets(namespace).Get(name)
 	if err != nil {
 		return "", err
@@ -1663,9 +1694,11 @@ func (p *PetSetDescriber) Describe(namespace, name string) (string, error) {
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", ps.CreationTimestamp.Time.Format(time.RFC1123Z))
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		describeVolumes(ps.Spec.Template.Spec.Volumes, out, "")
-		events, _ := p.client.Events(namespace).Search(ps)
-		if events != nil {
-			DescribeEvents(events, out)
+		if describerSettings.ShowEvents {
+			events, _ := p.client.Events(namespace).Search(ps)
+			if events != nil {
+				DescribeEvents(events, out)
+			}
 		}
 		return nil
 	})
@@ -1676,7 +1709,7 @@ type HorizontalPodAutoscalerDescriber struct {
 	client *client.Client
 }
 
-func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (string, error) {
+func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	hpa, err := d.client.Extensions().HorizontalPodAutoscalers(namespace).Get(name)
 	if err != nil {
 		return "", err
@@ -1718,9 +1751,11 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 			}
 		}
 
-		events, _ := d.client.Events(namespace).Search(hpa)
-		if events != nil {
-			DescribeEvents(events, out)
+		if describerSettings.ShowEvents {
+			events, _ := d.client.Events(namespace).Search(hpa)
+			if events != nil {
+				DescribeEvents(events, out)
+			}
 		}
 		return nil
 	})
@@ -1827,7 +1862,7 @@ type DeploymentDescriber struct {
 	clientset.Interface
 }
 
-func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) {
+func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	d, err := dd.Extensions().Deployments(namespace).Get(name)
 	if err != nil {
 		return "", err
@@ -1861,9 +1896,11 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 			}
 			fmt.Fprintf(out, "NewReplicaSet:\t%s\n", printReplicaSetsByLabels(newRSs))
 		}
-		events, err := dd.Core().Events(namespace).Search(d)
-		if err == nil && events != nil {
-			DescribeEvents(events, out)
+		if describerSettings.ShowEvents {
+			events, err := dd.Core().Events(namespace).Search(d)
+			if err == nil && events != nil {
+				DescribeEvents(events, out)
+			}
 		}
 		return nil
 	})
@@ -1951,7 +1988,7 @@ type ConfigMapDescriber struct {
 	client.Interface
 }
 
-func (d *ConfigMapDescriber) Describe(namespace, name string) (string, error) {
+func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.ConfigMaps(namespace)
 
 	configMap, err := c.Get(name)
