@@ -1,7 +1,5 @@
-// +build linux
-
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,18 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-import (
-	"os"
-	"os/signal"
-	"syscall"
-)
+static void sigdown(int signo) {
+	psignal(signo, "shutting down, got signal");
+	exit(0);
+}
 
-func main() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
-
-	// Block until a signal is received.
-	<-c
+int main() {
+	if (signal(SIGINT, sigdown) == SIG_ERR)
+		return 1;
+	if (signal(SIGTERM, sigdown) == SIG_ERR)
+		return 2;
+	signal(SIGKILL, sigdown);
+	for (;;) pause();
+	fprintf(stderr, "error: infinite loop terminated\n");
+	return 42;
 }

@@ -684,7 +684,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 			Containers: []api.Container{
 				{
 					Name:  "c1",
-					Image: "kubernetes/pause",
+					Image: "gcr.io/google_containers/pause-amd64:3.0",
 					Ports: []api.ContainerPort{
 						{ContainerPort: 1234, HostPort: 9999},
 					},

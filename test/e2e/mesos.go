@@ -94,7 +94,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "beta.gcr.io/google_containers/pause-amd64:3.0",
 					},
 				},
 			},
