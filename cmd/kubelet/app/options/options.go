@@ -40,16 +40,12 @@ const (
 	experimentalFlannelOverlay = false
 
 	defaultPodInfraContainerImageName    = "gcr.io/google_containers/pause"
-	defaultPodInfraContainerImageVersion = "2.0"
+	defaultPodInfraContainerImageVersion = "3.0"
 )
 
 // Returns the arch-specific pause image that kubelet should use as the default
 func GetDefaultPodInfraContainerImage() string {
-	if runtime.GOARCH == "amd64" {
-		return defaultPodInfraContainerImageName + ":" + defaultPodInfraContainerImageVersion
-	} else {
-		return defaultPodInfraContainerImageName + "-" + runtime.GOARCH + ":" + defaultPodInfraContainerImageVersion
-	}
+	return defaultPodInfraContainerImageName + "-" + runtime.GOARCH + ":" + defaultPodInfraContainerImageVersion
 }
 
 // KubeletServer encapsulates all of the parameters necessary for starting up

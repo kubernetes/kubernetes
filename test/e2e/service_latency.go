@@ -118,7 +118,7 @@ var _ = framework.KubeDescribe("Service endpoints latency", func() {
 func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
 	cfg := framework.RCConfig{
 		Client:       f.Client,
-		Image:        "gcr.io/google_containers/pause:2.0",
+		Image:        "gcr.io/google_containers/pause-amd64:3.0",
 		Name:         "svc-latency-rc",
 		Namespace:    f.Namespace.Name,
 		Replicas:     1,

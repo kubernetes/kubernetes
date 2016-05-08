@@ -62,7 +62,7 @@ var _ = Describe("MirrorPod", func() {
 			uid := pod.UID
 
 			By("update the static pod container image")
-			image := "gcr.io/google_containers/pause:2.0"
+			image := "gcr.io/google_containers/pause-amd64:3.0"
 			err = createStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns, image, api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
