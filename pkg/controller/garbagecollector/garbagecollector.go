@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
@@ -41,80 +42,119 @@ import (
 
 const ResourceResyncTime = 30 * time.Second
 
-type Monitor struct {
-	Store      cache.Store
-	Controller *framework.Controller
+type monitor struct {
+	store      cache.Store
+	controller *framework.Controller
 }
 
-type SelfReference struct {
+type objectReference struct {
 	metatypes.OwnerReference
 	// This is needed by the dynamic client
 	Namespace string
 }
 
-func (s SelfReference) String() string {
-	return fmt.Sprintf("%s/%s, namespace: %s, name: %s, uid: %s", s.APIVersion, s.Kind, s.Namespace, s.Name, s.UID)
+func (s objectReference) String() string {
+	return fmt.Sprintf("[%s/%s, namespace: %s, name: %s, uid: %s]", s.APIVersion, s.Kind, s.Namespace, s.Name, s.UID)
 }
 
+// node does not require a lock to protect. The single-threaded
+// Propagator.processEvent() is the sole writer of the nodes. The multi-threaded
+// GarbageCollector.processItem() reads the nodes, but it only reads the fields
+// that never gets changed by Propagator.processEvent().
 type node struct {
-	identity   SelfReference
-	dependents []*node
+	identity   objectReference
+	dependents map[*node]struct{}
 	// When processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
 	owners []metatypes.OwnerReference
 }
 
-type EventType string
+type eventType string
 
-const Add EventType = "Add"
-const Update EventType = "Update"
-const Delete EventType = "Delete"
+const addEvent eventType = "Add"
+const updateEvent eventType = "Update"
+const deleteEvent eventType = "Delete"
 
-type Event struct {
-	Type   EventType
+type event struct {
+	Type   eventType
 	Obj    interface{}
 	OldObj interface{}
 }
 
 type Propagator struct {
-	eventQueue  *workqueue.Type
-	graphLookup map[types.UID]*node
-	gc          *GarbageCollector
+	eventQueue *workqueue.Type
+	// uidToNode doesn't require a lock, because only the single-threaded Propagator.processEvent() read/write it.
+	uidToNode map[types.UID]*node
+	gc        *GarbageCollector
 }
 
-func (p *Propagator) addToGraphLookup(n *node) {
+func (p *Propagator) insertNode(n *node) {
 	fmt.Println("CHAO: add to graph:", n.identity)
-	p.graphLookup[n.identity.UID] = n
+	p.uidToNode[n.identity.UID] = n
 }
 
-func (p *Propagator) removeFromGraphLookup(n *node) {
+func (p *Propagator) removeNode(n *node) {
 	fmt.Println("CHAO: remove from graph:", n.identity)
-	delete(p.graphLookup, n.identity.UID)
+	delete(p.uidToNode, n.identity.UID)
 }
 
-func (p *Propagator) updateOwners(n *node) (ownerExists bool) {
-	fmt.Println("CHAO: in updateOwners, graphLookUp:", p.graphLookup)
+// addToOwners finds all owners as listed in n.owners, and marks n as one of
+// their dependents. ownerExists indicates if any owner listed in n.owners exist
+// in p.uidToNode.
+func (p *Propagator) addToOwners(n *node) (ownerExists bool) {
+	fmt.Println("CHAO: in addToOwners, uidToNode:", p.uidToNode)
 	for _, owner := range n.owners {
-		fmt.Println("CHAO: in updateOwners, lookup for:", owner.UID)
-		ownerNode, ok := p.graphLookup[owner.UID]
+		fmt.Println("CHAO: in addToOwners, lookup for:", owner.UID)
+		ownerNode, ok := p.uidToNode[owner.UID]
 		if !ok {
 			fmt.Println("CHAO: lookup not found")
 			continue
 		}
 		fmt.Println("CHAO: lookup found")
 		ownerExists = true
-		ownerNode.dependents = append(ownerNode.dependents, n)
+		ownerNode.dependents[n] = struct{}{}
 	}
 	return ownerExists
 }
 
-// TODO: finish this function.
-func equalReferences(a []metatypes.OwnerReference, b []metatypes.OwnerReference) bool {
-	if len(a) != len(b) {
-		return false
+// removeFromOwners finds all owners as listed in n.owners, and removes n from
+// their dependents list.
+func (p *Propagator) removeFromOwners(n *node) {
+	fmt.Println("CHAO: in removeFromOwners, uidToNode:", p.uidToNode)
+	for _, owner := range n.owners {
+		fmt.Println("CHAO: in removeFromOwners, lookup for:", owner.UID)
+		ownerNode, ok := p.uidToNode[owner.UID]
+		if !ok {
+			fmt.Println("CHAO: lookup not found")
+			continue
+		}
+		fmt.Println("CHAO: lookup found")
+		delete(ownerNode.dependents, n)
 	}
-	// sort and compare
-	return true
+}
+
+func ReferencesDiffs(old []metatypes.OwnerReference, new []metatypes.OwnerReference) (added []metatypes.OwnerReference, removed []metatypes.OwnerReference) {
+	oldUIDToRef := make(map[string]metatypes.OwnerReference)
+	for i := 0; i < len(old); i++ {
+		oldUIDToRef[string(old[i].UID)] = old[i]
+	}
+	oldUIDSet := sets.StringKeySet(oldUIDToRef)
+	newUIDToRef := make(map[string]metatypes.OwnerReference)
+	for i := 0; i < len(new); i++ {
+		newUIDToRef[string(new[i].UID)] = new[i]
+	}
+	newUIDSet := sets.StringKeySet(newUIDToRef)
+
+	addedUID := newUIDSet.Difference(oldUIDSet)
+	removedUID := oldUIDSet.Difference(newUIDSet)
+
+	for uid, _ := range addedUID {
+		added = append(added, newUIDToRef[uid])
+	}
+	for uid, _ := range removedUID {
+		removed = append(removed, oldUIDToRef[uid])
+	}
+	return added, removed
 }
 
 // Dequeue from eventQueue, updating graph, populating dirty_queue.
@@ -124,13 +164,17 @@ func (p *Propagator) processEvent() {
 		return
 	}
 	defer p.eventQueue.Done(key)
-	event, ok := key.(Event)
+	event, ok := key.(event)
 	if !ok {
-		glog.Errorf("expect an Event, got %v", key)
+		glog.Errorf("expect an event, got %v", key)
 		return
 	}
 	obj := event.Obj
 	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		glog.Errorf("cannot access obj: %v", err)
+		return
+	}
 	typeAccessor, err := meta.TypeAccessor(obj)
 	if err != nil {
 		glog.Errorf("cannot access obj: %v", err)
@@ -138,15 +182,15 @@ func (p *Propagator) processEvent() {
 	}
 	glog.V(6).Infof("Propagator process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.Type)
 	switch event.Type {
-	case Add:
+	case addEvent:
 		// Check if the node already exsits
-		_, ok := p.graphLookup[accessor.GetUID()]
+		_, ok := p.uidToNode[accessor.GetUID()]
 		if ok {
 			// We can optionally check if the node in the graph is in sync with that in the Store.
 			return
 		}
 		newNode := &node{
-			identity: SelfReference{
+			identity: objectReference{
 				OwnerReference: metatypes.OwnerReference{
 					APIVersion: typeAccessor.GetAPIVersion(),
 					Kind:       typeAccessor.GetKind(),
@@ -155,58 +199,96 @@ func (p *Propagator) processEvent() {
 				},
 				Namespace: accessor.GetNamespace(),
 			},
-			owners: accessor.GetOwnerReferences(),
+			dependents: make(map[*node]struct{}),
+			owners:     accessor.GetOwnerReferences(),
 		}
-		p.addToGraphLookup(newNode)
-		ownerExists := p.updateOwners(newNode)
+		p.insertNode(newNode)
+		ownerExists := p.addToOwners(newNode)
 		// Push the object to the dirty queue if none of its owners exists in the Graph.
+		// TODO: when handling such an object in the dirtyQueue, the worker should
+		// enqueue an Add event to the eventQueue if the owner exists. This is
+		// to prevent the following case: GC observes the creation of dependent
+		// D, but hasn't observed the creation of Owner O yet; GC adds D to the
+		// dirtyQueue, worker works on D, and O exists in the API server, so GC
+		// doesn't remove D. Then, Propagator sees the creation of O, but no one
+		// will update the graph to reflect that D is the dependent of O, so
+		// when O is deleted, D will not be cascadingly deleted.
 		if !ownerExists && len(newNode.owners) != 0 {
 			fmt.Println("CHAO: directly added to dirty queue: ", newNode.identity)
 			p.gc.dirtyQueue.Add(newNode)
 		}
 
-	case Update:
-		node, ok := p.graphLookup[accessor.GetUID()]
+	case updateEvent:
+		node, ok := p.uidToNode[accessor.GetUID()]
 		if !ok {
 			glog.Errorf("received an update for %v, but cannot find the node in the graph", accessor.GetUID())
 		}
 		// TODO: finalizer: Check if ObjectMeta.DeletionTimestamp is updated from nil to non-nil
 		// We only need to add/remove owner refs for now
-		if !equalReferences(node.owners, accessor.GetOwnerReferences()) {
-			ownerExists := p.updateOwners(node)
-			if !ownerExists && len(node.owners) != 0 {
-				p.gc.dirtyQueue.Add(node)
-			}
+		added, removed := ReferencesDiffs(node.owners, accessor.GetOwnerReferences())
+		if len(added) == 0 && len(removed) == 0 {
+			glog.V(6).Infof("The updateEvent %#v doesn't change node references, ignore", event)
+			return
 		}
-	case Delete:
-		node, ok := p.graphLookup[accessor.GetUID()]
+		// update the node itself
+		node.owners = accessor.GetOwnerReferences()
+		// Add the node to its new owners' dependent lists. We just go through
+		// all the owners so we know if we should put the object into the
+		// dirtyQueue.
+		ownerExists := p.addToOwners(node)
+		if !ownerExists && len(node.owners) != 0 {
+			p.gc.dirtyQueue.Add(node)
+		}
+		// TODO: remove the deleted references
+		// remove the node from the dependent list of node pionted by the
+		// removed refrences.
+		for _, owner := range removed {
+			fmt.Println("CHAO: remove from removed, lookup for:", owner.UID)
+			ownerNode, ok := p.uidToNode[owner.UID]
+			if !ok {
+				fmt.Println("CHAO: remove from removed, lookup not found")
+				continue
+			}
+			fmt.Println("CHAO: remove from removed, lookup found")
+			delete(ownerNode.dependents, node)
+		}
+
+	case deleteEvent:
+		node, ok := p.uidToNode[accessor.GetUID()]
 		if !ok {
 			glog.V(6).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
+			return
 		}
-		p.removeFromGraphLookup(node)
-		for _, dep := range node.dependents {
+		p.removeNode(node)
+		p.removeFromOwners(node)
+		for dep, _ := range node.dependents {
 			p.gc.dirtyQueue.Add(dep)
 		}
 	}
 }
 
+// GarbageCollector is responsible for carrying out cascading deletion, and
+// removing ownerReferences from the dependents if the owner is deleted with
+// DeleteOptions.OrphanDependents=true.
 type GarbageCollector struct {
 	restMapper meta.RESTMapper
 	clientPool dynamic.ClientPool
 	dirtyQueue *workqueue.Type
-	monitors   []Monitor
+	monitors   []monitor
 	propagator *Propagator
 }
 
-func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (Monitor, error) {
+func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (monitor, error) {
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
-	var monitor Monitor
+	var monitor monitor
 	client, err := clientPool.ClientForGroupVersion(resource.GroupVersion())
 	if err != nil {
 		return monitor, err
 	}
-	monitor.Store, monitor.Controller = framework.NewInformer(
+	monitor.store, monitor.controller = framework.NewInformer(
+		// TODO: make special List and Watch function that removes fields other
+		// than ObjectMeta.
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				// APIResource.Kind is not used by the dynamic client, so
@@ -232,19 +314,19 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 			// Add the event to the propagator's event queue.
 			AddFunc: func(obj interface{}) {
 				fmt.Println("CHAO: AddFunc: obj=", obj)
-				event := Event{
-					Type: Add,
+				event := event{
+					Type: addEvent,
 					Obj:  obj,
 				}
 				p.eventQueue.Add(event)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				event := Event{Update, newObj, oldObj}
+				event := event{updateEvent, newObj, oldObj}
 				p.eventQueue.Add(event)
 			},
 			DeleteFunc: func(obj interface{}) {
-				event := Event{
-					Type: Delete,
+				event := event{
+					Type: deleteEvent,
 					Obj:  obj,
 				}
 				p.eventQueue.Add(event)
@@ -269,9 +351,9 @@ func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.
 		restMapper: registered.RESTMapper(),
 	}
 	gc.propagator = &Propagator{
-		eventQueue:  workqueue.New(),
-		graphLookup: make(map[types.UID]*node),
-		gc:          gc,
+		eventQueue: workqueue.New(),
+		uidToNode:  make(map[types.UID]*node),
+		gc:         gc,
 	}
 	for _, resource := range resources {
 		if _, ok := ignoredResources[resource]; ok {
@@ -298,6 +380,9 @@ func (gc *GarbageCollector) worker() {
 		glog.Errorf("Error syncing item %v: %v", key, err)
 	}
 }
+
+// apiResource consults the REST mapper to translate an <apiVersion, kind,
+// namespace> tuple to an unversioned.APIResource struct.
 func (gc *GarbageCollector) apiResource(apiVersion, kind, namespace string) (*unversioned.APIResource, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
@@ -313,32 +398,32 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind, namespace string) (*un
 	return &resource, nil
 }
 
-func (gc *GarbageCollector) deleteObject(item *node) error {
-	fqKind := unversioned.FromAPIVersionAndKind(item.identity.APIVersion, item.identity.Kind)
+func (gc *GarbageCollector) deleteObject(item objectReference) error {
+	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	resource, err := gc.apiResource(item.identity.APIVersion, item.identity.Kind, item.identity.Namespace)
+	resource, err := gc.apiResource(item.APIVersion, item.Kind, item.Namespace)
 	if err != nil {
 		return err
 	}
-	uid := item.identity.UID
+	uid := item.UID
 	preconditions := v1.Preconditions{UID: &uid}
 	deleteOptions := v1.DeleteOptions{Preconditions: &preconditions}
-	return client.Resource(resource, item.identity.Namespace).Delete(item.identity.Name, &deleteOptions)
+	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
 }
 
-func (gc *GarbageCollector) getObject(item *node) (*runtime.Unstructured, error) {
-	fqKind := unversioned.FromAPIVersionAndKind(item.identity.APIVersion, item.identity.Kind)
+func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructured, error) {
+	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	resource, err := gc.apiResource(item.identity.APIVersion, item.identity.Kind, item.identity.Namespace)
+	resource, err := gc.apiResource(item.APIVersion, item.Kind, item.Namespace)
 	if err != nil {
 		return nil, err
 	}
-	return client.Resource(resource, item.identity.Namespace).Get(item.identity.Name)
+	return client.Resource(resource, item.Namespace).Get(item.Name)
 }
 
 func (gc *GarbageCollector) processItem(item *node) error {
 	// Get the latest item from the API server
-	latest, err := gc.getObject(item)
+	latest, err := gc.getObject(item.identity)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			glog.V(6).Infof("item %v not found, ignore it", item.identity)
@@ -381,17 +466,14 @@ func (gc *GarbageCollector) processItem(item *node) error {
 			return err
 		}
 	}
-	glog.V(6).Infof("none of object %s's owners exist any more, will garbage collect it", item.identity.UID)
-	return gc.deleteObject(item)
+	glog.V(2).Infof("none of object [%s]'s owners exist any more, will garbage collect it", item.identity)
+	return gc.deleteObject(item.identity)
 }
 
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	for _, monitor := range gc.monitors {
-		go monitor.Controller.Run(stopCh)
+		go monitor.controller.Run(stopCh)
 	}
-	// list
-	// TODO: remove
-	// go wait.Until(gc.scanner, ResourceResyncTime, stopCh)
 
 	// worker
 	go wait.Until(gc.propagator.processEvent, 0, stopCh)

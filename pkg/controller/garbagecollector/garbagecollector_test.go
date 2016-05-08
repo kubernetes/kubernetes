@@ -25,14 +25,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/json"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 func TestNewGarbageCollector(t *testing.T) {
@@ -94,7 +97,7 @@ func TestCheckGarbage(t *testing.T) {
 		t.Fatal(err)
 	}
 	item := &node{
-		identity: SelfReference{
+		identity: objectReference{
 			OwnerReference: metatypes.OwnerReference{
 				Kind:       pod.Kind,
 				APIVersion: pod.APIVersion,
@@ -183,4 +186,104 @@ func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request))
 		Host: srv.URL,
 	}
 	return srv, config
+}
+
+// verifyGraphInvariants verifies that all of a node's owners list the node as a
+// dependent and vice versa. This invariant holds when the owners are created
+// before their dependents. uidToNode has all the nodes in the graph.
+func verifyGraphInvariants(scenario string, uidToNode map[types.UID]*node, t *testing.T) {
+	for myUID, node := range uidToNode {
+		for dependentNode, _ := range node.dependents {
+			found := false
+			for _, owner := range dependentNode.owners {
+				if owner.UID == myUID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("scenario: %s: node %s has node %s as a dependent, but it's not present in the latter node's owners list", scenario, node.identity, dependentNode.identity)
+			}
+		}
+
+		for _, owner := range node.owners {
+			ownerNode, ok := uidToNode[owner.UID]
+			if !ok {
+				// It's possible that the owner node doesn't exist
+				continue
+			}
+			if _, ok := ownerNode.dependents[node]; !ok {
+				t.Errorf("node %s has node %s as an owner, but it's not present in the latter node's dependents list", node.identity, ownerNode.identity)
+			}
+		}
+	}
+}
+
+// if eventType==updateEvent, the owners will be treated as the owners in the
+// new object.
+func createEvent(eventType eventType, selfUID string, owners []string) event {
+	var ownerReferences []api.OwnerReference
+	for i := 0; i < len(owners); i++ {
+		ownerReferences = append(ownerReferences, api.OwnerReference{UID: types.UID(owners[i])})
+	}
+	return event{
+		Type: eventType,
+		Obj: &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				UID:             types.UID(selfUID),
+				OwnerReferences: ownerReferences,
+			},
+		},
+	}
+}
+
+func TestProcessEvent(t *testing.T) {
+	var testScenarios = []struct {
+		name   string
+		events []event
+	}{
+		{
+			name: "test1",
+			events: []event{
+				createEvent(addEvent, "1", []string{}),
+				createEvent(addEvent, "2", []string{"1"}),
+				createEvent(addEvent, "3", []string{"1", "2"}),
+			},
+		},
+		{
+			name: "test2",
+			events: []event{
+				createEvent(addEvent, "1", []string{}),
+				createEvent(addEvent, "2", []string{"1"}),
+				createEvent(addEvent, "3", []string{"1", "2"}),
+				createEvent(addEvent, "4", []string{"2"}),
+				createEvent(deleteEvent, "2", []string{"doesn't matter"}),
+			},
+		},
+		{
+			name: "test3",
+			events: []event{
+				createEvent(addEvent, "1", []string{}),
+				createEvent(addEvent, "2", []string{"1"}),
+				createEvent(addEvent, "3", []string{"1", "2"}),
+				createEvent(addEvent, "4", []string{"3"}),
+				createEvent(updateEvent, "2", []string{"4"}),
+			},
+		},
+	}
+
+	for _, scenario := range testScenarios {
+		propagator := &Propagator{
+			eventQueue: workqueue.New(),
+			uidToNode:  make(map[types.UID]*node),
+			gc: &GarbageCollector{
+				dirtyQueue: workqueue.New(),
+			},
+		}
+		for i := 0; i < len(scenario.events); i++ {
+			propagator.eventQueue.Add(scenario.events[i])
+			propagator.processEvent()
+		}
+		verifyGraphInvariants(scenario.name, propagator.uidToNode, t)
+	}
 }

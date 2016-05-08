@@ -1,4 +1,4 @@
-// +build integration,!no-etcd
+//// +build integration,!no-etcd
 
 /*
 Copyright 2015 The Kubernetes Authors All rights reserved.
@@ -37,25 +37,26 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-const podName = "test.pod.1"
+const garbageCollectedPodName = "test.pod.1"
+const independentPodName = "test.pod.2"
+const oneValidOwnerPodName = "test.pod.3"
 const rcName = "test.rc.1"
+const remainingRCName = "test.rc.2"
 
-func newDanglingPod() *v1.Pod {
+func newPod(podName string, ownerReferences []v1.OwnerReference) *v1.Pod {
+	for i := 0; i < len(ownerReferences); i++ {
+		ownerReferences[i].Kind = "ReplicationController"
+		ownerReferences[i].APIVersion = "v1"
+	}
 	return &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      podName,
-			Namespace: framework.TestNS,
-			OwnerReferences: []v1.OwnerReference{
-				{
-					Kind:       "ReplicationController",
-					Name:       rcName,
-					APIVersion: "v1",
-				},
-			},
+			Name:            podName,
+			Namespace:       framework.TestNS,
+			OwnerReferences: ownerReferences,
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -68,15 +69,15 @@ func newDanglingPod() *v1.Pod {
 	}
 }
 
-func newOwnerRC() *v1.ReplicationController {
+func newOwnerRC(name string) *v1.ReplicationController {
 	return &v1.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
 			APIVersion: "v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      rcName,
 			Namespace: framework.TestNS,
+			Name:      name,
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Selector: map[string]string{"name": "test"},
@@ -120,8 +121,7 @@ func observePodDeletion(t *testing.T, w watch.Interface) (deletedPod *api.Pod) {
 	return
 }
 
-// This test simulates the cascading deletion.
-func TestCascadingDeletion(t *testing.T) {
+func setup(t *testing.T) (*garbagecollector.GarbageCollector, clientset.Interface) {
 	flag.Set("v", "9")
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -150,23 +150,48 @@ func TestCascadingDeletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
 	}
+	return gc, clientSet
+}
 
+// This test simulates the cascading deletion.
+func TestCascadingDeletion(t *testing.T) {
+	gc, clientSet := setup(t)
 	rcClient := clientSet.Core().ReplicationControllers(framework.TestNS)
-	rc, err := rcClient.Create(newOwnerRC())
+	podClient := clientSet.Core().Pods(framework.TestNS)
+
+	toBeDeletedRC, err := rcClient.Create(newOwnerRC(rcName))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
+	remainingRC, err := rcClient.Create(newOwnerRC(remainingRCName))
+	if err != nil {
+		t.Fatalf("Failed to create replication controller: %v", err)
+	}
+
 	rcs, err := rcClient.List(api.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list replication controllers: %v", err)
 	}
-	if len(rcs.Items) != 1 {
-		t.Fatalf("Expect only 1 replication controller")
+	if len(rcs.Items) != 2 {
+		t.Fatalf("Expect only 2 replication controller")
 	}
 
-	podClient := clientSet.Core().Pods(framework.TestNS)
-	pod := newDanglingPod()
-	pod.ObjectMeta.OwnerReferences[0].UID = rc.ObjectMeta.UID
+	pod := newPod(garbageCollectedPodName, []v1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: rcName}})
+	_, err = podClient.Create(pod)
+	if err != nil {
+		t.Fatalf("Failed to create Pod: %v", err)
+	}
+
+	pod = newPod(oneValidOwnerPodName, []v1.OwnerReference{
+		{UID: toBeDeletedRC.ObjectMeta.UID, Name: rcName},
+		{UID: remainingRC.ObjectMeta.UID, Name: remainingRCName},
+	})
+	_, err = podClient.Create(pod)
+	if err != nil {
+		t.Fatalf("Failed to create Pod: %v", err)
+	}
+
+	pod = newPod(independentPodName, []v1.OwnerReference{})
 	_, err = podClient.Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
@@ -177,8 +202,8 @@ func TestCascadingDeletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
-	if len(pods.Items) != 1 {
-		t.Fatalf("Expect only 1 pod")
+	if len(pods.Items) != 3 {
+		t.Fatalf("Expect only 3 pods")
 	}
 	options := api.ListOptions{
 		ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -198,45 +223,27 @@ func TestCascadingDeletion(t *testing.T) {
 	if deletedPod == nil {
 		t.Fatalf("empty deletedPod")
 	}
-	if deletedPod.Name != podName {
+	if deletedPod.Name != garbageCollectedPodName {
 		t.Fatalf("deleted unexpected pod: %v", *deletedPod)
+	}
+	// wait for another 30 seconds to give garbage collect a chance to make mistakes.
+	time.Sleep(30 * time.Second)
+	if _, err := podClient.Get(independentPodName); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := podClient.Get(oneValidOwnerPodName); err != nil {
+		t.Fatal(err)
 	}
 }
 
 // This test simulates the case where an object is created with an owner that
 // doesn't exist. It verifies the GC will delete such delete such an object.
 func TestCreateWithNonExisitentOwner(t *testing.T) {
-	flag.Set("v", "9")
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	// TODO: Uncomment when fix #19254
-	// defer s.Close()
-
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
-
-	framework.DeleteAllEtcdKeys()
-	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
-	if err != nil {
-		t.Fatalf("Error in create clientset: %v", err)
-	}
-	groupVersionResources, err := garbagecollector.ServerPreferredGroupVersionResources(clientSet.Discovery())
-	if err != nil {
-		t.Fatalf("Failed to get supported resources from server: %v", err)
-	}
-	clientPool := dynamic.NewClientPool(&restclient.Config{Host: s.URL}, dynamic.LegacyAPIPathResolverFunc)
-	gc, err := garbagecollector.NewGarbageCollector(clientPool, groupVersionResources)
-	if err != nil {
-		t.Fatalf("Failed to create garbage collector")
-	}
-
+	gc, clientSet := setup(t)
 	podClient := clientSet.Core().Pods(framework.TestNS)
-	_, err = podClient.Create(newDanglingPod())
+
+	pod := newPod(garbageCollectedPodName, []v1.OwnerReference{{UID: "doesn't matter", Name: rcName}})
+	_, err := podClient.Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
@@ -263,7 +270,7 @@ func TestCreateWithNonExisitentOwner(t *testing.T) {
 	if deletedPod == nil {
 		t.Fatalf("empty deletedPod")
 	}
-	if deletedPod.Name != podName {
+	if deletedPod.Name != garbageCollectedPodName {
 		t.Fatalf("deleted unexpected pod: %v", *deletedPod)
 	}
 }
