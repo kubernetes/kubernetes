@@ -229,6 +229,54 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 	return nil
 }
 
+// GetLoadingPrecedence implements ConfigAccess
+func (rules *ClientConfigLoadingRules) GetLoadingPrecedence() []string {
+	return rules.Precedence
+}
+
+// GetStartingConfig implements ConfigAccess
+func (rules *ClientConfigLoadingRules) GetStartingConfig() (*clientcmdapi.Config, error) {
+	clientConfig := NewNonInteractiveDeferredLoadingClientConfig(rules, &ConfigOverrides{})
+	rawConfig, err := clientConfig.RawConfig()
+	if os.IsNotExist(err) {
+		return clientcmdapi.NewConfig(), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &rawConfig, nil
+}
+
+// GetDefaultFilename implements ConfigAccess
+func (rules *ClientConfigLoadingRules) GetDefaultFilename() string {
+	// Explicit file if we have one.
+	if rules.IsExplicitFile() {
+		return rules.GetExplicitFile()
+	}
+	// Otherwise, first existing file from precedence.
+	for _, filename := range rules.GetLoadingPrecedence() {
+		if _, err := os.Stat(filename); err == nil {
+			return filename
+		}
+	}
+	// If none exists, use the first from precendence.
+	if len(rules.Precedence) > 0 {
+		return rules.Precedence[0]
+	}
+	return ""
+}
+
+// IsExplicitFile implements ConfigAccess
+func (rules *ClientConfigLoadingRules) IsExplicitFile() bool {
+	return len(rules.ExplicitPath) > 0
+}
+
+// GetExplicitFile implements ConfigAccess
+func (rules *ClientConfigLoadingRules) GetExplicitFile() string {
+	return rules.ExplicitPath
+}
+
 // LoadFromFile takes a filename and deserializes the contents into Config object
 func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	kubeconfigBytes, err := ioutil.ReadFile(filename)
