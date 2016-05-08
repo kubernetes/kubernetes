@@ -82,6 +82,7 @@ func NewLoadBalancerRR() *LoadBalancerRR {
 }
 
 func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) error {
+	glog.V(4).Infof("LoadBalancerRR NewService %q", svcPort)
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 	lb.newServiceInternal(svcPort, affinityType, ttlMinutes)
@@ -101,6 +102,13 @@ func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affi
 		lb.services[svcPort].affinity.affinityType = affinityType
 	}
 	return lb.services[svcPort]
+}
+
+func (lb *LoadBalancerRR) DeleteService(svcPort proxy.ServicePortName) {
+	glog.V(4).Infof("LoadBalancerRR DeleteService %q", svcPort)
+	lb.lock.Lock()
+	defer lb.lock.Unlock()
+	delete(lb.services, svcPort)
 }
 
 // return true if this service is using some form of session affinity.
@@ -281,7 +289,11 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	for k := range lb.services {
 		if _, exists := registeredEndpoints[k]; !exists {
 			glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", k)
-			delete(lb.services, k)
+			// Reset but don't delete.
+			state := lb.services[k]
+			state.endpoints = []string{}
+			state.index = 0
+			state.affinity.affinityMap = map[string]*affinityState{}
 		}
 	}
 }
