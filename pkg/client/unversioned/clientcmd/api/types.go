@@ -116,7 +116,8 @@ type Context struct {
 
 // AuthProviderConfig holds the configuration for a specified auth provider.
 type AuthProviderConfig struct {
-	Name string `json:"name"`
+	Name   string            `json:"name"`
+	Config map[string]string `json:"config,omitempty"`
 }
 
 // NewConfig is a convenience function that returns a new Config object with non-nil maps

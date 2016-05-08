@@ -770,12 +770,12 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdConfig(NewDefaultPathOptions(), buf)
+	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), buf)
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
 
 	// outBytes, _ := ioutil.ReadFile(fakeKubeFile.Name())
-	config := getConfigFromFileOrDie(fakeKubeFile.Name())
+	config := clientcmd.GetConfigFromFileOrDie(fakeKubeFile.Name())
 
 	return buf.String(), *config
 }

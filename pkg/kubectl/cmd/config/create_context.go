@@ -29,7 +29,7 @@ import (
 )
 
 type createContextOptions struct {
-	configAccess ConfigAccess
+	configAccess clientcmd.ConfigAccess
 	name         string
 	cluster      util.StringFlag
 	authInfo     util.StringFlag
@@ -43,7 +43,7 @@ Specifying a name that already exists will merge new fields on top of existing v
 kubectl config set-context gce --user=cluster-admin`
 )
 
-func NewCmdConfigSetContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
@@ -90,7 +90,7 @@ func (o createContextOptions) run() error {
 	context := o.modifyContext(*startingStanza)
 	config.Contexts[o.name] = &context
 
-	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 
