@@ -368,6 +368,17 @@ func TestMountExternalVolumes(t *testing.T) {
 	if plug.NewAttacherCallCount != 1 {
 		t.Errorf("Expected plugin NewAttacher to be called %d times but got %d", 1, plug.NewAttacherCallCount)
 	}
+
+	attacher := plug.Attachers[0]
+	if attacher.AttachCallCount != 1 {
+		t.Errorf("Expected Attach to be called")
+	}
+	if attacher.WaitForAttachCallCount != 1 {
+		t.Errorf("Expected WaitForAttach to be called")
+	}
+	if attacher.MountDeviceCallCount != 1 {
+		t.Errorf("Expected MountDevice to be called")
+	}
 }
 
 func TestGetPodVolumesFromDisk(t *testing.T) {
@@ -435,6 +446,11 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 		fv := volumetest.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
 		fv.SetUp(nil)
 		pathsOnDisk = append(pathsOnDisk, fv.GetPath())
+
+		// Simulate the global mount so that the fakeMounter returns the
+		// expected number of refs for the attached disk.
+		kubelet.mounter.Mount(fv.GetPath(), fv.GetPath(), "fakefs", nil)
+		kubelet.mounter.Mount(fv.GetPath(), "/path/fake/device", "fake", nil)
 	}
 
 	// store the claim in fake kubelet database
@@ -483,6 +499,14 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 		t.Errorf("cleanupOrphanedVolumes failed: %v", err)
 	}
 
+	if len(plug.Unmounters) != len(volsOnDisk) {
+		t.Errorf("Unexpected number of unmounters created. Expected %d got %d", len(volsOnDisk), len(plug.Unmounters))
+	}
+	for _, unmounter := range plug.Unmounters {
+		if unmounter.TearDownCallCount != 0 {
+			t.Errorf("Unexpected number of calls to TearDown() %d for volume %v", unmounter.TearDownCallCount, unmounter)
+		}
+	}
 	volumesFound := kubelet.getPodVolumesFromDisk()
 	if len(volumesFound) != len(pathsOnDisk) {
 		t.Errorf("Expected to find %d unmounters, got %d", len(pathsOnDisk), len(volumesFound))
@@ -511,6 +535,34 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 	}
 	for _, cl := range volumesFound {
 		t.Errorf("Found unexpected volume %s", cl.Unmounter.GetPath())
+	}
+
+	// Two unmounters created by the previous calls to cleanupOrphanedVolumes and getPodVolumesFromDisk
+	expectedUnmounters := len(volsOnDisk) + 2
+	if len(plug.Unmounters) != expectedUnmounters {
+		t.Errorf("Unexpected number of unmounters created. Expected %d got  %d", expectedUnmounters, len(plug.Unmounters))
+	}
+
+	// This is the unmounter which was actually used to perform a tear down.
+	unmounter := plug.Unmounters[2]
+
+	if unmounter.TearDownCallCount != 1 {
+		t.Errorf("Unexpected number of calls to TearDown() %d for volume %v", unmounter.TearDownCallCount, unmounter)
+	}
+
+	if plug.NewDetacherCallCount != expectedUnmounters {
+		t.Errorf("Expected plugin NewDetacher to be called %d times but got %d", expectedUnmounters, plug.NewDetacherCallCount)
+	}
+
+	detacher := plug.Detachers[2]
+	if detacher.DetachCallCount != 1 {
+		t.Errorf("Expected Detach to be called")
+	}
+	if detacher.WaitForDetachCallCount != 1 {
+		t.Errorf("Expected WaitForDetach to be called")
+	}
+	if detacher.UnmountDeviceCallCount != 1 {
+		t.Errorf("Expected UnmountDevice to be called")
 	}
 }
 
