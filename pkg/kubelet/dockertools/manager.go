@@ -18,6 +18,7 @@ package dockertools
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -102,8 +104,7 @@ var (
 	// TODO: make this a TTL based pull (if image older than X policy, pull)
 	podInfraContainerImagePullPolicy = api.PullIfNotPresent
 
-	// Default set of security options. Seccomp is disabled by default until
-	// github issue #20870 is resolved.
+	// Default set of security options.
 	defaultSecurityOpt = []string{"seccomp:unconfined"}
 )
 
@@ -172,6 +173,9 @@ type DockerManager struct {
 
 	// The version cache of docker daemon.
 	versionCache *cache.ObjectCache
+
+	// Directory to host local seccomp profiles.
+	seccompProfileRoot string
 }
 
 // A subset of the pod.Manager interface extracted for testing purposes.
@@ -214,6 +218,7 @@ func NewDockerManager(
 	serializeImagePulls bool,
 	enableCustomMetrics bool,
 	hairpinMode bool,
+	seccompProfileRoot string,
 	options ...kubecontainer.Option) *DockerManager {
 	// Wrap the docker client with instrumentedDockerInterface
 	client = newInstrumentedDockerInterface(client)
@@ -250,6 +255,7 @@ func NewDockerManager(
 		enableCustomMetrics:    enableCustomMetrics,
 		configureHairpinMode:   hairpinMode,
 		imageStatsProvider:     &imageStatsProvider{client},
+		seccompProfileRoot:     seccompProfileRoot,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	if serializeImagePulls {
@@ -552,7 +558,7 @@ func (dm *DockerManager) runContainer(
 		ContainerName: container.Name,
 	}
 
-	securityOpts, err := dm.getDefaultSecurityOpt()
+	securityOpts, err := dm.getSecurityOpt(pod, container.Name)
 	if err != nil {
 		return kubecontainer.ContainerID{}, err
 	}
@@ -971,20 +977,57 @@ func (dm *DockerManager) checkVersionCompatibility() error {
 	return nil
 }
 
-func (dm *DockerManager) getDefaultSecurityOpt() ([]string, error) {
+func (dm *DockerManager) getSecurityOpt(pod *api.Pod, ctrName string) ([]string, error) {
 	version, err := dm.APIVersion()
 	if err != nil {
 		return nil, err
 	}
-	// seccomp is to be disabled on docker versions >= v1.10
+
+	// seccomp is only on docker versions >= v1.10
 	result, err := version.Compare(dockerV110APIVersion)
 	if err != nil {
 		return nil, err
 	}
-	if result >= 0 {
+	if result < 0 {
+		// return early for old versions
+		return nil, nil
+	}
+
+	profile, profileOK := pod.ObjectMeta.Annotations["security.alpha.kubernetes.io/seccomp/container/"+ctrName]
+	if !profileOK {
+		// try the pod profile
+		profile, profileOK = pod.ObjectMeta.Annotations["security.alpha.kubernetes.io/seccomp/pod"]
+		if !profileOK {
+			// return early the default
+			return defaultSecurityOpt, nil
+		}
+	}
+
+	if profile == "unconfined" {
+		// return early the default
 		return defaultSecurityOpt, nil
 	}
-	return nil, nil
+
+	if profile == "docker/default" {
+		// return nil so docker will load the default seccomp profile
+		return nil, nil
+	}
+
+	if !strings.HasPrefix(profile, "localhost") {
+		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
+	}
+
+	file, err := ioutil.ReadFile(filepath.Join(dm.seccompProfileRoot, strings.TrimPrefix(profile, "localhost/")))
+	if err != nil {
+		return nil, err
+	}
+
+	b := bytes.NewBuffer(nil)
+	if err := json.Compact(b, file); err != nil {
+		return nil, err
+	}
+
+	return []string{fmt.Sprintf("seccomp=%s", b.Bytes())}, nil
 }
 
 type dockerExitError struct {
