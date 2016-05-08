@@ -184,38 +184,6 @@ end script
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment; filename="kube-addons.conf"
-
-#upstart-job
-
-description "Run kubernetes addon pods"
-
-start on stopped kube-master-components
-
-respawn
-
-script
-	set -o errexit
-	set -o nounset
-
-	. /etc/kube-env
-	export HOME="/root"
-	export KUBECTL_BIN="/usr/bin/kubectl"
-	export TRUSTY_MASTER="true"
-	if [ -n "${TEST_ADDON_CHECK_INTERVAL_SEC:-}" ]; then
-		export TEST_ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC}
-	fi
-	# Run the script to start and monitoring addon manifest changes.
-	exec /var/lib/cloud/scripts/kubernetes/kube-addons.sh 1>>/var/log/kube-addons.log 2>&1
-end script
-
-# Wait for 10s to start it again.
-post-stop exec sleep 10
-
---====================================
-MIME-Version: 1.0
-Content-Type: text/upstart-job; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
 Content-Disposition: attachment; filename="kube-master-health-monitoring.conf"
 
 #upstart-job

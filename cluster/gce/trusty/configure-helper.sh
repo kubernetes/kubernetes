@@ -662,13 +662,6 @@ prepare_kube_addons() {
     setup_addon_manifests "admission-controls" "limit-range"
   fi
 
-  # Prepare the scripts for running addons.
-  addon_script_dir="/var/lib/cloud/scripts/kubernetes"
-  mkdir -p "${addon_script_dir}"
-  cp "${addon_src_dir}/kube-addons.sh" "${addon_script_dir}"
-  cp "${addon_src_dir}/kube-addon-update.sh" "${addon_script_dir}"
-  chmod 544 "${addon_script_dir}/"*.sh
-  # In case that some GCE customized trusty may have a read-only /root.
-  mount -t tmpfs tmpfs /root
-  mount --bind -o remount,rw,noexec /root
+  # Place addon manager pod manifest
+  cp "${addon_src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
 }
