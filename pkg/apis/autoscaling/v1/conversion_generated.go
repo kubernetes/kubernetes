@@ -26,7 +26,6 @@ import (
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	reflect "reflect"
 )
 
 func init() {
@@ -52,9 +51,7 @@ func init() {
 }
 
 func autoConvert_v1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *extensions.HorizontalPodAutoscaler, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*HorizontalPodAutoscaler))(in)
-	}
+	SetDefaults_HorizontalPodAutoscaler(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -76,9 +73,6 @@ func Convert_v1_HorizontalPodAutoscaler_To_extensions_HorizontalPodAutoscaler(in
 }
 
 func autoConvert_extensions_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in *extensions.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.HorizontalPodAutoscaler))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -100,9 +94,6 @@ func Convert_extensions_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in
 }
 
 func autoConvert_v1_HorizontalPodAutoscalerList_To_extensions_HorizontalPodAutoscalerList(in *HorizontalPodAutoscalerList, out *extensions.HorizontalPodAutoscalerList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*HorizontalPodAutoscalerList))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -128,9 +119,6 @@ func Convert_v1_HorizontalPodAutoscalerList_To_extensions_HorizontalPodAutoscale
 }
 
 func autoConvert_extensions_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscalerList(in *extensions.HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.HorizontalPodAutoscalerList))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -156,9 +144,6 @@ func Convert_extensions_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscale
 }
 
 func autoConvert_v1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *extensions.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*HorizontalPodAutoscalerStatus))(in)
-	}
 	if in.ObservedGeneration != nil {
 		in, out := &in.ObservedGeneration, &out.ObservedGeneration
 		*out = new(int64)
@@ -192,9 +177,6 @@ func Convert_v1_HorizontalPodAutoscalerStatus_To_extensions_HorizontalPodAutosca
 }
 
 func autoConvert_extensions_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(in *extensions.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*extensions.HorizontalPodAutoscalerStatus))(in)
-	}
 	if in.ObservedGeneration != nil {
 		in, out := &in.ObservedGeneration, &out.ObservedGeneration
 		*out = new(int64)
@@ -228,9 +210,6 @@ func Convert_extensions_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutosca
 }
 
 func autoConvert_v1_Scale_To_autoscaling_Scale(in *Scale, out *autoscaling.Scale, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*Scale))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -252,9 +231,6 @@ func Convert_v1_Scale_To_autoscaling_Scale(in *Scale, out *autoscaling.Scale, s 
 }
 
 func autoConvert_autoscaling_Scale_To_v1_Scale(in *autoscaling.Scale, out *Scale, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*autoscaling.Scale))(in)
-	}
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -276,9 +252,6 @@ func Convert_autoscaling_Scale_To_v1_Scale(in *autoscaling.Scale, out *Scale, s 
 }
 
 func autoConvert_v1_ScaleSpec_To_autoscaling_ScaleSpec(in *ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ScaleSpec))(in)
-	}
 	out.Replicas = in.Replicas
 	return nil
 }
@@ -288,9 +261,6 @@ func Convert_v1_ScaleSpec_To_autoscaling_ScaleSpec(in *ScaleSpec, out *autoscali
 }
 
 func autoConvert_autoscaling_ScaleSpec_To_v1_ScaleSpec(in *autoscaling.ScaleSpec, out *ScaleSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*autoscaling.ScaleSpec))(in)
-	}
 	out.Replicas = in.Replicas
 	return nil
 }
@@ -300,9 +270,6 @@ func Convert_autoscaling_ScaleSpec_To_v1_ScaleSpec(in *autoscaling.ScaleSpec, ou
 }
 
 func autoConvert_v1_ScaleStatus_To_autoscaling_ScaleStatus(in *ScaleStatus, out *autoscaling.ScaleStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ScaleStatus))(in)
-	}
 	out.Replicas = in.Replicas
 	out.Selector = in.Selector
 	return nil
@@ -313,9 +280,6 @@ func Convert_v1_ScaleStatus_To_autoscaling_ScaleStatus(in *ScaleStatus, out *aut
 }
 
 func autoConvert_autoscaling_ScaleStatus_To_v1_ScaleStatus(in *autoscaling.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*autoscaling.ScaleStatus))(in)
-	}
 	out.Replicas = in.Replicas
 	out.Selector = in.Selector
 	return nil
