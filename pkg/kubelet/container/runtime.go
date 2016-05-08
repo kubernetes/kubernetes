@@ -237,9 +237,6 @@ type Container struct {
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
 	Hash uint64
-	// The timestamp of the creation time of the container.
-	// TODO(yifan): Consider to move it to api.ContainerStatus.
-	Created int64
 	// State is the state of the container.
 	State ContainerState
 }
