@@ -35,6 +35,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+const (
+	cinderVolumeUnderProvisioningName = "placeholder-for-provisioning"
+)
+
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&cinderPlugin{}}
@@ -47,6 +51,7 @@ type CinderProvider interface {
 	CreateVolume(name string, size int, tags *map[string]string) (volumeName string, err error)
 	GetDevicePath(diskId string) string
 	InstanceID() (string, error)
+	GetVolumeLabels(volumeName string) (map[string]string, error)
 }
 
 type cinderPlugin struct {
@@ -59,6 +64,7 @@ var _ volume.VolumePlugin = &cinderPlugin{}
 var _ volume.PersistentVolumePlugin = &cinderPlugin{}
 var _ volume.DeletableVolumePlugin = &cinderPlugin{}
 var _ volume.ProvisionableVolumePlugin = &cinderPlugin{}
+var _ volume.VolumeLabelerPlugin = &cinderPlugin{}
 
 const (
 	cinderVolumePluginName = "kubernetes.io/cinder"
@@ -161,6 +167,19 @@ func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions,
 		},
 		options: options,
 	}, nil
+}
+
+func (plugin *cinderPlugin) NewVolumeLabeler(spec *volume.Spec) (volume.VolumeLabeler, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.Cinder is nil")
+	}
+	return &cinderVolumeVolumeLabeler{
+		cinderVolume: &cinderVolume{
+			volName: spec.Name(),
+			pdName:  spec.PersistentVolume.Spec.Cinder.VolumeID,
+			manager: &CinderDiskUtil{},
+			plugin:  plugin,
+		}}, nil
 }
 
 func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
@@ -458,7 +477,7 @@ func (c *cinderVolumeProvisioner) NewPersistentVolumeTemplate() (*api.Persistent
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				Cinder: &api.CinderVolumeSource{
-					VolumeID: volume.ProvisionedVolumeName,
+					VolumeID: cinderVolumeUnderProvisioningName,
 					FSType:   "ext4",
 					ReadOnly: false,
 				},
@@ -466,4 +485,22 @@ func (c *cinderVolumeProvisioner) NewPersistentVolumeTemplate() (*api.Persistent
 		},
 	}, nil
 
+}
+
+type cinderVolumeVolumeLabeler struct {
+	*cinderVolume
+}
+
+func (labeler *cinderVolumeVolumeLabeler) GetLabels() (map[string]string, error) {
+	if labeler.cinderVolume.pdName == cinderVolumeUnderProvisioningName {
+		// the volume is being provisioned right now and does not have labels yet
+		return map[string]string{}, nil
+	}
+
+	cloud, err := labeler.cinderVolume.plugin.getCloudProvider()
+	if err != nil {
+		return nil, err
+	}
+
+	return cloud.GetVolumeLabels(labeler.cinderVolume.pdName)
 }

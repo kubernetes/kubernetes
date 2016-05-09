@@ -169,6 +169,13 @@ type Detacher interface {
 	UnmountDevice(globalMountPath string, mounter mount.Interface) error
 }
 
+// VolumeLabeler interface provides methods to get volume labels from external cloud
+type VolumeLabeler interface {
+	// GetLabels returns labels of the volume. This function SHOULD return error
+	// when the volume does not exist.
+	GetLabels() (map[string]string, error)
+}
+
 func RenameDirectory(oldPath, newName string) (string, error) {
 	newPath, err := ioutil.TempDir(path.Dir(oldPath), newName)
 	if err != nil {

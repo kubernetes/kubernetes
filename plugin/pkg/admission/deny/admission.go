@@ -26,7 +26,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("AlwaysDeny", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("AlwaysDeny", func(client clientset.Interface, config io.Reader, host admission.AdmissionPluginHost) (admission.Interface, error) {
 		return NewAlwaysDeny(), nil
 	})
 }

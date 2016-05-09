@@ -25,11 +25,16 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+)
+
+const (
+	gcePdUnderProvisioningName = "placeholder-for-provisioning"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -45,6 +50,7 @@ var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
+var _ volume.VolumeLabelerPlugin = &gcePersistentDiskPlugin{}
 
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
@@ -159,6 +165,19 @@ func (plugin *gcePersistentDiskPlugin) newProvisionerInternal(options volume.Vol
 		},
 		options: options,
 	}, nil
+}
+
+func (plugin *gcePersistentDiskPlugin) NewVolumeLabeler(spec *volume.Spec) (volume.VolumeLabeler, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.GCEPersistentDisk == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.GCEPersistentDisk is nil")
+	}
+	return &gcePersistentDiskVolumeLabeler{
+		gcePersistentDisk: &gcePersistentDisk{
+			volName: spec.Name(),
+			pdName:  spec.PersistentVolume.Spec.GCEPersistentDisk.PDName,
+			manager: &GCEDiskUtil{},
+			plugin:  plugin,
+		}}, nil
 }
 
 // Abstract interface to PD operations.
@@ -411,7 +430,7 @@ func (c *gcePersistentDiskProvisioner) NewPersistentVolumeTemplate() (*api.Persi
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-					PDName:    volume.ProvisionedVolumeName,
+					PDName:    gcePdUnderProvisioningName,
 					FSType:    "ext4",
 					Partition: 0,
 					ReadOnly:  false,
@@ -419,4 +438,26 @@ func (c *gcePersistentDiskProvisioner) NewPersistentVolumeTemplate() (*api.Persi
 			},
 		},
 	}, nil
+}
+
+type gcePersistentDiskVolumeLabeler struct {
+	*gcePersistentDisk
+}
+
+func (labeler *gcePersistentDiskVolumeLabeler) GetLabels() (map[string]string, error) {
+	if labeler.gcePersistentDisk.pdName == gcePdUnderProvisioningName {
+		// the volume is being provisioned right now and does not have labels yet
+		return map[string]string{}, nil
+	}
+
+	cloud := labeler.gcePersistentDisk.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		return nil, fmt.Errorf("cannot get labels of GCE volume: cloud provider not initialized")
+	}
+	gceCloud, ok := cloud.(*gcecloud.GCECloud)
+	if !ok {
+		return nil, fmt.Errorf("cannot get labels of GCE volume: not running on GCE")
+	}
+
+	return gceCloud.GetAutoLabelsForPD(labeler.gcePersistentDisk.pdName)
 }

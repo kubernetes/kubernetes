@@ -21,19 +21,20 @@ import (
 	"io"
 	"sync"
 
+	"github.com/golang/glog"
+
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 func init() {
-	admission.RegisterPlugin("PersistentVolumeLabel", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		persistentVolumeLabelAdmission := NewPersistentVolumeLabel()
+	admission.RegisterPlugin("PersistentVolumeLabel", func(client clientset.Interface, config io.Reader, host admission.AdmissionPluginHost) (admission.Interface, error) {
+		persistentVolumeLabelAdmission := NewPersistentVolumeLabel(host)
 		return persistentVolumeLabelAdmission, nil
 	})
 }
@@ -46,15 +47,17 @@ type persistentVolumeLabel struct {
 	mutex            sync.Mutex
 	ebsVolumes       aws.Volumes
 	gceCloudProvider *gce.GCECloud
+	host             admission.AdmissionPluginHost
 }
 
 // NewPersistentVolumeLabel returns an admission.Interface implementation which adds labels to PersistentVolume CREATE requests,
 // based on the labels provided by the underlying cloud provider.
 //
 // As a side effect, the cloud provider may block invalid or non-existent volumes.
-func NewPersistentVolumeLabel() *persistentVolumeLabel {
+func NewPersistentVolumeLabel(host admission.AdmissionPluginHost) *persistentVolumeLabel {
 	return &persistentVolumeLabel{
 		Handler: admission.NewHandler(admission.Create),
+		host:    host,
 	}
 }
 
@@ -66,123 +69,50 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 	if obj == nil {
 		return nil
 	}
-	volume, ok := obj.(*api.PersistentVolume)
+	vol, ok := obj.(*api.PersistentVolume)
 	if !ok {
 		return nil
 	}
 
-	var volumeLabels map[string]string
-	if volume.Spec.AWSElasticBlockStore != nil {
-		labels, err := l.findAWSEBSLabels(volume)
-		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("error querying AWS EBS volume %s: %v", volume.Spec.AWSElasticBlockStore.VolumeID, err))
-		}
-		volumeLabels = labels
+	volSpec := &volume.Spec{
+		PersistentVolume: vol,
 	}
-	if volume.Spec.GCEPersistentDisk != nil {
-		labels, err := l.findGCEPDLabels(volume)
-		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("error querying GCE PD volume %s: %v", volume.Spec.GCEPersistentDisk.PDName, err))
-		}
-		volumeLabels = labels
+	volumePluginMgr := l.host.GetVolumePluginMgr()
+	volumePlugin, err := volumePluginMgr.FindPluginBySpec(volSpec)
+	if err != nil {
+		return admission.NewForbidden(a, err)
 	}
 
-	if len(volumeLabels) != 0 {
-		if volume.Labels == nil {
-			volume.Labels = make(map[string]string)
+	labelerPlugin, ok := volumePlugin.(volume.VolumeLabelerPlugin)
+	if !ok {
+		// the volume plugin does not implement VolumeLabeler interface and thus
+		// does not support labels -> allow
+		glog.V(5).Infof("Ignoring PersistentVolume %s: plugin does not implement VolumeLabeler interface", vol.ObjectMeta.Name)
+		return nil
+	}
+
+	labeler, err := labelerPlugin.NewVolumeLabeler(volSpec)
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("error creating labeler for volume: %v", err))
+	}
+
+	labels, err := labeler.GetLabels()
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("error getting labels for volume: %v", err))
+	}
+
+	if len(labels) != 0 {
+		if vol.Labels == nil {
+			vol.Labels = make(map[string]string)
+
 		}
-		for k, v := range volumeLabels {
+		for k, v := range labels {
 			// We (silently) replace labels if they are provided.
 			// This should be OK because they are in the kubernetes.io namespace
 			// i.e. we own them
-			volume.Labels[k] = v
+			vol.Labels[k] = v
 		}
 	}
 
 	return nil
-}
-
-func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (map[string]string, error) {
-	// Ignore any volumes that are being provisioned
-	if volume.Spec.AWSElasticBlockStore.VolumeID == vol.ProvisionedVolumeName {
-		return nil, nil
-	}
-	ebsVolumes, err := l.getEBSVolumes()
-	if err != nil {
-		return nil, err
-	}
-	if ebsVolumes == nil {
-		return nil, fmt.Errorf("unable to build AWS cloud provider for EBS")
-	}
-
-	// TODO: GetVolumeLabels is actually a method on the Volumes interface
-	// If that gets standardized we can refactor to reduce code duplication
-	labels, err := ebsVolumes.GetVolumeLabels(volume.Spec.AWSElasticBlockStore.VolumeID)
-	if err != nil {
-		return nil, err
-	}
-
-	return labels, err
-}
-
-// getEBSVolumes returns the AWS Volumes interface for ebs
-func (l *persistentVolumeLabel) getEBSVolumes() (aws.Volumes, error) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	if l.ebsVolumes == nil {
-		cloudProvider, err := cloudprovider.GetCloudProvider("aws", nil)
-		if err != nil || cloudProvider == nil {
-			return nil, err
-		}
-		awsCloudProvider, ok := cloudProvider.(*aws.AWSCloud)
-		if !ok {
-			// GetCloudProvider has gone very wrong
-			return nil, fmt.Errorf("error retrieving AWS cloud provider")
-		}
-		l.ebsVolumes = awsCloudProvider
-	}
-	return l.ebsVolumes, nil
-}
-
-func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (map[string]string, error) {
-	// Ignore any volumes that are being provisioned
-	if volume.Spec.GCEPersistentDisk.PDName == vol.ProvisionedVolumeName {
-		return nil, nil
-	}
-
-	provider, err := l.getGCECloudProvider()
-	if err != nil {
-		return nil, err
-	}
-	if provider == nil {
-		return nil, fmt.Errorf("unable to build GCE cloud provider for PD")
-	}
-
-	labels, err := provider.GetAutoLabelsForPD(volume.Spec.GCEPersistentDisk.PDName)
-	if err != nil {
-		return nil, err
-	}
-
-	return labels, err
-}
-
-// getGCECloudProvider returns the GCE cloud provider, for use for querying volume labels
-func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.GCECloud, error) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	if l.gceCloudProvider == nil {
-		cloudProvider, err := cloudprovider.GetCloudProvider("gce", nil)
-		if err != nil || cloudProvider == nil {
-			return nil, err
-		}
-		gceCloudProvider, ok := cloudProvider.(*gce.GCECloud)
-		if !ok {
-			// GetCloudProvider has gone very wrong
-			return nil, fmt.Errorf("error retrieving GCE cloud provider")
-		}
-		l.gceCloudProvider = gceCloudProvider
-	}
-	return l.gceCloudProvider, nil
 }

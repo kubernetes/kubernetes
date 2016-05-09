@@ -216,6 +216,10 @@ func (plugin *FakeVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 	return []api.PersistentVolumeAccessMode{}
 }
 
+func (plugin *FakeVolumePlugin) NewLabeler() (VolumeLabeler, error) {
+	return &FakeLabeler{plugin.Host}, nil
+}
+
 type FakeVolume struct {
 	PodUID  types.UID
 	VolName string
@@ -385,4 +389,12 @@ func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
 	}
 	used.Format = resource.BinarySI
 	return used, nil
+}
+
+type FakeLabeler struct {
+	Host VolumeHost
+}
+
+func (fc *FakeLabeler) GetLabels() (map[string]string, error) {
+	return map[string]string{}, nil
 }

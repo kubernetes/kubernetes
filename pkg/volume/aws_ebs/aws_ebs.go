@@ -27,11 +27,16 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+)
+
+const (
+	awsElasticBlockStoreUnderProvisioningName = "placeholder-for-provisioning"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -47,6 +52,7 @@ var _ volume.VolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.PersistentVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.DeletableVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.ProvisionableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.VolumeLabelerPlugin = &awsElasticBlockStorePlugin{}
 
 const (
 	awsElasticBlockStorePluginName = "kubernetes.io/aws-ebs"
@@ -159,6 +165,19 @@ func (plugin *awsElasticBlockStorePlugin) newProvisionerInternal(options volume.
 		},
 		options: options,
 	}, nil
+}
+
+func (plugin *awsElasticBlockStorePlugin) NewVolumeLabeler(spec *volume.Spec) (volume.VolumeLabeler, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AWSElasticBlockStore == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.AWSElasticBlockStore is nil")
+	}
+	return &awsElasticBlockStoreVolumeLabeler{
+		awsElasticBlockStore: &awsElasticBlockStore{
+			volName:  spec.Name(),
+			volumeID: spec.PersistentVolume.Spec.AWSElasticBlockStore.VolumeID,
+			manager:  &AWSDiskUtil{},
+			plugin:   plugin,
+		}}, nil
 }
 
 // Abstract interface to PD operations.
@@ -449,7 +468,7 @@ func (c *awsElasticBlockStoreProvisioner) NewPersistentVolumeTemplate() (*api.Pe
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
-					VolumeID:  volume.ProvisionedVolumeName,
+					VolumeID:  awsElasticBlockStoreUnderProvisioningName,
 					FSType:    "ext4",
 					Partition: 0,
 					ReadOnly:  false,
@@ -457,4 +476,26 @@ func (c *awsElasticBlockStoreProvisioner) NewPersistentVolumeTemplate() (*api.Pe
 			},
 		},
 	}, nil
+}
+
+type awsElasticBlockStoreVolumeLabeler struct {
+	*awsElasticBlockStore
+}
+
+func (labeler *awsElasticBlockStoreVolumeLabeler) GetLabels() (map[string]string, error) {
+	if labeler.awsElasticBlockStore.volumeID == awsElasticBlockStoreUnderProvisioningName {
+		// the volume is being provisioned right now and does not have labels yet
+		return map[string]string{}, nil
+	}
+
+	cloud := labeler.awsElasticBlockStore.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		return nil, fmt.Errorf("cannot get labels of AWS volume: cloud provider not initialized")
+	}
+	awsCloud, ok := cloud.(*aws.AWSCloud)
+	if !ok {
+		return nil, fmt.Errorf("cannot get labels of AWS volume: not running on AWS")
+	}
+
+	return awsCloud.GetVolumeLabels(labeler.awsElasticBlockStore.volumeID)
 }

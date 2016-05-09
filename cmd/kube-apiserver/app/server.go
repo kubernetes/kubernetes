@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	volumeplugins "k8s.io/kubernetes/pkg/volume/util/plugins"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -90,16 +91,17 @@ func Run(s *options.APIServer) error {
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
+	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	if err != nil {
+		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+	}
+
 	// Setup tunneler if needed
 	var tunneler genericapiserver.Tunneler
 	var proxyDialerFn apiserver.ProxyDialerFunc
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSH genericapiserver.InstallSSHKey
-		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-		if err != nil {
-			glog.Fatalf("Cloud provider could not be initialized: %v", err)
-		}
 		if cloud != nil {
 			if instances, supported := cloud.Instances(); supported {
 				installSSH = instances.AddSSHKeyToAllInstances
@@ -237,8 +239,10 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}
 
+	volumePlugins := volumeplugins.ProbeAllVolumePlugins("")
+	admissionPluginHost := admission.NewAdmissionPluginHost(cloud, volumePlugins)
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
-	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
+	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, admissionPluginHost)
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.

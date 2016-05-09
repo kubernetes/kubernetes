@@ -35,7 +35,7 @@ import (
 const PluginName = "NamespaceLifecycle"
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader, host admission.AdmissionPluginHost) (admission.Interface, error) {
 		return NewLifecycle(client, sets.NewString(api.NamespaceDefault)), nil
 	})
 }

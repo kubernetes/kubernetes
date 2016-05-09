@@ -25,7 +25,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("AlwaysAdmit", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("AlwaysAdmit", func(client clientset.Interface, config io.Reader, host admission.AdmissionPluginHost) (admission.Interface, error) {
 		return NewAlwaysAdmit(), nil
 	})
 }

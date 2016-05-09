@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/gcfg.v1"
+
 	"github.com/rackspace/gophercloud"
 	osvolumeattach "github.com/rackspace/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	osservers "github.com/rackspace/gophercloud/openstack/compute/v2/servers"
@@ -36,10 +38,10 @@ import (
 	"github.com/rackspace/gophercloud/rackspace/blockstorage/v1/volumes"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/volumeattach"
-	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -528,6 +530,20 @@ func (rs *Rackspace) GetDevicePath(diskId string) string {
 		return ""
 	}
 	return attachments[0]["device"].(string)
+}
+
+// GetVolumeLabels returns map of labels to attach to Kubernetes
+// PersistentVolume object representing volume with given name.
+func (rs *Rackspace) GetVolumeLabels(volumeName string) (map[string]string, error) {
+	vol, err := rs.getVolume(volumeName)
+	if err != nil {
+		return nil, err
+	}
+
+	labels := make(map[string]string)
+	labels[unversioned.LabelZoneFailureDomain] = vol.AvailabilityZone
+	labels[unversioned.LabelZoneRegion] = rs.region
+	return labels, nil
 }
 
 // Takes a partial/full disk id or diskname

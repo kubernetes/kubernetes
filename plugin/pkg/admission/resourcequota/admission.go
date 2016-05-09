@@ -31,7 +31,7 @@ import (
 
 func init() {
 	admission.RegisterPlugin("ResourceQuota",
-		func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+		func(client clientset.Interface, config io.Reader, host admission.AdmissionPluginHost) (admission.Interface, error) {
 			registry := install.NewRegistry(client)
 			return NewResourceQuota(client, registry, 5)
 		})

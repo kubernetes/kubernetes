@@ -71,6 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeplugins "k8s.io/kubernetes/pkg/volume/util/plugins"
 )
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -255,7 +256,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		SystemCgroups:                  s.SystemCgroups,
 		TLSOptions:                     tlsOptions,
 		Writer:                         writer,
-		VolumePlugins:                  ProbeVolumePlugins(s.VolumePluginDir),
+		VolumePlugins:                  volumeplugins.ProbeAllVolumePlugins(s.VolumePluginDir),
 		OutOfDiskTransitionFrequency:   s.OutOfDiskTransitionFrequency.Duration,
 		HairpinMode:                    s.HairpinMode,
 		BabysitDaemons:                 s.BabysitDaemons,

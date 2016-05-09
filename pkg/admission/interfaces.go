@@ -19,7 +19,9 @@ package admission
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Attributes is an interface used by AdmissionController to get information about a request
@@ -55,6 +57,16 @@ type Interface interface {
 	// Handles returns true if this admission controller can handle the given operation
 	// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
 	Handles(operation Operation) bool
+}
+
+// AdmissionPluginHost is interface between admission plugins and rest of
+// kube-apiserver.
+type AdmissionPluginHost interface {
+	// GetCloudProvider returns current Kubernetes cloud provider, usable by the
+	// admission controller to check stuff with external cloud APIs.
+	GetCloudProvider() cloudprovider.Interface
+	// GetVolumePlugins returns list of registered volume plugins.
+	GetVolumePluginMgr() *volume.VolumePluginMgr
 }
 
 // Operation is the type of resource operation being checked for admission control

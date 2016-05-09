@@ -135,6 +135,13 @@ type AttachableVolumePlugin interface {
 	NewDetacher(name string, podUID types.UID) (Detacher, error)
 }
 
+// VolumeLabelerPlugin is an extended interface of VolumePlugin and is used to get default labels for
+// PersistentVolumes from external cloud.
+type VolumeLabelerPlugin interface {
+	VolumePlugin
+	NewVolumeLabeler(spec *Spec) (VolumeLabeler, error)
+}
+
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
