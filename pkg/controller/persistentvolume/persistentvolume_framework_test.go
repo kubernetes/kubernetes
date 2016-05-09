@@ -83,8 +83,8 @@ type testCall func(ctrl *PersistentVolumeController, reactor *volumeReactor, tes
 const testNamespace = "default"
 const versionConflictError = "VersionError"
 
-var noVolumes []*api.PersistentVolume
-var noClaims []*api.PersistentVolumeClaim
+var novolumes []*api.PersistentVolume
+var noclaims []*api.PersistentVolumeClaim
 
 // volumeReactor is a core.Reactor that simulates etcd and API server. It
 // stores:
