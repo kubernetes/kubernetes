@@ -159,14 +159,6 @@ __kubectl_compopt() {
 	true # don't do anything. Not supported by bashcompinit in zsh
 }
 
-__kubectl_declare() {
-	if [ "$1" == "-F" ]; then
-		whence -w "$@"
-	else
-		builtin declare "$@"
-	fi
-}
-
 __kubectl_ltrim_colon_completions()
 {
 	if [[ "$1" == *:* && "$COMP_WORDBREAKS" == *:* ]]; then
@@ -253,7 +245,6 @@ __kubectl_bash_source <(sed \
 	-e "s/${LWORD}__ltrim_colon_completions${RWORD}/__kubectl_ltrim_colon_completions/g" \
 	-e "s/${LWORD}compgen${RWORD}/__kubectl_compgen/g" \
 	-e "s/${LWORD}compopt${RWORD}/__kubectl_compopt/g" \
-	-e "s/${LWORD}declare${RWORD}/__kubectl_declare/g" \
 	-e "s/\\\$(type${RWORD}/\$(__kubectl_type/g" \
 	<<'BASH_COMPLETION_EOF'
 `

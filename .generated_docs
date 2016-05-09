@@ -1,5 +1,4 @@
 .generated_docs
-contrib/completions/bash/kubectl
 docs/admin/kube-apiserver.md
 docs/admin/kube-controller-manager.md
 docs/admin/kube-proxy.md
@@ -11,6 +10,7 @@ docs/man/man1/kubectl-apply.1
 docs/man/man1/kubectl-attach.1
 docs/man/man1/kubectl-autoscale.1
 docs/man/man1/kubectl-cluster-info.1
+docs/man/man1/kubectl-completion.1
 docs/man/man1/kubectl-config-current-context.1
 docs/man/man1/kubectl-config-set-cluster.1
 docs/man/man1/kubectl-config-set-context.1
@@ -63,6 +63,7 @@ docs/user-guide/kubectl/kubectl_apply.md
 docs/user-guide/kubectl/kubectl_attach.md
 docs/user-guide/kubectl/kubectl_autoscale.md
 docs/user-guide/kubectl/kubectl_cluster-info.md
+docs/user-guide/kubectl/kubectl_completion.md
 docs/user-guide/kubectl/kubectl_config.md
 docs/user-guide/kubectl/kubectl_config_current-context.md
 docs/user-guide/kubectl/kubectl_config_set-cluster.md
@@ -113,6 +114,7 @@ docs/yaml/kubectl/kubectl_apply.yaml
 docs/yaml/kubectl/kubectl_attach.yaml
 docs/yaml/kubectl/kubectl_autoscale.yaml
 docs/yaml/kubectl/kubectl_cluster-info.yaml
+docs/yaml/kubectl/kubectl_completion.yaml
 docs/yaml/kubectl/kubectl_config.yaml
 docs/yaml/kubectl/kubectl_convert.yaml
 docs/yaml/kubectl/kubectl_cordon.yaml
