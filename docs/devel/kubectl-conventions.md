@@ -42,6 +42,7 @@ Updated: 8/27/2015
 
   - [Principles](#principles)
   - [Command conventions](#command-conventions)
+    - [Create commands](#create-commands)
   - [Flag conventions](#flag-conventions)
   - [Output conventions](#output-conventions)
   - [Documentation conventions](#documentation-conventions)
@@ -70,6 +71,19 @@ Updated: 8/27/2015
   * Ideally, commonly needed functionality would be implemented server-side in order to avoid problems typical of "fat" clients and to make it readily available to non-Go clients.
 * Commands that generate resources, such as `run` or `expose`, should obey specific conventions, see [generators](#generators).
 * A command group (e.g., `kubectl config`) may be used to group related non-standard commands, such as custom generators, mutations, and computations.
+
+
+### Create commands
+
+`kubectl create <resource>` commands fill the gap between "I want to try Kubernetes, but I don't know or care what gets created" (`kubectl run`) and "I want to create exactly this" (author yaml and run `kubectl create -f`).
+They provide an easy way to create a valid object without having to know the vagaries of particular kinds, nested fields, and object key typos that are ignored by the yaml/json parser.
+Because editing an already created object is easier than authoring one from scratch, these commands only need to have enough parameters to create a valid object and set common immutable fields.  It should default as much as is reasonably possible.
+Once that valid object is created, it can be further manipulated using `kubectl edit` or the eventual `kubectl set` commands.
+
+`kubectl create <resource> <special-case>` commands help in cases where you need to perform non-trivial configuration generation/transformation tailored for a common use case.
+`kubectl create secret` is a good example, there's a `generic` flavor with keys mapping to files, then there's a `docker-registry` flavor that is tailored for creating an image pull secret,
+and there's a `tls` flavor for creating tls secrets.  You create these as separate commands to get distinct flags and separate help that is tailored for the particular usage.
+
 
 ## Flag conventions
 
@@ -252,6 +266,7 @@ func (g *NamespaceGeneratorV1) validate() error {
 
 The generator struct (`NamespaceGeneratorV1`) holds the necessary fields for namespace generation. It also satisfies the `kubectl.StructuredGenerator` interface by implementing the `StructuredGenerate() (runtime.Object, error)` method which configures the generated namespace that callers of the generator (`kubectl create namespace` in our case) need to create.
 * `--dry-run` should output the resource that would be created, without creating it.
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/kubectl-conventions.md?pixel)]()
