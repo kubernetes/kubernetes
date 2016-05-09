@@ -58,6 +58,33 @@ func TestNewRequestSetsAccept(t *testing.T) {
 	}
 }
 
+type clientFunc func(req *http.Request) (*http.Response, error)
+
+func (f clientFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestRequestSetsHeaders(t *testing.T) {
+	server := clientFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Header.Get("Accept") != "application/other, */*" {
+			t.Errorf("unexpected headers: %#v", req.Header)
+		}
+		return &http.Response{
+			StatusCode: http.StatusForbidden,
+			Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+		}, nil
+	})
+	config := defaultContentConfig()
+	config.ContentType = "application/other"
+	serializers := defaultSerializers()
+	r := NewRequest(server, "get", &url.URL{Path: "/path"}, "", config, serializers, nil, nil)
+
+	// Check if all "issue" methods are setting headers.
+	_ = r.Do()
+	_, _ = r.Watch()
+	_, _ = r.Stream()
+}
+
 func TestRequestWithErrorWontChange(t *testing.T) {
 	original := Request{
 		err:     errors.New("test"),
@@ -461,12 +488,6 @@ func TestTransformUnstructuredError(t *testing.T) {
 			t.Errorf("unexpected error string: %s", err)
 		}
 	}
-}
-
-type clientFunc func(req *http.Request) (*http.Response, error)
-
-func (f clientFunc) Do(req *http.Request) (*http.Response, error) {
-	return f(req)
 }
 
 func TestRequestWatch(t *testing.T) {
