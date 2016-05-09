@@ -37,7 +37,7 @@ func TestVisitorHttpGet(t *testing.T) {
 			return 0, "", nil, expectedErr
 		}
 		return 0, "", nil, fmt.Errorf("Unexpected error")
-	}, 0, "hello")
+	}, 0, "hello", 3)
 	assert.Equal(t, expectedErr, actualErr)
 	assert.Nil(t, actualBytes)
 	assert.Equal(t, 3, i)
@@ -48,7 +48,7 @@ func TestVisitorHttpGet(t *testing.T) {
 		assert.Equal(t, "hello", url)
 		i++
 		return 501, "Status", nil, nil
-	}, 0, "hello")
+	}, 0, "hello", 3)
 	assert.Error(t, actualErr)
 	assert.Nil(t, actualBytes)
 	assert.Equal(t, 3, i)
@@ -59,14 +59,35 @@ func TestVisitorHttpGet(t *testing.T) {
 		assert.Equal(t, "hello", url)
 		i++
 		return 300, "Status", nil, nil
-	}, 0, "hello")
+	}, 0, "hello", 3)
 	assert.Error(t, actualErr)
 	assert.Nil(t, actualBytes)
 	assert.Equal(t, 1, i)
 
-	// Test Success
+	// Test attempt count is respected
+	i = 0
+	actualBytes, actualErr = readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
+		assert.Equal(t, "hello", url)
+		i++
+		return 501, "Status", nil, nil
+	}, 0, "hello", 1)
+	assert.Error(t, actualErr)
+	assert.Nil(t, actualBytes)
+	assert.Equal(t, 1, i)
+
+	// Test attempts less than 1 results in an error
 	i = 0
 	b := bytes.Buffer{}
+	actualBytes, actualErr = readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
+		return 200, "Status", ioutil.NopCloser(&b), nil
+	}, 0, "hello", 0)
+	assert.Error(t, actualErr)
+	assert.Nil(t, actualBytes)
+	assert.Equal(t, 0, i)
+
+	// Test Success
+	i = 0
+	b = bytes.Buffer{}
 	actualBytes, actualErr = readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
 		assert.Equal(t, "hello", url)
 		i++
@@ -74,7 +95,7 @@ func TestVisitorHttpGet(t *testing.T) {
 			return 200, "Status", ioutil.NopCloser(&b), nil
 		}
 		return 501, "Status", nil, nil
-	}, 0, "hello")
+	}, 0, "hello", 3)
 	assert.Nil(t, actualErr)
 	assert.NotNil(t, actualBytes)
 	assert.Equal(t, 2, i)
