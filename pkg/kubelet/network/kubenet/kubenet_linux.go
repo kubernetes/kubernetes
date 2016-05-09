@@ -31,6 +31,7 @@ import (
 	"github.com/vishvananda/netlink/nl"
 
 	"github.com/appc/cni/libcni"
+	cnitypes "github.com/appc/cni/pkg/types"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -54,6 +55,7 @@ type kubenetNetworkPlugin struct {
 
 	host        network.Host
 	netConfig   *libcni.NetworkConfig
+	loConfig    *libcni.NetworkConfig
 	cniConfig   *libcni.CNIConfig
 	shaper      bandwidth.BandwidthShaper
 	podCIDRs    map[kubecontainer.ContainerID]string
@@ -93,8 +95,18 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 	// was built-in, we simply ignore the error here. A better thing to do is
 	// to check the kernel version in the future.
 	plugin.execer.Command("modprobe", "br-netfilter").CombinedOutput()
-	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
+	err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1)
+	if err != nil {
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+	}
+
+	plugin.loConfig, err = libcni.ConfFromBytes([]byte(`{
+  "cniVersion": "0.1.0",
+  "name": "kubenet-loopback",
+  "type": "loopback"
+}`))
+	if err != nil {
+		return fmt.Errorf("Failed to generate loopback config: %v", err)
 	}
 
 	return nil
@@ -265,19 +277,20 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
 	}
 
-	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
-	if err != nil {
-		return fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
-	}
-
-	rt := buildCNIRuntimeConf(name, namespace, id, netnsPath)
-	if err != nil {
-		return fmt.Errorf("Error building CNI config: %v", err)
-	}
-
-	if err = plugin.addContainerToNetwork(id, rt); err != nil {
+	// Bring up container loopback interface
+	if _, err := plugin.addContainerToNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
 		return err
 	}
+
+	// Hook container up with our bridge
+	res, err := plugin.addContainerToNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id)
+	if err != nil {
+		return err
+	}
+	if res.IP4 == nil || res.IP4.IP.String() == "" {
+		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", id)
+	}
+	plugin.podCIDRs[id] = res.IP4.IP.String()
 
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
@@ -325,16 +338,6 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 		return fmt.Errorf("Kubenet needs a PodCIDR to tear down pods")
 	}
 
-	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
-	if err != nil {
-		return err
-	}
-
-	rt := buildCNIRuntimeConf(name, namespace, id, netnsPath)
-	if err != nil {
-		return fmt.Errorf("Error building CNI config: %v", err)
-	}
-
 	// no cached CIDR is Ok during teardown
 	if cidr, ok := plugin.podCIDRs[id]; ok {
 		glog.V(5).Infof("Removing pod CIDR %s from shaper", cidr)
@@ -345,9 +348,10 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 			}
 		}
 	}
-	if err = plugin.delContainerFromNetwork(id, rt); err != nil {
+	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
 		return err
 	}
+	delete(plugin.podCIDRs, id)
 
 	return nil
 }
@@ -399,37 +403,43 @@ func (plugin *kubenetNetworkPlugin) Status() error {
 	return nil
 }
 
-func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) *libcni.RuntimeConf {
-	glog.V(4).Infof("Kubenet: using netns path %v", podNetnsPath)
-	glog.V(4).Infof("Kubenet: using podns path %v", podNs)
+func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubecontainer.ContainerID) (*libcni.RuntimeConf, error) {
+	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
+	if err != nil {
+		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
+	}
 
 	return &libcni.RuntimeConf{
-		ContainerID: podInfraContainerID.ID,
-		NetNS:       podNetnsPath,
-		IfName:      network.DefaultInterfaceName,
-	}
+		ContainerID: id.ID,
+		NetNS:       netnsPath,
+		IfName:      ifName,
+	}, nil
 }
 
-func (plugin *kubenetNetworkPlugin) addContainerToNetwork(id kubecontainer.ContainerID, rt *libcni.RuntimeConf) error {
-	glog.V(3).Infof("Calling cni plugins to add container to network with cni runtime: %+v", rt)
-	res, err := plugin.cniConfig.AddNetwork(plugin.netConfig, rt)
+func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) (*cnitypes.Result, error) {
+	rt, err := plugin.buildCNIRuntimeConf(ifName, id)
 	if err != nil {
-		return fmt.Errorf("Error adding container to network: %v", err)
-	}
-	if res.IP4 == nil || res.IP4.IP.String() == "" {
-		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", id)
+		return nil, fmt.Errorf("Error building CNI config: %v", err)
 	}
 
-	plugin.podCIDRs[id] = res.IP4.IP.String()
-	return nil
+	glog.V(3).Infof("Adding %s/%s to '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
+	res, err := plugin.cniConfig.AddNetwork(config, rt)
+	if err != nil {
+		return nil, fmt.Errorf("Error adding container to network: %v", err)
+	}
+	return res, nil
 }
 
-func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(id kubecontainer.ContainerID, rt *libcni.RuntimeConf) error {
-	glog.V(3).Infof("Calling cni plugins to remove container from network with cni runtime: %+v", rt)
-	if err := plugin.cniConfig.DelNetwork(plugin.netConfig, rt); err != nil {
+func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) error {
+	rt, err := plugin.buildCNIRuntimeConf(ifName, id)
+	if err != nil {
+		return fmt.Errorf("Error building CNI config: %v", err)
+	}
+
+	glog.V(3).Infof("Removing %s/%s from '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
+	if err := plugin.cniConfig.DelNetwork(config, rt); err != nil {
 		return fmt.Errorf("Error removing container from network: %v", err)
 	}
-	delete(plugin.podCIDRs, id)
 	return nil
 }
 
