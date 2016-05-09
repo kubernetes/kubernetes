@@ -188,7 +188,28 @@ func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{})
 // deleteVolume is callback from framework.Controller watching PersistentVolume
 // events.
 func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
-	// Intentionally left blank - we do not react on deleted volumes
+	if !ctrl.isFullySynced() {
+		return
+	}
+
+	var claim *api.PersistentVolumeClaim
+	if volume, ok := obj.(*api.PersistentVolume); ok && volume.Spec.ClaimRef != nil {
+		if claimObj, exists, _ := ctrl.claims.GetByKey(claimrefToClaimKey(volume.Spec.ClaimRef)); exists {
+			if c, ok := claimObj.(*api.PersistentVolumeClaim); ok {
+				claim = c
+			}
+		}
+	}
+
+	// sync the claim when its volume is deleted. Explicitly syncing the claim
+	// here in response to volume deletion prevents the claim from waiting until
+	// the next sync period for its Lost status.
+	if claim != nil {
+		err := ctrl.syncClaim(claim)
+		if err != nil {
+			glog.Errorf("PersistentVolumeController could not update volume %q from deleteClaim handler: %+v", claimToClaimKey(claim), err)
+		}
+	}
 }
 
 // addClaim is callback from framework.Controller watching PersistentVolumeClaim
