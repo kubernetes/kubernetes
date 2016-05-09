@@ -177,7 +177,7 @@ script
 	start_kube_apiserver
 	start_kube_controller_manager
 	start_kube_scheduler
-	prepare_kube_addons
+	start_kube_addons
 end script
 
 --====================================

@@ -22,18 +22,18 @@
 
 download_kube_env() {
   # Fetch kube-env from GCE metadata server.
-  readonly tmp_install_dir="/var/cache/kubernetes-install"
-  mkdir -p "${tmp_install_dir}"
+  readonly tmp_kube_env="/tmp/kube-env.yaml"
   curl --fail --retry 5 --retry-delay 3 --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
-    -o "${tmp_install_dir}/kube_env.yaml" \
+    -o "${tmp_kube_env}" \
     http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
   # Convert the yaml format file into a shell-style file.
   eval $(python -c '''
 import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
-''' < "${tmp_install_dir}/kube_env.yaml" > /etc/kube-env)
+''' < "${tmp_kube_env}" > /etc/kube-env)
+  rm -f "${tmp_kube_env}"
 }
 
 validate_hash() {
