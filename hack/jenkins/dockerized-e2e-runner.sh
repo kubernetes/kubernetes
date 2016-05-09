@@ -25,6 +25,10 @@ export REPO_DIR=${REPO_DIR:-$(pwd)}
 export HOST_ARTIFACTS_DIR=${WORKSPACE}/_artifacts
 mkdir -p "${HOST_ARTIFACTS_DIR}"
 
+# TODO(ixdy): remove when all jobs are setting these vars using Jenkins credentials
+: ${JENKINS_GCE_SSH_PRIVATE_KEY_FILE:='/var/lib/jenkins/gce_keys/google_compute_engine'}
+: ${JENKINS_GCE_SSH_PUBLIC_KEY_FILE:='/var/lib/jenkins/gce_keys/google_compute_engine.pub'}
+
 env -u HOME -u PATH -u PWD -u WORKSPACE >${WORKSPACE}/env.list
 
 # Add all uncommented lines for metadata.google.internal in /etc/hosts to the
@@ -48,9 +52,10 @@ fi
 docker run --rm=true -i \
   -v "${WORKSPACE}/_artifacts":/workspace/_artifacts \
   -v /etc/localtime:/etc/localtime:ro \
-  -v /var/lib/jenkins/gce_keys:/workspace/.ssh:ro `# TODO(ixdy): remove when all jobs are using JENKINS_GCE_SSH_KEYFILE` \
-  ${JENKINS_GCE_SSH_KEY_FILE:+-v "${JENKINS_GCE_SSH_KEY_FILE}:/workspace/.ssh/google_compute_engine:ro"} \
-  ${JENKINS_AWS_SSH_KEY_FILE:+-v "${JENKINS_AWS_SSH_KEY_FILE}:/workspace/.ssh/kube_aws_rsa:ro"} \
+  ${JENKINS_GCE_SSH_PRIVATE_KEY_FILE:+-v "${JENKINS_GCE_SSH_PRIVATE_KEY_FILE}:/workspace/.ssh/google_compute_engine:ro"} \
+  ${JENKINS_GCE_SSH_PUBLIC_KEY_FILE:+-v "${JENKINS_GCE_SSH_PUBLIC_KEY_FILE}:/workspace/.ssh/google_compute_engine.pub:ro"} \
+  ${JENKINS_AWS_SSH_PRIVATE_KEY_FILE:+-v "${JENKINS_AWS_SSH_PRIVATE_KEY_FILE}:/workspace/.ssh/kube_aws_rsa:ro"} \
+  ${JENKINS_AWS_SSH_PUBLIC_KEY_FILE:+-v "${JENKINS_AWS_SSH_PUBLIC_KEY_FILE}:/workspace/.ssh/kube_aws_rsa.pub:ro"} \
   ${JENKINS_AWS_CREDENTIALS_FILE:+-v "${JENKINS_AWS_CREDENTIALS_FILE}:/workspace/.aws/credentials:ro"} \
   --env-file "${WORKSPACE}/env.list" \
   -e "HOME=/workspace" \
