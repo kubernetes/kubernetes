@@ -28,6 +28,9 @@ ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
 # Define k8s version to use.
 K8S_VERSION=${K8S_VERSION:-"1.1.1"}
 
+# Define docker version to use.
+DOCKER_VERSION=${DOCKER_VERSION:-"1.10.3"}
+
 FLANNEL_DOWNLOAD_URL=\
 "https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz"
 
@@ -36,3 +39,6 @@ ETCD_DOWNLOAD_URL=\
 
 K8S_DOWNLOAD_URL=\
 "https://github.com/kubernetes/kubernetes/releases/download/v${K8S_VERSION}/kubernetes.tar.gz"
+
+DOCKER_DOWNLOAD_URL=\
+"https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}"
