@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
@@ -157,12 +158,10 @@ type SyncHandler interface {
 	HandlePodCleanups() error
 }
 
-type SourcesReadyFn func(sourcesSeen sets.String) bool
-
 // Option is a functional option type for Kubelet
 type Option func(*Kubelet)
 
-// New instantiates a new Kubelet object along with all the required internal modules.
+// NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(
 	hostname string,
@@ -177,7 +176,7 @@ func NewMainKubelet(
 	eventQPS float32,
 	eventBurst int,
 	containerGCPolicy kubecontainer.ContainerGCPolicy,
-	sourcesReady SourcesReadyFn,
+	sourcesReadyFn config.SourcesReadyFn,
 	registerNode bool,
 	registerSchedulable bool,
 	standaloneMode bool,
@@ -306,7 +305,7 @@ func NewMainKubelet(
 		resyncInterval:                 resyncInterval,
 		containerRefManager:            containerRefManager,
 		httpClient:                     &http.Client{},
-		sourcesReady:                   sourcesReady,
+		sourcesReady:                   config.NewSourcesReady(sourcesReadyFn),
 		registerNode:                   registerNode,
 		registerSchedulable:            registerSchedulable,
 		standaloneMode:                 standaloneMode,
@@ -490,7 +489,6 @@ func NewMainKubelet(
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
-	klet.sourcesSeen = sets.NewString()
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
 	// apply functional Option's
@@ -558,12 +556,8 @@ type Kubelet struct {
 	// pods on this node.
 	resyncInterval time.Duration
 
-	// sourcesReady is a function to call to determine if all config sources
-	// are ready.
-	sourcesReady SourcesReadyFn
-	// sourcesSeen records the sources seen by kubelet. This set is not thread
-	// safe and should only be access by the main kubelet syncloop goroutine.
-	sourcesSeen sets.String
+	// sourcesReady records the sources seen by the kubelet, it is thread-safe.
+	sourcesReady config.SourcesReady
 
 	// podManager is a facade that abstracts away the various sources of pods
 	// this Kubelet services.
@@ -826,18 +820,6 @@ func (kl *Kubelet) validateNodeIP() error {
 		}
 	}
 	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", kl.nodeIP.String())
-}
-
-// allSourcesReady returns whether all seen pod sources are ready.
-func (kl *Kubelet) allSourcesReady() bool {
-	// Make a copy of the sourcesSeen list because it's not thread-safe.
-	return kl.sourcesReady(sets.NewString(kl.sourcesSeen.List()...))
-}
-
-// addSource adds a new pod source to the list of sources seen.
-// TODO: reassess in the context of kubernetes/24810
-func (kl *Kubelet) addSource(source string) {
-	kl.sourcesSeen.Insert(source)
 }
 
 // dirExists returns true if the path exists and represents a directory.
@@ -2149,7 +2131,7 @@ func (kl *Kubelet) deletePod(pod *api.Pod) error {
 	if pod == nil {
 		return fmt.Errorf("deletePod does not allow nil pod")
 	}
-	if !kl.allSourcesReady() {
+	if !kl.sourcesReady.AllReady() {
 		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
 		// for sources that haven't reported yet.
 		return fmt.Errorf("skipping delete because sources aren't ready yet")
@@ -2496,7 +2478,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			glog.Errorf("Update channel is closed. Exiting the sync loop.")
 			return false
 		}
-		kl.addSource(u.Source)
+		kl.sourcesReady.AddSource(u.Source)
 
 		switch u.Op {
 		case kubetypes.ADD:
@@ -2553,8 +2535,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			handler.HandlePodSyncs([]*api.Pod{pod})
 		}
 	case <-housekeepingCh:
-		// It's time to do housekeeping
-		if !kl.allSourcesReady() {
+		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready, skip housekeeping, as we may
 			// accidentally delete pods from unready sources.
 			glog.V(4).Infof("SyncLoop (housekeeping, skipped): sources aren't ready yet.")
