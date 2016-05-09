@@ -114,7 +114,7 @@ func isSessionAffinity(affinity *affinityPolicy) bool {
 
 // NextEndpoint returns a service endpoint.
 // The service endpoint is chosen using the round-robin algorithm.
-func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr net.Addr) (string, error) {
+func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr net.Addr, sessionAffinityReset bool) (string, error) {
 	// Coarse locking is simple.  We can get more fine-grained if/when we
 	// can prove it matters.
 	lb.lock.Lock()
@@ -139,13 +139,15 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 		if err != nil {
 			return "", fmt.Errorf("malformed source address %q: %v", srcAddr.String(), err)
 		}
-		sessionAffinity, exists := state.affinity.affinityMap[ipaddr]
-		if exists && int(time.Now().Sub(sessionAffinity.lastUsed).Minutes()) < state.affinity.ttlMinutes {
-			// Affinity wins.
-			endpoint := sessionAffinity.endpoint
-			sessionAffinity.lastUsed = time.Now()
-			glog.V(4).Infof("NextEndpoint for service %q from IP %s with sessionAffinity %+v: %s", svcPort, ipaddr, sessionAffinity, endpoint)
-			return endpoint, nil
+		if !sessionAffinityReset {
+			sessionAffinity, exists := state.affinity.affinityMap[ipaddr]
+			if exists && int(time.Now().Sub(sessionAffinity.lastUsed).Minutes()) < state.affinity.ttlMinutes {
+				// Affinity wins.
+				endpoint := sessionAffinity.endpoint
+				sessionAffinity.lastUsed = time.Now()
+				glog.V(4).Infof("NextEndpoint for service %q from IP %s with sessionAffinity %+v: %s", svcPort, ipaddr, sessionAffinity, endpoint)
+				return endpoint, nil
+			}
 		}
 	}
 	// Take the next endpoint.
