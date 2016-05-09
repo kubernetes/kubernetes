@@ -7,9 +7,9 @@ import (
 	"github.com/kubernetes/kubernetes/pkg/cloudprovider"
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"k8s.io/kubernetes/pkg/api"
-	//"github.com/kubernetes/kubernetes/pkg/api"
+	// "github.com/kubernetes/kubernetes/pkg/api"
 	"k8s.io/kubernetes/kubernetes/pkg/api/service"
-	//"github.com/kubernetes/kubernetes/pkg/api/service"
+	// "github.com/kubernetes/kubernetes/pkg/api/service"
 	"github.com/golang/glog"
 )
 
@@ -20,7 +20,7 @@ type Config struct {
 		       APIUrl     string `gcfg:"api-url"`
 		       APIKey     string `gcfg:"api-key"`
 		       SecretKey  string `gcfg:"secret-key"`
-		       VerifySSL  string `gcfg:"verify-ssl"`
+		       VerifySSL  bool `gcfg:"verify-ssl"`
 	       }
 }
 
@@ -140,11 +140,10 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 	}
 
 	// TODO: Implement a more efficient update strategy for common changes than delete & create
-	// In particular, if we implement hosts update, we can get rid of UpdateHosts
 	if exists {
 		err := lb.EnsureLoadBalancerDeleted(apiService)
 		if err != nil {
-			return nil, fmt.Errorf("error deleting existing openstack load balancer: %v", err)
+			return nil, fmt.Errorf("error deleting existing CloudStack load balancer: %v", err)
 		}
 	}
 
@@ -164,7 +163,10 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 	if lbIpAddr == nil {
 		return nil, fmt.Errorf("unsupported service without predefined Load Balancer IPaddress")
 	}
-	publicIpId := getPublicIpId(lbIpAddr)
+	publicIpId, err := lb.getPublicIpId(lbIpAddr)
+	if err != nil {
+		return nil, fmt.Errorf("error getting public IP address information for creating CloudStack load balancer")
+	}
 
 	//Config name for new LB
 	lbName := apiService.ObjectMeta.Name
@@ -201,7 +203,11 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 
 		// associate vms to new LB
 		assignLbParams := lb.cs.client.LoadBalancer.NewAssignToLoadBalancerRuleParams(createLBRuleResponse.Id)
-		assignLbParams.SetVirtualmachineids(getVirtualMachineIds(hosts))
+		vmIds, err := lb.getVirtualMachineIds(hosts)
+		if err != nil {
+			return nil, fmt.Errorf("error getting list of vms associated with CloudStack load balancer")
+		}
+		assignLbParams.SetVirtualmachineids(vmIds)
 		assignLBRuleResponse, err := lb.cs.client.LoadBalancer.AssignToLoadBalancerRule(assignLbParams)
 
 		if err != nil || !assignLBRuleResponse.Success {
@@ -223,7 +229,10 @@ func (lb *LoadBalancer) UpdateLoadBalancer(apiService *api.Service, hosts []stri
 
 	//Get new list of vms associated with LB of service
 	//Set of member (addresses) that _should_ exist
-	vmIds := getVirtualMachineIds(hosts)
+	vmIds, err := lb.getVirtualMachineIds(hosts)
+	if err != nil {
+		return fmt.Errorf("error getting list of vms associated with CloudStack load balancer")
+	}
 	vms := map[string]bool{}
 	for _, vmId := range vmIds {
 		vms[vmId] = true
@@ -237,7 +246,11 @@ func (lb *LoadBalancer) UpdateLoadBalancer(apiService *api.Service, hosts []stri
 	}
 
 	//list all LB rules associated with this public IPaddress
-	lbParams.SetPublicipid(getPublicIpId(lbIpAddr))
+	publicIpId, err := lb.getPublicIpId(lbIpAddr)
+	if err != nil {
+		return fmt.Errorf("error getting public IP address information for creating CloudStack load balancer")
+	}
+	lbParams.SetPublicipid(publicIpId)
 	lbRulesResponse, err := lb.cs.client.LoadBalancer.ListLoadBalancerRules(lbParams)
 	if err != nil {
 		return err
@@ -246,12 +259,15 @@ func (lb *LoadBalancer) UpdateLoadBalancer(apiService *api.Service, hosts []stri
 	lbInstancesParams := lb.cs.client.LoadBalancer.NewListLoadBalancerRuleInstancesParams(lbRuleId)
 	lbInstancesParams.SetLbvmips(true)
 
-	//TODO - lbInstancesResponse object doesn't fit to real output when making the API call on terminal
-	//lbInstancesResponse.LoadBalancerRuleInstances[0].
-	//OUTPUT: oldvmIds
+	//list out all VMs currently associated to this LB
 	lbInstancesResponse, err := lb.cs.client.LoadBalancer.ListLoadBalancerRuleInstances(lbInstancesParams)
 	if err != nil {
 		return err
+	}
+
+	var oldvmIds []string
+	for _, lbInstance := range lbInstancesResponse.LoadBalancerRuleInstances {
+		oldvmIds = append(oldvmIds, lbInstance.Loadbalancerruleinstance.Id)
 	}
 
 	//Compare two list of vms to thus update LB
@@ -300,7 +316,11 @@ func (lb *LoadBalancer) EnsureLoadBalancerDeleted(apiService *api.Service) error
 	if lbIpAddr != nil {
 		//list all LB rules associated to this public ipaddress.
 		listLBParams := lb.cs.client.LoadBalancer.NewListLoadBalancerRulesParams()
-		listLBParams.SetPublicipid(getPublicIpId(lbIpAddr))
+		publicIpId, err := lb.getPublicIpId(lbIpAddr)
+		if err != nil {
+			return fmt.Errorf("error getting public IP address information for creating CloudStack load balancer")
+		}
+		listLBParams.SetPublicipid(publicIpId)
 		listLoadBalancerResponse, err := lb.cs.client.LoadBalancer.ListLoadBalancerRules(listLBParams)
 		if err != nil {
 			return err
@@ -323,10 +343,39 @@ func (lb *LoadBalancer) EnsureLoadBalancerDeleted(apiService *api.Service) error
 	return nil
 }
 
-func getPublicIpId(lbIp string) string {
-	//TODO
+func (lb *LoadBalancer) getPublicIpId(lbIP string) (string, error) {
+	addressParams := lb.cs.client.Address.NewListPublicIpAddressesParams()
+	addressParams.SetIpaddress(lbIP)
+	addressResponse, err := lb.cs.client.Address.ListPublicIpAddresses(addressParams)
+	if err != nil {
+		return nil, err
+	}
+
+	if addressResponse.Count > 1 {
+		return nil, fmt.Errorf("Found more than one address objects with IP = %s", lbIP)
+	} else if addressResponse.Count == 0 {
+		//TODO: acquire new IP address with lbIP from CloudStack
+	}
+
+	return addressResponse.PublicIpAddresses[0].Id, nil
 }
 
-func getVirtualMachineIds(hosts []string) []string {
-	//TODO
+func (lb *LoadBalancer) getVirtualMachineIds(hosts []string) ([]string, error) {
+	var vmIDs []string
+	for _, host := range hosts {
+		vmParams := lb.cs.client.VirtualMachine.NewListVirtualMachinesParams()
+		vmParams.SetName(host)
+		vmParams.SetListall(true)
+		vmResponse, err := lb.cs.client.VirtualMachine.ListVirtualMachines(vmParams)
+		if err != nil {
+			return nil, err
+		}
+		if vmResponse.Count > 1 {
+			return nil, fmt.Errorf("Found more than one ID of node name %s", host)
+		} else if vmResponse.Count == 0 {
+			return nil, fmt.Errorf("ID of node name %s is not found", host)
+		}
+		vmIDs = append(vmIDs, vmResponse.VirtualMachines[0].Id)
+	}
+	return vmIDs, nil
 }
