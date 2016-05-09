@@ -180,6 +180,10 @@ type ObjectMeta struct {
 	// been deleted, this object will be garbage collected.
 	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
+	// Reference to a Collection (Controller) that owns this object. Only the controller
+	// referenced here should modify this object.
+	CollectionRef *CollectionReference `json:"collectionRef,omitempty" patchStrategy:"merge" patchMergeKey:"uid"`
+
 	// Must be empty before the object is deleted from the registry. Each entry
 	// is an identifier for the responsible component that will remove the entry
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
@@ -2614,6 +2618,24 @@ type OwnerReference struct {
 	// UID of the referent.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
 	UID types.UID `json:"uid" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID"`
+}
+
+// CollectionReference contains all information needed to indentify a collection (Controller)
+// managing object. Managing collection has to be in the same Namespace.
+type CollectionReference struct {
+	// API version of the referent.
+	APIVersion string `json:"apiVersion"`
+	// Kind of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	Kind string `json:"kind"`
+	// Name of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	Name string `json:"name"`
+	// UID of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
+	UID types.UID `json:"uid"`
+	// Should this CollectionReference be treated as an owner for cascading deletion purposes.
+	Owner bool `json:"owner"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
