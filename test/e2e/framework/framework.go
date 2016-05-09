@@ -123,6 +123,9 @@ func (f *Framework) BeforeEach() {
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = f.options.ClientQPS
 		config.Burst = f.options.ClientBurst
+		if TestContext.KubeAPIContentType != "" {
+			config.ContentType = TestContext.KubeAPIContentType
+		}
 		c, err := loadClientFromConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.Client = c
