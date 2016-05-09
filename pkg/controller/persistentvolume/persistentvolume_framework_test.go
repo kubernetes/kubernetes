@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
+	vol "k8s.io/kubernetes/pkg/volume"
 )
 
 // This is a unit test framework for persistent volume controller.
@@ -184,6 +186,17 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		r.changedSinceLastSync++
 		glog.V(4).Infof("saved updated claim %s", claim.Name)
 		return true, claim, nil
+
+	case action.Matches("get", "persistentvolumes"):
+		name := action.(core.GetAction).GetName()
+		volume, found := r.volumes[name]
+		if found {
+			glog.V(4).Infof("GetVolume: found %s", volume.Name)
+			return true, volume, nil
+		} else {
+			glog.V(4).Infof("GetVolume: volume %s not found", name)
+			return true, nil, fmt.Errorf("Cannot find volume %s", name)
+		}
 	}
 	return false, nil, nil
 }
@@ -381,16 +394,31 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 
 func newPersistentVolumeController(kubeClient clientset.Interface) *PersistentVolumeController {
 	ctrl := &PersistentVolumeController{
-		volumes:       newPersistentVolumeOrderedIndex(),
-		claims:        cache.NewStore(cache.MetaNamespaceKeyFunc),
-		kubeClient:    kubeClient,
-		eventRecorder: record.NewFakeRecorder(1000),
+		volumes:           newPersistentVolumeOrderedIndex(),
+		claims:            cache.NewStore(cache.MetaNamespaceKeyFunc),
+		kubeClient:        kubeClient,
+		eventRecorder:     record.NewFakeRecorder(1000),
+		runningOperations: make(map[string]bool),
 	}
 	return ctrl
 }
 
+func addRecyclePlugin(ctrl *PersistentVolumeController, expectedRecycleCalls []error) {
+	plugin := &mockVolumePlugin{
+		recycleCalls: expectedRecycleCalls,
+	}
+	ctrl.recyclePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, ctrl)
+}
+
+func addDeletePlugin(ctrl *PersistentVolumeController, expectedDeleteCalls []error) {
+	plugin := &mockVolumePlugin{
+		deleteCalls: expectedDeleteCalls,
+	}
+	ctrl.recyclePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, ctrl)
+}
+
 // newVolume returns a new volume with given attributes
-func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase api.PersistentVolumePhase, annotations ...string) *api.PersistentVolume {
+func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase api.PersistentVolumePhase, reclaimPolicy api.PersistentVolumeReclaimPolicy, annotations ...string) *api.PersistentVolume {
 	volume := api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name:            name,
@@ -403,7 +431,8 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase a
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
 			},
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany},
+			AccessModes:                   []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany},
+			PersistentVolumeReclaimPolicy: reclaimPolicy,
 		},
 		Status: api.PersistentVolumeStatus{
 			Phase: phase,
@@ -432,9 +461,9 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase a
 
 // newVolumeArray returns array with a single volume that would be returned by
 // newVolume() with the same parameters.
-func newVolumeArray(name, capacity, boundToClaimUID, boundToClaimName string, phase api.PersistentVolumePhase, annotations ...string) []*api.PersistentVolume {
+func newVolumeArray(name, capacity, boundToClaimUID, boundToClaimName string, phase api.PersistentVolumePhase, reclaimPolicy api.PersistentVolumeReclaimPolicy, annotations ...string) []*api.PersistentVolume {
 	return []*api.PersistentVolume{
-		newVolume(name, capacity, boundToClaimUID, boundToClaimName, phase, annotations...),
+		newVolume(name, capacity, boundToClaimUID, boundToClaimName, phase, reclaimPolicy, annotations...),
 	}
 }
 
@@ -497,6 +526,85 @@ func testSyncVolume(ctrl *PersistentVolumeController, reactor *volumeReactor, te
 	return ctrl.syncVolume(test.initialVolumes[0])
 }
 
+type operationType string
+
+const operationDelete = "Delete"
+const operationRecycle = "Recycle"
+
+// wrapTestWithControllerConfig returns a testCall that:
+// - configures controller with recycler or deleter which will return provided
+//   errors when a volume is deleted or recycled.
+// - calls given testCall
+func wrapTestWithControllerConfig(operation operationType, expectedOperationCalls []error, toWrap testCall) testCall {
+	expected := expectedOperationCalls
+
+	return func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+		switch operation {
+		case operationDelete:
+			addDeletePlugin(ctrl, expected)
+		case operationRecycle:
+			addRecyclePlugin(ctrl, expected)
+		}
+
+		return toWrap(ctrl, reactor, test)
+	}
+}
+
+// wrapTestWithInjectedOperation returns a testCall that:
+// - starts the controller and lets it run original testCall until
+//   scheduleOperation() call. It blocks the controller there and calls the
+//   injected function to simulate that something is happenning when the
+//   controller waits for the operation lock. Controller is then resumed and we
+//   check how it behaves.
+func wrapTestWithInjectedOperation(toWrap testCall, injectBeforeOperation func(ctrl *PersistentVolumeController, reactor *volumeReactor)) testCall {
+
+	return func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+		// Let the controller fire a condidition when it reaches
+		// scheduleOperation().
+		testMutex := sync.Mutex{}
+		ctrl.testingSchedulerOperationCondMutex = &testMutex
+		ctrl.testingSchedulerOperationCond = sync.NewCond(&testMutex)
+
+		// Hold the mutex until we're waiting for the condition (we do not want
+		// to miss it).
+		ctrl.testingSchedulerOperationCondMutex.Lock()
+		// Hold the operation mutex to prevent scheduleOperation proceed after
+		// it signals the condition.
+		ctrl.runningOperationsMapLock.Lock()
+
+		// Run the tested function (typically syncClaim/syncVolume) in a
+		// separate goroutine.
+		var testError error
+		var testFinished int32
+
+		go func() {
+			testError = toWrap(ctrl, reactor, test)
+			// Let the "main" test function know that syncVolume has finished.
+			atomic.StoreInt32(&testFinished, 1)
+		}()
+
+		// Wait for test function to get into scheduleOperation(). It unlocks
+		// testingSchedulerOperationCondMutex, i.e. lets scheduleOperation to
+		// grab it and signal the condition.
+		ctrl.testingSchedulerOperationCond.Wait()
+		// Now, the controller is in scheduleOperation() and it's waiting for
+		// runningOperationsMapLock. Inject our test call.
+		glog.V(4).Infof("reactor: scheduleOperation reached, injecting call")
+		injectBeforeOperation(ctrl, reactor)
+		// Resume the controller.
+		ctrl.runningOperationsMapLock.Unlock()
+		// We no longer need testingSchedulerOperationCondMutex
+		ctrl.testingSchedulerOperationCondMutex.Unlock()
+
+		// Wait for the controler to finish the test function.
+		for atomic.LoadInt32(&testFinished) == 0 {
+			time.Sleep(time.Millisecond * 10)
+		}
+
+		return testError
+	}
+}
+
 func evaluateTestResults(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest, t *testing.T) {
 	// Evaluate results
 	if err := reactor.checkClaims(t, test.expectedClaims); err != nil {
@@ -540,6 +648,9 @@ func runSyncTests(t *testing.T, tests []controllerTest) {
 		if err != nil {
 			t.Errorf("Test %q failed: %v", test.name, err)
 		}
+
+		// Wait for all goroutines to finish
+		reactor.waitTest()
 
 		evaluateTestResults(ctrl, reactor, test, t)
 	}
@@ -594,6 +705,9 @@ func runMultisyncTests(t *testing.T, tests []controllerTest) {
 				t.Errorf("Test %q failed: too many iterations", test.name)
 				break
 			}
+
+			// Wait for all goroutines to finish
+			reactor.waitTest()
 
 			obj := reactor.popChange()
 			if obj == nil {
@@ -653,4 +767,123 @@ func runMultisyncTests(t *testing.T, tests []controllerTest) {
 		evaluateTestResults(ctrl, reactor, test, t)
 		glog.V(4).Infof("test %q finished after %d iterations", test.name, counter)
 	}
+}
+
+// Dummy volume plugin for provisioning, deletion and recycling. It contains
+// lists of expected return values to simulate errors.
+type mockVolumePlugin struct {
+	provisionCalls       []error
+	provisionCallCounter int
+	deleteCalls          []error
+	deleteCallCounter    int
+	recycleCalls         []error
+	recycleCallCounter   int
+}
+
+var _ vol.VolumePlugin = &mockVolumePlugin{}
+
+func (plugin *mockVolumePlugin) Init(host vol.VolumeHost) error {
+	return nil
+}
+
+func (plugin *mockVolumePlugin) Name() string {
+	return "mockVolumePlugin"
+}
+
+func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
+	return true
+}
+
+func (plugin *mockVolumePlugin) NewMounter(spec *vol.Spec, podRef *api.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
+	return nil, fmt.Errorf("Mounter is not supported by this plugin")
+}
+
+func (plugin *mockVolumePlugin) NewUnmounter(name string, podUID types.UID) (vol.Unmounter, error) {
+	return nil, fmt.Errorf("Unmounter is not supported by this plugin")
+}
+
+// Provisioner interfaces
+
+func (plugin *mockVolumePlugin) NewProvisioner(options vol.VolumeOptions) (vol.Provisioner, error) {
+	if len(plugin.provisionCalls) > 0 {
+		// mockVolumePlugin directly implements Provisioner interface
+		glog.V(4).Infof("mock plugin NewProvisioner called, returning mock provisioner")
+		return plugin, nil
+	} else {
+		return nil, fmt.Errorf("Mock plugin error: no provisionCalls configured")
+	}
+}
+
+func (plugin *mockVolumePlugin) Provision(*api.PersistentVolume) error {
+	if len(plugin.provisionCalls) <= plugin.provisionCallCounter {
+		return fmt.Errorf("Mock plugin error: unexpected provisioner call %d", plugin.provisionCallCounter)
+	}
+	ret := plugin.provisionCalls[plugin.provisionCallCounter]
+	plugin.provisionCallCounter++
+	glog.V(4).Infof("mock plugin Provision call nr. %d, returning %v", plugin.provisionCallCounter, ret)
+	return ret
+}
+
+func (plugin *mockVolumePlugin) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+	if len(plugin.provisionCalls) <= plugin.provisionCallCounter {
+		return nil, fmt.Errorf("Mock plugin error: unexpected provisioner call %d", plugin.provisionCallCounter)
+	}
+	ret := plugin.provisionCalls[plugin.provisionCallCounter]
+	plugin.provisionCallCounter++
+	glog.V(4).Infof("mock plugin NewPersistentVolumeTemplate call nr. %d, returning %v", plugin.provisionCallCounter, ret)
+	return nil, ret
+}
+
+// Deleter interfaces
+
+func (plugin *mockVolumePlugin) NewDeleter(spec *vol.Spec) (vol.Deleter, error) {
+	if len(plugin.deleteCalls) > 0 {
+		// mockVolumePlugin directly implements Deleter interface
+		glog.V(4).Infof("mock plugin NewDeleter called, returning mock deleter")
+		return plugin, nil
+	} else {
+		return nil, fmt.Errorf("Mock plugin error: no deleteCalls configured")
+	}
+}
+
+func (plugin *mockVolumePlugin) Delete() error {
+	if len(plugin.deleteCalls) <= plugin.deleteCallCounter {
+		return fmt.Errorf("Mock plugin error: unexpected deleter call %d", plugin.deleteCallCounter)
+	}
+	ret := plugin.deleteCalls[plugin.deleteCallCounter]
+	plugin.deleteCallCounter++
+	glog.V(4).Infof("mock plugin Delete call nr. %d, returning %v", plugin.deleteCallCounter, ret)
+	return ret
+}
+
+// Volume interfaces
+
+func (plugin *mockVolumePlugin) GetPath() string {
+	return ""
+}
+
+func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
+	return nil, nil
+}
+
+// Recycler interfaces
+
+func (plugin *mockVolumePlugin) NewRecycler(spec *vol.Spec) (vol.Recycler, error) {
+	if len(plugin.recycleCalls) > 0 {
+		// mockVolumePlugin directly implements Recycler interface
+		glog.V(4).Infof("mock plugin NewRecycler called, returning mock recycler")
+		return plugin, nil
+	} else {
+		return nil, fmt.Errorf("Mock plugin error: no recycleCalls configured")
+	}
+}
+
+func (plugin *mockVolumePlugin) Recycle() error {
+	if len(plugin.recycleCalls) <= plugin.recycleCallCounter {
+		return fmt.Errorf("Mock plugin error: unexpected recycle call %d", plugin.recycleCallCounter)
+	}
+	ret := plugin.recycleCalls[plugin.recycleCallCounter]
+	plugin.recycleCallCounter++
+	glog.V(4).Infof("mock plugin Recycle call nr. %d, returning %v", plugin.recycleCallCounter, ret)
+	return ret
 }

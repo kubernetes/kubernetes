@@ -104,6 +104,12 @@ type PersistentVolumeController struct {
 	// runningOperations is map of running operations. The value does not
 	// matter, presence of a key is enough to consider an operation running.
 	runningOperations map[string]bool
+
+	// For testing only: condition to signal when scheduleOperation is about
+	// to run any operation and mutex guarding it.
+	// Not used when set to nil.
+	testingSchedulerOperationCondMutex *sync.Mutex
+	testingSchedulerOperationCond      *sync.Cond
 }
 
 // NewPersistentVolumeController creates a new PersistentVolumeController
@@ -1151,6 +1157,13 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *api.PersistentV
 // makes sure the operation is already not running.
 func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, operation func(arg interface{}), arg interface{}) {
 	glog.V(4).Infof("scheduleOperation[%s]", operationName)
+
+	// Poke test code that an operation is just about to get started.
+	if ctrl.testingSchedulerOperationCond != nil {
+		ctrl.testingSchedulerOperationCondMutex.Lock()
+		ctrl.testingSchedulerOperationCond.Signal()
+		ctrl.testingSchedulerOperationCondMutex.Unlock()
+	}
 
 	isRunning := func() bool {
 		// In anonymous func() to get the locking right.
