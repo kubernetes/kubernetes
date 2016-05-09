@@ -57,15 +57,16 @@ Updated: 8/27/2015
 * Explicit should always override implicit
   * Environment variables should override default values
   * Command-line flags should override default values and environment variables
-    * --namespace should also override the value specified in a specified resource
+    * `--namespace` should also override the value specified in a specified resource
 
 ## Command conventions
 
 * Command names are all lowercase, and hyphenated if multiple words.
 * kubectl VERB NOUNs for commands that apply to multiple resource types.
+* Command itself should not have built-in aliases.
 * NOUNs may be specified as `TYPE name1 name2` or `TYPE/name1 TYPE/name2` or `TYPE1,TYPE2,TYPE3/name1`; TYPE is omitted when only a single type is expected.
 * Resource types are all lowercase, with no hyphens; both singular and plural forms are accepted.
-* NOUNs may also be specified by one or more file arguments: -f file1 -f file2 ...
+* NOUNs may also be specified by one or more file arguments: `-f file1 -f file2 ...`
 * Resource types may have 2- or 3-letter aliases.
 * Business logic should be decoupled from the command framework, so that it can be reused independently of kubectl, cobra, etc.
   * Ideally, commonly needed functionality would be implemented server-side in order to avoid problems typical of "fat" clients and to make it readily available to non-Go clients.
@@ -89,7 +90,7 @@ and there's a `tls` flavor for creating tls secrets.  You create these as separa
 
 * Flags are all lowercase, with words separated by hyphens
 * Flag names and single-character aliases should have the same meaning across all commands
-* Command-line flags corresponding to API fields should accept API enums exactly (e.g., --restart=Always)
+* Command-line flags corresponding to API fields should accept API enums exactly (e.g., `--restart=Always`)
 * Do not reuse flags for different semantic purposes, and do not use different flag names for the same semantic purpose -- grep for `"Flags()"` before adding a new flag
 * Use short flags sparingly, only for the most frequently used options, prefer lowercase over uppercase for the most common cases, try to stick to well known conventions for UNIX commands and/or Docker, where they exist, and update this list when adding new short flags
   * `-f`: Resource file
@@ -101,7 +102,6 @@ and there's a `tls` flavor for creating tls secrets.  You create these as separa
     * also used for `--client` in `version`, but should be deprecated
   * `-i`: Attach stdin
   * `-t`: Allocate TTY
-    * also used for `--template`, but deprecated
   * `-w`: Watch (currently also used for `--www` in `proxy`, but should be deprecated)
   * `-p`: Previous
     * also used for `--pod` in `exec`, but deprecated
@@ -111,8 +111,8 @@ and there's a `tls` flavor for creating tls secrets.  You create these as separa
   * `-r`: Replicas
   * `-u`: Unix socket
   * `-v`: Verbose logging level
-* `--dry-run`: Don't modify the live state; simulate the mutation and display the output
-* `--local`: Don't contact the server; just do local read, transformation, generation, etc. and display the output
+* `--dry-run`: Don't modify the live state; simulate the mutation and display the output. All mutations should support it.
+* `--local`: Don't contact the server; just do local read, transformation, generation, etc., and display the output
 * `--output-version=...`: Convert the output to a different API group/version
 * `--validate`: Validate the resource schema
 
