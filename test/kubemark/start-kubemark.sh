@@ -104,9 +104,9 @@ create-certs ${MASTER_IP}
 KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
-echo "${CA_CERT_BASE64}" | base64 -d > ca.crt
-echo "${KUBECFG_CERT_BASE64}" | base64 -d > kubecfg.crt
-echo "${KUBECFG_KEY_BASE64}" | base64 -d > kubecfg.key
+echo "${CA_CERT_BASE64}" | base64 -d > "${RESOURCE_DIRECTORY}/ca.crt"
+echo "${KUBECFG_CERT_BASE64}" | base64 -d > "${RESOURCE_DIRECTORY}/kubecfg.crt"
+echo "${KUBECFG_KEY_BASE64}" | base64 -d > "${RESOURCE_DIRECTORY}/kubecfg.key"
 
 until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" --command="ls" &> /dev/null; do
   sleep 1
@@ -129,14 +129,14 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
 if [ "${RUN_FROM_DISTRO}" == "false" ]; then
   gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
     "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" \
-    "${KUBE_ROOT}/test/kubemark/start-kubemark-master.sh" \
-    "${KUBE_ROOT}/test/kubemark/configure-kubectl.sh" \
+    "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
+    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
     "${MASTER_NAME}":~
 else
   gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
     "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" \
-    "${KUBE_ROOT}/test/kubemark/start-kubemark-master.sh" \
-    "${KUBE_ROOT}/test/kubemark/configure-kubectl.sh" \
+    "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
+    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
     "${MASTER_NAME}":~
 fi
 
@@ -163,7 +163,7 @@ contexts:
   name: kubemark-context
 current-context: kubemark-context" | base64 | tr -d "\n\r")
 
-KUBECONFIG_SECRET=kubeconfig_secret.json
+KUBECONFIG_SECRET="${RESOURCE_DIRECTORY}/kubeconfig_secret.json"
 cat > "${KUBECONFIG_SECRET}" << EOF
 {
   "apiVersion": "v1",
@@ -178,7 +178,7 @@ cat > "${KUBECONFIG_SECRET}" << EOF
 }
 EOF
 
-LOCAL_KUBECONFIG=${KUBE_ROOT}/test/kubemark/kubeconfig.loc
+LOCAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.loc"
 cat > "${LOCAL_KUBECONFIG}" << EOF
 apiVersion: v1
 kind: Config
@@ -202,17 +202,30 @@ contexts:
 current-context: kubemark-context
 EOF
 
-sed "s/##numreplicas##/${NUM_NODES:-10}/g" "${KUBE_ROOT}"/test/kubemark/hollow-node_template.json > "${KUBE_ROOT}"/test/kubemark/hollow-node.json
-sed -i'' -e "s/##project##/${PROJECT}/g" "${KUBE_ROOT}"/test/kubemark/hollow-node.json
-"${KUBECTL}" create -f "${KUBE_ROOT}"/test/kubemark/kubemark-ns.json
+
+sed "s/##numreplicas##/${NUM_NODES:-10}/g" "${RESOURCE_DIRECTORY}/hollow-node_template.json" > "${RESOURCE_DIRECTORY}/hollow-node.json"
+sed -i'' -e "s/##project##/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
+
+mkdir "${RESOURCE_DIRECTORY}/addons" || true
+
+sed "s/##MASTER_IP##/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/heapster_template.json" > "${RESOURCE_DIRECTORY}/addons/heapster.json"
+metrics_mem_per_node=4
+metrics_mem=$((200 + ${metrics_mem_per_node}*${NUM_NODES:-10}))
+sed -i'' -e "s/##METRICS_MEM##/${metrics_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
+eventer_mem_per_node=500
+eventer_mem=$((200 * 1024 + ${eventer_mem_per_node}*${NUM_NODES:-10}))
+sed -i'' -e "s/##EVENTER_MEM##/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
+
+"${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/kubemark-ns.json"
 "${KUBECTL}" create -f "${KUBECONFIG_SECRET}" --namespace="kubemark"
-"${KUBECTL}" create -f "${KUBE_ROOT}"/test/kubemark/hollow-node.json --namespace="kubemark"
+"${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
+"${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.json" --namespace="kubemark"
 
 rm "${KUBECONFIG_SECRET}"
 
 echo "Waiting for all HollowNodes to become Running..."
 start=$(date +%s)
-nodes=$("${KUBECTL}" --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node) || true
+nodes=$("${KUBECTL}" --kubeconfig="${RESOURCE_DIRECTORY}/kubeconfig.loc" get node) || true
 ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 
 until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
@@ -224,16 +237,16 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
     echo ""
     echo "Timeout waiting for all HollowNodes to become Running"
     # Try listing nodes again - if it fails it means that API server is not responding
-    if "${KUBECTL}" --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node &> /dev/null; then
+    if "${KUBECTL}" --kubeconfig="${RESOURCE_DIRECTORY}/kubeconfig.loc" get node &> /dev/null; then
       echo "Found only ${ready} ready Nodes while waiting for ${NUM_NODES}."
       exit 1
     fi
     echo "Got error while trying to list Nodes. Probably API server is down."
     exit 1
   fi
-  nodes=$("${KUBECTL}" --kubeconfig="${KUBE_ROOT}"/test/kubemark/kubeconfig.loc get node) || true
+  nodes=$("${KUBECTL}" --kubeconfig="${RESOURCE_DIRECTORY}/kubeconfig.loc" get node) || true
   ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 done
-
 echo ""
+
 echo "Password to kubemark master: ${password}"
