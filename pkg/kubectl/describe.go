@@ -769,6 +769,8 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		capacity = storage.String()
 	}
 
+	events, _ := d.Events(namespace).Search(pvc)
+
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
@@ -777,6 +779,10 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		printLabelsMultiline(out, "Labels", pvc.Labels)
 		fmt.Fprintf(out, "Capacity:\t%s\n", capacity)
 		fmt.Fprintf(out, "Access Modes:\t%s\n", accessModes)
+		if events != nil {
+			DescribeEvents(events, out)
+		}
+
 		return nil
 	})
 }

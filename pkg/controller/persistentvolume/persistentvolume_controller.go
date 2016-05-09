@@ -23,6 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversioned_core "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -80,6 +82,7 @@ type PersistentVolumeController struct {
 	claims           cache.Store
 	claimController  *framework.Controller
 	kubeClient       clientset.Interface
+	eventRecorder    record.EventRecorder
 
 	// Map of channels used to stop both PerstentVolume and
 	// PersistentVolumeClaim framework.Controllers (running in separate
@@ -95,8 +98,13 @@ func NewPersistentVolumeController(
 	recyclers []vol.VolumePlugin,
 	cloud cloudprovider.Interface) *PersistentVolumeController {
 
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: "persistentvolume-controller"})
+
 	controller := &PersistentVolumeController{
-		kubeClient: kubeClient,
+		kubeClient:    kubeClient,
+		eventRecorder: recorder,
 	}
 
 	volumeSource := &cache.ListWatch{
@@ -428,8 +436,8 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 		if claim.Status.Phase != api.ClaimLost {
 			// Log the error only once, when we enter 'Lost' phase
 			glog.V(3).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume reference lost!", claimToClaimKey(claim))
+			ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ClaimLost", "Bound claim has lost reference to PersistentVolume. Data on the volume is lost!")
 		}
-		// TODO: emit event and save reason
 		if _, err := ctrl.updateClaimPhase(claim, api.ClaimLost); err != nil {
 			return err
 		}
@@ -444,8 +452,8 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 		if claim.Status.Phase != api.ClaimLost {
 			// Log the error only once, when we enter 'Lost' phase
 			glog.V(3).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q lost!", claimToClaimKey(claim), claim.Spec.VolumeName)
+			ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ClaimLost", "Bound claim has lost its PersistentVolume. Data on the volume is lost!")
 		}
-		// TODO: emit event and save reason
 		if _, err = ctrl.updateClaimPhase(claim, api.ClaimLost); err != nil {
 			return err
 		}
@@ -463,7 +471,6 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 			// volume yet. We can't distinguish these cases.
 			// Bind the volume again and set all states to Bound.
 			glog.V(4).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume is unbound, fixing")
-
 			if err = ctrl.bind(volume, claim); err != nil {
 				// Objects not saved, next syncPV or syncClaim will try again
 				return err
@@ -487,8 +494,8 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 			if claim.Status.Phase != api.ClaimLost {
 				// Log the error only once, when we enter 'Lost' phase
 				glog.V(3).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q bound to another claim %q, this claim is lost!", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
+				ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ClaimMisbound", "Two claims are bound to the same volume, this one is bound incorrectly")
 			}
-			// TODO: emit event and save reason
 			if _, err = ctrl.updateClaimPhase(claim, api.ClaimLost); err != nil {
 				return err
 			}
