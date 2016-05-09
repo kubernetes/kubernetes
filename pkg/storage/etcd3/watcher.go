@@ -110,11 +110,14 @@ func (wc *watchChan) run() {
 	select {
 	case err := <-wc.errChan:
 		errResult := parseError(err)
-		wc.cancel()
-		// error result is guaranteed to be received by user before closing ResultChan.
 		if errResult != nil {
-			wc.resultChan <- *errResult
+			// error result is guaranteed to be received by user before closing ResultChan.
+			select {
+			case wc.resultChan <- *errResult:
+			case <-wc.ctx.Done(): // user has given up all results
+			}
 		}
+		wc.cancel()
 	case <-wc.ctx.Done():
 	}
 	// we need to wait until resultChan wouldn't be sent to anymore
