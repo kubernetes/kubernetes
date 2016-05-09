@@ -1,0 +1,25 @@
+# A service pointing to pods with the label netperf-w2
+
+apiVersion: v1
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    app: netperf-w2
+  name: netperf-w2
+  namespace: netperf
+spec:
+  ports:
+      - port: 5201
+        name: netperf-w2
+        protocol: TCP
+      - port: 12865
+        name: netperf-w2-netperf
+        protocol: TCP
+      - port: 5201
+        name: netperf-w2-udp
+        protocol: UDP
+  selector:
+    app: netperf-w2
+
+

@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    app: {{ podname }}
+    
+  name: {{ podname }}
+  namespace: netperf
+spec:
+  replicas: 1
+  selector:
+    app: {{ podname }}
+  template:
+    metadata:
+      labels:
+        app: {{ podname }}
+    spec:
+      # Force this pod onto the specified node
+      nodeSelector:
+        kubernetes.io/hostname: {{ kubenode }}
+      containers:
+        - image: {{ image }}
+          imagePullPolicy: Always
+          name: {{ podname }}
+          ports:
+            {% if worker == "netperf-w1" %}
+            # Worker W1 is a client-only pod - no ports are exposed
+            {% else %}
+          - containerPort: 5201
+            name: netperf
+            protocol: TCP
+            {% endif %}
+          args:
+            - -mode
+            - {{ mode }}
+          env:
+            - name: worker
+              value: "{{worker}}"
+            - name: kubenode
+              value: "{{kubenode}}"
+            - name: podname
+              value: "{{podname}}"
+      hostNetwork: {{ hostnetworking }}
