@@ -18,9 +18,12 @@ package etcd3
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
+
+	"sync"
 
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
@@ -185,6 +188,29 @@ func TestWatchContextCancel(t *testing.T) {
 		t.Errorf("cancelling context shouldn't return any error. Err: %v", err)
 	default:
 	}
+}
+
+func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
+	origCtx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+	ctx, cancel := context.WithCancel(origCtx)
+	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, storage.Everything)
+	// make resutlChan and errChan blocking to ensure ordering.
+	w.resultChan = make(chan watch.Event)
+	w.errChan = make(chan error)
+	// The event flow goes like:
+	// - first we send an error, it should block on resultChan.
+	// - Then we cancel ctx. The blocking on resultChan should be freed up
+	//   and run() goroutine should return.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		w.run()
+		wg.Done()
+	}()
+	w.errChan <- fmt.Errorf("some error")
+	cancel()
+	wg.Wait()
 }
 
 type testWatchStruct struct {
