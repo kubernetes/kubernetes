@@ -58,4 +58,10 @@ kubernetes/server/bin/kube-apiserver \
 until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
 	sleep 1
 done
-kubernetes/server/bin/kube-controller-manager --master=127.0.0.1:8080 --service-account-private-key-file=/srv/kubernetes/server.key --root-ca-file=/srv/kubernetes/ca.crt --v=2 &> /var/log/kube-controller-manager.log &
+kubernetes/server/bin/kube-controller-manager \
+  --master=127.0.0.1:8080 \
+  --service-account-private-key-file=/srv/kubernetes/server.key \
+  --root-ca-file=/srv/kubernetes/ca.crt \
+  --v=2 \
+  --allocate-node-cidrs=true \
+  --cluster-cidr=10.180.0.0/13 &> /var/log/kube-controller-manager.log &
