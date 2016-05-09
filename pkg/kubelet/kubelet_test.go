@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -136,7 +137,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	if err := os.MkdirAll(kubelet.rootDirectory, 0750); err != nil {
 		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
 	}
-	kubelet.sourcesReady = func(_ sets.String) bool { return true }
+	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
@@ -309,7 +310,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	kubelet := testKubelet.kubelet
-	kubelet.sourcesReady = func(_ sets.String) bool { return ready }
+	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return ready })
 
 	fakeRuntime.PodList = []*kubecontainer.Pod{
 		{
