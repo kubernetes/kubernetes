@@ -193,7 +193,7 @@ godep v53 (linux/amd64/go1.5.3)
 
 ### Using godep
 
-Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/\_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
+Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into `vendor/`. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
 
 1) Devote a directory to this endeavor:
 

@@ -29,7 +29,7 @@ import (
 func construct(t *testing.T, files map[string]string) *generator.Context {
 	b := parser.New()
 	for name, src := range files {
-		if err := b.AddFile(name, []byte(src)); err != nil {
+		if err := b.AddFile("/tmp/"+name, name, []byte(src)); err != nil {
 			t.Fatal(err)
 		}
 	}

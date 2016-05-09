@@ -26,11 +26,8 @@ DOCKER_HOST=${DOCKER_HOST:-""}
 DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
 readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox --virtualbox-memory 4096 --virtualbox-cpu-count -1"}
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-cd "${KUBE_ROOT}"
-
-# This'll canonicalize the path
-KUBE_ROOT=$PWD
+# This will canonicalize the path
+KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd -P)
 
 source hack/lib/init.sh
 
@@ -77,13 +74,10 @@ readonly DOCKER_MOUNT_ARGS_BASE=(
   --volume /etc/localtime:/etc/localtime:ro
 )
 
-# We create a Docker data container to cache incremental build artifacts.  We
-# need to cache both the go tree in _output and the go tree under Godeps.
+# We create a Docker data container to cache incremental build artifacts.
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
-readonly REMOTE_GODEP_GOPATH="/go/src/${KUBE_GO_PACKAGE}/Godeps/_workspace/pkg"
 readonly DOCKER_DATA_MOUNT_ARGS=(
   --volume "${REMOTE_OUTPUT_GOPATH}"
-  --volume "${REMOTE_GODEP_GOPATH}"
 )
 
 # This is where the final release artifacts are created locally
@@ -465,7 +459,6 @@ function kube::build::source_targets() {
     docs
     examples
     federation
-    Godeps/_workspace/src
     Godeps/Godeps.json
     hack
     LICENSE
@@ -475,6 +468,7 @@ function kube::build::source_targets() {
     README.md
     test
     third_party
+    vendor
     contrib/completions/bash/kubectl
     contrib/mesos
     .generated_docs
@@ -547,6 +541,16 @@ function kube::build::clean_images() {
 }
 
 function kube::build::ensure_data_container() {
+  # This is temporary, while last remnants of _workspace are obliterated.  If
+  # the data container exists it might be from before the change from
+  # Godeps/_workspace/ to vendor/, and thereby still have a Godeps/_workspace/
+  # directory in it, which trips up godep (yay godep!).  Once we are confident
+  # that this has run ~everywhere we care about, we can remove this.
+  # TODO(thockin): remove this after v1.3 is cut.
+  if "${DOCKER[@]}" inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" \
+      | grep -q "Godeps/_workspace/pkg"; then
+    docker rm -f "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+  fi
   if ! "${DOCKER[@]}" inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1; then
     kube::log::status "Creating data container"
     local -ra docker_cmd=(

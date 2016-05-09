@@ -31,7 +31,6 @@ kube::test::find_dirs() {
           -path './_artifacts/*' \
           -o -path './_output/*' \
           -o -path './_gopath/*' \
-          -o -path './Godeps/*' \
           -o -path './contrib/podex/*' \
           -o -path './output/*' \
           -o -path './release/*' \
@@ -40,12 +39,13 @@ kube::test::find_dirs() {
           -o -path './test/e2e_node/*' \
           -o -path './test/integration/*' \
           -o -path './test/component/scheduler/perf/*' \
+          -o -path './third_party/*'\
+          -o -path './vendor/*'\
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
   )
 }
 
-# -covermode=atomic becomes default with -race in Go >=1.3
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 120s}
 KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
 KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}

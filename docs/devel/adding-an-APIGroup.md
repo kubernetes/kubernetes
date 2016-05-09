@@ -50,8 +50,8 @@ We plan on improving the way the types are factored in the future; see
 in which this might evolve.
 
 1. Create a folder in pkg/apis to hold you group. Create types.go in
- pkg/apis/`<group>`/ and pkg/apis/`<group>`/`<version>`/ to define API objects
- in your group;
+pkg/apis/`<group>`/ and pkg/apis/`<group>`/`<version>`/ to define API objects
+in your group;
 
 2. Create pkg/apis/`<group>`/{register.go, `<version>`/register.go} to register
 this group's API objects to the encoding/decoding scheme (e.g.,
@@ -75,10 +75,10 @@ cmd/libs/go2idl/ tool.
 1. Generate conversions and deep-copies:
 
     1. Add your "group/" or "group/version" into
-cmd/libs/go2idl/{conversion-gen, deep-copy-gen}/main.go;
+       cmd/libs/go2idl/{conversion-gen, deep-copy-gen}/main.go;
     2. Make sure your pkg/apis/`<group>`/`<version>` directory has a doc.go file
-with the comment `// +genconversion=true`, to catch the attention of our
-gen-conversion script.
+       with the comment `// +genconversion=true`, to catch the attention of our
+       gen-conversion script.
     3. Run hack/update-all.sh.
 
 
@@ -89,7 +89,8 @@ gen-conversion script.
 
 3. Generate protobuf objects:
 
-    1. Add your group to `cmd/libs/go2idl/go-to-protobuf/protobuf/cmd.go` to `New()` in the `Packages` field
+    1. Add your group to `cmd/libs/go2idl/go-to-protobuf/protobuf/cmd.go` to
+       `New()` in the `Packages` field
     2. Run hack/update-generated-protobuf.sh
 
 ### Client (optional):

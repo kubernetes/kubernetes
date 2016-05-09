@@ -18,6 +18,7 @@ package parser_test
 
 import (
 	"bytes"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"text/template"
@@ -30,7 +31,7 @@ import (
 func construct(t *testing.T, files map[string]string, testNamer namer.Namer) (*parser.Builder, types.Universe, []*types.Type) {
 	b := parser.New()
 	for name, src := range files {
-		if err := b.AddFile(name, []byte(src)); err != nil {
+		if err := b.AddFile(filepath.Dir(name), name, []byte(src)); err != nil {
 			t.Fatal(err)
 		}
 	}

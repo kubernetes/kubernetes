@@ -107,7 +107,7 @@ $ go install golang.org/x/tools/cmd/stress
 Then build your test binary
 
 ```
-$ godep go test -c -race
+$ go test -c -race
 ```
 
 Then run it under stress

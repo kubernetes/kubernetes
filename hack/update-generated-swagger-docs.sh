@@ -46,8 +46,9 @@ function generate_version() {
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
 
-  GOPATH=$(godep path):$GOPATH go run cmd/genswaggertypedocs/swagger_type_docs.go -s \
-    "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types.go" -f - \
+  go run cmd/genswaggertypedocs/swagger_type_docs.go -s \
+    "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types.go" \
+    -f - \
     >>  "$TMPFILE"
 
   echo "// AUTO-GENERATED FUNCTIONS END HERE" >> "$TMPFILE"

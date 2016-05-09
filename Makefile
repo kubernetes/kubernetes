@@ -21,7 +21,6 @@
 #   clean: Clean up.
 
 OUT_DIR = _output
-GODEPS_PKG_DIR = Godeps/_workspace/pkg
 
 KUBE_GOFLAGS = $(GOFLAGS)
 export KUBE_GOFLAGS
@@ -111,7 +110,6 @@ test_e2e_node:
 clean:
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
-	rm -rf $(GODEPS_PKG_DIR)
 .PHONY: clean
 
 # Run 'go vet'.

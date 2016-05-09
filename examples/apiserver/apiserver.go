@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io/v1"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	// Install the testgroup API
-	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup.k8s.io/install"
+	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/install"
 )
 
 const (
