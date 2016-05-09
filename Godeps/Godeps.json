@@ -49,8 +49,8 @@
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema",
-			"Comment": "v0.7.4-6-g5d54e27",
-			"Rev": "5d54e27f1764a0309eafe12c9df7bac03f241646"
+			"Comment": "v0.7.4-43-gd22f52b",
+			"Rev": "d22f52bfeba06614d37c7aa1ad6fd76d8fdb2ba8"
 		},
 		{
 			"ImportPath": "github.com/armon/go-metrics",
@@ -139,10 +139,6 @@
 			"ImportPath": "github.com/boltdb/bolt",
 			"Comment": "v1.1.0-65-gee4a088",
 			"Rev": "ee4a0888a9abe7eefe5a0992ca4cb06864839873"
-		},
-		{
-			"ImportPath": "github.com/camlistore/go4/errorutil",
-			"Rev": "3b6feb5cf32f573fb124905de36a54c24ee14ac1"
 		},
 		{
 			"ImportPath": "github.com/codegangsta/negroni",
@@ -1041,6 +1037,10 @@
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
 		},
 		{
+			"ImportPath": "go4.org/errorutil",
+			"Rev": "03efcb870d84809319ea509714dd6d19a1498483"
+		},
+		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",
 			"Rev": "c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3"
 		},
@@ -1139,7 +1139,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",
-			"Comment": "v1.1.0-beta1",
+			"Comment": "v1.1.0-beta1-15-gde510e4",
 			"Rev": "de510e4bdcdea96722b5bde19ff0b7a142939485"
 		},
 		{
