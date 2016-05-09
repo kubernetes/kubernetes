@@ -222,10 +222,11 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 type URLVisitor struct {
 	URL *url.URL
 	*StreamVisitor
+	HttpAttemptCount int
 }
 
 func (v *URLVisitor) Visit(fn VisitorFunc) error {
-	body, err := readHttpWithRetries(httpgetImpl, time.Second, v.URL.String())
+	body, err := readHttpWithRetries(httpgetImpl, time.Second, v.URL.String(), v.HttpAttemptCount)
 	if err != nil {
 		return err
 	}
@@ -234,11 +235,14 @@ func (v *URLVisitor) Visit(fn VisitorFunc) error {
 	return v.StreamVisitor.Visit(fn)
 }
 
-// readHttpWithRetries tries to http.Get the v.URL 3 times before giving up.
-func readHttpWithRetries(get httpget, duration time.Duration, u string) (io.ReadCloser, error) {
+// readHttpWithRetries tries to http.Get the v.URL retries times before giving up.
+func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts int) (io.ReadCloser, error) {
 	var err error
 	var body io.ReadCloser
-	for i := 0; i < 3; i++ {
+	if attempts <= 0 {
+		return nil, fmt.Errorf("http attempts must be greater than 0, was %d", attempts)
+	}
+	for i := 0; i < attempts; i++ {
 		var statusCode int
 		var status string
 		if i > 0 {
