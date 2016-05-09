@@ -648,6 +648,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	req.Header = r.headers
 	client := r.client
 	if client == nil {
 		client = http.DefaultClient
@@ -715,6 +716,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	req.Header = r.headers
 	client := r.client
 	if client == nil {
 		client = http.DefaultClient
