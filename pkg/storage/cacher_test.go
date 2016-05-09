@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -229,11 +230,15 @@ func TestWatch(t *testing.T) {
 	verifyWatchEvent(t, watcher, watch.Added, podFoo)
 	verifyWatchEvent(t, watcher, watch.Modified, podFooPrime)
 
-	// Check whether we get too-old error.
-	_, err = cacher.Watch(context.TODO(), "pods/ns/foo", "1", storage.Everything)
-	if err == nil {
-		t.Errorf("Expected 'error too old' error")
+	// Check whether we get too-old error via the watch channel
+	tooOldWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "1", storage.Everything)
+	if err != nil {
+		t.Fatalf("Expected no direct error, got %v", err)
 	}
+	defer tooOldWatcher.Stop()
+	// Ensure we get a "Gone" error
+	expectedGoneError := errors.NewGone("").(*errors.StatusError).ErrStatus
+	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedGoneError)
 
 	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, storage.Everything)
 	if err != nil {

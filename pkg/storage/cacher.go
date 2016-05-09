@@ -18,6 +18,7 @@ package storage
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
@@ -25,8 +26,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -264,7 +267,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	defer c.watchCache.RUnlock()
 	initEvents, err := c.watchCache.GetAllEventsSinceThreadUnsafe(watchRV)
 	if err != nil {
-		return nil, err
+		// To match the uncached watch implementation, once we have passed authn/authz/admission,
+		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
+		// rather than a directly returned error.
+		return newErrWatcher(err), nil
 	}
 
 	c.Lock()
@@ -458,6 +464,46 @@ func (lw *cacherListerWatcher) List(options api.ListOptions) (runtime.Object, er
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) Watch(options api.ListOptions) (watch.Interface, error) {
 	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, options.ResourceVersion, Everything)
+}
+
+// cacherWatch implements watch.Interface to return a single error
+type errWatcher struct {
+	result chan watch.Event
+}
+
+func newErrWatcher(err error) *errWatcher {
+	// Create an error event
+	errEvent := watch.Event{Type: watch.Error}
+	switch err := err.(type) {
+	case runtime.Object:
+		errEvent.Object = err
+	case *errors.StatusError:
+		errEvent.Object = &err.ErrStatus
+	default:
+		errEvent.Object = &unversioned.Status{
+			Status:  unversioned.StatusFailure,
+			Message: err.Error(),
+			Reason:  unversioned.StatusReasonInternalError,
+			Code:    http.StatusInternalServerError,
+		}
+	}
+
+	// Create a watcher with room for a single event, populate it, and close the channel
+	watcher := &errWatcher{result: make(chan watch.Event, 1)}
+	watcher.result <- errEvent
+	close(watcher.result)
+
+	return watcher
+}
+
+// Implements watch.Interface.
+func (c *errWatcher) ResultChan() <-chan watch.Event {
+	return c.result
+}
+
+// Implements watch.Interface.
+func (c *errWatcher) Stop() {
+	// no-op
 }
 
 // cacherWatch implements watch.Interface
