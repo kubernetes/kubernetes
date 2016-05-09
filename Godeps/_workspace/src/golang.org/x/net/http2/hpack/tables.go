@@ -1,7 +1,6 @@
-// Copyright 2014 The Go Authors.
-// See https://code.google.com/p/go/source/browse/CONTRIBUTORS
-// Licensed under the same terms as Go itself:
-// https://code.google.com/p/go/source/browse/LICENSE
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
 package hpack
 
@@ -10,7 +9,7 @@ func pair(name, value string) HeaderField {
 }
 
 // http://tools.ietf.org/html/draft-ietf-httpbis-header-compression-07#appendix-B
-var staticTable = []HeaderField{
+var staticTable = [...]HeaderField{
 	pair(":authority", ""), // index 1 (1-based)
 	pair(":method", "GET"),
 	pair(":method", "POST"),
@@ -74,7 +73,7 @@ var staticTable = []HeaderField{
 	pair("www-authenticate", ""),
 }
 
-var huffmanCodes = []uint32{
+var huffmanCodes = [256]uint32{
 	0x1ff8,
 	0x7fffd8,
 	0xfffffe2,
@@ -333,7 +332,7 @@ var huffmanCodes = []uint32{
 	0x3ffffee,
 }
 
-var huffmanCodeLen = []uint8{
+var huffmanCodeLen = [256]uint8{
 	13, 23, 28, 28, 28, 28, 28, 28, 28, 24, 30, 28, 28, 30, 28, 28,
 	28, 28, 28, 28, 28, 28, 30, 28, 28, 28, 28, 28, 28, 28, 28, 28,
 	6, 10, 10, 12, 13, 6, 8, 11, 10, 10, 8, 11, 8, 6, 6, 6,
