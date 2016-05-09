@@ -1,0 +1,58 @@
+{% set params = pillar['autoscaler_mig_config'] -%}
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "cluster-autoscaler",
+        "namespace": "kube-system",
+        "labels": {
+            "tier": "cluster-management",
+            "component": "cluster-autoscaler"
+        }
+    },
+    "spec": {
+        "hostNetwork": true,
+        "containers": [
+            {
+                "name": "cluster-autoscaler",
+                "image": "gcr.io/mwielgus-proj/cluster-autoscaler:v0.0.1-alpha2-4",
+                "command": [
+                    "./cluster-autoscaler",
+                    "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
+                    {% for param in params.split(" ") %}
+                    "{{param}}",
+                    {% endfor %}
+                    "-v=4"
+                ],
+                "resources": {
+                    "limits": {
+                        "cpu": "100m",
+                        "memory": "300Mi"
+                    },
+                    "requests": {
+                        "cpu": "50m",
+                        "memory": "300Mi"
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "name": "ssl-certs",
+                        "readOnly": true,
+                        "mountPath": "/etc/ssl/certs"
+                    }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent"
+            }
+        ],
+        "volumes": [
+            {
+                "name": "ssl-certs",
+                "hostPath": {
+                    "path": "/etc/ssl/certs"
+                }
+            }
+        ],
+        "restartPolicy": "Always"
+    }
+}

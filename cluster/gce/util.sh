@@ -562,16 +562,15 @@ function kube-up {
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     parse-master-env
     create-nodes
-    create-autoscaler
   else
     check-existing
     create-network
     write-cluster-name
+    create-autoscaler-config
     create-master
     create-nodes-firewall
     create-nodes-template
     create-nodes
-    create-autoscaler
     check-cluster
   fi
 }
@@ -733,37 +732,82 @@ function set_num_migs() {
 function create-nodes() {
   local template_name="${NODE_INSTANCE_PREFIX}-template"
 
-  local instances_per_mig=$(((${NUM_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
-  local last_mig_size=$((${NUM_NODES} - (${NUM_MIGS} - 1) * ${instances_per_mig}))
+  local instances_left=${NUM_NODES}
 
   #TODO: parallelize this loop to speed up the process
-  for ((i=1; i<${NUM_MIGS}; i++)); do
+  for ((i=1; i<=${NUM_MIGS}; i++)); do
+    local group_name="${NODE_INSTANCE_PREFIX}-group-$i"
+    if [[ $i == ${NUM_MIGS} ]]; then
+      # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
+      # We should change it at some point, but note #18545 when changing this.
+      group_name="${NODE_INSTANCE_PREFIX}-group"
+    fi
+    # Spread the remaining number of nodes evenly
+    this_mig_size=$((${instances_left} / (${NUM_MIGS}-${i}+1)))
+    instances_left=$((instances_left-${this_mig_size}))
+    
     gcloud compute instance-groups managed \
-        create "${NODE_INSTANCE_PREFIX}-group-$i" \
+        create "${group_name}" \
         --project "${PROJECT}" \
         --zone "${ZONE}" \
         --base-instance-name "${NODE_INSTANCE_PREFIX}" \
-        --size "${instances_per_mig}" \
+        --size "${this_mig_size}" \
         --template "$template_name" || true;
     gcloud compute instance-groups managed wait-until-stable \
-        "${NODE_INSTANCE_PREFIX}-group-$i" \
+        "${group_name}" \
         --zone "${ZONE}" \
         --project "${PROJECT}" || true;
   done
+}
 
-  # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
-  # We should change it at some point, but note #18545 when changing this.
-  gcloud compute instance-groups managed \
-      create "${NODE_INSTANCE_PREFIX}-group" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --base-instance-name "${NODE_INSTANCE_PREFIX}" \
-      --size "${last_mig_size}" \
-      --template "$template_name" || true;
-  gcloud compute instance-groups managed wait-until-stable \
-      "${NODE_INSTANCE_PREFIX}-group" \
-      --zone "${ZONE}" \
-      --project "${PROJECT}" || true;
+# Assumes:
+# - NUM_MIGS
+# - NODE_INSTANCE_PREFIX
+# - PROJECT
+# - ZONE
+# - AUTOSCALER_MAX_NODES
+# - AUTOSCALER_MIN_NODES
+# Exports
+# - AUTOSCALER_MIG_CONFIG
+function create-cluster-autoscaler-mig-config() {
+
+  # Each MIG must have at least one node, so the min number of nodes
+  # must be greater or equal to the number of migs. 
+  if [[ ${AUTOSCALER_MIN_NODES} < ${NUM_MIGS} ]]; then
+    echo "AUTOSCALER_MIN_NODES must be greater or equal ${NUM_MIGS}"
+    exit 2    
+  fi
+
+  # Each MIG must have at least one node, so the min number of nodes
+  # must be greater or equal to the number of migs. 
+  if [[ ${AUTOSCALER_MAX_NODES} < ${NUM_MIGS} ]]; then
+    echo "AUTOSCALER_MAX_NODES must be greater or equal ${NUM_MIGS}"
+    exit 2    
+  fi
+
+  # The code assumes that the migs were created with create-nodes 
+  # function which tries to evenly spread nodes across the migs.
+  AUTOSCALER_MIG_CONFIG=""
+
+  local left_min=${AUTOSCALER_MIN_NODES}
+  local left_max=${AUTOSCALER_MAX_NODES}
+
+  for ((i=1; i<=${NUM_MIGS}; i++)); do
+    local group_name="${NODE_INSTANCE_PREFIX}-group-$i"
+    if [[ $i == ${NUM_MIGS} ]]; then
+      # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
+      # We should change it at some point, but note #18545 when changing this.
+      group_name="${NODE_INSTANCE_PREFIX}-group"
+    fi
+
+    this_mig_min=$((${left_min}/(${NUM_MIGS}-${i}+1)))
+    this_mig_max=$((${left_max}/(${NUM_MIGS}-${i}+1)))
+    left_min=$((left_min-$this_mig_min))
+    left_max=$((left_max-$this_mig_max))
+
+    local mig_url="https://www.googleapis.com/compute/v1/projects/${PROJECT}/zones/${ZONE}/instanceGroups/${group_name}"
+    AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --nodes=${this_mig_min}:${this_mig_max}:${mig_url}"
+  done
 }
 
 # Assumes:
@@ -772,38 +816,13 @@ function create-nodes() {
 # - PROJECT
 # - ZONE
 # - ENABLE_NODE_AUTOSCALER
-# - TARGET_NODE_UTILIZATION\
 # - AUTOSCALER_MAX_NODES
 # - AUTOSCALER_MIN_NODES
-function create-autoscaler() {
-  # Create autoscaler for nodes if requested
+function create-autoscaler-config() {
+  # Create autoscaler for nodes configuration if requested
   if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
-    local metrics=""
-    # Current usage
-    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
-    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
-    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-
-    # Reservation
-    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_reservation,"
-    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    metrics+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
-    metrics+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-
-    echo "Creating node autoscalers."
-
-    local max_instances_per_mig=$(((${AUTOSCALER_MAX_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
-    local last_max_instances=$((${AUTOSCALER_MAX_NODES} - (${NUM_MIGS} - 1) * ${max_instances_per_mig}))
-    local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${NUM_MIGS} - 1) / ${NUM_MIGS}))
-    local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${NUM_MIGS} - 1) * ${min_instances_per_mig}))
-
-    for ((i=1; i<${NUM_MIGS}; i++)); do
-      gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group-$i" --zone "${ZONE}" --project "${PROJECT}" \
-          --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${metrics} || true
-    done
-    gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
-      --min-num-replicas "${last_min_instances}" --max-num-replicas "${last_max_instances}" ${metrics} || true
+    create-cluster-autoscaler-mig-config
+    echo "Using autoscaler config: ${AUTOSCALER_MIG_CONFIG}"
   fi
 }
 
