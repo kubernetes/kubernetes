@@ -82,6 +82,8 @@ type controllerTest struct {
 	// Expected events - any event with prefix will pass, we don't check full
 	// event message.
 	expectedEvents []string
+	// Errors to produce on matching action
+	errors []reactorError
 	// Function to call as the test.
 	test testCall
 }
@@ -95,6 +97,7 @@ const mockPluginName = "MockVolumePlugin"
 var novolumes []*api.PersistentVolume
 var noclaims []*api.PersistentVolumeClaim
 var noevents = []string{}
+var noerrors = []reactorError{}
 
 // volumeReactor is a core.Reactor that simulates etcd and API server. It
 // stores:
@@ -107,6 +110,11 @@ var noevents = []string{}
 // - Optionally, volume and claim event sources. When set, all changed
 //   volumes/claims are sent as Modify event to these sources. These sources can
 //   be linked back to the controller watcher as "volume/claim updated" events.
+// - Optionally, list of error that should be returned by reactor, simulating
+//   etcd / API server failures. These errors are evaluated in order and every
+//   error is returned only once. I.e. when the reactor finds matching
+//   reactorError, it return appropriate error and removes the reactorError from
+//   the list.
 type volumeReactor struct {
 	volumes              map[string]*api.PersistentVolume
 	claims               map[string]*api.PersistentVolumeClaim
@@ -116,6 +124,17 @@ type volumeReactor struct {
 	volumeSource         *framework.FakeControllerSource
 	claimSource          *framework.FakeControllerSource
 	lock                 sync.Mutex
+	errors               []reactorError
+}
+
+// reactorError is an error that is returned by test reactor (=simulated
+// etcd+/API server) when an action performed by the reactor matches given verb
+// ("get", "update", "create", "delete" or "*"") on given resource
+// ("persistentvolumes", "persistentvolumeclaims" or "*").
+type reactorError struct {
+	verb     string
+	resource string
+	error    error
 }
 
 // React is a callback called by fake kubeClient from the controller.
@@ -133,6 +152,13 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 
 	glog.V(4).Infof("reactor got operation %q on %q", action.GetVerb(), action.GetResource())
 
+	// Inject error when requested
+	err = r.injectReactError(action)
+	if err != nil {
+		return true, nil, err
+	}
+
+	// Test did not requst to inject an error, continue simulating API server.
 	switch {
 	case action.Matches("create", "persistentvolumes"):
 		obj := action.(core.UpdateAction).GetObject()
@@ -243,6 +269,26 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 	}
 
 	return false, nil, nil
+}
+
+// injectReactError returns an error when the test requested given action to
+// fail. nil is returned otherwise.
+func (r *volumeReactor) injectReactError(action core.Action) error {
+	if len(r.errors) == 0 {
+		// No more errors to inject, everything should succeed.
+		return nil
+	}
+
+	for i, expected := range r.errors {
+		glog.V(4).Infof("trying to match %q %q with %q %q", expected.verb, expected.resource, action.GetVerb(), action.GetResource())
+		if action.Matches(expected.verb, expected.resource) {
+			// That's the action we're waiting for, remove it from injectedErrors
+			r.errors = append(r.errors[:i], r.errors[i+1:]...)
+			glog.V(4).Infof("reactor found matching error at index %d: %q %q, returning %v", i, expected.verb, expected.resource, expected.error)
+			return expected.error
+		}
+	}
+	return nil
 }
 
 // checkVolumes compares all expectedVolumes with set of volumes at the end of
@@ -424,13 +470,14 @@ func (r *volumeReactor) waitTest() {
 	}
 }
 
-func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, volumeSource, claimSource *framework.FakeControllerSource) *volumeReactor {
+func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, volumeSource, claimSource *framework.FakeControllerSource, errors []reactorError) *volumeReactor {
 	reactor := &volumeReactor{
 		volumes:      make(map[string]*api.PersistentVolume),
 		claims:       make(map[string]*api.PersistentVolumeClaim),
 		ctrl:         ctrl,
 		volumeSource: volumeSource,
 		claimSource:  claimSource,
+		errors:       errors,
 	}
 	client.AddReactor("*", "*", reactor.React)
 	return reactor
@@ -695,7 +742,7 @@ func runSyncTests(t *testing.T, tests []controllerTest) {
 		// Initialize the controller
 		client := &fake.Clientset{}
 		ctrl := newPersistentVolumeController(client)
-		reactor := newVolumeReactor(client, ctrl, nil, nil)
+		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
 			reactor.claims[claim.Name] = claim
@@ -739,7 +786,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest) {
 		// Initialize the controller
 		client := &fake.Clientset{}
 		ctrl := newPersistentVolumeController(client)
-		reactor := newVolumeReactor(client, ctrl, nil, nil)
+		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
 			reactor.claims[claim.Name] = claim
