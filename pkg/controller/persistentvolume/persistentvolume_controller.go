@@ -83,6 +83,7 @@ type PersistentVolumeController struct {
 	claimController  *framework.Controller
 	kubeClient       clientset.Interface
 	eventRecorder    record.EventRecorder
+	cloud            cloudprovider.Interface
 
 	// Map of channels used to stop both PerstentVolume and
 	// PersistentVolumeClaim framework.Controllers (running in separate
@@ -105,6 +106,7 @@ func NewPersistentVolumeController(
 	controller := &PersistentVolumeController{
 		kubeClient:    kubeClient,
 		eventRecorder: recorder,
+		cloud:         cloud,
 	}
 
 	volumeSource := &cache.ListWatch{
@@ -967,6 +969,8 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *api.PersistentVolu
 	*/
 	return nil
 }
+
+// Stateless functions
 
 func hasAnnotation(obj api.ObjectMeta, ann string) bool {
 	_, found := obj.Annotations[ann]
