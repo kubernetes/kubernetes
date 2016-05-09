@@ -27,12 +27,10 @@ import (
 )
 
 func TestVisitorHttpGet(t *testing.T) {
-	instance := &URLVisitor{}
-
 	// Test retries on errors
 	i := 0
 	expectedErr := fmt.Errorf("Failed to get http")
-	actualBytes, actualErr := instance.readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
+	actualBytes, actualErr := readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
 		assert.Equal(t, "hello", url)
 		i++
 		if i > 2 {
@@ -46,7 +44,7 @@ func TestVisitorHttpGet(t *testing.T) {
 
 	// Test that 500s are retried.
 	i = 0
-	actualBytes, actualErr = instance.readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
+	actualBytes, actualErr = readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
 		assert.Equal(t, "hello", url)
 		i++
 		return 501, "Status", nil, nil
@@ -57,7 +55,7 @@ func TestVisitorHttpGet(t *testing.T) {
 
 	// Test that 300s are not retried
 	i = 0
-	actualBytes, actualErr = instance.readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
+	actualBytes, actualErr = readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
 		assert.Equal(t, "hello", url)
 		i++
 		return 300, "Status", nil, nil
@@ -69,7 +67,7 @@ func TestVisitorHttpGet(t *testing.T) {
 	// Test Success
 	i = 0
 	b := bytes.Buffer{}
-	actualBytes, actualErr = instance.readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
+	actualBytes, actualErr = readHttpWithRetries(func(url string) (int, string, io.ReadCloser, error) {
 		assert.Equal(t, "hello", url)
 		i++
 		if i > 1 {

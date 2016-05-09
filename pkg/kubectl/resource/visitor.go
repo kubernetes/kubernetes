@@ -225,7 +225,7 @@ type URLVisitor struct {
 }
 
 func (v *URLVisitor) Visit(fn VisitorFunc) error {
-	body, err := v.readHttpWithRetries(httpgetImpl, time.Second, v.URL.String())
+	body, err := readHttpWithRetries(httpgetImpl, time.Second, v.URL.String())
 	if err != nil {
 		return err
 	}
@@ -235,7 +235,7 @@ func (v *URLVisitor) Visit(fn VisitorFunc) error {
 }
 
 // readHttpWithRetries tries to http.Get the v.URL 3 times before giving up.
-func (v *URLVisitor) readHttpWithRetries(get httpget, duration time.Duration, u string) (io.ReadCloser, error) {
+func readHttpWithRetries(get httpget, duration time.Duration, u string) (io.ReadCloser, error) {
 	var err error
 	var body io.ReadCloser
 	for i := 0; i < 3; i++ {
