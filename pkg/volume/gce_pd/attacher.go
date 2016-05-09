@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -39,14 +38,17 @@ var _ volume.Attacher = &gcePersistentDiskAttacher{}
 
 var _ volume.AttachableVolumePlugin = &gcePersistentDiskPlugin{}
 
-// Singleton key mutex for keeping attach/detach operations for the same PD atomic
+// Singleton key mutex for keeping attach/detach operations for the
+// same PD atomic
+// TODO(swagiaal): Once the Mount/Unmount manager is implemented this
+// will no longer be needed and should be rmeoved
 var attachDetachMutex = keymutex.NewKeyMutex()
 
 func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	return &gcePersistentDiskAttacher{}, nil
 }
 
-func (attacher *gcePersistentDiskAttacher) Attach(cloudProvider cloudprovider.Interface, spec *volume.Spec, hostName string) error {
+func (attacher *gcePersistentDiskAttacher) Attach(host volume.VolumeHost, spec *volume.Spec, hostName string) error {
 	volumeSource, readOnly := getVolumeSource(spec)
 	pdName := volumeSource.PDName
 
@@ -54,22 +56,12 @@ func (attacher *gcePersistentDiskAttacher) Attach(cloudProvider cloudprovider.In
 	attachDetachMutex.LockKey(pdName)
 	defer attachDetachMutex.UnlockKey(pdName)
 
-	gceCloud, err := getCloudProvider(cloudProvider)
+	gceCloud, err := getCloudProvider(host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
 
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
-		var attached bool
-		attached, err = gceCloud.DiskIsAttached(pdName, hostName)
-		if err != nil {
-			glog.Errorf("Error checking GCE PD attached status PD %q: %v", pdName, err)
-		}
-		if attached {
-			glog.V(3).Infof("Disk %s is already attached to node %s", pdName, hostName)
-			return nil
-		}
-
 		if numRetries > 0 {
 			glog.Warningf("Retrying attach for GCE PD %q (retry count=%v).", pdName, numRetries)
 		}
@@ -79,6 +71,8 @@ func (attacher *gcePersistentDiskAttacher) Attach(cloudProvider cloudprovider.In
 			time.Sleep(errorSleepDuration)
 			continue
 		}
+
+		return nil
 	}
 
 	return err
@@ -167,29 +161,19 @@ func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	return &gcePersistentDiskDetacher{}, nil
 }
 
-func (detacher *gcePersistentDiskDetacher) Detach(cloudProvider cloudprovider.Interface, deviceMountPath string, hostName string) error {
+func (detacher *gcePersistentDiskDetacher) Detach(host volume.VolumeHost, deviceMountPath string, hostName string) error {
 	pdName := path.Base(deviceMountPath)
 
 	// Block execution until any pending attach/detach operations for this PD have completed
 	attachDetachMutex.LockKey(pdName)
 	defer attachDetachMutex.UnlockKey(pdName)
 
-	gceCloud, err := getCloudProvider(cloudProvider)
+	gceCloud, err := getCloudProvider(host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
 
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
-		var attached bool
-		attached, err = gceCloud.DiskIsAttached(pdName, hostName)
-		if err != nil {
-			glog.Errorf("Error checking GCE PD attached status PD %q: %+v", pdName, err)
-		}
-		if !attached {
-			glog.V(3).Infof("Disk %s is not attached to node %s", pdName, hostName)
-			break
-		}
-
 		if numRetries > 0 {
 			glog.Warningf("Retrying detach for GCE PD %q (retry count=%v).", pdName, numRetries)
 		}
@@ -199,6 +183,8 @@ func (detacher *gcePersistentDiskDetacher) Detach(cloudProvider cloudprovider.In
 			time.Sleep(errorSleepDuration)
 			continue
 		}
+
+		return nil
 	}
 
 	return err
