@@ -3,13 +3,13 @@ package cloudstack
 import (
 	"fmt"
 	"io"
-	"github.com/scalingdata/gcfg"
-	"github.com/kubernetes/kubernetes/pkg/cloudprovider"
+	"gopkg.in/gcfg.v1"
 	"github.com/xanzy/go-cloudstack/cloudstack"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/api"
-	// "github.com/kubernetes/kubernetes/pkg/api"
-	"k8s.io/kubernetes/kubernetes/pkg/api/service"
-	// "github.com/kubernetes/kubernetes/pkg/api/service"
+	 //"github.com/kubernetes/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/service"
+	 //"github.com/kubernetes/kubernetes/pkg/api/service"
 	"github.com/golang/glog"
 )
 
@@ -44,13 +44,13 @@ func init() {
 func readConfig(config io.Reader) (Config, error) {
 	if config == nil {
 		err := fmt.Errorf("no cloud provider config given")
-		return nil, err
+		return Config{}, err
 	}
 
-	cfg := &Config{}
-	if err := gcfg.ReadInto(cfg, config); err != nil {
+	cfg := Config{}
+	if err := gcfg.ReadInto(&cfg, config); err != nil {
 		glog.Errorf("Couldn't parse config: %v", err)
-		return nil, err
+		return Config{}, err
 	}
 
 	return cfg, nil
@@ -75,31 +75,38 @@ func newCSCloud(cfg Config) (*CSCloud, error) {
 
 func readInstanceID() (string, error) {
 	// TODO: get instanceID from virtual router metadata
-	return nil, nil
+	return "", nil
 }
 
 // LoadBalancer returns an implementation of LoadBalancer for CloudStack.
 func (cs *CSCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	glog.V(4).Info("cloudstack.LoadBalancer() called")
-	return cs, true
+	return &LoadBalancer{cs}, true
 }
 
-// Instances returns an implementation of Instances for CloudStack.
+func (cs *CSCloud) Clusters() (cloudprovider.Clusters, bool) {
+	return nil, false
+}
+
 func (cs *CSCloud) Instances() (cloudprovider.Instances, bool) {
-	glog.V(4).Info("cloudstack.Instances() called")
-	return cs, true
+	return nil, false
 }
 
-// Routes returns an implementation of Routes for CloudStack.
 func (cs *CSCloud) Routes() (cloudprovider.Routes, bool) {
-	glog.V(4).Info("cloudstack.Routes() called")
-	return cs, true
+	return nil, false
 }
 
-// Zones returns an implementation of Zones for CloudStack.
 func (cs *CSCloud) Zones() (cloudprovider.Zones, bool) {
-	glog.V(4).Info("cloudstack.Zones() called")
-	return cs, true
+	return nil, false
+}
+
+func (cs *CSCloud) ProviderName() string {
+	return ProviderName
+}
+
+// ScrubDNS filters DNS settings for pods.
+func (cs *CSCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
 }
 
 type LoadBalancer struct {
@@ -160,7 +167,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 
 	//Get public IP address will be associated to the new LB
 	lbIpAddr := apiService.Spec.LoadBalancerIP
-	if lbIpAddr == nil {
+	if lbIpAddr == "" {
 		return nil, fmt.Errorf("unsupported service without predefined Load Balancer IPaddress")
 	}
 	publicIpId, err := lb.getPublicIpId(lbIpAddr)
@@ -190,7 +197,12 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		)
 
 		//Config protocol for new LB
-		lbParams.SetProtocol(port.Protocol)
+		switch port.Protocol {
+		case api.ProtocolTCP:
+			lbParams.SetProtocol("TCP")
+		case api.ProtocolUDP:
+			lbParams.SetProtocol("UDP")
+		}
 
 		//Config LB IP
 		lbParams.SetPublicipid(publicIpId)
@@ -241,8 +253,8 @@ func (lb *LoadBalancer) UpdateLoadBalancer(apiService *api.Service, hosts []stri
 	//Now get the current list of vms. And then make comparison to update the list.
 	//Public IPaddress associated with LB of service
 	lbIpAddr := apiService.Spec.LoadBalancerIP
-	if lbIpAddr == nil {
-		return nil, fmt.Errorf("unsupported service without predefined Load Balancer IPaddress")
+	if lbIpAddr == "" {
+		return fmt.Errorf("unsupported service without predefined Load Balancer IPaddress")
 	}
 
 	//list all LB rules associated with this public IPaddress
@@ -313,7 +325,7 @@ func (lb *LoadBalancer) EnsureLoadBalancerDeleted(apiService *api.Service) error
 
 
 	lbIpAddr := apiService.Spec.LoadBalancerIP
-	if lbIpAddr != nil {
+	if lbIpAddr != "" {
 		//list all LB rules associated to this public ipaddress.
 		listLBParams := lb.cs.client.LoadBalancer.NewListLoadBalancerRulesParams()
 		publicIpId, err := lb.getPublicIpId(lbIpAddr)
@@ -348,11 +360,11 @@ func (lb *LoadBalancer) getPublicIpId(lbIP string) (string, error) {
 	addressParams.SetIpaddress(lbIP)
 	addressResponse, err := lb.cs.client.Address.ListPublicIpAddresses(addressParams)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if addressResponse.Count > 1 {
-		return nil, fmt.Errorf("Found more than one address objects with IP = %s", lbIP)
+		return "", fmt.Errorf("Found more than one address objects with IP = %s", lbIP)
 	} else if addressResponse.Count == 0 {
 		//TODO: acquire new IP address with lbIP from CloudStack
 	}
@@ -379,3 +391,4 @@ func (lb *LoadBalancer) getVirtualMachineIds(hosts []string) ([]string, error) {
 	}
 	return vmIDs, nil
 }
+
