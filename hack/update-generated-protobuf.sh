@@ -37,16 +37,10 @@ function prereqs() {
   KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
   DOCKER_MOUNT_ARGS=(
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/cluster:/go/src/${KUBE_GO_PACKAGE}/cluster"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/cmd:/go/src/${KUBE_GO_PACKAGE}/cmd"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/Godeps/_workspace/src:/go/src/${KUBE_GO_PACKAGE}/Godeps/_workspace/src"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/hack:/go/src/${KUBE_GO_PACKAGE}/hack"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/pkg:/go/src/${KUBE_GO_PACKAGE}/pkg"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/federation:/go/src/${KUBE_GO_PACKAGE}/federation"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/third_party:/go/src/${KUBE_GO_PACKAGE}/third_party"
+    --volume "${REPO_DIR:-${KUBE_ROOT}}:/go/src/${KUBE_GO_PACKAGE}"
     --volume /etc/localtime:/etc/localtime:ro
     --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}"
-	)
+  )
   LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 }
 
@@ -55,6 +49,6 @@ mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
 cp "${KUBE_ROOT}/cmd/libs/go2idl/go-to-protobuf/build-image/Dockerfile" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
 kube::build::update_dockerfile
 kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
-kube::build::run_build_command hack/after-build/update-generated-protobuf.sh "$@"
+kube::build::run_build_command hack/update-generated-protobuf-dockerized.sh "$@"
 
 # ex: ts=2 sw=2 et filetype=sh

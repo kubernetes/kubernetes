@@ -30,6 +30,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+export LANG=C
+export LC_ALL=C
+
 ###############################################################################
 # Manage the state of LICENSE/COPYRIGHT files
 # Default operation is to check to see if a file is in the state file.
@@ -56,7 +59,7 @@ file_state () {
 
   # Get return code from grep itself
   # Redirect stderr so that a missing state file returns 1 quietly
-  LANG=C egrep -wq "^${file}$" ${GODEPS_STATE} 2>/dev/null
+  egrep -wq "^${file}$" ${GODEPS_STATE} 2>/dev/null
 }
 
 ###############################################################################
@@ -68,12 +71,11 @@ file_state () {
 process_content () {
   local package=$1
   local type=$2
-  local f
+
   local package_root
   local ensure_pattern
   local package_root_url
   local dir_root
-  local godeps_root
   local find_maxdepth
   local find_names
   local -a local_files=()
@@ -103,7 +105,7 @@ process_content () {
     github.com/*|golang.org/*|bitbucket.org/*)
      package_root=$(echo ${package} |awk -F/ '{print $1"/"$2"/"$3 }')
      ;;
-               *) 
+    *)
      package_root=$(echo ${package} |awk -F/ '{print $1"/"$2 }')
      ;;
   esac
@@ -111,49 +113,46 @@ process_content () {
   package_root_url="${package_root/github.com/raw.githubusercontent.com}"
 
   # Find LOCAL files first - only root and package level
-  for dir_root in ${package} ${package_root}; do
-    for godeps_root in ${GODEPS_SRC} ${GODEPS_AUX}; do
-      [[ -d ${godeps_root}/${dir_root} ]] || continue
+  local_files=($(
+    for dir_root in ${package} ${package_root}; do
+      [[ -d ${DEPS_DIR}/${dir_root} ]] || continue
 
       # One (set) of these is fine
-      local_files+=($(find ${godeps_root}/${dir_root} \
-                           -xdev -follow -maxdepth ${find_maxdepth} \
-                           -type f "${find_names[@]}"))
-    done
-  done
-  # Uniquely sort the array
-  IFS=$'\n' local_files=($(LC_ALL=C sort -u <<<"${local_files[*]-}"))
-  unset IFS
+      find ${DEPS_DIR}/${dir_root} \
+          -xdev -follow -maxdepth ${find_maxdepth} \
+          -type f "${find_names[@]}"
+    done | sort -u))
 
+  local index
+  local f
+  index="${package}-${type}"
+  FILE_CONTENT[${index}]=""
   for f in ${local_files[@]-}; do
     # Find some copyright info in any file and break
-    egrep -wq "${ensure_pattern}" ${f} && \
-     FILE_CONTENT[${package}-${type}]="$(cat ${f})" && break
+    if egrep -wq "${ensure_pattern}" "${f}"; then
+      FILE_CONTENT[${index}]=$(cat "${f}")
+      break
+    fi
   done
-  # When nothing is set at the package level, try package_root
-  : ${FILE_CONTENT[${package}-${type}]:="${FILE_CONTENT[${package_root}-${type}]-}"}
 
-  if [[ -z "${FILE_CONTENT[${package}-${type}]-}" ]]; then
+  if [[ -z "${FILE_CONTENT[${index}]-}" ]]; then
+    # When nothing is set at the package level, try package_root
+    FILE_CONTENT[${index}]="${FILE_CONTENT[${package_root}-${type}]-}"
+  fi
+
+  if [[ -z "${FILE_CONTENT[${index}]-}" ]]; then
+    # Last ditch attempt - see if we can get it from version control
     for f in ${remote_files[@]}; do
       file_state "${package_root_url}/master/${f}" && continue
-      if ! FILE_CONTENT[${package}-${type}]="$(\
+      if ! FILE_CONTENT[${index}]="$(\
           curl --fail --retry 10 -s \
-           https://${package_root_url}/master/${f})" || \
-         ! $(echo "${FILE_CONTENT[${package}-${type}]-}" |\
+              https://${package_root_url}/master/${f})" || \
+         ! $(echo "${FILE_CONTENT[${index}]-}" |\
           egrep -qw "${ensure_pattern}") ||
-         [[ "${FILE_CONTENT[${package}-${type}]-}" =~ \<\ *html ]] ; then
+         [[ "${FILE_CONTENT[${index}]-}" =~ \<\ *html ]] ; then
 
         ((CREATE_MISSING)) || file_state -a "${package_root_url}/master/${f}"
         continue
-      fi
-
-      if [[ -n "${FILE_CONTENT[${package}-${type}]-}" ]]; then
-        if ((CREATE_MISSING)); then
-          mkdir -p ${GODEPS_AUX}/${package_root}
-          echo "${FILE_CONTENT[${package}-${type}]}" \
-           > ${GODEPS_AUX}/${package_root}/${f}
-        fi
-        break
       fi
     done
   fi
@@ -163,8 +162,11 @@ process_content () {
 #############################################################################
 # MAIN
 #############################################################################
-KUBE_ROOT="${KUBE_ROOT:-$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd -P)}"
-cd "${KUBE_ROOT}"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
+LICENSE_ROOT="${LICENSE_ROOT:-${KUBE_ROOT}}"
+cd "${LICENSE_ROOT}"
 
 # If CREATE_MISSING=1, the state file is ignored
 CREATE_MISSING=0
@@ -177,8 +179,7 @@ fi
 GODEPS_STATE="Godeps/.license_file_state"
 
 GODEPS_LICENSE_FILE=${1:-"Godeps/LICENSES"}
-GODEPS_SRC="Godeps/_workspace/src"
-GODEPS_AUX="Godeps/_workspace_aux/src"
+DEPS_DIR="vendor"
 declare -Ag FILE_CONTENT
 
 
@@ -187,20 +188,20 @@ declare -Ag FILE_CONTENT
 echo "================================================================================"
 echo "= Kubernetes licensed under: ="
 echo
-cat ${KUBE_ROOT}/LICENSE
+cat ${LICENSE_ROOT}/LICENSE
 ) > ${GODEPS_LICENSE_FILE}
 
 # Loop through every package in Godeps.json
-for PACKAGE in $(cat Godeps/Godeps.json |\
-                 jq -r ".Deps[].ImportPath" | LC_ALL=C sort -f); do
-
+for PACKAGE in $(cat Godeps/Godeps.json | \
+                 jq -r ".Deps[].ImportPath" | \
+                 sort -f); do
   process_content ${PACKAGE} LICENSE
   process_content ${PACKAGE} COPYRIGHT
 
   # display content
   echo
   echo "================================================================================"
-  echo "= ${GODEPS_SRC}/${PACKAGE} licensed under: ="
+  echo "= ${DEPS_DIR}/${PACKAGE} licensed under: ="
   echo
 
   if [[ -z "${FILE_CONTENT[${PACKAGE}-LICENSE]-}" &&

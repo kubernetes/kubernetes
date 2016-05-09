@@ -34,7 +34,7 @@ if [ "$INSTALL_GODEP" = true ] ; then
   go get -u github.com/onsi/gomega
 fi
 
-godep go build test/e2e_node/environment/conformance.go
-godep go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
+go build test/e2e_node/environment/conformance.go
+go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
   --zone="$GCE_ZONE" --project="$GCE_PROJECT"  \
   --hosts="$GCE_HOSTS" --images="$GCE_IMAGES" --cleanup="$CLEANUP"
