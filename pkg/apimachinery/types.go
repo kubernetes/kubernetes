@@ -17,6 +17,8 @@ limitations under the License.
 package apimachinery
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -46,7 +48,29 @@ type GroupMeta struct {
 	// versions.
 	RESTMapper meta.RESTMapper
 
-	// InterfacesFor returns the default Codec and ResourceVersioner for a given version
-	// or an error if the version is not known.
-	InterfacesFor func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error)
+	// InterfacesByVersion stores the per-version interfaces.
+	InterfacesByVersion map[unversioned.GroupVersion]*meta.VersionInterfaces
+}
+
+// InterfacesFor returns the default Codec and ResourceVersioner for a given version
+// string, or an error if the version is not known.
+func (gm *GroupMeta) InterfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+	if v, ok := gm.InterfacesByVersion[version]; ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, gm.GroupVersions)
+}
+
+// Adds the given version to the group. Only call during init, after that
+// GroupMeta objects should be immutable. Not thread safe.
+func (gm *GroupMeta) AddVersion(version unversioned.GroupVersion, interfaces *meta.VersionInterfaces) error {
+	if e, a := gm.GroupVersion.Group, version.Group; a != e {
+		return fmt.Errorf("got a version in group %v, but am in group %v", a, e)
+	}
+	if gm.InterfacesByVersion == nil {
+		gm.InterfacesByVersion = make(map[unversioned.GroupVersion]*meta.VersionInterfaces)
+	}
+	gm.InterfacesByVersion[version] = interfaces
+	gm.GroupVersions = append(gm.GroupVersions, version)
+	return nil
 }
