@@ -13,12 +13,14 @@ spec:
     spec:
       containers:
       - name: nfs-server
-        image: gcr.io/google-samples/nfs-server:1.0
+        image: hchen/nfs3-server:latest #gcr.io/google-samples/nfs-server:1.0
         ports:
           - name: nfs
             containerPort: 2049
           - name: mountd
             containerPort: 20048
+          - name: rpcbind
+            containerPort: 111
         securityContext:
           privileged: true
         volumeMounts:
