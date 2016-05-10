@@ -16,6 +16,10 @@ limitations under the License.
 
 package runtime
 
+import (
+	"fmt"
+)
+
 type ProtobufMarshaller interface {
 	MarshalTo(data []byte) (int, error)
 }
@@ -43,6 +47,11 @@ func (m *Unknown) NestedMarshalTo(data []byte, b ProtobufMarshaller, size uint64
 		n2, err := b.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
+		}
+		if uint64(n2) != size {
+			// programmer error: the Size() method for protobuf does not match the results of MarshalTo, which means the proto
+			// struct returned would be wrong.
+			return 0, fmt.Errorf("the Size() value of %T was %d, but NestedMarshalTo wrote %d bytes to data", b, size, n2)
 		}
 		i += n2
 	}
