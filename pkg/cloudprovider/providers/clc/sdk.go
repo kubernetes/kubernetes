@@ -35,6 +35,14 @@ type HealthCheck struct {
 	Mode               string
 }
 
+type HealthCheckJSON struct {
+	UnhealthyThreshold int    `json:"unhealthyThreshold"`
+	HealthyThreshold   int    `json:"healthyThreshold"`
+	IntervalSeconds    int    `json:"intervalSeconds"`
+	TargetPort         int    `json:"targetPort"`
+	Mode               string `json:"mode,omitempty"`
+}
+
 type PoolDetails struct {
 	PoolID string
 	LBID   string // LB this pool belongs to

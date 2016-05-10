@@ -7,8 +7,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	// activating stack-dump code requires this
-	// "runtime/debug"
 )
 
 //// clcProviderLB implements the LoadBalancer interface (from pkg/cloudprovider/cloud.go)
@@ -31,7 +29,7 @@ type clcProviderLB struct {
 }
 
 const (
-	K8S_LB_PREFIX = "Kubernetes:"
+	k8sLBPrefix = "Kubernetes:"
 )
 
 func makeProviderLB(clc CenturyLinkClient) *clcProviderLB {
@@ -55,7 +53,7 @@ func findLoadBalancerInstance(clcClient CenturyLinkClient, name, region string, 
 	}
 
 	for _, lbSummary := range summaries {
-		if (lbSummary.DataCenter == region) && ((lbSummary.Name == name) || (lbSummary.Name == (K8S_LB_PREFIX + name))) {
+		if (lbSummary.DataCenter == region) && ((lbSummary.Name == name) || (lbSummary.Name == (k8sLBPrefix + name))) {
 			ret, e := clcClient.inspectLB(lbSummary.DataCenter, lbSummary.LBID)
 			if e != nil {
 				glog.Info(fmt.Sprintf("CLC.findLoadBalancerInstance could not inspect LB: dc=%s, LBID=%s, err=%s", lbSummary.DataCenter, lbSummary.LBID, e.Error()))
@@ -105,7 +103,7 @@ func (clc *clcProviderLB) EnsureLoadBalancer(name, region string,
 
 	if lb == nil { // make a new LB
 		glog.Info(fmt.Sprintf("CLC.EnsureLoadBalancer: creating LB, dc=%s, name=%s", region, name))
-		inf, e := clc.clcClient.createLB(region, K8S_LB_PREFIX+name, serviceName.String())
+		inf, e := clc.clcClient.createLB(region, k8sLBPrefix+name, serviceName.String())
 		if e != nil {
 			glog.Info("CLC.EnsureLoadBalancer: failed to create new LB: err=%s", e.Error())
 			return nil, e
@@ -150,7 +148,7 @@ func (clc *clcProviderLB) EnsureLoadBalancer(name, region string,
 	for _, port := range ports {
 		bMatched := false
 		for _, pool := range lb.Pools {
-			if port.Port == pool.IncomingPort { // use ServicePort.Port==PoolDetails.IncomingPort to match
+			if port.Port == int32(pool.IncomingPort) { // use ServicePort.Port==PoolDetails.IncomingPort to match
 				fromPorts = append(fromPorts, port)
 				toPools = append(toPools, pool) // insert fromPorts/toPool as a pair only
 				bMatched = true
@@ -166,7 +164,7 @@ func (clc *clcProviderLB) EnsureLoadBalancer(name, region string,
 	for _, pool := range lb.Pools {
 		bMatched := false
 		for _, port := range ports {
-			if port.Port == pool.IncomingPort { // would have been sent to fromPorts/toPool above
+			if port.Port == int32(pool.IncomingPort) { // would have been sent to fromPorts/toPool above
 				bMatched = true
 				break
 			}
@@ -223,13 +221,14 @@ func makePoolDetailsFromServicePort(lbid string, srcPort *api.ServicePort, hosts
 	return &PoolDetails{
 		PoolID:       "", // createPool to fill in
 		LBID:         lbid,
-		IncomingPort: srcPort.Port,
+		IncomingPort: int(srcPort.Port),
 		Method:       "roundrobin",
 		Persistence:  persist,
 		TimeoutMS:    99999, // and what should the default be?
 		Mode:         "tcp",
-		Health:       &HealthCheck{UnhealthyThreshold: 2, HealthyThreshold: 2, IntervalSeconds: 5, TargetPort: srcPort.NodePort, Mode: "TCP"},
-		Nodes:        makeNodeListFromHosts(hosts, srcPort.NodePort),
+
+		Health: &HealthCheck{UnhealthyThreshold: 2, HealthyThreshold: 2, IntervalSeconds: 5, TargetPort: int(srcPort.NodePort), Mode: "TCP"},
+		Nodes:  makeNodeListFromHosts(hosts, int(srcPort.NodePort)),
 	}
 }
 

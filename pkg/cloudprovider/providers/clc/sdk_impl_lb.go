@@ -25,13 +25,13 @@ import (
 )
 
 //// api use involves calls to both addresses
-var clcServer_API_V2 string = "api.ctl.io"               // URL form  https://api.ctl.io/v2/<resource>/<accountAlias>
-var clcServer_LB_BETA string = "api.loadbalancer.ctl.io" // URL form  https://api.loadbalancer.ctl.io/<accountAlias>/<datacenter>/loadbalancers
+var clcServerapiV2 = "api.ctl.io"               // URL form  https://api.ctl.io/v2/<resource>/<accountAlias>
+var clcServerLBBETA = "api.loadbalancer.ctl.io" // URL form  https://api.loadbalancer.ctl.io/<accountAlias>/<datacenter>/loadbalancers
 
 //// auth methods
 func implMakeCLC() CenturyLinkClient {
 	return clcImpl{
-		creds: MakeEmptyCreds(clcServer_API_V2, "/v2/authentication/login"),
+		creds: MakeEmptyCreds(clcServerapiV2, "/v2/authentication/login"),
 	}
 }
 
@@ -57,7 +57,7 @@ func (clc clcImpl) listAllDC() ([]DataCenterName, error) {
 	uri := fmt.Sprintf("/v2/datacenters/%s", clc.creds.GetAccount())
 	dcret := make([]*dcNamesJSON, 0)
 
-	_, err := simpleGET(clcServer_API_V2, uri, clc.creds, &dcret)
+	_, err := simpleGET(clcServerapiV2, uri, clc.creds, &dcret)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (clc clcImpl) listAllLB() ([]LoadBalancerSummary, error) {
 	uri := fmt.Sprintf("/%s/loadbalancers", clc.creds.GetAccount())
 	apiret := &lbListingWrapperJSON{}
 
-	_, err := simpleGET(clcServer_LB_BETA, uri, clc.creds, &apiret)
+	_, err := simpleGET(clcServerLBBETA, uri, clc.creds, &apiret)
 	if err != nil {
 		return nil, err
 	}
@@ -115,13 +115,13 @@ func (clc clcImpl) listAllLB() ([]LoadBalancerSummary, error) {
 
 //////////////// clc method: createLB()
 
-type LinkJSON struct {
+type linkJSON struct {
 	Rel  string `json:"rel,omitempty"`
 	Href string `json:"href,omitempty"`
 	ID   string `json:"resourceId,omitempty"`
 }
 
-type ApiLinks []LinkJSON
+type apiLinks []linkJSON
 
 type lbCreateRequestJSON struct {
 	LBID           string   `json:"id"`
@@ -129,7 +129,7 @@ type lbCreateRequestJSON struct {
 	Description    string   `json:"description"`
 	RequestDate    int64    `json:"requestDate"`
 	CompletionDate int64    `json:"completionDate"`
-	Links          ApiLinks `json:"links"`
+	Links          apiLinks `json:"links"`
 }
 
 func rawCreateLB(clcCreds Credentials, dc string, lbname string, desc string) (*LoadBalancerCreationInfo, error) {
@@ -139,7 +139,7 @@ func rawCreateLB(clcCreds Credentials, dc string, lbname string, desc string) (*
 
 	body := fmt.Sprintf("{ \"name\":\"%s\", \"description\":\"%s\" }", lbname, desc)
 
-	_, err := simplePOST(clcServer_LB_BETA, uri, clcCreds, body, apiret)
+	_, err := simplePOST(clcServerLBBETA, uri, clcCreds, body, apiret)
 
 	if err != nil {
 		return nil, err
@@ -183,14 +183,14 @@ func (clc clcImpl) createLB(dc string, lbname string, desc string) (*LoadBalance
 
 //////////////// clc method: inspectLB()
 
-type NodeJSON struct {
+type nodeJSON struct {
 	TargetIP   string `json:"ipAddress"`
 	TargetPort int    `json:"privatePort"`
 }
 
-type ApiNodes []NodeJSON
+type apiNodes []nodeJSON
 
-type PoolJSON struct {
+type poolJSON struct {
 	PoolID       string           `json:"id"`
 	IncomingPort int              `json:"port"`
 	Method       string           `json:"loadBalancingMethod"`
@@ -198,10 +198,10 @@ type PoolJSON struct {
 	TimeoutMS    int64            `json:"idleTimeout"`
 	Mode         string           `json:"loadBalancingMode"`
 	Health       *HealthCheckJSON `json:"healthCheck,omitempty"`
-	Nodes        ApiNodes         `json:"nodes"`
+	Nodes        apiNodes         `json:"nodes"`
 }
 
-type ApiPools []PoolJSON
+type apiPools []poolJSON
 
 type lbDetailsJSON struct {
 	LBID        string   `json:"id"`
@@ -210,7 +210,7 @@ type lbDetailsJSON struct {
 	Description string   `json:"description"`
 	PublicIP    string   `json:"publicIPAddress"`
 	DataCenter  string   `json:"dataCenter"`
-	Pools       ApiPools `json:"pools"`
+	Pools       apiPools `json:"pools"`
 }
 
 func (clc clcImpl) inspectLB(dc, lbid string) (*LoadBalancerDetails, error) {
@@ -218,35 +218,35 @@ func (clc clcImpl) inspectLB(dc, lbid string) (*LoadBalancerDetails, error) {
 	uri := fmt.Sprintf("/%s/%s/loadbalancers/%s", clc.creds.GetAccount(), dc, lbid)
 	apiret := &lbDetailsJSON{}
 
-	_, err := simpleGET(clcServer_LB_BETA, uri, clc.creds, apiret)
+	_, err := simpleGET(clcServerLBBETA, uri, clc.creds, apiret)
 	if err != nil {
 		return nil, err
 	}
 
-	var json_pools []PoolDetails = nil
+	var jsonPools []PoolDetails
 	if apiret.Pools != nil {
 		nPools := len(apiret.Pools)
-		json_pools = make([]PoolDetails, nPools, nPools)
+		jsonPools = make([]PoolDetails, nPools, nPools)
 
 		for idx, srcpool := range apiret.Pools {
-			var json_nodes []PoolNode = nil
+			var jsonNodes []PoolNode
 			if srcpool.Nodes != nil {
 				nNodes := len(srcpool.Nodes)
-				json_nodes = make([]PoolNode, nNodes, nNodes)
+				jsonNodes = make([]PoolNode, nNodes, nNodes)
 
 				for idxNode, srcNode := range srcpool.Nodes {
-					json_nodes[idxNode] = PoolNode{
+					jsonNodes[idxNode] = PoolNode{
 						TargetIP:   srcNode.TargetIP,
 						TargetPort: srcNode.TargetPort,
 					}
 				}
 			} else {
-				json_nodes = make([]PoolNode, 0, 0)
+				jsonNodes = make([]PoolNode, 0, 0)
 			}
 
-			var pool_health *HealthCheck = nil
+			var poolHealth *HealthCheck
 			if srcpool.Health != nil {
-				pool_health = &HealthCheck{
+				poolHealth = &HealthCheck{
 					UnhealthyThreshold: srcpool.Health.UnhealthyThreshold,
 					HealthyThreshold:   srcpool.Health.HealthyThreshold,
 					IntervalSeconds:    srcpool.Health.IntervalSeconds,
@@ -255,20 +255,20 @@ func (clc clcImpl) inspectLB(dc, lbid string) (*LoadBalancerDetails, error) {
 				}
 			}
 
-			json_pools[idx] = PoolDetails{
+			jsonPools[idx] = PoolDetails{
 				PoolID:       srcpool.PoolID,
 				LBID:         apiret.LBID,
 				IncomingPort: srcpool.IncomingPort,
 				Method:       srcpool.Method,
-				Health:       pool_health,
+				Health:       poolHealth,
 				Persistence:  srcpool.Persistence,
 				TimeoutMS:    srcpool.TimeoutMS,
 				Mode:         srcpool.Mode,
-				Nodes:        json_nodes,
+				Nodes:        jsonNodes,
 			}
 		}
 	} else {
-		json_pools = make([]PoolDetails, 0, 0)
+		jsonPools = make([]PoolDetails, 0, 0)
 	}
 
 	return &LoadBalancerDetails{
@@ -278,7 +278,7 @@ func (clc clcImpl) inspectLB(dc, lbid string) (*LoadBalancerDetails, error) {
 		Description: apiret.Description,
 		PublicIP:    apiret.PublicIP,
 		DataCenter:  apiret.DataCenter,
-		Pools:       json_pools,
+		Pools:       jsonPools,
 	}, nil
 }
 
@@ -291,10 +291,10 @@ type lbDeleteJSON struct {
 	Description    string   `json:"description"`
 	RequestTime    int64    `json:"requestDate"`
 	CompletionTime int64    `json:"completionTime"`
-	Links          ApiLinks `json:"links"`
+	Links          apiLinks `json:"links"`
 }
 
-func findLinkLB(links *ApiLinks, rel string) string {
+func findLinkLB(links *apiLinks, rel string) string {
 	for _, link := range *links {
 		if link.Rel == rel {
 			return link.ID
@@ -309,7 +309,7 @@ func (clc clcImpl) deleteLB(dc, lbid string) (bool, error) {
 	uri := fmt.Sprintf("/%s/%s/loadbalancers/%s", clc.creds.GetAccount(), dc, lbid)
 	apiret := &lbDeleteJSON{}
 
-	code, err := simpleDELETE(clcServer_LB_BETA, uri, clc.creds, apiret)
+	code, err := simpleDELETE(clcServerLBBETA, uri, clc.creds, apiret)
 	if err == nil { // ordinary success, LB was deleted
 		return true, nil
 	}
@@ -347,7 +347,7 @@ type PoolEntityJSON struct {
 	Nodes        []NodeEntityJSON `json:"nodes"`
 }
 
-func health_to_json(src *HealthCheck) *HealthCheckJSON {
+func healthToJSON(src *HealthCheck) *HealthCheckJSON {
 	if src == nil {
 		return nil
 	}
@@ -361,31 +361,31 @@ func health_to_json(src *HealthCheck) *HealthCheckJSON {
 	}
 }
 
-func pool_to_json(pool *PoolDetails) *PoolEntityJSON {
-	var json_nodes []NodeEntityJSON = nil
+func poolToJSON(pool *PoolDetails) *PoolEntityJSON {
+	var jsonNodes []NodeEntityJSON
 	if pool.Nodes != nil {
 		nNodes := len(pool.Nodes)
-		json_nodes = make([]NodeEntityJSON, nNodes, nNodes)
+		jsonNodes = make([]NodeEntityJSON, nNodes, nNodes)
 
 		for idx, srcNode := range pool.Nodes {
-			json_nodes[idx] = NodeEntityJSON{
+			jsonNodes[idx] = NodeEntityJSON{
 				TargetIP:   srcNode.TargetIP,
 				TargetPort: srcNode.TargetPort,
 			}
 		}
 	} else {
-		json_nodes = make([]NodeEntityJSON, 0, 0)
+		jsonNodes = make([]NodeEntityJSON, 0, 0)
 	}
 
 	return &PoolEntityJSON{
 		PoolID:       pool.PoolID,
 		IncomingPort: pool.IncomingPort,
 		Method:       pool.Method,
-		Health:       health_to_json(pool.Health),
+		Health:       healthToJSON(pool.Health),
 		Persistence:  pool.Persistence,
 		TimeoutMS:    pool.TimeoutMS,
 		Mode:         pool.Mode,
-		Nodes:        json_nodes,
+		Nodes:        jsonNodes,
 	}
 }
 
@@ -395,20 +395,20 @@ type CreatePoolResponseJSON struct {
 	Description    string   `json:"description"`
 	RequestDate    int64    `json:"requestDate"`
 	CompletionDate int64    `json:"completionDate"`
-	Links          ApiLinks `json:"links"` // Q: does the marshaling work if all we include is this one field?  All we need is links[rel="pool"].resourceID
+	Links          apiLinks `json:"links"` // Q: does the marshaling work if all we include is this one field?  All we need is links[rel="pool"].resourceID
 }
 
 func (clc clcImpl) createPool(dc, lbid string, newpool *PoolDetails) (*PoolCreationInfo, error) {
 	uri := fmt.Sprintf("/%s/%s/loadbalancers/%s/pools", clc.creds.GetAccount(), dc, lbid)
-	pool_req := pool_to_json(newpool)
+	poolReq := poolToJSON(newpool)
 
-	pool_resp := &CreatePoolResponseJSON{}
-	_, err := marshalledPOST(clcServer_LB_BETA, uri, clc.creds, pool_req, pool_resp)
+	poolResp := &CreatePoolResponseJSON{}
+	_, err := marshalledPOST(clcServerLBBETA, uri, clc.creds, poolReq, poolResp)
 	if err != nil {
 		return nil, err
 	}
 
-	poolID := findLinkLB(&pool_resp.Links, "pool")
+	poolID := findLinkLB(&poolResp.Links, "pool")
 	if poolID == "" {
 		return nil, clcError("could not determine ID of new pool")
 	}
@@ -418,7 +418,7 @@ func (clc clcImpl) createPool(dc, lbid string, newpool *PoolDetails) (*PoolCreat
 		DataCenter:  dc,
 		LBID:        lbid,
 		PoolID:      poolID,
-		RequestTime: pool_resp.RequestDate,
+		RequestTime: poolResp.RequestDate,
 	}, nil
 }
 
@@ -428,8 +428,8 @@ func (clc clcImpl) updatePool(dc, lbid string, newpool *PoolDetails) (*PoolDetai
 	uri := fmt.Sprintf("/%s/%s/loadbalancers/%s/pools/%s", clc.creds.GetAccount(),
 		dc, lbid, newpool.PoolID)
 
-	update_req := pool_to_json(newpool) // and ignore async-request return object
-	_, err := marshalledPUT(clcServer_LB_BETA, uri, clc.creds, update_req, nil)
+	updateReq := poolToJSON(newpool) // and ignore async-request return object
+	_, err := marshalledPUT(clcServerLBBETA, uri, clc.creds, updateReq, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +443,7 @@ func (clc clcImpl) deletePool(dc, lbid string, poolID string) error {
 	uri := fmt.Sprintf("/%s/%s/loadbalancers/%s/pools/%s", clc.creds.GetAccount(),
 		dc, lbid, poolID)
 
-	_, err := simpleDELETE(clcServer_LB_BETA, uri, clc.creds, nil)
+	_, err := simpleDELETE(clcServerLBBETA, uri, clc.creds, nil)
 	return err // no other return body
 }
 
