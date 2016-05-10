@@ -590,8 +590,8 @@ setup_addon_manifests() {
   chmod 644 "${dst_dir}"/*
 }
 
-# Prepares the manifests of k8s addons static pods.
-prepare_kube_addons() {
+# Prepares the manifests of k8s addons, and starts the addon manager.
+start_kube_addons() {
   addon_src_dir="/home/kubernetes/kube-manifests/kubernetes/gci-trusty"
   addon_dst_dir="/etc/kubernetes/addons"
   # Set up manifests of other addons.
@@ -623,7 +623,6 @@ prepare_kube_addons() {
     sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
   fi
-  cp "${addon_src_dir}/namespace.yaml" "${addon_dst_dir}"
   if [ "${ENABLE_L7_LOADBALANCING:-}" = "glbc" ]; then
     setup_addon_manifests "addons" "cluster-loadbalancing/glbc"
   fi
