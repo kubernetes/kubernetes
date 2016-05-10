@@ -14,159 +14,145 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// teststale checks the staleness of a test binary. go test -c builds a test
+// binary but it does no staleness check. In other words, every time one runs
+// go test -c, it compiles the test packages and links the binary even when
+// nothing has changed. This program helps to mitigate that problem by allowing
+// to check the staleness of a given test package and its binary.
 package main
 
 import (
-	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
+const usageHelp = "" +
+	`This program checks the staleness of a given test package and its test
+binary so that one can make a decision about re-building the test binary.
+
+Usage:
+  teststale -binary=/path/to/test/binary -package=package
+
+Example:
+  teststale -binary="$HOME/gosrc/bin/e2e.test" -package="k8s.io/kubernetes/test/e2e"
+
+`
+
 var (
-	binary  = flag.String("binary", "", "absolute filesystem path to the test binary")
-	pkgPath = flag.String("package", "", "test package import path in the format used in the import statements without the $GOPATH prefix")
+	binary  = flag.String("binary", "", "filesystem path to the test binary file. Example: \"$HOME/gosrc/bin/e2e.test\"")
+	pkgPath = flag.String("package", "", "import path of the test package in the format used while importing packages. Example: \"k8s.io/kubernetes/test/e2e\"")
 )
 
-type pkg struct {
-	dir          string
-	target       string
-	stale        bool
-	testGoFiles  []string
-	testImports  []string
-	xTestGoFiles []string
-	xTestImports []string
+func usage() {
+	fmt.Fprintln(os.Stderr, usageHelp)
+	fmt.Fprintln(os.Stderr, "Flags:")
+	flag.PrintDefaults()
+	os.Exit(2)
 }
 
-func newCmd(format string, pkgPaths []string) *exec.Cmd {
+type pkg struct {
+	Dir          string
+	ImportPath   string
+	Target       string
+	Stale        bool
+	TestGoFiles  []string
+	TestImports  []string
+	XTestGoFiles []string
+	XTestImports []string
+}
+
+func pkgInfo(pkgPaths []string) ([]pkg, error) {
 	args := []string{
 		"list",
-		"-f",
-		format,
+		"-json",
 	}
 	args = append(args, pkgPaths...)
 	cmd := exec.Command("go", args...)
 	cmd.Env = os.Environ()
-	return cmd
-}
 
-func newPkg(path string) (*pkg, error) {
-	format := "Dir: {{println .Dir}}Target: {{println .Target}}Stale: {{println .Stale}}TestGoFiles: {{println .TestGoFiles}}TestImports: {{println .TestImports}}XTestGoFiles: {{println .XTestGoFiles}}XTestImports: {{println .XTestImports}}"
-	cmd := newCmd(format, []string{path})
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("could not pipe STDOUT: %v", err)
+		return nil, fmt.Errorf("failed to obtain the metadata output stream: %v", err)
 	}
+
+	dec := json.NewDecoder(stdout)
 
 	// Start executing the command
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("command did not start: %v", err)
 	}
 
-	// Parse the command output
-	scanner := bufio.NewScanner(stdout)
-	scanner.Split(bufio.ScanLines)
-
-	// To be conservative, default to package to be stale
-	p := &pkg{
-		stale: true,
+	var pkgs []pkg
+	for {
+		var p pkg
+		if err := dec.Decode(&p); err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal metadata for package %s: %v", p.ImportPath, err)
+		}
+		pkgs = append(pkgs, p)
 	}
-
-	// TODO: avoid this stupid code repetition by iterating through struct fields.
-	scanner.Scan()
-	p.dir = strings.TrimPrefix(scanner.Text(), "Dir: ")
-	scanner.Scan()
-	p.target = strings.TrimPrefix(scanner.Text(), "Target: ")
-	scanner.Scan()
-	if strings.TrimPrefix(scanner.Text(), "Stale: ") == "false" {
-		p.stale = false
-	}
-	p.testGoFiles = scanLineList(scanner, "TestGoFiles: ")
-	p.testImports = scanLineList(scanner, "TestImports: ")
-	p.xTestGoFiles = scanLineList(scanner, "XTestGoFiles: ")
-	p.xTestImports = scanLineList(scanner, "XTestImports: ")
 
 	if err := cmd.Wait(); err != nil {
 		return nil, fmt.Errorf("command did not complete: %v", err)
 	}
-	return p, nil
+	return pkgs, nil
 }
 
-func (p *pkg) isStale(buildTime time.Time) bool {
+func (p *pkg) isNewerThan(buildTime time.Time) bool {
 	// If the package itself is stale, then we have to rebuild the whole thing anyway.
-	if p.stale {
+	if p.Stale {
 		return true
 	}
 
 	// Test for file staleness
-	for _, f := range p.testGoFiles {
-		if isStale(buildTime, filepath.Join(p.dir, f)) {
+	for _, f := range p.TestGoFiles {
+		if isNewerThan(filepath.Join(p.Dir, f), buildTime) {
 			log.Printf("test Go file %s is stale", f)
 			return true
 		}
 	}
-	for _, f := range p.xTestGoFiles {
-		if isStale(buildTime, filepath.Join(p.dir, f)) {
+	for _, f := range p.XTestGoFiles {
+		if isNewerThan(filepath.Join(p.Dir, f), buildTime) {
 			log.Printf("external test Go file %s is stale", f)
 			return true
 		}
 	}
 
-	format := "{{.Stale}}"
 	imps := []string{}
-	imps = append(imps, p.testImports...)
-	imps = append(imps, p.xTestImports...)
+	imps = append(imps, p.TestImports...)
+	imps = append(imps, p.XTestImports...)
 
-	cmd := newCmd(format, imps)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Printf("unexpected error with creating stdout pipe: %v", err)
+	// This calls `go list` the second time. This is required because the first
+	// call to `go list` checks the staleness of the package in question by
+	// looking the non-test dependencies, but it doesn't look at the test
+	// dependencies. However, it returns the list of test dependencies. This
+	// second call to `go list` checks the staleness of all the test
+	// dependencies.
+	pkgs, err := pkgInfo(imps)
+	if err != nil || len(pkgs) < 1 {
+		log.Printf("failed to obtain metadata for packages %s: %v", imps, err)
 		return true
 	}
-	// Start executing the command
-	if err := cmd.Start(); err != nil {
-		log.Printf("unexpected error executing command: %v", err)
-		return true
-	}
 
-	// Parse the command output
-	scanner := bufio.NewScanner(stdout)
-	scanner.Split(bufio.ScanLines)
-
-	for i := 0; scanner.Scan(); i++ {
-		if out := scanner.Text(); out != "false" {
-			log.Printf("import %q is stale: %s", imps[i], out)
+	for _, p := range pkgs {
+		if p.Stale {
+			log.Printf("import %q is stale", p.ImportPath)
 			return true
 		}
 	}
 
-	if err := cmd.Wait(); err != nil {
-		log.Printf("unexpected error waiting to finish: %v", err)
-		return true
-	}
 	return false
 }
 
-// scanLineList scans a line, removes the prefix and splits the remaining line into
-// individual strings.
-// TODO: There are ton of intermediate strings being created here. Convert this to
-// a bufio.SplitFunc instead.
-func scanLineList(scanner *bufio.Scanner, prefix string) []string {
-	scanner.Scan()
-	list := strings.TrimPrefix(scanner.Text(), prefix)
-	line := strings.Trim(list, "[]")
-	if len(line) == 0 {
-		return []string{}
-	}
-	return strings.Split(line, " ")
-}
-
-func isStale(buildTime time.Time, filename string) bool {
+func isNewerThan(filename string, buildTime time.Time) bool {
 	stat, err := os.Stat(filename)
 	if err != nil {
 		return true
@@ -174,30 +160,29 @@ func isStale(buildTime time.Time, filename string) bool {
 	return stat.ModTime().After(buildTime)
 }
 
-// IsTestStale checks if the test binary is stale and needs to rebuilt.
+// isTestStale checks if the test binary is stale and needs to rebuilt.
 // Some of the ideas here are inspired by how Go does staleness checks.
 func isTestStale(binPath, pkgPath string) bool {
 	bStat, err := os.Stat(binPath)
 	if err != nil {
-		log.Printf("Couldn't obtain the modified time of the binary: %v", err)
+		log.Printf("Couldn't obtain the modified time of the binary %s: %v", binPath, err)
 		return true
 	}
 	buildTime := bStat.ModTime()
 
-	p, err := newPkg(pkgPath)
-	if err != nil {
-		log.Printf("Couldn't retrieve the test package information: %v", err)
+	pkgs, err := pkgInfo([]string{pkgPath})
+	if err != nil || len(pkgs) < 1 {
+		log.Printf("Couldn't retrieve test package information for package %s: %v", pkgPath, err)
 		return false
 	}
 
-	return p.isStale(buildTime)
+	return pkgs[0].isNewerThan(buildTime)
 }
 
 func main() {
+	flag.Usage = usage
 	flag.Parse()
-	if isTestStale(*binary, *pkgPath) {
-		fmt.Println("true")
-	} else {
-		fmt.Println("false")
+	if !isTestStale(*binary, *pkgPath) {
+		os.Exit(1)
 	}
 }
