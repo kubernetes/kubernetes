@@ -89,12 +89,10 @@ type Propagator struct {
 }
 
 func (p *Propagator) insertNode(n *node) {
-	fmt.Println("CHAO: add to graph:", n.identity)
 	p.uidToNode[n.identity.UID] = n
 }
 
 func (p *Propagator) removeNode(n *node) {
-	fmt.Println("CHAO: remove from graph:", n.identity)
 	delete(p.uidToNode, n.identity.UID)
 }
 
@@ -102,15 +100,11 @@ func (p *Propagator) removeNode(n *node) {
 // their dependents. ownerExists indicates if any owner listed in n.owners exist
 // in p.uidToNode.
 func (p *Propagator) addToOwners(n *node) (ownerExists bool) {
-	fmt.Println("CHAO: in addToOwners, uidToNode:", p.uidToNode)
 	for _, owner := range n.owners {
-		fmt.Println("CHAO: in addToOwners, lookup for:", owner.UID)
 		ownerNode, ok := p.uidToNode[owner.UID]
 		if !ok {
-			fmt.Println("CHAO: lookup not found")
 			continue
 		}
-		fmt.Println("CHAO: lookup found")
 		ownerExists = true
 		ownerNode.dependents[n] = struct{}{}
 	}
@@ -120,15 +114,11 @@ func (p *Propagator) addToOwners(n *node) (ownerExists bool) {
 // removeFromOwners finds all owners as listed in n.owners, and removes n from
 // their dependents list.
 func (p *Propagator) removeFromOwners(n *node) {
-	fmt.Println("CHAO: in removeFromOwners, uidToNode:", p.uidToNode)
 	for _, owner := range n.owners {
-		fmt.Println("CHAO: in removeFromOwners, lookup for:", owner.UID)
 		ownerNode, ok := p.uidToNode[owner.UID]
 		if !ok {
-			fmt.Println("CHAO: lookup not found")
 			continue
 		}
-		fmt.Println("CHAO: lookup found")
 		delete(ownerNode.dependents, n)
 	}
 }
@@ -214,7 +204,6 @@ func (p *Propagator) processEvent() {
 		// will update the graph to reflect that D is the dependent of O, so
 		// when O is deleted, D will not be cascadingly deleted.
 		if !ownerExists && len(newNode.owners) != 0 {
-			fmt.Println("CHAO: directly added to dirty queue: ", newNode.identity)
 			p.gc.dirtyQueue.Add(newNode)
 		}
 
@@ -243,13 +232,10 @@ func (p *Propagator) processEvent() {
 		// remove the node from the dependent list of node pionted by the
 		// removed refrences.
 		for _, owner := range removed {
-			fmt.Println("CHAO: remove from removed, lookup for:", owner.UID)
 			ownerNode, ok := p.uidToNode[owner.UID]
 			if !ok {
-				fmt.Println("CHAO: remove from removed, lookup not found")
 				continue
 			}
-			fmt.Println("CHAO: remove from removed, lookup found")
 			delete(ownerNode.dependents, node)
 		}
 
@@ -313,7 +299,6 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 		framework.ResourceEventHandlerFuncs{
 			// Add the event to the propagator's event queue.
 			AddFunc: func(obj interface{}) {
-				fmt.Println("CHAO: AddFunc: obj=", obj)
 				event := event{
 					Type: addEvent,
 					Obj:  obj,
