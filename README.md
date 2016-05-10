@@ -1,5 +1,4 @@
 # Kubernetes
-FIXME
 
 [![GoReportCard Widget]][GoReportCard] [![GoDoc Widget]][GoDoc] [![Travis Widget]][Travis] [![Coverage Status Widget]][Coverage Status]
 
