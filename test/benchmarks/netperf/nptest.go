@@ -55,15 +55,15 @@ var podname string
 
 var workerStateMap map[string]*workerState
 
-var iperf_tcp_output_regexp *regexp.Regexp
-var iperf_udp_output_regexp *regexp.Regexp
-var netperf_output_regexp *regexp.Regexp
+var iperfTCPOutputRegexp *regexp.Regexp
+var iperfUDPOutputRegexp *regexp.Regexp
+var netperfOutputRegexp *regexp.Regexp
 
 var dataPoints map[string][]point
 var dataPointKeys []string
 var datapointsFlushed bool
 
-var global_lock sync.Mutex
+var globalLock sync.Mutex
 
 const (
 	workerMode           = "worker"
@@ -167,9 +167,9 @@ func init() {
 	currentJobIndex = 0
 
 	// Regexes to parse the Mbits/sec out of iperf TCP, UDP and netperf output
-	iperf_tcp_output_regexp = regexp.MustCompile("SUM.*\\s+(\\d+)\\sMbits/sec\\s+receiver")
-	iperf_udp_output_regexp = regexp.MustCompile("\\s+(\\S+)\\sMbits/sec\\s+\\S+\\s+ms\\s+")
-	netperf_output_regexp = regexp.MustCompile("\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\S+\\s+(\\S+)\\s+")
+	iperfTCPOutputRegexp = regexp.MustCompile("SUM.*\\s+(\\d+)\\sMbits/sec\\s+receiver")
+	iperfUDPOutputRegexp = regexp.MustCompile("\\s+(\\S+)\\sMbits/sec\\s+\\S+\\s+ms\\s+")
+	netperfOutputRegexp = regexp.MustCompile("\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\S+\\s+(\\S+)\\s+")
 
 	dataPoints = make(map[string][]point)
 }
@@ -205,7 +205,7 @@ func main() {
 	if mode == orchestratorMode {
 		orchestrate()
 	} else {
-		start_work()
+		startWork()
 	}
 	fmt.Println("Terminating npd")
 }
@@ -315,8 +315,8 @@ func allocateWorkToClient(workerS *workerState, reply *WorkItem) {
 }
 
 func (t *NetPerfRpc) RegisterClient(data *ClientRegistrationData, reply *WorkItem) error {
-	global_lock.Lock()
-	defer global_lock.Unlock()
+	globalLock.Lock()
+	defer globalLock.Unlock()
 
 	state, ok := workerStateMap[data.Worker]
 
@@ -328,10 +328,10 @@ func (t *NetPerfRpc) RegisterClient(data *ClientRegistrationData, reply *WorkIte
 		reply.ServerItem.ListenPort = "5201"
 		reply.ServerItem.Timeout = 3600
 		return nil
-	} else {
-		// Worker defaults to idle unless the allocateWork routine below assigns an item
-		state.idle = true
 	}
+
+	// Worker defaults to idle unless the allocateWork routine below assigns an item
+	state.idle = true
 
 	// Give the worker a new work item or let it idle loop another 5 seconds
 	allocateWorkToClient(state, reply)
@@ -404,7 +404,7 @@ func flushDataPointsToCsv() {
 
 func parseIperfTcpBandwidth(output string) string {
 	// Parses the output of iperf3 and grabs the group Mbits/sec from the output
-	match := iperf_tcp_output_regexp.FindStringSubmatch(output)
+	match := iperfTCPOutputRegexp.FindStringSubmatch(output)
 	if match != nil && len(match) > 1 {
 		return match[1]
 	}
@@ -413,7 +413,7 @@ func parseIperfTcpBandwidth(output string) string {
 
 func parseIperfUdpBandwidth(output string) string {
 	// Parses the output of iperf3 (UDP mode) and grabs the Mbits/sec from the output
-	match := iperf_udp_output_regexp.FindStringSubmatch(output)
+	match := iperfUDPOutputRegexp.FindStringSubmatch(output)
 	if match != nil && len(match) > 1 {
 		return match[1]
 	}
@@ -422,7 +422,7 @@ func parseIperfUdpBandwidth(output string) string {
 
 func parseNetperfBandwidth(output string) string {
 	// Parses the output of netperf and grabs the Bbits/sec from the output
-	match := netperf_output_regexp.FindStringSubmatch(output)
+	match := netperfOutputRegexp.FindStringSubmatch(output)
 	if match != nil && len(match) > 1 {
 		return match[1]
 	}
@@ -430,8 +430,8 @@ func parseNetperfBandwidth(output string) string {
 }
 
 func (t *NetPerfRpc) ReceiveOutput(data *WorkerOutput, reply *int) error {
-	global_lock.Lock()
-	defer global_lock.Unlock()
+	globalLock.Lock()
+	defer globalLock.Unlock()
 
 	testcase := testcases[currentJobIndex]
 
@@ -468,7 +468,7 @@ func (t *NetPerfRpc) ReceiveOutput(data *WorkerOutput, reply *int) error {
 	return nil
 }
 
-func serveRpcRequests(port string) {
+func serveRPCRequests(port string) {
 	baseObject := new(NetPerfRpc)
 	rpc.Register(baseObject)
 	rpc.HandleHTTP()
@@ -481,7 +481,7 @@ func serveRpcRequests(port string) {
 
 // Blocking RPC server start - only runs on the orchestrator
 func orchestrate() {
-	serveRpcRequests(rpcServicePort)
+	serveRPCRequests(rpcServicePort)
 }
 
 // Walk the list of interfaces and find the first interface that has a valid IP
@@ -510,24 +510,24 @@ func getMyIP() string {
 	return "127.0.0.1"
 }
 
-func handle_client_work_item(client *rpc.Client, work_item *WorkItem) {
-	fmt.Println("Orchestrator requests worker run item Type:", work_item.ClientItem.Type)
+func handleClientWorkItem(client *rpc.Client, workItem *WorkItem) {
+	fmt.Println("Orchestrator requests worker run item Type:", workItem.ClientItem.Type)
 	switch {
-	case work_item.ClientItem.Type == iperfTcpTest || work_item.ClientItem.Type == iperfUdpTest:
-		outputString := iperf_client(work_item.ClientItem.Host, work_item.ClientItem.Port, work_item.ClientItem.MSS, work_item.ClientItem.Type)
+	case workItem.ClientItem.Type == iperfTcpTest || workItem.ClientItem.Type == iperfUdpTest:
+		outputString := iperfClient(workItem.ClientItem.Host, workItem.ClientItem.Port, workItem.ClientItem.MSS, workItem.ClientItem.Type)
 		var reply int
-		client.Call("NetPerfRpc.ReceiveOutput", WorkerOutput{Output: outputString, Worker: worker, Type: work_item.ClientItem.Type}, &reply)
-	case work_item.ClientItem.Type == netperfTest:
-		outputString := netperf_client(work_item.ClientItem.Host, work_item.ClientItem.Port, work_item.ClientItem.Type)
+		client.Call("NetPerfRpc.ReceiveOutput", WorkerOutput{Output: outputString, Worker: worker, Type: workItem.ClientItem.Type}, &reply)
+	case workItem.ClientItem.Type == netperfTest:
+		outputString := netperfClient(workItem.ClientItem.Host, workItem.ClientItem.Port, workItem.ClientItem.Type)
 		var reply int
-		client.Call("NetPerfRpc.ReceiveOutput", WorkerOutput{Output: outputString, Worker: worker, Type: work_item.ClientItem.Type}, &reply)
+		client.Call("NetPerfRpc.ReceiveOutput", WorkerOutput{Output: outputString, Worker: worker, Type: workItem.ClientItem.Type}, &reply)
 	}
 	// Client COOLDOWN period before asking for next work item to replenish burst allowance policers etc
 	time.Sleep(10 * time.Second)
 }
 
-// start_work : Entry point to the worker infinite loop
-func start_work() {
+// startWork : Entry point to the worker infinite loop
+func startWork() {
 	for true {
 		var timeout time.Duration
 		var client *rpc.Client
@@ -545,60 +545,60 @@ func start_work() {
 		}
 
 		for true {
-			client_data := ClientRegistrationData{Host: podname, KubeNode: kubenode, Worker: worker, IP: getMyIP()}
-			var work_item WorkItem
+			clientData := ClientRegistrationData{Host: podname, KubeNode: kubenode, Worker: worker, IP: getMyIP()}
+			var workItem WorkItem
 
-			if err := client.Call("NetPerfRpc.RegisterClient", client_data, &work_item); err != nil {
+			if err := client.Call("NetPerfRpc.RegisterClient", clientData, &workItem); err != nil {
 				// RPC server has probably gone away - attempt to reconnect
 				fmt.Println("Error attempting RPC call", err)
 				break
 			}
 
 			switch {
-			case work_item.IsIdle == true:
+			case workItem.IsIdle == true:
 				time.Sleep(5 * time.Second)
 				continue
 
-			case work_item.IsServerItem == true:
+			case workItem.IsServerItem == true:
 				fmt.Println("Orchestrator requests worker run iperf and netperf servers")
-				go iperf_server()
-				go netperf_server()
+				go iperfServer()
+				go netperfServer()
 				time.Sleep(1 * time.Second)
 
-			case work_item.IsClientItem == true:
-				handle_client_work_item(client, &work_item)
+			case workItem.IsClientItem == true:
+				handleClientWorkItem(client, &workItem)
 			}
 		}
 	}
 }
 
 // Invoke and indefinitely run an iperf server
-func iperf_server() {
-	output, success := CmdExec(iperf3Path, []string{iperf3Path, "-s", host, "-J", "-i", "60"}, 15)
+func iperfServer() {
+	output, success := cmdExec(iperf3Path, []string{iperf3Path, "-s", host, "-J", "-i", "60"}, 15)
 	if success {
 		fmt.Println(output)
 	}
 }
 
 // Invoke and indefinitely run netperf server
-func netperf_server() {
-	output, success := CmdExec(netperfServerPath, []string{netperfServerPath, "-D"}, 15)
+func netperfServer() {
+	output, success := cmdExec(netperfServerPath, []string{netperfServerPath, "-D"}, 15)
 	if success {
 		fmt.Println(output)
 	}
 }
 
 // Invoke and run an iperf client and return the output if successful.
-func iperf_client(serverHost, serverPort string, mss int, workItemType int) (rv string) {
+func iperfClient(serverHost, serverPort string, mss int, workItemType int) (rv string) {
 	switch {
 	case workItemType == iperfTcpTest:
-		output, success := CmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-N", "-i", "30", "-t", "10", "-f", "m", "-w", "512M", "-Z", "-P", parallelStreams, "-M", string(mss)}, 15)
+		output, success := cmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-N", "-i", "30", "-t", "10", "-f", "m", "-w", "512M", "-Z", "-P", parallelStreams, "-M", string(mss)}, 15)
 		if success {
 			rv = output
 		}
 
 	case workItemType == iperfUdpTest:
-		output, success := CmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-i", "30", "-t", "10", "-f", "m", "-b", "0", "-u"}, 15)
+		output, success := cmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-i", "30", "-t", "10", "-f", "m", "-b", "0", "-u"}, 15)
 		if success {
 			rv = output
 		}
@@ -607,8 +607,8 @@ func iperf_client(serverHost, serverPort string, mss int, workItemType int) (rv 
 }
 
 // Invoke and run a netperf client and return the output if successful.
-func netperf_client(serverHost, serverPort string, workItemType int) (rv string) {
-	output, success := CmdExec(netperfPath, []string{netperfPath, "-H", serverHost}, 15)
+func netperfClient(serverHost, serverPort string, workItemType int) (rv string) {
+	output, success := cmdExec(netperfPath, []string{netperfPath, "-H", serverHost}, 15)
 	if success {
 		fmt.Println(output)
 		rv = output
@@ -619,7 +619,7 @@ func netperf_client(serverHost, serverPort string, workItemType int) (rv string)
 	return
 }
 
-func CmdExec(command string, args []string, timeout int32) (rv string, rc bool) {
+func cmdExec(command string, args []string, timeout int32) (rv string, rc bool) {
 	cmd := exec.Cmd{Path: command, Args: args}
 
 	var stdoutput bytes.Buffer
