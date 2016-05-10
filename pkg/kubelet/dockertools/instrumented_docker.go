@@ -38,13 +38,18 @@ func newInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterfac
 
 // recordOperation records the duration of the operation.
 func recordOperation(operation string, start time.Time) {
+	metrics.DockerOperations.WithLabelValues(operation).Inc()
 	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
 }
 
 // recordError records error for metric if an error occurred.
 func recordError(operation string, err error) {
 	if err != nil {
-		metrics.DockerErrors.WithLabelValues(operation).Inc()
+		if _, ok := err.(operationTimeout); ok {
+			metrics.DockerOperationsTimeout.WithLabelValues(operation).Inc()
+		}
+		// Docker operation timeout error is also a docker error, so we don't add else here.
+		metrics.DockerOperationsErrors.WithLabelValues(operation).Inc()
 	}
 }
 
