@@ -88,7 +88,7 @@ func TestCreateWithTTL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, 0, watch.Deleted, w, nil)
+	testCheckEventType(t, watch.Deleted, w)
 }
 
 func TestCreateWithKeyExist(t *testing.T) {
@@ -396,7 +396,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, 0, watch.Deleted, w, nil)
+	testCheckEventType(t, watch.Deleted, w)
 }
 
 func TestGuaranteedUpdateWithConflict(t *testing.T) {

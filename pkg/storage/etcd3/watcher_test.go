@@ -46,7 +46,8 @@ func TestWatchList(t *testing.T) {
 
 // It tests that
 // - first occurrence of objects should notify Add event
-// -
+// - update should trigger Modified event
+// - update that gets filtered should trigger Deleted event
 func testWatch(t *testing.T, recursive bool) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
@@ -90,6 +91,7 @@ func testWatch(t *testing.T, recursive bool) {
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
+		var prevObj *api.Pod
 		for _, watchTest := range tt.watchTests {
 			out := &api.Pod{}
 			key := tt.key
@@ -104,8 +106,14 @@ func testWatch(t *testing.T, recursive bool) {
 				t.Fatalf("GuaranteedUpdate failed: %v", err)
 			}
 			if watchTest.expectEvent {
-				testCheckResult(t, i, watchTest.watchType, w, nil)
+				expectObj := out
+				if watchTest.watchType == watch.Deleted {
+					expectObj = prevObj
+					expectObj.ResourceVersion = out.ResourceVersion
+				}
+				testCheckResult(t, i, watchTest.watchType, w, expectObj)
 			}
+			prevObj = out
 		}
 		w.Stop()
 		testCheckStop(t, i, w)
@@ -123,7 +131,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 	if err := store.Delete(ctx, key, &api.Pod{}, nil); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
-	testCheckResult(t, 0, watch.Deleted, w, nil)
+	testCheckEventType(t, watch.Deleted, w)
 }
 
 // TestWatchSync tests that
@@ -168,7 +176,7 @@ func TestWatchError(t *testing.T) {
 		func(runtime.Object) (runtime.Object, error) {
 			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, nil
 		}))
-	testCheckResult(t, 0, watch.Error, w, nil)
+	testCheckEventType(t, watch.Error, w)
 }
 
 func TestWatchContextCancel(t *testing.T) {
@@ -213,7 +221,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	wg.Wait()
 }
 
-func TestWatchDeleteEventObjectShouldHaveLatestRV(t *testing.T) {
+func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
@@ -257,6 +265,17 @@ func (c *testCodec) Decode(data []byte, defaults *unversioned.GroupVersionKind, 
 	return nil, nil, errors.New("Expected decoding failure")
 }
 
+func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
+	select {
+	case res := <-w.ResultChan():
+		if res.Type != expectEventType {
+			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
+	}
+}
+
 func testCheckResult(t *testing.T, i int, expectEventType watch.EventType, w watch.Interface, expectObj *api.Pod) {
 	select {
 	case res := <-w.ResultChan():
@@ -264,7 +283,7 @@ func testCheckResult(t *testing.T, i int, expectEventType watch.EventType, w wat
 			t.Errorf("#%d: event type want=%v, get=%v", i, expectEventType, res.Type)
 			return
 		}
-		if expectObj != nil && !reflect.DeepEqual(expectObj, res.Object) {
+		if !reflect.DeepEqual(expectObj, res.Object) {
 			t.Errorf("#%d: obj want=\n%#v\nget=\n%#v", i, expectObj, res.Object)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
