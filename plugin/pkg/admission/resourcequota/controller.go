@@ -21,7 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
+	"github.com/golang/glog"
+	lru "github.com/hashicorp/golang-lru"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
@@ -126,25 +127,35 @@ func newQuotaEvaluator(client clientset.Interface, registry quota.Registry) (*qu
 }
 
 // Run begins watching and syncing.
-func (e *quotaEvaluator) Run(workers int) {
+func (e *quotaEvaluator) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(e.doWork, time.Second, make(chan struct{}))
+		go wait.Until(e.doWork, time.Second, stopCh)
 	}
+	<-stopCh
+	glog.Infof("Shutting down quota evaluator")
+	e.queue.ShutDown()
 }
 
 func (e *quotaEvaluator) doWork() {
+	workFunc := func() bool {
+		ns, admissionAttributes, quit := e.getWork()
+		if quit {
+			return true
+		}
+		defer e.completeWork(ns)
+		if len(admissionAttributes) == 0 {
+			return false
+		}
+		e.checkAttributes(ns, admissionAttributes)
+		return false
+	}
 	for {
-		func() {
-			ns, admissionAttributes := e.getWork()
-			defer e.completeWork(ns)
-			if len(admissionAttributes) == 0 {
-				return
-			}
-
-			e.checkAttributes(ns, admissionAttributes)
-		}()
+		if quit := workFunc(); quit {
+			glog.Infof("quota evaluator worker shutdown")
+			return
+		}
 	}
 }
 
@@ -434,8 +445,11 @@ func (e *quotaEvaluator) completeWork(ns string) {
 	e.inProgress.Delete(ns)
 }
 
-func (e *quotaEvaluator) getWork() (string, []*admissionWaiter) {
-	uncastNS, _ := e.queue.Get()
+func (e *quotaEvaluator) getWork() (string, []*admissionWaiter, bool) {
+	uncastNS, shutdown := e.queue.Get()
+	if shutdown {
+		return "", []*admissionWaiter{}, shutdown
+	}
 	ns := uncastNS.(string)
 
 	e.workLock.Lock()
@@ -450,12 +464,12 @@ func (e *quotaEvaluator) getWork() (string, []*admissionWaiter) {
 
 	if len(work) != 0 {
 		e.inProgress.Insert(ns)
-		return ns, work
+		return ns, work, false
 	}
 
 	e.queue.Done(ns)
 	e.inProgress.Delete(ns)
-	return ns, []*admissionWaiter{}
+	return ns, []*admissionWaiter{}, false
 }
 
 func (e *quotaEvaluator) getQuotas(namespace string) ([]api.ResourceQuota, error) {
