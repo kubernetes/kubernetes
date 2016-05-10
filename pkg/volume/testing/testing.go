@@ -273,7 +273,7 @@ func (fv *FakeVolume) WaitForAttach(spec *Spec, spectimeout time.Duration) (stri
 	return "", nil
 }
 
-func (fv *FakeVolume) GetDeviceMountPath(host VolumeHost, spec *Spec) string {
+func (fv *FakeVolume) GetDeviceMountPath(spec *Spec) string {
 	fv.GetDeviceMountPathCallCount++
 	return ""
 }
