@@ -1830,6 +1830,10 @@ type NodeSystemInfo struct {
 	KubeletVersion string `json:"kubeletVersion"`
 	// KubeProxy Version reported by the node.
 	KubeProxyVersion string `json:"kubeProxyVersion"`
+	// The Operating System reported by the node
+	OperatingSystem string `json:"operatingSystem"`
+	// The Architecture reported by the node
+	Architecture string `json:"architecture"`
 }
 
 // NodeStatus is information about the current status of a node.

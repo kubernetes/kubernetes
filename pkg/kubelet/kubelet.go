@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	goRuntime "runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -963,8 +964,12 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{
-			Name:   kl.nodeName,
-			Labels: map[string]string{unversioned.LabelHostname: kl.hostname},
+			Name: kl.nodeName,
+			Labels: map[string]string{
+				unversioned.LabelHostname: kl.hostname,
+				unversioned.LabelOS:       goRuntime.GOOS,
+				unversioned.LabelArch:     goRuntime.GOARCH,
+			},
 		},
 		Spec: api.NodeSpec{
 			Unschedulable: !kl.registerSchedulable,
@@ -3006,7 +3011,7 @@ func (kl *Kubelet) setNodeStatusDaemonEndpoints(node *api.Node) {
 	node.Status.DaemonEndpoints = *kl.daemonEndpoints
 }
 
-// Set images list fot this node
+// Set images list for the node
 func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 	// Update image list of this node
 	var imagesOnNode []api.ContainerImage
@@ -3024,12 +3029,19 @@ func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 	node.Status.Images = imagesOnNode
 }
 
+// Set the GOOS and GOARCH for this node
+func (kl *Kubelet) setNodeStatusGoRuntime(node *api.Node) {
+	node.Status.NodeInfo.OperatingSystem = goRuntime.GOOS
+	node.Status.NodeInfo.Architecture = goRuntime.GOARCH
+}
+
 // Set status for the node.
 func (kl *Kubelet) setNodeStatusInfo(node *api.Node) {
 	kl.setNodeStatusMachineInfo(node)
 	kl.setNodeStatusVersionInfo(node)
 	kl.setNodeStatusDaemonEndpoints(node)
 	kl.setNodeStatusImages(node)
+	kl.setNodeStatusGoRuntime(node)
 }
 
 // Set Readycondition for the node.

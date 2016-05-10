@@ -24,4 +24,7 @@ const (
 	LabelZoneRegion        = "failure-domain.beta.kubernetes.io/region"
 
 	LabelInstanceType = "beta.kubernetes.io/instance-type"
+
+	LabelOS   = "beta.kubernetes.io/os"
+	LabelArch = "beta.kubernetes.io/arch"
 )
