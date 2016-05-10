@@ -37,7 +37,7 @@ type fakePortForwarder struct {
 	pfErr  error
 }
 
-func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error {
+func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, address string, stopChan <-chan struct{}) error {
 	f.method = method
 	f.url = url
 	return f.pfErr

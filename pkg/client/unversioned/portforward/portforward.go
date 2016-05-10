@@ -38,6 +38,7 @@ import (
 // a remote pod via an upgraded HTTP request.
 type PortForwarder struct {
 	ports    []ForwardedPort
+	address  string
 	stopChan <-chan struct{}
 
 	dialer        httpstream.Dialer
@@ -107,7 +108,7 @@ func parsePorts(ports []string) ([]ForwardedPort, error) {
 }
 
 // New creates a new PortForwarder.
-func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}) (*PortForwarder, error) {
+func New(dialer httpstream.Dialer, ports []string, address string, stopChan <-chan struct{}) (*PortForwarder, error) {
 	if len(ports) == 0 {
 		return nil, errors.New("You must specify at least 1 port")
 	}
@@ -118,6 +119,7 @@ func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}) (*P
 	return &PortForwarder{
 		dialer:   dialer,
 		ports:    parsedPorts,
+		address:  address,
 		stopChan: stopChan,
 		Ready:    make(chan struct{}),
 	}, nil
@@ -146,7 +148,7 @@ func (pf *PortForwarder) forward() error {
 
 	listenSuccess := false
 	for _, port := range pf.ports {
-		err = pf.listenOnPort(&port)
+		err = pf.listenOnPortBothIpv4AndIpv6(&port, pf.address)
 		switch {
 		case err == nil:
 			listenSuccess = true
@@ -173,8 +175,8 @@ func (pf *PortForwarder) forward() error {
 
 // listenOnPort delegates tcp4 and tcp6 listener creation and waits for connections on both of these addresses.
 // If both listener creation fail, an error is raised.
-func (pf *PortForwarder) listenOnPort(port *ForwardedPort) error {
-	errTcp4 := pf.listenOnPortAndAddress(port, "tcp4", "127.0.0.1")
+func (pf *PortForwarder) listenOnPortBothIpv4AndIpv6(port *ForwardedPort, hostname string) error {
+	errTcp4 := pf.listenOnPortAndAddress(port, "tcp4", hostname)
 	errTcp6 := pf.listenOnPortAndAddress(port, "tcp6", "[::1]")
 	if errTcp4 != nil && errTcp6 != nil {
 		return fmt.Errorf("All listeners failed to create with the following errors: %s, %s", errTcp4, errTcp6)

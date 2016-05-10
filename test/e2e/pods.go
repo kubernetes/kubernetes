@@ -1209,7 +1209,7 @@ var _ = KubeDescribe("Pods", func() {
 				Suffix("portForward", framework.Namespace.Name, pod.Name)
 
 			stopChan := make(chan struct{})
-			pf, err := portforward.New(req, clientConfig, []string{"5678:80"}, stopChan)
+			pf, err := portforward.New(req, clientConfig, []string{"5678:80"}, "127.0.0.1", stopChan)
 			if err != nil {
 				Failf("Error creating port forwarder: %s", err)
 			}

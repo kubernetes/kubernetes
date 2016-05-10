@@ -42,7 +42,14 @@ kubectl port-forward mypod 8888:5000
 kubectl port-forward mypod :5000
 
 # Listen on a random port locally, forwarding to 5000 in the pod
-kubectl port-forward  mypod 0:5000`
+kubectl port-forward  mypod 0:5000
+
+# List on a random port locally on all addresses, forwarding to 5000 in the pod
+kubectl port-foward --address="" mypod 0:5000
+
+# List on a random port locally on ip address 192.168.1.16, forwarding to 5000 in the pod
+kubectl port-foward --address="192.168.1.16" mypod 0:5000
+`
 )
 
 func NewCmdPortForward(f *cmdutil.Factory) *cobra.Command {
@@ -57,22 +64,24 @@ func NewCmdPortForward(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringP("pod", "p", "", "Pod name")
+	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address to listen on (an empty string binds all addresses).")
+
 	// TODO support UID
 	return cmd
 }
 
 type portForwarder interface {
-	ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error
+	ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, address string, stopChan <-chan struct{}) error
 }
 
 type defaultPortForwarder struct{}
 
-func (*defaultPortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error {
+func (*defaultPortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, address string, stopChan <-chan struct{}) error {
 	dialer, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
 	}
-	fw, err := portforward.New(dialer, ports, stopChan)
+	fw, err := portforward.New(dialer, ports, address, stopChan)
 	if err != nil {
 		return err
 	}
@@ -81,6 +90,8 @@ func (*defaultPortForwarder) ForwardPorts(method string, url *url.URL, config *r
 
 func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw portForwarder) error {
 	podName := cmdutil.GetFlagString(cmd, "pod")
+	address := cmdutil.GetFlagString(cmd, "address")
+
 	if len(podName) == 0 && len(args) == 0 {
 		return cmdutil.UsageError(cmd, "POD is required for port-forward")
 	}
@@ -136,5 +147,5 @@ func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw po
 		Name(pod.Name).
 		SubResource("portforward")
 
-	return fw.ForwardPorts("POST", req.URL(), config, args, stopCh)
+	return fw.ForwardPorts("POST", req.URL(), config, args, address, stopCh)
 }
