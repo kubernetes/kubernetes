@@ -1,4 +1,4 @@
-//// +build integration,!no-etcd
+// +build integration,!no-etcd
 
 /*
 Copyright 2015 The Kubernetes Authors All rights reserved.
@@ -40,7 +40,7 @@ import (
 const garbageCollectedPodName = "test.pod.1"
 const independentPodName = "test.pod.2"
 const oneValidOwnerPodName = "test.pod.3"
-const rcName = "test.rc.1"
+const toBeDeletedRCName = "test.rc.1"
 const remainingRCName = "test.rc.2"
 
 func newPod(podName string, ownerReferences []v1.OwnerReference) *v1.Pod {
@@ -159,7 +159,7 @@ func TestCascadingDeletion(t *testing.T) {
 	rcClient := clientSet.Core().ReplicationControllers(framework.TestNS)
 	podClient := clientSet.Core().Pods(framework.TestNS)
 
-	toBeDeletedRC, err := rcClient.Create(newOwnerRC(rcName))
+	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
@@ -176,14 +176,16 @@ func TestCascadingDeletion(t *testing.T) {
 		t.Fatalf("Expect only 2 replication controller")
 	}
 
-	pod := newPod(garbageCollectedPodName, []v1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: rcName}})
+	// this pod should be cascadingly deleted.
+	pod := newPod(garbageCollectedPodName, []v1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
 	_, err = podClient.Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
+	// this pod shouldn't be cascadingly deleted, because it has a valid referenece.
 	pod = newPod(oneValidOwnerPodName, []v1.OwnerReference{
-		{UID: toBeDeletedRC.ObjectMeta.UID, Name: rcName},
+		{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName},
 		{UID: remainingRC.ObjectMeta.UID, Name: remainingRCName},
 	})
 	_, err = podClient.Create(pod)
@@ -191,6 +193,7 @@ func TestCascadingDeletion(t *testing.T) {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
+	// this pod shouldn't be cascadingly deleted, because it doesn't have an owner.
 	pod = newPod(independentPodName, []v1.OwnerReference{})
 	_, err = podClient.Create(pod)
 	if err != nil {
@@ -215,7 +218,8 @@ func TestCascadingDeletion(t *testing.T) {
 	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
 	defer close(stopCh)
-	if err := rcClient.Delete(rcName, nil); err != nil {
+	// delete one of the replication controller
+	if err := rcClient.Delete(toBeDeletedRCName, nil); err != nil {
 		t.Fatalf("failed to delete replication controller: %v", err)
 	}
 
@@ -228,6 +232,7 @@ func TestCascadingDeletion(t *testing.T) {
 	}
 	// wait for another 30 seconds to give garbage collect a chance to make mistakes.
 	time.Sleep(30 * time.Second)
+	// checks the garbage collect doesn't delete pods it shouldn't do.
 	if _, err := podClient.Get(independentPodName); err != nil {
 		t.Fatal(err)
 	}
@@ -237,12 +242,12 @@ func TestCascadingDeletion(t *testing.T) {
 }
 
 // This test simulates the case where an object is created with an owner that
-// doesn't exist. It verifies the GC will delete such delete such an object.
+// doesn't exist. It verifies the GC will delete such an object.
 func TestCreateWithNonExisitentOwner(t *testing.T) {
 	gc, clientSet := setup(t)
 	podClient := clientSet.Core().Pods(framework.TestNS)
 
-	pod := newPod(garbageCollectedPodName, []v1.OwnerReference{{UID: "doesn't matter", Name: rcName}})
+	pod := newPod(garbageCollectedPodName, []v1.OwnerReference{{UID: "doesn't matter", Name: toBeDeletedRCName}})
 	_, err := podClient.Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)

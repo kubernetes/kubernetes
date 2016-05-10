@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -60,7 +61,7 @@ func (s objectReference) String() string {
 // node does not require a lock to protect. The single-threaded
 // Propagator.processEvent() is the sole writer of the nodes. The multi-threaded
 // GarbageCollector.processItem() reads the nodes, but it only reads the fields
-// that never gets changed by Propagator.processEvent().
+// that never get changed by Propagator.processEvent().
 type node struct {
 	identity   objectReference
 	dependents map[*node]struct{}
@@ -69,37 +70,34 @@ type node struct {
 	owners []metatypes.OwnerReference
 }
 
-type eventType string
+type eventType int
 
-const addEvent eventType = "Add"
-const updateEvent eventType = "Update"
-const deleteEvent eventType = "Delete"
+const (
+	addEvent eventType = iota
+	updateEvent
+	deleteEvent
+)
 
 type event struct {
-	Type   eventType
-	Obj    interface{}
-	OldObj interface{}
+	eventType eventType
+	obj       interface{}
+	// the update event comes with an old object, but it's not used by the garbage collector.
+	oldObj interface{}
 }
 
 type Propagator struct {
 	eventQueue *workqueue.Type
-	// uidToNode doesn't require a lock, because only the single-threaded Propagator.processEvent() read/write it.
+	// uidToNode doesn't require a lock to protect, because only the
+	// single-threaded Propagator.processEvent() reads/writes it.
 	uidToNode map[types.UID]*node
 	gc        *GarbageCollector
 }
 
-func (p *Propagator) insertNode(n *node) {
+// insertNode insert the node to p.uidToNode; then it finds all owners as listed
+// in n.owners, and adds the node to their dependents list. ownerExists
+// indicates if any owner listed in n.owners exists in p.uidToNode.
+func (p *Propagator) insertNode(n *node) (ownerExists bool) {
 	p.uidToNode[n.identity.UID] = n
-}
-
-func (p *Propagator) removeNode(n *node) {
-	delete(p.uidToNode, n.identity.UID)
-}
-
-// addToOwners finds all owners as listed in n.owners, and marks n as one of
-// their dependents. ownerExists indicates if any owner listed in n.owners exist
-// in p.uidToNode.
-func (p *Propagator) addToOwners(n *node) (ownerExists bool) {
 	for _, owner := range n.owners {
 		ownerNode, ok := p.uidToNode[owner.UID]
 		if !ok {
@@ -111,9 +109,8 @@ func (p *Propagator) addToOwners(n *node) (ownerExists bool) {
 	return ownerExists
 }
 
-// removeFromOwners finds all owners as listed in n.owners, and removes n from
-// their dependents list.
-func (p *Propagator) removeFromOwners(n *node) {
+// removeFromOwners remove n from owners' dependents list.
+func (p *Propagator) removeFromOwners(n *node, owners []metatypes.OwnerReference) {
 	for _, owner := range n.owners {
 		ownerNode, ok := p.uidToNode[owner.UID]
 		if !ok {
@@ -123,7 +120,16 @@ func (p *Propagator) removeFromOwners(n *node) {
 	}
 }
 
-func ReferencesDiffs(old []metatypes.OwnerReference, new []metatypes.OwnerReference) (added []metatypes.OwnerReference, removed []metatypes.OwnerReference) {
+// removeFromOwners removes the node from p.uidToNode, then finds all owners as
+// listed in n.owners, and removes n from their dependents list.
+func (p *Propagator) removeNode(n *node) {
+	delete(p.uidToNode, n.identity.UID)
+	p.removeFromOwners(n, n.owners)
+}
+
+// TODO: profile this function to see if a naive N^2 algorithm performs better
+// when the number of references is small.
+func referencesDiffs(old []metatypes.OwnerReference, new []metatypes.OwnerReference) (added []metatypes.OwnerReference, removed []metatypes.OwnerReference) {
 	oldUIDToRef := make(map[string]metatypes.OwnerReference)
 	for i := 0; i < len(old); i++ {
 		oldUIDToRef[string(old[i].UID)] = old[i]
@@ -147,7 +153,7 @@ func ReferencesDiffs(old []metatypes.OwnerReference, new []metatypes.OwnerRefere
 	return added, removed
 }
 
-// Dequeue from eventQueue, updating graph, populating dirty_queue.
+// Dequeueing an event from eventQueue, updating graph, populating dirty_queue.
 func (p *Propagator) processEvent() {
 	key, quit := p.eventQueue.Get()
 	if quit {
@@ -156,29 +162,25 @@ func (p *Propagator) processEvent() {
 	defer p.eventQueue.Done(key)
 	event, ok := key.(event)
 	if !ok {
-		glog.Errorf("expect an event, got %v", key)
+		utilruntime.HandleError(fmt.Errorf("expect an event, got %v", key))
 		return
 	}
-	obj := event.Obj
+	obj := event.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		glog.Errorf("cannot access obj: %v", err)
+		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return
 	}
 	typeAccessor, err := meta.TypeAccessor(obj)
 	if err != nil {
-		glog.Errorf("cannot access obj: %v", err)
+		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return
 	}
-	glog.V(6).Infof("Propagator process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.Type)
-	switch event.Type {
-	case addEvent:
-		// Check if the node already exsits
-		_, ok := p.uidToNode[accessor.GetUID()]
-		if ok {
-			// We can optionally check if the node in the graph is in sync with that in the Store.
-			return
-		}
+	glog.V(6).Infof("Propagator process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
+	// Check if the node already exsits
+	existingNode, found := p.uidToNode[accessor.GetUID()]
+	switch {
+	case (event.eventType == addEvent || event.eventType == updateEvent) && !found:
 		newNode := &node{
 			identity: objectReference{
 				OwnerReference: metatypes.OwnerReference{
@@ -192,62 +194,47 @@ func (p *Propagator) processEvent() {
 			dependents: make(map[*node]struct{}),
 			owners:     accessor.GetOwnerReferences(),
 		}
-		p.insertNode(newNode)
-		ownerExists := p.addToOwners(newNode)
+		ownerExists := p.insertNode(newNode)
 		// Push the object to the dirty queue if none of its owners exists in the Graph.
-		// TODO: when handling such an object in the dirtyQueue, the worker should
-		// enqueue an Add event to the eventQueue if the owner exists. This is
-		// to prevent the following case: GC observes the creation of dependent
-		// D, but hasn't observed the creation of Owner O yet; GC adds D to the
-		// dirtyQueue, worker works on D, and O exists in the API server, so GC
-		// doesn't remove D. Then, Propagator sees the creation of O, but no one
-		// will update the graph to reflect that D is the dependent of O, so
-		// when O is deleted, D will not be cascadingly deleted.
+		// TODO: when handling such an object in the dirtyQueue, the worker
+		// should enqueue an Add event to the eventQueue if any owner exists.
+		// This is to prevent the following bug: Propagator observes the
+		// creation of dependent D, but hasn't observed the creation of Owner O
+		// yet; GC adds D to the dirtyQueue, worker works on D, and O exists in
+		// the API server, so GC doesn't remove D. Then, Propagator sees the
+		// creation of O, but no one will update the graph to reflect that D is
+		// the dependent of O, so when O is deleted, D will not be cascadingly
+		// deleted.
 		if !ownerExists && len(newNode.owners) != 0 {
 			p.gc.dirtyQueue.Add(newNode)
 		}
-
-	case updateEvent:
-		node, ok := p.uidToNode[accessor.GetUID()]
-		if !ok {
-			glog.Errorf("received an update for %v, but cannot find the node in the graph", accessor.GetUID())
-		}
+	case (event.eventType == addEvent || event.eventType == updateEvent) && found:
 		// TODO: finalizer: Check if ObjectMeta.DeletionTimestamp is updated from nil to non-nil
 		// We only need to add/remove owner refs for now
-		added, removed := ReferencesDiffs(node.owners, accessor.GetOwnerReferences())
+		added, removed := referencesDiffs(existingNode.owners, accessor.GetOwnerReferences())
 		if len(added) == 0 && len(removed) == 0 {
 			glog.V(6).Infof("The updateEvent %#v doesn't change node references, ignore", event)
 			return
 		}
 		// update the node itself
-		node.owners = accessor.GetOwnerReferences()
+		existingNode.owners = accessor.GetOwnerReferences()
 		// Add the node to its new owners' dependent lists. We just go through
 		// all the owners so we know if we should put the object into the
 		// dirtyQueue.
-		ownerExists := p.addToOwners(node)
-		if !ownerExists && len(node.owners) != 0 {
-			p.gc.dirtyQueue.Add(node)
+		ownerExists := p.insertNode(existingNode)
+		if !ownerExists && len(existingNode.owners) != 0 {
+			p.gc.dirtyQueue.Add(existingNode)
 		}
-		// TODO: remove the deleted references
 		// remove the node from the dependent list of node pionted by the
 		// removed refrences.
-		for _, owner := range removed {
-			ownerNode, ok := p.uidToNode[owner.UID]
-			if !ok {
-				continue
-			}
-			delete(ownerNode.dependents, node)
-		}
-
-	case deleteEvent:
-		node, ok := p.uidToNode[accessor.GetUID()]
-		if !ok {
+		p.removeFromOwners(existingNode, removed)
+	case event.eventType == deleteEvent:
+		if !found {
 			glog.V(6).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
 			return
 		}
-		p.removeNode(node)
-		p.removeFromOwners(node)
-		for dep, _ := range node.dependents {
+		p.removeNode(existingNode)
+		for dep, _ := range existingNode.dependents {
 			p.gc.dirtyQueue.Add(dep)
 		}
 	}
@@ -282,8 +269,7 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 				// namespaces if it's namespace scoped, so leave
 				// APIResource.Namespaced as false is all right.
 				apiResource := unversioned.APIResource{Name: resource.Resource}
-				// TODO: Probably we should process the UnstructuredList, extracting only the ObjectMeta before caching it.
-				return client.Resource(&apiResource, api.NamespaceAll).UnversionedList(options)
+				return client.Resource(&apiResource, api.NamespaceAll).List(&options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				// APIResource.Kind is not used by the dynamic client, so
@@ -291,17 +277,17 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 				// namespaces if it's namespace scoped, so leave
 				// APIResource.Namespaced as false is all right.
 				apiResource := unversioned.APIResource{Name: resource.Resource}
-				return client.Resource(&apiResource, api.NamespaceAll).UnversionedWatch(options)
+				return client.Resource(&apiResource, api.NamespaceAll).Watch(&options)
 			},
 		},
 		nil,
 		ResourceResyncTime,
 		framework.ResourceEventHandlerFuncs{
-			// Add the event to the propagator's event queue.
+			// add the event to the propagator's eventQueue.
 			AddFunc: func(obj interface{}) {
 				event := event{
-					Type: addEvent,
-					Obj:  obj,
+					eventType: addEvent,
+					obj:       obj,
 				}
 				p.eventQueue.Add(event)
 			},
@@ -311,8 +297,8 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 			},
 			DeleteFunc: func(obj interface{}) {
 				event := event{
-					Type: deleteEvent,
-					Obj:  obj,
+					eventType: deleteEvent,
+					obj:       obj,
 				}
 				p.eventQueue.Add(event)
 			},
@@ -362,12 +348,12 @@ func (gc *GarbageCollector) worker() {
 	defer gc.dirtyQueue.Done(key)
 	err := gc.processItem(key.(*node))
 	if err != nil {
-		glog.Errorf("Error syncing item %v: %v", key, err)
+		utilruntime.HandleError(fmt.Errorf("Error syncing item %v: %v", key, err))
 	}
 }
 
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
-// namespace> tuple to an unversioned.APIResource struct.
+// namespace> tuple to a unversioned.APIResource struct.
 func (gc *GarbageCollector) apiResource(apiVersion, kind, namespace string) (*unversioned.APIResource, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
@@ -425,8 +411,15 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		glog.V(6).Infof("object %s's doesn't have an owner, continue on next item", item.identity)
 		return nil
 	}
+	// TODO: we need to remove dangling references if the object is not to be
+	// deleted.
 	for _, reference := range ownerReferences {
-		// TODO: need to verify the reference resource is supported by the system.
+		// TODO: we need to verify the reference resource is supported by the
+		// system. If it's not a valid resource, the garbage collector should i)
+		// ignore the reference when decide if the object should be deleted, and
+		// ii) should update the object to remove such references. This is to
+		// prevent objects having references to an old resource from being
+		// deleted during a cluster upgrade.
 		fqKind := unversioned.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
 		client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
 		if err != nil {
@@ -437,7 +430,6 @@ func (gc *GarbageCollector) processItem(item *node) error {
 			return err
 		}
 		owner, err := client.Resource(resource, item.identity.Namespace).Get(reference.Name)
-		// TODO: need to compare the UID.
 		if err == nil {
 			if owner.GetUID() != reference.UID {
 				glog.V(6).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
@@ -451,7 +443,7 @@ func (gc *GarbageCollector) processItem(item *node) error {
 			return err
 		}
 	}
-	glog.V(2).Infof("none of object [%s]'s owners exist any more, will garbage collect it", item.identity)
+	glog.V(2).Infof("none of object %s's owners exist any more, will garbage collect it", item.identity)
 	return gc.deleteObject(item.identity)
 }
 
