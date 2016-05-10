@@ -21,10 +21,11 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 
+	"k8s.io/kubernetes/federation/apis/core"
+	_ "k8s.io/kubernetes/federation/apis/core/install"
+	"k8s.io/kubernetes/federation/apis/core/v1"
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/v1"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 )
 
@@ -34,19 +35,19 @@ func installCoreAPIs(s *genericapiserver.ServerRunOptions, g *genericapiserver.G
 		"services":        serviceStore,
 		"services/status": serviceStatusStorage,
 	}
-	coreGroupMeta := registered.GroupOrDie(api.GroupName)
+	coreGroupMeta := registered.GroupOrDie(core.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *coreGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			v1.SchemeGroupVersion.Version: coreResources,
 		},
-		OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+		OptionsExternalVersion: &registered.GroupOrDie(core.GroupName).GroupVersion,
 		IsLegacyGroup:          true,
-		Scheme:                 api.Scheme,
-		ParameterCodec:         api.ParameterCodec,
-		NegotiatedSerializer:   api.Codecs,
+		Scheme:                 core.Scheme,
+		ParameterCodec:         core.ParameterCodec,
+		NegotiatedSerializer:   core.Codecs,
 	}
 	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
-		glog.Fatalf("Error in registering group versions: %v", err)
+		glog.Fatalf("Error in registering group version: %v", err)
 	}
 }
