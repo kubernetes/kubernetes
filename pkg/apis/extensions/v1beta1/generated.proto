@@ -823,7 +823,7 @@ message ScaleStatus {
 
 // SubresourceReference contains enough information to let you inspect or modify the referred subresource.
 message SubresourceReference {
-  // Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+  // Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   optional string kind = 1;
 
   // Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
