@@ -14,24 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install installs the batch API group, making it available as
+// Package install installs the batch.v1 API group, making it available as
 // an option to all of the API encoding/decoding machinery.
 package install
 
 import (
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/batch"
-
-	// TODO: Remove from here, add to places where this install package is imported.
-	_ "k8s.io/kubernetes/pkg/apis/batch/v1/install"
 )
 
 func init() {
-	if err := registered.AnnounceGroup(&registered.GroupMetaFactory{
-		GroupName:                  "batch",
-		VersionPreferenceOrder:     []string{"v1"},
-		ImportPrefix:               "k8s.io/kubernetes/pkg/apis/batch",
-		AddInternalObjectsToScheme: batch.AddToScheme,
+	if err := registered.AnnounceGroupVersion(&registered.GroupVersionFactory{
+		GroupName:   "",
+		VersionName: "v1",
+		AddToScheme: v1.AddToScheme,
 	}); err != nil {
 		panic(err)
 	}
