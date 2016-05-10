@@ -1216,8 +1216,13 @@ func TestBuildListener(t *testing.T) {
 	}{
 		{
 			"No cert or BE protocol annotation, passthrough",
-			80, 8000, "", "",
+			80, 7999, "", "",
 			false, "tcp", "tcp", "",
+		},
+		{
+			"Cert annotation without BE protocol specified, SSL->TCP",
+			80, 8000, "", "cert",
+			false, "ssl", "tcp", "cert",
 		},
 		{
 			"BE protocol without cert annotation, passthrough",
@@ -1265,7 +1270,7 @@ func TestBuildListener(t *testing.T) {
 		if test.certAnnotation != "" {
 			annotations[ServiceAnnotationLoadBalancerCertificate] = test.certAnnotation
 		}
-		l, err := getListener(api.ServicePort{
+		l, err := buildListener(api.ServicePort{
 			NodePort: int32(test.instancePort),
 			Port:     int32(test.lbPort),
 			Protocol: api.Protocol("tcp"),

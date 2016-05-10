@@ -2133,12 +2133,12 @@ func buildListener(port api.ServicePort, annotations map[string]string) (*elb.Li
 	if certID != "" {
 		instanceProtocol = annotations[ServiceAnnotationLoadBalancerBEProtocol]
 		if instanceProtocol == "" {
-			protocol = "https"
-			instanceProtocol = "http"
+			protocol = "ssl"
+			instanceProtocol = "tcp"
 		} else {
 			protocol = backendProtocolMapping[instanceProtocol]
 			if protocol == "" {
-				return nil, fmt.Errorf("Invalid backend protocol %s in %s", instanceProtocol, certID)
+				return nil, fmt.Errorf("Invalid backend protocol %s for %s in %s", instanceProtocol, certID, ServiceAnnotationLoadBalancerBEProtocol)
 			}
 		}
 		listener.SSLCertificateId = &certID
