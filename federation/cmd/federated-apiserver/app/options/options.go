@@ -23,8 +23,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -92,69 +90,12 @@ func NewAPIServer() *APIServer {
 	return &s
 }
 
-// dest must be a map of group to groupVersion.
-func mergeGroupVersionIntoMap(gvList string, dest map[string]unversioned.GroupVersion) error {
-	for _, gvString := range strings.Split(gvList, ",") {
-		if gvString == "" {
-			continue
-		}
-		// We accept two formats. "group/version" OR
-		// "group=group/version". The latter is used when types
-		// move between groups.
-		if !strings.Contains(gvString, "=") {
-			gv, err := unversioned.ParseGroupVersion(gvString)
-			if err != nil {
-				return err
-			}
-			dest[gv.Group] = gv
-
-		} else {
-			parts := strings.SplitN(gvString, "=", 2)
-			gv, err := unversioned.ParseGroupVersion(parts[1])
-			if err != nil {
-				return err
-			}
-			dest[parts[0]] = gv
-		}
-	}
-
-	return nil
-}
-
-// StorageGroupsToEncodingVersion returns a map from group name to group version,
-// computed from the s.DeprecatedStorageVersion and s.StorageVersions flags.
-// TODO: can we move the whole storage version concept to the generic apiserver?
-func (s *APIServer) StorageGroupsToEncodingVersion() (map[string]unversioned.GroupVersion, error) {
-	storageVersionMap := map[string]unversioned.GroupVersion{}
-	if s.DeprecatedStorageVersion != "" {
-		storageVersionMap[""] = unversioned.GroupVersion{Group: apiutil.GetGroup(s.DeprecatedStorageVersion), Version: apiutil.GetVersion(s.DeprecatedStorageVersion)}
-	}
-
-	// First, get the defaults.
-	if err := mergeGroupVersionIntoMap(s.DefaultStorageVersions, storageVersionMap); err != nil {
-		return nil, err
-	}
-	// Override any defaults with the user settings.
-	if err := mergeGroupVersionIntoMap(s.StorageVersions, storageVersionMap); err != nil {
-		return nil, err
-	}
-
-	return storageVersionMap, nil
-}
-
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.ServerRunOptions.AddFlags(fs)
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-	fs.StringVar(&s.DeprecatedStorageVersion, "storage-version", s.DeprecatedStorageVersion, "The version to store the legacy v1 resources with. Defaults to server preferred")
-	fs.MarkDeprecated("storage-version", "--storage-version is deprecated and will be removed when the v1 API is retired. See --storage-versions instead.")
-	fs.StringVar(&s.StorageVersions, "storage-versions", s.StorageVersions, "The per-group version to store resources in. "+
-		"Specified in the format \"group1/version1,group2/version2,...\". "+
-		"In the case where objects are moved from one group to the other, you may specify the format \"group1=group2/v1beta1,group3/v1beta1,...\". "+
-		"You only need to pass the groups you wish to change from the defaults. "+
-		"It defaults to a list of preferred versions of all registered groups, which is derived from the KUBE_API_VERSIONS environment variable.")
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, "The media type to use to store objects in storage. Defaults to application/json. Some resources may only support a specific media type and will ignore this setting.")
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")
 	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, "If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.")
