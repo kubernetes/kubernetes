@@ -21,7 +21,7 @@
 #
 # Args: --mode=worker --host=<service cluster ip> --port=5202
 #
-FROM debian:latest
+FROM debian:jessie
 
 MAINTAINER Girish Kalele <gkalele@google.com>
 # install binary and remove cache
@@ -35,11 +35,5 @@ RUN curl -LO ftp://ftp.netperf.org/netperf/netperf-2.7.0.tar.gz && tar -xzf netp
 RUN cd netperf-2.7.0 && ./configure && make && make install
 
 COPY nptests /usr/bin/
-
-# Expose the two server ports we need - iperf3 => 5201 tcp+udp, nptest =>5202, netperf => 12865
-EXPOSE 5201
-EXPOSE 5201/udp
-EXPOSE 5202
-EXPOSE 12865
 
 ENTRYPOINT ["nptests"]

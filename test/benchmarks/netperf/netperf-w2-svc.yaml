@@ -21,5 +21,7 @@ spec:
         protocol: UDP
   selector:
     app: netperf-w2
+  type: ClusterIP
 
+    
 

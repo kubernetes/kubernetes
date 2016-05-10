@@ -31,13 +31,8 @@ CLOUD_STORAGE_FOLDER = "gs://gkalele-netperf-archive/"
 DEBUG_LOG = "output.txt"
 NAMESPACE = "netperf"
 
-# TODO - Add ACLs to permit read access to this Container Registry
-NETPERF_IMAGE        = "us.gcr.io/google.com/gkalele-netperf/netperf:latest"
-NETPERF_CLIENT_IMAGE = "us.gcr.io/google.com/gkalele-netperf/netperf:latest-client"
-
 # Moved to public Docker hub
 NETPERF_IMAGE        = "girishkalele/netperf-latest"
-NETPERF_CLIENT_IMAGE = "girishkalele/netperf-client-latest"
 
 # Unique run id for storing datafiles
 RUN_UUID = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
@@ -59,10 +54,6 @@ parser.add_option("-i", "--image", dest="netperf_image",
                   metavar="NETPERF_CONTAINER_IMAGE_PATH",
                   default=NETPERF_IMAGE,
                   help="Netperf container image to use for this run")
-parser.add_option("-c", "--clientimage", dest="netperf_client_image",
-                  metavar="NETPERF_CONTAINER_CLIENT_IMAGE_PATH",
-                  default=NETPERF_CLIENT_IMAGE,
-                  help="Netperf client container image to use for this run")
 
 def cmd(cmdline, quiet=True):
   if quiet:
@@ -125,11 +116,6 @@ def create_pods(options, args, nodes):
       kubenode = nodes[0]
 
     image = options.netperf_image
-    if worker == 1:
-      # Worker W1 is a client-only image, to prevent host port collisions in net=host mode
-      # we need to pull the client only docker image that does not expose any ports
-      # in its Dockerfile definition
-      image = options.netperf_client_image
 
     # kubenode will be used for the nodeselector label
     data = {

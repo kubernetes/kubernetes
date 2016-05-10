@@ -41,15 +41,14 @@ items:
       spec:
         containers:
         - name: netperf-orch
-          image: us.gcr.io/google.com/gkalele-netperf/netperf/latest
+          image: girishkalele/netperf-latest
           imagePullPolicy: Always
           ports:
           - containerPort: 5202
             name: netperf-orch
             protocol: TCP
           args:
-            - -mode
-            - orchestrator
+            - -mode=orchestrator
 
 - kind: Service
   apiVersion: v1
@@ -65,5 +64,6 @@ items:
           protocol: TCP
     selector:
       app: netperf-orch
+    type: ClusterIP
 
 

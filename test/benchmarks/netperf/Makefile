@@ -12,29 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: docker nptests push docker-client
-
-# Unfortunately, we need to build two Docker containers - one with no ports exposed
-# otherwise net=host mode cannot colocate W1 and W2 pods on the same node as needed
-# for testing within node network performance
+all: docker nptests push
 
 DOCKERREPO       := girishkalele/netperf-latest
-DOCKERCLIENTREPO := girishkalele/netperf-client-latest
 
 docker: nptests
 	mkdir -p Dockerbuild && \
 	cp -f Dockerfile Dockerbuild/ && \
 	cp -f nptests Dockerbuild/ &&\
-	docker build -t $(DOCKERCLIENTREPO) Dockerbuild/ 
+	docker build -t $(DOCKERREPO) Dockerbuild/ 
 
-docker-client: nptests docker
-	mkdir -p Dockerbuildclient && \
-	cp -f Dockerfile-client Dockerbuildclient/Dockerfile && \
-	cp -f nptests Dockerbuildclient/ &&\
-	docker build -t $(DOCKERREPO) Dockerbuildclient/ 
-
-push: docker docker-client
-	gcloud docker push $(DOCKERCLIENTREPO)
+push: docker
 	gcloud docker push $(DOCKERREPO)
 
 authorize_gcloud:
@@ -48,7 +36,6 @@ nptests: nptest.go
 
 clean:
 	@rm -f Dockerbuild/*
-	@rm -f Dockerbuildclient/*
 	@rm -f ./nptests ./*svg ./*png ./*jpg ./*csv ./*.cap ./*.pyc nptests
 	@go clean
 
