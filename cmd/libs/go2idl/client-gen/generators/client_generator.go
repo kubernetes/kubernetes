@@ -166,15 +166,32 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	if !ok {
 		glog.Fatalf("cannot convert arguments.CustomArgs to clientgenargs.Args")
 	}
+	includeResourceOverrides := customArgs.IncludeResourceOverrides
 
 	generatedBy := generatedBy(customArgs)
 
 	gvToTypes := map[unversioned.GroupVersion][]*types.Type{}
 	for gv, inputDir := range customArgs.GroupVersionToInputPath {
 		p := context.Universe.Package(inputDir)
-		for _, t := range p.Types {
-			if types.ExtractCommentTags("+", t.SecondClosestCommentLines)["genclient"] != "true" {
-				continue
+		for n, t := range p.Types {
+			// filter out resources which are not included in user specified override.
+			resources, ok := includeResourceOverrides[gv]
+			if ok {
+				found := false
+				for _, resource := range resources {
+					if resource == n {
+						found = true
+					}
+				}
+				if !found {
+					continue
+				}
+			} else {
+				// User has not specified any override for this group version.
+				// filter out types which dont have genclient=true.
+				if types.ExtractCommentTags("+", t.SecondClosestCommentLines)["genclient"] != "true" {
+					continue
+				}
 			}
 			if _, found := gvToTypes[gv]; !found {
 				gvToTypes[gv] = []*types.Type{}

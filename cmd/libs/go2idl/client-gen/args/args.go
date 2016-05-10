@@ -29,6 +29,10 @@ type Args struct {
 	// the respective types.go. We still need GroupVersions in the struct because
 	// we need an order.
 	GroupVersionToInputPath map[unversioned.GroupVersion]string
+
+	// Overrides for which resources should be included in the client.
+	IncludeResourceOverrides map[unversioned.GroupVersion][]string
+
 	// ClientsetName is the name of the clientset to be generated. It's
 	// populated from command-line arguments.
 	ClientsetName string
