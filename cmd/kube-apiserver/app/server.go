@@ -21,7 +21,6 @@ package app
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -35,26 +34,18 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -132,44 +123,17 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
 
-	apiResourceConfigSource, err := parseRuntimeConfig(s)
+	storageGroupsToEncodingVersion, err := s.StorageGroupsToEncodingVersion()
 	if err != nil {
-		glog.Fatalf("error in parsing runtime-config: %s", err)
+		glog.Fatalf("error generating storage version map: %s", err)
 	}
-
-	clientConfig := &restclient.Config{
-		Host: net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}
-	if len(s.DeprecatedStorageVersion) != 0 {
-		gv, err := unversioned.ParseGroupVersion(s.DeprecatedStorageVersion)
-		if err != nil {
-			glog.Fatalf("error in parsing group version: %s", err)
-		}
-		clientConfig.GroupVersion = &gv
-	}
-
-	client, err := clientset.NewForConfig(clientConfig)
+	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
+		s.StorageConfig, s.DefaultStorageMediaType, api.Codecs,
+		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
+		master.DefaultAPIResourceConfigSource(), s.RuntimeConfig)
 	if err != nil {
-		glog.Errorf("Failed to create clientset: %v", err)
+		glog.Fatalf("error in initializing storage factory: %s", err)
 	}
-
-	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
-	groupToEncoding, err := s.StorageGroupsToEncodingVersion()
-	if err != nil {
-		glog.Fatalf("error getting group encoding: %s", err)
-	}
-	for group, storageEncodingVersion := range groupToEncoding {
-		resourceEncoding.SetVersionEncoding(group, storageEncodingVersion, unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
-	}
-
-	storageFactory := genericapiserver.NewDefaultStorageFactory(s.StorageConfig, s.DefaultStorageMediaType, api.Codecs, resourceEncoding, apiResourceConfigSource)
-	// third party resources are always serialized to storage using JSON
-	storageFactory.SetSerializer(extensions.Resource("thirdpartyresources"), "application/json", nil)
 	storageFactory.AddCohabitatingResources(batch.Resource("jobs"), extensions.Resource("jobs"))
 	storageFactory.AddCohabitatingResources(autoscaling.Resource("horizontalpodautoscalers"), extensions.Resource("horizontalpodautoscalers"))
 	for _, override := range s.EtcdServersOverrides {
@@ -238,6 +202,10 @@ func Run(s *options.APIServer) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
+	client, err := s.NewSelfClient()
+	if err != nil {
+		glog.Errorf("Failed to create clientset: %v", err)
+	}
 	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
@@ -247,7 +215,7 @@ func Run(s *options.APIServer) error {
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = authorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.APIResourceConfigSource = apiResourceConfigSource
+	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.ProxyDialer = proxyDialerFn
 	genericConfig.ProxyTLSClientConfig = proxyTLSClientConfig
@@ -274,86 +242,4 @@ func Run(s *options.APIServer) error {
 
 	m.Run(s.ServerRunOptions)
 	return nil
-}
-
-func getRuntimeConfigValue(s *options.APIServer, apiKey string, defaultValue bool) bool {
-	flagValue, ok := s.RuntimeConfig[apiKey]
-	if ok {
-		if flagValue == "" {
-			return true
-		}
-		boolValue, err := strconv.ParseBool(flagValue)
-		if err != nil {
-			glog.Fatalf("Invalid value of %s: %s, err: %v", apiKey, flagValue, err)
-		}
-		return boolValue
-	}
-	return defaultValue
-}
-
-// Parses the given runtime-config and formats it into genericapiserver.APIResourceConfigSource
-func parseRuntimeConfig(s *options.APIServer) (genericapiserver.APIResourceConfigSource, error) {
-	v1GroupVersionString := "api/v1"
-	extensionsGroupVersionString := extensionsapiv1beta1.SchemeGroupVersion.String()
-	versionToResourceSpecifier := map[unversioned.GroupVersion]string{
-		apiv1.SchemeGroupVersion:                v1GroupVersionString,
-		extensionsapiv1beta1.SchemeGroupVersion: extensionsGroupVersionString,
-		batchapiv1.SchemeGroupVersion:           batchapiv1.SchemeGroupVersion.String(),
-		autoscalingapiv1.SchemeGroupVersion:     autoscalingapiv1.SchemeGroupVersion.String(),
-		appsapi.SchemeGroupVersion:              appsapi.SchemeGroupVersion.String(),
-	}
-
-	resourceConfig := master.DefaultAPIResourceConfigSource()
-
-	// "api/all=false" allows users to selectively enable specific api versions.
-	enableAPIByDefault := true
-	allAPIFlagValue, ok := s.RuntimeConfig["api/all"]
-	if ok && allAPIFlagValue == "false" {
-		enableAPIByDefault = false
-	}
-
-	// "api/legacy=false" allows users to disable legacy api versions.
-	disableLegacyAPIs := false
-	legacyAPIFlagValue, ok := s.RuntimeConfig["api/legacy"]
-	if ok && legacyAPIFlagValue == "false" {
-		disableLegacyAPIs = true
-	}
-	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
-
-	// "<resourceSpecifier>={true|false} allows users to enable/disable API.
-	// This takes preference over api/all and api/legacy, if specified.
-	for version, resourceSpecifier := range versionToResourceSpecifier {
-		enableVersion := getRuntimeConfigValue(s, resourceSpecifier, enableAPIByDefault)
-		if enableVersion {
-			resourceConfig.EnableVersions(version)
-		} else {
-			resourceConfig.DisableVersions(version)
-		}
-	}
-
-	for key := range s.RuntimeConfig {
-		tokens := strings.Split(key, "/")
-		if len(tokens) != 3 {
-			continue
-		}
-
-		switch {
-		case strings.HasPrefix(key, extensionsGroupVersionString+"/"):
-			if !resourceConfig.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
-				return nil, fmt.Errorf("%v is disabled, you cannot configure its resources individually", extensionsapiv1beta1.SchemeGroupVersion)
-			}
-
-			resource := strings.TrimPrefix(key, extensionsGroupVersionString+"/")
-			if getRuntimeConfigValue(s, key, false) {
-				resourceConfig.EnableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource(resource))
-			} else {
-				resourceConfig.DisableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource(resource))
-			}
-
-		default:
-			// TODO enable individual resource capability for all GroupVersionResources
-			return nil, fmt.Errorf("%v resources cannot be enabled/disabled individually", key)
-		}
-	}
-	return resourceConfig, nil
 }

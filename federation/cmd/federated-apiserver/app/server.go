@@ -20,8 +20,6 @@ limitations under the License.
 package app
 
 import (
-	"net"
-	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -34,11 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -62,21 +57,21 @@ cluster's shared state through which all other components interact.`,
 func Run(s *options.APIServer) error {
 	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
 
-	apiResourceConfigSource, err := parseRuntimeConfig(s)
+	// TODO: register cluster federation resources here.
+	resourceConfig := genericapiserver.NewResourceConfig()
+
+	storageGroupsToEncodingVersion, err := s.StorageGroupsToEncodingVersion()
 	if err != nil {
-		glog.Fatalf("error in parsing runtime-config: %s", err)
+		glog.Fatalf("error generating storage version map: %s", err)
+	}
+	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
+		s.StorageConfig, s.DefaultStorageMediaType, api.Codecs,
+		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
+		resourceConfig, s.RuntimeConfig)
+	if err != nil {
+		glog.Fatalf("error in initializing storage factory: %s", err)
 	}
 
-	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
-	groupToEncoding, err := s.StorageGroupsToEncodingVersion()
-	if err != nil {
-		glog.Fatalf("error getting group encoding: %s", err)
-	}
-	for group, storageEncodingVersion := range groupToEncoding {
-		resourceEncoding.SetVersionEncoding(group, storageEncodingVersion, unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
-	}
-
-	storageFactory := genericapiserver.NewDefaultStorageFactory(s.StorageConfig, s.DefaultStorageMediaType, api.Codecs, resourceEncoding, apiResourceConfigSource)
 	for _, override := range s.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {
@@ -119,27 +114,10 @@ func Run(s *options.APIServer) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
-	clientConfig := &restclient.Config{
-		Host: net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}
-	if len(s.DeprecatedStorageVersion) != 0 {
-		gv, err := unversioned.ParseGroupVersion(s.DeprecatedStorageVersion)
-		if err != nil {
-			glog.Fatalf("error in parsing group version: %s", err)
-		}
-		clientConfig.GroupVersion = &gv
-	}
-
-	client, err := clientset.NewForConfig(clientConfig)
+	client, err := s.NewSelfClient()
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
-
 	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
@@ -149,7 +127,7 @@ func Run(s *options.APIServer) error {
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = authorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.APIResourceConfigSource = apiResourceConfigSource
+	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.Serializer = api.Codecs
 
@@ -167,26 +145,4 @@ func Run(s *options.APIServer) error {
 
 	m.Run(s.ServerRunOptions)
 	return nil
-}
-
-func getRuntimeConfigValue(s *options.APIServer, apiKey string, defaultValue bool) bool {
-	flagValue, ok := s.RuntimeConfig[apiKey]
-	if ok {
-		if flagValue == "" {
-			return true
-		}
-		boolValue, err := strconv.ParseBool(flagValue)
-		if err != nil {
-			glog.Fatalf("Invalid value of %s: %s, err: %v", apiKey, flagValue, err)
-		}
-		return boolValue
-	}
-	return defaultValue
-}
-
-// Parses the given runtime-config and formats it into genericapiserver.APIResourceConfigSource
-func parseRuntimeConfig(s *options.APIServer) (genericapiserver.APIResourceConfigSource, error) {
-	// TODO: parse the relevant group version when we add any.
-	resourceConfig := genericapiserver.NewResourceConfig()
-	return resourceConfig, nil
 }

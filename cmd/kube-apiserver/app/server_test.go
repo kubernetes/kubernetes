@@ -17,14 +17,10 @@ limitations under the License.
 package app
 
 import (
-	"reflect"
 	"regexp"
 	"testing"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/master"
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
@@ -66,100 +62,4 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 			t.Errorf("path should have match regexp did not: %s", path)
 		}
 	}
-}
-
-func TestParseRuntimeConfig(t *testing.T) {
-	testCases := []struct {
-		runtimeConfig     map[string]string
-		expectedAPIConfig func() *genericapiserver.ResourceConfig
-		err               bool
-	}{
-		{
-			runtimeConfig: map[string]string{},
-			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
-				return master.DefaultAPIResourceConfigSource()
-			},
-			err: false,
-		},
-		{
-			// Cannot override v1 resources.
-			runtimeConfig: map[string]string{
-				"api/v1/pods": "false",
-			},
-			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
-				return master.DefaultAPIResourceConfigSource()
-			},
-			err: true,
-		},
-		{
-			// Disable v1.
-			runtimeConfig: map[string]string{
-				"api/v1": "false",
-			},
-			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
-				config := master.DefaultAPIResourceConfigSource()
-				config.DisableVersions(unversioned.GroupVersion{Group: "", Version: "v1"})
-				return config
-			},
-			err: false,
-		},
-		{
-			// Disable extensions.
-			runtimeConfig: map[string]string{
-				"extensions/v1beta1": "false",
-			},
-			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
-				config := master.DefaultAPIResourceConfigSource()
-				config.DisableVersions(unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"})
-				return config
-			},
-			err: false,
-		},
-		{
-			// Disable deployments.
-			runtimeConfig: map[string]string{
-				"extensions/v1beta1/deployments": "false",
-			},
-			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
-				config := master.DefaultAPIResourceConfigSource()
-				config.DisableResources(unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"})
-				return config
-			},
-			err: false,
-		},
-		{
-			// Enable deployments and disable jobs.
-			runtimeConfig: map[string]string{
-				"extensions/v1beta1/anything": "true",
-				"extensions/v1beta1/jobs":     "false",
-			},
-			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
-				config := master.DefaultAPIResourceConfigSource()
-				config.DisableResources(unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "jobs"})
-				config.EnableResources(unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "anything"})
-				return config
-			},
-			err: false,
-		},
-	}
-	for _, test := range testCases {
-		s := &options.APIServer{
-			ServerRunOptions: &genericapiserver.ServerRunOptions{
-				RuntimeConfig: test.runtimeConfig,
-			},
-		}
-		actualDisablers, err := parseRuntimeConfig(s)
-
-		if err == nil && test.err {
-			t.Fatalf("expected error for test: %v", test)
-		} else if err != nil && !test.err {
-			t.Fatalf("unexpected error: %s, for test: %v", err, test)
-		}
-
-		expectedConfig := test.expectedAPIConfig()
-		if err == nil && !reflect.DeepEqual(actualDisablers, expectedConfig) {
-			t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %v\n expected: %v", test.runtimeConfig, actualDisablers, expectedConfig)
-		}
-	}
-
 }

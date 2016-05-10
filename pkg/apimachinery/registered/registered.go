@@ -168,6 +168,15 @@ func IsRegisteredVersion(v unversioned.GroupVersion) bool {
 	return found
 }
 
+// RegisteredGroupVersions returns all registered group versions.
+func RegisteredGroupVersions() []unversioned.GroupVersion {
+	ret := []unversioned.GroupVersion{}
+	for groupVersion := range registeredVersions {
+		ret = append(ret, groupVersion)
+	}
+	return ret
+}
+
 // IsThirdPartyAPIGroupVersion returns true if the api version is a user-registered group/version.
 func IsThirdPartyAPIGroupVersion(gv unversioned.GroupVersion) bool {
 	for ix := range thirdPartyGroupVersions {
