@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -122,6 +123,41 @@ stuff: 1
 	obj = generic{}
 	if err := s.Decode(&obj); err != io.EOF {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDecodeBrokenYAML(t *testing.T) {
+	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
+stuff: 1
+		test-foo: 1
+
+---       
+  `)), 100)
+	obj := generic{}
+	err := s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with yaml: prefix, got no error")
+	}
+	if !strings.HasPrefix(err.Error(), "yaml: line 2:") {
+		t.Fatalf("expected %q to have 'yaml: line 2:' prefix", err.Error())
+	}
+}
+
+func TestDecodeBrokenJSON(t *testing.T) {
+	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`{
+	"foo": {
+		"stuff": 1
+		"otherStuff": 2
+	}
+}
+  `)), 100)
+	obj := generic{}
+	err := s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with json: prefix, got no error")
+	}
+	if !strings.HasPrefix(err.Error(), "json: line 3:") {
+		t.Fatalf("expected %q to have 'json: line 3:' prefix", err.Error())
 	}
 }
 
