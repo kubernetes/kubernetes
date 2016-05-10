@@ -1475,7 +1475,7 @@ func (c *EC2) CreateSecurityGroupRequest(input *CreateSecurityGroupInput) (req *
 //
 //  EC2-Classic: You can have up to 500 security groups.
 //
-// EC2-VPC: You can create up to 100 security groups per VPC.
+// EC2-VPC: You can create up to 500 security groups per VPC.
 //
 //  When you create a security group, you specify a friendly name of your choice.
 // You can have a security group for use in EC2-Classic with the same name as
@@ -3041,21 +3041,20 @@ func (c *EC2) DescribeIdFormatRequest(input *DescribeIdFormatInput) (req *reques
 	return
 }
 
-// Important: This command is reserved for future use, and is currently not
-// available for you to use.
-//
-// Describes the ID format settings for your resources, for example, to view
-// which resource types are enabled for longer IDs. This request only returns
-// information about resource types whose ID formats can be modified; it does
-// not return information about other resource types.
+// Describes the ID format settings for your resources on a per-region basis,
+// for example, to view which resource types are enabled for longer IDs. This
+// request only returns information about resource types whose ID formats can
+// be modified; it does not return information about other resource types.
 //
 // The following resource types support longer IDs: instance | reservation.
 //
 // These settings apply to the IAM user who makes the request; they do not
 // apply to the entire AWS account. By default, an IAM user defaults to the
 // same settings as the root user, unless they explicitly override the settings
-// by running the ModifyIdFormat command. These settings are applied on a per-region
-// basis.
+// by running the ModifyIdFormat command. Resources created with longer IDs
+// are visible to all IAM users, regardless of these settings and provided that
+// they have permission to use the relevant Describe command for the resource
+// type.
 func (c *EC2) DescribeIdFormat(input *DescribeIdFormatInput) (*DescribeIdFormatOutput, error) {
 	req, out := c.DescribeIdFormatRequest(input)
 	err := req.Send()
@@ -4452,6 +4451,39 @@ func (c *EC2) DescribeVpcClassicLink(input *DescribeVpcClassicLinkInput) (*Descr
 	return out, err
 }
 
+const opDescribeVpcClassicLinkDnsSupport = "DescribeVpcClassicLinkDnsSupport"
+
+// DescribeVpcClassicLinkDnsSupportRequest generates a request for the DescribeVpcClassicLinkDnsSupport operation.
+func (c *EC2) DescribeVpcClassicLinkDnsSupportRequest(input *DescribeVpcClassicLinkDnsSupportInput) (req *request.Request, output *DescribeVpcClassicLinkDnsSupportOutput) {
+	op := &request.Operation{
+		Name:       opDescribeVpcClassicLinkDnsSupport,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &DescribeVpcClassicLinkDnsSupportInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &DescribeVpcClassicLinkDnsSupportOutput{}
+	req.Data = output
+	return
+}
+
+// Describes the ClassicLink DNS support status of one or more VPCs. If enabled,
+// the DNS hostname of a linked EC2-Classic instance resolves to its private
+// IP address when addressed from an instance in the VPC to which it's linked.
+// Similarly, the DNS hostname of an instance in a VPC resolves to its private
+// IP address when addressed from a linked EC2-Classic instance. For more information
+// about ClassicLink, see ClassicLink (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/vpc-classiclink.html)
+// in the Amazon Elastic Compute Cloud User Guide.
+func (c *EC2) DescribeVpcClassicLinkDnsSupport(input *DescribeVpcClassicLinkDnsSupportInput) (*DescribeVpcClassicLinkDnsSupportOutput, error) {
+	req, out := c.DescribeVpcClassicLinkDnsSupportRequest(input)
+	err := req.Send()
+	return out, err
+}
+
 const opDescribeVpcEndpointServices = "DescribeVpcEndpointServices"
 
 // DescribeVpcEndpointServicesRequest generates a request for the DescribeVpcEndpointServices operation.
@@ -4837,6 +4869,37 @@ func (c *EC2) DisableVpcClassicLink(input *DisableVpcClassicLinkInput) (*Disable
 	return out, err
 }
 
+const opDisableVpcClassicLinkDnsSupport = "DisableVpcClassicLinkDnsSupport"
+
+// DisableVpcClassicLinkDnsSupportRequest generates a request for the DisableVpcClassicLinkDnsSupport operation.
+func (c *EC2) DisableVpcClassicLinkDnsSupportRequest(input *DisableVpcClassicLinkDnsSupportInput) (req *request.Request, output *DisableVpcClassicLinkDnsSupportOutput) {
+	op := &request.Operation{
+		Name:       opDisableVpcClassicLinkDnsSupport,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &DisableVpcClassicLinkDnsSupportInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &DisableVpcClassicLinkDnsSupportOutput{}
+	req.Data = output
+	return
+}
+
+// Disables ClassicLink DNS support for a VPC. If disabled, DNS hostnames resolve
+// to public IP addresses when addressed between a linked EC2-Classic instance
+// and instances in the VPC to which it's linked. For more information about
+// ClassicLink, see ClassicLink (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/vpc-classiclink.html)
+// in the Amazon Elastic Compute Cloud User Guide.
+func (c *EC2) DisableVpcClassicLinkDnsSupport(input *DisableVpcClassicLinkDnsSupportInput) (*DisableVpcClassicLinkDnsSupportOutput, error) {
+	req, out := c.DisableVpcClassicLinkDnsSupportRequest(input)
+	err := req.Send()
+	return out, err
+}
+
 const opDisassociateAddress = "DisassociateAddress"
 
 // DisassociateAddressRequest generates a request for the DisassociateAddress operation.
@@ -4989,6 +5052,39 @@ func (c *EC2) EnableVpcClassicLinkRequest(input *EnableVpcClassicLinkInput) (req
 // in the Amazon Elastic Compute Cloud User Guide.
 func (c *EC2) EnableVpcClassicLink(input *EnableVpcClassicLinkInput) (*EnableVpcClassicLinkOutput, error) {
 	req, out := c.EnableVpcClassicLinkRequest(input)
+	err := req.Send()
+	return out, err
+}
+
+const opEnableVpcClassicLinkDnsSupport = "EnableVpcClassicLinkDnsSupport"
+
+// EnableVpcClassicLinkDnsSupportRequest generates a request for the EnableVpcClassicLinkDnsSupport operation.
+func (c *EC2) EnableVpcClassicLinkDnsSupportRequest(input *EnableVpcClassicLinkDnsSupportInput) (req *request.Request, output *EnableVpcClassicLinkDnsSupportOutput) {
+	op := &request.Operation{
+		Name:       opEnableVpcClassicLinkDnsSupport,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &EnableVpcClassicLinkDnsSupportInput{}
+	}
+
+	req = c.newRequest(op, input, output)
+	output = &EnableVpcClassicLinkDnsSupportOutput{}
+	req.Data = output
+	return
+}
+
+// Enables a VPC to support DNS hostname resolution for ClassicLink. If enabled,
+// the DNS hostname of a linked EC2-Classic instance resolves to its private
+// IP address when addressed from an instance in the VPC to which it's linked.
+// Similarly, the DNS hostname of an instance in a VPC resolves to its private
+// IP address when addressed from a linked EC2-Classic instance. For more information
+// about ClassicLink, see ClassicLink (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/vpc-classiclink.html)
+// in the Amazon Elastic Compute Cloud User Guide.
+func (c *EC2) EnableVpcClassicLinkDnsSupport(input *EnableVpcClassicLinkDnsSupportInput) (*EnableVpcClassicLinkDnsSupportOutput, error) {
+	req, out := c.EnableVpcClassicLinkDnsSupportRequest(input)
 	err := req.Send()
 	return out, err
 }
@@ -5284,17 +5380,17 @@ func (c *EC2) ModifyIdFormatRequest(input *ModifyIdFormatInput) (req *request.Re
 	return
 }
 
-// Important: This command is reserved for future use, and is currently not
-// available for you to use.
-//
-// Modifies the ID format for the specified resource. You can specify that
-// resources should receive longer IDs (17-character IDs) when they are created.
-// The following resource types support longer IDs: instance | reservation.
+// Modifies the ID format for the specified resource on a per-region basis.
+// You can specify that resources should receive longer IDs (17-character IDs)
+// when they are created. The following resource types support longer IDs: instance
+// | reservation.
 //
 // This setting applies to the IAM user who makes the request; it does not
 // apply to the entire AWS account. By default, an IAM user defaults to the
 // same settings as the root user, unless they explicitly override the settings
-// by running this request. These settings are applied on a per-region basis.
+// by running this request. Resources created with longer IDs are visible to
+// all IAM users, regardless of these settings and provided that they have permission
+// to use the relevant Describe command for the resource type.
 func (c *EC2) ModifyIdFormat(input *ModifyIdFormatInput) (*ModifyIdFormatOutput, error) {
 	req, out := c.ModifyIdFormatRequest(input)
 	err := req.Send()
@@ -5722,12 +5818,14 @@ func (c *EC2) MoveAddressToVpcRequest(input *MoveAddressToVpcInput) (req *reques
 }
 
 // Moves an Elastic IP address from the EC2-Classic platform to the EC2-VPC
-// platform. The Elastic IP address must be allocated to your account, and it
-// must not be associated with an instance. After the Elastic IP address is
-// moved, it is no longer available for use in the EC2-Classic platform, unless
-// you move it back using the RestoreAddressToClassic request. You cannot move
-// an Elastic IP address that's allocated for use in the EC2-VPC platform to
-// the EC2-Classic platform.
+// platform. The Elastic IP address must be allocated to your account for more
+// than 24 hours, and it must not be associated with an instance. After the
+// Elastic IP address is moved, it is no longer available for use in the EC2-Classic
+// platform, unless you move it back using the RestoreAddressToClassic request.
+// You cannot move an Elastic IP address that's allocated for use in the EC2-VPC
+// platform to the EC2-Classic platform. You cannot migrate an Elastic IP address
+// that's associated with a reverse DNS record. Contact AWS account and billing
+// support to remove the reverse DNS record.
 func (c *EC2) MoveAddressToVpc(input *MoveAddressToVpcInput) (*MoveAddressToVpcOutput, error) {
 	req, out := c.MoveAddressToVpcRequest(input)
 	err := req.Send()
@@ -6358,7 +6456,9 @@ func (c *EC2) RestoreAddressToClassicRequest(input *RestoreAddressToClassicInput
 // Restores an Elastic IP address that was previously moved to the EC2-VPC platform
 // back to the EC2-Classic platform. You cannot move an Elastic IP address that
 // was originally allocated for use in EC2-VPC. The Elastic IP address must
-// not be associated with an instance or network interface.
+// not be associated with an instance or network interface. You cannot restore
+// an Elastic IP address that's associated with a reverse DNS record. Contact
+// AWS account and billing support to remove the reverse DNS record.
 func (c *EC2) RestoreAddressToClassic(input *RestoreAddressToClassicInput) (*RestoreAddressToClassicOutput, error) {
 	req, out := c.RestoreAddressToClassicRequest(input)
 	err := req.Send()
@@ -8144,6 +8244,27 @@ func (s CancelledSpotInstanceRequest) String() string {
 
 // GoString returns the string representation
 func (s CancelledSpotInstanceRequest) GoString() string {
+	return s.String()
+}
+
+// Describes the ClassicLink DNS support status of a VPC.
+type ClassicLinkDnsSupport struct {
+	_ struct{} `type:"structure"`
+
+	// Indicates whether ClassicLink DNS support is enabled for the VPC.
+	ClassicLinkDnsSupported *bool `locationName:"classicLinkDnsSupported" type:"boolean"`
+
+	// The ID of the VPC.
+	VpcId *string `locationName:"vpcId" type:"string"`
+}
+
+// String returns the string representation
+func (s ClassicLinkDnsSupport) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ClassicLinkDnsSupport) GoString() string {
 	return s.String()
 }
 
@@ -12146,7 +12267,7 @@ type DescribeInstancesInput struct {
 	//
 	//   network-interface.mac-address - The MAC address of the network interface.
 	//
-	//   network-interface-private-dns-name - The private DNS name of the network
+	//   network-interface.private-dns-name - The private DNS name of the network
 	// interface.
 	//
 	//   network-interface.source-dest-check - Whether the network interface performs
@@ -14552,6 +14673,52 @@ func (s DescribeVpcAttributeOutput) GoString() string {
 	return s.String()
 }
 
+type DescribeVpcClassicLinkDnsSupportInput struct {
+	_ struct{} `type:"structure"`
+
+	// The maximum number of items to return for this request. The request returns
+	// a token that you can specify in a subsequent call to get the next set of
+	// results.
+	MaxResults *int64 `locationName:"maxResults" min:"5" type:"integer"`
+
+	// The token for the next set of items to return. (You received this token from
+	// a prior call.)
+	NextToken *string `locationName:"nextToken" min:"1" type:"string"`
+
+	// One or more VPC IDs.
+	VpcIds []*string `locationNameList:"VpcId" type:"list"`
+}
+
+// String returns the string representation
+func (s DescribeVpcClassicLinkDnsSupportInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeVpcClassicLinkDnsSupportInput) GoString() string {
+	return s.String()
+}
+
+type DescribeVpcClassicLinkDnsSupportOutput struct {
+	_ struct{} `type:"structure"`
+
+	// The token to use when requesting the next set of items.
+	NextToken *string `locationName:"nextToken" min:"1" type:"string"`
+
+	// Information about the ClassicLink DNS support status of the VPCs.
+	Vpcs []*ClassicLinkDnsSupport `locationName:"vpcs" locationNameList:"item" type:"list"`
+}
+
+// String returns the string representation
+func (s DescribeVpcClassicLinkDnsSupportOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeVpcClassicLinkDnsSupportOutput) GoString() string {
+	return s.String()
+}
+
 type DescribeVpcClassicLinkInput struct {
 	_ struct{} `type:"structure"`
 
@@ -14979,7 +15146,8 @@ type DescribeVpnGatewaysInput struct {
 	//
 	//   attachment.vpc-id - The ID of an attached VPC.
 	//
-	//   availability-zone - The Availability Zone for the virtual private gateway.
+	//   availability-zone - The Availability Zone for the virtual private gateway
+	// (if applicable).
 	//
 	//   state - The state of the virtual private gateway (pending | available
 	// | deleting | deleted).
@@ -15312,6 +15480,40 @@ func (s DisableVgwRoutePropagationOutput) String() string {
 
 // GoString returns the string representation
 func (s DisableVgwRoutePropagationOutput) GoString() string {
+	return s.String()
+}
+
+type DisableVpcClassicLinkDnsSupportInput struct {
+	_ struct{} `type:"structure"`
+
+	// The ID of the VPC.
+	VpcId *string `type:"string"`
+}
+
+// String returns the string representation
+func (s DisableVpcClassicLinkDnsSupportInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DisableVpcClassicLinkDnsSupportInput) GoString() string {
+	return s.String()
+}
+
+type DisableVpcClassicLinkDnsSupportOutput struct {
+	_ struct{} `type:"structure"`
+
+	// Returns true if the request succeeds; otherwise, it returns an error.
+	Return *bool `locationName:"return" type:"boolean"`
+}
+
+// String returns the string representation
+func (s DisableVpcClassicLinkDnsSupportOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DisableVpcClassicLinkDnsSupportOutput) GoString() string {
 	return s.String()
 }
 
@@ -15711,6 +15913,40 @@ func (s EnableVolumeIOOutput) GoString() string {
 	return s.String()
 }
 
+type EnableVpcClassicLinkDnsSupportInput struct {
+	_ struct{} `type:"structure"`
+
+	// The ID of the VPC.
+	VpcId *string `type:"string"`
+}
+
+// String returns the string representation
+func (s EnableVpcClassicLinkDnsSupportInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s EnableVpcClassicLinkDnsSupportInput) GoString() string {
+	return s.String()
+}
+
+type EnableVpcClassicLinkDnsSupportOutput struct {
+	_ struct{} `type:"structure"`
+
+	// Returns true if the request succeeds; otherwise, it returns an error.
+	Return *bool `locationName:"return" type:"boolean"`
+}
+
+// String returns the string representation
+func (s EnableVpcClassicLinkDnsSupportOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s EnableVpcClassicLinkDnsSupportOutput) GoString() string {
+	return s.String()
+}
+
 type EnableVpcClassicLinkInput struct {
 	_ struct{} `type:"structure"`
 
@@ -16018,7 +16254,8 @@ type GetConsoleOutputOutput struct {
 	// The ID of the instance.
 	InstanceId *string `locationName:"instanceId" type:"string"`
 
-	// The console output, Base64 encoded.
+	// The console output, Base64 encoded. If using a command line tool, the tools
+	// decode the output for you.
 	Output *string `locationName:"output" type:"string"`
 
 	// The time the output was last updated.
@@ -21060,7 +21297,12 @@ type RunInstancesInput struct {
 	// [EC2-VPC] The ID of the subnet to launch the instance into.
 	SubnetId *string `type:"string"`
 
-	// The Base64-encoded MIME user data for the instances.
+	// Data to configure the instance, or a script to run during instance launch.
+	// For more information, see Running Commands on Your Linux Instance at Launch
+	// (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html) (Linux)
+	// and Adding User Data (http://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/ec2-instance-metadata.html#instancedata-add-user-data)
+	// (Windows). For API calls, the text must be base64-encoded. Command line tools
+	// perform encoding for you.
 	UserData *string `type:"string"`
 }
 
@@ -21826,7 +22068,8 @@ type StateReason struct {
 	// Client.UserInitiatedShutdown: The instance was shut down using the Amazon
 	// EC2 API.
 	//
-	// Client.VolumeLimitExceeded: The volume limit was exceeded.
+	// Client.VolumeLimitExceeded: The limit on the number of EBS volumes or total
+	// storage was exceeded. Decrease usage or request an increase in your limits.
 	//
 	// Client.InvalidSnapshot.NotFound: The specified snapshot was not found.
 	Message *string `locationName:"message" type:"string"`
@@ -22811,7 +23054,8 @@ func (s VpnConnectionOptionsSpecification) GoString() string {
 type VpnGateway struct {
 	_ struct{} `type:"structure"`
 
-	// The Availability Zone where the virtual private gateway was created.
+	// The Availability Zone where the virtual private gateway was created, if applicable.
+	// This field may be empty or not returned.
 	AvailabilityZone *string `locationName:"availabilityZone" type:"string"`
 
 	// The current state of the virtual private gateway.
@@ -23241,6 +23485,8 @@ const (
 	InstanceTypeM44xlarge = "m4.4xlarge"
 	// @enum InstanceType
 	InstanceTypeM410xlarge = "m4.10xlarge"
+	// @enum InstanceType
+	InstanceTypeT2Nano = "t2.nano"
 	// @enum InstanceType
 	InstanceTypeT2Micro = "t2.micro"
 	// @enum InstanceType
