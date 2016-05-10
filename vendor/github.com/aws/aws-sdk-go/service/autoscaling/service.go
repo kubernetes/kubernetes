@@ -61,10 +61,10 @@ func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 
 	// Handlers
 	svc.Handlers.Sign.PushBack(v4.Sign)
-	svc.Handlers.Build.PushBack(query.Build)
-	svc.Handlers.Unmarshal.PushBack(query.Unmarshal)
-	svc.Handlers.UnmarshalMeta.PushBack(query.UnmarshalMeta)
-	svc.Handlers.UnmarshalError.PushBack(query.UnmarshalError)
+	svc.Handlers.Build.PushBackNamed(query.BuildHandler)
+	svc.Handlers.Unmarshal.PushBackNamed(query.UnmarshalHandler)
+	svc.Handlers.UnmarshalMeta.PushBackNamed(query.UnmarshalMetaHandler)
+	svc.Handlers.UnmarshalError.PushBackNamed(query.UnmarshalErrorHandler)
 
 	// Run custom client initialization if present
 	if initClient != nil {

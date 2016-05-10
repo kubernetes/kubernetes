@@ -24,30 +24,38 @@ type lener interface {
 // BuildContentLengthHandler builds the content length of a request based on the body,
 // or will use the HTTPRequest.Header's "Content-Length" if defined. If unable
 // to determine request body length and no "Content-Length" was specified it will panic.
+//
+// The Content-Length will only be aded to the request if the length of the body
+// is greater than 0. If the body is empty or the current `Content-Length`
+// header is <= 0, the header will also be stripped.
 var BuildContentLengthHandler = request.NamedHandler{Name: "core.BuildContentLengthHandler", Fn: func(r *request.Request) {
-	if slength := r.HTTPRequest.Header.Get("Content-Length"); slength != "" {
-		length, _ := strconv.ParseInt(slength, 10, 64)
-		r.HTTPRequest.ContentLength = length
-		return
-	}
-
 	var length int64
-	switch body := r.Body.(type) {
-	case nil:
-		length = 0
-	case lener:
-		length = int64(body.Len())
-	case io.Seeker:
-		r.BodyStart, _ = body.Seek(0, 1)
-		end, _ := body.Seek(0, 2)
-		body.Seek(r.BodyStart, 0) // make sure to seek back to original location
-		length = end - r.BodyStart
-	default:
-		panic("Cannot get length of body, must provide `ContentLength`")
+
+	if slength := r.HTTPRequest.Header.Get("Content-Length"); slength != "" {
+		length, _ = strconv.ParseInt(slength, 10, 64)
+	} else {
+		switch body := r.Body.(type) {
+		case nil:
+			length = 0
+		case lener:
+			length = int64(body.Len())
+		case io.Seeker:
+			r.BodyStart, _ = body.Seek(0, 1)
+			end, _ := body.Seek(0, 2)
+			body.Seek(r.BodyStart, 0) // make sure to seek back to original location
+			length = end - r.BodyStart
+		default:
+			panic("Cannot get length of body, must provide `ContentLength`")
+		}
 	}
 
-	r.HTTPRequest.ContentLength = length
-	r.HTTPRequest.Header.Set("Content-Length", fmt.Sprintf("%d", length))
+	if length > 0 {
+		r.HTTPRequest.ContentLength = length
+		r.HTTPRequest.Header.Set("Content-Length", fmt.Sprintf("%d", length))
+	} else {
+		r.HTTPRequest.ContentLength = 0
+		r.HTTPRequest.Header.Del("Content-Length")
+	}
 }}
 
 // SDKVersionUserAgentHandler is a request handler for adding the SDK Version to the user agent.
@@ -64,6 +72,11 @@ var SendHandler = request.NamedHandler{Name: "core.SendHandler", Fn: func(r *req
 	var err error
 	r.HTTPResponse, err = r.Config.HTTPClient.Do(r.HTTPRequest)
 	if err != nil {
+		// Prevent leaking if an HTTPResponse was returned. Clean up
+		// the body.
+		if r.HTTPResponse != nil {
+			r.HTTPResponse.Body.Close()
+		}
 		// Capture the case where url.Error is returned for error processing
 		// response. e.g. 301 without location header comes back as string
 		// error and r.HTTPResponse is nil. Other url redirect errors will

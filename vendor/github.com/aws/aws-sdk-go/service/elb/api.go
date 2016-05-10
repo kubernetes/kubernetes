@@ -4,6 +4,7 @@
 package elb
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awsutil"
@@ -999,6 +1000,19 @@ func (s AccessLog) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *AccessLog) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "AccessLog"}
+	if s.Enabled == nil {
+		invalidParams.Add(request.NewErrParamRequired("Enabled"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type AddTagsInput struct {
 	_ struct{} `type:"structure"`
 
@@ -1017,6 +1031,35 @@ func (s AddTagsInput) String() string {
 // GoString returns the string representation
 func (s AddTagsInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *AddTagsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "AddTagsInput"}
+	if s.LoadBalancerNames == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerNames"))
+	}
+	if s.Tags == nil {
+		invalidParams.Add(request.NewErrParamRequired("Tags"))
+	}
+	if s.Tags != nil && len(s.Tags) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Tags", 1))
+	}
+	if s.Tags != nil {
+		for i, v := range s.Tags {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "Tags", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type AddTagsOutput struct {
@@ -1097,6 +1140,22 @@ func (s ApplySecurityGroupsToLoadBalancerInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ApplySecurityGroupsToLoadBalancerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ApplySecurityGroupsToLoadBalancerInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.SecurityGroups == nil {
+		invalidParams.Add(request.NewErrParamRequired("SecurityGroups"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type ApplySecurityGroupsToLoadBalancerOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1133,6 +1192,22 @@ func (s AttachLoadBalancerToSubnetsInput) String() string {
 // GoString returns the string representation
 func (s AttachLoadBalancerToSubnetsInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *AttachLoadBalancerToSubnetsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "AttachLoadBalancerToSubnetsInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.Subnets == nil {
+		invalidParams.Add(request.NewErrParamRequired("Subnets"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type AttachLoadBalancerToSubnetsOutput struct {
@@ -1193,6 +1268,27 @@ func (s ConfigureHealthCheckInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ConfigureHealthCheckInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ConfigureHealthCheckInput"}
+	if s.HealthCheck == nil {
+		invalidParams.Add(request.NewErrParamRequired("HealthCheck"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.HealthCheck != nil {
+		if err := s.HealthCheck.Validate(); err != nil {
+			invalidParams.AddNested("HealthCheck", err.(request.ErrInvalidParams))
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type ConfigureHealthCheckOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1232,6 +1328,19 @@ func (s ConnectionDraining) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ConnectionDraining) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ConnectionDraining"}
+	if s.Enabled == nil {
+		invalidParams.Add(request.NewErrParamRequired("Enabled"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 // Information about the ConnectionSettings attribute.
 type ConnectionSettings struct {
 	_ struct{} `type:"structure"`
@@ -1249,6 +1358,22 @@ func (s ConnectionSettings) String() string {
 // GoString returns the string representation
 func (s ConnectionSettings) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ConnectionSettings) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ConnectionSettings"}
+	if s.IdleTimeout == nil {
+		invalidParams.Add(request.NewErrParamRequired("IdleTimeout"))
+	}
+	if s.IdleTimeout != nil && *s.IdleTimeout < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("IdleTimeout", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type CreateAppCookieStickinessPolicyInput struct {
@@ -1274,6 +1399,25 @@ func (s CreateAppCookieStickinessPolicyInput) String() string {
 // GoString returns the string representation
 func (s CreateAppCookieStickinessPolicyInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateAppCookieStickinessPolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateAppCookieStickinessPolicyInput"}
+	if s.CookieName == nil {
+		invalidParams.Add(request.NewErrParamRequired("CookieName"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.PolicyName == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type CreateAppCookieStickinessPolicyOutput struct {
@@ -1315,6 +1459,22 @@ func (s CreateLBCookieStickinessPolicyInput) String() string {
 // GoString returns the string representation
 func (s CreateLBCookieStickinessPolicyInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateLBCookieStickinessPolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateLBCookieStickinessPolicyInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.PolicyName == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type CreateLBCookieStickinessPolicyOutput struct {
@@ -1392,6 +1552,45 @@ func (s CreateLoadBalancerInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateLoadBalancerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateLoadBalancerInput"}
+	if s.Listeners == nil {
+		invalidParams.Add(request.NewErrParamRequired("Listeners"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.Tags != nil && len(s.Tags) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Tags", 1))
+	}
+	if s.Listeners != nil {
+		for i, v := range s.Listeners {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "Listeners", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+	if s.Tags != nil {
+		for i, v := range s.Tags {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "Tags", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type CreateLoadBalancerListenersInput struct {
 	_ struct{} `type:"structure"`
 
@@ -1410,6 +1609,32 @@ func (s CreateLoadBalancerListenersInput) String() string {
 // GoString returns the string representation
 func (s CreateLoadBalancerListenersInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateLoadBalancerListenersInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateLoadBalancerListenersInput"}
+	if s.Listeners == nil {
+		invalidParams.Add(request.NewErrParamRequired("Listeners"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.Listeners != nil {
+		for i, v := range s.Listeners {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "Listeners", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type CreateLoadBalancerListenersOutput struct {
@@ -1470,6 +1695,25 @@ func (s CreateLoadBalancerPolicyInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateLoadBalancerPolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateLoadBalancerPolicyInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.PolicyName == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyName"))
+	}
+	if s.PolicyTypeName == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyTypeName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type CreateLoadBalancerPolicyOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -1502,6 +1746,19 @@ func (s CrossZoneLoadBalancing) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CrossZoneLoadBalancing) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CrossZoneLoadBalancing"}
+	if s.Enabled == nil {
+		invalidParams.Add(request.NewErrParamRequired("Enabled"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DeleteLoadBalancerInput struct {
 	_ struct{} `type:"structure"`
 
@@ -1517,6 +1774,19 @@ func (s DeleteLoadBalancerInput) String() string {
 // GoString returns the string representation
 func (s DeleteLoadBalancerInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteLoadBalancerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteLoadBalancerInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DeleteLoadBalancerListenersInput struct {
@@ -1537,6 +1807,22 @@ func (s DeleteLoadBalancerListenersInput) String() string {
 // GoString returns the string representation
 func (s DeleteLoadBalancerListenersInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteLoadBalancerListenersInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteLoadBalancerListenersInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.LoadBalancerPorts == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerPorts"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DeleteLoadBalancerListenersOutput struct {
@@ -1588,6 +1874,22 @@ func (s DeleteLoadBalancerPolicyInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteLoadBalancerPolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteLoadBalancerPolicyInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.PolicyName == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DeleteLoadBalancerPolicyOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -1620,6 +1922,22 @@ func (s DeregisterInstancesFromLoadBalancerInput) String() string {
 // GoString returns the string representation
 func (s DeregisterInstancesFromLoadBalancerInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeregisterInstancesFromLoadBalancerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeregisterInstancesFromLoadBalancerInput"}
+	if s.Instances == nil {
+		invalidParams.Add(request.NewErrParamRequired("Instances"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DeregisterInstancesFromLoadBalancerOutput struct {
@@ -1659,6 +1977,19 @@ func (s DescribeInstanceHealthInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeInstanceHealthInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeInstanceHealthInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DescribeInstanceHealthOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1691,6 +2022,19 @@ func (s DescribeLoadBalancerAttributesInput) String() string {
 // GoString returns the string representation
 func (s DescribeLoadBalancerAttributesInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeLoadBalancerAttributesInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeLoadBalancerAttributesInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DescribeLoadBalancerAttributesOutput struct {
@@ -1807,6 +2151,19 @@ func (s DescribeLoadBalancersInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeLoadBalancersInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeLoadBalancersInput"}
+	if s.PageSize != nil && *s.PageSize < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("PageSize", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DescribeLoadBalancersOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1843,6 +2200,22 @@ func (s DescribeTagsInput) String() string {
 // GoString returns the string representation
 func (s DescribeTagsInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeTagsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeTagsInput"}
+	if s.LoadBalancerNames == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerNames"))
+	}
+	if s.LoadBalancerNames != nil && len(s.LoadBalancerNames) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LoadBalancerNames", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DescribeTagsOutput struct {
@@ -1882,6 +2255,22 @@ func (s DetachLoadBalancerFromSubnetsInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DetachLoadBalancerFromSubnetsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DetachLoadBalancerFromSubnetsInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.Subnets == nil {
+		invalidParams.Add(request.NewErrParamRequired("Subnets"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DetachLoadBalancerFromSubnetsOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1919,6 +2308,22 @@ func (s DisableAvailabilityZonesForLoadBalancerInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DisableAvailabilityZonesForLoadBalancerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DisableAvailabilityZonesForLoadBalancerInput"}
+	if s.AvailabilityZones == nil {
+		invalidParams.Add(request.NewErrParamRequired("AvailabilityZones"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DisableAvailabilityZonesForLoadBalancerOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1954,6 +2359,22 @@ func (s EnableAvailabilityZonesForLoadBalancerInput) String() string {
 // GoString returns the string representation
 func (s EnableAvailabilityZonesForLoadBalancerInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *EnableAvailabilityZonesForLoadBalancerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "EnableAvailabilityZonesForLoadBalancerInput"}
+	if s.AvailabilityZones == nil {
+		invalidParams.Add(request.NewErrParamRequired("AvailabilityZones"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type EnableAvailabilityZonesForLoadBalancerOutput struct {
@@ -2024,6 +2445,43 @@ func (s HealthCheck) String() string {
 // GoString returns the string representation
 func (s HealthCheck) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *HealthCheck) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "HealthCheck"}
+	if s.HealthyThreshold == nil {
+		invalidParams.Add(request.NewErrParamRequired("HealthyThreshold"))
+	}
+	if s.HealthyThreshold != nil && *s.HealthyThreshold < 2 {
+		invalidParams.Add(request.NewErrParamMinValue("HealthyThreshold", 2))
+	}
+	if s.Interval == nil {
+		invalidParams.Add(request.NewErrParamRequired("Interval"))
+	}
+	if s.Interval != nil && *s.Interval < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("Interval", 1))
+	}
+	if s.Target == nil {
+		invalidParams.Add(request.NewErrParamRequired("Target"))
+	}
+	if s.Timeout == nil {
+		invalidParams.Add(request.NewErrParamRequired("Timeout"))
+	}
+	if s.Timeout != nil && *s.Timeout < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("Timeout", 1))
+	}
+	if s.UnhealthyThreshold == nil {
+		invalidParams.Add(request.NewErrParamRequired("UnhealthyThreshold"))
+	}
+	if s.UnhealthyThreshold != nil && *s.UnhealthyThreshold < 2 {
+		invalidParams.Add(request.NewErrParamMinValue("UnhealthyThreshold", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 // The ID of a back-end instance.
@@ -2175,6 +2633,28 @@ func (s Listener) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *Listener) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "Listener"}
+	if s.InstancePort == nil {
+		invalidParams.Add(request.NewErrParamRequired("InstancePort"))
+	}
+	if s.InstancePort != nil && *s.InstancePort < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("InstancePort", 1))
+	}
+	if s.LoadBalancerPort == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerPort"))
+	}
+	if s.Protocol == nil {
+		invalidParams.Add(request.NewErrParamRequired("Protocol"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 // The policies enabled for a listener.
 type ListenerDescription struct {
 	_ struct{} `type:"structure"`
@@ -2247,6 +2727,36 @@ func (s LoadBalancerAttributes) String() string {
 // GoString returns the string representation
 func (s LoadBalancerAttributes) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *LoadBalancerAttributes) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "LoadBalancerAttributes"}
+	if s.AccessLog != nil {
+		if err := s.AccessLog.Validate(); err != nil {
+			invalidParams.AddNested("AccessLog", err.(request.ErrInvalidParams))
+		}
+	}
+	if s.ConnectionDraining != nil {
+		if err := s.ConnectionDraining.Validate(); err != nil {
+			invalidParams.AddNested("ConnectionDraining", err.(request.ErrInvalidParams))
+		}
+	}
+	if s.ConnectionSettings != nil {
+		if err := s.ConnectionSettings.Validate(); err != nil {
+			invalidParams.AddNested("ConnectionSettings", err.(request.ErrInvalidParams))
+		}
+	}
+	if s.CrossZoneLoadBalancing != nil {
+		if err := s.CrossZoneLoadBalancing.Validate(); err != nil {
+			invalidParams.AddNested("CrossZoneLoadBalancing", err.(request.ErrInvalidParams))
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 // Information about a load balancer.
@@ -2344,6 +2854,27 @@ func (s ModifyLoadBalancerAttributesInput) String() string {
 // GoString returns the string representation
 func (s ModifyLoadBalancerAttributesInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ModifyLoadBalancerAttributesInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ModifyLoadBalancerAttributesInput"}
+	if s.LoadBalancerAttributes == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerAttributes"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.LoadBalancerAttributes != nil {
+		if err := s.LoadBalancerAttributes.Validate(); err != nil {
+			invalidParams.AddNested("LoadBalancerAttributes", err.(request.ErrInvalidParams))
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type ModifyLoadBalancerAttributesOutput struct {
@@ -2537,6 +3068,22 @@ func (s RegisterInstancesWithLoadBalancerInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *RegisterInstancesWithLoadBalancerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "RegisterInstancesWithLoadBalancerInput"}
+	if s.Instances == nil {
+		invalidParams.Add(request.NewErrParamRequired("Instances"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type RegisterInstancesWithLoadBalancerOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -2575,6 +3122,35 @@ func (s RemoveTagsInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *RemoveTagsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "RemoveTagsInput"}
+	if s.LoadBalancerNames == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerNames"))
+	}
+	if s.Tags == nil {
+		invalidParams.Add(request.NewErrParamRequired("Tags"))
+	}
+	if s.Tags != nil && len(s.Tags) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Tags", 1))
+	}
+	if s.Tags != nil {
+		for i, v := range s.Tags {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "Tags", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type RemoveTagsOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -2610,6 +3186,25 @@ func (s SetLoadBalancerListenerSSLCertificateInput) String() string {
 // GoString returns the string representation
 func (s SetLoadBalancerListenerSSLCertificateInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *SetLoadBalancerListenerSSLCertificateInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "SetLoadBalancerListenerSSLCertificateInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.LoadBalancerPort == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerPort"))
+	}
+	if s.SSLCertificateId == nil {
+		invalidParams.Add(request.NewErrParamRequired("SSLCertificateId"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type SetLoadBalancerListenerSSLCertificateOutput struct {
@@ -2650,6 +3245,25 @@ func (s SetLoadBalancerPoliciesForBackendServerInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *SetLoadBalancerPoliciesForBackendServerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "SetLoadBalancerPoliciesForBackendServerInput"}
+	if s.InstancePort == nil {
+		invalidParams.Add(request.NewErrParamRequired("InstancePort"))
+	}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.PolicyNames == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyNames"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type SetLoadBalancerPoliciesForBackendServerOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -2686,6 +3300,25 @@ func (s SetLoadBalancerPoliciesOfListenerInput) String() string {
 // GoString returns the string representation
 func (s SetLoadBalancerPoliciesOfListenerInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *SetLoadBalancerPoliciesOfListenerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "SetLoadBalancerPoliciesOfListenerInput"}
+	if s.LoadBalancerName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerName"))
+	}
+	if s.LoadBalancerPort == nil {
+		invalidParams.Add(request.NewErrParamRequired("LoadBalancerPort"))
+	}
+	if s.PolicyNames == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyNames"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type SetLoadBalancerPoliciesOfListenerOutput struct {
@@ -2744,6 +3377,22 @@ func (s Tag) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *Tag) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "Tag"}
+	if s.Key == nil {
+		invalidParams.Add(request.NewErrParamRequired("Key"))
+	}
+	if s.Key != nil && len(*s.Key) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Key", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 // The tags associated with a load balancer.
 type TagDescription struct {
 	_ struct{} `type:"structure"`
@@ -2781,4 +3430,17 @@ func (s TagKeyOnly) String() string {
 // GoString returns the string representation
 func (s TagKeyOnly) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *TagKeyOnly) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "TagKeyOnly"}
+	if s.Key != nil && len(*s.Key) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Key", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }

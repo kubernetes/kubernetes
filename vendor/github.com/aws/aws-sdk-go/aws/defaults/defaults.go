@@ -67,6 +67,7 @@ func Handlers() request.Handlers {
 
 	handlers.Validate.PushBackNamed(corehandlers.ValidateEndpointHandler)
 	handlers.Build.PushBackNamed(corehandlers.SDKVersionUserAgentHandler)
+	handlers.Build.AfterEachFn = request.HandlerListStopOnError
 	handlers.Sign.PushBackNamed(corehandlers.BuildContentLengthHandler)
 	handlers.Send.PushBackNamed(corehandlers.SendHandler)
 	handlers.AfterRetry.PushBackNamed(corehandlers.AfterRetryHandler)
@@ -83,13 +84,14 @@ func Handlers() request.Handlers {
 func CredChain(cfg *aws.Config, handlers request.Handlers) *credentials.Credentials {
 	endpoint, signingRegion := endpoints.EndpointForRegion(ec2metadata.ServiceName, *cfg.Region, true)
 
-	return credentials.NewChainCredentials(
-		[]credentials.Provider{
+	return credentials.NewCredentials(&credentials.ChainProvider{
+		VerboseErrors: aws.BoolValue(cfg.CredentialsChainVerboseErrors),
+		Providers: []credentials.Provider{
 			&credentials.EnvProvider{},
 			&credentials.SharedCredentialsProvider{Filename: "", Profile: ""},
 			&ec2rolecreds.EC2RoleProvider{
 				Client:       ec2metadata.NewClient(*cfg, handlers, endpoint, signingRegion),
 				ExpiryWindow: 5 * time.Minute,
 			},
-		})
+		}})
 }

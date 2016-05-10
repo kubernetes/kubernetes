@@ -51,12 +51,21 @@ type Session struct {
 //     sess := session.New()
 //     svc := s3.New(sess)
 func New(cfgs ...*aws.Config) *Session {
-	def := defaults.Get()
+	cfg := defaults.Config()
+	handlers := defaults.Handlers()
+
+	// Apply the passed in configs so the configuration can be applied to the
+	// default credential chain
+	cfg.MergeIn(cfgs...)
+	cfg.Credentials = defaults.CredChain(cfg, handlers)
+
+	// Reapply any passed in configs to override credentials if set
+	cfg.MergeIn(cfgs...)
+
 	s := &Session{
-		Config:   def.Config,
-		Handlers: def.Handlers,
+		Config:   cfg,
+		Handlers: handlers,
 	}
-	s.Config.MergeIn(cfgs...)
 
 	initHandlers(s)
 
@@ -77,7 +86,7 @@ func initHandlers(s *Session) {
 //
 // Example:
 //     // Create a copy of the current session, configured for the us-west-2 region.
-//     sess.Copy(&aws.Config{Region: aws.String("us-west-2"})
+//     sess.Copy(&aws.Config{Region: aws.String("us-west-2")})
 func (s *Session) Copy(cfgs ...*aws.Config) *Session {
 	newSession := &Session{
 		Config:   s.Config.Copy(cfgs...),

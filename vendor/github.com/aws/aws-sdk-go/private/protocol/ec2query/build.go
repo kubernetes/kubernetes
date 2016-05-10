@@ -11,6 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go/private/protocol/query/queryutil"
 )
 
+// BuildHandler is a named request handler for building ec2query protocol requests
+var BuildHandler = request.NamedHandler{Name: "awssdk.ec2query.Build", Fn: Build}
+
 // Build builds a request for the EC2 protocol.
 func Build(r *request.Request) {
 	body := url.Values{
