@@ -248,7 +248,9 @@ func (f *FIFO) Resync() error {
 	for id := range f.items {
 		f.queue = append(f.queue, id)
 	}
-	f.cond.Broadcast()
+	if len(f.queue) > 0 {
+		f.cond.Broadcast()
+	}
 	return nil
 }
 

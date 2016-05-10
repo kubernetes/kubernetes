@@ -397,10 +397,6 @@ func (f *DeltaFIFO) Pop() interface{} {
 func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	return f.replaceLocked(list)
-}
-
-func (f *DeltaFIFO) replaceLocked(list []interface{}) error {
 	keys := make(sets.String, len(list))
 
 	if !f.populated {
@@ -464,8 +460,10 @@ func (f *DeltaFIFO) replaceLocked(list []interface{}) error {
 func (f *DeltaFIFO) Resync() error {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	if err := f.replaceLocked(f.listLocked()); err != nil {
-		return fmt.Errorf("couldn't queue object: %v", err)
+	for _, obj := range f.listLocked() {
+		if err := f.queueActionLocked(Sync, obj); err != nil {
+			return fmt.Errorf("couldn't queue object: %v", err)
+		}
 	}
 	return nil
 }
