@@ -1200,7 +1200,7 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	c.EnsureLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{}, map[string]string{})
 }
 
-func TestGetListener(t *testing.T) {
+func TestBuildListener(t *testing.T) {
 	tests := []struct {
 		name string
 
