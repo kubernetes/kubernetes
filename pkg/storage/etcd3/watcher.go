@@ -322,7 +322,11 @@ func prepareObjs(ctx context.Context, e *event, client *clientv3.Client, codec r
 		if err != nil {
 			return nil, nil, err
 		}
-		oldObj, err = decodeObj(codec, versioner, getResp.Kvs[0].Value, getResp.Kvs[0].ModRevision)
+		// Note that this sends the *old* object with the etcd revision for the time at
+		// which it gets deleted.
+		// We assume old object is returned only in Deleted event. Users (e.g. cacher) need
+		// to have larger than previous rev to tell the ordering.
+		oldObj, err = decodeObj(codec, versioner, getResp.Kvs[0].Value, e.rev)
 		if err != nil {
 			return nil, nil, err
 		}
