@@ -53,6 +53,7 @@ function verify-prereqs {
       prlctl parallels vagrant-parallels
       VBoxManage virtualbox ''
       virsh libvirt vagrant-libvirt
+      '' vsphere vagrant-vsphere
   )
   local provider_found=''
   local provider_bin
