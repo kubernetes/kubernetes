@@ -1322,6 +1322,12 @@ message NodeSystemInfo {
 
   // KubeProxy Version reported by the node.
   optional string kubeProxyVersion = 8;
+
+  // The Operating System reported by the node
+  optional string operatingSystem = 9;
+
+  // The Architecture reported by the node
+  optional string architecture = 10;
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.

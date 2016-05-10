@@ -16063,7 +16063,9 @@
      "osImage",
      "containerRuntimeVersion",
      "kubeletVersion",
-     "kubeProxyVersion"
+     "kubeProxyVersion",
+     "operatingSystem",
+     "architecture"
     ],
     "properties": {
      "machineID": {
@@ -16097,6 +16099,14 @@
      "kubeProxyVersion": {
       "type": "string",
       "description": "KubeProxy Version reported by the node."
+     },
+     "operatingSystem": {
+      "type": "string",
+      "description": "The Operating System reported by the node"
+     },
+     "architecture": {
+      "type": "string",
+      "description": "The Architecture reported by the node"
      }
     }
    },
