@@ -28,7 +28,13 @@ Documentation for other releases can be found at
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
 ## Motivation
-With kernel support of namespaced kernel parameters, it could be possible to set these settings differently on each container. In docker version 1.11.1 it was possible to change kernel parameters only manualy from privileged containers and changes would be applied to every container. It was not possible to set the parameters within a non-privileged container. Now in Docker verison 1.12.0 it is possible to set namespaced parameters while container creation. These modified parameters would be related only to container. In kubernetes we want to allow to set these parameters within a pod.
+With kernel support of namespaced kernel parameters, it is possible to set these settings differently on each container.
+In docker version 1.11.1 it was possible to change kernel parameters only manualy from privileged containers
+and changes would be applied to every container.
+It was not possible to set the parameters within a non-privileged container.
+Since docker verison 1.12.0 it is possible to set namespaced parameters during container creation.
+These modified parameters would be related only to container.
+In kubernetes we want to allow to set these parameters within a pod.
 
 Goal:
 - possibility to set customizable sysctl records for namespaces within a pod
@@ -44,22 +50,24 @@ A user wants to set customizable sysctl records for namespaces within a containe
 
 ## Community Work
 
-### Container runtime support for sysctl
+### Runc support for sysctl
 
 Applied changes:
-	https://github.com/opencontainers/runc/pull/73
-	https://github.com/opencontainers/runc/pull/303
+
+* https://github.com/opencontainers/runc/pull/73
+* https://github.com/opencontainers/runc/pull/303
 
 ### Docker support for sysctl
 
 Applied changes:
 
-	docker/docker#19265
-	docker/engine-api#38
+* https://github.com/docker/docker#19265
+* https://github.com/docker/engine-api#38
 
 Issues:
-	docker/docker#21126
-	ibm-messaging/mq-docker#13
+
+* https://github.com/docker/docker#21126
+* https://github.com/ibm-messaging/mq-docker#13
 
 ## Proposed Design
 	
@@ -95,7 +103,7 @@ type SecurityContext struct {
 
 ### Use in a pod
 
-Here's an example of a pod that has net.ipv4.ip_forward set to 2:
+Here's an example of a pod that has ``net.ipv4.ip_forward`` set to ``2``:
 
 ```yaml
 apiVersion: v1
