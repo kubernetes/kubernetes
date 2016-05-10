@@ -317,6 +317,12 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.CheckPodsRunningReady(c, ns, []string{netexecContainer}, framework.PodStartTimeout)
 			// Clean up
 			defer framework.Cleanup(netexecPodPath, ns, netexecPodSelector)
+			defer func() {
+				if CurrentGinkgoTestDescription().Failed {
+					logs, err := framework.GetPodLogs(c, ns, "netexec", "netexec")
+					framework.Logf("Logs for netexec pod(error: %s): %s", err, logs)
+				}
+			}()
 			// Upload kubeconfig
 			type NetexecOutput struct {
 				Output string `json:"output"`
