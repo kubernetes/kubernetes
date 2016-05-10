@@ -910,12 +910,30 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		return Result{err: errors.FromObject(status)}
 	}
 
-	// TODO: Check ContentType.
+	contentType := resp.Header.Get("Content-Type")
+	var decoder runtime.Decoder
+	if contentType == r.content.ContentType {
+		decoder = r.serializers.Decoder
+	} else {
+		mediaType, params, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			return Result{err: errors.NewInternalError(err)}
+		}
+		decoder, err = r.serializers.RenegotiatedDecoder(mediaType, params)
+		if err != nil {
+			return Result{
+				body:        body,
+				contentType: contentType,
+				statusCode:  resp.StatusCode,
+			}
+		}
+	}
+
 	return Result{
 		body:        body,
-		contentType: resp.Header.Get("Content-Type"),
+		contentType: contentType,
 		statusCode:  resp.StatusCode,
-		decoder:     r.serializers.Decoder,
+		decoder:     decoder,
 	}
 }
 
@@ -1021,6 +1039,9 @@ func (r Result) Get() (runtime.Object, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
+	if r.decoder == nil {
+		return nil, fmt.Errorf("serializer for %s doesn't exist", r.contentType)
+	}
 	return runtime.Decode(r.decoder, r.body)
 }
 
@@ -1035,6 +1056,9 @@ func (r Result) StatusCode(statusCode *int) Result {
 func (r Result) Into(obj runtime.Object) error {
 	if r.err != nil {
 		return r.err
+	}
+	if r.decoder == nil {
+		return fmt.Errorf("serializer for %s doesn't exist", r.contentType)
 	}
 	return runtime.DecodeInto(r.decoder, r.body, obj)
 }
