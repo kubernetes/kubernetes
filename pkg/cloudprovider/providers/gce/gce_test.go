@@ -19,6 +19,9 @@ package gce
 import (
 	"reflect"
 	"testing"
+
+	compute "google.golang.org/api/compute/v1"
+	"k8s.io/kubernetes/pkg/util/rand"
 )
 
 func TestGetRegion(t *testing.T) {
@@ -146,5 +149,114 @@ func TestScrubDNS(t *testing.T) {
 		if !reflect.DeepEqual(s, tcs[i].searchesOut) {
 			t.Errorf("Expected %v, got %v", tcs[i].searchesOut, s)
 		}
+	}
+}
+
+func TestRestrictTargetPool(t *testing.T) {
+	const maxInstances = 5
+	tests := []struct {
+		instances []string
+		want      []string
+	}{
+		{
+			instances: []string{"1", "2", "3", "4", "5"},
+			want:      []string{"1", "2", "3", "4", "5"},
+		},
+		{
+			instances: []string{"1", "2", "3", "4", "5", "6"},
+			want:      []string{"4", "3", "5", "2", "6"},
+		},
+	}
+	for _, tc := range tests {
+		rand.Seed(5)
+		got := restrictTargetPool(append([]string{}, tc.instances...), maxInstances)
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("restrictTargetPool(%v) => %v, want %v", tc.instances, got, tc.want)
+		}
+	}
+}
+
+func TestComputeUpdate(t *testing.T) {
+	const maxInstances = 5
+	const fakeZone = "us-moon1-f"
+	tests := []struct {
+		tp           []string
+		instances    []string
+		wantToAdd    []string
+		wantToRemove []string
+	}{
+		{
+			// Test adding all instances.
+			tp:           []string{},
+			instances:    []string{"0", "1", "2"},
+			wantToAdd:    []string{"0", "1", "2"},
+			wantToRemove: []string{},
+		},
+		{
+			// Test node 1 coming back healthy.
+			tp:           []string{"0", "2"},
+			instances:    []string{"0", "1", "2"},
+			wantToAdd:    []string{"1"},
+			wantToRemove: []string{},
+		},
+		{
+			// Test node 1 going healthy while node 4 needs to be removed.
+			tp:           []string{"0", "2", "4"},
+			instances:    []string{"0", "1", "2"},
+			wantToAdd:    []string{"1"},
+			wantToRemove: []string{"4"},
+		},
+		{
+			// Test exceeding the TargetPool max of 5 (for the test),
+			// which shuffles in 7, 5, 8 based on the deterministic
+			// seed below.
+			tp:           []string{"0", "2", "4", "6"},
+			instances:    []string{"0", "1", "2", "3", "5", "7", "8"},
+			wantToAdd:    []string{"7", "5", "8"},
+			wantToRemove: []string{"4", "6"},
+		},
+		{
+			// Test all nodes getting removed.
+			tp:           []string{"0", "1", "2", "3"},
+			instances:    []string{},
+			wantToAdd:    []string{},
+			wantToRemove: []string{"0", "1", "2", "3"},
+		},
+	}
+	for _, tc := range tests {
+		rand.Seed(5) // Arbitrary RNG seed for deterministic testing.
+
+		// Dummy up the gceInstance slice.
+		var instances []*gceInstance
+		for _, inst := range tc.instances {
+			instances = append(instances, &gceInstance{Name: inst, Zone: fakeZone})
+		}
+		// Dummy up the TargetPool URL list.
+		var urls []string
+		for _, inst := range tc.tp {
+			inst := &gceInstance{Name: inst, Zone: fakeZone}
+			urls = append(urls, inst.makeComparableHostPath())
+		}
+		gotAddInsts, gotRem := computeUpdate(&compute.TargetPool{Instances: urls}, instances, maxInstances)
+		var wantAdd []string
+		for _, inst := range tc.wantToAdd {
+			inst := &gceInstance{Name: inst, Zone: fakeZone}
+			wantAdd = append(wantAdd, inst.makeComparableHostPath())
+		}
+		var gotAdd []string
+		for _, inst := range gotAddInsts {
+			gotAdd = append(gotAdd, inst.Instance)
+		}
+		if !reflect.DeepEqual(wantAdd, gotAdd) {
+			t.Errorf("computeTargetPool(%v, %v) => added %v, wanted %v", tc.tp, tc.instances, gotAdd, wantAdd)
+		}
+		_ = gotRem
+		// var gotRem []string
+		// for _, inst := range gotRemInsts {
+		// 	gotRem = append(gotRem, inst.Instance)
+		// }
+		// if !reflect.DeepEqual(tc.wantToRemove, gotRem) {
+		// 	t.Errorf("computeTargetPool(%v, %v) => removed %v, wanted %v", tc.tp, tc.instances, gotRem, tc.wantToRemove)
+		// }
 	}
 }
