@@ -14,24 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake
+package v1
 
-import (
-	v1alpha1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/federation/v1alpha1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-)
-
-type FakeFederation struct {
-	*core.Fake
-}
-
-func (c *FakeFederation) Clusters() v1alpha1.ClusterInterface {
-	return &FakeClusters{c}
-}
-
-// GetRESTClient returns a RESTClient that is used to communicate
-// with API server by this client implementation.
-func (c *FakeFederation) GetRESTClient() *restclient.RESTClient {
-	return nil
-}
+type ServiceExpansion interface{}

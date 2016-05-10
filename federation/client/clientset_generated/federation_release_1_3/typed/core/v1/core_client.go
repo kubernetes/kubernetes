@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type FederationInterface interface {
+type CoreInterface interface {
 	GetRESTClient() *restclient.RESTClient
-	ClustersGetter
+	ServicesGetter
 }
 
-// FederationClient is used to interact with features provided by the Federation group.
-type FederationClient struct {
+// CoreClient is used to interact with features provided by the Core group.
+type CoreClient struct {
 	*restclient.RESTClient
 }
 
-func (c *FederationClient) Clusters() ClusterInterface {
-	return newClusters(c)
+func (c *CoreClient) Services(namespace string) ServiceInterface {
+	return newServices(c, namespace)
 }
 
-// NewForConfig creates a new FederationClient for the given config.
-func NewForConfig(c *restclient.Config) (*FederationClient, error) {
+// NewForConfig creates a new CoreClient for the given config.
+func NewForConfig(c *restclient.Config) (*CoreClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*FederationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FederationClient{client}, nil
+	return &CoreClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new FederationClient for the given config and
+// NewForConfigOrDie creates a new CoreClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *FederationClient {
+func NewForConfigOrDie(c *restclient.Config) *CoreClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,18 +59,18 @@ func NewForConfigOrDie(c *restclient.Config) *FederationClient {
 	return client
 }
 
-// New creates a new FederationClient for the given RESTClient.
-func New(c *restclient.RESTClient) *FederationClient {
-	return &FederationClient{c}
+// New creates a new CoreClient for the given RESTClient.
+func New(c *restclient.RESTClient) *CoreClient {
+	return &CoreClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	// if federation group is not registered, return an error
-	g, err := registered.Group("federation")
+	// if core group is not registered, return an error
+	g, err := registered.Group("")
 	if err != nil {
 		return err
 	}
-	config.APIPath = "/apis"
+	config.APIPath = "/api"
 	if config.UserAgent == "" {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
@@ -93,7 +93,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FederationClient) GetRESTClient() *restclient.RESTClient {
+func (c *CoreClient) GetRESTClient() *restclient.RESTClient {
 	if c == nil {
 		return nil
 	}

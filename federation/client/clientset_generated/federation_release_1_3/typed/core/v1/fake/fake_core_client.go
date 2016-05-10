@@ -17,21 +17,21 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/federation/v1alpha1"
+	v1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/core/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeFederation struct {
+type FakeCore struct {
 	*core.Fake
 }
 
-func (c *FakeFederation) Clusters() v1alpha1.ClusterInterface {
-	return &FakeClusters{c}
+func (c *FakeCore) Services(namespace string) v1.ServiceInterface {
+	return &FakeServices{c, namespace}
 }
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeFederation) GetRESTClient() *restclient.RESTClient {
+func (c *FakeCore) GetRESTClient() *restclient.RESTClient {
 	return nil
 }
