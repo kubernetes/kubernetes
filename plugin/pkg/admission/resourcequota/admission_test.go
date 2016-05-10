@@ -72,6 +72,46 @@ func validPod(name string, numContainers int, resources api.ResourceRequirements
 	return pod
 }
 
+func TestPrettyPrint(t *testing.T) {
+	toResourceList := func(resources map[api.ResourceName]string) api.ResourceList {
+		resourceList := api.ResourceList{}
+		for key, value := range resources {
+			resourceList[key] = resource.MustParse(value)
+		}
+		return resourceList
+	}
+	testCases := []struct {
+		input    api.ResourceList
+		expected string
+	}{
+		{
+			input: toResourceList(map[api.ResourceName]string{
+				api.ResourceCPU: "100m",
+			}),
+			expected: "cpu=100m",
+		},
+		{
+			input: toResourceList(map[api.ResourceName]string{
+				api.ResourcePods:                   "10",
+				api.ResourceServices:               "10",
+				api.ResourceReplicationControllers: "10",
+				api.ResourceServicesNodePorts:      "10",
+				api.ResourceRequestsCPU:            "100m",
+				api.ResourceRequestsMemory:         "100Mi",
+				api.ResourceLimitsCPU:              "100m",
+				api.ResourceLimitsMemory:           "100Mi",
+			}),
+			expected: "limits.cpu=100m,limits.memory=100Mi,pods=10,replicationcontrollers=10,requests.cpu=100m,requests.memory=100Mi,services=10,services.nodeports=10",
+		},
+	}
+	for i, testCase := range testCases {
+		result := prettyPrint(testCase.input)
+		if result != testCase.expected {
+			t.Errorf("Pretty print did not give stable sorted output[%d], expected %v, but got %v", i, testCase.expected, result)
+		}
+	}
+}
+
 // TestAdmissionIgnoresDelete verifies that the admission controller ignores delete operations
 func TestAdmissionIgnoresDelete(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
