@@ -18,6 +18,8 @@ package rand
 
 import (
 	"math/rand"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -69,5 +71,16 @@ func TestPerm(t *testing.T) {
 				t.Errorf("Perm call result is unexpected")
 			}
 		}
+	}
+}
+
+func TestShuffle(t *testing.T) {
+	Seed(5) // Arbitrary RNG seed for deterministic testing.
+	have := []int{0, 1, 2, 3, 4}
+	want := []int{3, 2, 4, 1, 0} // "have" shuffled, with RNG at Seed(5).
+	got := append([]int{}, have...)
+	Shuffle(sort.IntSlice(got))
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Shuffle(%v) => %v, want %v", have, got, want)
 	}
 }
