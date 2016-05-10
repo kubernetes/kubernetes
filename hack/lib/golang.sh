@@ -450,9 +450,16 @@ kube::golang::build_binaries_for_platform() {
       "${platform}")
 
     local testpkg="$(dirname ${test})"
-    if [[ "$(${teststale} -binary "${outfile}" -package "${testpkg}")" == "false" ]]; then
+    if ! ${teststale} -binary "${outfile}" -package "${testpkg}"; then
       continue
     fi
+    # `go test -c` below directly builds the binary. It builds the packages,
+    # but it never installs them. `go test -i` only installs the dependencies
+    # of the test, but not the test package itself. So neither `go test -c`
+    # nor `go test -i` installs, for example, test/e2e.a. And without that,
+    # doing a staleness check on k8s.io/kubernetes/test/e2e package always
+    # returns true (always stale). And that's why we need to install the
+    # test package.
     go install "${goflags[@]:+${goflags[@]}}" \
         -ldflags "${goldflags}" \
         "${testpkg}"
