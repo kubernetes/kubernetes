@@ -111,8 +111,8 @@ ensure your questions don't go unanswered.
 Before posting a new question, please search stackoverflow for answers to
 similar questions, and also familiarize yourself with:
 
-  * [user guide](http://kubernetes.io/v1.0/)
-  * [troubleshooting guide](http://kubernetes.io/v1.0/docs/troubleshooting.html)
+  * [user guide](http://kubernetes.io/docs/user-guide/)
+  * [troubleshooting guide](http://kubernetes.io/docs/admin/cluster-troubleshooting/)
 
 Again, thanks for using Kubernetes.
 
