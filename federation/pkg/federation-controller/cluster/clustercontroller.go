@@ -37,7 +37,7 @@ import (
 type ClusterController struct {
 	knownClusterSet sets.String
 
-	//federationClient used to operate cluster and subrs
+	// federationClient used to operate cluster
 	federationClient federationclientset.Interface
 
 	// clusterMonitorPeriod is the period for updating status of cluster
@@ -89,12 +89,12 @@ func (cc *ClusterController) delFromClusterSet(obj interface{}) {
 	delete(cc.clusterKubeClientMap, cluster.Name)
 }
 
-// addToClusterSet insert the new cluster to clusterSet and creat a corresponding
+// addToClusterSet insert the new cluster to clusterSet and create a corresponding
 // restclient to map clusterKubeClientMap
 func (cc *ClusterController) addToClusterSet(obj interface{}) {
 	cluster := obj.(*federation_v1alpha1.Cluster)
 	cc.knownClusterSet.Insert(cluster.Name)
-	//create the restclient of cluster
+	// create the restclient of cluster
 	restClient, err := NewClusterClientSet(cluster)
 	if err != nil || restClient == nil {
 		glog.Errorf("Failed to create corresponding restclient of kubernetes cluster: %v", err)
@@ -145,7 +145,6 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 	}
 
 	// If there's a difference between lengths of known clusters and observed clusters
-	// TODO: some clusters have been removed, so need to evict the subRs belong to the cluster
 	if len(cc.knownClusterSet) != len(clusters.Items) {
 		observedSet := make(sets.String)
 		for _, cluster := range clusters.Items {
@@ -154,19 +153,18 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 		deleted := cc.knownClusterSet.Difference(observedSet)
 		for clusterName := range deleted {
 			glog.V(1).Infof("ClusterController observed a Cluster deletion: %v", clusterName)
-			//TODO: evict the subRS
 			cc.knownClusterSet.Delete(clusterName)
 		}
 	}
 	for _, cluster := range clusters.Items {
 		clusterStatusNew, err := cc.GetClusterStatus(&cluster)
 		if err != nil {
-			glog.Infof("Get the status of cluster: %v fail", cluster.Name)
+			glog.Infof("Failed to Get the status of cluster: %v", cluster.Name)
 			continue
 		}
 		clusterStatusOld, found := cc.clusterClusterStatusMap[cluster.Name]
 		if !found {
-			glog.Infof("Have not get the status of cluster: %v never before", cluster.Name)
+			glog.Infof("There is no status stored for cluster: %v before", cluster.Name)
 
 		} else {
 			hasTransition := false
@@ -187,7 +185,7 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 		cluster.Status = *clusterStatusNew
 		cluster, err := cc.federationClient.Federation().Clusters().UpdateStatus(&cluster)
 		if err != nil {
-			glog.Infof("Update the status of cluster: %v fail, error is : %v", cluster.Name, err)
+			glog.Infof("Failed to update the status of cluster: %v ,error is : %v", cluster.Name, err)
 			continue
 		}
 	}

@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// If you make changes to this file, you should also make the corresponding change in ReplicationController.
-
 package cluster
 
 import (
@@ -87,7 +85,7 @@ func createHttptestFakeHandlerForFederation(clusterList *federation_v1alpha1.Clu
 }
 
 // init a fake http handler, simulate a cluster apiserver, response the "/healthz"
-// when "canBeGotten" is false, means that user can not request apiserver
+// when "canBeGotten" is false, means that user can not get response from apiserver
 func createHttptestFakeHandlerForCluster(canBeGotten bool) *http.HandlerFunc {
 	fakeHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

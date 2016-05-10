@@ -57,54 +57,55 @@ func NewClusterClientSet(c *federation_v1alpha1.Cluster) (*ClusterClient, error)
 			break
 		}
 	}
-
 	var clusterClientSet = ClusterClient{}
-	clusterConfig, err := clientcmd.BuildConfigFromFlags(serverAddress, "")
-	if err != nil {
-		return nil, err
-	}
-	clusterConfig.QPS = KubeAPIQPS
-	clusterConfig.Burst = KubeAPIBurst
-	clusterClientSet.discoveryClient = discovery.NewDiscoveryClientForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
-	if clusterClientSet.discoveryClient == nil {
-		return nil, nil
+	if serverAddress != "" {
+		clusterConfig, err := clientcmd.BuildConfigFromFlags(serverAddress, "")
+		if err != nil {
+			return nil, err
+		}
+		clusterConfig.QPS = KubeAPIQPS
+		clusterConfig.Burst = KubeAPIBurst
+		clusterClientSet.discoveryClient = discovery.NewDiscoveryClientForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
+		if clusterClientSet.discoveryClient == nil {
+			return nil, nil
+		}
 	}
 	return &clusterClientSet, err
 }
 
-// GetClusterHealthStatus get the kubernetes cluster health status by requesting "/healthz"
+// GetClusterHealthStatus gets the kubernetes cluster health status by requesting "/healthz"
 func (self *ClusterClient) GetClusterHealthStatus() *federation_v1alpha1.ClusterStatus {
 	clusterStatus := federation_v1alpha1.ClusterStatus{}
 	currentTime := unversioned.Now()
 	newClusterReadyCondition := federation_v1alpha1.ClusterCondition{
 		Type:               federation_v1alpha1.ClusterReady,
 		Status:             v1.ConditionTrue,
-		Reason:             "federate cluster is ready",
-		Message:            "federate cluster response the '/healthz' with 'OK' ",
+		Reason:             "cluster is ready",
+		Message:            "/healthz responded with ok",
 		LastProbeTime:      currentTime,
 		LastTransitionTime: currentTime,
 	}
 	newClusterNotReadyCondition := federation_v1alpha1.ClusterCondition{
 		Type:               federation_v1alpha1.ClusterReady,
 		Status:             v1.ConditionFalse,
-		Reason:             "federate cluster is not ready",
-		Message:            "federate cluster response the '/healthz' request without 'OK' ",
+		Reason:             "cluster is not ready",
+		Message:            "/healthz responded without ok",
 		LastProbeTime:      currentTime,
 		LastTransitionTime: currentTime,
 	}
 	newNodeOfflineCondition := federation_v1alpha1.ClusterCondition{
 		Type:               federation_v1alpha1.ClusterOffline,
 		Status:             v1.ConditionTrue,
-		Reason:             "federate cluster is not reachable",
-		Message:            "federate cluster can not reach",
+		Reason:             "cluster is not reachable",
+		Message:            "cluster can not reach",
 		LastProbeTime:      currentTime,
 		LastTransitionTime: currentTime,
 	}
 	newNodeNotOfflineCondition := federation_v1alpha1.ClusterCondition{
 		Type:               federation_v1alpha1.ClusterOffline,
 		Status:             v1.ConditionFalse,
-		Reason:             "federate cluster is reachable",
-		Message:            "federate cluster can reach",
+		Reason:             "cluster is reachable",
+		Message:            "cluster can reach",
 		LastProbeTime:      currentTime,
 		LastTransitionTime: currentTime,
 	}

@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package federated_controller contains code for controllers (like the cluster
+// Package federation_controller contains code for controllers (like the cluster
 // controller).
-package federated_controller
+package federation_controller
