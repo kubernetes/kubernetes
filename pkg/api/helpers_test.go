@@ -23,8 +23,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/labels"
-
-	"speter.net/go/exp/math/dec/inf"
 )
 
 func TestConversionError(t *testing.T) {
@@ -56,8 +54,8 @@ func TestSemantic(t *testing.T) {
 		{resource.Quantity{}, resource.MustParse("0"), true},
 		{resource.Quantity{}, resource.MustParse("1m"), false},
 		{
-			resource.Quantity{Amount: inf.NewDec(5, 0), Format: resource.BinarySI},
-			resource.Quantity{Amount: inf.NewDec(5, 0), Format: resource.DecimalSI},
+			resource.NewQuantity(5, resource.BinarySI),
+			resource.NewQuantity(5, resource.DecimalSI),
 			true,
 		},
 		{resource.MustParse("2m"), resource.MustParse("1m"), false},

@@ -235,7 +235,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *extensions.H
 		}
 		statusList.Items = append(statusList.Items, extensions.CustomMetricCurrentStatus{
 			Name:         customMetricTarget.Name,
-			CurrentValue: *quantity,
+			CurrentValue: quantity,
 		})
 	}
 	byteStatusList, err := json.Marshal(statusList)

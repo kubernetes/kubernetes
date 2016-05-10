@@ -58,7 +58,7 @@ var Semantic = conversion.EqualitiesOrDie(
 		// TODO: if we decide it's important, it should be safe to start comparing the format.
 		//
 		// Uninitialized quantities are equivalent to 0 quantities.
-		if a.Sign() == 0 && b.Sign() == 0 {
+		if a.IsZero() && b.IsZero() {
 			return true
 		}
 		return a.Cmp(b) == 0

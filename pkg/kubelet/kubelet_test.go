@@ -4258,7 +4258,7 @@ func TestExtractBandwidthResources(t *testing.T) {
 					},
 				},
 			},
-			expectedIngress: ten,
+			expectedIngress: &ten,
 		},
 		{
 			pod: &api.Pod{
@@ -4268,7 +4268,7 @@ func TestExtractBandwidthResources(t *testing.T) {
 					},
 				},
 			},
-			expectedEgress: ten,
+			expectedEgress: &ten,
 		},
 		{
 			pod: &api.Pod{
@@ -4279,8 +4279,8 @@ func TestExtractBandwidthResources(t *testing.T) {
 					},
 				},
 			},
-			expectedIngress: four,
-			expectedEgress:  twenty,
+			expectedIngress: &four,
+			expectedEgress:  &twenty,
 		},
 		{
 			pod: &api.Pod{

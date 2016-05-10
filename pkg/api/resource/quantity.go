@@ -260,6 +260,9 @@ Suffix:
 
 // ParseQuantity turns str into a Quantity, or returns an error.
 func ParseQuantity(str string) (Quantity, error) {
+	if len(str) == 0 {
+		return Quantity{}, ErrFormatWrong
+	}
 	if str == "0" {
 		return Quantity{Format: DecimalSI}, nil
 	}
@@ -373,7 +376,7 @@ func ParseQuantity(str string) (Quantity, error) {
 // * Otherwise, if q.Format is set to BinarySI, frational parts of q.Amount will be
 //   rounded up. (1.1i becomes 2i.)
 func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
-	if q.Sign() == 0 {
+	if q.IsZero() {
 		return zeroBytes, nil
 	}
 
@@ -450,6 +453,13 @@ func (q *Quantity) AsCanonicalBase1024Bytes(out []byte) (result []byte, exponent
 	return q.i.AsCanonicalBase1024Bytes(out)
 }
 
+func (q *Quantity) IsZero() bool {
+	if q.d.Dec != nil {
+		return q.d.Dec.Sign() == 0
+	}
+	return q.i.value == 0
+}
+
 func (q *Quantity) Sign() int {
 	if q.d.Dec != nil {
 		return q.d.Dec.Sign()
@@ -488,7 +498,7 @@ func (q *Quantity) Add(y Quantity) {
 		if q.i.Add(y.i) {
 			return
 		}
-	} else if q.Sign() == 0 {
+	} else if q.IsZero() {
 		q.Format = y.Format
 	}
 	q.ToDec().d.Dec.Add(q.d.Dec, y.AsDec())
@@ -496,7 +506,7 @@ func (q *Quantity) Add(y Quantity) {
 
 func (q *Quantity) Sub(y Quantity) {
 	q.s = nil
-	if q.Sign() == 0 {
+	if q.IsZero() {
 		q.Format = y.Format
 	}
 	if q.d.Dec == nil && y.d.Dec == nil && q.i.Sub(y.i) {
