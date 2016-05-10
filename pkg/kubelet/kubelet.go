@@ -1725,11 +1725,12 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, podStatus *kubecont
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// Kill pod if it should not be running
-	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
-		if err := kl.killPod(pod, nil, podStatus, nil); err != nil {
-			utilruntime.HandleError(err)
+	if errOuter := canRunPod(pod); errOuter != nil || pod.DeletionTimestamp != nil {
+		if errInner := kl.killPod(pod, nil, podStatus, nil); errInner != nil {
+			errOuter = fmt.Errorf("error killing pod: %v", errInner)
+			utilruntime.HandleError(errOuter)
 		}
-		return err
+		return errOuter
 	}
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
