@@ -75,10 +75,8 @@ type Config struct {
 		Username   string `gcfg:"username"`
 		Password   string `gcfg:"password-base64"`
 		Alias      string `gcfg:"alias"`
-		Token      string
 		Datacenter string `gcfg:"datacenter"`
 	}
-	// LoadBalancer LoadBalancerOpts
 }
 
 func readConfig(config io.Reader) (Config, error) {

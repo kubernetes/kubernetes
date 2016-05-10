@@ -18,12 +18,7 @@ package clc
 
 import (
 	"bytes"
-
-	// put this back if cert checking is to be disabled again
-	// tls "crypto/tls"
-
 	"encoding/json"
-
 	"fmt"
 	"io"
 	"net/http"
@@ -37,26 +32,26 @@ var bCloseConnections = true
 var bDebugRequests = true
 var bDebugResponses = true
 
-func SetCloseConnectionMode(b bool) {
+func setCloseConnectionMode(b bool) {
 	bCloseConnections = b
 }
 
-func SetDebugRequestMode(b bool) {
+func setDebugRequestMode(b bool) {
 	bDebugRequests = b
 }
 
-func SetDebugResponseMode(b bool) {
+func setDebugResponseMode(b bool) {
 	bDebugResponses = b
 }
 
 //// most funcs here return HttpError, which is an error
 
 const ( // HttpError codes when the error occurred here, not in the remote call.  Hijacking the 000 range for this.
-	HTTP_ERROR_UNKNOWN   = 0
-	HTTP_ERROR_NOCREDS   = 1
-	HTTP_ERROR_CLIENT    = 2
-	HTTP_ERROR_NOREQUEST = 3
-	HTTP_ERROR_JSON      = 4
+	httpErrorUnknown = iota
+	httpErrorNoCreds
+	httpErrorClient
+	httpErrorNoRequest
+	httpErrorJSON
 )
 
 // no request message body sent.  Response body returned if ret is not nil
@@ -74,7 +69,7 @@ func marshalledPOST(server, uri string, creds Credentials, body interface{}, ret
 	b := new(bytes.Buffer)
 	err := json.NewEncoder(b).Encode(body)
 	if err != nil {
-		return HTTP_ERROR_JSON, clcError(fmt.Sprintf("JSON marshalling failed, err=%s", err.Error()))
+		return httpErrorJSON, clcError(fmt.Sprintf("JSON marshalling failed, err=%s", err.Error()))
 	}
 
 	return invokeHTTP("POST", server, uri, creds, b, ret)
@@ -85,7 +80,7 @@ func marshalledPUT(server, uri string, creds Credentials, body interface{}, ret 
 	b := new(bytes.Buffer)
 	err := json.NewEncoder(b).Encode(body)
 	if err != nil {
-		return HTTP_ERROR_JSON, clcError(fmt.Sprintf("JSON marshalling failed, err=%s", err.Error()))
+		return httpErrorJSON, clcError(fmt.Sprintf("JSON marshalling failed, err=%s", err.Error()))
 	}
 
 	return invokeHTTP("PUT", server, uri, creds, b, ret)
@@ -104,7 +99,7 @@ func simplePOST(server, uri string, creds Credentials, body string, ret interfac
 // body may be be nil
 
 // return int is HTTP response code.  Or an HTTP_ERROR series-000 value, especially if no request was made
-// So the possible returns are: (HTTP_ERROR_XXX, err) (non-2xx, err), (2xx, json-err), (2xx, nil)
+// So the possible returns are: (httpErrorXXX, err) (non-2xx, err), (2xx, json-err), (2xx, nil)
 //      caller couldn't marshal a payload                                                        (0, err)
 // 		failed to issue a request.  Does anyone really need the integer code of why not?         (0, err)
 //		HTTP response had a failure code.  Retain this code, a 404 might not really be an error. (4xx, err)
@@ -114,13 +109,13 @@ func simplePOST(server, uri string, creds Credentials, body string, ret interfac
 
 func invokeHTTP(method, server, uri string, creds Credentials, body io.Reader, ret interface{}) (int, error) {
 	if (creds == nil) || !creds.IsValid() {
-		return HTTP_ERROR_NOCREDS, clcError("username and/or password not provided")
+		return httpErrorNoCreds, clcError("username and/or password not provided")
 	}
 
-	full_url := ("https://" + server + uri)
-	req, err := http.NewRequest(method, full_url, body)
+	fullURL := ("https://" + server + uri)
+	req, err := http.NewRequest(method, fullURL, body)
 	if err != nil {
-		return HTTP_ERROR_NOREQUEST, err
+		return httpErrorNoRequest, err
 	} else if body != nil {
 		req.Header.Add("Content-Type", "application/json") // incoming body to be a marshaled object already
 	}
@@ -157,7 +152,7 @@ func invokeHTTP(method, server, uri string, creds Credentials, body io.Reader, r
 	}
 
 	if err != nil { // failed HTTP call
-		return HTTP_ERROR_CLIENT, err
+		return httpErrorClient, err
 	}
 
 	if resp.StatusCode == 401 { // Unauthorized.  Not a failure yet, perhaps we can reauth.  This is why we need a whole Credentials and not just the token
