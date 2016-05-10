@@ -59,8 +59,7 @@ func TestQuota(t *testing.T) {
 		<-initializationCh
 		m.Handler.ServeHTTP(w, req)
 	}))
-	// TODO: Uncomment when fix #19254
-	// defer s.Close()
+	defer s.Close()
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	admission, err := resourcequota.NewResourceQuota(clientset, quotainstall.NewRegistry(clientset), 5)
 	if err != nil {
