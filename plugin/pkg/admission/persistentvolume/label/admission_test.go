@@ -53,6 +53,14 @@ func (v *mockVolumes) GetVolumeLabels(volumeName string) (map[string]string, err
 	return v.volumeLabels, v.volumeLabelsError
 }
 
+func (c *mockVolumes) GetDiskPath(volumeName string) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+func (c *mockVolumes) DiskIsAttached(volumeName, instanceID string) (bool, error) {
+	return false, fmt.Errorf("not implemented")
+}
+
 func mockVolumeFailure(err error) *mockVolumes {
 	return &mockVolumes{volumeLabelsError: err}
 }
