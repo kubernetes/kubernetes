@@ -360,6 +360,10 @@ function detect-trusty-image () {
         AWS_IMAGE=ami-93876e93
         ;;
 
+      ap-northeast-2)
+        AWS_IMAGE=ami-62ac620c
+        ;;
+
       ap-southeast-1)
         AWS_IMAGE=ami-66546234
         ;;

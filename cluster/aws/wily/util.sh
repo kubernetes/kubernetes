@@ -33,6 +33,10 @@ function detect-wily-image () {
         AWS_IMAGE=ami-3355505d
         ;;
 
+      ap-northeast-2)
+        AWS_IMAGE=ami-e427e98a
+        ;;
+
       ap-southeast-1)
         AWS_IMAGE=ami-60975903
         ;;
