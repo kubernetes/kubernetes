@@ -26,11 +26,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 const usageHelp = "" +
@@ -115,13 +116,13 @@ func (p *pkg) isNewerThan(buildTime time.Time) bool {
 	// Test for file staleness
 	for _, f := range p.TestGoFiles {
 		if isNewerThan(filepath.Join(p.Dir, f), buildTime) {
-			log.Printf("test Go file %s is stale", f)
+			glog.V(4).Infof("test Go file %s is stale", f)
 			return true
 		}
 	}
 	for _, f := range p.XTestGoFiles {
 		if isNewerThan(filepath.Join(p.Dir, f), buildTime) {
-			log.Printf("external test Go file %s is stale", f)
+			glog.V(4).Infof("external test Go file %s is stale", f)
 			return true
 		}
 	}
@@ -138,13 +139,13 @@ func (p *pkg) isNewerThan(buildTime time.Time) bool {
 	// dependencies.
 	pkgs, err := pkgInfo(imps)
 	if err != nil || len(pkgs) < 1 {
-		log.Printf("failed to obtain metadata for packages %s: %v", imps, err)
+		glog.V(4).Infof("failed to obtain metadata for packages %s: %v", imps, err)
 		return true
 	}
 
 	for _, p := range pkgs {
 		if p.Stale {
-			log.Printf("import %q is stale", p.ImportPath)
+			glog.V(4).Infof("import %q is stale", p.ImportPath)
 			return true
 		}
 	}
@@ -165,14 +166,14 @@ func isNewerThan(filename string, buildTime time.Time) bool {
 func isTestStale(binPath, pkgPath string) bool {
 	bStat, err := os.Stat(binPath)
 	if err != nil {
-		log.Printf("Couldn't obtain the modified time of the binary %s: %v", binPath, err)
+		glog.V(4).Infof("Couldn't obtain the modified time of the binary %s: %v", binPath, err)
 		return true
 	}
 	buildTime := bStat.ModTime()
 
 	pkgs, err := pkgInfo([]string{pkgPath})
 	if err != nil || len(pkgs) < 1 {
-		log.Printf("Couldn't retrieve test package information for package %s: %v", pkgPath, err)
+		glog.V(4).Infof("Couldn't retrieve test package information for package %s: %v", pkgPath, err)
 		return false
 	}
 
