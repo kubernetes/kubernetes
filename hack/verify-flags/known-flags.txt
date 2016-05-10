@@ -121,6 +121,7 @@ event-ttl
 eviction-hard
 eviction-soft
 eviction-soft-grace-period
+eviction-pressure-transition-period
 executor-bindall
 executor-logv
 executor-path

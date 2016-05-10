@@ -38,6 +38,14 @@ const (
 	OpLessThan ThresholdOperator = "LessThan"
 )
 
+// Config holds information about how eviction is configured.
+type Config struct {
+	// PressureTransitionPeriod is duration the kubelet has to wait before transititioning out of a pressure condition.
+	PressureTransitionPeriod time.Duration
+	// Thresholds define the set of conditions monitored to trigger eviction.
+	Thresholds []Threshold
+}
+
 // Threshold defines a metric for when eviction should occur.
 type Threshold struct {
 	// Signal defines the entity that was measured.

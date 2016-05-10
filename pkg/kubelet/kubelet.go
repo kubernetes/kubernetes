@@ -223,7 +223,7 @@ func NewMainKubelet(
 	containerRuntimeOptions []kubecontainer.Option,
 	hairpinMode string,
 	babysitDaemons bool,
-	thresholds []eviction.Threshold,
+	evictionConfig eviction.Config,
 	kubeOptions []Option,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
