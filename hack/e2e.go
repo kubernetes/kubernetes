@@ -155,6 +155,10 @@ func Up() bool {
 
 // Ensure that the cluster is large engough to run the e2e tests.
 func ValidateClusterSize() {
+	if os.Getenv("FEDERATION") == "true" {
+		//TODO(colhom): federated equivalent of  ValidateClusterSize
+		return
+	}
 	// Check that there are at least minNodeCount nodes running
 	cmd := exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh"))
 	if *verbose {
@@ -189,7 +193,15 @@ func Test() bool {
 		ValidateClusterSize()
 	}
 
-	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
+	if os.Getenv("FEDERATION") == "" {
+		return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
+	} else {
+
+		if *testArgs == "" {
+			*testArgs = "--ginkgo.focus=\\[Feature:Federation\\]"
+		}
+		return finishRunning("Federated Ginkgo tests", exec.Command(filepath.Join(*root, "hack/federated-ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
+	}
 }
 
 func finishRunning(stepName string, cmd *exec.Cmd) bool {
@@ -212,8 +224,9 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 // returns either "", or a list of args intended for appending with the
 // kubectl command (beginning with a space).
 func kubectlArgs() string {
+	args := []string{""}
 	if *checkVersionSkew {
-		return " --match-server-version"
+		args = append(args, "--match-server-version")
 	}
-	return ""
+	return strings.Join(args, " ")
 }

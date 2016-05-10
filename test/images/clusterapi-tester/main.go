@@ -22,11 +22,12 @@ import (
 	"log"
 
 	"fmt"
+	"net/http"
+
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"net/http"
 )
 
 func main() {
