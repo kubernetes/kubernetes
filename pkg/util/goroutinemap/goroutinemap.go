@@ -37,6 +37,11 @@ type GoRoutineMap interface {
 	// removed from the list of executing operations allowing a new operation
 	// to be started with the same name without error.
 	NewGoRoutine(operationName string, operation func() error) error
+
+	// Wait blocks until all operations are completed. This is typically
+	// necessary during tests - the test should wait until all operations finish
+	// and evaluate results after that.
+	Wait()
 }
 
 // NewGoRoutineMap returns a new instance of GoRoutineMap.
@@ -49,6 +54,7 @@ func NewGoRoutineMap() GoRoutineMap {
 type goRoutineMap struct {
 	operations map[string]bool
 	sync.Mutex
+	wg sync.WaitGroup
 }
 
 func (grm *goRoutineMap) NewGoRoutine(operationName string, operation func() error) error {
@@ -60,6 +66,7 @@ func (grm *goRoutineMap) NewGoRoutine(operationName string, operation func() err
 	}
 
 	grm.operations[operationName] = true
+	grm.wg.Add(1)
 	go func() {
 		defer grm.operationComplete(operationName)
 		defer runtime.HandleCrash()
@@ -70,7 +77,12 @@ func (grm *goRoutineMap) NewGoRoutine(operationName string, operation func() err
 }
 
 func (grm *goRoutineMap) operationComplete(operationName string) {
+	defer grm.wg.Done()
 	grm.Lock()
 	defer grm.Unlock()
 	delete(grm.operations, operationName)
+}
+
+func (grm *goRoutineMap) Wait() {
+	grm.wg.Wait()
 }
