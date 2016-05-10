@@ -79,6 +79,12 @@ type ServerRunOptions struct {
 }
 
 func NewServerRunOptions() *ServerRunOptions {
+	// This needs to happen after all init() calls and before anything
+	// calls stuff in the registered package. Here seems good. It could go
+	// earlier but this seems the earliest common place.
+	if err := registered.RegisterAnnouncedVersions(); err != nil {
+		glog.Fatalf("Unable to register announced versions. This probably means you have an error in your group or group version announcing code. The specific error was: %v", err)
+	}
 	return &ServerRunOptions{
 		APIGroupPrefix:         "/apis",
 		APIPrefix:              "/api",
