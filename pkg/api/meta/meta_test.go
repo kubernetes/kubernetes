@@ -739,6 +739,8 @@ type MyAPIObject2 struct {
 func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metatypes.OwnerReference) {
 	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&myAPIObject2)
 	references := myAPIObject2.ObjectMeta.OwnerReferences
+	// This is necessary for the test to pass because the getter will return a
+	// non-nil slice.
 	metaOwnerReferences = make([]metatypes.OwnerReference, 0)
 	for i := 0; i < len(references); i++ {
 		metaOwnerReferences = append(metaOwnerReferences, metatypes.OwnerReference{
@@ -749,17 +751,11 @@ func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerRef
 		})
 	}
 	if len(references) == 0 {
+		// This is necessary for the test to pass because the setter will make a
+		// non-nil slice.
 		myAPIObject2.ObjectMeta.OwnerReferences = make([]v1.OwnerReference, 0)
 	}
 	return myAPIObject2, metaOwnerReferences
-}
-
-func TestAccessOwnerReferences(t *testing.T) {
-	fuzzIter := 5
-	for i := 0; i < fuzzIter; i++ {
-		testGetOwnerReferences(t)
-		testSetOwnerReferences(t)
-	}
 }
 
 func testGetOwnerReferences(t *testing.T) {
@@ -782,8 +778,16 @@ func testSetOwnerReferences(t *testing.T) {
 		t.Error(err)
 	}
 	accessor.SetOwnerReferences(references)
-	if !reflect.DeepEqual(obj.ObjectMeta.OwnerReferences, expected.ObjectMeta.OwnerReferences) {
-		t.Errorf("expect %#v\n got %#v", expected.ObjectMeta.OwnerReferences, obj.ObjectMeta.OwnerReferences)
+	if e, a := expected.ObjectMeta.OwnerReferences, obj.ObjectMeta.OwnerReferences; !reflect.DeepEqual(e, a) {
+		t.Errorf("expect %#v\n got %#v", e, a)
+	}
+}
+
+func TestAccessOwnerReferences(t *testing.T) {
+	fuzzIter := 5
+	for i := 0; i < fuzzIter; i++ {
+		testGetOwnerReferences(t)
+		testSetOwnerReferences(t)
 	}
 }
 

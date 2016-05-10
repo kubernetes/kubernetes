@@ -72,14 +72,6 @@ func getObjectMetaAndOwnerRefereneces() (objectMeta api.ObjectMeta, metaOwnerRef
 	return objectMeta, metaOwnerReferences
 }
 
-func TestAccessOwnerReferences(t *testing.T) {
-	fuzzIter := 5
-	for i := 0; i < fuzzIter; i++ {
-		testGetOwnerReferences(t)
-		testSetOwnerReferences(t)
-	}
-}
-
 func testGetOwnerReferences(t *testing.T) {
 	meta, expected := getObjectMetaAndOwnerReferneces()
 	refs := meta.GetOwnerReferences()
@@ -94,5 +86,13 @@ func testSetOwnerReferences(t *testing.T) {
 	objectMeta.SetOwnerReferences(newRefs)
 	if !reflect.DeepEqual(expected.OwnerReferences, objectMeta.OwnerReferences) {
 		t.Errorf("expect: %#v\n got: %#v", expected.OwnerReferences, objectMeta.OwnerReferences)
+	}
+}
+
+func TestAccessOwnerReferences(t *testing.T) {
+	fuzzIter := 5
+	for i := 0; i < fuzzIter; i++ {
+		testGetOwnerReferences(t)
+		testSetOwnerReferences(t)
 	}
 }

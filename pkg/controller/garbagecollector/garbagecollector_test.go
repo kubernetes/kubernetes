@@ -17,12 +17,13 @@ limitations under the License.
 package garbagecollector
 
 import (
-	"flag"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+
+	_ "k8s.io/kubernetes/pkg/api/install"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/json"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -46,6 +46,55 @@ func TestNewGarbageCollector(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 1, len(gc.monitors))
+}
+
+// fakeAction records information about requests to aid in testing.
+type fakeAction struct {
+	method string
+	path   string
+}
+
+// String returns method=path to aid in testing
+func (f *fakeAction) String() string {
+	return strings.Join([]string{f.method, f.path}, "=")
+}
+
+type FakeResponse struct {
+	statusCode int
+	content    []byte
+}
+
+// fakeActionHandler holds a list of fakeActions received
+type fakeActionHandler struct {
+	// statusCode and content returned by this handler for different method + path.
+	response map[string]FakeResponse
+
+	lock    sync.Mutex
+	actions []fakeAction
+}
+
+// ServeHTTP logs the action that occurred and always returns the associated status code
+func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
+	fakeResponse, ok := f.response[request.Method+request.URL.Path]
+	if !ok {
+		fakeResponse.statusCode = 200
+		fakeResponse.content = []byte("{\"kind\": \"List\"}")
+	}
+	response.WriteHeader(fakeResponse.statusCode)
+	response.Write(fakeResponse.content)
+}
+
+// testServerAndClientConfig returns a server that listens and a config that can reference it
+func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request)) (*httptest.Server, *restclient.Config) {
+	srv := httptest.NewServer(http.HandlerFunc(handler))
+	config := &restclient.Config{
+		Host: srv.URL,
+	}
+	return srv, config
 }
 
 func newDanglingPod() *v1.Pod {
@@ -69,8 +118,8 @@ func newDanglingPod() *v1.Pod {
 	}
 }
 
-func TestCheckGarbage(t *testing.T) {
-	flag.Set("v", "9")
+// test the processItem function making the expected actions.
+func TestProcessItem(t *testing.T) {
 	pod := newDanglingPod()
 	podBytes, err := json.Marshal(pod)
 	if err != nil {
@@ -128,66 +177,6 @@ func TestCheckGarbage(t *testing.T) {
 	}
 }
 
-// TODO: this code is shared with the deployment_controller_test. Move it to a common place.
-func getKey(obj interface{}, t *testing.T) string {
-	if key, err := controller.KeyFunc(obj); err != nil {
-		t.Errorf("Unexpected error getting key: %v", err)
-		return ""
-	} else {
-		return key
-	}
-}
-
-//TODO: this test code is shared with the namespace_controller_test. Move it to pkg/util/testing/fake_handler.go
-// fakeAction records information about requests to aid in testing.
-type fakeAction struct {
-	method string
-	path   string
-}
-
-// String returns method=path to aid in testing
-func (f *fakeAction) String() string {
-	return strings.Join([]string{f.method, f.path}, "=")
-}
-
-type FakeResponse struct {
-	statusCode int
-	content    []byte
-}
-
-// fakeActionHandler holds a list of fakeActions received
-type fakeActionHandler struct {
-	// statusCode returned by this handler for different method + path.
-	response map[string]FakeResponse
-
-	lock    sync.Mutex
-	actions []fakeAction
-}
-
-// ServeHTTP logs the action that occurred and always returns the associated status code
-func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-
-	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
-	fakeResponse, ok := f.response[request.Method+request.URL.Path]
-	if !ok {
-		fakeResponse.statusCode = 200
-		fakeResponse.content = []byte("{\"kind\": \"List\"}")
-	}
-	response.WriteHeader(fakeResponse.statusCode)
-	response.Write(fakeResponse.content)
-}
-
-// testServerAndClientConfig returns a server that listens and a config that can reference it
-func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request)) (*httptest.Server, *restclient.Config) {
-	srv := httptest.NewServer(http.HandlerFunc(handler))
-	config := &restclient.Config{
-		Host: srv.URL,
-	}
-	return srv, config
-}
-
 // verifyGraphInvariants verifies that all of a node's owners list the node as a
 // dependent and vice versa. This invariant holds when the owners are created
 // before their dependents. uidToNode has all the nodes in the graph.
@@ -219,8 +208,6 @@ func verifyGraphInvariants(scenario string, uidToNode map[types.UID]*node, t *te
 	}
 }
 
-// if eventType==updateEvent, the owners will be treated as the owners in the
-// new object.
 func createEvent(eventType eventType, selfUID string, owners []string) event {
 	var ownerReferences []api.OwnerReference
 	for i := 0; i < len(owners); i++ {
@@ -239,7 +226,9 @@ func createEvent(eventType eventType, selfUID string, owners []string) event {
 
 func TestProcessEvent(t *testing.T) {
 	var testScenarios = []struct {
-		name   string
+		name string
+		// a series of events that will be supplied to the
+		// Propagator.eventQueue.
 		events []event
 	}{
 		{

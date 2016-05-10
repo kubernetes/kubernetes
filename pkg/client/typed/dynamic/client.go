@@ -119,17 +119,6 @@ func (rc *ResourceClient) List(opts runtime.Object) (*runtime.UnstructuredList, 
 	return result, err
 }
 
-// UnversionedList returns a list of objects for this resource.
-func (rc *ResourceClient) UnversionedList(opts api.ListOptions) (*runtime.UnstructuredList, error) {
-	result := new(runtime.UnstructuredList)
-	err := rc.namespace(rc.cl.Get()).
-		Resource(rc.resource.Name).
-		VersionedParams(&opts, parameterEncoder).
-		Do().
-		Into(result)
-	return result, err
-}
-
 // Get gets the resource with the specified name.
 func (rc *ResourceClient) Get(name string) (*runtime.Unstructured, error) {
 	result := new(runtime.Unstructured)
@@ -192,14 +181,6 @@ func (rc *ResourceClient) Watch(opts runtime.Object) (watch.Interface, error) {
 	return rc.namespace(rc.cl.Get().Prefix("watch")).
 		Resource(rc.resource.Name).
 		VersionedParams(opts, parameterEncoder).
-		Watch()
-}
-
-// UnversionedWatch returns a watch.Interface that watches the resource.
-func (rc *ResourceClient) UnversionedWatch(opts api.ListOptions) (watch.Interface, error) {
-	return rc.namespace(rc.cl.Get().Prefix("watch")).
-		Resource(rc.resource.Name).
-		VersionedParams(&opts, parameterEncoder).
 		Watch()
 }
 

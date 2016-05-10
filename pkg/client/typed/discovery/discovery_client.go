@@ -189,7 +189,6 @@ func (d *DiscoveryClient) serverPreferredResources(namespaced bool) ([]unversion
 			continue
 		}
 		groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
-		// TODO: we need to skip bindings, extensions/v1beta1/replicationcontrollers (the dummy). Discovery API doesn't tell what operations are allowed.
 		for _, apiResource := range apiResourceList.APIResources {
 			// ignore the root scoped resources if "namespaced" is true.
 			if namespaced && !apiResource.Namespaced {
