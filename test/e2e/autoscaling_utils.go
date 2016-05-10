@@ -40,7 +40,8 @@ const (
 	timeoutRC                       = 120 * time.Second
 	startServiceTimeout             = time.Minute
 	startServiceInterval            = 5 * time.Second
-	resourceConsumerImage           = "gcr.io/google_containers/resource_consumer:beta2"
+	resourceConsumerImage           = "gcr.io/google_containers/resource_consumer:beta4"
+	resourceConsumerControllerImage = "gcr.io/google_containers/resource_consumer/controller:beta4"
 	rcIsNil                         = "ERROR: replicationController = nil"
 	deploymentIsNil                 = "ERROR: deployment = nil"
 	rsIsNil                         = "ERROR: replicaset = nil"
@@ -58,6 +59,7 @@ rc.ConsumeCPU(300)
 */
 type ResourceConsumer struct {
 	name                     string
+	controllerName           string
 	kind                     string
 	framework                *framework.Framework
 	cpu                      chan int
@@ -97,6 +99,7 @@ func newResourceConsumer(name, kind string, replicas, initCPUTotal, initMemoryTo
 	runServiceAndWorkloadForResourceConsumer(f.Client, f.Namespace.Name, name, kind, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
 		name:                     name,
+		controllerName:           name + "-controller",
 		kind:                     kind,
 		framework:                f,
 		cpu:                      make(chan int),
@@ -111,8 +114,10 @@ func newResourceConsumer(name, kind string, replicas, initCPUTotal, initMemoryTo
 		requestSizeInMegabytes:   requestSizeInMegabytes,
 		requestSizeCustomMetric:  requestSizeCustomMetric,
 	}
+
 	go rc.makeConsumeCPURequests()
 	rc.ConsumeCPU(initCPUTotal)
+
 	go rc.makeConsumeMemRequests()
 	rc.ConsumeMem(initMemoryTotal)
 	go rc.makeConsumeCustomMetric()
@@ -140,25 +145,15 @@ func (rc *ResourceConsumer) ConsumeCustomMetric(amount int) {
 
 func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	defer GinkgoRecover()
-	var count int
-	var rest int
 	sleepTime := time.Duration(0)
+	millicores := 0
 	for {
 		select {
-		case millicores := <-rc.cpu:
-			framework.Logf("RC %s: consume %v millicores in total", rc.name, millicores)
-			if rc.requestSizeInMillicores != 0 {
-				count = millicores / rc.requestSizeInMillicores
-			}
-			rest = millicores - count*rc.requestSizeInMillicores
+		case millicores = <-rc.cpu:
+			framework.Logf("RC %s: setting consumption to %v millicores in total", rc.name, millicores)
 		case <-time.After(sleepTime):
-			framework.Logf("RC %s: sending %v requests to consume %v millicores each and 1 request to consume %v millicores", rc.name, count, rc.requestSizeInMillicores, rest)
-			if count > 0 {
-				rc.sendConsumeCPURequests(count, rc.requestSizeInMillicores, rc.consumptionTimeInSeconds)
-			}
-			if rest > 0 {
-				go rc.sendOneConsumeCPURequest(rest, rc.consumptionTimeInSeconds)
-			}
+			framework.Logf("RC %s: sending request to consume %d millicores", rc.name, millicores)
+			rc.sendConsumeCPURequest(millicores)
 			sleepTime = rc.sleepTime
 		case <-rc.stopCPU:
 			return
@@ -168,25 +163,15 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 
 func (rc *ResourceConsumer) makeConsumeMemRequests() {
 	defer GinkgoRecover()
-	var count int
-	var rest int
 	sleepTime := time.Duration(0)
+	megabytes := 0
 	for {
 		select {
-		case megabytes := <-rc.mem:
-			framework.Logf("RC %s: consume %v MB in total", rc.name, megabytes)
-			if rc.requestSizeInMegabytes != 0 {
-				count = megabytes / rc.requestSizeInMegabytes
-			}
-			rest = megabytes - count*rc.requestSizeInMegabytes
+		case megabytes = <-rc.mem:
+			framework.Logf("RC %s: setting consumption to %v MB in total", rc.name, megabytes)
 		case <-time.After(sleepTime):
-			framework.Logf("RC %s: sending %v requests to consume %v MB each and 1 request to consume %v MB", rc.name, count, rc.requestSizeInMegabytes, rest)
-			if count > 0 {
-				rc.sendConsumeMemRequests(count, rc.requestSizeInMegabytes, rc.consumptionTimeInSeconds)
-			}
-			if rest > 0 {
-				go rc.sendOneConsumeMemRequest(rest, rc.consumptionTimeInSeconds)
-			}
+			framework.Logf("RC %s: sending request to consume %d MB", rc.name, megabytes)
+			rc.sendConsumeMemRequest(megabytes)
 			sleepTime = rc.sleepTime
 		case <-rc.stopMem:
 			return
@@ -196,26 +181,15 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 
 func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 	defer GinkgoRecover()
-	var count int
-	var rest int
 	sleepTime := time.Duration(0)
+	delta := 0
 	for {
 		select {
-		case total := <-rc.customMetric:
-			framework.Logf("RC %s: consume custom metric %v in total", rc.name, total)
-			if rc.requestSizeInMegabytes != 0 {
-				count = total / rc.requestSizeCustomMetric
-			}
-			rest = total - count*rc.requestSizeCustomMetric
+		case delta := <-rc.customMetric:
+			framework.Logf("RC %s: setting bump of metric %s to %d in total", rc.name, customMetricName, delta)
 		case <-time.After(sleepTime):
-			framework.Logf("RC %s: sending %v requests to consume %v custom metric each and 1 request to consume %v",
-				rc.name, count, rc.requestSizeCustomMetric, rest)
-			if count > 0 {
-				rc.sendConsumeCustomMetric(count, rc.requestSizeCustomMetric, rc.consumptionTimeInSeconds)
-			}
-			if rest > 0 {
-				go rc.sendOneConsumeCustomMetric(rest, rc.consumptionTimeInSeconds)
-			}
+			framework.Logf("RC %s: sending request to consume %d of custom metric %s", rc.name, delta, customMetricName)
+			rc.sendConsumeCustomMetric(delta)
 			sleepTime = rc.sleepTime
 		case <-rc.stopCustomMetric:
 			return
@@ -223,64 +197,48 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 	}
 }
 
-func (rc *ResourceConsumer) sendConsumeCPURequests(requests, millicores, durationSec int) {
-	for i := 0; i < requests; i++ {
-		go rc.sendOneConsumeCPURequest(millicores, durationSec)
-	}
-}
-
-func (rc *ResourceConsumer) sendConsumeMemRequests(requests, megabytes, durationSec int) {
-	for i := 0; i < requests; i++ {
-		go rc.sendOneConsumeMemRequest(megabytes, durationSec)
-	}
-}
-
-func (rc *ResourceConsumer) sendConsumeCustomMetric(requests, delta, durationSec int) {
-	for i := 0; i < requests; i++ {
-		go rc.sendOneConsumeCustomMetric(delta, durationSec)
-	}
-}
-
-// sendOneConsumeCPURequest sends POST request for cpu consumption
-func (rc *ResourceConsumer) sendOneConsumeCPURequest(millicores int, durationSec int) {
-	defer GinkgoRecover()
+func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.Client, rc.framework.Client.Post())
 	framework.ExpectNoError(err)
-	_, err = proxyRequest.Namespace(rc.framework.Namespace.Name).
-		Name(rc.name).
+	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		Name(rc.controllerName).
 		Suffix("ConsumeCPU").
 		Param("millicores", strconv.Itoa(millicores)).
-		Param("durationSec", strconv.Itoa(durationSec)).
-		DoRaw()
+		Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
+		Param("requestSizeMillicores", strconv.Itoa(rc.requestSizeInMillicores))
+	framework.Logf("URL: %v", *req.URL())
+	_, err = req.DoRaw()
 	framework.ExpectNoError(err)
 }
 
-// sendOneConsumeMemRequest sends POST request for memory consumption
-func (rc *ResourceConsumer) sendOneConsumeMemRequest(megabytes int, durationSec int) {
-	defer GinkgoRecover()
+// sendConsumeMemRequest sends POST request for memory consumption
+func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.Client, rc.framework.Client.Post())
 	framework.ExpectNoError(err)
-	_, err = proxyRequest.Namespace(rc.framework.Namespace.Name).
-		Name(rc.name).
+	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		Name(rc.controllerName).
 		Suffix("ConsumeMem").
 		Param("megabytes", strconv.Itoa(megabytes)).
-		Param("durationSec", strconv.Itoa(durationSec)).
-		DoRaw()
+		Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
+		Param("requestSizeMegabytes", strconv.Itoa(rc.requestSizeInMegabytes))
+	framework.Logf("URL: %v", *req.URL())
+	_, err = req.DoRaw()
 	framework.ExpectNoError(err)
 }
 
-// sendOneConsumeCustomMetric sends POST request for custom metric consumption
-func (rc *ResourceConsumer) sendOneConsumeCustomMetric(delta int, durationSec int) {
-	defer GinkgoRecover()
+// sendConsumeCustomMetric sends POST request for custom metric consumption
+func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.Client, rc.framework.Client.Post())
 	framework.ExpectNoError(err)
-	_, err = proxyRequest.Namespace(rc.framework.Namespace.Name).
-		Name(rc.name).
+	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		Name(rc.controllerName).
 		Suffix("BumpMetric").
 		Param("metric", customMetricName).
 		Param("delta", strconv.Itoa(delta)).
-		Param("durationSec", strconv.Itoa(durationSec)).
-		DoRaw()
+		Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
+		Param("requestSizeMetrics", strconv.Itoa(rc.requestSizeCustomMetric))
+	framework.Logf("URL: %v", *req.URL())
+	_, err = req.DoRaw()
 	framework.ExpectNoError(err)
 }
 
@@ -346,6 +304,8 @@ func (rc *ResourceConsumer) CleanUp() {
 	time.Sleep(10 * time.Second)
 	framework.ExpectNoError(framework.DeleteRC(rc.framework.Client, rc.framework.Namespace.Name, rc.name))
 	framework.ExpectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.name))
+	framework.ExpectNoError(framework.DeleteRC(rc.framework.Client, rc.framework.Namespace.Name, rc.controllerName))
+	framework.ExpectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.controllerName))
 }
 
 func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
@@ -399,6 +359,38 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 	default:
 		framework.Failf(invalidKind)
 	}
+
+	By(fmt.Sprintf("Running controller"))
+	controllerName := name + "-controller"
+	_, err = c.Services(ns).Create(&api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name: controllerName,
+		},
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{{
+				Port:       port,
+				TargetPort: intstr.FromInt(targetPort),
+			}},
+
+			Selector: map[string]string{
+				"name": controllerName,
+			},
+		},
+	})
+	framework.ExpectNoError(err)
+
+	dnsClusterFirst := api.DNSClusterFirst
+	controllerRcConfig := framework.RCConfig{
+		Client:    c,
+		Image:     resourceConsumerControllerImage,
+		Name:      controllerName,
+		Namespace: ns,
+		Timeout:   timeoutRC,
+		Replicas:  1,
+		Command:   []string{"/controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
+		DNSPolicy: &dnsClusterFirst,
+	}
+	framework.ExpectNoError(framework.RunRC(controllerRcConfig))
 
 	// Make sure endpoints are propagated.
 	// TODO(piosz): replace sleep with endpoints watch.

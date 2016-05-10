@@ -271,6 +271,7 @@ type RCConfig struct {
 	MemRequest     int64 // bytes
 	MemLimit       int64 // bytes
 	ReadinessProbe *api.Probe
+	DNSPolicy      *api.DNSPolicy
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -2181,6 +2182,10 @@ func RunRC(config RCConfig) error {
 
 func (config *RCConfig) create() error {
 	By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
+	dnsDefault := api.DNSDefault
+	if config.DNSPolicy == nil {
+		config.DNSPolicy = &dnsDefault
+	}
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: config.Name,
@@ -2204,7 +2209,7 @@ func (config *RCConfig) create() error {
 							ReadinessProbe: config.ReadinessProbe,
 						},
 					},
-					DNSPolicy: api.DNSDefault,
+					DNSPolicy: *config.DNSPolicy,
 				},
 			},
 		},
