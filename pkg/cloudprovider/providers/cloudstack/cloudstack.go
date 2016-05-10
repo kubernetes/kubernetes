@@ -89,7 +89,7 @@ func (cs *CSCloud) Clusters() (cloudprovider.Clusters, bool) {
 }
 
 func (cs *CSCloud) Instances() (cloudprovider.Instances, bool) {
-	return nil, false
+	return &Instances{cs}, true
 }
 
 func (cs *CSCloud) Routes() (cloudprovider.Routes, bool) {
@@ -97,7 +97,7 @@ func (cs *CSCloud) Routes() (cloudprovider.Routes, bool) {
 }
 
 func (cs *CSCloud) Zones() (cloudprovider.Zones, bool) {
-	return nil, false
+	return cs, true
 }
 
 func (cs *CSCloud) ProviderName() string {
@@ -109,8 +109,93 @@ func (cs *CSCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []st
 	return nameservers, searches
 }
 
+func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (cs *CSCloud) GetZone() (cloudprovider.Zone, error) {
+	glog.V(1).Infof("Current zone is null")
+
+	return cloudprovider.Zone{Region: ""}, nil
+}
+
+func (i *Instances) CurrentNodeName(hostname string) (string, error) {
+	return hostname, nil
+}
+
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
+func (i *Instances) ExternalID(name string) (string, error) {
+	var lb LoadBalancer
+	var hosts []string
+	hosts = append(hosts, name)
+	vmIDs, err := lb.getVirtualMachineIds(hosts)
+	if  err != nil {
+		return "", err
+	}
+	return vmIDs[0], nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
+func (i *Instances) InstanceID(name string) (string, error) {
+	var lb LoadBalancer
+	var hosts []string
+	hosts = append(hosts, name)
+	vmIDs, err := lb.getVirtualMachineIds(hosts)
+	if  err != nil {
+		return "", cloudprovider.InstanceNotFound
+	}
+	return vmIDs[0], nil
+}
+
+// InstanceType returns the type of the specified instance.
+func (i *Instances) InstanceType(name string) (string, error) {
+	return "", nil
+}
+// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
+func (i *Instances) List(name_filter string) ([]string, error) {
+	vmParams := i.cs.client.VirtualMachine.NewListVirtualMachinesParams()
+	vmParams.SetName(name_filter)
+	vmParamsResponse, err := i.cs.client.VirtualMachine.ListVirtualMachines(vmParams)
+	if err != nil {
+		return nil, err
+	}
+	var vms []string
+	for _, vm := range vmParamsResponse.VirtualMachines {
+		vms = append(vms, vm.Name)
+	}
+	return vms, nil
+}
+// NodeAddresses returns the addresses of the specified instance.
+// TODO(roberthbailey): This currently is only used in such a way that it
+// returns the address of the calling instance. We should do a rename to
+// make this clearer.
+func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	vmParams := i.cs.client.VirtualMachine.NewListVirtualMachinesParams()
+	vmParams.SetName(name)
+	vmParamsResponse, err := i.cs.client.VirtualMachine.ListVirtualMachines(vmParams)
+	if err != nil {
+		return nil, err
+	}
+
+	addrs := []api.NodeAddress{}
+	publicIP := vmParamsResponse.VirtualMachines[0].Publicip
+	addrs = append(addrs, api.NodeAddress{Type: api.NodeExternalIP, Address: publicIP})
+
+	for _, nic := range vmParamsResponse.VirtualMachines[0].Nic {
+		addrs = append(addrs, api.NodeAddress{Type: api.NodeInternalIP, Address: nic.Ipaddress})
+		addrs = append(addrs, api.NodeAddress{Type: api.NodeLegacyHostIP, Address: nic.Ipaddress})
+	}
+
+	return addrs, nil
+}
+
 type LoadBalancer struct {
 	cs	*CSCloud
+}
+
+type Instances struct {
+	cs 	*CSCloud
 }
 
 func (lb *LoadBalancer) GetLoadBalancer(apiService *api.Service) (*api.LoadBalancerStatus, bool, error) {
@@ -206,6 +291,9 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 
 		//Config LB IP
 		lbParams.SetPublicipid(publicIpId)
+
+		//Do not create corresponding firewall rule
+		lbParams.SetOpenfirewall(false)
 
 		// create a Load Balancer rule
 		createLBRuleResponse, err := lb.cs.client.LoadBalancer.CreateLoadBalancerRule(lbParams)
