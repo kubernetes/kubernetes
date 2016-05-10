@@ -78,7 +78,6 @@ const ServiceAnnotationLoadBalancerCertificate = "service.beta.kubernetes.io/aws
 // Only inspected when `aws-load-balancer-ssl-cert` is used.
 // If `http` (default) or `https`, an HTTPS listener that terminates the connection and parses headers is created.
 // If set to `ssl` or `tcp`, a "raw" SSL listener is used.
-
 const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
 
 // Maps from backend protocol to ELB protocol
@@ -2119,7 +2118,9 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
 	return false, nil
 }
 
-func getListener(port api.ServicePort, annotations map[string]string) (*elb.Listener, error) {
+// buildListener creates a new listener from the given port, adding an SSL certificate
+// if indicated by the appropriate annotations.
+func buildListener(port api.ServicePort, annotations map[string]string) (*elb.Listener, error) {
 	loadBalancerPort := int64(port.Port)
 	instancePort := int64(port.NodePort)
 	protocol := strings.ToLower(string(port.Protocol))
@@ -2172,7 +2173,7 @@ func (s *AWSCloud) EnsureLoadBalancer(apiService *api.Service, hosts []string, a
 			glog.Errorf("Ignoring port without NodePort defined: %v", port)
 			continue
 		}
-		listener, err := getListener(port, annotations)
+		listener, err := buildListener(port, annotations)
 		if err != nil {
 			return nil, err
 		}
