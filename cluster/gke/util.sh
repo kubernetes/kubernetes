@@ -124,9 +124,11 @@ function validate-cluster {
 #   ZONE
 #   CLUSTER_API_VERSION (optional)
 #   NUM_NODES
-#   ADDITIONAL_ZONES
+#   ADDITIONAL_ZONES (optional)
 #   NODE_SCOPES
 #   MACHINE_TYPE
+#   CLUSTER_IP_RANGE (optional)
+#   GKE_CREATE_FLAGS (optional, space delineated)
 function kube-up() {
   echo "... in gke:kube-up()" >&2
   detect-project >&2
@@ -165,6 +167,12 @@ function kube-up() {
   if [[ ! -z "${ADDITIONAL_ZONES:-}" ]]; then
     create_args+=("--additional-zones=${ADDITIONAL_ZONES}")
   fi
+
+  if [[ ! -z "${CLUSTER_IP_RANGE:-}" ]]; then
+    create_args+=("--cluster-ipv4-cidr=${CLUSTER_IP_RANGE}")
+  fi
+
+  create_args+=( ${GKE_CREATE_FLAGS:-} )
 
   # Bring up the cluster.
   "${GCLOUD}" ${CMD_GROUP:-} container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
