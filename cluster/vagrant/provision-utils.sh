@@ -25,6 +25,14 @@ function prepare-package-manager() {
   dnf update -y dnf dnf-plugins-core
 }
 
+
+function add-volume-support() {
+  echo "Adding nfs volume support"
+
+  # we need nfs-utils to support volumes
+  dnf install -y nfs-utils
+}
+
 function write-salt-config() {
   local role="$1"
 
