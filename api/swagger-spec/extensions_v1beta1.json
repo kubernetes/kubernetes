@@ -8116,7 +8116,7 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\""
+      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "name": {
       "type": "string",
