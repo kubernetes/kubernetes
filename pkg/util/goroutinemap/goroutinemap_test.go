@@ -17,6 +17,7 @@ limitations under the License.
 package goroutinemap
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -194,4 +195,72 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 		Steps:    4,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func Test_NewGoRoutineMap_Positive_WaitEmpty(t *testing.T) {
+	// Test than Wait() on empty GoRoutineMap always succeeds without blocking
+	// Arrange
+	grm := NewGoRoutineMap()
+
+	// Act
+	waitDoneCh := make(chan interface{}, 1)
+	go func() {
+		grm.Wait()
+		waitDoneCh <- true
+	}()
+
+	// Assert
+	// Tolerate 50 milliseconds for goroutine context switches etc.
+	err := waitChannelWithTimeout(waitDoneCh, 50*time.Millisecond)
+	if err != nil {
+		t.Errorf("Error waiting for GoRoutineMap.Wait: %v", err)
+	}
+}
+
+func Test_NewGoRoutineMap_Positive_Wait(t *testing.T) {
+	// Test that Wait() really blocks until the last operation succeeds
+	// Arrange
+	grm := NewGoRoutineMap()
+	operationName := "operation-name"
+	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1 := generateWaitFunc(operation1DoneCh)
+	err := grm.NewGoRoutine(operationName, operation1)
+	if err != nil {
+		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	waitDoneCh := make(chan interface{}, 1)
+	go func() {
+		grm.Wait()
+		waitDoneCh <- true
+	}()
+
+	// Assert
+	// Check that Wait() really blocks
+	err = waitChannelWithTimeout(waitDoneCh, 100*time.Millisecond)
+	if err == nil {
+		t.Fatalf("Expected Wait() to block but it returned early")
+	}
+
+	// Finish the operation
+	operation1DoneCh <- true
+
+	// check that Wait() finishes in reasonable time
+	err = waitChannelWithTimeout(waitDoneCh, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("Error waiting for GoRoutineMap.Wait: %v", err)
+	}
+}
+
+func waitChannelWithTimeout(ch <-chan interface{}, timeout time.Duration) error {
+	timer := time.NewTimer(timeout)
+
+	select {
+	case <-ch:
+		// Success!
+		return nil
+	case <-timer.C:
+		return fmt.Errorf("timeout after %v", timeout)
+	}
 }
