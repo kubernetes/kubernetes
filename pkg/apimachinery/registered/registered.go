@@ -145,8 +145,8 @@ func EnabledVersionsForGroup(group string) []unversioned.GroupVersion {
 	return append([]unversioned.GroupVersion{}, groupMeta.GroupVersions...)
 }
 
-// Group returns the metadata of a group if the gruop is registered, otherwise
-// an erorr is returned.
+// Group returns the metadata of a group if the group is registered, otherwise
+// an error is returned.
 func Group(group string) (*apimachinery.GroupMeta, error) {
 	groupMeta, found := groupMetaMap[group]
 	if !found {
@@ -342,5 +342,4 @@ func reset() {
 	registeredVersions = map[unversioned.GroupVersion]struct{}{}
 	enabledVersions = map[unversioned.GroupVersion]struct{}{}
 	groupMetaMap = map[string]*apimachinery.GroupMeta{}
-
 }
