@@ -34,7 +34,6 @@ import (
 
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	utilpod "k8s.io/kubernetes/pkg/api/pod"
@@ -3580,71 +3579,6 @@ func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
 // ResyncInterval returns the interval used for periodic syncs.
 func (kl *Kubelet) ResyncInterval() time.Duration {
 	return kl.resyncInterval
-}
-
-// GetContainerInfo returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-
-	podUID = kl.podManager.TranslatePodUID(podUID)
-
-	pods, err := kl.runtimeCache.GetPods()
-	if err != nil {
-		return nil, err
-	}
-	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
-	container := pod.FindContainerByName(containerName)
-	if container == nil {
-		return nil, kubecontainer.ErrContainerNotFound
-	}
-
-	ci, err := kl.cadvisor.DockerContainer(container.ID.ID, req)
-	if err != nil {
-		return nil, err
-	}
-	return &ci, nil
-}
-
-// GetContainerInfoV2 returns stats (from Cadvisor) for containers.
-func (kl *Kubelet) GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
-	return kl.cadvisor.ContainerInfoV2(name, options)
-}
-
-// DockerImagesFsInfo returns information about docker image fs usage from
-// cadvisor.
-func (kl *Kubelet) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return kl.cadvisor.DockerImagesFsInfo()
-}
-
-// RootFsInfo returns info about the root fs from cadvisor.
-func (kl *Kubelet) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return kl.cadvisor.RootFsInfo()
-}
-
-// Returns stats (from Cadvisor) for a non-Kubernetes container.
-func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
-	if subcontainers {
-		return kl.cadvisor.SubcontainerInfo(containerName, req)
-	} else {
-		containerInfo, err := kl.cadvisor.ContainerInfo(containerName, req)
-		if err != nil {
-			return nil, err
-		}
-		return map[string]*cadvisorapi.ContainerInfo{
-			containerInfo.Name: containerInfo,
-		}, nil
-	}
-}
-
-// GetCachedMachineInfo assumes that the machine info can't change without a reboot
-func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
-	if kl.machineInfo == nil {
-		info, err := kl.cadvisor.MachineInfo()
-		if err != nil {
-			return nil, err
-		}
-		kl.machineInfo = info
-	}
-	return kl.machineInfo, nil
 }
 
 // ListenAndServe runs the kubelet HTTP server.
