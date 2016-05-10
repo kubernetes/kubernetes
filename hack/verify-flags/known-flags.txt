@@ -366,6 +366,7 @@ service-account-key-file
 service-account-lookup
 service-account-private-key-file
 service-address
+service-cidr
 service-cluster-ip-range
 service-generator
 service-node-port-range

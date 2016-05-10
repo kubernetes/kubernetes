@@ -35,6 +35,7 @@ type CIDRAllocator interface {
 }
 
 type rangeAllocator struct {
+	clusterCIDR     *net.IPNet
 	clusterIP       net.IP
 	clusterMaskSize int
 	subNetMaskSize  int
@@ -50,6 +51,7 @@ func NewCIDRRangeAllocator(clusterCIDR *net.IPNet, subNetMaskSize int) CIDRAlloc
 	clusterMaskSize, _ := clusterMask.Size()
 
 	ra := &rangeAllocator{
+		clusterCIDR:     clusterCIDR,
 		clusterIP:       clusterCIDR.IP.To4(),
 		clusterMaskSize: clusterMaskSize,
 		subNetMaskSize:  subNetMaskSize,
@@ -99,15 +101,43 @@ func (r *rangeAllocator) Release(cidr *net.IPNet) error {
 	return nil
 }
 
-func (r *rangeAllocator) Occupy(cidr *net.IPNet) error {
-	used, err := r.getBitforCIDR(cidr)
+func (r *rangeAllocator) MaxCIDRs() int {
+	return r.maxCIDRs
+}
+
+func (r *rangeAllocator) Occupy(cidr *net.IPNet) (err error) {
+	begin, end := 0, r.maxCIDRs
+	mask := net.CIDRMask(r.subNetMaskSize, 32)
+
+	if r.clusterCIDR.Contains(cidr.IP) {
+		begin, err = r.getBitforCIDR(&net.IPNet{
+			IP:   cidr.IP.To4().Mask(mask),
+			Mask: mask,
+		})
+	}
 	if err != nil {
-		return err
+		return nil
+	}
+
+	if !cidr.Contains(r.clusterCIDR.IP) {
+		ip := make([]byte, 4)
+		ipInt := binary.BigEndian.Uint32(cidr.IP) | (^binary.BigEndian.Uint32(cidr.Mask))
+		binary.BigEndian.PutUint32(ip, ipInt)
+		end, err = r.getBitforCIDR(&net.IPNet{
+			IP:   net.IP(ip).To4().Mask(mask),
+			Mask: mask,
+		})
+	}
+	if err != nil {
+		return nil
 	}
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	r.used.SetBit(&r.used, used, 1)
+
+	for i := begin; i <= end; i++ {
+		r.used.SetBit(&r.used, i, 1)
+	}
 
 	return nil
 }

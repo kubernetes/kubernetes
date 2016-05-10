@@ -419,7 +419,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	for _, item := range table {
 		nodeController := NewNodeController(nil, item.fakeNodeHandler,
 			evictionTimeout, flowcontrol.NewFakeAlwaysRateLimiter(), flowcontrol.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod,
-			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
+			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		for _, ds := range item.daemonSets {
 			nodeController.daemonSetStore.Add(&ds)
@@ -489,7 +489,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 	nodeController := NewNodeController(nil, fnh, 10*time.Minute,
 		flowcontrol.NewFakeAlwaysRateLimiter(), flowcontrol.NewFakeAlwaysRateLimiter(),
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
-		testNodeMonitorPeriod, nil, false)
+		testNodeMonitorPeriod, nil, nil, false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
 	nodeController.now = func() unversioned.Time { return unversioned.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
 	nodeController.nodeExistsInCloudProvider = func(nodeName string) (bool, error) {
@@ -721,7 +721,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 
 	for i, item := range table {
 		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, flowcontrol.NewFakeAlwaysRateLimiter(),
-			flowcontrol.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
+			flowcontrol.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -871,7 +871,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 
 	for i, item := range table {
 		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, flowcontrol.NewFakeAlwaysRateLimiter(),
-			flowcontrol.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
+			flowcontrol.NewFakeAlwaysRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("Case[%d] unexpected error: %v", i, err)
@@ -953,7 +953,7 @@ func TestNodeDeletion(t *testing.T) {
 	}
 
 	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, flowcontrol.NewFakeAlwaysRateLimiter(), flowcontrol.NewFakeAlwaysRateLimiter(),
-		testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
+		testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, false)
 	nodeController.now = func() unversioned.Time { return fakeNow }
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1056,7 +1056,7 @@ func TestCheckPod(t *testing.T) {
 		},
 	}
 
-	nc := NewNodeController(nil, nil, 0, nil, nil, 0, 0, 0, nil, false)
+	nc := NewNodeController(nil, nil, 0, nil, nil, 0, 0, 0, nil, nil, false)
 	nc.nodeStore.Store = cache.NewStore(cache.MetaNamespaceKeyFunc)
 	nc.nodeStore.Store.Add(&api.Node{
 		ObjectMeta: api.ObjectMeta{
@@ -1133,7 +1133,7 @@ func TestCleanupOrphanedPods(t *testing.T) {
 		newPod("b", "bar"),
 		newPod("c", "gone"),
 	}
-	nc := NewNodeController(nil, nil, 0, nil, nil, 0, 0, 0, nil, false)
+	nc := NewNodeController(nil, nil, 0, nil, nil, 0, 0, 0, nil, nil, false)
 
 	nc.nodeStore.Store.Add(newNode("foo"))
 	nc.nodeStore.Store.Add(newNode("bar"))
