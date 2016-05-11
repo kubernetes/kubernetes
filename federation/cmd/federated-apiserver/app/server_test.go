@@ -29,12 +29,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	fed_v1a1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
-	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
-	regexp := regexp.MustCompile(options.NewAPIServer().LongRunningRequestRE)
+	regexp := regexp.MustCompile(genericapiserver.NewServerRunOptions().LongRunningRequestRE)
 	dontMatch := []string{
 		"/api/v1/watch-namespace/",
 		"/api/v1/namespace-proxy/",
@@ -79,7 +79,7 @@ var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
 var groupVersion = fed_v1a1.SchemeGroupVersion
 
 func TestRun(t *testing.T) {
-	s := options.NewAPIServer()
+	s := genericapiserver.NewServerRunOptions()
 	s.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.ServiceClusterIPRange = *ipNet

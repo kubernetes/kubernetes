@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app"
-	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -38,7 +38,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	s := options.NewAPIServer()
+	s := genericapiserver.NewServerRunOptions()
 	s.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()
