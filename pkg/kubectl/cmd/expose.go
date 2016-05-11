@@ -110,7 +110,6 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("load-balancer-ip", "", "IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
 	cmd.Flags().String("selector", "", "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
 	cmd.Flags().String("container-port", "", "Synonym for --target-port")
 	cmd.Flags().MarkDeprecated("container-port", "--container-port will be removed in the future, please use --target-port instead")
 	cmd.Flags().String("target-port", "", "Name or number for the port on the container that the service should direct traffic to. Optional.")
@@ -121,6 +120,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -256,8 +256,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			}
 		}
 		info.Refresh(object, true)
-		// TODO: extract this flag to a central location, when such a location exists.
-		if cmdutil.GetFlagBool(cmd, "dry-run") {
+		if cmdutil.GetDryRunFlag(cmd) {
 			return f.PrintObject(cmd, mapper, object, out)
 		}
 		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {

@@ -98,8 +98,8 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
 	cmd.Flags().String("container", "", "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod")
 	cmd.Flags().String("image-pull-policy", "", "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.")
-	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
 	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
+	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -157,7 +157,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	period := cmdutil.GetFlagDuration(cmd, "update-period")
 	interval := cmdutil.GetFlagDuration(cmd, "poll-interval")
 	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
-	dryrun := cmdutil.GetFlagBool(cmd, "dry-run")
+	dryrun := cmdutil.GetDryRunFlag(cmd)
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	container := cmdutil.GetFlagString(cmd, "container")
 

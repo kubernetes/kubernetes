@@ -17,7 +17,7 @@ options:
 - name: dry-run
   default_value: "false"
   usage: |
-    If true, print out the changes that would be made, but don't actually make them.
+    If true, only print the object that would be sent, without sending it.
 - name: filename
   shorthand: f
   default_value: '[]'
