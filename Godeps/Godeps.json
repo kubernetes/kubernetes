@@ -1761,6 +1761,10 @@
 			"Rev": "8992d7483a06748dea706e4716d042a4a9e73918"
 		},
 		{
+			"ImportPath": "github.com/robfig/cron",
+			"Rev": "0f39cf7ebc65a602f45692f9894bd6a193faf8fa"
+		},
+		{
 			"ImportPath": "github.com/russross/blackfriday",
 			"Comment": "v1.2-42-g77efab5",
 			"Rev": "77efab57b2f74dd3f9051c79752b2e8995c8b789"
