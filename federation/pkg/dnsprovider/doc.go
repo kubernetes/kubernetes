@@ -11,5 +11,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package dnsprovider supplies interfaces and implementations for dns service providers (e.g. Google Cloud DNS, AWS route53, etc)
+/*
+dnsprovider supplies interfaces for dns service providers (e.g. Google Cloud DNS, AWS route53, etc).
+Implementations exist in the providers sub-package
+*/
 package dnsprovider

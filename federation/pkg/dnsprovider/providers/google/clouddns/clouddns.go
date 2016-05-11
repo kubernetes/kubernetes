@@ -13,3 +13,96 @@ limitations under the License.
 
 // clouddns is the implementation of pkg/dnsprovider interface for Google Cloud DNS
 package clouddns
+
+import (
+	"io"
+
+	"code.google.com/p/gcfg"
+	"github.com/golang/glog"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/dns/v1"
+	"google.golang.org/cloud/compute/metadata"
+
+	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal"
+)
+
+const (
+	ProviderName = "google-clouddns"
+	// operationPollInterval        = 3 * time.Second
+	// operationPollTimeoutDuration = 30 * time.Minute
+
+	// Each page can have 500 results, but we cap how many pages
+	// are iterated through to prevent infinite loops if the API
+	// were to continuously return a nextPageToken.
+	// maxPages = 25
+)
+
+func init() {
+	dnsprovider.RegisterDnsProvider(ProviderName, func(config io.Reader) (dnsprovider.Interface, error) {
+		return newGCECloud(config)
+	})
+}
+
+type Config struct {
+	Global struct {
+		TokenURL  string `gcfg:"token-url"`
+		TokenBody string `gcfg:"token-body"`
+		ProjectID string `gcfg:"project-id"`
+	}
+}
+
+// newCloudDns creates a new instance of .
+func newCloudDns(config io.Reader) (*Interface, error) {
+	projectID, err := metadata.ProjectID() // On error we get an empty string, which is fine for now.
+	tokenSource := google.ComputeTokenSource("")
+	// Possibly override defaults with config below
+	if config != nil {
+		var cfg Config
+		if err := gcfg.ReadInto(&cfg, config); err != nil {
+			glog.Errorf("Couldn't read config: %v", err)
+			return nil, err
+		}
+		glog.Infof("Using Google Cloud DNS provider config %+v", cfg)
+		if cfg.Global.ProjectID != "" {
+			projectID = cfg.Global.ProjectID
+		}
+		if cfg.Global.TokenURL != "" {
+			tokenSource = newAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
+		}
+	}
+	return CreateInterface(projectID, tokenSource)
+}
+
+// Creates a  clouddns.Interface object using the specified parameters.
+// If no tokenSource is specified, uses oauth2.DefaultTokenSource.
+func CreateInterface(projectID, tokenSource oauth2.TokenSource) (*GCECloud, error) {
+	if tokenSource == nil {
+		var err error
+		tokenSource, err = google.DefaultTokenSource(
+			oauth2.NoContext,
+			compute.CloudPlatformScope,
+			compute.ComputeScope)
+		glog.Infof("Using DefaultTokenSource %#v", tokenSource)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		glog.Infof("Using existing Token Source %#v", tokenSource)
+	}
+
+	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
+	svc, err := compute.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	service, err := dns.New(oauthClient)
+	if err != nil {
+		glog.Errorf("Failed to get Cloud DNS client: %v", err)
+	}
+	glog.Infof("Successfully got DNS service: %v\n", service)
+	return newInterfaceWithStub(project, internal.NewService(service))
+}

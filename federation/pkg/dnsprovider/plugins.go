@@ -22,34 +22,34 @@ import (
 	"github.com/golang/glog"
 )
 
-// Factory is a function that returns a cloudprovider.Interface.
+// Factory is a function that returns a dnsprovider.Interface.
 // The config parameter provides an io.Reader handler to the factory in
 // order to load specific configurations. If no configuration is provided
 // the parameter is nil.
 type Factory func(config io.Reader) (Interface, error)
 
-// All registered cloud providers.
+// All registered dns providers.
 var providersMutex sync.Mutex
 var providers = make(map[string]Factory)
 
-// RegisterCloudProvider registers a cloudprovider.Factory by name.  This
-// is expected to happen during app startup.
-func RegisterCloudProvider(name string, cloud Factory) {
+// RegisterDnsProvider registers a dnsprovider.Factory by name.  This
+// is expected to happen during startup.
+func RegisterDnsProvider(name string, cloud Factory) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
 	if _, found := providers[name]; found {
-		glog.Fatalf("Cloud provider %q was registered twice", name)
+		glog.Fatalf("DNS provider %q was registered twice", name)
 	}
-	glog.V(1).Infof("Registered cloud provider %q", name)
+	glog.V(1).Infof("Registered DNS provider %q", name)
 	providers[name] = cloud
 }
 
-// GetCloudProvider creates an instance of the named cloud provider, or nil if
+// GetDnsProvider creates an instance of the named DNS provider, or nil if
 // the name is not known.  The error return is only used if the named provider
 // was known but failed to initialize. The config parameter specifies the
-// io.Reader handler of the configuration file for the cloud provider, or nil
+// io.Reader handler of the configuration file for the DNS provider, or nil
 // for no configuation.
-func GetCloudProvider(name string, config io.Reader) (Interface, error) {
+func GetDnsProvider(name string, config io.Reader) (Interface, error) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
 	f, found := providers[name]
@@ -59,13 +59,13 @@ func GetCloudProvider(name string, config io.Reader) (Interface, error) {
 	return f(config)
 }
 
-// InitCloudProvider creates an instance of the named cloud provider.
-func InitCloudProvider(name string, configFilePath string) (Interface, error) {
-	var cloud Interface
+// InitDnsProvider creates an instance of the named DNS provider.
+func InitDnsProvider(name string, configFilePath string) (Interface, error) {
+	var dns Interface
 	var err error
 
 	if name == "" {
-		glog.Info("No cloud provider specified.")
+		glog.Info("No DNS provider specified.")
 		return nil, nil
 	}
 
@@ -73,24 +73,24 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 		var config *os.File
 		config, err = os.Open(configFilePath)
 		if err != nil {
-			glog.Fatalf("Couldn't open cloud provider configuration %s: %#v",
+			glog.Fatalf("Couldn't open DNS provider configuration %s: %#v",
 				configFilePath, err)
 		}
 
 		defer config.Close()
-		cloud, err = GetCloudProvider(name, config)
+		dns, err = GetDnsProvider(name, config)
 	} else {
 		// Pass explicit nil so plugins can actually check for nil. See
 		// "Why is my nil error value not equal to nil?" in golang.org/doc/faq.
-		cloud, err = GetCloudProvider(name, nil)
+		dns, err = GetDnsProvider(name, nil)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("could not init cloud provider %q: %v", name, err)
+		return nil, fmt.Errorf("could not init DNS provider %q: %v", name, err)
 	}
-	if cloud == nil {
-		return nil, fmt.Errorf("unknown cloud provider %q", name)
+	if dns == nil {
+		return nil, fmt.Errorf("unknown DNS provider %q", name)
 	}
 
-	return cloud, nil
+	return dns, nil
 }

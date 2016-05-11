@@ -15,7 +15,7 @@ package dnsprovider
 
 import "k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 
-// Interface an abstract, pluggable interface for DNS providers.
+// Interface is an abstract, pluggable interface for DNS providers.
 type Interface interface {
 	Zones() (Zones, bool)
 }
