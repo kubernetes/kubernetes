@@ -342,9 +342,9 @@ func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
 	kl.recorder.Eventf(kl.nodeRef, eventtype, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
-// Set IP addresses for the node.
+// Set IP and hostname addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *api.Node) error {
-
+	hostnameAddress := api.NodeAddress{Type: api.NodeHostName, Address: kl.GetHostname()}
 	if kl.nodeIP != nil {
 		if err := kl.validateNodeIP(); err != nil {
 			return fmt.Errorf("failed to validate nodeIP: %v", err)
@@ -365,7 +365,6 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
-
 		if kl.nodeIP != nil {
 			for _, nodeAddress := range nodeAddresses {
 				if nodeAddress.Address == kl.nodeIP.String() {
@@ -377,8 +376,7 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 			}
 			return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", kl.nodeIP)
 		}
-
-		node.Status.Addresses = nodeAddresses
+		node.Status.Addresses = append(nodeAddresses, hostnameAddress)
 	} else {
 		var ipAddr net.IP
 		var err error
@@ -413,6 +411,7 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 			node.Status.Addresses = []api.NodeAddress{
 				{Type: api.NodeLegacyHostIP, Address: ipAddr.String()},
 				{Type: api.NodeInternalIP, Address: ipAddr.String()},
+				hostnameAddress,
 			}
 		}
 	}
