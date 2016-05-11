@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"strings"
@@ -25,7 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	k8syaml "k8s.io/kubernetes/pkg/util/yaml"
 
 	"github.com/ghodss/yaml"
 )
@@ -39,9 +43,55 @@ func readPod(filename string) ([]byte, error) {
 }
 
 func readSwaggerFile() ([]byte, error) {
-	// TODO this path is broken
-	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
+	return readSwaggerApiFile(testapi.Default)
+}
+
+func readSwaggerApiFile(group testapi.TestGroup) ([]byte, error) {
+	// TODO: Figure out a better way of finding these files
+	var pathToSwaggerSpec string
+	if group.GroupVersion().Group == "" {
+		pathToSwaggerSpec = "../../../api/swagger-spec/" + group.GroupVersion().Version + ".json"
+	} else {
+		pathToSwaggerSpec = "../../../api/swagger-spec/" + group.GroupVersion().Group + "_" + group.GroupVersion().Version + ".json"
+	}
+
 	return ioutil.ReadFile(pathToSwaggerSpec)
+}
+
+// Mock delegating Schema.  Not a full fake impl.
+type Factory struct {
+	defaultSchema    Schema
+	extensionsSchema Schema
+}
+
+var _ Schema = &Factory{}
+
+// TODO: Consider using a mocking library instead or fully fleshing this out into a fake impl and putting it in some
+// generally available location
+func (f *Factory) ValidateBytes(data []byte) error {
+	var obj interface{}
+	out, err := k8syaml.ToJSON(data)
+	if err != nil {
+		return err
+	}
+	data = out
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	fields, ok := obj.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("error in unmarshaling data %s", string(data))
+	}
+	// Note: This only supports the 2 api versions we expect from the test it is currently supporting.
+	groupVersion := fields["apiVersion"]
+	switch groupVersion {
+	case "v1":
+		return f.defaultSchema.ValidateBytes(data)
+	case "extensions/v1beta1":
+		return f.extensionsSchema.ValidateBytes(data)
+	default:
+		return fmt.Errorf("Unsupported API version %s", groupVersion)
+	}
 }
 
 func loadSchemaForTest() (Schema, error) {
@@ -49,7 +99,30 @@ func loadSchemaForTest() (Schema, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewSwaggerSchemaFromBytes(data)
+	return NewSwaggerSchemaFromBytes(data, nil)
+}
+
+func loadSchemaForTestWithFactory(group testapi.TestGroup, factory Schema) (Schema, error) {
+	data, err := readSwaggerApiFile(group)
+	if err != nil {
+		return nil, err
+	}
+	return NewSwaggerSchemaFromBytes(data, factory)
+}
+
+func NewFactory() (*Factory, error) {
+	f := &Factory{}
+	defaultSchema, err := loadSchemaForTestWithFactory(testapi.Default, f)
+	if err != nil {
+		return nil, err
+	}
+	f.defaultSchema = defaultSchema
+	extensionSchema, err := loadSchemaForTestWithFactory(testapi.Extensions, f)
+	if err != nil {
+		return nil, err
+	}
+	f.extensionsSchema = extensionSchema
+	return f, nil
 }
 
 func TestLoad(t *testing.T) {
@@ -88,6 +161,42 @@ func TestValidateOk(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		}
+	}
+}
+
+func TestValidateDifferentApiVersions(t *testing.T) {
+	schema, err := loadSchemaForTest()
+	if err != nil {
+		t.Errorf("Failed to load: %v", err)
+	}
+
+	pod := &api.Pod{}
+	pod.APIVersion = "v1"
+	pod.Kind = "Pod"
+
+	deployment := &extensions.Deployment{}
+	deployment.APIVersion = "extensions/v1beta1"
+	deployment.Kind = "Deployment"
+
+	list := &api.List{}
+	list.APIVersion = "v1"
+	list.Kind = "List"
+	list.Items = []runtime.Object{pod, deployment}
+	bytes, err := json.Marshal(list)
+	if err != nil {
+		t.Error(err)
+	}
+	err = schema.ValidateBytes(bytes)
+	if err == nil {
+		t.Error(fmt.Errorf("Expected error when validating different api version and no delegate exists."))
+	}
+	f, err := NewFactory()
+	if err != nil {
+		t.Error(fmt.Errorf("Failed to create Schema factory %v.", err))
+	}
+	err = f.ValidateBytes(bytes)
+	if err != nil {
+		t.Error(fmt.Errorf("Failed to validate object with multiple ApiGroups: %v.", err))
 	}
 }
 
@@ -171,7 +280,7 @@ func TestTypeOAny(t *testing.T) {
 	}
 	// Replace type: "any" in the spec by type: "object" and verify that the validation still passes.
 	newData := strings.Replace(string(data), `"type": "object"`, `"type": "any"`, -1)
-	schema, err := NewSwaggerSchemaFromBytes([]byte(newData))
+	schema, err := NewSwaggerSchemaFromBytes([]byte(newData), nil)
 	if err != nil {
 		t.Errorf("Failed to load: %v", err)
 	}
