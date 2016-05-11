@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,30 +20,118 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
+
+// TODO(mikedanese): Add setup, validate, and teardown for:
+//  - secrets
+//  - volumes
+//  - persistent volumes
+var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
+	f := framework.NewDefaultFramework("cluster-upgrade")
+
+	framework.KubeDescribe("master upgrade", func() {
+		It("should maintain responsive services [Feature:MasterUpgrade]", func() {
+			cm := chaosmonkey.New(func() {
+				v, err := realVersion(framework.TestContext.UpgradeTarget)
+				framework.ExpectNoError(err)
+				framework.ExpectNoError(masterUpgrade(v))
+				framework.ExpectNoError(checkMasterVersion(f.Client, v))
+			})
+			cm.Register(func(sem *chaosmonkey.Semaphore) {
+				// Close over f.
+				testServiceRemainsUp(f, sem)
+			})
+			cm.Do()
+		})
+	})
+
+	framework.KubeDescribe("node upgrade", func() {
+		It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
+			cm := chaosmonkey.New(func() {
+				v, err := realVersion(framework.TestContext.UpgradeTarget)
+				framework.ExpectNoError(err)
+				framework.ExpectNoError(nodeUpgrade(f, v))
+				framework.ExpectNoError(checkNodesVersions(f.Client, v))
+			})
+			cm.Register(func(sem *chaosmonkey.Semaphore) {
+				// Close over f.
+				testServiceUpBeforeAndAfter(f, sem)
+			})
+			cm.Do()
+		})
+
+		It("should maintain responsive services [Feature:ExperimentalNodeUpgrade]", func() {
+			cm := chaosmonkey.New(func() {
+				v, err := realVersion(framework.TestContext.UpgradeTarget)
+				framework.ExpectNoError(err)
+				framework.ExpectNoError(nodeUpgrade(f, v))
+				framework.ExpectNoError(checkNodesVersions(f.Client, v))
+			})
+			cm.Register(func(sem *chaosmonkey.Semaphore) {
+				// Close over f.
+				testServiceRemainsUp(f, sem)
+			})
+			cm.Do()
+		})
+	})
+
+	framework.KubeDescribe("cluster upgrade", func() {
+		It("should maintain a functioning cluster [Feature:ClusterUpgrade]", func() {
+			cm := chaosmonkey.New(func() {
+				v, err := realVersion(framework.TestContext.UpgradeTarget)
+				framework.ExpectNoError(err)
+				framework.ExpectNoError(masterUpgrade(v))
+				framework.ExpectNoError(checkMasterVersion(f.Client, v))
+				framework.ExpectNoError(nodeUpgrade(f, v))
+				framework.ExpectNoError(checkNodesVersions(f.Client, v))
+			})
+			cm.Register(func(sem *chaosmonkey.Semaphore) {
+				// Close over f.
+				testServiceUpBeforeAndAfter(f, sem)
+			})
+			cm.Do()
+		})
+
+		It("should maintain responsive services [Feature:ExperimentalClusterUpgrade]", func() {
+			cm := chaosmonkey.New(func() {
+				v, err := realVersion(framework.TestContext.UpgradeTarget)
+				framework.ExpectNoError(err)
+				framework.ExpectNoError(masterUpgrade(v))
+				framework.ExpectNoError(checkMasterVersion(f.Client, v))
+				framework.ExpectNoError(nodeUpgrade(f, v))
+				framework.ExpectNoError(checkNodesVersions(f.Client, v))
+			})
+			cm.Register(func(sem *chaosmonkey.Semaphore) {
+				// Close over f.
+				testServiceRemainsUp(f, sem)
+			})
+			cm.Do()
+		})
+	})
+})
 
 // realVersion turns a version constant s into a version string deployable on
 // GKE.  See hack/get-build.sh for more information.
 func realVersion(s string) (string, error) {
+	framework.Logf(fmt.Sprintf("Getting real version for %q", s))
 	v, _, err := runCmd(path.Join(framework.TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
 	if err != nil {
 		return v, err
 	}
+	framework.Logf("Version for %q is %q", s, v)
 	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
 }
 
@@ -80,7 +168,7 @@ func masterUpgradeGKE(v string) error {
 	return err
 }
 
-var nodeUpgrade = func(f *framework.Framework, replicas int32, v string) error {
+var nodeUpgrade = func(f *framework.Framework, v string) error {
 	// Perform the upgrade.
 	var err error
 	switch framework.TestContext.Provider {
@@ -95,7 +183,7 @@ var nodeUpgrade = func(f *framework.Framework, replicas int32, v string) error {
 		return err
 	}
 
-	// Wait for it to complete and validate nodes and pods are healthy.
+	// Wait for it to complete and validate nodes are healthy.
 	//
 	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
 	// GKE; the operation shouldn't return until they all are.
@@ -103,8 +191,7 @@ var nodeUpgrade = func(f *framework.Framework, replicas int32, v string) error {
 	if _, err := checkNodesReady(f.Client, restartNodeReadyAgainTimeout, framework.TestContext.CloudConfig.NumNodes); err != nil {
 		return err
 	}
-	framework.Logf("Waiting up to %v for all pods to be running and ready after the upgrade", restartPodReadyAgainTimeout)
-	return framework.WaitForPodsRunningReady(f.Namespace.Name, replicas, restartPodReadyAgainTimeout)
+	return nil
 }
 
 func nodeUpgradeGCE(rawV string) error {
@@ -170,191 +257,69 @@ func nodeUpgradeGKE(v string) error {
 	return err
 }
 
-var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
+func testServiceUpBeforeAndAfter(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testService(f, sem, false)
+}
 
-	svcName, replicas := "baz", int32(2)
-	var rcName, ip, v string
-	var ingress api.LoadBalancerIngress
+func testServiceRemainsUp(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testService(f, sem, true)
+}
 
-	BeforeEach(func() {
-		// The version is determined once at the beginning of the test so that
-		// the master and nodes won't be skewed if the value changes during the
-		// test.
-		By(fmt.Sprintf("Getting real version for %q", framework.TestContext.UpgradeTarget))
-		var err error
-		v, err = realVersion(framework.TestContext.UpgradeTarget)
-		framework.ExpectNoError(err)
-		framework.Logf("Version for %q is %q", framework.TestContext.UpgradeTarget, v)
+// testService is a helper for testServiceUpBeforeAndAfter and testServiceRemainsUp with a flag for testDuringDisruption
+//
+// TODO(ihmccreery) remove this abstraction once testServiceUpBeforeAndAfter is no longer needed, because node upgrades
+// maintain a responsive service.
+func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisruption bool) {
+	// Setup
+	serviceName := "service-test"
+
+	jig := NewServiceTestJig(f.Client, serviceName)
+	// nodeIP := pickNodeIP(jig.Client) // for later
+
+	By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + f.Namespace.Name)
+	// TODO it's weird that we have to do this and then wait WaitForLoadBalancer which changes
+	// tcpService.
+	tcpService := jig.CreateTCPServiceOrFail(f.Namespace.Name, func(s *api.Service) {
+		s.Spec.Type = api.ServiceTypeLoadBalancer
 	})
+	tcpService = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, tcpService.Name)
+	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 
-	f := framework.NewDefaultFramework("cluster-upgrade")
-	var w *ServiceTestFixture
-	BeforeEach(func() {
-		By("Setting up the service, RC, and pods")
-		w = NewServerTest(f.Client, f.Namespace.Name, svcName)
-		rc := w.CreateWebserverRC(replicas)
-		rcName = rc.ObjectMeta.Name
-		svc := w.BuildServiceSpec()
-		svc.Spec.Type = api.ServiceTypeLoadBalancer
-		w.CreateService(svc)
+	// Get info to hit it with
+	tcpIngressIP := getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
+	svcPort := int(tcpService.Spec.Ports[0].Port)
 
-		By("Waiting for the service to become reachable")
-		result, err := waitForLoadBalancerIngress(f.Client, svcName, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
-		ingresses := result.Status.LoadBalancer.Ingress
-		if len(ingresses) != 1 {
-			framework.Failf("Was expecting only 1 ingress IP but got %d (%v): %v", len(ingresses), ingresses, result)
-		}
-		ingress = ingresses[0]
-		framework.Logf("Got load balancer ingress point %v", ingress)
-		ip = ingress.IP
-		if ip == "" {
-			ip = ingress.Hostname
-		}
-		testLoadBalancerReachable(ingress, 80)
+	By("creating pod to be part of service " + serviceName)
+	// TODO newRCTemplate only allows for the creation of one replica... that probably won't
+	// work so well.
+	jig.RunOrFail(f.Namespace.Name, nil)
 
-		// TODO(mikedanese): Add setup, validate, and teardown for:
-		//  - secrets
-		//  - volumes
-		//  - persistent volumes
-	})
+	// Hit it once before considering ourselves ready
+	By("hitting the pod through the service's LoadBalancer")
+	jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeoutDefault)
 
-	AfterEach(func() {
-		w.Cleanup()
-	})
+	sem.Ready()
 
-	framework.KubeDescribe("master upgrade", func() {
-		It("should maintain responsive services [Feature:MasterUpgrade]", func() {
-			By("Validating cluster before master upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a master upgrade")
-			testUpgrade(ip, v, masterUpgrade)
-			By("Checking master version")
-			framework.ExpectNoError(checkMasterVersion(f.Client, v))
-			By("Validating cluster after master upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-		})
-	})
+	if testDuringDisruption {
+		// Continuous validation
+		wait.Until(func() {
+			By("hitting the pod through the service's LoadBalancer")
+			jig.TestReachableHTTP(tcpIngressIP, svcPort, framework.Poll)
+		}, framework.Poll, sem.StopCh)
+	} else {
+		// Block until chaosmonkey is done
+		By("waiting for upgrade to finish without checking if service remains up")
+		<-sem.StopCh
+	}
 
-	framework.KubeDescribe("node upgrade", func() {
-		It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
-			By("Validating cluster before node upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a node upgrade")
-			// Circumnavigate testUpgrade, since services don't necessarily stay up.
-			framework.Logf("Starting upgrade")
-			framework.ExpectNoError(nodeUpgrade(f, replicas, v))
-			framework.Logf("Upgrade complete")
-			By("Checking node versions")
-			framework.ExpectNoError(checkNodesVersions(f.Client, v))
-			By("Validating cluster after node upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-		})
-
-		It("should maintain responsive services [Feature:ExperimentalNodeUpgrade]", func() {
-			By("Validating cluster before node upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a node upgrade")
-			testUpgrade(ip, v, func(v string) error {
-				return nodeUpgrade(f, replicas, v)
-			})
-			By("Checking node versions")
-			framework.ExpectNoError(checkNodesVersions(f.Client, v))
-			By("Validating cluster after node upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-		})
-	})
-
-	framework.KubeDescribe("cluster upgrade", func() {
-		It("should maintain responsive services [Feature:ClusterUpgrade]", func() {
-			By("Validating cluster before master upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a master upgrade")
-			testUpgrade(ip, v, masterUpgrade)
-			By("Checking master version")
-			framework.ExpectNoError(checkMasterVersion(f.Client, v))
-			By("Validating cluster after master upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-
-			By("Validating cluster before node upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a node upgrade")
-			// Circumnavigate testUpgrade, since services don't necessarily stay up.
-			framework.Logf("Starting upgrade")
-			framework.ExpectNoError(nodeUpgrade(f, replicas, v))
-			framework.Logf("Upgrade complete")
-			By("Checking node versions")
-			framework.ExpectNoError(checkNodesVersions(f.Client, v))
-			By("Validating cluster after node upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-		})
-
-		It("should maintain responsive services [Feature:ExperimentalClusterUpgrade]", func() {
-			By("Validating cluster before master upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a master upgrade")
-			testUpgrade(ip, v, masterUpgrade)
-			By("Checking master version")
-			framework.ExpectNoError(checkMasterVersion(f.Client, v))
-			By("Validating cluster after master upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-
-			By("Validating cluster before node upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-			By("Performing a node upgrade")
-			testUpgrade(ip, v, func(v string) error {
-				return nodeUpgrade(f, replicas, v)
-			})
-			By("Checking node versions")
-			framework.ExpectNoError(checkNodesVersions(f.Client, v))
-			By("Validating cluster after node upgrade")
-			framework.ExpectNoError(validate(f, svcName, rcName, ingress, replicas))
-		})
-	})
-})
-
-func testUpgrade(ip, v string, upF func(v string) error) {
-	framework.Logf("Starting async validation")
-	httpClient := http.Client{Timeout: 2 * time.Second}
-	done := make(chan struct{}, 1)
-	// Let's make sure we've finished the heartbeat before shutting things down.
-	var wg sync.WaitGroup
-	go wait.Until(func() {
-		defer GinkgoRecover()
-		wg.Add(1)
-		defer wg.Done()
-
-		if err := wait.Poll(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
-			r, err := httpClient.Get("http://" + ip)
-			if err != nil {
-				framework.Logf("Error reaching %s: %v", ip, err)
-				return false, nil
-			}
-			if r.StatusCode < http.StatusOK || r.StatusCode >= http.StatusNotFound {
-				framework.Logf("Bad response; status: %d, response: %v", r.StatusCode, r)
-				return false, nil
-			}
-			return true, nil
-		}); err != nil {
-			// We log the error here because the test will fail at the very end
-			// because this validation runs in another goroutine. Without this,
-			// a failure is very confusing to track down because from the logs
-			// everything looks fine.
-			msg := fmt.Sprintf("Failed to contact service during upgrade: %v", err)
-			framework.Logf(msg)
-			framework.Failf(msg)
-		}
-	}, 200*time.Millisecond, done)
-
-	framework.Logf("Starting upgrade")
-	framework.ExpectNoError(upF(v))
-	done <- struct{}{}
-	framework.Logf("Stopping async validation")
-	wg.Wait()
-	framework.Logf("Upgrade complete")
+	// Sanity check and hit it once more
+	By("hitting the pod through the service's LoadBalancer")
+	jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeoutDefault)
+	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 }
 
 func checkMasterVersion(c *client.Client, want string) error {
+	framework.Logf("Checking master version")
 	v, err := c.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("checkMasterVersion() couldn't get the master version: %v", err)
@@ -418,6 +383,9 @@ func runCmd(command string, args ...string) (string, string, error) {
 	cmd := exec.Command(command, args...)
 	// We also output to the OS stdout/stderr to aid in debugging in case cmd
 	// hangs and never returns before the test gets killed.
+	//
+	// This creates some ugly output because gcloud doesn't always provide
+	// newlines.
 	cmd.Stdout = io.MultiWriter(os.Stdout, &bout)
 	cmd.Stderr = io.MultiWriter(os.Stderr, &berr)
 	err := cmd.Run()
@@ -429,51 +397,17 @@ func runCmd(command string, args ...string) (string, string, error) {
 	return stdout, stderr, nil
 }
 
-func validate(f *framework.Framework, svcNameWant, rcNameWant string, ingress api.LoadBalancerIngress, podsWant int32) error {
-	framework.Logf("Beginning cluster validation")
-	// Verify RC.
-	rcs, err := f.Client.ReplicationControllers(f.Namespace.Name).List(api.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("error listing RCs: %v", err)
-	}
-	if len(rcs.Items) != 1 {
-		return fmt.Errorf("wanted 1 RC with name %s, got %d", rcNameWant, len(rcs.Items))
-	}
-	if got := rcs.Items[0].Name; got != rcNameWant {
-		return fmt.Errorf("wanted RC name %q, got %q", rcNameWant, got)
-	}
-
-	// Verify pods.
-	if err := framework.VerifyPods(f.Client, f.Namespace.Name, rcNameWant, false, podsWant); err != nil {
-		return fmt.Errorf("failed to find %d %q pods: %v", podsWant, rcNameWant, err)
-	}
-
-	// Verify service.
-	svc, err := f.Client.Services(f.Namespace.Name).Get(svcNameWant)
-	if err != nil {
-		return fmt.Errorf("error getting service %s: %v", svcNameWant, err)
-	}
-	if svcNameWant != svc.Name {
-		return fmt.Errorf("wanted service name %q, got %q", svcNameWant, svc.Name)
-	}
-	// TODO(mikedanese): Make testLoadBalancerReachable return an error.
-	testLoadBalancerReachable(ingress, 80)
-
-	framework.Logf("Cluster validation succeeded")
-	return nil
-}
-
 // migRollingUpdate starts a MIG rolling update, upgrading the nodes to a new
 // instance template named tmpl, and waits up to nt times the number of nodes
 // for it to complete.
 func migRollingUpdate(tmpl string, nt time.Duration) error {
-	By(fmt.Sprintf("starting the MIG rolling update to %s", tmpl))
+	framework.Logf(fmt.Sprintf("starting the MIG rolling update to %s", tmpl))
 	id, err := migRollingUpdateStart(tmpl, nt)
 	if err != nil {
 		return fmt.Errorf("couldn't start the MIG rolling update: %v", err)
 	}
 
-	By(fmt.Sprintf("polling the MIG rolling update (%s) until it completes", id))
+	framework.Logf(fmt.Sprintf("polling the MIG rolling update (%s) until it completes", id))
 	if err := migRollingUpdatePoll(id, nt); err != nil {
 		return fmt.Errorf("err waiting until update completed: %v", err)
 	}
@@ -610,62 +544,4 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 	}
 	framework.Logf("MIG rolling update complete after %v", time.Since(start))
 	return nil
-}
-
-func testLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
-	loadBalancerLagTimeout := loadBalancerLagTimeoutDefault
-	if framework.ProviderIs("aws") {
-		loadBalancerLagTimeout = loadBalancerLagTimeoutAWS
-	}
-	return testLoadBalancerReachableInTime(ingress, port, loadBalancerLagTimeout)
-}
-
-func testLoadBalancerReachableInTime(ingress api.LoadBalancerIngress, port int, timeout time.Duration) bool {
-	ip := ingress.IP
-	if ip == "" {
-		ip = ingress.Hostname
-	}
-
-	return testReachableInTime(conditionFuncDecorator(ip, port, testReachableHTTP, "/", "test-webserver"), timeout)
-
-}
-
-func conditionFuncDecorator(ip string, port int, fn func(string, int, string, string) (bool, error), request string, expect string) wait.ConditionFunc {
-	return func() (bool, error) {
-		return fn(ip, port, request, expect)
-	}
-}
-
-func testReachableInTime(testFunc wait.ConditionFunc, timeout time.Duration) bool {
-	By(fmt.Sprintf("Waiting up to %v", timeout))
-	err := wait.PollImmediate(framework.Poll, timeout, testFunc)
-	if err != nil {
-		Expect(err).NotTo(HaveOccurred(), "Error waiting")
-		return false
-	}
-	return true
-}
-
-func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string) (*api.Service, error) {
-	// TODO: once support ticket 21807001 is resolved, reduce this timeout
-	// back to something reasonable
-	const timeout = 20 * time.Minute
-	var service *api.Service
-	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have a LoadBalancer ingress point", timeout, serviceName, namespace))
-	i := 1
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(3 * time.Second) {
-		service, err := c.Services(namespace).Get(serviceName)
-		if err != nil {
-			framework.Logf("Get service failed, ignoring for 5s: %v", err)
-			continue
-		}
-		if len(service.Status.LoadBalancer.Ingress) > 0 {
-			return service, nil
-		}
-		if i%5 == 0 {
-			framework.Logf("Waiting for service %s in namespace %s to have a LoadBalancer ingress point (%v)", serviceName, namespace, time.Since(start))
-		}
-		i++
-	}
-	return service, fmt.Errorf("service %s in namespace %s doesn't have a LoadBalancer ingress point after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }
