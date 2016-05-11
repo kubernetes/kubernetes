@@ -171,6 +171,7 @@ __custom_func() {
    * resourcequotas (aka 'quota')
    * replicasets (aka 'rs')
    * replicationcontrollers (aka 'rc')
+   * templates
    * secrets
    * serviceaccounts (aka 'sa')
    * services (aka 'svc')

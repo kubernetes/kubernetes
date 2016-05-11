@@ -94,37 +94,44 @@ func (s *SwaggerSchema) validateItems(items interface{}) []error {
 	if !ok {
 		return append(allErrs, fmt.Errorf("items isn't a slice"))
 	}
-	for i, item := range itemList {
+	return s.validateObjectSlice("items", itemList)
+}
+
+// validateObjectSlice validates a field on an Object that is a collection of Generic objects.
+// Each object in slice has its metadata fields checked and is then passed to ValidateObject
+func (s *SwaggerSchema) validateObjectSlice(fieldName string, slice []interface{}) []error {
+	allErrs := []error{}
+	for i, item := range slice {
 		fields, ok := item.(map[string]interface{})
 		if !ok {
-			allErrs = append(allErrs, fmt.Errorf("items[%d] isn't a map[string]interface{}", i))
+			allErrs = append(allErrs, fmt.Errorf("%s[%d] isn't a map[string]interface{}", fieldName, i))
 			continue
 		}
 		groupVersion := fields["apiVersion"]
 		if groupVersion == nil {
-			allErrs = append(allErrs, fmt.Errorf("items[%d].apiVersion not set", i))
+			allErrs = append(allErrs, fmt.Errorf("%s[%d].apiVersion not set", fieldName, i))
 			continue
 		}
 		itemVersion, ok := groupVersion.(string)
 		if !ok {
-			allErrs = append(allErrs, fmt.Errorf("items[%d].apiVersion isn't string type", i))
+			allErrs = append(allErrs, fmt.Errorf("%s[%d].apiVersion isn't string type", fieldName, i))
 			continue
 		}
 		if len(itemVersion) == 0 {
-			allErrs = append(allErrs, fmt.Errorf("items[%d].apiVersion is empty", i))
+			allErrs = append(allErrs, fmt.Errorf("%s[%d].apiVersion is empty", fieldName, i))
 		}
 		kind := fields["kind"]
 		if kind == nil {
-			allErrs = append(allErrs, fmt.Errorf("items[%d].kind not set", i))
+			allErrs = append(allErrs, fmt.Errorf("%s[%d].kind not set", fieldName, i))
 			continue
 		}
 		itemKind, ok := kind.(string)
 		if !ok {
-			allErrs = append(allErrs, fmt.Errorf("items[%d].kind isn't string type", i))
+			allErrs = append(allErrs, fmt.Errorf("%s[%d].kind isn't string type", fieldName, i))
 			continue
 		}
 		if len(itemKind) == 0 {
-			allErrs = append(allErrs, fmt.Errorf("items[%d].kind is empty", i))
+			allErrs = append(allErrs, fmt.Errorf("%s[%d].kind is empty", fieldName, i))
 		}
 		version := apiutil.GetVersion(itemVersion)
 		errs := s.ValidateObject(item, "", version+"."+itemKind)
@@ -226,7 +233,13 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 		// This is because the actual values will be of some sub-type (e.g. Deployment) not the expected
 		// super-type (RawExtention)
 		if s.isGenericArray(details) {
-			errs := s.validateItems(value)
+			allErrs := []error{}
+			genericSlice, ok := value.([]interface{})
+			if !ok {
+				allErrs = append(allErrs, fmt.Errorf("genericSlice isn't a slice"))
+				continue
+			}
+			errs := s.validateObjectSlice(key, genericSlice)
 			if len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			}

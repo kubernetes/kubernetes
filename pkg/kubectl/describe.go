@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -105,6 +106,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		extensions.Kind("DaemonSet"):                &DaemonSetDescriber{c},
 		extensions.Kind("Deployment"):               &DeploymentDescriber{adapter.FromUnversionedClient(c)},
 		extensions.Kind("Job"):                      &JobDescriber{c},
+		extensions.Kind("Template"):                 &TemplateDescriber{adapter.FromUnversionedClient(c)},
 		batch.Kind("Job"):                           &JobDescriber{c},
 		apps.Kind("PetSet"):                         &PetSetDescriber{c},
 		extensions.Kind("Ingress"):                  &IngressDescriber{c},
@@ -1227,6 +1229,38 @@ func describeSecret(secret *api.Secret) (string, error) {
 			}
 		}
 
+		return nil
+	})
+}
+
+type TemplateDescriber struct {
+	clientset.Interface
+}
+
+func (td *TemplateDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	temp, err := td.Extensions().Templates(namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%v\n", temp.Name)
+		fmt.Fprintf(out, "Namespace:\t%v\n", temp.Namespace)
+		fmt.Fprintf(out, "Parameters (Count: %v):\n    Name\tDisplayName\tRequired\tType\tValue\tDescription\n", len(temp.Spec.Parameters))
+		fmt.Fprint(out, "    ----\t--------\t--------\t----\t------\t-----------\n")
+		for _, p := range temp.Spec.Parameters {
+			fmt.Fprintf(out, "    %s\t%s\t%t\t%s\t%s\t%s\n",
+				p.Name, p.DisplayName, p.Required, p.Type, p.Value, p.Description)
+		}
+		fmt.Fprintf(out, "Items (Count: %v):\n    Name\tApiGroupVersion\tKind\n", len(temp.Spec.Objects))
+		fmt.Fprint(out, "    ----\t---------------\t----\n")
+		for _, i := range temp.Spec.Objects {
+			decodedObj, err := runtime.Decode(runtime.UnstructuredJSONScheme, i.Raw)
+			unstructured := decodedObj.(*runtime.Unstructured)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "    %s\t%s\t%s\n", unstructured.GetName(), unstructured.GetAPIVersion(), unstructured.GroupVersionKind().Kind)
+		}
 		return nil
 	})
 }
