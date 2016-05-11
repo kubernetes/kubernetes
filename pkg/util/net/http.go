@@ -153,8 +153,14 @@ func GetClientIP(req *http.Request) net.IP {
 	}
 
 	// Fallback to Remote Address in request, which will give the correct client IP when there is no proxy.
-	ip := net.ParseIP(req.RemoteAddr)
-	return ip
+	// Remote Address in Go's HTTP server is in the form host:port so we need to split that first.
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err == nil {
+		return net.ParseIP(host)
+	}
+
+	// Fallback if Remote Address was just IP.
+	return net.ParseIP(req.RemoteAddr)
 }
 
 var defaultProxyFuncPointer = fmt.Sprintf("%p", http.ProxyFromEnvironment)
