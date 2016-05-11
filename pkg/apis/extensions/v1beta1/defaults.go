@@ -28,6 +28,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		SetDefaults_Job,
 		SetDefaults_HorizontalPodAutoscaler,
 		SetDefaults_ReplicaSet,
+		SetDefaults_Parameter,
+		SetDefaults_TemplateParameters,
 	)
 }
 
@@ -148,5 +150,34 @@ func SetDefaults_ReplicaSet(obj *ReplicaSet) {
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1
+	}
+}
+
+func SetDefaults_Parameter(obj *Parameter) {
+	if obj.Required == nil {
+		obj.Required = new(bool)
+		*obj.Required = false
+	}
+	if obj.Type == nil {
+		obj.Type = new(string)
+		*obj.Type = StringParam
+	}
+	if obj.Value == nil {
+		obj.Value = new(string)
+		*obj.Value = ""
+	}
+	if obj.DisplayName == nil {
+		obj.DisplayName = new(string)
+		*obj.DisplayName = ""
+	}
+	if obj.Description == nil {
+		obj.Description = new(string)
+		*obj.Description = ""
+	}
+}
+
+func SetDefaults_TemplateParameters(obj *TemplateParameters) {
+	if obj.ParameterValues == nil {
+		obj.ParameterValues = map[string]string{}
 	}
 }

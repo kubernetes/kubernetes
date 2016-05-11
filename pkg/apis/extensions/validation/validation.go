@@ -146,6 +146,11 @@ func ValidateDeploymentName(name string, prefix bool) (bool, string) {
 	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
 
+// Validates that the given name can be used as a Template name.
+func ValidateTemplateName(name string, prefix bool) (bool, string) {
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
+}
+
 func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if intOrPercent.Type == intstr.String {
@@ -685,5 +690,24 @@ func ValidatePodSecurityPolicyUpdate(old *extensions.PodSecurityPolicy, new *ext
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&old.ObjectMeta, &new.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// Template Api Validation
+func ValidateTemplateSpec(spec *extensions.TemplateSpec, fldPath *field.Path) field.ErrorList {
+	// TODO: Write this
+	allErrs := field.ErrorList{}
+	return allErrs
+}
+
+func ValidateTemplateUpdate(update, old *extensions.Template) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateTemplateSpec(&update.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateTemplate(obj *extensions.Template) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateTemplateName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateTemplateSpec(&obj.Spec, field.NewPath("spec"))...)
 	return allErrs
 }

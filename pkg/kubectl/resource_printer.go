@@ -442,6 +442,7 @@ var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print 
 var deploymentColumns = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
 var configMapColumns = []string{"NAME", "DATA", "AGE"}
 var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS", "SELINUX", "RUNASUSER"}
+var templateColumns = []string{"NAME", "AGE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -497,6 +498,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podSecurityPolicyColumns, printPodSecurityPolicyList)
 	h.Handler(thirdPartyResourceDataColumns, printThirdPartyResourceData)
 	h.Handler(thirdPartyResourceDataColumns, printThirdPartyResourceDataList)
+	h.Handler(templateColumns, printTemplate)
+	h.Handler(templateColumns, printTemplateList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -1607,6 +1610,34 @@ func printDeployment(deployment *extensions.Deployment, w io.Writer, options Pri
 func printDeploymentList(list *extensions.DeploymentList, w io.Writer, options PrintOptions) error {
 	for _, item := range list.Items {
 		if err := printDeployment(&item, w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printTemplate(template *extensions.Template, w io.Writer, options PrintOptions) error {
+	if options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", template.Namespace); err != nil {
+			return err
+		}
+	}
+
+	age := translateTimestamp(template.CreationTimestamp)
+
+	if _, err := fmt.Fprintf(w, "%s\t%s", template.Name, age); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, appendLabels(template.Labels, options.ColumnLabels)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendAllLabels(options.ShowLabels, template.Labels))
+	return err
+}
+
+func printTemplateList(list *extensions.TemplateList, w io.Writer, options PrintOptions) error {
+	for _, item := range list.Items {
+		if err := printTemplate(&item, w, options); err != nil {
 			return err
 		}
 	}
