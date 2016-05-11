@@ -131,8 +131,8 @@ type ProvisionableVolumePlugin interface {
 // to a node before mounting.
 type AttachableVolumePlugin interface {
 	VolumePlugin
-	NewAttacher(spec *Spec) (Attacher, error)
-	NewDetacher(name string, podUID types.UID) (Detacher, error)
+	NewAttacher() (Attacher, error)
+	NewDetacher() (Detacher, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
