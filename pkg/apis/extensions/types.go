@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -808,4 +809,76 @@ type PodSecurityPolicyList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []PodSecurityPolicy `json:"items"`
+}
+
+// +genclient=true
+
+// Template contains one or more partially complete configs with substitution parameters.
+type Template struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+
+	Spec TemplateSpec `json:"spec"`
+}
+
+type TemplateSpec struct {
+	// Optional: Parameters is an array of Parameters used during the
+	// Template to Config transformation.
+	Parameters []Parameter `json:"parameters,omitempty"`
+
+	// Required: A yaml config list of resources to create
+	Objects []runtime.RawExtension `json:"objects"`
+}
+
+// TemplateList is a list of Template objects.
+type TemplateList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
+	Items                []Template `json:"items"`
+}
+
+const (
+	StringParam = "string"
+	IntParam    = "integer"
+	BoolParam   = "boolean"
+	Base64Param = "base64"
+)
+
+// Parameter defines a name/value variable that is to be processed during
+// the Template to Config transformation.
+type Parameter struct {
+	// Required: Parameter name must be set and it can be referenced in Template
+	// Items (See Value)
+	Name string `json:"name"`
+
+	// The name that will show in UI instead of parameter 'Name'.
+	DisplayName string `json:"displayName,omitempty"`
+
+	// Parameter can have description.
+	Description string `json:"description,omitempty"`
+
+	// Value holds the Parameter data.
+	// The value replaces all occurrences of the Parameter $(Name)
+	// expression during the Template to Config transformation.
+	Value string `json:"value,omitempty"`
+
+	// Indicates the parameter must have a value.
+	Required bool `json:"required,omitempty"`
+
+	// Type-value of the parameter (one of string, int, bool, or base64)
+	// Used by clients to provide validation of user input and guide users.
+	Type string `json:"type,omitempty"`
+}
+
+// TemplateParameters contains the substitution parameters for processing a Template
+type TemplateParameters struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// This must match the Name of a template
+	Name string `json:"name"`
+
+	// ParameterValues is a map of Substitution parameters to be expanded in the Template
+	// All required Template Parameters must be specified in this map and parseable to the Parameter Type
+	// if specified.
+	ParameterValues map[string]string `json:"parameters,omitempty"`
 }
