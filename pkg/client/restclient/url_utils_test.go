@@ -25,23 +25,23 @@ import (
 
 func TestValidatesHostParameter(t *testing.T) {
 	testCases := []struct {
-		Host    string
+		Hosts   []string
 		APIPath string
 
 		URL string
 		Err bool
 	}{
-		{"127.0.0.1", "", "http://127.0.0.1/" + testapi.Default.GroupVersion().Version, false},
-		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/" + testapi.Default.GroupVersion().Version, false},
-		{"foo.bar.com", "", "http://foo.bar.com/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host/prefix", "", "http://host/prefix/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host", "", "http://host/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host", "/", "http://host/" + testapi.Default.GroupVersion().Version, false},
-		{"http://host", "/other", "http://host/other/" + testapi.Default.GroupVersion().Version, false},
-		{"host/server", "", "", true},
+		{[]string{"127.0.0.1"}, "", "http://127.0.0.1/" + testapi.Default.GroupVersion().Version, false},
+		{[]string{"127.0.0.1:8080"}, "", "http://127.0.0.1:8080/" + testapi.Default.GroupVersion().Version, false},
+		{[]string{"foo.bar.com"}, "", "http://foo.bar.com/" + testapi.Default.GroupVersion().Version, false},
+		{[]string{"http://host/prefix"}, "", "http://host/prefix/" + testapi.Default.GroupVersion().Version, false},
+		{[]string{"http://host"}, "", "http://host/" + testapi.Default.GroupVersion().Version, false},
+		{[]string{"http://host"}, "/", "http://host/" + testapi.Default.GroupVersion().Version, false},
+		{[]string{"http://host"}, "/other", "http://host/other/" + testapi.Default.GroupVersion().Version, false},
+		{[]string{"host/server"}, "", "", true},
 	}
 	for i, testCase := range testCases {
-		u, versionedAPIPath, err := DefaultServerURL(testCase.Host, testCase.APIPath, *testapi.Default.GroupVersion(), false)
+		basepaths, versionedAPIPath, err := DefaultServerURL(testCase.Hosts, testCase.APIPath, *testapi.Default.GroupVersion(), false)
 		switch {
 		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")
@@ -52,10 +52,12 @@ func TestValidatesHostParameter(t *testing.T) {
 		case err != nil:
 			continue
 		}
-		u.Path = path.Join(u.Path, versionedAPIPath)
-		if e, a := testCase.URL, u.String(); e != a {
-			t.Errorf("%d: expected host %s, got %s", i, e, a)
-			continue
+		for _, u := range basepaths {
+			u.Path = path.Join(u.Path, versionedAPIPath)
+			if e, a := testCase.URL, u.String(); e != a {
+				t.Errorf("%d: expected host %s, got %s", i, e, a)
+				continue
+			}
 		}
 	}
 }

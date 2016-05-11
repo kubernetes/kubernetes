@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -36,8 +37,24 @@ const (
 	pollInterval           = time.Second * 1
 )
 
+type testStatus struct {
+	Name             string
+	RestartPolicy    api.RestartPolicy
+	Phase            api.PodPhase
+	State            ContainerState
+	RestartCountOper string
+	RestartCount     int32
+	Ready            bool
+}
+
 var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
+	var cl *client.Client
+
+	BeforeEach(func() {
+		// Setup the apiserver client
+		cl = client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
+	})
 
 	Describe("container runtime conformance blackbox test", func() {
 		Context("when starting a container that exits", func() {
