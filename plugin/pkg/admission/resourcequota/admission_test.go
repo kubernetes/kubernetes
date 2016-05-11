@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -115,7 +116,9 @@ func TestPrettyPrint(t *testing.T) {
 // TestAdmissionIgnoresDelete verifies that the admission controller ignores delete operations
 func TestAdmissionIgnoresDelete(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
-	handler, err := NewResourceQuota(kubeClient, install.NewRegistry(kubeClient), 5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	handler, err := NewResourceQuota(kubeClient, install.NewRegistry(kubeClient), 5, stopCh)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -143,7 +146,10 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
 	evaluator.indexer = indexer
-	evaluator.Run(5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer utilruntime.HandleCrash()
+	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -181,7 +187,10 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
 	evaluator.indexer = indexer
-	evaluator.Run(5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer utilruntime.HandleCrash()
+	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -255,7 +264,10 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
 	evaluator.indexer = indexer
-	evaluator.Run(5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer utilruntime.HandleCrash()
+	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -293,7 +305,10 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
 	evaluator.indexer = indexer
-	evaluator.Run(5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer utilruntime.HandleCrash()
+	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -334,7 +349,10 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
 	evaluator.indexer = indexer
 	evaluator.liveLookupCache = liveLookupCache
-	evaluator.Run(5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer utilruntime.HandleCrash()
+	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -394,7 +412,10 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
 	evaluator.indexer = indexer
-	evaluator.Run(5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer utilruntime.HandleCrash()
+	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -493,7 +514,10 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
 	evaluator.indexer = indexer
-	evaluator.Run(5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer utilruntime.HandleCrash()
+	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -579,7 +603,10 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
 	evaluator.indexer = indexer
-	evaluator.Run(5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer utilruntime.HandleCrash()
+	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -692,7 +719,10 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	evaluator, _ := newQuotaEvaluator(kubeClient, install.NewRegistry(kubeClient))
 	evaluator.indexer = indexer
 	evaluator.registry = registry
-	evaluator.Run(5)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer utilruntime.HandleCrash()
+	go evaluator.Run(5, stopCh)
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
