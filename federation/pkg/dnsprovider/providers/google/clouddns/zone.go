@@ -30,3 +30,7 @@ func (zone *Zone) Name() string {
 func (zone *Zone) ResourceRecordSets() (dnsprovider.ResourceRecordSets, bool) {
 	return &ResourceRecordSets{zone, zone.zones.interface_.service.ResourceRecordSets()}, true
 }
+
+func (zone Zone) project() string {
+	return zone.zones.project()
+}

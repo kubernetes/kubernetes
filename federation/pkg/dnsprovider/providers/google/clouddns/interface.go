@@ -21,8 +21,8 @@ import (
 var _ dnsprovider.Interface = Interface{}
 
 type Interface struct {
-	project string
-	service interfaces.Service
+	project_ string
+	service  interfaces.Service
 }
 
 /*
@@ -46,7 +46,7 @@ func NewInterface(project string, tokenSource oauth2.TokenSource) dnsprovider.In
 
 // newInterfaceWithStub facilitates stubbing out the underlying Google Cloud DNS
 // library for testing purposes.  It returns an provider-independent interface.
-func newInterfaceWithStub(project string, service interfaces.Service) dnsprovider.Interface {
+func newInterfaceWithStub(project string, service interfaces.Service) *Interface {
 	return &Interface{project, service}
 }
 
@@ -71,4 +71,8 @@ func getOauthClient() (*http.Client, error) {
 // Zones returns the provider's Zones interface, or false if not supported.
 func (i Interface) Zones() (zones dnsprovider.Zones, supported bool) {
 	return Zones{i.service.ManagedZones(), &i}, true
+}
+
+func (i Interface) project() string {
+	return i.project_
 }

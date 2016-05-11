@@ -18,17 +18,13 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 )
 
-const (
-	projectName = "federation0-cluster00" // TODO - get from config
-)
-
 type Zones struct {
 	impl       interfaces.ManagedZonesService
 	interface_ *Interface
 }
 
 func (zones Zones) List() ([]dnsprovider.Zone, error) {
-	response, err := zones.impl.List(projectName).Do()
+	response, err := zones.impl.List(zones.project()).Do()
 	if err != nil {
 		return []dnsprovider.Zone{}, nil
 	}
@@ -38,4 +34,8 @@ func (zones Zones) List() ([]dnsprovider.Zone, error) {
 		zoneList[i] = &Zone{zone, &zones}
 	}
 	return zoneList, nil
+}
+
+func (zones Zones) project() string {
+	return zones.interface_.project()
 }

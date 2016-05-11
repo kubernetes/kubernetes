@@ -27,7 +27,7 @@ type ResourceRecordSets struct {
 }
 
 func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error) {
-	response, err := rrsets.impl.List(projectName, rrsets.zone.impl.Name()).Do()
+	response, err := rrsets.impl.List(rrsets.project(), rrsets.zone.impl.Name()).Do()
 	if err != nil {
 		return []dnsprovider.ResourceRecordSet{}, err
 	}
@@ -42,7 +42,7 @@ func (rrsets ResourceRecordSets) Add(rrset dnsprovider.ResourceRecordSet) (dnspr
 	service := rrsets.zone.zones.interface_.service.Changes()
 	additions := []interfaces.ResourceRecordSet{rrset.(*ResourceRecordSet).impl}
 	change := service.NewChange(additions, []interfaces.ResourceRecordSet{})
-	newChange, err := service.Create(projectName, rrsets.zone.impl.Name(), change).Do()
+	newChange, err := service.Create(rrsets.project(), rrsets.zone.impl.Name(), change).Do()
 	if err != nil {
 		return dnsprovider.ResourceRecordSet(nil), err
 	}
@@ -57,7 +57,7 @@ func (rrsets ResourceRecordSets) Remove(rrset dnsprovider.ResourceRecordSet) err
 	service := rrsets.zone.zones.interface_.service.Changes()
 	deletions := []interfaces.ResourceRecordSet{rrset.(ResourceRecordSet).impl}
 	change := service.NewChange([]interfaces.ResourceRecordSet{}, deletions)
-	newChange, err := service.Create(projectName, rrsets.zone.impl.Name(), change).Do()
+	newChange, err := service.Create(rrsets.project(), rrsets.zone.impl.Name(), change).Do()
 	if err != nil {
 		return err
 	}
@@ -70,4 +70,8 @@ func (rrsets ResourceRecordSets) Remove(rrset dnsprovider.ResourceRecordSet) err
 
 func (rrsets ResourceRecordSets) New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) dnsprovider.ResourceRecordSet {
 	return &ResourceRecordSet{rrsets.impl.NewResourceRecordSet(name, rrdatas, ttl, rrstype), &rrsets}
+}
+
+func (rrsets ResourceRecordSets) project() string {
+	return rrsets.zone.project()
 }

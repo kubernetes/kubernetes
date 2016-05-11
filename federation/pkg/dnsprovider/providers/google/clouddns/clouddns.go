@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
 
 const (
@@ -42,7 +43,7 @@ const (
 
 func init() {
 	dnsprovider.RegisterDnsProvider(ProviderName, func(config io.Reader) (dnsprovider.Interface, error) {
-		return newGCECloud(config)
+		return newCloudDns(config)
 	})
 }
 
@@ -56,8 +57,9 @@ type Config struct {
 
 // newCloudDns creates a new instance of .
 func newCloudDns(config io.Reader) (*Interface, error) {
-	projectID, err := metadata.ProjectID() // On error we get an empty string, which is fine for now.
-	tokenSource := google.ComputeTokenSource("")
+	projectID, _ := metadata.ProjectID() // On error we get an empty string, which is fine for now.
+	// tokenSource := google.ComputeTokenSource("")
+	var tokenSource oauth2.TokenSource
 	// Possibly override defaults with config below
 	if config != nil {
 		var cfg Config
@@ -70,7 +72,7 @@ func newCloudDns(config io.Reader) (*Interface, error) {
 			projectID = cfg.Global.ProjectID
 		}
 		if cfg.Global.TokenURL != "" {
-			tokenSource = newAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
+			tokenSource = gce.NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
 		}
 	}
 	return CreateInterface(projectID, tokenSource)
@@ -78,7 +80,7 @@ func newCloudDns(config io.Reader) (*Interface, error) {
 
 // Creates a  clouddns.Interface object using the specified parameters.
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
-func CreateInterface(projectID, tokenSource oauth2.TokenSource) (*GCECloud, error) {
+func CreateInterface(projectID string, tokenSource oauth2.TokenSource) (*Interface, error) {
 	if tokenSource == nil {
 		var err error
 		tokenSource, err = google.DefaultTokenSource(
@@ -93,16 +95,12 @@ func CreateInterface(projectID, tokenSource oauth2.TokenSource) (*GCECloud, erro
 		glog.Infof("Using existing Token Source %#v", tokenSource)
 	}
 
-	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
-	svc, err := compute.New(client)
-	if err != nil {
-		return nil, err
-	}
+	oauthClient := oauth2.NewClient(oauth2.NoContext, tokenSource)
 
 	service, err := dns.New(oauthClient)
 	if err != nil {
 		glog.Errorf("Failed to get Cloud DNS client: %v", err)
 	}
 	glog.Infof("Successfully got DNS service: %v\n", service)
-	return newInterfaceWithStub(project, internal.NewService(service))
+	return newInterfaceWithStub(projectID, internal.NewService(service)), nil
 }

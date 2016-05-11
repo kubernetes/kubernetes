@@ -15,6 +15,7 @@ package clouddns
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"testing"
 
@@ -23,30 +24,41 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
 
-func newTestInterface() dnsprovider.Interface {
-	// return NewInterface()     // Use this to test the real cloud service
-	return newFakeInterface() // Use this to stub out the entire cloud service
+func newTestInterface() (dnsprovider.Interface, error) {
+	// Use this to test the real cloud service - insert appropriate project-id.  Default token source will be used.  See
+	// https://github.com/golang/oauth2/blob/master/google/default.go for details.
+	// i, err := dnsprovider.GetDnsProvider(ProviderName, strings.NewReader("\n[global]\nproject-id = federation0-cluster00"))
+	i, err := newFakeInterface() // Use this to stub out the entire cloud service
+	if err != nil {
+		return nil, err
+	}
+	return i, nil
 }
 
-func newFakeInterface() dnsprovider.Interface {
+func newFakeInterface() (dnsprovider.Interface, error) {
 	service := stubs.NewService()
-	interface_ := newInterfaceWithStub(service)
+	interface_ := newInterfaceWithStub("", service)
 	zones := service.ManagedZones_
 	// Add a fake zone to test against.
 	zone := &stubs.ManagedZone{zones, "example.com", []stubs.ResourceRecordSet{}}
-	call := zones.Create(projectName, zone)
+	call := zones.Create(interface_.project(), zone)
 	_, err := call.Do()
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return interface_
+	return interface_, nil
 }
 
 var interface_ dnsprovider.Interface
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	interface_ = newTestInterface()
+	var err error
+	interface_, err = newTestInterface()
+	if err != nil {
+		fmt.Printf("Error creating interface: %v", err)
+		os.Exit(1)
+	}
 	os.Exit(m.Run())
 }
 
