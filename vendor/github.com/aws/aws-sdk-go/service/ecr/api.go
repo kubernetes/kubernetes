@@ -489,7 +489,7 @@ type AuthorizationData struct {
 
 	// The registry URL to use for this authorization token in a docker login command.
 	// The Amazon ECR registry URL format is https://aws_account_id.dkr.ecr.region.amazonaws.com.
-	// For example, https://012345678910.dkr.ecr.us-east-1.amazonaws.com.
+	// For example, https://012345678910.dkr.ecr.us-east-1.amazonaws.com..
 	ProxyEndpoint *string `locationName:"proxyEndpoint" type:"string"`
 }
 
@@ -525,6 +525,28 @@ func (s BatchCheckLayerAvailabilityInput) String() string {
 // GoString returns the string representation
 func (s BatchCheckLayerAvailabilityInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *BatchCheckLayerAvailabilityInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "BatchCheckLayerAvailabilityInput"}
+	if s.LayerDigests == nil {
+		invalidParams.Add(request.NewErrParamRequired("LayerDigests"))
+	}
+	if s.LayerDigests != nil && len(s.LayerDigests) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LayerDigests", 1))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type BatchCheckLayerAvailabilityOutput struct {
@@ -575,6 +597,28 @@ func (s BatchDeleteImageInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *BatchDeleteImageInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "BatchDeleteImageInput"}
+	if s.ImageIds == nil {
+		invalidParams.Add(request.NewErrParamRequired("ImageIds"))
+	}
+	if s.ImageIds != nil && len(s.ImageIds) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ImageIds", 1))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type BatchDeleteImageOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -618,6 +662,28 @@ func (s BatchGetImageInput) String() string {
 // GoString returns the string representation
 func (s BatchGetImageInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *BatchGetImageInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "BatchGetImageInput"}
+	if s.ImageIds == nil {
+		invalidParams.Add(request.NewErrParamRequired("ImageIds"))
+	}
+	if s.ImageIds != nil && len(s.ImageIds) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ImageIds", 1))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type BatchGetImageOutput struct {
@@ -668,6 +734,31 @@ func (s CompleteLayerUploadInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CompleteLayerUploadInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CompleteLayerUploadInput"}
+	if s.LayerDigests == nil {
+		invalidParams.Add(request.NewErrParamRequired("LayerDigests"))
+	}
+	if s.LayerDigests != nil && len(s.LayerDigests) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LayerDigests", 1))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+	if s.UploadId == nil {
+		invalidParams.Add(request.NewErrParamRequired("UploadId"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type CompleteLayerUploadOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -713,6 +804,22 @@ func (s CreateRepositoryInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateRepositoryInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateRepositoryInput"}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type CreateRepositoryOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -754,6 +861,22 @@ func (s DeleteRepositoryInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteRepositoryInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteRepositoryInput"}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DeleteRepositoryOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -792,6 +915,22 @@ func (s DeleteRepositoryPolicyInput) String() string {
 // GoString returns the string representation
 func (s DeleteRepositoryPolicyInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteRepositoryPolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteRepositoryPolicyInput"}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DeleteRepositoryPolicyOutput struct {
@@ -856,6 +995,22 @@ func (s DescribeRepositoriesInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeRepositoriesInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeRepositoriesInput"}
+	if s.MaxResults != nil && *s.MaxResults < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("MaxResults", 1))
+	}
+	if s.RepositoryNames != nil && len(s.RepositoryNames) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryNames", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DescribeRepositoriesOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -896,6 +1051,19 @@ func (s GetAuthorizationTokenInput) String() string {
 // GoString returns the string representation
 func (s GetAuthorizationTokenInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *GetAuthorizationTokenInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "GetAuthorizationTokenInput"}
+	if s.RegistryIds != nil && len(s.RegistryIds) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("RegistryIds", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type GetAuthorizationTokenOutput struct {
@@ -940,6 +1108,25 @@ func (s GetDownloadUrlForLayerInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *GetDownloadUrlForLayerInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "GetDownloadUrlForLayerInput"}
+	if s.LayerDigest == nil {
+		invalidParams.Add(request.NewErrParamRequired("LayerDigest"))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type GetDownloadUrlForLayerOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -979,6 +1166,22 @@ func (s GetRepositoryPolicyInput) String() string {
 // GoString returns the string representation
 func (s GetRepositoryPolicyInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *GetRepositoryPolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "GetRepositoryPolicyInput"}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type GetRepositoryPolicyOutput struct {
@@ -1095,6 +1298,22 @@ func (s InitiateLayerUploadInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *InitiateLayerUploadInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "InitiateLayerUploadInput"}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type InitiateLayerUploadOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1201,6 +1420,25 @@ func (s ListImagesInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ListImagesInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ListImagesInput"}
+	if s.MaxResults != nil && *s.MaxResults < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("MaxResults", 1))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type ListImagesOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1249,6 +1487,25 @@ func (s PutImageInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *PutImageInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "PutImageInput"}
+	if s.ImageManifest == nil {
+		invalidParams.Add(request.NewErrParamRequired("ImageManifest"))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type PutImageOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1281,6 +1538,10 @@ type Repository struct {
 
 	// The name of the repository.
 	RepositoryName *string `locationName:"repositoryName" min:"2" type:"string"`
+
+	// The URI for the repository. You can use this URI for Docker push and pull
+	// operations.
+	RepositoryUri *string `locationName:"repositoryUri" type:"string"`
 }
 
 // String returns the string representation
@@ -1322,6 +1583,25 @@ func (s SetRepositoryPolicyInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *SetRepositoryPolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "SetRepositoryPolicyInput"}
+	if s.PolicyText == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyText"))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type SetRepositoryPolicyOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1349,6 +1629,8 @@ type UploadLayerPartInput struct {
 	_ struct{} `type:"structure"`
 
 	// The base64-encoded layer part payload.
+	//
+	// LayerPartBlob is automatically base64 encoded/decoded by the SDK.
 	LayerPartBlob []byte `locationName:"layerPartBlob" type:"blob" required:"true"`
 
 	// The integer value of the first byte of the layer part.
@@ -1377,6 +1659,34 @@ func (s UploadLayerPartInput) String() string {
 // GoString returns the string representation
 func (s UploadLayerPartInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *UploadLayerPartInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "UploadLayerPartInput"}
+	if s.LayerPartBlob == nil {
+		invalidParams.Add(request.NewErrParamRequired("LayerPartBlob"))
+	}
+	if s.PartFirstByte == nil {
+		invalidParams.Add(request.NewErrParamRequired("PartFirstByte"))
+	}
+	if s.PartLastByte == nil {
+		invalidParams.Add(request.NewErrParamRequired("PartLastByte"))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+	if s.UploadId == nil {
+		invalidParams.Add(request.NewErrParamRequired("UploadId"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type UploadLayerPartOutput struct {

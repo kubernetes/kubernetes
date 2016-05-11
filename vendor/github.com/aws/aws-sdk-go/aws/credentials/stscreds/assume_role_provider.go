@@ -14,6 +14,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 )
 
+// ProviderName provides a name of AssumeRole provider
+const ProviderName = "AssumeRoleProvider"
+
 // AssumeRoler represents the minimal subset of the STS client API used by this provider.
 type AssumeRoler interface {
 	AssumeRole(input *sts.AssumeRoleInput) (*sts.AssumeRoleOutput, error)
@@ -43,6 +46,26 @@ type AssumeRoleProvider struct {
 
 	// Optional ExternalID to pass along, defaults to nil if not set.
 	ExternalID *string
+
+	// The policy plain text must be 2048 bytes or shorter. However, an internal
+	// conversion compresses it into a packed binary format with a separate limit.
+	// The PackedPolicySize response element indicates by percentage how close to
+	// the upper size limit the policy is, with 100% equaling the maximum allowed
+	// size.
+	Policy *string
+
+	// The identification number of the MFA device that is associated with the user
+	// who is making the AssumeRole call. Specify this value if the trust policy
+	// of the role being assumed includes a condition that requires MFA authentication.
+	// The value is either the serial number for a hardware device (such as GAHT12345678)
+	// or an Amazon Resource Name (ARN) for a virtual device (such as arn:aws:iam::123456789012:mfa/user).
+	SerialNumber *string
+
+	// The value provided by the MFA device, if the trust policy of the role being
+	// assumed requires MFA (that is, if the policy includes a condition that tests
+	// for MFA). If the role being assumed requires MFA and if the TokenCode value
+	// is missing or expired, the AssumeRole call returns an "access denied" error.
+	TokenCode *string
 
 	// ExpiryWindow will allow the credentials to trigger refreshing prior to
 	// the credentials actually expiring. This is beneficial so race conditions
@@ -107,16 +130,23 @@ func (p *AssumeRoleProvider) Retrieve() (credentials.Value, error) {
 		// Expire as often as AWS permits.
 		p.Duration = DefaultDuration
 	}
-
-	roleOutput, err := p.Client.AssumeRole(&sts.AssumeRoleInput{
+	input := &sts.AssumeRoleInput{
 		DurationSeconds: aws.Int64(int64(p.Duration / time.Second)),
 		RoleArn:         aws.String(p.RoleARN),
 		RoleSessionName: aws.String(p.RoleSessionName),
 		ExternalId:      p.ExternalID,
-	})
+	}
+	if p.Policy != nil {
+		input.Policy = p.Policy
+	}
+	if p.SerialNumber != nil && p.TokenCode != nil {
+		input.SerialNumber = p.SerialNumber
+		input.TokenCode = p.TokenCode
+	}
+	roleOutput, err := p.Client.AssumeRole(input)
 
 	if err != nil {
-		return credentials.Value{}, err
+		return credentials.Value{ProviderName: ProviderName}, err
 	}
 
 	// We will proactively generate new credentials before they expire.
@@ -126,5 +156,6 @@ func (p *AssumeRoleProvider) Retrieve() (credentials.Value, error) {
 		AccessKeyID:     *roleOutput.Credentials.AccessKeyId,
 		SecretAccessKey: *roleOutput.Credentials.SecretAccessKey,
 		SessionToken:    *roleOutput.Credentials.SessionToken,
+		ProviderName:    ProviderName,
 	}, nil
 }

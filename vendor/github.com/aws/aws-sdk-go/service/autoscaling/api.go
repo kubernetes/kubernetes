@@ -4,10 +4,13 @@
 package autoscaling
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awsutil"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/private/protocol"
+	"github.com/aws/aws-sdk-go/private/protocol/query"
 )
 
 const opAttachInstances = "AttachInstances"
@@ -25,6 +28,8 @@ func (c *AutoScaling) AttachInstancesRequest(input *AttachInstancesInput) (req *
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &AttachInstancesOutput{}
 	req.Data = output
 	return
@@ -100,20 +105,22 @@ func (c *AutoScaling) CompleteLifecycleActionRequest(input *CompleteLifecycleAct
 	return
 }
 
-// Completes the lifecycle action for the associated token initiated under the
-// given lifecycle hook with the specified result.
+// Completes the lifecycle action for the specified token or instance with the
+// specified result.
 //
-// This operation is a part of the basic sequence for adding a lifecycle hook
-// to an Auto Scaling group:
+// This step is a part of the procedure for adding a lifecycle hook to an Auto
+// Scaling group:
 //
-//  Create a notification target. A target can be either an Amazon SQS queue
-// or an Amazon SNS topic. Create an IAM role. This role allows Auto Scaling
-// to publish lifecycle notifications to the designated SQS queue or SNS topic.
-// Create the lifecycle hook. You can create a hook that acts when instances
-// launch or when instances terminate. If necessary, record the lifecycle action
-// heartbeat to keep the instance in a pending state. Complete the lifecycle
-// action.  For more information, see Auto Scaling Pending State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingPendingState.html)
-// and Auto Scaling Terminating State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingTerminatingState.html)
+//  (Optional) Create a Lambda function and a rule that allows CloudWatch Events
+// to invoke your Lambda function when Auto Scaling launches or terminates instances.
+// (Optional) Create a notification target and an IAM role. The target can be
+// either an Amazon SQS queue or an Amazon SNS topic. The role allows Auto Scaling
+// to publish lifecycle notifications to the target. Create the lifecycle hook.
+// Specify whether the hook is used when the instances launch or terminate.
+// If you need more time, record the lifecycle action heartbeat to keep the
+// instance in a pending state. If you finish before the timeout period ends,
+// complete the lifecycle action.  For more information, see Auto Scaling Lifecycle
+// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroupLifecycle.html)
 // in the Auto Scaling Developer Guide.
 func (c *AutoScaling) CompleteLifecycleAction(input *CompleteLifecycleActionInput) (*CompleteLifecycleActionOutput, error) {
 	req, out := c.CompleteLifecycleActionRequest(input)
@@ -136,6 +143,8 @@ func (c *AutoScaling) CreateAutoScalingGroupRequest(input *CreateAutoScalingGrou
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &CreateAutoScalingGroupOutput{}
 	req.Data = output
 	return
@@ -170,6 +179,8 @@ func (c *AutoScaling) CreateLaunchConfigurationRequest(input *CreateLaunchConfig
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &CreateLaunchConfigurationOutput{}
 	req.Data = output
 	return
@@ -204,19 +215,14 @@ func (c *AutoScaling) CreateOrUpdateTagsRequest(input *CreateOrUpdateTagsInput) 
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &CreateOrUpdateTagsOutput{}
 	req.Data = output
 	return
 }
 
 // Creates or updates tags for the specified Auto Scaling group.
-//
-// A tag is defined by its resource ID, resource type, key, value, and propagate
-// flag. The value and the propagate flag are optional parameters. The only
-// supported resource type is auto-scaling-group, and the resource ID must be
-// the name of the group. The PropagateAtLaunch flag determines whether the
-// tag is added to instances launched in the group. Valid values are true or
-// false.
 //
 // When you specify a tag with a key that already exists, the operation overwrites
 // the previous tag definition, and you do not get an error message.
@@ -244,6 +250,8 @@ func (c *AutoScaling) DeleteAutoScalingGroupRequest(input *DeleteAutoScalingGrou
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &DeleteAutoScalingGroupOutput{}
 	req.Data = output
 	return
@@ -286,6 +294,8 @@ func (c *AutoScaling) DeleteLaunchConfigurationRequest(input *DeleteLaunchConfig
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &DeleteLaunchConfigurationOutput{}
 	req.Data = output
 	return
@@ -347,6 +357,8 @@ func (c *AutoScaling) DeleteNotificationConfigurationRequest(input *DeleteNotifi
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &DeleteNotificationConfigurationOutput{}
 	req.Data = output
 	return
@@ -374,6 +386,8 @@ func (c *AutoScaling) DeletePolicyRequest(input *DeletePolicyInput) (req *reques
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &DeletePolicyOutput{}
 	req.Data = output
 	return
@@ -404,6 +418,8 @@ func (c *AutoScaling) DeleteScheduledActionRequest(input *DeleteScheduledActionI
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &DeleteScheduledActionOutput{}
 	req.Data = output
 	return
@@ -431,6 +447,8 @@ func (c *AutoScaling) DeleteTagsRequest(input *DeleteTagsInput) (req *request.Re
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &DeleteTagsOutput{}
 	req.Data = output
 	return
@@ -1122,6 +1140,8 @@ func (c *AutoScaling) DisableMetricsCollectionRequest(input *DisableMetricsColle
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &DisableMetricsCollectionOutput{}
 	req.Data = output
 	return
@@ -1150,6 +1170,8 @@ func (c *AutoScaling) EnableMetricsCollectionRequest(input *EnableMetricsCollect
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &EnableMetricsCollectionOutput{}
 	req.Data = output
 	return
@@ -1188,7 +1210,7 @@ func (c *AutoScaling) EnterStandbyRequest(input *EnterStandbyInput) (req *reques
 
 // Moves the specified instances into Standby mode.
 //
-// For more information, see Auto Scaling InService State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingInServiceState.html)
+// For more information, see Auto Scaling Lifecycle (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroupLifecycle.html)
 // in the Auto Scaling Developer Guide.
 func (c *AutoScaling) EnterStandby(input *EnterStandbyInput) (*EnterStandbyOutput, error) {
 	req, out := c.EnterStandbyRequest(input)
@@ -1211,6 +1233,8 @@ func (c *AutoScaling) ExecutePolicyRequest(input *ExecutePolicyInput) (req *requ
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &ExecutePolicyOutput{}
 	req.Data = output
 	return
@@ -1245,7 +1269,7 @@ func (c *AutoScaling) ExitStandbyRequest(input *ExitStandbyInput) (req *request.
 
 // Moves the specified instances out of Standby mode.
 //
-// For more information, see Auto Scaling InService State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingInServiceState.html)
+// For more information, see Auto Scaling Lifecycle (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroupLifecycle.html)
 // in the Auto Scaling Developer Guide.
 func (c *AutoScaling) ExitStandby(input *ExitStandbyInput) (*ExitStandbyOutput, error) {
 	req, out := c.ExitStandbyRequest(input)
@@ -1279,17 +1303,19 @@ func (c *AutoScaling) PutLifecycleHookRequest(input *PutLifecycleHookInput) (req
 // an instance that is not actively in service; for example, either when the
 // instance launches or before the instance terminates.
 //
-// This operation is a part of the basic sequence for adding a lifecycle hook
-// to an Auto Scaling group:
+// This step is a part of the procedure for adding a lifecycle hook to an Auto
+// Scaling group:
 //
-//  Create a notification target. A target can be either an Amazon SQS queue
-// or an Amazon SNS topic. Create an IAM role. This role allows Auto Scaling
-// to publish lifecycle notifications to the designated SQS queue or SNS topic.
-// Create the lifecycle hook. You can create a hook that acts when instances
-// launch or when instances terminate. If necessary, record the lifecycle action
-// heartbeat to keep the instance in a pending state. Complete the lifecycle
-// action.  For more information, see Auto Scaling Pending State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingPendingState.html)
-// and Auto Scaling Terminating State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingTerminatingState.html)
+//  (Optional) Create a Lambda function and a rule that allows CloudWatch Events
+// to invoke your Lambda function when Auto Scaling launches or terminates instances.
+// (Optional) Create a notification target and an IAM role. The target can be
+// either an Amazon SQS queue or an Amazon SNS topic. The role allows Auto Scaling
+// to publish lifecycle notifications to the target. Create the lifecycle hook.
+// Specify whether the hook is used when the instances launch or terminate.
+// If you need more time, record the lifecycle action heartbeat to keep the
+// instance in a pending state. If you finish before the timeout period ends,
+// complete the lifecycle action.  For more information, see Auto Scaling Lifecycle
+// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroupLifecycle.html)
 // in the Auto Scaling Developer Guide.
 //
 // If you exceed your maximum limit of lifecycle hooks, which by default is
@@ -1317,6 +1343,8 @@ func (c *AutoScaling) PutNotificationConfigurationRequest(input *PutNotification
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &PutNotificationConfigurationOutput{}
 	req.Data = output
 	return
@@ -1387,6 +1415,8 @@ func (c *AutoScaling) PutScheduledUpdateGroupActionRequest(input *PutScheduledUp
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &PutScheduledUpdateGroupActionOutput{}
 	req.Data = output
 	return
@@ -1424,21 +1454,23 @@ func (c *AutoScaling) RecordLifecycleActionHeartbeatRequest(input *RecordLifecyc
 	return
 }
 
-// Records a heartbeat for the lifecycle action associated with a specific token.
-// This extends the timeout by the length of time defined by the HeartbeatTimeout
-// parameter of PutLifecycleHook.
+// Records a heartbeat for the lifecycle action associated with the specified
+// token or instance. This extends the timeout by the length of time defined
+// using PutLifecycleHook.
 //
-// This operation is a part of the basic sequence for adding a lifecycle hook
-// to an Auto Scaling group:
+// This step is a part of the procedure for adding a lifecycle hook to an Auto
+// Scaling group:
 //
-//  Create a notification target. A target can be either an Amazon SQS queue
-// or an Amazon SNS topic. Create an IAM role. This role allows Auto Scaling
-// to publish lifecycle notifications to the designated SQS queue or SNS topic.
-// Create the lifecycle hook. You can create a hook that acts when instances
-// launch or when instances terminate. If necessary, record the lifecycle action
-// heartbeat to keep the instance in a pending state. Complete the lifecycle
-// action.  For more information, see Auto Scaling Pending State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingPendingState.html)
-// and Auto Scaling Terminating State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingTerminatingState.html)
+//  (Optional) Create a Lambda function and a rule that allows CloudWatch Events
+// to invoke your Lambda function when Auto Scaling launches or terminates instances.
+// (Optional) Create a notification target and an IAM role. The target can be
+// either an Amazon SQS queue or an Amazon SNS topic. The role allows Auto Scaling
+// to publish lifecycle notifications to the target. Create the lifecycle hook.
+// Specify whether the hook is used when the instances launch or terminate.
+// If you need more time, record the lifecycle action heartbeat to keep the
+// instance in a pending state. If you finish before the timeout period ends,
+// complete the lifecycle action.  For more information, see Auto Scaling Lifecycle
+// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroupLifecycle.html)
 // in the Auto Scaling Developer Guide.
 func (c *AutoScaling) RecordLifecycleActionHeartbeat(input *RecordLifecycleActionHeartbeatInput) (*RecordLifecycleActionHeartbeatOutput, error) {
 	req, out := c.RecordLifecycleActionHeartbeatRequest(input)
@@ -1461,15 +1493,18 @@ func (c *AutoScaling) ResumeProcessesRequest(input *ScalingProcessQuery) (req *r
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &ResumeProcessesOutput{}
 	req.Data = output
 	return
 }
 
-// Resumes the specified suspended Auto Scaling processes for the specified
-// Auto Scaling group. To resume specific processes, use the ScalingProcesses
-// parameter. To resume all processes, omit the ScalingProcesses parameter.
-// For more information, see Suspend and Resume Auto Scaling Processes (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/US_SuspendResume.html)
+// Resumes the specified suspended Auto Scaling processes, or all suspended
+// process, for the specified Auto Scaling group.
+//
+// For more information, see Suspending and Resuming Auto Scaling Processes
+// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/US_SuspendResume.html)
 // in the Auto Scaling Developer Guide.
 func (c *AutoScaling) ResumeProcesses(input *ScalingProcessQuery) (*ResumeProcessesOutput, error) {
 	req, out := c.ResumeProcessesRequest(input)
@@ -1492,6 +1527,8 @@ func (c *AutoScaling) SetDesiredCapacityRequest(input *SetDesiredCapacityInput) 
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &SetDesiredCapacityOutput{}
 	req.Data = output
 	return
@@ -1522,6 +1559,8 @@ func (c *AutoScaling) SetInstanceHealthRequest(input *SetInstanceHealthInput) (r
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &SetInstanceHealthOutput{}
 	req.Data = output
 	return
@@ -1582,21 +1621,23 @@ func (c *AutoScaling) SuspendProcessesRequest(input *ScalingProcessQuery) (req *
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &SuspendProcessesOutput{}
 	req.Data = output
 	return
 }
 
-// Suspends the specified Auto Scaling processes for the specified Auto Scaling
-// group. To suspend specific processes, use the ScalingProcesses parameter.
-// To suspend all processes, omit the ScalingProcesses parameter.
+// Suspends the specified Auto Scaling processes, or all processes, for the
+// specified Auto Scaling group.
 //
 // Note that if you suspend either the Launch or Terminate process types, it
 // can prevent other process types from functioning properly.
 //
 // To resume processes that have been suspended, use ResumeProcesses.
 //
-// For more information, see Suspend and Resume Auto Scaling Processes (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/US_SuspendResume.html)
+// For more information, see Suspending and Resuming Auto Scaling Processes
+// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/US_SuspendResume.html)
 // in the Auto Scaling Developer Guide.
 func (c *AutoScaling) SuspendProcesses(input *ScalingProcessQuery) (*SuspendProcessesOutput, error) {
 	req, out := c.SuspendProcessesRequest(input)
@@ -1650,6 +1691,8 @@ func (c *AutoScaling) UpdateAutoScalingGroupRequest(input *UpdateAutoScalingGrou
 	}
 
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Remove(query.UnmarshalHandler)
+	req.Handlers.Unmarshal.PushBackNamed(protocol.UnmarshalDiscardBodyHandler)
 	output = &UpdateAutoScalingGroupOutput{}
 	req.Data = output
 	return
@@ -1781,7 +1824,7 @@ type AttachInstancesInput struct {
 	// The name of the group.
 	AutoScalingGroupName *string `min:"1" type:"string" required:"true"`
 
-	// One or more EC2 instance IDs.
+	// One or more instance IDs.
 	InstanceIds []*string `type:"list"`
 }
 
@@ -1793,6 +1836,22 @@ func (s AttachInstancesInput) String() string {
 // GoString returns the string representation
 func (s AttachInstancesInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *AttachInstancesInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "AttachInstancesInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type AttachInstancesOutput struct {
@@ -1827,6 +1886,19 @@ func (s AttachLoadBalancersInput) String() string {
 // GoString returns the string representation
 func (s AttachLoadBalancersInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *AttachLoadBalancersInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "AttachLoadBalancersInput"}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type AttachLoadBalancersOutput struct {
@@ -1874,11 +1946,38 @@ func (s BlockDeviceMapping) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *BlockDeviceMapping) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "BlockDeviceMapping"}
+	if s.DeviceName == nil {
+		invalidParams.Add(request.NewErrParamRequired("DeviceName"))
+	}
+	if s.DeviceName != nil && len(*s.DeviceName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("DeviceName", 1))
+	}
+	if s.VirtualName != nil && len(*s.VirtualName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("VirtualName", 1))
+	}
+	if s.Ebs != nil {
+		if err := s.Ebs.Validate(); err != nil {
+			invalidParams.AddNested("Ebs", err.(request.ErrInvalidParams))
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type CompleteLifecycleActionInput struct {
 	_ struct{} `type:"structure"`
 
 	// The name of the group for the lifecycle hook.
 	AutoScalingGroupName *string `min:"1" type:"string" required:"true"`
+
+	// The ID of the instance.
+	InstanceId *string `min:"1" type:"string"`
 
 	// The action for the group to take. This parameter can be either CONTINUE or
 	// ABANDON.
@@ -1887,7 +1986,7 @@ type CompleteLifecycleActionInput struct {
 	// A universally unique identifier (UUID) that identifies a specific lifecycle
 	// action associated with an instance. Auto Scaling sends this token to the
 	// notification target you specified when you created the lifecycle hook.
-	LifecycleActionToken *string `min:"36" type:"string" required:"true"`
+	LifecycleActionToken *string `min:"36" type:"string"`
 
 	// The name of the lifecycle hook.
 	LifecycleHookName *string `min:"1" type:"string" required:"true"`
@@ -1901,6 +2000,37 @@ func (s CompleteLifecycleActionInput) String() string {
 // GoString returns the string representation
 func (s CompleteLifecycleActionInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CompleteLifecycleActionInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CompleteLifecycleActionInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.InstanceId != nil && len(*s.InstanceId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("InstanceId", 1))
+	}
+	if s.LifecycleActionResult == nil {
+		invalidParams.Add(request.NewErrParamRequired("LifecycleActionResult"))
+	}
+	if s.LifecycleActionToken != nil && len(*s.LifecycleActionToken) < 36 {
+		invalidParams.Add(request.NewErrParamMinLen("LifecycleActionToken", 36))
+	}
+	if s.LifecycleHookName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LifecycleHookName"))
+	}
+	if s.LifecycleHookName != nil && len(*s.LifecycleHookName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LifecycleHookName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type CompleteLifecycleActionOutput struct {
@@ -1925,13 +2055,13 @@ type CreateAutoScalingGroupInput struct {
 	AutoScalingGroupName *string `min:"1" type:"string" required:"true"`
 
 	// One or more Availability Zones for the group. This parameter is optional
-	// if you specify subnets using the VPCZoneIdentifier parameter.
+	// if you specify one or more subnets.
 	AvailabilityZones []*string `min:"1" type:"list"`
 
 	// The amount of time, in seconds, after a scaling activity completes before
 	// another scaling activity can start. The default is 300.
 	//
-	// For more information, see Understanding Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
+	// For more information, see Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
 	// in the Auto Scaling Developer Guide.
 	DefaultCooldown *int64 `type:"integer"`
 
@@ -1947,7 +2077,7 @@ type CreateAutoScalingGroupInput struct {
 	//
 	// This parameter is required if you are adding an ELB health check.
 	//
-	// For more information, see Health Checks for Auto Scaling Instances (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/healthcheck.html)
+	// For more information, see Health Checks (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/healthcheck.html)
 	// in the Auto Scaling Developer Guide.
 	HealthCheckGracePeriod *int64 `type:"integer"`
 
@@ -1958,27 +2088,27 @@ type CreateAutoScalingGroupInput struct {
 	// in the Auto Scaling Developer Guide.
 	HealthCheckType *string `min:"1" type:"string"`
 
-	// The ID of the EC2 instance used to create a launch configuration for the
-	// group. Alternatively, use the LaunchConfigurationName parameter to specify
-	// a launch configuration instead of an EC2 instance.
+	// The ID of the instance used to create a launch configuration for the group.
+	// Alternatively, specify a launch configuration instead of an EC2 instance.
 	//
 	// When you specify an ID of an instance, Auto Scaling creates a new launch
 	// configuration and associates it with the group. This launch configuration
 	// derives its attributes from the specified instance, with the exception of
 	// the block device mapping.
 	//
-	// For more information, see Create an Auto Scaling Group from an EC2 Instance
+	// For more information, see Create an Auto Scaling Group Using an EC2 Instance
 	// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/create-asg-from-instance.html)
 	// in the Auto Scaling Developer Guide.
 	InstanceId *string `min:"1" type:"string"`
 
-	// The name of the launch configuration. Alternatively, use the InstanceId parameter
-	// to specify an EC2 instance instead of a launch configuration.
+	// The name of the launch configuration. Alternatively, specify an EC2 instance
+	// instead of a launch configuration.
 	LaunchConfigurationName *string `min:"1" type:"string"`
 
 	// One or more load balancers.
 	//
-	// For more information, see Load Balance Your Auto Scaling Group (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/US_SetUpASLBApp.html)
+	// For more information, see Using a Load Balancer With an Auto Scaling Group
+	// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/US_SetUpASLBApp.html)
 	// in the Auto Scaling Developer Guide.
 	LoadBalancerNames []*string `type:"list"`
 
@@ -1997,9 +2127,7 @@ type CreateAutoScalingGroupInput struct {
 	// in the Amazon Elastic Compute Cloud User Guide.
 	PlacementGroup *string `min:"1" type:"string"`
 
-	// The tag to be created or updated. Each tag should be defined by its resource
-	// type, resource ID, key, value, and a propagate flag. Valid values: key=value,
-	// value=value, propagate=true or false. Value and propagate are optional parameters.
+	// One or more tags.
 	//
 	// For more information, see Tagging Auto Scaling Groups and Instances (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/ASTagging.html)
 	// in the Auto Scaling Developer Guide.
@@ -2008,8 +2136,8 @@ type CreateAutoScalingGroupInput struct {
 	// One or more termination policies used to select the instance to terminate.
 	// These policies are executed in the order that they are listed.
 	//
-	// For more information, see Choosing a Termination Policy for Your Auto Scaling
-	// Group (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/us-termination-policy.html)
+	// For more information, see Controlling Which Instances Auto Scaling Terminates
+	// During Scale In (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingBehavior.InstanceTermination.html)
 	// in the Auto Scaling Developer Guide.
 	TerminationPolicies []*string `type:"list"`
 
@@ -2019,8 +2147,7 @@ type CreateAutoScalingGroupInput struct {
 	// If you specify subnets and Availability Zones with this call, ensure that
 	// the subnets' Availability Zones match the Availability Zones specified.
 	//
-	// For more information, see Auto Scaling and Amazon Virtual Private Cloud
-	// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/autoscalingsubnets.html)
+	// For more information, see Launching Auto Scaling Instances in a VPC (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/asg-in-vpc.html)
 	// in the Auto Scaling Developer Guide.
 	VPCZoneIdentifier *string `min:"1" type:"string"`
 }
@@ -2033,6 +2160,56 @@ func (s CreateAutoScalingGroupInput) String() string {
 // GoString returns the string representation
 func (s CreateAutoScalingGroupInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateAutoScalingGroupInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateAutoScalingGroupInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.AvailabilityZones != nil && len(s.AvailabilityZones) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AvailabilityZones", 1))
+	}
+	if s.HealthCheckType != nil && len(*s.HealthCheckType) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("HealthCheckType", 1))
+	}
+	if s.InstanceId != nil && len(*s.InstanceId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("InstanceId", 1))
+	}
+	if s.LaunchConfigurationName != nil && len(*s.LaunchConfigurationName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LaunchConfigurationName", 1))
+	}
+	if s.MaxSize == nil {
+		invalidParams.Add(request.NewErrParamRequired("MaxSize"))
+	}
+	if s.MinSize == nil {
+		invalidParams.Add(request.NewErrParamRequired("MinSize"))
+	}
+	if s.PlacementGroup != nil && len(*s.PlacementGroup) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("PlacementGroup", 1))
+	}
+	if s.VPCZoneIdentifier != nil && len(*s.VPCZoneIdentifier) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("VPCZoneIdentifier", 1))
+	}
+	if s.Tags != nil {
+		for i, v := range s.Tags {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "Tags", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type CreateAutoScalingGroupOutput struct {
@@ -2054,11 +2231,11 @@ type CreateLaunchConfigurationInput struct {
 
 	// Used for groups that launch instances into a virtual private cloud (VPC).
 	// Specifies whether to assign a public IP address to each instance. For more
-	// information, see Auto Scaling and Amazon Virtual Private Cloud (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/autoscalingsubnets.html)
+	// information, see Launching Auto Scaling Instances in a VPC (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/asg-in-vpc.html)
 	// in the Auto Scaling Developer Guide.
 	//
-	// If you specify a value for this parameter, be sure to specify at least one
-	// subnet using the VPCZoneIdentifier parameter when you create your group.
+	// If you specify this parameter, be sure to specify at least one subnet when
+	// you create your group.
 	//
 	// Default: If the instance is launched into a default subnet, the default
 	// is true. If the instance is launched into a nondefault subnet, the default
@@ -2077,9 +2254,9 @@ type CreateLaunchConfigurationInput struct {
 	// in the Amazon Elastic Compute Cloud User Guide.
 	ClassicLinkVPCId *string `min:"1" type:"string"`
 
-	// The IDs of one or more security groups for the VPC specified in ClassicLinkVPCId.
-	// This parameter is required if ClassicLinkVPCId is specified, and is not supported
-	// otherwise. For more information, see ClassicLink (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/vpc-classiclink.html)
+	// The IDs of one or more security groups for the specified ClassicLink-enabled
+	// VPC. This parameter is required if you specify a ClassicLink-enabled VPC,
+	// and is not supported otherwise. For more information, see ClassicLink (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/vpc-classiclink.html)
 	// in the Amazon Elastic Compute Cloud User Guide.
 	ClassicLinkVPCSecurityGroups []*string `type:"list"`
 
@@ -2108,7 +2285,7 @@ type CreateLaunchConfigurationInput struct {
 	// in the Amazon Elastic Compute Cloud User Guide.
 	ImageId *string `min:"1" type:"string"`
 
-	// The ID of the EC2 instance to use to create the launch configuration.
+	// The ID of the instance to use to create the launch configuration.
 	//
 	// The new launch configuration derives attributes from the instance, with
 	// the exception of the block device mapping.
@@ -2127,7 +2304,8 @@ type CreateLaunchConfigurationInput struct {
 	// When detailed monitoring is enabled, Amazon CloudWatch generates metrics
 	// every minute and your account is charged a fee. When you disable detailed
 	// monitoring, by specifying False, CloudWatch generates metrics every 5 minutes.
-	// For more information, see Monitor Your Auto Scaling Instances (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/as-instance-monitoring.html)
+	// For more information, see Monitoring Your Auto Scaling Instances and Groups
+	// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/as-instance-monitoring.html)
 	// in the Auto Scaling Developer Guide.
 	InstanceMonitoring *InstanceMonitoring `type:"structure"`
 
@@ -2155,11 +2333,10 @@ type CreateLaunchConfigurationInput struct {
 	// Dedicated Instances into a shared tenancy VPC (VPC with instance placement
 	// tenancy attribute set to default).
 	//
-	// If you specify a value for this parameter, be sure to specify at least one
-	// subnet using the VPCZoneIdentifier parameter when you create your group.
+	// If you specify this parameter, be sure to specify at least one subnet when
+	// you create your group.
 	//
-	// For more information, see Auto Scaling and Amazon Virtual Private Cloud
-	// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/autoscalingsubnets.html)
+	// For more information, see Launching Auto Scaling Instances in a VPC (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/asg-in-vpc.html)
 	// in the Auto Scaling Developer Guide.
 	//
 	// Valid values: default | dedicated
@@ -2182,7 +2359,7 @@ type CreateLaunchConfigurationInput struct {
 
 	// The maximum hourly price to be paid for any Spot Instance launched to fulfill
 	// the request. Spot Instances are launched when the price you specify exceeds
-	// the current Spot market price. For more information, see Launch Spot Instances
+	// the current Spot market price. For more information, see Launching Spot Instances
 	// in Your Auto Scaling Group (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/US-SpotInstances.html)
 	// in the Auto Scaling Developer Guide.
 	SpotPrice *string `min:"1" type:"string"`
@@ -2190,9 +2367,6 @@ type CreateLaunchConfigurationInput struct {
 	// The user data to make available to the launched EC2 instances. For more information,
 	// see Instance Metadata and User Data (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html)
 	// in the Amazon Elastic Compute Cloud User Guide.
-	//
-	// At this time, launch configurations don't support compressed (zipped) user
-	// data files.
 	UserData *string `type:"string"`
 }
 
@@ -2204,6 +2378,62 @@ func (s CreateLaunchConfigurationInput) String() string {
 // GoString returns the string representation
 func (s CreateLaunchConfigurationInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateLaunchConfigurationInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateLaunchConfigurationInput"}
+	if s.ClassicLinkVPCId != nil && len(*s.ClassicLinkVPCId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClassicLinkVPCId", 1))
+	}
+	if s.IamInstanceProfile != nil && len(*s.IamInstanceProfile) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("IamInstanceProfile", 1))
+	}
+	if s.ImageId != nil && len(*s.ImageId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ImageId", 1))
+	}
+	if s.InstanceId != nil && len(*s.InstanceId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("InstanceId", 1))
+	}
+	if s.InstanceType != nil && len(*s.InstanceType) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("InstanceType", 1))
+	}
+	if s.KernelId != nil && len(*s.KernelId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("KernelId", 1))
+	}
+	if s.KeyName != nil && len(*s.KeyName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("KeyName", 1))
+	}
+	if s.LaunchConfigurationName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LaunchConfigurationName"))
+	}
+	if s.LaunchConfigurationName != nil && len(*s.LaunchConfigurationName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LaunchConfigurationName", 1))
+	}
+	if s.PlacementTenancy != nil && len(*s.PlacementTenancy) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("PlacementTenancy", 1))
+	}
+	if s.RamdiskId != nil && len(*s.RamdiskId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("RamdiskId", 1))
+	}
+	if s.SpotPrice != nil && len(*s.SpotPrice) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("SpotPrice", 1))
+	}
+	if s.BlockDeviceMappings != nil {
+		for i, v := range s.BlockDeviceMappings {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "BlockDeviceMappings", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type CreateLaunchConfigurationOutput struct {
@@ -2235,6 +2465,29 @@ func (s CreateOrUpdateTagsInput) String() string {
 // GoString returns the string representation
 func (s CreateOrUpdateTagsInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateOrUpdateTagsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateOrUpdateTagsInput"}
+	if s.Tags == nil {
+		invalidParams.Add(request.NewErrParamRequired("Tags"))
+	}
+	if s.Tags != nil {
+		for i, v := range s.Tags {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "Tags", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type CreateOrUpdateTagsOutput struct {
@@ -2273,6 +2526,22 @@ func (s DeleteAutoScalingGroupInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteAutoScalingGroupInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteAutoScalingGroupInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DeleteAutoScalingGroupOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -2302,6 +2571,22 @@ func (s DeleteLaunchConfigurationInput) String() string {
 // GoString returns the string representation
 func (s DeleteLaunchConfigurationInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteLaunchConfigurationInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteLaunchConfigurationInput"}
+	if s.LaunchConfigurationName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LaunchConfigurationName"))
+	}
+	if s.LaunchConfigurationName != nil && len(*s.LaunchConfigurationName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LaunchConfigurationName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DeleteLaunchConfigurationOutput struct {
@@ -2336,6 +2621,28 @@ func (s DeleteLifecycleHookInput) String() string {
 // GoString returns the string representation
 func (s DeleteLifecycleHookInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteLifecycleHookInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteLifecycleHookInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.LifecycleHookName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LifecycleHookName"))
+	}
+	if s.LifecycleHookName != nil && len(*s.LifecycleHookName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LifecycleHookName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DeleteLifecycleHookOutput struct {
@@ -2373,6 +2680,28 @@ func (s DeleteNotificationConfigurationInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteNotificationConfigurationInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteNotificationConfigurationInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.TopicARN == nil {
+		invalidParams.Add(request.NewErrParamRequired("TopicARN"))
+	}
+	if s.TopicARN != nil && len(*s.TopicARN) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("TopicARN", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DeleteNotificationConfigurationOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -2405,6 +2734,25 @@ func (s DeletePolicyInput) String() string {
 // GoString returns the string representation
 func (s DeletePolicyInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeletePolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeletePolicyInput"}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.PolicyName == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyName"))
+	}
+	if s.PolicyName != nil && len(*s.PolicyName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("PolicyName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DeletePolicyOutput struct {
@@ -2441,6 +2789,25 @@ func (s DeleteScheduledActionInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteScheduledActionInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteScheduledActionInput"}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.ScheduledActionName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ScheduledActionName"))
+	}
+	if s.ScheduledActionName != nil && len(*s.ScheduledActionName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ScheduledActionName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DeleteScheduledActionOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -2458,10 +2825,7 @@ func (s DeleteScheduledActionOutput) GoString() string {
 type DeleteTagsInput struct {
 	_ struct{} `type:"structure"`
 
-	// Each tag should be defined by its resource type, resource ID, key, value,
-	// and a propagate flag. Valid values are: Resource type = auto-scaling-group,
-	// Resource ID = AutoScalingGroupName, key=value, value=value, propagate=true
-	// or false.
+	// One or more tags.
 	Tags []*Tag `type:"list" required:"true"`
 }
 
@@ -2473,6 +2837,29 @@ func (s DeleteTagsInput) String() string {
 // GoString returns the string representation
 func (s DeleteTagsInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteTagsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteTagsInput"}
+	if s.Tags == nil {
+		invalidParams.Add(request.NewErrParamRequired("Tags"))
+	}
+	if s.Tags != nil {
+		for i, v := range s.Tags {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "Tags", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DeleteTagsOutput struct {
@@ -2610,9 +2997,9 @@ func (s DescribeAutoScalingGroupsOutput) GoString() string {
 type DescribeAutoScalingInstancesInput struct {
 	_ struct{} `type:"structure"`
 
-	// One or more Auto Scaling instances to describe, up to 50 instances. If you
-	// omit this parameter, all Auto Scaling instances are described. If you specify
-	// an ID that does not exist, it is ignored with no error.
+	// The instances to describe; up to 50 instance IDs. If you omit this parameter,
+	// all Auto Scaling instances are described. If you specify an ID that does
+	// not exist, it is ignored with no error.
 	InstanceIds []*string `type:"list"`
 
 	// The maximum number of items to return with this call.
@@ -2795,6 +3182,22 @@ func (s DescribeLifecycleHooksInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeLifecycleHooksInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeLifecycleHooksInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DescribeLifecycleHooksOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -2834,6 +3237,22 @@ func (s DescribeLoadBalancersInput) String() string {
 // GoString returns the string representation
 func (s DescribeLoadBalancersInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeLoadBalancersInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeLoadBalancersInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DescribeLoadBalancersOutput struct {
@@ -2969,6 +3388,19 @@ func (s DescribePoliciesInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribePoliciesInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribePoliciesInput"}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DescribePoliciesOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -2994,10 +3426,10 @@ type DescribeScalingActivitiesInput struct {
 	_ struct{} `type:"structure"`
 
 	// The activity IDs of the desired scaling activities. If this list is omitted,
-	// all activities are described. If the AutoScalingGroupName parameter is provided,
-	// the results are limited to that group. The list of requested activities cannot
-	// contain more than 50 items. If unknown activities are requested, they are
-	// ignored with no error.
+	// all activities are described. If you specify an Auto Scaling group, the results
+	// are limited to that group. The list of requested activities cannot contain
+	// more than 50 items. If unknown activities are requested, they are ignored
+	// with no error.
 	ActivityIds []*string `type:"list"`
 
 	// The name of the group.
@@ -3019,6 +3451,19 @@ func (s DescribeScalingActivitiesInput) String() string {
 // GoString returns the string representation
 func (s DescribeScalingActivitiesInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeScalingActivitiesInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeScalingActivitiesInput"}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DescribeScalingActivitiesOutput struct {
@@ -3096,7 +3541,7 @@ type DescribeScheduledActionsInput struct {
 	//
 	// You can describe up to a maximum of 50 instances with a single call. If
 	// there are more items to return, the call returns a token. To get the next
-	// set of items, repeat the call with the returned token in the NextToken parameter.
+	// set of items, repeat the call with the returned token.
 	ScheduledActionNames []*string `type:"list"`
 
 	// The earliest scheduled start time to return. If scheduled action names are
@@ -3112,6 +3557,19 @@ func (s DescribeScheduledActionsInput) String() string {
 // GoString returns the string representation
 func (s DescribeScheduledActionsInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeScheduledActionsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeScheduledActionsInput"}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DescribeScheduledActionsOutput struct {
@@ -3166,7 +3624,7 @@ type DescribeTagsOutput struct {
 	// items to return, the string is empty.
 	NextToken *string `type:"string"`
 
-	// The tags.
+	// One or more tags.
 	Tags []*TagDescription `type:"list"`
 }
 
@@ -3236,6 +3694,25 @@ func (s DetachInstancesInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DetachInstancesInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DetachInstancesInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.ShouldDecrementDesiredCapacity == nil {
+		invalidParams.Add(request.NewErrParamRequired("ShouldDecrementDesiredCapacity"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DetachInstancesOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -3271,6 +3748,19 @@ func (s DetachLoadBalancersInput) String() string {
 // GoString returns the string representation
 func (s DetachLoadBalancersInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DetachLoadBalancersInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DetachLoadBalancersInput"}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type DetachLoadBalancersOutput struct {
@@ -3324,6 +3814,22 @@ func (s DisableMetricsCollectionInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DisableMetricsCollectionInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DisableMetricsCollectionInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type DisableMetricsCollectionOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -3342,7 +3848,7 @@ func (s DisableMetricsCollectionOutput) GoString() string {
 type Ebs struct {
 	_ struct{} `type:"structure"`
 
-	// Indicates whether to delete the volume on instance termination.
+	// Indicates whether the volume is deleted on instance termination.
 	//
 	// Default: true
 	DeleteOnTermination *bool `type:"boolean"`
@@ -3356,28 +3862,25 @@ type Ebs struct {
 	// the Amazon Elastic Compute Cloud User Guide.
 	Encrypted *bool `type:"boolean"`
 
-	// For Provisioned IOPS (SSD) volumes only. The number of I/O operations per
-	// second (IOPS) to provision for the volume.
+	// The number of I/O operations per second (IOPS) to provision for the volume.
 	//
-	// Default: None
+	// Constraint: Required when the volume type is io1.
 	Iops *int64 `min:"100" type:"integer"`
 
 	// The ID of the snapshot.
 	SnapshotId *string `min:"1" type:"string"`
 
-	// The volume size, in gigabytes.
-	//
-	// Valid values: If the volume type is io1, the minimum size of the volume
-	// is 10 GiB. If you specify SnapshotId and VolumeSize, VolumeSize must be equal
-	// to or larger than the size of the snapshot.
+	// The volume size, in GiB. For standard volumes, specify a value from 1 to
+	// 1,024. For io1 volumes, specify a value from 4 to 16,384. For gp2 volumes,
+	// specify a value from 1 to 16,384. If you specify a snapshot, the volume size
+	// must be equal to or larger than the snapshot size.
 	//
 	// Default: If you create a volume from a snapshot and you don't specify a
-	// volume size, the default is the size of the snapshot.
-	//
-	// Required: Required when the volume type is io1.
+	// volume size, the default is the snapshot size.
 	VolumeSize *int64 `min:"1" type:"integer"`
 
-	// The volume type.
+	// The volume type. For more information, see Amazon EBS Volume Types (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html)
+	// in the Amazon Elastic Compute Cloud User Guide.
 	//
 	// Valid values: standard | io1 | gp2
 	//
@@ -3393,6 +3896,28 @@ func (s Ebs) String() string {
 // GoString returns the string representation
 func (s Ebs) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *Ebs) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "Ebs"}
+	if s.Iops != nil && *s.Iops < 100 {
+		invalidParams.Add(request.NewErrParamMinValue("Iops", 100))
+	}
+	if s.SnapshotId != nil && len(*s.SnapshotId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("SnapshotId", 1))
+	}
+	if s.VolumeSize != nil && *s.VolumeSize < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("VolumeSize", 1))
+	}
+	if s.VolumeType != nil && len(*s.VolumeType) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("VolumeType", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type EnableMetricsCollectionInput struct {
@@ -3437,6 +3962,28 @@ func (s EnableMetricsCollectionInput) String() string {
 // GoString returns the string representation
 func (s EnableMetricsCollectionInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *EnableMetricsCollectionInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "EnableMetricsCollectionInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.Granularity == nil {
+		invalidParams.Add(request.NewErrParamRequired("Granularity"))
+	}
+	if s.Granularity != nil && len(*s.Granularity) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Granularity", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type EnableMetricsCollectionOutput struct {
@@ -3517,6 +4064,25 @@ func (s EnterStandbyInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *EnterStandbyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "EnterStandbyInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.ShouldDecrementDesiredCapacity == nil {
+		invalidParams.Add(request.NewErrParamRequired("ShouldDecrementDesiredCapacity"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type EnterStandbyOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -3552,7 +4118,7 @@ type ExecutePolicyInput struct {
 	//
 	// This parameter is not supported if the policy type is StepScaling.
 	//
-	// For more information, see Understanding Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
+	// For more information, see Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
 	// in the Auto Scaling Developer Guide.
 	HonorCooldown *bool `type:"boolean"`
 
@@ -3581,6 +4147,25 @@ func (s ExecutePolicyInput) String() string {
 // GoString returns the string representation
 func (s ExecutePolicyInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ExecutePolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ExecutePolicyInput"}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.PolicyName == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyName"))
+	}
+	if s.PolicyName != nil && len(*s.PolicyName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("PolicyName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type ExecutePolicyOutput struct {
@@ -3615,6 +4200,22 @@ func (s ExitStandbyInput) String() string {
 // GoString returns the string representation
 func (s ExitStandbyInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ExitStandbyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ExitStandbyInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type ExitStandbyOutput struct {
@@ -3749,7 +4350,9 @@ type Instance struct {
 	// The Availability Zone in which the instance is running.
 	AvailabilityZone *string `min:"1" type:"string" required:"true"`
 
-	// The health status of the instance.
+	// The health status of the instance. "Healthy" means that the instance is healthy
+	// and should remain in service. "Unhealthy" means that the instance is unhealthy
+	// and Auto Scaling should terminate and replace it.
 	HealthStatus *string `min:"1" type:"string" required:"true"`
 
 	// The ID of the instance.
@@ -3799,7 +4402,7 @@ type InstanceDetails struct {
 	LaunchConfigurationName *string `min:"1" type:"string" required:"true"`
 
 	// The lifecycle state for the instance. For more information, see Auto Scaling
-	// Instance States (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroupLifecycle.html#AutoScalingStates)
+	// Lifecycle (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroupLifecycle.html)
 	// in the Auto Scaling Developer Guide.
 	LifecycleState *string `min:"1" type:"string" required:"true"`
 
@@ -3853,8 +4456,8 @@ type LaunchConfiguration struct {
 	ClassicLinkVPCId *string `min:"1" type:"string"`
 
 	// The IDs of one or more security groups for the VPC specified in ClassicLinkVPCId.
-	// This parameter is required if ClassicLinkVPCId is specified, and cannot be
-	// used otherwise. For more information, see ClassicLink (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/vpc-classiclink.html)
+	// This parameter is required if you specify a ClassicLink-enabled VPC, and
+	// cannot be used otherwise. For more information, see ClassicLink (http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/vpc-classiclink.html)
 	// in the Amazon Elastic Compute Cloud User Guide.
 	ClassicLinkVPCSecurityGroups []*string `type:"list"`
 
@@ -3923,8 +4526,7 @@ func (s LaunchConfiguration) GoString() string {
 //
 //  Pause the instance after it launches, but before it is put into service
 // Pause the instance as it terminates, but before it is fully terminated  For
-// more information, see Auto Scaling Pending State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingPendingState.html)
-// and Auto Scaling Terminating State (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingTerminatingState.html)
+// more information, see Auto Scaling Lifecycle (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroupLifecycle.html)
 // in the Auto Scaling Developer Guide.
 type LifecycleHook struct {
 	_ struct{} `type:"structure"`
@@ -3943,8 +4545,8 @@ type LifecycleHook struct {
 
 	// The maximum time, in seconds, that can elapse before the lifecycle hook times
 	// out. The default is 3600 seconds (1 hour). When the lifecycle hook times
-	// out, Auto Scaling performs the action defined in the DefaultResult parameter.
-	// You can prevent the lifecycle hook from timing out by calling RecordLifecycleActionHeartbeat.
+	// out, Auto Scaling performs the default action. You can prevent the lifecycle
+	// hook from timing out by calling RecordLifecycleActionHeartbeat.
 	HeartbeatTimeout *int64 `type:"integer"`
 
 	// The name of the lifecycle hook.
@@ -4146,16 +4748,14 @@ type PutLifecycleHookInput struct {
 	AutoScalingGroupName *string `min:"1" type:"string" required:"true"`
 
 	// Defines the action the Auto Scaling group should take when the lifecycle
-	// hook timeout elapses or if an unexpected failure occurs. The value for this
-	// parameter can be either CONTINUE or ABANDON. The default value for this parameter
-	// is ABANDON.
+	// hook timeout elapses or if an unexpected failure occurs. This parameter can
+	// be either CONTINUE or ABANDON. The default value is ABANDON.
 	DefaultResult *string `type:"string"`
 
 	// The amount of time, in seconds, that can elapse before the lifecycle hook
-	// times out. When the lifecycle hook times out, Auto Scaling performs the action
-	// defined in the DefaultResult parameter. You can prevent the lifecycle hook
-	// from timing out by calling RecordLifecycleActionHeartbeat. The default is
-	// 3600 seconds (1 hour).
+	// times out. When the lifecycle hook times out, Auto Scaling performs the default
+	// action. You can prevent the lifecycle hook from timing out by calling RecordLifecycleActionHeartbeat.
+	// The default is 3600 seconds (1 hour).
 	HeartbeatTimeout *int64 `type:"integer"`
 
 	// The name of the lifecycle hook.
@@ -4174,24 +4774,23 @@ type PutLifecycleHookInput struct {
 
 	// The ARN of the notification target that Auto Scaling will use to notify you
 	// when an instance is in the transition state for the lifecycle hook. This
-	// ARN target can be either an SQS queue or an SNS topic.
+	// target can be either an SQS queue or an SNS topic. If you specify an empty
+	// string, this overrides the current ARN.
 	//
-	// This parameter is required for new lifecycle hooks, but optional when updating
-	// existing hooks.
+	// The notification messages sent to the target include the following information:
 	//
-	// The notification message sent to the target will include:
-	//
-	//  LifecycleActionToken. The Lifecycle action token. AccountId. The user account
-	// ID. AutoScalingGroupName. The name of the Auto Scaling group. LifecycleHookName.
-	// The lifecycle hook name. EC2InstanceId. The EC2 instance ID. LifecycleTransition.
-	// The lifecycle transition. NotificationMetadata. The notification metadata.
+	//  AutoScalingGroupName. The name of the Auto Scaling group. AccountId. The
+	// AWS account ID. LifecycleTransition. The lifecycle hook type. LifecycleActionToken.
+	// The lifecycle action token. EC2InstanceId. The EC2 instance ID. LifecycleHookName.
+	// The name of the lifecycle hook. NotificationMetadata. User-defined information.
 	//  This operation uses the JSON format when sending notifications to an Amazon
 	// SQS queue, and an email key/value pair format when sending notifications
 	// to an Amazon SNS topic.
 	//
-	// When you call this operation, a test message is sent to the notification
-	// target. This test message contains an additional key/value pair: Event:autoscaling:TEST_NOTIFICATION.
-	NotificationTargetARN *string `min:"1" type:"string"`
+	// When you specify a notification target, Auto Scaling sends it a test message.
+	// Test messages contains the following additional key/value pair: "Event":
+	// "autoscaling:TEST_NOTIFICATION".
+	NotificationTargetARN *string `type:"string"`
 
 	// The ARN of the IAM role that allows the Auto Scaling group to publish to
 	// the specified notification target.
@@ -4209,6 +4808,34 @@ func (s PutLifecycleHookInput) String() string {
 // GoString returns the string representation
 func (s PutLifecycleHookInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *PutLifecycleHookInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "PutLifecycleHookInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.LifecycleHookName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LifecycleHookName"))
+	}
+	if s.LifecycleHookName != nil && len(*s.LifecycleHookName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LifecycleHookName", 1))
+	}
+	if s.NotificationMetadata != nil && len(*s.NotificationMetadata) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("NotificationMetadata", 1))
+	}
+	if s.RoleARN != nil && len(*s.RoleARN) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("RoleARN", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type PutLifecycleHookOutput struct {
@@ -4250,6 +4877,31 @@ func (s PutNotificationConfigurationInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *PutNotificationConfigurationInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "PutNotificationConfigurationInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.NotificationTypes == nil {
+		invalidParams.Add(request.NewErrParamRequired("NotificationTypes"))
+	}
+	if s.TopicARN == nil {
+		invalidParams.Add(request.NewErrParamRequired("TopicARN"))
+	}
+	if s.TopicARN != nil && len(*s.TopicARN) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("TopicARN", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type PutNotificationConfigurationOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -4283,7 +4935,7 @@ type PutScalingPolicyInput struct {
 	//
 	// This parameter is not supported unless the policy type is SimpleScaling.
 	//
-	// For more information, see Understanding Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
+	// For more information, see Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
 	// in the Auto Scaling Developer Guide.
 	Cooldown *int64 `type:"integer"`
 
@@ -4308,7 +4960,7 @@ type PutScalingPolicyInput struct {
 	MinAdjustmentMagnitude *int64 `type:"integer"`
 
 	// Available for backward compatibility. Use MinAdjustmentMagnitude instead.
-	MinAdjustmentStep *int64 `type:"integer"`
+	MinAdjustmentStep *int64 `deprecated:"true" type:"integer"`
 
 	// The name of the policy.
 	PolicyName *string `min:"1" type:"string" required:"true"`
@@ -4341,6 +4993,50 @@ func (s PutScalingPolicyInput) String() string {
 // GoString returns the string representation
 func (s PutScalingPolicyInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *PutScalingPolicyInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "PutScalingPolicyInput"}
+	if s.AdjustmentType == nil {
+		invalidParams.Add(request.NewErrParamRequired("AdjustmentType"))
+	}
+	if s.AdjustmentType != nil && len(*s.AdjustmentType) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AdjustmentType", 1))
+	}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.MetricAggregationType != nil && len(*s.MetricAggregationType) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("MetricAggregationType", 1))
+	}
+	if s.PolicyName == nil {
+		invalidParams.Add(request.NewErrParamRequired("PolicyName"))
+	}
+	if s.PolicyName != nil && len(*s.PolicyName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("PolicyName", 1))
+	}
+	if s.PolicyType != nil && len(*s.PolicyType) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("PolicyType", 1))
+	}
+	if s.StepAdjustments != nil {
+		for i, v := range s.StepAdjustments {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "StepAdjustments", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type PutScalingPolicyOutput struct {
@@ -4399,10 +5095,7 @@ type PutScheduledUpdateGroupActionInput struct {
 	// boundaries of when the recurring action starts and stops.
 	StartTime *time.Time `type:"timestamp" timestampFormat:"iso8601"`
 
-	// This parameter is deprecated; use StartTime instead.
-	//
-	// The time for this action to start. If both Time and StartTime are specified,
-	// their values must be identical.
+	// This parameter is deprecated.
 	Time *time.Time `type:"timestamp" timestampFormat:"iso8601"`
 }
 
@@ -4414,6 +5107,31 @@ func (s PutScheduledUpdateGroupActionInput) String() string {
 // GoString returns the string representation
 func (s PutScheduledUpdateGroupActionInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *PutScheduledUpdateGroupActionInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "PutScheduledUpdateGroupActionInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.Recurrence != nil && len(*s.Recurrence) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Recurrence", 1))
+	}
+	if s.ScheduledActionName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ScheduledActionName"))
+	}
+	if s.ScheduledActionName != nil && len(*s.ScheduledActionName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ScheduledActionName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type PutScheduledUpdateGroupActionOutput struct {
@@ -4436,10 +5154,13 @@ type RecordLifecycleActionHeartbeatInput struct {
 	// The name of the Auto Scaling group for the hook.
 	AutoScalingGroupName *string `min:"1" type:"string" required:"true"`
 
+	// The ID of the instance.
+	InstanceId *string `min:"1" type:"string"`
+
 	// A token that uniquely identifies a specific lifecycle action associated with
 	// an instance. Auto Scaling sends this token to the notification target you
 	// specified when you created the lifecycle hook.
-	LifecycleActionToken *string `min:"36" type:"string" required:"true"`
+	LifecycleActionToken *string `min:"36" type:"string"`
 
 	// The name of the lifecycle hook.
 	LifecycleHookName *string `min:"1" type:"string" required:"true"`
@@ -4453,6 +5174,34 @@ func (s RecordLifecycleActionHeartbeatInput) String() string {
 // GoString returns the string representation
 func (s RecordLifecycleActionHeartbeatInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *RecordLifecycleActionHeartbeatInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "RecordLifecycleActionHeartbeatInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.InstanceId != nil && len(*s.InstanceId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("InstanceId", 1))
+	}
+	if s.LifecycleActionToken != nil && len(*s.LifecycleActionToken) < 36 {
+		invalidParams.Add(request.NewErrParamMinLen("LifecycleActionToken", 36))
+	}
+	if s.LifecycleHookName == nil {
+		invalidParams.Add(request.NewErrParamRequired("LifecycleHookName"))
+	}
+	if s.LifecycleHookName != nil && len(*s.LifecycleHookName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LifecycleHookName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type RecordLifecycleActionHeartbeatOutput struct {
@@ -4516,7 +5265,7 @@ type ScalingPolicy struct {
 	MinAdjustmentMagnitude *int64 `type:"integer"`
 
 	// Available for backward compatibility. Use MinAdjustmentMagnitude instead.
-	MinAdjustmentStep *int64 `type:"integer"`
+	MinAdjustmentStep *int64 `deprecated:"true" type:"integer"`
 
 	// The Amazon Resource Name (ARN) of the policy.
 	PolicyARN *string `min:"1" type:"string"`
@@ -4583,6 +5332,22 @@ func (s ScalingProcessQuery) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ScalingProcessQuery) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ScalingProcessQuery"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 // Describes a scheduled update to an Auto Scaling group.
 type ScheduledUpdateGroupAction struct {
 	_ struct{} `type:"structure"`
@@ -4619,7 +5384,7 @@ type ScheduledUpdateGroupAction struct {
 	// boundaries of when the recurring action will start and stop.
 	StartTime *time.Time `type:"timestamp" timestampFormat:"iso8601"`
 
-	// This parameter is deprecated; use StartTime instead.
+	// This parameter is deprecated.
 	Time *time.Time `type:"timestamp" timestampFormat:"iso8601"`
 }
 
@@ -4659,6 +5424,25 @@ func (s SetDesiredCapacityInput) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *SetDesiredCapacityInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "SetDesiredCapacityInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.DesiredCapacity == nil {
+		invalidParams.Add(request.NewErrParamRequired("DesiredCapacity"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type SetDesiredCapacityOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -4681,7 +5465,7 @@ type SetInstanceHealthInput struct {
 	// of service. Auto Scaling will terminate and replace the unhealthy instance.
 	HealthStatus *string `min:"1" type:"string" required:"true"`
 
-	// The ID of the EC2 instance.
+	// The ID of the instance.
 	InstanceId *string `min:"1" type:"string" required:"true"`
 
 	// If the Auto Scaling group of the specified instance has a HealthCheckGracePeriod
@@ -4689,7 +5473,7 @@ type SetInstanceHealthInput struct {
 	// Set this to False, if you do not want the call to respect the grace period
 	// associated with the group.
 	//
-	// For more information, see the HealthCheckGracePeriod parameter description
+	// For more information, see the description of the health check grace period
 	// for CreateAutoScalingGroup.
 	ShouldRespectGracePeriod *bool `type:"boolean"`
 }
@@ -4702,6 +5486,28 @@ func (s SetInstanceHealthInput) String() string {
 // GoString returns the string representation
 func (s SetInstanceHealthInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *SetInstanceHealthInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "SetInstanceHealthInput"}
+	if s.HealthStatus == nil {
+		invalidParams.Add(request.NewErrParamRequired("HealthStatus"))
+	}
+	if s.HealthStatus != nil && len(*s.HealthStatus) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("HealthStatus", 1))
+	}
+	if s.InstanceId == nil {
+		invalidParams.Add(request.NewErrParamRequired("InstanceId"))
+	}
+	if s.InstanceId != nil && len(*s.InstanceId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("InstanceId", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type SetInstanceHealthOutput struct {
@@ -4740,6 +5546,28 @@ func (s SetInstanceProtectionInput) String() string {
 // GoString returns the string representation
 func (s SetInstanceProtectionInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *SetInstanceProtectionInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "SetInstanceProtectionInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.InstanceIds == nil {
+		invalidParams.Add(request.NewErrParamRequired("InstanceIds"))
+	}
+	if s.ProtectedFromScaleIn == nil {
+		invalidParams.Add(request.NewErrParamRequired("ProtectedFromScaleIn"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type SetInstanceProtectionOutput struct {
@@ -4820,6 +5648,19 @@ func (s StepAdjustment) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *StepAdjustment) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "StepAdjustment"}
+	if s.ScalingAdjustment == nil {
+		invalidParams.Add(request.NewErrParamRequired("ScalingAdjustment"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 type SuspendProcessesOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -4887,6 +5728,22 @@ func (s Tag) GoString() string {
 	return s.String()
 }
 
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *Tag) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "Tag"}
+	if s.Key == nil {
+		invalidParams.Add(request.NewErrParamRequired("Key"))
+	}
+	if s.Key != nil && len(*s.Key) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Key", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
 // Describes a tag for an Auto Scaling group.
 type TagDescription struct {
 	_ struct{} `type:"structure"`
@@ -4921,7 +5778,7 @@ func (s TagDescription) GoString() string {
 type TerminateInstanceInAutoScalingGroupInput struct {
 	_ struct{} `type:"structure"`
 
-	// The ID of the EC2 instance.
+	// The ID of the instance.
 	InstanceId *string `min:"1" type:"string" required:"true"`
 
 	// If true, terminating the instance also decrements the size of the Auto Scaling
@@ -4937,6 +5794,25 @@ func (s TerminateInstanceInAutoScalingGroupInput) String() string {
 // GoString returns the string representation
 func (s TerminateInstanceInAutoScalingGroupInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *TerminateInstanceInAutoScalingGroupInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "TerminateInstanceInAutoScalingGroupInput"}
+	if s.InstanceId == nil {
+		invalidParams.Add(request.NewErrParamRequired("InstanceId"))
+	}
+	if s.InstanceId != nil && len(*s.InstanceId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("InstanceId", 1))
+	}
+	if s.ShouldDecrementDesiredCapacity == nil {
+		invalidParams.Add(request.NewErrParamRequired("ShouldDecrementDesiredCapacity"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type TerminateInstanceInAutoScalingGroupOutput struct {
@@ -4968,7 +5844,7 @@ type UpdateAutoScalingGroupInput struct {
 	// The amount of time, in seconds, after a scaling activity completes before
 	// another scaling activity can start. The default is 300.
 	//
-	// For more information, see Understanding Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
+	// For more information, see Auto Scaling Cooldowns (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/Cooldown.html)
 	// in the Auto Scaling Developer Guide.
 	DefaultCooldown *int64 `type:"integer"`
 
@@ -4981,7 +5857,7 @@ type UpdateAutoScalingGroupInput struct {
 	// health status of an EC2 instance that has come into service. The default
 	// is 300.
 	//
-	// For more information, see Health Checks For Auto Scaling Instances (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/healthcheck.html)
+	// For more information, see Health Checks (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/healthcheck.html)
 	// in the Auto Scaling Developer Guide.
 	HealthCheckGracePeriod *int64 `type:"integer"`
 
@@ -5010,8 +5886,8 @@ type UpdateAutoScalingGroupInput struct {
 	// select the instance to terminate. The policies are executed in the order
 	// that they are listed.
 	//
-	// For more information, see Choosing a Termination Policy for Your Auto Scaling
-	// Group (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/us-termination-policy.html)
+	// For more information, see Controlling Which Instances Auto Scaling Terminates
+	// During Scale In (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingBehavior.InstanceTermination.html)
 	// in the Auto Scaling Developer Guide.
 	TerminationPolicies []*string `type:"list"`
 
@@ -5021,8 +5897,7 @@ type UpdateAutoScalingGroupInput struct {
 	// When you specify VPCZoneIdentifier with AvailabilityZones, ensure that the
 	// subnets' Availability Zones match the values you specify for AvailabilityZones.
 	//
-	// For more information, see Auto Scaling and Amazon Virtual Private Cloud
-	// (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/autoscalingsubnets.html)
+	// For more information, see Launching Auto Scaling Instances in a VPC (http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/asg-in-vpc.html)
 	// in the Auto Scaling Developer Guide.
 	VPCZoneIdentifier *string `min:"1" type:"string"`
 }
@@ -5035,6 +5910,37 @@ func (s UpdateAutoScalingGroupInput) String() string {
 // GoString returns the string representation
 func (s UpdateAutoScalingGroupInput) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *UpdateAutoScalingGroupInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "UpdateAutoScalingGroupInput"}
+	if s.AutoScalingGroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("AutoScalingGroupName"))
+	}
+	if s.AutoScalingGroupName != nil && len(*s.AutoScalingGroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AutoScalingGroupName", 1))
+	}
+	if s.AvailabilityZones != nil && len(s.AvailabilityZones) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("AvailabilityZones", 1))
+	}
+	if s.HealthCheckType != nil && len(*s.HealthCheckType) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("HealthCheckType", 1))
+	}
+	if s.LaunchConfigurationName != nil && len(*s.LaunchConfigurationName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("LaunchConfigurationName", 1))
+	}
+	if s.PlacementGroup != nil && len(*s.PlacementGroup) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("PlacementGroup", 1))
+	}
+	if s.VPCZoneIdentifier != nil && len(*s.VPCZoneIdentifier) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("VPCZoneIdentifier", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 type UpdateAutoScalingGroupOutput struct {

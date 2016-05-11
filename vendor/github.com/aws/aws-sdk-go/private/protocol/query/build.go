@@ -11,6 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go/private/protocol/query/queryutil"
 )
 
+// BuildHandler is a named request handler for building query protocol requests
+var BuildHandler = request.NamedHandler{Name: "awssdk.query.Build", Fn: Build}
+
 // Build builds a request for an AWS Query service.
 func Build(r *request.Request) {
 	body := url.Values{
