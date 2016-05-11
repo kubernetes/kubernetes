@@ -123,8 +123,8 @@ func (hk *HyperKube) Run(args []string) error {
 	command := args[0]
 	baseCommand := path.Base(command)
 	serverName := baseCommand
+	args = args[1:]
 	if serverName == hk.Name {
-		args = args[1:]
 
 		baseFlags := hk.Flags()
 		baseFlags.SetInterspersed(false) // Only parse flags up to the next real command
