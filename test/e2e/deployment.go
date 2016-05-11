@@ -38,6 +38,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/api/annotations"
 )
 
 const (
@@ -220,7 +221,7 @@ func testNewDeployment(f *framework.Framework) {
 	replicas := int32(1)
 	framework.Logf("Creating simple deployment %s", deploymentName)
 	d := newDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
-	d.Annotations = map[string]string{"test": "should-copy-to-replica-set", kubectl.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
+	d.Annotations = map[string]string{"test": "should-copy-to-replica-set", annotations.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
 	_, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 	defer stopDeployment(c, f.Client, ns, deploymentName)
@@ -238,9 +239,9 @@ func testNewDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	// Check new RS annotations
 	Expect(newRS.Annotations["test"]).Should(Equal("should-copy-to-replica-set"))
-	Expect(newRS.Annotations[kubectl.LastAppliedConfigAnnotation]).Should(Equal(""))
+	Expect(newRS.Annotations[annotations.LastAppliedConfigAnnotation]).Should(Equal(""))
 	Expect(deployment.Annotations["test"]).Should(Equal("should-copy-to-replica-set"))
-	Expect(deployment.Annotations[kubectl.LastAppliedConfigAnnotation]).Should(Equal("should-not-copy-to-replica-set"))
+	Expect(deployment.Annotations[annotations.LastAppliedConfigAnnotation]).Should(Equal("should-not-copy-to-replica-set"))
 }
 
 func testRollingUpdateDeployment(f *framework.Framework) {
