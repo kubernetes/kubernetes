@@ -131,8 +131,6 @@ type Deleter interface {
 
 // Attacher can attach a volume to a node.
 type Attacher interface {
-	Volume
-
 	// Attach the volume specified by the given spec to the given host
 	Attach(spec *Spec, hostName string) error
 
@@ -145,11 +143,11 @@ type Attacher interface {
 	// GetDeviceMountPath returns a path where the device should
 	// be mounted after it is attached. This is a global mount
 	// point which should be bind mounted for individual volumes.
-	GetDeviceMountPath(spec *Spec) string
+	GetDeviceMountPath(host VolumeHost, spec *Spec) string
 
 	// MountDevice mounts the disk to a global path which
 	// individual pods can then bind mount
-	MountDevice(devicePath string, deviceMountPath string, mounter mount.Interface) error
+	MountDevice(spec *Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error
 }
 
 // Detacher can detach a volume from a node.
@@ -159,14 +157,14 @@ type Detacher interface {
 	Detach(deviceMountPath string, hostName string) error
 
 	// WaitForDetach blocks until the device is detached from this
-	// node. If the device does not detach within the given timout
+	// node. If the device does not detach within the given timeout
 	// period an error is returned.
-	WaitForDetach(devicePath string, timout time.Duration) error
+	WaitForDetach(devicePath string, timeout time.Duration) error
 
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been
 	// unmounted.
-	UnmountDevice(globalMountPath string, mounter mount.Interface) error
+	UnmountDevice(deviceMountPath string, mounter mount.Interface) error
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {
