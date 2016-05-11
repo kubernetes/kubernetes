@@ -18,6 +18,8 @@ package runtime
 
 import (
 	gojson "encoding/json"
+	"errors"
+	"fmt"
 	"io"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -145,4 +147,40 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 		list.Items = append(list.Items, unstruct)
 	}
 	return nil
+}
+
+// UnstructuredObjectConverter is an ObjectConverter for use with
+// Unstructured objects. Since it has no schema or type information,
+// it will only succeed for no-op conversions. This is provided as a
+// sane implementation for APIs that require an object converter.
+type UnstructuredObjectConverter struct{}
+
+func (UnstructuredObjectConverter) Convert(in, out interface{}) error {
+	unstructIn, ok := in.(*Unstructured)
+	if !ok {
+		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
+	}
+
+	unstructOut, ok := out.(*Unstructured)
+	if !ok {
+		return fmt.Errorf("output type %T in not valid for unstructured conversion", out)
+	}
+
+	// maybe deep copy the map? It is documented in the
+	// ObjectConverter interface that this function is not
+	// guaranteeed to not mutate the input. Or maybe set the input
+	// object to nil.
+	unstructOut.Object = unstructIn.Object
+	return nil
+}
+
+func (UnstructuredObjectConverter) ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
+	if gvk := in.GetObjectKind().GroupVersionKind(); gvk.GroupVersion() != outVersion {
+		return nil, errors.New("unstructured converter cannot convert versions")
+	}
+	return in, nil
+}
+
+func (UnstructuredObjectConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+	return "", "", errors.New("unstructured cannot convert field labels")
 }
