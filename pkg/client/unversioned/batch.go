@@ -27,6 +27,7 @@ import (
 
 type BatchInterface interface {
 	JobsNamespacer
+	ScheduledJobsNamespacer
 }
 
 // BatchClient is used to interact with Kubernetes batch features.
@@ -36,6 +37,10 @@ type BatchClient struct {
 
 func (c *BatchClient) Jobs(namespace string) JobInterface {
 	return newJobsV1(c, namespace)
+}
+
+func (c *BatchClient) ScheduledJobs(namespace string) ScheduledJobInterface {
+	return newScheduledJobs(c, namespace)
 }
 
 func NewBatch(c *restclient.Config) (*BatchClient, error) {
