@@ -52,6 +52,7 @@ docs/man/man1/kubectl-rollout-undo.1
 docs/man/man1/kubectl-rollout.1
 docs/man/man1/kubectl-run.1
 docs/man/man1/kubectl-scale.1
+docs/man/man1/kubectl-set.1
 docs/man/man1/kubectl-stop.1
 docs/man/man1/kubectl-uncordon.1
 docs/man/man1/kubectl-version.1
@@ -104,6 +105,7 @@ docs/user-guide/kubectl/kubectl_rollout_resume.md
 docs/user-guide/kubectl/kubectl_rollout_undo.md
 docs/user-guide/kubectl/kubectl_run.md
 docs/user-guide/kubectl/kubectl_scale.md
+docs/user-guide/kubectl/kubectl_set.md
 docs/user-guide/kubectl/kubectl_uncordon.md
 docs/user-guide/kubectl/kubectl_version.md
 docs/yaml/kubectl/kubectl.yaml
@@ -136,6 +138,7 @@ docs/yaml/kubectl/kubectl_rolling-update.yaml
 docs/yaml/kubectl/kubectl_rollout.yaml
 docs/yaml/kubectl/kubectl_run.yaml
 docs/yaml/kubectl/kubectl_scale.yaml
+docs/yaml/kubectl/kubectl_set.yaml
 docs/yaml/kubectl/kubectl_stop.yaml
 docs/yaml/kubectl/kubectl_uncordon.yaml
 docs/yaml/kubectl/kubectl_version.yaml
