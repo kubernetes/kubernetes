@@ -27,7 +27,6 @@ import (
 type ExtensionsInterface interface {
 	DaemonSetsGetter
 	DeploymentsGetter
-	HorizontalPodAutoscalersGetter
 	IngressesGetter
 	ReplicaSetsGetter
 	ScalesGetter
@@ -45,10 +44,6 @@ func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
 
 func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
 	return newDeployments(c, namespace)
-}
-
-func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
-	return newHorizontalPodAutoscalers(c, namespace)
 }
 
 func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {

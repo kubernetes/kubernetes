@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
@@ -1607,16 +1608,15 @@ func printDeploymentList(list *extensions.DeploymentList, w io.Writer, options P
 	return nil
 }
 
-func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.Writer, options PrintOptions) error {
+func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io.Writer, options PrintOptions) error {
 	namespace := hpa.Namespace
 	name := hpa.Name
-	reference := fmt.Sprintf("%s/%s/%s",
-		hpa.Spec.ScaleRef.Kind,
-		hpa.Spec.ScaleRef.Name,
-		hpa.Spec.ScaleRef.Subresource)
+	reference := fmt.Sprintf("%s/%s",
+		hpa.Spec.ScaleTargetRef.Kind,
+		hpa.Spec.ScaleTargetRef.Name)
 	target := "<unset>"
-	if hpa.Spec.CPUUtilization != nil {
-		target = fmt.Sprintf("%d%%", hpa.Spec.CPUUtilization.TargetPercentage)
+	if hpa.Spec.TargetCPUUtilizationPercentage != nil {
+		target = fmt.Sprintf("%d%%", *hpa.Spec.TargetCPUUtilizationPercentage)
 	}
 	current := "<waiting>"
 	if hpa.Status.CurrentCPUUtilizationPercentage != nil {
@@ -1651,7 +1651,7 @@ func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.
 	return err
 }
 
-func printHorizontalPodAutoscalerList(list *extensions.HorizontalPodAutoscalerList, w io.Writer, options PrintOptions) error {
+func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerList, w io.Writer, options PrintOptions) error {
 	for i := range list.Items {
 		if err := printHorizontalPodAutoscaler(&list.Items[i], w, options); err != nil {
 			return err

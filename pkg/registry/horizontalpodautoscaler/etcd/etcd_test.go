@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	// Ensure that extensions/v1beta1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	// Ensure that autoscaling/v1 package is initialized.
+	_ "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -32,26 +32,26 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
+	etcdStorage, server := registrytest.NewEtcdStorage(t, autoscaling.GroupName)
 	restOptions := generic.RESTOptions{Storage: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
 	horizontalPodAutoscalerStorage, statusStorage := NewREST(restOptions)
 	return horizontalPodAutoscalerStorage, statusStorage, server
 }
 
-func validNewHorizontalPodAutoscaler(name string) *extensions.HorizontalPodAutoscaler {
-	return &extensions.HorizontalPodAutoscaler{
+func validNewHorizontalPodAutoscaler(name string) *autoscaling.HorizontalPodAutoscaler {
+	cpu := int32(70)
+	return &autoscaling.HorizontalPodAutoscaler{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: extensions.HorizontalPodAutoscalerSpec{
-			ScaleRef: extensions.SubresourceReference{
-				Kind:        "ReplicationController",
-				Name:        "myrc",
-				Subresource: "scale",
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
 			},
-			MaxReplicas:    5,
-			CPUUtilization: &extensions.CPUTargetUtilization{TargetPercentage: 70},
+			MaxReplicas:                    5,
+			TargetCPUUtilizationPercentage: &cpu,
 		},
 	}
 }
@@ -66,7 +66,7 @@ func TestCreate(t *testing.T) {
 		// valid
 		autoscaler,
 		// invalid
-		&extensions.HorizontalPodAutoscaler{},
+		&autoscaling.HorizontalPodAutoscaler{},
 	)
 }
 
@@ -79,7 +79,7 @@ func TestUpdate(t *testing.T) {
 		validNewHorizontalPodAutoscaler("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.HorizontalPodAutoscaler)
+			object := obj.(*autoscaling.HorizontalPodAutoscaler)
 			object.Spec.MaxReplicas = object.Spec.MaxReplicas + 1
 			return object
 		},
