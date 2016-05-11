@@ -311,6 +311,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	if err := unversioned.DeepCopy_unversioned_Duration(in.EvictionPressureTransitionPeriod, &out.EvictionPressureTransitionPeriod, c); err != nil {
 		return err
 	}
+	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 	return nil
 }
 
