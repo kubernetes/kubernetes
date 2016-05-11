@@ -317,20 +317,37 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
 fi
 
 # Allow download & unpack of alternate version of tests, for cross-version & upgrade testing.
-if [[ -n "${JENKINS_PUBLISHED_TEST_VERSION:-}" ]]; then
+#
+# JENKINS_PUBLISHED_SKEW_VERSION downloads an alternate version of Kubernetes
+# for testing, moving the old one to kubernetes_old.
+#
+# E2E_UPGRADE_TEST=true triggers a run of the e2e tests, to do something like
+# upgrade the cluster, before the main test run.  It uses
+# GINKGO_UPGRADE_TESTS_ARGS for the test run.
+#
+# JENKINS_USE_SKEW_TESTS=true will run tests from the skewed version rather
+# than the original version; it is mutuall exclusive with
+# JENKINS_USE_SKEW_KUBECTL.
+#
+# JENKINS_USE_SKEW_KUBECTL=true will use the skewed version of Kubectl; it is
+# mutually exclusive with JENKINS_USE_SKEW_TESTS.
+if [[ -n "${JENKINS_PUBLISHED_SKEW_VERSION:-}" ]]; then
     cd ..
     mv kubernetes kubernetes_old
-    fetch_published_version_tars "${JENKINS_PUBLISHED_TEST_VERSION}"
+    fetch_published_version_tars "${JENKINS_PUBLISHED_SKEW_VERSION}"
     cd kubernetes
     # Upgrade the cluster before running other tests
     if [[ "${E2E_UPGRADE_TEST:-}" == "true" ]]; then
-	# Add a report prefix for the e2e tests so that the tests don't get overwritten when we run
-	# the rest of the e2es.
+        # Add a report prefix for the e2e tests so that the tests don't get overwritten when we run
+        # the rest of the e2es.
         E2E_REPORT_PREFIX='upgrade' e2e_test "${GINKGO_UPGRADE_TEST_ARGS:-}"
-	# If JENKINS_USE_OLD_TESTS is set, back out into the old tests now that we've upgraded.
-        if [[ "${JENKINS_USE_OLD_TESTS:-}" == "true" ]]; then
-            cd ../kubernetes_old
-        fi
+    fi
+    if [[ "${JENKINS_USE_SKEW_TESTS:-}" != "true" ]]; then
+        # Back out into the old tests now that we've downloaded & maybe upgraded.
+        cd ../kubernetes_old
+    elif [[ "${JENKINS_USE_SKEW_KUBECTL:-}" == "true" ]]; then
+        # Append kubectl-path of skewed kubectl to test args
+        GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-} --kubectl-path=$(pwd)/../kubernetes/cluster/kubectl.sh"
     fi
 fi
 
