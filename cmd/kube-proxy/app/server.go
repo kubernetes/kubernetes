@@ -168,14 +168,21 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	// Create a Kube Client
 	// define api config source
-	if config.Kubeconfig == "" && config.Master == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
+	if config.Kubeconfig == "" && config.Master == "" && len(config.APIServerList) == 0 {
+		glog.Warningf("Neither --kubeconfig nor --master nor --api-servers was specified.  Using default API client.  This might not work.")
 	}
 	// This creates a client, first loading any specified kubeconfig
 	// file, and then overriding the Master flag, if non-empty.
+
+	// Otherwise default value from client_config is used which is http://localhost:8080
+	master := config.Master
+	if master == "" && len(config.APIServerList) > 0 {
+		master = config.APIServerList[0]
+	}
 	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: config.Master}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{
+			Server: master, Servers: config.APIServerList}}).ClientConfig()
 	if err != nil {
 		return nil, err
 	}

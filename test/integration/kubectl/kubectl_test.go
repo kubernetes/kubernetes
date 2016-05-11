@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func TestKubectlValidation(t *testing.T) {
+func kubectlValidation(t *testing.T, cluster *clientcmdapi.Cluster) {
 	testCases := []struct {
 		data string
 		err  bool
@@ -42,16 +42,10 @@ func TestKubectlValidation(t *testing.T) {
 		{`{"apiVersion": "extensions/v1beta1", "kind": "Job"}`, false},
 		{`{"apiVersion": "vNotAVersion", "kind": "Job"}`, true},
 	}
-	components := framework.NewMasterComponents(&framework.Config{})
-	defer components.Stop(true, true)
+
 	ctx := clientcmdapi.NewContext()
 	cfg := clientcmdapi.NewConfig()
-	// Enable swagger api on master.
-	components.KubeMaster.InstallSwaggerAPI()
-	cluster := clientcmdapi.NewCluster()
 
-	cluster.Server = components.ApiServer.URL
-	cluster.InsecureSkipTLSVerify = true
 	cfg.Contexts = map[string]*clientcmdapi.Context{"test": ctx}
 	cfg.CurrentContext = "test"
 	overrides := clientcmd.ConfigOverrides{
@@ -76,4 +70,27 @@ func TestKubectlValidation(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestKubectlValidation(t *testing.T) {
+	components := framework.NewMasterComponents(&framework.Config{})
+	defer components.Stop(true, true)
+	// Enable swagger api on master.
+	components.KubeMaster.InstallSwaggerAPI()
+	cluster := clientcmdapi.NewCluster()
+	cluster.Server = components.ApiServer.URL
+	cluster.InsecureSkipTLSVerify = true
+	kubectlValidation(t, cluster)
+}
+
+func TestKubectlValidationWithFailover(t *testing.T) {
+	components := framework.NewMasterComponents(&framework.Config{})
+	defer components.Stop(true, true)
+	// Enable swagger api on master.
+	components.KubeMaster.InstallSwaggerAPI()
+	cluster := clientcmdapi.NewCluster()
+	cluster.Server = "http://localhost:7777"
+	cluster.Servers = []string{components.ApiServer.URL}
+	cluster.InsecureSkipTLSVerify = true
+	kubectlValidation(t, cluster)
 }

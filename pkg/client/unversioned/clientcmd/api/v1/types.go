@@ -57,7 +57,10 @@ type Preferences struct {
 // Cluster contains information about how to communicate with a kubernetes cluster
 type Cluster struct {
 	// Server is the address of the kubernetes cluster (https://hostname:port).
+	// Joined with Servers in restclient.
 	Server string `json:"server"`
+	// Servers is an array of addresses to the kubernetes apiservers with the format: (https://hostname:port). Joined with Server in restclient, duplicate Server will be removed.
+	Servers []string `json:"servers,omitempty"`
 	// APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
 	APIVersion string `json:"api-version,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.

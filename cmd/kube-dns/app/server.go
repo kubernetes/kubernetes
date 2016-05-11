@@ -91,7 +91,7 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 		}
 	}
 
-	glog.Infof("Using %s for kubernetes master, kubernetes API: %v", config.Host, config.GroupVersion)
+	glog.Infof("Using %s to access kubernetes API: %v", config.Host, config.GroupVersion)
 	return clientset.NewForConfig(config)
 }
 

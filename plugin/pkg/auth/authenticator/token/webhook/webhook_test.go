@@ -46,7 +46,7 @@ type Service interface {
 
 // NewTestServer wraps a Service as an httptest.Server.
 func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error) {
-	const webhookPath = "/testserver"
+	const webhookPath = "/testserver/"
 	var tlsConfig *tls.Config
 	if cert != nil {
 		cert, err := tls.X509KeyPair(cert, key)
@@ -192,7 +192,6 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 	if err != nil {
 		return nil, err
 	}
-
 	return newWithBackoff(c, cacheTime, 0)
 }
 

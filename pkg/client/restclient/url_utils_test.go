@@ -21,28 +21,29 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestValidatesHostParameter(t *testing.T) {
 	testCases := []struct {
-		Host    string
+		Hosts   []string
 		APIPath string
 
 		URL string
 		Err bool
 	}{
-		{"127.0.0.1", "", "http://127.0.0.1/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
-		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
-		{"foo.bar.com", "", "http://foo.bar.com/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
-		{"http://host/prefix", "", "http://host/prefix/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
-		{"http://host", "", "http://host/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
-		{"http://host", "/", "http://host/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
-		{"http://host", "/other", "http://host/other/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
-		{"host/server", "", "", true},
+		{[]string{"127.0.0.1"}, "", "http://127.0.0.1/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{[]string{"127.0.0.1:8080"}, "", "http://127.0.0.1:8080/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{[]string{"foo.bar.com"}, "", "http://foo.bar.com/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{[]string{"http://host/prefix"}, "", "http://host/prefix/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{[]string{"http://host"}, "", "http://host/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{[]string{"http://host"}, "/", "http://host/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{[]string{"http://host"}, "/other", "http://host/other/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version, false},
+		{[]string{"host/server"}, "", "", true},
 	}
 	for i, testCase := range testCases {
-		u, versionedAPIPath, err := DefaultServerURL(testCase.Host, testCase.APIPath, registered.GroupOrDie(api.GroupName).GroupVersion, false)
+		basepaths, versionedAPIPath, err := DefaultServerURLsForHosts(testCase.Hosts, testCase.APIPath, *testapi.Default.GroupVersion(), false)
 		switch {
 		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")
@@ -53,10 +54,12 @@ func TestValidatesHostParameter(t *testing.T) {
 		case err != nil:
 			continue
 		}
-		u.Path = path.Join(u.Path, versionedAPIPath)
-		if e, a := testCase.URL, u.String(); e != a {
-			t.Errorf("%d: expected host %s, got %s", i, e, a)
-			continue
+		for _, u := range basepaths {
+			u.Path = path.Join(u.Path, versionedAPIPath)
+			if e, a := testCase.URL, u.String(); e != a {
+				t.Errorf("%d: expected host %s, got %s", i, e, a)
+				continue
+			}
 		}
 	}
 }

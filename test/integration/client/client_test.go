@@ -47,71 +47,90 @@ func TestClient(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-
-	ns := framework.CreateTestingNamespace("client", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	info, err := client.Discovery().ServerVersion()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if e, a := version.Get(), *info; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %#v, got %#v", e, a)
-	}
-
-	pods, err := client.Pods(ns.Name).List(api.ListOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(pods.Items) != 0 {
-		t.Errorf("expected no pods, got %#v", pods)
-	}
-
-	// get a validation error
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			GenerateName: "test",
-			Namespace:    ns.Name,
+	testCases := []struct {
+		description string
+		config      *restclient.Config
+		namespace   string
+	}{
+		{
+			description: "single host",
+			config:      &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
+			namespace:   "client1",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name: "test",
+		{
+			description: "multiple hosts, first host valid url but will not respond",
+			config:      &restclient.Config{AlternateHosts: []string{"http://localhost:7778", s.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
+			namespace:   "client2",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Logf("Running test case: %v", testCase.description)
+		client := client.NewOrDie(testCase.config)
+
+		ns := framework.CreateTestingNamespace(testCase.namespace, s, t)
+		defer framework.DeleteTestingNamespace(ns, s, t)
+
+		info, err := client.Discovery().ServerVersion()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if e, a := version.Get(), *info; !reflect.DeepEqual(e, a) {
+			t.Errorf("expected %#v, got %#v", e, a)
+		}
+
+		pods, err := client.Pods(ns.Name).List(api.ListOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(pods.Items) != 0 {
+			t.Errorf("expected no pods, got %#v", pods)
+		}
+
+		// get a validation error
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				GenerateName: "test",
+				Namespace:    ns.Name,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test",
+					},
 				},
 			},
-		},
-	}
+		}
 
-	got, err := client.Pods(ns.Name).Create(pod)
-	if err == nil {
-		t.Fatalf("unexpected non-error: %v", got)
-	}
+		got, err := client.Pods(ns.Name).Create(pod)
+		if err == nil {
+			t.Fatalf("unexpected non-error: %v", got)
+		}
 
-	// get a created pod
-	pod.Spec.Containers[0].Image = "an-image"
-	got, err = client.Pods(ns.Name).Create(pod)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.Name == "" {
-		t.Errorf("unexpected empty pod Name %v", got)
-	}
+		// get a created pod
+		pod.Spec.Containers[0].Image = "an-image"
+		got, err = client.Pods(ns.Name).Create(pod)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Name == "" {
+			t.Errorf("unexpected empty pod Name %v", got)
+		}
 
-	// pod is shown, but not scheduled
-	pods, err = client.Pods(ns.Name).List(api.ListOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(pods.Items) != 1 {
-		t.Errorf("expected one pod, got %#v", pods)
-	}
-	actual := pods.Items[0]
-	if actual.Name != got.Name {
-		t.Errorf("expected pod %#v, got %#v", got, actual)
-	}
-	if actual.Spec.NodeName != "" {
-		t.Errorf("expected pod to be unscheduled, got %#v", actual)
+		// pod is shown, but not scheduled
+		pods, err = client.Pods(ns.Name).List(api.ListOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(pods.Items) != 1 {
+			t.Errorf("expected one pod, got %#v", pods)
+		}
+		actual := pods.Items[0]
+		if actual.Name != got.Name {
+			t.Errorf("expected pod %#v, got %#v", got, actual)
+		}
+		if actual.Spec.NodeName != "" {
+			t.Errorf("expected pod to be unscheduled, got %#v", actual)
+		}
 	}
 }
 

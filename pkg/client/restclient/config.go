@@ -112,6 +112,10 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
+	// AlternateHosts must be a slice of strings, with properties of Host.
+	// They will be used if Host will be empty or unavailable.
+	AlternateHosts []string
 }
 
 // TLSClientConfig contains settings to enable transport layer security
@@ -152,6 +156,23 @@ type ContentConfig struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 }
 
+// Hosts returns Host and AlternateHosts as a single slice, if Host is already present
+// in AlternateHosts it won't be repeated
+func (c *Config) Hosts() []string {
+	var hosts []string
+	if len(c.Host) > 0 {
+		hosts = append(hosts, c.Host)
+	}
+	if len(c.AlternateHosts) > 0 {
+		for _, host := range c.AlternateHosts {
+			if host != c.Host {
+				hosts = append(hosts, host)
+			}
+		}
+	}
+	return hosts
+}
+
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
 // object. Note that a RESTClient may require fields that are optional when initializing a Client.
 // A RESTClient created by this method is generic - it expects to operate on an API that follows
@@ -172,7 +193,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		burst = DefaultBurst
 	}
 
-	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
+	hosts, versionedAPIPath, err := defaultServerUrlsFor(config)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +208,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		httpClient = &http.Client{Transport: transport}
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	return NewRESTClient(hosts, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -197,7 +218,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("NeogitatedSerializer is required when initializing a RESTClient")
 	}
 
-	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
+	hosts, versionedAPIPath, err := defaultServerUrlsFor(config)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +239,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		versionConfig.GroupVersion = &v
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	return NewRESTClient(hosts, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
@@ -268,7 +289,6 @@ func InClusterConfig() (*Config, error) {
 	}
 
 	return &Config{
-		// TODO: switch to using cluster DNS.
 		Host:            "https://" + net.JoinHostPort(host, port),
 		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
@@ -278,16 +298,29 @@ func InClusterConfig() (*Config, error) {
 // IsConfigTransportTLS returns true if and only if the provided
 // config will result in a protected connection to the server when it
 // is passed to restclient.RESTClientFor().  Use to determine when to
-// send credentials over the wire.
+// send credentials over the wire. Any non-https host will return false.
+// All Hosts in Config must be either TLS enabled or not.
 //
 // Note: the Insecure flag is ignored when testing for this value, so MITM attacks are
 // still possible.
-func IsConfigTransportTLS(config Config) bool {
-	baseURL, _, err := defaultServerUrlFor(&config)
+func IsConfigTransportTLS(config Config) (bool, error) {
+	hosts, _, err := defaultServerUrlsFor(&config)
+	allHttps := 0
+	// TODO Propagate errors from defaultServerUrlsFor
 	if err != nil {
-		return false
+		return false, nil
 	}
-	return baseURL.Scheme == "https"
+	for _, host := range hosts {
+		if host.Scheme == "https" {
+			allHttps++
+		}
+	}
+	if allHttps == 0 {
+		return false, nil
+	} else if allHttps == len(hosts) {
+		return true, nil
+	}
+	return false, fmt.Errorf("https and http can't be mixed, hosts: %v", hosts)
 }
 
 // LoadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
@@ -338,10 +371,11 @@ func AddUserAgent(config *Config, userAgent string) *Config {
 func AnonymousClientConfig(config *Config) *Config {
 	// copy only known safe fields
 	return &Config{
-		Host:          config.Host,
-		APIPath:       config.APIPath,
-		Prefix:        config.Prefix,
-		ContentConfig: config.ContentConfig,
+		Host:           config.Host,
+		AlternateHosts: config.AlternateHosts,
+		APIPath:        config.APIPath,
+		Prefix:         config.Prefix,
+		ContentConfig:  config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
 			CAFile: config.TLSClientConfig.CAFile,
 			CAData: config.TLSClientConfig.CAData,

@@ -46,6 +46,7 @@ type ProxyServerConfig struct {
 	CleanupAndExit    bool
 	NodeRef           *api.ObjectReference
 	Master            string
+	APIServerList     []string
 	Kubeconfig        string
 }
 
@@ -65,6 +66,7 @@ func NewProxyConfig() *ProxyServerConfig {
 func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(componentconfig.IPVar{Val: &s.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
+	fs.StringSliceVar(&s.APIServerList, "api-servers", []string{}, "List of Kubernetes API servers for publishing events, and reading pods and services. Comma separated list of hostnames or host:port pairs.")
 	fs.Int32Var(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.Var(componentconfig.IPVar{Val: &s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.Int32Var(s.OOMScoreAdj, "oom-score-adj", util.Int32PtrDerefOr(s.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")

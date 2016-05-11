@@ -91,7 +91,7 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 		StreamingSerializer: streamingSerializer,
 		Framer:              streamingSerializer.Framer,
 	}
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
+	return restclient.NewRequest(c, verb, restclient.NewRoundRobinProvider(&url.URL{Host: "localhost"}), "", config, serializers, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {

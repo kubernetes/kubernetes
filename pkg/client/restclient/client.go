@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -46,8 +47,7 @@ const (
 //
 // Most consumers should use client.New() to get a Kubernetes API client.
 type RESTClient struct {
-	// base is the root URL for all invocations of the client
-	base *url.URL
+	urlProvider URLProvider
 	// versionedAPIPath is a path segment connecting the base URL to the resource root
 	versionedAPIPath string
 
@@ -78,13 +78,17 @@ type Serializers struct {
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server.
-func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
-	base := *baseURL
-	if !strings.HasSuffix(base.Path, "/") {
-		base.Path += "/"
+func NewRESTClient(hosts []*url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+	var clientHosts []*url.URL
+	for _, host := range hosts {
+		u := *host
+		if !strings.HasSuffix(u.Path, "/") {
+			u.Path += "/"
+		}
+		u.RawQuery = ""
+		u.Fragment = ""
+		clientHosts = append(clientHosts, &u)
 	}
-	base.RawQuery = ""
-	base.Fragment = ""
 
 	if config.GroupVersion == nil {
 		config.GroupVersion = &unversioned.GroupVersion{}
@@ -103,8 +107,9 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	} else if rateLimiter != nil {
 		throttle = rateLimiter
 	}
+	glog.V(4).Infof("Rest client initialized with following urls %v", clientHosts)
 	return &RESTClient{
-		base:             &base,
+		urlProvider:      NewRoundRobinProvider(clientHosts...),
 		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
@@ -188,9 +193,9 @@ func (c *RESTClient) Verb(verb string) *Request {
 	backoff := c.createBackoffMgr()
 
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+		return NewRequest(nil, verb, c.urlProvider, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+	return NewRequest(c.Client, verb, c.urlProvider, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
