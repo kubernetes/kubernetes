@@ -22,6 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/build/common.sh"
 
 kube::golang::setup_env
+hack/build-go.sh cmd/libs/go2idl/go-to-protobuf cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
 
 function prereqs() {
   kube::log::status "Verifying Prerequisites...."
