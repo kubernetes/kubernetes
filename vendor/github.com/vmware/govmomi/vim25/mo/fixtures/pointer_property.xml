@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RetrievePropertiesResponse xmlns="urn:vim25" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <returnval>
+    <obj type="VirtualMachine">vm-411</obj>
+    <propSet>
+      <name>config.bootOptions</name>
+      <val xsi:type="VirtualMachineBootOptions">
+        <bootDelay>0</bootDelay>
+        <enterBIOSSetup>false</enterBIOSSetup>
+        <bootRetryEnabled>false</bootRetryEnabled>
+        <bootRetryDelay>10000</bootRetryDelay>
+      </val>
+    </propSet>
+  </returnval>
+</RetrievePropertiesResponse>
