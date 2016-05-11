@@ -31,6 +31,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -79,6 +80,19 @@ func (op *OIDCProvider) ServeTLSWithKeyPair(cert, key string) (*httptest.Server,
 	return srv, nil
 }
 
+func (op *OIDCProvider) AddMinimalProviderConfig(srv *httptest.Server) {
+	op.PCFG = oidc.ProviderConfig{
+		Issuer:                  MustParseURL(srv.URL),
+		AuthEndpoint:            MustParseURL(srv.URL + "/auth"),
+		TokenEndpoint:           MustParseURL(srv.URL + "/token"),
+		KeysEndpoint:            MustParseURL(srv.URL + "/keys"),
+		ResponseTypesSupported:  []string{"code"},
+		SubjectTypesSupported:   []string{"public"},
+		IDTokenSigningAlgValues: []string{"RS256"},
+	}
+
+}
+
 func (op *OIDCProvider) handleConfig(w http.ResponseWriter, req *http.Request) {
 	b, err := json.Marshal(&op.PCFG)
 	if err != nil {
@@ -106,6 +120,14 @@ func (op *OIDCProvider) handleKeys(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Expires", time.Now().Add(time.Hour).Format(time.RFC1123))
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)
+}
+
+func MustParseURL(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(fmt.Errorf("Failed to parse url: %v", err))
+	}
+	return u
 }
 
 // generateSelfSignedCert generates a self-signed cert/key pairs and writes to the certPath/keyPath.

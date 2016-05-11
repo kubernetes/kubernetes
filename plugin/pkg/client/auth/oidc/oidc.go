@@ -34,12 +34,12 @@ import (
 
 const (
 	cfgIssuerUrl                = "idp-issuer-url"
-	cfgClientId                 = "client-id"
+	cfgClientID                 = "client-id"
 	cfgClientSecret             = "client-secret"
 	cfgCertificateAuthority     = "idp-certificate-authority"
 	cfgCertificateAuthorityData = "idp-certificate-authority-data"
 	cfgExtraScopes              = "extra-scopes"
-	cfgIdToken                  = "id-token"
+	cfgIDToken                  = "id-token"
 	cfgRefreshToken             = "refresh-token"
 )
 
@@ -50,6 +50,21 @@ func init() {
 }
 
 func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+	issuer := cfg[cfgIssuerUrl]
+	if issuer == "" {
+		return nil, fmt.Errorf("Must provide %s", cfgIssuerUrl)
+	}
+
+	clientID := cfg[cfgClientID]
+	if clientID == "" {
+		return nil, fmt.Errorf("Must provide %s", cfgClientID)
+	}
+
+	clientSecret := cfg[cfgClientSecret]
+	if clientSecret == "" {
+		return nil, fmt.Errorf("Must provide %s", cfgClientSecret)
+	}
+
 	var certAuthData []byte
 	var err error
 	if cfg[cfgCertificateAuthorityData] != "" {
@@ -72,11 +87,6 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 	}
 	hc := &http.Client{Transport: trans}
 
-	issuer, ok := cfg[cfgIssuerUrl]
-	if !ok || issuer == "" {
-		return nil, errors.New("Must provide idp-issuer-url")
-	}
-
 	providerCfg, err := oidc.FetchProviderConfig(hc, strings.TrimSuffix(issuer, "/"))
 	if err != nil {
 		return nil, fmt.Errorf("error fetching provider config: %v", err)
@@ -86,8 +96,8 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 	oidcCfg := oidc.ClientConfig{
 		HTTPClient: hc,
 		Credentials: oidc.ClientCredentials{
-			ID:     cfg[cfgClientId],
-			Secret: cfg[cfgClientSecret],
+			ID:     clientID,
+			Secret: clientSecret,
 		},
 		ProviderConfig: providerCfg,
 		Scope:          scopes,
@@ -99,15 +109,15 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 	}
 
 	var initialIDToken jose.JWT
-	if cfg[cfgIdToken] != "" {
-		initialIDToken, err = jose.ParseJWT(cfg[cfgIdToken])
+	if cfg[cfgIDToken] != "" {
+		initialIDToken, err = jose.ParseJWT(cfg[cfgIDToken])
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return &oidcAuthProvider{
-		intialIDToken: initialIDToken,
+		initialIDToken: initialIDToken,
 		refresher: &idTokenRefresher{
 			client:    client,
 			cfg:       cfg,
@@ -117,8 +127,8 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 }
 
 type oidcAuthProvider struct {
-	refresher     *idTokenRefresher
-	intialIDToken jose.JWT
+	refresher      *idTokenRefresher
+	initialIDToken jose.JWT
 }
 
 func (g *oidcAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
@@ -126,7 +136,7 @@ func (g *oidcAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper
 		TokenRefresher: g.refresher,
 		RoundTripper:   rt,
 	}
-	at.SetJWT(g.intialIDToken)
+	at.SetJWT(g.initialIDToken)
 	return at
 }
 
@@ -185,7 +195,7 @@ func (r *idTokenRefresher) Refresh() (jose.JWT, error) {
 	if tokens.RefreshToken != "" && tokens.RefreshToken != rt {
 		r.cfg[cfgRefreshToken] = tokens.RefreshToken
 	}
-	r.cfg[cfgIdToken] = jwt.Encode()
+	r.cfg[cfgIDToken] = jwt.Encode()
 
 	err = r.persister.Persist(r.cfg)
 	if err != nil {
