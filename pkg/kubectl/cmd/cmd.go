@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 
@@ -232,6 +233,9 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdExplain(f, out))
 	cmds.AddCommand(NewCmdConvert(f, out))
+
+	// TODO: move under new set command
+	cmds.AddCommand(set.NewCmdProbe(cmds.Use, f, out, err))
 
 	if cmds.Flag("namespace").Annotations == nil {
 		cmds.Flag("namespace").Annotations = map[string][]string{}

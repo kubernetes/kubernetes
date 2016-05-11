@@ -1,0 +1,261 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl probe \- Update a probe on a pod template
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl probe\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Set or remove a liveness or readiness probe from a pod or pod template
+
+.PP
+Each container in a pod may define one or more probes that are used for general health
+checking. A liveness probe is checked periodically to ensure the container is still healthy:
+if the probe fails, the container is restarted. Readiness probes set or clear the ready
+flag for each container, which controls whether the container's ports are included in the list
+of endpoints for a service and whether a deployment can proceed. A readiness check should
+indicate when your container is ready to accept incoming traffic or begin handling work.
+Setting both liveness and readiness probes for each container is highly recommended.
+
+.PP
+The three probe types are:
+.IP \(bu 2
+
+\item Open a TCP socket on the pod IP
+\item Perform an HTTP GET against a URL on a container that must return 200 OK
+\item Run a command in the container that must return exit code 0
+.PP
+Containers that take a variable amount of time to start should set generous
+initial\-delay\-seconds values, otherwise as your application evolves you may suddenly begin
+to fail.
+
+
+.SH OPTIONS
+.PP
+\fB\-\-all\fP=false
+    Select all resources in the namespace of the specified resource types
+
+.PP
+\fB\-c\fP, \fB\-\-containers\fP="*"
+    The names of containers in the selected pod templates to change \- may use wildcards
+
+.PP
+\fB\-\-failure\-threshold\fP=0
+    The number of failures before the probe is considered to have failed
+
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to file to use to edit the resource.
+
+.PP
+\fB\-\-get\-url\fP=""
+    A URL to perform an HTTP GET on (you can omit the host, have a string port, or omit the scheme.
+
+.PP
+\fB\-\-initial\-delay\-seconds\fP=0
+    The time in seconds to wait before the probe begins checking
+
+.PP
+\fB\-\-liveness\fP=false
+    Set or remove a liveness probe to verify this container is running
+
+.PP
+\fB\-\-no\-headers\fP=false
+    When using the default output, don't print headers.
+
+.PP
+\fB\-\-open\-tcp\fP=""
+    A port number or port name to attempt to open via TCP.
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output format. One of: json|yaml|wide|name|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See golang template [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
+\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]].
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
+
+.PP
+\fB\-\-period\-seconds\fP=0
+    The time in seconds between attempts
+
+.PP
+\fB\-\-readiness\fP=false
+    Set or remove a readiness probe to indicate when this container should receive traffic
+
+.PP
+\fB\-\-remove\fP=false
+    If true, remove the specified probe(s).
+
+.PP
+\fB\-l\fP, \fB\-\-selector\fP=""
+    Selector (label query) to filter on
+
+.PP
+\fB\-a\fP, \fB\-\-show\-all\fP=false
+    When printing, show all resources (default hide terminated pods.)
+
+.PP
+\fB\-\-show\-labels\fP=false
+    When printing, show all labels as the last column (default hide labels column)
+
+.PP
+\fB\-\-sort\-by\fP=""
+    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
+
+.PP
+\fB\-\-success\-threshold\fP=0
+    The number of successes required before the probe is considered successful
+
+.PP
+\fB\-\-template\fP=""
+    Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
+
+.PP
+\fB\-\-timeout\-seconds\fP=0
+    The time in seconds to wait before considering the probe to have failed
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-api\-version\fP=""
+    DEPRECATED: The API version to use when talking to the server
+
+.PP
+\fB\-\-as\fP=""
+    Username to impersonate for the operation.
+
+.PP
+\fB\-\-certificate\-authority\fP=""
+    Path to a cert. file for the certificate authority.
+
+.PP
+\fB\-\-client\-certificate\fP=""
+    Path to a client certificate file for TLS.
+
+.PP
+\fB\-\-client\-key\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-cluster\fP=""
+    The name of the kubeconfig cluster to use
+
+.PP
+\fB\-\-context\fP=""
+    The name of the kubeconfig context to use
+
+.PP
+\fB\-\-insecure\-skip\-tls\-verify\fP=false
+    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    Path to the kubeconfig file to use for CLI requests.
+
+.PP
+\fB\-\-log\-backtrace\-at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\-dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\-flush\-frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-match\-server\-version\fP=false
+    Require server version to match client version
+
+.PP
+\fB\-\-namespace\fP=""
+    If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-password\fP=""
+    Password for basic authentication to the API server.
+
+.PP
+\fB\-s\fP, \fB\-\-server\fP=""
+    The address and port of the Kubernetes API server
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-token\fP=""
+    Bearer token for authentication to the API server.
+
+.PP
+\fB\-\-user\fP=""
+    The name of the kubeconfig user to use
+
+.PP
+\fB\-\-username\fP=""
+    Username for basic authentication to the API server.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+  # Clear both readiness and liveness probes off all containers
+  kubectl probe dc/registry \-\-remove \-\-readiness \-\-liveness
+
+  # Set an exec action as a liveness probe to run 'echo ok'
+  kubectl probe dc/registry \-\-liveness \-\- echo ok
+
+  # Set a readiness probe to try to open a TCP socket on 3306
+  kubectl probe rc/mysql \-\-readiness \-\-open\-tcp=3306
+
+  # Set an HTTP readiness probe for port 8080 and path /healthz over HTTP on the pod IP
+  kubectl probe dc/webapp \-\-readiness \-\-get\-url=http://:8080/healthz
+
+  # Set an HTTP readiness probe over HTTPS on 127.0.0.1 for a hostNetwork pod
+  kubectl probe dc/router \-\-readiness \-\-get\-url=https://127.0.0.1:1936/stats
+
+  # Set only the initial\-delay\-seconds field on all deployments
+  kubectl probe dc \-\-all \-\-readiness \-\-initial\-delay\-seconds=30
+
+.fi
+.RE
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!
