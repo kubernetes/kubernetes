@@ -20,6 +20,27 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 source "${KUBE_ROOT}/test/kubemark/common.sh"
 
+function writeEnvironmentFiles() {
+  cat > "${RESOURCE_DIRECTORY}/apiserver_flags" <<EOF
+${APISERVER_TEST_ARGS}
+--service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}"
+EOF
+sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/apiserver_flags"
+
+  cat > "${RESOURCE_DIRECTORY}/scheduler_flags" <<EOF
+${SCHEDULER_TEST_ARGS}
+EOF
+sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/scheduler_flags"
+
+  cat > "${RESOURCE_DIRECTORY}/controllers_flags" <<EOF
+${CONTROLLER_MANAGER_TEST_ARGS}
+--allocate-node-cidrs="${ALLOCATE_NODE_CIDRS}"
+--cluster-cidr="${CLUSTER_IP_RANGE}"
+--terminated-pod-gc-threshold="${TERMINATED_POD_GC_THRESHOLD}"
+EOF
+sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/controllers_flags"
+}
+
 RUN_FROM_DISTRO=${RUN_FROM_DISTRO:-false}
 MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
 
@@ -126,17 +147,25 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo ${password},admin,admin > /srv/kubernetes/basic_auth.csv\""
 
+writeEnvironmentFiles
+
 if [ "${RUN_FROM_DISTRO}" == "false" ]; then
   gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
     "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" \
     "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
     "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
+    "${RESOURCE_DIRECTORY}/apiserver_flags" \
+    "${RESOURCE_DIRECTORY}/scheduler_flags" \
+    "${RESOURCE_DIRECTORY}/controllers_flags" \
     "${MASTER_NAME}":~
 else
   gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
     "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" \
     "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
     "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
+    "${RESOURCE_DIRECTORY}/apiserver_flags" \
+    "${RESOURCE_DIRECTORY}/scheduler_flags" \
+    "${RESOURCE_DIRECTORY}/controllers_flags" \
     "${MASTER_NAME}":~
 fi
 

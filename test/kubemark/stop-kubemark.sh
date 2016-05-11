@@ -45,4 +45,10 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
 fi
 
 rm -rf "${RESOURCE_DIRECTORY}/addons" "${RESOURCE_DIRECTORY}/kubeconfig.loc" &> /dev/null || true
-rm "${RESOURCE_DIRECTORY}/ca.crt" "${RESOURCE_DIRECTORY}/kubecfg.crt" "${RESOURCE_DIRECTORY}/kubecfg.key" "${RESOURCE_DIRECTORY}/hollow-node.json" &> /dev/null || true
+rm "${RESOURCE_DIRECTORY}/ca.crt" \
+	"${RESOURCE_DIRECTORY}/kubecfg.crt" \
+	"${RESOURCE_DIRECTORY}/kubecfg.key" \
+	"${RESOURCE_DIRECTORY}/hollow-node.json" \
+	"${RESOURCE_DIRECTORY}/apiserver_flags" \
+	"${RESOURCE_DIRECTORY}/controllers_flags" \
+	"${RESOURCE_DIRECTORY}/scheduler_flags" &> /dev/null || true
