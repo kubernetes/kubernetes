@@ -143,7 +143,7 @@ for current in "${index[@]}"; do
   ###echo "DBG: running ${CODECGEN} -d 1234 -o ${base_generated_file} ${base_file}"
   ${CODECGEN} -d 1234 -o "${base_generated_file}" "${base_file}"
   # Add boilerplate at the beginning of the generated file.
-  sed 's/YEAR/2015/' "${initial_dir}/hack/boilerplate/boilerplate.go.txt" > "${base_generated_file}.tmp"
+  sed 's/YEAR/2016/' "${initial_dir}/hack/boilerplate/boilerplate.go.txt" > "${base_generated_file}.tmp"
   cat "${base_generated_file}" >> "${base_generated_file}.tmp"
   mv "${base_generated_file}.tmp" "${base_generated_file}"
   popd > /dev/null
