@@ -127,11 +127,11 @@ func TestProcessItem(t *testing.T) {
 	}
 	testHandler := &fakeActionHandler{
 		response: map[string]FakeResponse{
-			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/owner1": FakeResponse{
+			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/owner1": {
 				404,
 				[]byte{},
 			},
-			"GET" + "/api/v1/namespaces/ns1/pods/ToBeDeletedPod": FakeResponse{
+			"GET" + "/api/v1/namespaces/ns1/pods/ToBeDeletedPod": {
 				200,
 				podBytes,
 			},
@@ -182,7 +182,7 @@ func TestProcessItem(t *testing.T) {
 // before their dependents. uidToNode has all the nodes in the graph.
 func verifyGraphInvariants(scenario string, uidToNode map[types.UID]*node, t *testing.T) {
 	for myUID, node := range uidToNode {
-		for dependentNode, _ := range node.dependents {
+		for dependentNode := range node.dependents {
 			found := false
 			for _, owner := range dependentNode.owners {
 				if owner.UID == myUID {

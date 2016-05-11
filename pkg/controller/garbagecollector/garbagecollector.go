@@ -144,10 +144,10 @@ func referencesDiffs(old []metatypes.OwnerReference, new []metatypes.OwnerRefere
 	addedUID := newUIDSet.Difference(oldUIDSet)
 	removedUID := oldUIDSet.Difference(newUIDSet)
 
-	for uid, _ := range addedUID {
+	for uid := range addedUID {
 		added = append(added, newUIDToRef[uid])
 	}
-	for uid, _ := range removedUID {
+	for uid := range removedUID {
 		removed = append(removed, oldUIDToRef[uid])
 	}
 	return added, removed
@@ -234,7 +234,7 @@ func (p *Propagator) processEvent() {
 			return
 		}
 		p.removeNode(existingNode)
-		for dep, _ := range existingNode.dependents {
+		for dep := range existingNode.dependents {
 			p.gc.dirtyQueue.Add(dep)
 		}
 	}
@@ -308,10 +308,10 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 }
 
 var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}: struct{}{},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                              struct{}{},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                     struct{}{},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                struct{}{},
+	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}: {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                              {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                     {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                {},
 }
 
 func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
