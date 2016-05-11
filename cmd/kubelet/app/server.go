@@ -539,7 +539,7 @@ func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*restclie
 	if err != nil {
 		return nil, err
 	}
-	authConfig.Host = s.APIServerList[0]
+	authConfig.Hosts = s.APIServerList
 	return &authConfig, nil
 }
 

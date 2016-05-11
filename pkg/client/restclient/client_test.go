@@ -49,8 +49,15 @@ type TestParam struct {
 func TestDoRequestSuccess(t *testing.T) {
 	testServer, fakeHandler, status := testServerEnv(t, 200)
 	defer testServer.Close()
-
-	c, err := restClient(testServer)
+	c, err := RESTClientFor(&Config{
+		Hosts: []string{testServer.URL},
+		ContentConfig: ContentConfig{
+			GroupVersion:         testapi.Default.GroupVersion(),
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		},
+		Username: "user",
+		Password: "pass",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -77,8 +84,13 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-
-	c, err := restClient(testServer)
+	c, err := RESTClientFor(&Config{
+		Hosts: []string{testServer.URL},
+		ContentConfig: ContentConfig{
+			GroupVersion:         testapi.Default.GroupVersion(),
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		},
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -120,7 +132,15 @@ func TestDoRequestCreated(t *testing.T) {
 func TestDoRequestNotCreated(t *testing.T) {
 	testServer, fakeHandler, expectedStatus := testServerEnv(t, 202)
 	defer testServer.Close()
-	c, err := restClient(testServer)
+	c, err := RESTClientFor(&Config{
+		Hosts: []string{testServer.URL},
+		ContentConfig: ContentConfig{
+			GroupVersion:         testapi.Default.GroupVersion(),
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		},
+		Username: "user",
+		Password: "pass",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

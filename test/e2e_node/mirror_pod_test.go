@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -36,6 +37,12 @@ import (
 
 var _ = framework.KubeDescribe("MirrorPod", func() {
 	f := framework.NewDefaultFramework("mirror-pod")
+	var cl *client.Client
+	BeforeEach(func() {
+		// Setup the apiserver client
+		cl = client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
+	})
+	ns := "mirror-pod"
 	Context("when create a mirror pod ", func() {
 		var ns, staticPodName, mirrorPodName string
 		BeforeEach(func() {

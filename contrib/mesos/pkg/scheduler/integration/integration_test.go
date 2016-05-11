@@ -496,7 +496,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 
 	// create framework
 	client := clientset.NewForConfigOrDie(&restclient.Config{
-		Host:          apiServer.server.URL,
+		Hosts:         []string{apiServer.server.URL},
 		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 	})
 	c := *schedcfg.CreateDefaultConfig()
