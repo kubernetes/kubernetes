@@ -93,7 +93,7 @@ func TestUpdate(t *testing.T) {
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			cfg := obj.(*api.ConfigMap)
-			cfg.Data["badKey"] = "value"
+			cfg.Data["bad*Key"] = "value"
 			return cfg
 		},
 	)
