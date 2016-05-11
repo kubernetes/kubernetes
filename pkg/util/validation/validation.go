@@ -247,19 +247,26 @@ func IsHTTPHeaderName(value string) []string {
 	return nil
 }
 
-const configMapKeyFmt = "\\.?" + dns1123SubdomainFmt
+const configMapKeyFmt = `[-._a-zA-Z0-9]+`
 
 var configMapKeyRegexp = regexp.MustCompile("^" + configMapKeyFmt + "$")
 
-// IsConfigMapKey tests for a string that conforms to the definition of a
-// subdomain in DNS (RFC 1123), except that a leading dot is allowed
+// IsConfigMapKey tests for a string that is a valid key for a ConfigMap or Secret
 func IsConfigMapKey(value string) []string {
 	var errs []string
 	if len(value) > DNS1123SubdomainMaxLength {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
 	if !configMapKeyRegexp.MatchString(value) {
-		errs = append(errs, RegexError(configMapKeyFmt, "key.name"))
+		errs = append(errs, RegexError(configMapKeyFmt, "key.name", "KEY_NAME", "key-name"))
+	}
+	if value == "." {
+		errs = append(errs, `must not be '.'`)
+	}
+	if value == ".." {
+		errs = append(errs, `must not be '..'`)
+	} else if strings.HasPrefix(value, "..") {
+		errs = append(errs, `must not start with '..'`)
 	}
 	return errs
 }
