@@ -109,11 +109,11 @@ func (rc *ResourceClient) namespace(req *restclient.Request) *restclient.Request
 }
 
 // List returns a list of objects for this resource.
-func (rc *ResourceClient) List(opts v1.ListOptions) (*runtime.UnstructuredList, error) {
+func (rc *ResourceClient) List(opts runtime.Object) (*runtime.UnstructuredList, error) {
 	result := new(runtime.UnstructuredList)
 	err := rc.namespace(rc.cl.Get()).
 		Resource(rc.resource.Name).
-		VersionedParams(&opts, parameterEncoder).
+		VersionedParams(opts, parameterEncoder).
 		Do().
 		Into(result)
 	return result, err
@@ -141,10 +141,10 @@ func (rc *ResourceClient) Delete(name string, opts *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, listOptions runtime.Object) error {
 	return rc.namespace(rc.cl.Delete()).
 		Resource(rc.resource.Name).
-		VersionedParams(&listOptions, parameterEncoder).
+		VersionedParams(listOptions, parameterEncoder).
 		Body(deleteOptions).
 		Do().
 		Error()
@@ -177,10 +177,10 @@ func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructur
 }
 
 // Watch returns a watch.Interface that watches the resource.
-func (rc *ResourceClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (rc *ResourceClient) Watch(opts runtime.Object) (watch.Interface, error) {
 	return rc.namespace(rc.cl.Get().Prefix("watch")).
 		Resource(rc.resource.Name).
-		VersionedParams(&opts, parameterEncoder).
+		VersionedParams(opts, parameterEncoder).
 		Watch()
 }
 
