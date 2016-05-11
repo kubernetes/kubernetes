@@ -261,7 +261,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 
 	start := time.Now()
 	defer func() {
-		glog.V(4).Infof("TearDownPod took %v for %s/%s", time.Since(start), namespace, name)
+		glog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), namespace, name)
 	}()
 
 	pod, ok := plugin.host.GetPodByName(namespace, name)
