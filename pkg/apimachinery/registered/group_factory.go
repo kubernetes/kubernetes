@@ -158,7 +158,7 @@ func (gav *groupAndVersions) Register(m *Manager) error {
 	return nil
 }
 
-func (gav *groupAndVersions) newRESTMapper(externalVersions []unversioned.GroupVersion, groupMeta *apimachinery.GroupMeta) meta.RESTMapper {
+func (gav *groupAndVersions) newRESTMapper(scheme *runtime.Scheme, externalVersions []unversioned.GroupVersion, groupMeta *apimachinery.GroupMeta) meta.RESTMapper {
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
 	rootScoped := sets.NewString()
@@ -170,7 +170,8 @@ func (gav *groupAndVersions) newRESTMapper(externalVersions []unversioned.GroupV
 		ignoredKinds = gav.group.IgnoredKinds
 	}
 
-	return api.NewDefaultRESTMapper(
+	return api.NewRESTMapper(
+		scheme,
 		externalVersions,
 		groupMeta.InterfacesFor,
 		gav.group.ImportPrefix,
@@ -209,7 +210,6 @@ func (gav *groupAndVersions) Enable(m *Manager, scheme *runtime.Scheme) error {
 		GroupVersions: externalVersions,
 		SelfLinker:    runtime.SelfLinker(accessor),
 	}
-	groupMeta.RESTMapper = gav.newRESTMapper(externalVersions, groupMeta)
 	for _, gvf := range gav.versions {
 		err := groupMeta.AddVersion(
 			unversioned.GroupVersion{gvf.GroupName, gvf.VersionName},
@@ -222,10 +222,14 @@ func (gav *groupAndVersions) Enable(m *Manager, scheme *runtime.Scheme) error {
 			return err
 		}
 	}
+	groupMeta.RESTMapper = gav.newRESTMapper(scheme, externalVersions, groupMeta)
 
 	if err := m.RegisterGroup(*groupMeta); err != nil {
 		return err
 	}
-	api.RegisterRESTMapper(groupMeta.RESTMapper)
+	// TODO: remove this hack, move the main RESTMapper out of api and into the registered package.
+	if scheme == api.Scheme {
+		api.RegisterRESTMapper(groupMeta.RESTMapper)
+	}
 	return nil
 }

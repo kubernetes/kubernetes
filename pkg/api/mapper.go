@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -36,12 +37,21 @@ func RegisterRESTMapper(m meta.RESTMapper) {
 
 func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
 	importPathPrefix string, ignoredKinds, rootScoped sets.String) *meta.DefaultRESTMapper {
+	return NewRESTMapper(Scheme, defaultGroupVersions, interfacesFunc, importPathPrefix, ignoredKinds, rootScoped)
+}
 
+func NewRESTMapper(
+	scheme *runtime.Scheme,
+	defaultGroupVersions []unversioned.GroupVersion,
+	interfacesFunc meta.VersionInterfacesFunc,
+	importPathPrefix string,
+	ignoredKinds, rootScoped sets.String,
+) *meta.DefaultRESTMapper {
 	mapper := meta.NewDefaultRESTMapper(defaultGroupVersions, interfacesFunc)
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address
 	// our resources.
 	for _, gv := range defaultGroupVersions {
-		for kind, oType := range Scheme.KnownTypes(gv) {
+		for kind, oType := range scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
 			// TODO: Remove import path check.
 			// We check the import path because we currently stuff both "api" and "extensions" objects
