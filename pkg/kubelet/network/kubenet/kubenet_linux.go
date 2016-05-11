@@ -370,7 +370,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	if err != nil {
 		return nil, err
 	}
-	// Try to retrieve ip inside container netwrok namespace
+	// Try to retrieve ip inside container network namespace
 	output, err := plugin.execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
 		"ip", "-o", "-4", "addr", "show", "dev", network.DefaultInterfaceName).CombinedOutput()
 	if err != nil {
