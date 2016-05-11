@@ -24,6 +24,7 @@ import (
 
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netlink/nl"
@@ -241,6 +242,14 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 }
 
 func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
+
+	start := time.Now()
+	defer func() {
+		glog.V(4).Infof("TearDownPod took %v for %s/%s", time.Since(start), namespace, name)
+	}()
+
 	pod, ok := plugin.host.GetPodByName(namespace, name)
 	if !ok {
 		return fmt.Errorf("pod %q cannot be found", name)
@@ -293,6 +302,14 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 }
 
 func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
+
+	start := time.Now()
+	defer func() {
+		glog.V(4).Infof("TearDownPod took %v for %s/%s", time.Since(start), namespace, name)
+	}()
+
 	if plugin.netConfig == nil {
 		return fmt.Errorf("Kubenet needs a PodCIDR to tear down pods")
 	}
@@ -391,8 +408,6 @@ func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubec
 }
 
 func (plugin *kubenetNetworkPlugin) addContainerToNetwork(id kubecontainer.ContainerID, rt *libcni.RuntimeConf) error {
-	plugin.mu.Lock()
-	defer plugin.mu.Unlock()
 	glog.V(3).Infof("Calling cni plugins to add container to network with cni runtime: %+v", rt)
 	res, err := plugin.cniConfig.AddNetwork(plugin.netConfig, rt)
 	if err != nil {
@@ -407,8 +422,6 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(id kubecontainer.Conta
 }
 
 func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(id kubecontainer.ContainerID, rt *libcni.RuntimeConf) error {
-	plugin.mu.Lock()
-	defer plugin.mu.Unlock()
 	glog.V(3).Infof("Calling cni plugins to remove container from network with cni runtime: %+v", rt)
 	if err := plugin.cniConfig.DelNetwork(plugin.netConfig, rt); err != nil {
 		return fmt.Errorf("Error removing container from network: %v", err)
