@@ -25,6 +25,7 @@ import (
 type BatchInterface interface {
 	GetRESTClient() *restclient.RESTClient
 	JobsGetter
+	ScheduledJobsGetter
 }
 
 // BatchClient is used to interact with features provided by the Batch group.
@@ -34,6 +35,10 @@ type BatchClient struct {
 
 func (c *BatchClient) Jobs(namespace string) JobInterface {
 	return newJobs(c, namespace)
+}
+
+func (c *BatchClient) ScheduledJobs(namespace string) ScheduledJobInterface {
+	return newScheduledJobs(c, namespace)
 }
 
 // NewForConfig creates a new BatchClient for the given config.

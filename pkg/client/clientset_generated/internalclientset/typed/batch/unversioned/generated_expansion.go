@@ -17,3 +17,5 @@ limitations under the License.
 package unversioned
 
 type JobExpansion interface{}
+
+type ScheduledJobExpansion interface{}
