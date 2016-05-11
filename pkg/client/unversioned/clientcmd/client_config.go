@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"strings"
 
@@ -98,12 +97,12 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	configClusterInfo := config.getCluster()
 
 	clientConfig := &restclient.Config{}
-	clientConfig.Host = configClusterInfo.Server
-	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
-		u.RawQuery = ""
-		u.Fragment = ""
-		clientConfig.Host = u.String()
+
+	clientConfig.Hosts = configClusterInfo.Servers
+	if len(configClusterInfo.Server) != 0 {
+		clientConfig.Hosts = []string{configClusterInfo.Server}
 	}
+
 	if len(configAuthInfo.Impersonate) > 0 {
 		clientConfig.Impersonate = configAuthInfo.Impersonate
 	}

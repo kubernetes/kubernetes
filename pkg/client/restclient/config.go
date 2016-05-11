@@ -40,11 +40,11 @@ import (
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
 type Config struct {
-	// Host must be a host string, a host:port pair, or a URL to the base of the apiserver.
-	// If a URL is given then the (optional) Path of that URL represents a prefix that must
-	// be appended to all request URIs used to access the apiserver. This allows a frontend
-	// proxy to easily relocate all of the apiserver endpoints.
-	Host string
+	// Hosts must be a slice of host strings, host:port pairs, or a URLs to the base of the
+	// apiservers. If a URL is given then the (optional) Path of that URL represents a prefix
+	// that must be appended to all request URIs used to access the apiserver. This allows a
+	// frontend proxy to easily relocate all of the apiserver endpoints.
+	Hosts []string
 	// APIPath is a sub-path that points to an API root.
 	APIPath string
 	// Prefix is the sub path of the server. If not specified, the client will set
@@ -159,7 +159,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
 	}
 
-	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
+	hosts, versionedAPIPath, err := defaultServerUrlFor(config)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		httpClient = &http.Client{Transport: transport}
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	return NewRESTClient(hosts, versionedAPIPath, config.ContentConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -184,7 +184,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("NeogitatedSerializer is required when initializing a RESTClient")
 	}
 
-	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
+	hosts, versionedAPIPath, err := defaultServerUrlFor(config)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		versionConfig.GroupVersion = &v
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	return NewRESTClient(hosts, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
@@ -261,8 +261,7 @@ func InClusterConfig() (*Config, error) {
 	}
 
 	return &Config{
-		// TODO: switch to using cluster DNS.
-		Host:            "https://" + net.JoinHostPort(host, port),
+		Hosts:           []string{"https://" + net.JoinHostPort(host, port)},
 		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
 	}, nil
@@ -276,11 +275,16 @@ func InClusterConfig() (*Config, error) {
 // Note: the Insecure flag is ignored when testing for this value, so MITM attacks are
 // still possible.
 func IsConfigTransportTLS(config Config) bool {
-	baseURL, _, err := defaultServerUrlFor(&config)
+	hosts, _, err := defaultServerUrlFor(&config)
 	if err != nil {
 		return false
 	}
-	return baseURL.Scheme == "https"
+	for _, host := range hosts {
+		if !(host.Scheme == "https") {
+			return false
+		}
+	}
+	return true
 }
 
 // LoadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
