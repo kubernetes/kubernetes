@@ -47,6 +47,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		SetDefaults_ObjectFieldSelector,
 		SetDefaults_LimitRangeItem,
 		SetDefaults_ConfigMap,
+		SetDefaults_RBDVolumeSource,
 	)
 }
 
@@ -284,5 +285,17 @@ func defaultHostNetworkPorts(containers *[]Container) {
 				(*containers)[i].Ports[j].HostPort = (*containers)[i].Ports[j].ContainerPort
 			}
 		}
+	}
+}
+
+func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
+	if obj.RBDPool == "" {
+		obj.RBDPool = "rbd"
+	}
+	if obj.RadosUser == "" {
+		obj.RadosUser = "admin"
+	}
+	if obj.Keyring == "" {
+		obj.Keyring = "/etc/ceph/keyring"
 	}
 }

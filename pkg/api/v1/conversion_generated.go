@@ -5106,6 +5106,7 @@ func Convert_api_Probe_To_v1_Probe(in *api.Probe, out *Probe, s conversion.Scope
 }
 
 func autoConvert_v1_RBDVolumeSource_To_api_RBDVolumeSource(in *RBDVolumeSource, out *api.RBDVolumeSource, s conversion.Scope) error {
+	SetDefaults_RBDVolumeSource(in)
 	out.CephMonitors = in.CephMonitors
 	out.RBDImage = in.RBDImage
 	out.FSType = in.FSType

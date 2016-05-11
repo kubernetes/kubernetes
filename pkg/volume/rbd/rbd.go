@@ -107,17 +107,8 @@ func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSo
 func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Mounter, error) {
 	source, readOnly := plugin.getRBDVolumeSource(spec)
 	pool := source.RBDPool
-	if pool == "" {
-		pool = "rbd"
-	}
 	id := source.RadosUser
-	if id == "" {
-		id = "admin"
-	}
 	keyring := source.Keyring
-	if keyring == "" {
-		keyring = "/etc/ceph/keyring"
-	}
 
 	return &rbdMounter{
 		rbd: &rbd{
