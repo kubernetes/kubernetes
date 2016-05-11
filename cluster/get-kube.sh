@@ -38,6 +38,8 @@
 #   * export KUBERNETES_PROVIDER=photon-controller; wget -q -O - https://get.k8s.io | bash
 #  Rackspace
 #   * export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash
+#  OpenStack-Heat
+#   * export KUBERNETES_PROVIDER=openstack-heat; wget -q -O - https://get.k8s.io | bash
 #
 #  Set KUBERNETES_SKIP_DOWNLOAD to non-empty to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.

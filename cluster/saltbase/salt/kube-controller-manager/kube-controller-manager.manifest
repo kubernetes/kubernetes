@@ -37,6 +37,10 @@
   {% endif -%}
   {% set service_account_key = "--service-account-private-key-file=/srv/kubernetes/server.key" -%}
 
+  {% if grains.cloud in [ 'openstack' ] and grains.cloud_config is defined -%}
+    {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
+  {% endif -%}
+
   {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
     {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
     {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
@@ -46,7 +50,7 @@
 
 {% set root_ca_file = "" -%}
 
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere', 'photon-controller' ]    %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere', 'photon-controller', 'openstack']    %}
    {% set root_ca_file = "--root-ca-file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
 
@@ -117,8 +121,8 @@
         { "name": "etcopenssl",
         "mountPath": "/etc/openssl",
         "readOnly": true},
-        { "name": "etcpkitls",
-        "mountPath": "/etc/pki/tls",
+        { "name": "etcpki",
+        "mountPath": "/etc/pki",
         "readOnly": true}
       ]
     }
@@ -146,9 +150,9 @@
     "hostPath": {
         "path": "/etc/openssl"}
   },
-  { "name": "etcpkitls",
+  { "name": "etcpki",
     "hostPath": {
-        "path": "/etc/pki/tls"}
+        "path": "/etc/pki"}
   }
 ]
 }}
