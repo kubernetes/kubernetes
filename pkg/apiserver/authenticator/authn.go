@@ -45,6 +45,8 @@ type AuthenticatorConfig struct {
 	ServiceAccountLookup      bool
 	ServiceAccountTokenGetter serviceaccount.ServiceAccountTokenGetter
 	KeystoneURL               string
+        KeystoneDomainID          string
+        KeystoneDomainName        string
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -93,7 +95,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 	}
 
 	if len(config.KeystoneURL) > 0 {
-		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL)
+		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL, config.KeystoneDomainID, config.KeystoneDomainName)
 		if err != nil {
 			return nil, err
 		}
@@ -179,8 +181,8 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 }
 
 // newAuthenticatorFromTokenFile returns an authenticator.Request or an error
-func newAuthenticatorFromKeystoneURL(keystoneConfigFile string) (authenticator.Request, error) {
-	keystoneAuthenticator, err := keystone.NewKeystoneAuthenticator(keystoneConfigFile)
+func newAuthenticatorFromKeystoneURL(keystoneConfigFile, keystoneDomainID, keystoneDomainName string) (authenticator.Request, error) {
+	keystoneAuthenticator, err := keystone.NewKeystoneAuthenticator(keystoneConfigFile, keystoneDomainID, keystoneDomainName)
 	if err != nil {
 		return nil, err
 	}

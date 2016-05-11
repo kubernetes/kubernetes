@@ -102,6 +102,8 @@ func Run(s *options.APIServer) error {
 		OIDCUsernameClaim: s.OIDCUsernameClaim,
 		OIDCGroupsClaim:   s.OIDCGroupsClaim,
 		KeystoneURL:       s.KeystoneURL,
+                KeystoneDomainID:  s.KeystoneDomainID,
+                KeystoneDomainName: s.KeystoneDomainName,
 	})
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)

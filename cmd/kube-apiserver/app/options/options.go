@@ -46,6 +46,8 @@ type APIServer struct {
 	EtcdServersOverrides       []string
 	EventTTL                   time.Duration
 	KeystoneURL                string
+        KeystoneDomainID           string
+        KeystoneDomainName         string
 	KubeletConfig              kubeletclient.KubeletClientConfig
 	MasterServiceNamespace     string
 	MaxConnectionBytesPerSec   int64
@@ -101,6 +103,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-key-file", s.ServiceAccountKeyFile, "File containing PEM-encoded x509 RSA private or public key, used to verify ServiceAccount tokens. If unspecified, --tls-private-key-file is used.")
 	fs.BoolVar(&s.ServiceAccountLookup, "service-account-lookup", s.ServiceAccountLookup, "If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")
+        fs.StringVar(&s.KeystoneDomainID, "experimental-keystone-domainid", s.KeystoneDomainID, "DomainID for keystone authentication")
+        fs.StringVar(&s.KeystoneDomainName, "experimental-keystone-domainname", s.KeystoneDomainName, "DomainName for keystone authentication")
 	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
 	fs.StringVar(&s.AuthorizationConfig.PolicyFile, "authorization-policy-file", s.AuthorizationConfig.PolicyFile, "File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")
 	fs.StringVar(&s.AuthorizationConfig.WebhookConfigFile, "authorization-webhook-config-file", s.AuthorizationConfig.WebhookConfigFile, "File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. The API server will query the remote service to determine access on the API server's secure port.")
