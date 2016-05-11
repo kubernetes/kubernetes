@@ -110,6 +110,7 @@ test_e2e_node:
 clean:
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
+	rm -rf Godeps/_workspace # Just until we are sure it is gone
 .PHONY: clean
 
 # Run 'go vet'.
