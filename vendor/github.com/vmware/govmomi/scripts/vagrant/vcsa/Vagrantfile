@@ -1,0 +1,13 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Using the VCSA base box, no provisioning, inventory will be empty.
+
+Vagrant.configure("2") do |config|
+  config.vm.hostname = "vcsa"
+
+  config.vm.box = "vcsa"
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.network "forwarded_port", guest: 443, host: 16443
+end
