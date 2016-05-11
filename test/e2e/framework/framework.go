@@ -204,7 +204,7 @@ func (f *Framework) AfterEach() {
 	}()
 
 	// Print events if the test failed.
-	if CurrentGinkgoTestDescription().Failed {
+	if CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
 		DumpAllNamespaceInfo(f.Client, f.Namespace.Name)
 	}
 
