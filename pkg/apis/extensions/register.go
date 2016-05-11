@@ -55,6 +55,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&HorizontalPodAutoscalerList{},
 		&batch.Job{},
 		&batch.JobList{},
+		&batch.JobTemplate{},
 		&ReplicationControllerDummy{},
 		&Scale{},
 		&ThirdPartyResource{},

@@ -40,6 +40,7 @@ import (
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -128,7 +129,9 @@ func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *ass
 // limitedAPIResourceConfigSource only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion)
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion,
+		batchapiv1.SchemeGroupVersion, batchapiv2alpha1.SchemeGroupVersion,
+		appsapi.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion)
 	return ret
 }
 
@@ -423,12 +426,6 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 				Version:      testapi.Autoscaling.GroupVersion().Version,
 			},
 		},
-		batch.GroupName: {
-			{
-				GroupVersion: testapi.Batch.GroupVersion().String(),
-				Version:      testapi.Batch.GroupVersion().Version,
-			},
-		},
 		apps.GroupName: {
 			{
 				GroupVersion: testapi.Apps.GroupVersion().String(),
@@ -442,6 +439,15 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 			},
 		},
 	}
+	var batchVersions []unversioned.GroupVersionForDiscovery
+	for _, gv := range testapi.Batch.GroupVersions() {
+		batchVersions = append(batchVersions, unversioned.GroupVersionForDiscovery{
+			GroupVersion: gv.String(),
+			Version:      gv.Version,
+		})
+	}
+	expectVersions[batch.GroupName] = batchVersions
+
 	expectPreferredVersion := map[string]unversioned.GroupVersionForDiscovery{
 		autoscaling.GroupName: {
 			GroupVersion: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.String(),
