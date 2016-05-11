@@ -6,11 +6,11 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: l7-lb-controller-v0.6.0
+  name: l7-lb-controller-v0.6.2
   namespace: kube-system
   labels:
     k8s-app: glbc
-    version: v0.6.0
+    version: v0.6.2
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "GLBC"
 spec:
@@ -18,12 +18,12 @@ spec:
   replicas: 1
   selector:
     k8s-app: glbc
-    version: v0.6.0
+    version: v0.6.2
   template:
     metadata:
       labels:
         k8s-app: glbc
-        version: v0.6.0
+        version: v0.6.2
         name: glbc
         kubernetes.io/cluster-service: "true"
     spec:
@@ -50,7 +50,7 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
-      - image: gcr.io/google_containers/glbc:0.6.0
+      - image: gcr.io/google_containers/glbc:0.6.2
         livenessProbe:
           httpGet:
             path: /healthz
@@ -70,5 +70,6 @@ spec:
             memory: 50Mi
         args:
         - --default-backend-service=kube-system/default-http-backend
+        - --verbose=true
         - --sync-period=60s
         - --cluster-uid={{kube_uid}}
