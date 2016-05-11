@@ -36,12 +36,24 @@
 						{"containerPort": 10250},
 						{"containerPort": 10255}
 					],
+					"env": [
+						{
+							"name": "CONTENT_TYPE",
+							"valueFrom": {
+								"configMapKeyRef": {
+									"name": "node-configmap",
+									"key": "content.type"
+								}
+							}
+						}
+					],
 					"command": [
 						"./kubemark.sh"
 					],
 					"args": [
 						"--v=3",
-						"--morph=kubelet"
+						"--morph=kubelet",
+						"$(CONTENT_TYPE)"
 					],
 					"volumeMounts": [
 						{
@@ -60,12 +72,24 @@
 				{
 					"name": "hollow-proxy",
 					"image": "gcr.io/##project##/kubemark:latest",
+					"env": [
+						{
+							"name": "CONTENT_TYPE",
+							"valueFrom": {
+								"configMapKeyRef": {
+									"name": "node-configmap",
+									"key": "content.type"
+								}
+							}
+						}
+					],
 					"command": [
 						"./kubemark.sh"
 					],
 					"args": [
 						"--v=3",
-						"--morph=proxy"
+						"--morph=proxy",
+						"$(CONTENT_TYPE)"
 					],
 					"volumeMounts": [
 						{

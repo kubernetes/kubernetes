@@ -207,6 +207,20 @@ cat > "${KUBECONFIG_SECRET}" << EOF
 }
 EOF
 
+NODE_CONFIGMAP="${RESOURCE_DIRECTORY}/node_config_map.json"
+cat > "${NODE_CONFIGMAP}" << EOF
+{
+  "apiVersion": "v1",
+  "kind": "ConfigMap",
+  "metadata": {
+    "name": "node-configmap"
+  },
+  "data": {
+    "content.type": "${TEST_CLUSTER_API_CONTENT_TYPE}"
+  }
+}
+EOF
+
 LOCAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.loc"
 cat > "${LOCAL_KUBECONFIG}" << EOF
 apiVersion: v1
@@ -247,10 +261,12 @@ sed -i'' -e "s/##EVENTER_MEM##/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/h
 
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/kubemark-ns.json"
 "${KUBECTL}" create -f "${KUBECONFIG_SECRET}" --namespace="kubemark"
+"${KUBECTL}" create -f "${NODE_CONFIGMAP}" --namespace="kubemark"
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.json" --namespace="kubemark"
 
 rm "${KUBECONFIG_SECRET}"
+rm "${NODE_CONFIGMAP}"
 
 echo "Waiting for all HollowNodes to become Running..."
 start=$(date +%s)
