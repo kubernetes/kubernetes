@@ -1,1 +1,0 @@
-max_by(people, &age_str)
