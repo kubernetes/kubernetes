@@ -56,7 +56,8 @@ type quotaEvaluator struct {
 	// updatedQuotas holds a cache of quotas that we've updated.  This is used to pull the "really latest" during back to
 	// back quota evaluations that touch the same quota doc.  This only works because we can compare etcd resourceVersions
 	// for the same resource as integers.  Before this change: 22 updates with 12 conflicts.  after this change: 15 updates with 0 conflicts
-	updatedQuotas *lru.Cache
+	updatedQuotas     map[string]*api.ResourceQuota
+	updatedQuotasLock sync.Mutex
 
 	// TODO these are used together to bucket items by namespace and then batch them up for processing.
 	// The technique is valuable for rollup activities to avoid fanout and reduce resource contention.
@@ -106,10 +107,6 @@ func newQuotaEvaluator(client clientset.Interface, registry quota.Registry) (*qu
 	if err != nil {
 		return nil, err
 	}
-	updatedCache, err := lru.New(100)
-	if err != nil {
-		return nil, err
-	}
 	lw := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return client.Core().ResourceQuotas(api.NamespaceAll).List(options)
@@ -127,7 +124,7 @@ func newQuotaEvaluator(client clientset.Interface, registry quota.Registry) (*qu
 		registry:        registry,
 		liveLookupCache: liveLookupCache,
 		liveTTL:         time.Duration(30 * time.Second),
-		updatedQuotas:   updatedCache,
+		updatedQuotas:   map[string]*api.ResourceQuota{},
 
 		queue:      workqueue.New(),
 		work:       map[string][]*admissionWaiter{},
@@ -322,6 +319,8 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 // that capture what the usage would be if the request succeeded.  It return an error if the is insufficient quota to satisfy the request
 func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.Attributes) ([]api.ResourceQuota, error) {
 	namespace := a.GetNamespace()
+	name := a.GetName()
+
 	evaluators := e.registry.Evaluators()
 	evaluator, found := evaluators[a.GetKind().GroupKind()]
 	if !found {
@@ -380,9 +379,9 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	// if usage shows no change, just return since it has no impact on quota
 	deltaUsage := evaluator.Usage(inputObject)
 	if admission.Update == op {
-		prevItem := a.GetOldObject()
-		if prevItem == nil {
-			return nil, admission.NewForbidden(a, fmt.Errorf("Unable to get previous usage since prior version of object was not found"))
+		prevItem, err := evaluator.Get(namespace, name)
+		if err != nil {
+			return nil, admission.NewForbidden(a, fmt.Errorf("Unable to get previous: %v", err))
 		}
 		prevUsage := evaluator.Usage(prevItem)
 		deltaUsage = quota.Subtract(deltaUsage, prevUsage)
@@ -486,8 +485,11 @@ func (e *quotaEvaluator) getWork() (string, []*admissionWaiter, bool) {
 }
 
 func (e *quotaEvaluator) updateCache(quota *api.ResourceQuota) {
+	e.updatedQuotasLock.Lock()
+	defer e.updatedQuotasLock.Unlock()
+
 	key := quota.Namespace + "/" + quota.Name
-	e.updatedQuotas.Add(key, quota)
+	e.updatedQuotas[key] = quota
 }
 
 var etcdVersioner = etcd.APIObjectVersioner{}
@@ -496,15 +498,17 @@ var etcdVersioner = etcd.APIObjectVersioner{}
 // if the cache is out of date, it deletes the stale entry.  This only works because of etcd resourceVersions
 // being monotonically increasing integers
 func (e *quotaEvaluator) checkCache(quota *api.ResourceQuota) *api.ResourceQuota {
+	e.updatedQuotasLock.Lock()
+	defer e.updatedQuotasLock.Unlock()
+
 	key := quota.Namespace + "/" + quota.Name
-	uncastCachedQuota, ok := e.updatedQuotas.Get(key)
-	if !ok {
+	cachedQuota, exists := e.updatedQuotas[key]
+	if !exists {
 		return quota
 	}
-	cachedQuota := uncastCachedQuota.(*api.ResourceQuota)
 
 	if etcdVersioner.CompareResourceVersion(quota, cachedQuota) >= 0 {
-		e.updatedQuotas.Remove(key)
+		delete(e.updatedQuotas, key)
 		return quota
 	}
 	return cachedQuota

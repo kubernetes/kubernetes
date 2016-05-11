@@ -70,8 +70,15 @@ func NewResourceQuota(client clientset.Interface, registry quota.Registry, numEv
 	}, nil
 }
 
+var runningTotal time.Duration
+
 // Admit makes admission decisions while enforcing quota
 func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
+	startTime := time.Now()
+	defer func() {
+		duration := time.Now().Sub(startTime)
+		runningTotal = duration + runningTotal
+	}()
 	// ignore all operations that correspond to sub-resource actions
 	if a.GetSubresource() != "" {
 		return nil
