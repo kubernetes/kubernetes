@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"gopkg.in/inf.v0"
 	"k8s.io/kubernetes/pkg/api"
 	api_pod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"speter.net/go/exp/math/dec/inf"
 )
 
 func dec(i int64, exponent int) *inf.Dec {

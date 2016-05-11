@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	flag "github.com/spf13/pflag"
-	"speter.net/go/exp/math/dec/inf"
+	"gopkg.in/inf.v0"
 )
 
 // Quantity is a fixed-point representation of a number.
