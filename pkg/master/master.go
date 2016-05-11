@@ -38,6 +38,7 @@ import (
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -306,8 +307,9 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 
 	// Install batch unless disabled.
-	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv1.SchemeGroupVersion) {
-		batchResources := m.getBatchResources(c)
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv1.SchemeGroupVersion) ||
+		c.APIResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv2alpha1.SchemeGroupVersion) {
+		batchv1Resources := m.getBatchResources(c, batchapiv1.SchemeGroupVersion)
 		batchGroupMeta := registered.GroupOrDie(batch.GroupName)
 
 		// Hard code preferred group version to batch/v1
@@ -316,13 +318,18 @@ func (m *Master) InstallAPIs(c *Config) {
 		apiGroupInfo := genericapiserver.APIGroupInfo{
 			GroupMeta: *batchGroupMeta,
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-				"v1": batchResources,
+				"v1": batchv1Resources,
 			},
 			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
 			Scheme:                 api.Scheme,
 			ParameterCodec:         api.ParameterCodec,
 			NegotiatedSerializer:   api.Codecs,
 		}
+		if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv2alpha1.SchemeGroupVersion) {
+			batchv2alpha1Resources := m.getBatchResources(c, batchapiv2alpha1.SchemeGroupVersion)
+			apiGroupInfo.VersionedResourcesStorageMap["v2alpha1"] = batchv2alpha1Resources
+		}
+
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 
 		batchGVForDiscovery := unversioned.GroupVersionForDiscovery{
@@ -819,10 +826,7 @@ func (m *Master) getAutoscalingResources(c *Config) map[string]rest.Storage {
 }
 
 // getBatchResources returns the resources for batch api
-func (m *Master) getBatchResources(c *Config) map[string]rest.Storage {
-	// TODO update when we support more than one version of this group
-	version := batchapiv1.SchemeGroupVersion
-
+func (m *Master) getBatchResources(c *Config, version unversioned.GroupVersion) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
 		jobsStorage, jobsStatusStorage := jobetcd.NewREST(m.GetRESTOptionsOrDie(c, batch.Resource("jobs")))
