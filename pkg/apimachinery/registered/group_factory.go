@@ -74,7 +74,7 @@ type groupFactories map[string]*groupAndVersions
 func (gfm groupFactories) group(groupName string) *groupAndVersions {
 	gav, ok := gfm[groupName]
 	if !ok {
-		gav := &groupAndVersions{versions: map[string]*GroupVersionFactory{}}
+		gav = &groupAndVersions{versions: map[string]*GroupVersionFactory{}}
 		gfm[groupName] = gav
 	}
 	return gav
@@ -98,12 +98,12 @@ func (self groupFactories) AnnounceGroup(gmf *GroupMetaFactory) error {
 	return nil
 }
 
-func (gfm groupFactories) RegisterAndEnableAll() error {
+func (gfm groupFactories) RegisterAndEnableAll(m *Manager, scheme *runtime.Scheme) error {
 	for groupName, gav := range gfm {
-		if err := gav.Register(); err != nil {
+		if err := gav.Register(m); err != nil {
 			return fmt.Errorf("error registering %v: %v", groupName, err)
 		}
-		if err := gav.Enable(api.Scheme); err != nil {
+		if err := gav.Enable(m, scheme); err != nil {
 			return fmt.Errorf("error enabling %v: %v", groupName, err)
 		}
 	}
@@ -112,7 +112,7 @@ func (gfm groupFactories) RegisterAndEnableAll() error {
 
 // Register constructs the finalized prioritized version list and sanity checks
 // the announced group & versions. Then it calls register.
-func (gav *groupAndVersions) Register() error {
+func (gav *groupAndVersions) Register(m *Manager) error {
 	if gav.group == nil {
 		return fmt.Errorf("partially announced groups are not allowed, only got versions: %#v", gav.versions)
 	}
@@ -153,7 +153,7 @@ func (gav *groupAndVersions) Register() error {
 		return fmt.Errorf("group %v has versions in the priority list that were never announced: %s", gav.group.GroupName, pvSet)
 	}
 	prioritizedVersions = append(prioritizedVersions, availableVersions...)
-	RegisterVersions(prioritizedVersions)
+	m.RegisterVersions(prioritizedVersions)
 	gav.prioritizedVersionList = prioritizedVersions
 	return nil
 }
@@ -180,14 +180,14 @@ func (gav *groupAndVersions) newRESTMapper(externalVersions []unversioned.GroupV
 }
 
 // Enable enables group versions that are allowed, adds methods to the scheme, etc.
-func (gav *groupAndVersions) Enable(scheme *runtime.Scheme) error {
+func (gav *groupAndVersions) Enable(m *Manager, scheme *runtime.Scheme) error {
 	externalVersions := []unversioned.GroupVersion{}
 	for _, v := range gav.prioritizedVersionList {
-		if !IsAllowedVersion(v) {
+		if !m.IsAllowedVersion(v) {
 			continue
 		}
 		externalVersions = append(externalVersions, v)
-		if err := EnableVersions(v); err != nil {
+		if err := m.EnableVersions(v); err != nil {
 			return err
 		}
 		gav.versions[v.Version].AddToScheme(scheme)
@@ -214,7 +214,7 @@ func (gav *groupAndVersions) Enable(scheme *runtime.Scheme) error {
 		err := groupMeta.AddVersion(
 			unversioned.GroupVersion{gvf.GroupName, gvf.VersionName},
 			&meta.VersionInterfaces{
-				ObjectConvertor:  api.Scheme,
+				ObjectConvertor:  scheme,
 				MetadataAccessor: accessor,
 			},
 		)
@@ -223,7 +223,7 @@ func (gav *groupAndVersions) Enable(scheme *runtime.Scheme) error {
 		}
 	}
 
-	if err := RegisterGroup(*groupMeta); err != nil {
+	if err := m.RegisterGroup(*groupMeta); err != nil {
 		return err
 	}
 	api.RegisterRESTMapper(groupMeta.RESTMapper)

@@ -32,20 +32,20 @@ import (
 )
 
 var (
-	defaultManager *manager
+	DefaultManager *Manager
 )
 
 func init() {
 	// Env var KUBE_API_VERSIONS is a comma separated list of API versions that
 	// should be registered in the scheme.
 	var err error
-	defaultManager, err = NewManager(os.Getenv("KUBE_API_VERSIONS"))
+	DefaultManager, err = NewManager(os.Getenv("KUBE_API_VERSIONS"))
 	if err != nil {
 		glog.Fatalf("Could not construct version manager: %v", err)
 	}
 }
 
-type manager struct {
+type Manager struct {
 	// registeredGroupVersions stores all API group versions for which RegisterGroup is called.
 	registeredVersions map[unversioned.GroupVersion]struct{}
 
@@ -68,8 +68,8 @@ type manager struct {
 	envRequestedVersions []unversioned.GroupVersion
 }
 
-func NewManager(kubeAPIVersions string) (*manager, error) {
-	m := &manager{
+func NewManager(kubeAPIVersions string) (*Manager, error) {
+	m := &Manager{
 		registeredVersions:      map[unversioned.GroupVersion]struct{}{},
 		thirdPartyGroupVersions: []unversioned.GroupVersion{},
 		enabledVersions:         map[unversioned.GroupVersion]struct{}{},
@@ -90,39 +90,37 @@ func NewManager(kubeAPIVersions string) (*manager, error) {
 	return m, nil
 }
 
-/*
 // People are calling global functions. Let them continue to do that.
 var (
-	ValidateEnvRequestedVersions  = defaultManager.ValidateEnvRequestedVersions
-	AllPreferredGroupVersions     = defaultManager.AllPreferredGroupVersions
-	RESTMapper                    = defaultManager.RESTMapper
-	GroupOrDie                    = defaultManager.GroupOrDie
-	AddThirdPartyAPIGroupVersions = defaultManager.AddThirdPartyAPIGroupVersions
-	IsThirdPartyAPIGroupVersion   = defaultManager.IsThirdPartyAPIGroupVersion
-	RegisteredGroupVersions       = defaultManager.RegisteredGroupVersions
-	IsRegisteredVersion           = defaultManager.IsRegisteredVersion
-	IsRegistered                  = defaultManager.IsRegistered
-	Group                         = defaultManager.Group
-	EnabledVersionsForGroup       = defaultManager.EnabledVersionsForGroup
-	EnabledVersions               = defaultManager.EnabledVersions
-	IsEnabledVersion              = defaultManager.IsEnabledVersion
-	IsAllowedVersion              = defaultManager.IsAllowedVersion
-	EnableVersions                = defaultManager.EnableVersions
-	RegisterGroup                 = defaultManager.RegisterGroup
-	RegisterVersions              = defaultManager.RegisterVersions
-	reset                         = defaultManager.reset
+	ValidateEnvRequestedVersions  = DefaultManager.ValidateEnvRequestedVersions
+	AllPreferredGroupVersions     = DefaultManager.AllPreferredGroupVersions
+	RESTMapper                    = DefaultManager.RESTMapper
+	GroupOrDie                    = DefaultManager.GroupOrDie
+	AddThirdPartyAPIGroupVersions = DefaultManager.AddThirdPartyAPIGroupVersions
+	IsThirdPartyAPIGroupVersion   = DefaultManager.IsThirdPartyAPIGroupVersion
+	RegisteredGroupVersions       = DefaultManager.RegisteredGroupVersions
+	IsRegisteredVersion           = DefaultManager.IsRegisteredVersion
+	IsRegistered                  = DefaultManager.IsRegistered
+	Group                         = DefaultManager.Group
+	EnabledVersionsForGroup       = DefaultManager.EnabledVersionsForGroup
+	EnabledVersions               = DefaultManager.EnabledVersions
+	IsEnabledVersion              = DefaultManager.IsEnabledVersion
+	IsAllowedVersion              = DefaultManager.IsAllowedVersion
+	EnableVersions                = DefaultManager.EnableVersions
+	RegisterGroup                 = DefaultManager.RegisterGroup
+	RegisterVersions              = DefaultManager.RegisterVersions
+	reset                         = DefaultManager.reset
 )
-*/
 
 // RegisterVersions adds the given group versions to the list of registered group versions.
-func (m *manager) RegisterVersions(availableVersions []unversioned.GroupVersion) {
+func (m *Manager) RegisterVersions(availableVersions []unversioned.GroupVersion) {
 	for _, v := range availableVersions {
 		m.registeredVersions[v] = struct{}{}
 	}
 }
 
 // RegisterGroup adds the given group to the list of registered groups.
-func (m *manager) RegisterGroup(groupMeta apimachinery.GroupMeta) error {
+func (m *Manager) RegisterGroup(groupMeta apimachinery.GroupMeta) error {
 	groupName := groupMeta.GroupVersion.Group
 	if _, found := m.groupMetaMap[groupName]; found {
 		return fmt.Errorf("group %v is already registered", m.groupMetaMap)
@@ -134,7 +132,7 @@ func (m *manager) RegisterGroup(groupMeta apimachinery.GroupMeta) error {
 // EnableVersions adds the versions for the given group to the list of enabled versions.
 // Note that the caller should call RegisterGroup before calling this method.
 // The caller of this function is responsible to add the versions to scheme and RESTMapper.
-func (m *manager) EnableVersions(versions ...unversioned.GroupVersion) error {
+func (m *Manager) EnableVersions(versions ...unversioned.GroupVersion) error {
 	var unregisteredVersions []unversioned.GroupVersion
 	for _, v := range versions {
 		if _, found := m.registeredVersions[v]; !found {
@@ -151,7 +149,7 @@ func (m *manager) EnableVersions(versions ...unversioned.GroupVersion) error {
 // IsAllowedVersion returns if the version is allowed by the KUBE_API_VERSIONS
 // environment variable. If the environment variable is empty, then it always
 // returns true.
-func (m *manager) IsAllowedVersion(v unversioned.GroupVersion) bool {
+func (m *Manager) IsAllowedVersion(v unversioned.GroupVersion) bool {
 	if len(m.envRequestedVersions) == 0 {
 		return true
 	}
@@ -164,14 +162,14 @@ func (m *manager) IsAllowedVersion(v unversioned.GroupVersion) bool {
 }
 
 // IsEnabledVersion returns if a version is enabled.
-func (m *manager) IsEnabledVersion(v unversioned.GroupVersion) bool {
+func (m *Manager) IsEnabledVersion(v unversioned.GroupVersion) bool {
 	_, found := m.enabledVersions[v]
 	return found
 }
 
 // EnabledVersions returns all enabled versions.  Groups are randomly ordered, but versions within groups
 // are priority order from best to worst
-func (m *manager) EnabledVersions() []unversioned.GroupVersion {
+func (m *Manager) EnabledVersions() []unversioned.GroupVersion {
 	ret := []unversioned.GroupVersion{}
 	for _, groupMeta := range m.groupMetaMap {
 		ret = append(ret, groupMeta.GroupVersions...)
@@ -180,7 +178,7 @@ func (m *manager) EnabledVersions() []unversioned.GroupVersion {
 }
 
 // EnabledVersionsForGroup returns all enabled versions for a group in order of best to worst
-func (m *manager) EnabledVersionsForGroup(group string) []unversioned.GroupVersion {
+func (m *Manager) EnabledVersionsForGroup(group string) []unversioned.GroupVersion {
 	groupMeta, ok := m.groupMetaMap[group]
 	if !ok {
 		return []unversioned.GroupVersion{}
@@ -191,7 +189,7 @@ func (m *manager) EnabledVersionsForGroup(group string) []unversioned.GroupVersi
 
 // Group returns the metadata of a group if the group is registered, otherwise
 // an error is returned.
-func (m *manager) Group(group string) (*apimachinery.GroupMeta, error) {
+func (m *Manager) Group(group string) (*apimachinery.GroupMeta, error) {
 	groupMeta, found := m.groupMetaMap[group]
 	if !found {
 		return nil, fmt.Errorf("group %v has not been registered", group)
@@ -201,19 +199,19 @@ func (m *manager) Group(group string) (*apimachinery.GroupMeta, error) {
 }
 
 // IsRegistered takes a string and determines if it's one of the registered groups
-func (m *manager) IsRegistered(group string) bool {
+func (m *Manager) IsRegistered(group string) bool {
 	_, found := m.groupMetaMap[group]
 	return found
 }
 
 // IsRegisteredVersion returns if a version is registered.
-func (m *manager) IsRegisteredVersion(v unversioned.GroupVersion) bool {
+func (m *Manager) IsRegisteredVersion(v unversioned.GroupVersion) bool {
 	_, found := m.registeredVersions[v]
 	return found
 }
 
 // RegisteredGroupVersions returns all registered group versions.
-func (m *manager) RegisteredGroupVersions() []unversioned.GroupVersion {
+func (m *Manager) RegisteredGroupVersions() []unversioned.GroupVersion {
 	ret := []unversioned.GroupVersion{}
 	for groupVersion := range m.registeredVersions {
 		ret = append(ret, groupVersion)
@@ -222,7 +220,7 @@ func (m *manager) RegisteredGroupVersions() []unversioned.GroupVersion {
 }
 
 // IsThirdPartyAPIGroupVersion returns true if the api version is a user-registered group/version.
-func (m *manager) IsThirdPartyAPIGroupVersion(gv unversioned.GroupVersion) bool {
+func (m *Manager) IsThirdPartyAPIGroupVersion(gv unversioned.GroupVersion) bool {
 	for ix := range m.thirdPartyGroupVersions {
 		if m.thirdPartyGroupVersions[ix] == gv {
 			return true
@@ -235,7 +233,7 @@ func (m *manager) IsThirdPartyAPIGroupVersion(gv unversioned.GroupVersion) bool 
 // registers them in the API machinery and enables them.
 // Skips GroupVersions that are already registered.
 // Returns the list of GroupVersions that were skipped.
-func (m *manager) AddThirdPartyAPIGroupVersions(gvs ...unversioned.GroupVersion) []unversioned.GroupVersion {
+func (m *Manager) AddThirdPartyAPIGroupVersions(gvs ...unversioned.GroupVersion) []unversioned.GroupVersion {
 	filteredGVs := []unversioned.GroupVersion{}
 	skippedGVs := []unversioned.GroupVersion{}
 	for ix := range gvs {
@@ -263,7 +261,7 @@ func (m *manager) AddThirdPartyAPIGroupVersions(gvs ...unversioned.GroupVersion)
 // TODO: This is an expedient function, because we don't check if a Group is
 // supported throughout the code base. We will abandon this function and
 // checking the error returned by the Group() function.
-func (m *manager) GroupOrDie(group string) *apimachinery.GroupMeta {
+func (m *Manager) GroupOrDie(group string) *apimachinery.GroupMeta {
 	groupMeta, found := m.groupMetaMap[group]
 	if !found {
 		if group == "" {
@@ -281,7 +279,7 @@ func (m *manager) GroupOrDie(group string) *apimachinery.GroupMeta {
 //  1. legacy kube group preferred version, extensions preferred version, metrics perferred version, legacy
 //     kube any version, extensions any version, metrics any version, all other groups alphabetical preferred version,
 //     all other groups alphabetical.
-func (m *manager) RESTMapper(versionPatterns ...unversioned.GroupVersion) meta.RESTMapper {
+func (m *Manager) RESTMapper(versionPatterns ...unversioned.GroupVersion) meta.RESTMapper {
 	unionMapper := meta.MultiRESTMapper{}
 	unionedGroups := sets.NewString()
 	for enabledVersion := range m.enabledVersions {
@@ -335,7 +333,7 @@ func (m *manager) RESTMapper(versionPatterns ...unversioned.GroupVersion) meta.R
 
 // prioritiesForGroups returns the resource and kind priorities for a PriorityRESTMapper, preferring the preferred version of each group first,
 // then any non-preferred version of the group second.
-func (m *manager) prioritiesForGroups(groups ...string) ([]unversioned.GroupVersionResource, []unversioned.GroupVersionKind) {
+func (m *Manager) prioritiesForGroups(groups ...string) ([]unversioned.GroupVersionResource, []unversioned.GroupVersionKind) {
 	resourcePriority := []unversioned.GroupVersionResource{}
 	kindPriority := []unversioned.GroupVersionKind{}
 
@@ -356,7 +354,7 @@ func (m *manager) prioritiesForGroups(groups ...string) ([]unversioned.GroupVers
 
 // AllPreferredGroupVersions returns the preferred versions of all registered
 // groups in the form of "group1/version1,group2/version2,..."
-func (m *manager) AllPreferredGroupVersions() string {
+func (m *Manager) AllPreferredGroupVersions() string {
 	if len(m.groupMetaMap) == 0 {
 		return ""
 	}
@@ -370,7 +368,7 @@ func (m *manager) AllPreferredGroupVersions() string {
 
 // ValidateEnvRequestedVersions returns a list of versions that are requested in
 // the KUBE_API_VERSIONS environment variable, but not enabled.
-func (m *manager) ValidateEnvRequestedVersions() []unversioned.GroupVersion {
+func (m *Manager) ValidateEnvRequestedVersions() []unversioned.GroupVersion {
 	var missingVersions []unversioned.GroupVersion
 	for _, v := range m.envRequestedVersions {
 		if _, found := m.enabledVersions[v]; !found {
@@ -382,7 +380,7 @@ func (m *manager) ValidateEnvRequestedVersions() []unversioned.GroupVersion {
 
 // Resets the state.
 // Should not be used by anyone else than tests.
-func (m *manager) reset() {
+func (m *Manager) reset() {
 	m.registeredVersions = map[unversioned.GroupVersion]struct{}{}
 	m.enabledVersions = map[unversioned.GroupVersion]struct{}{}
 	m.groupMetaMap = map[string]*apimachinery.GroupMeta{}
