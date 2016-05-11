@@ -54,7 +54,7 @@ func GenerateSelfSignedCert(host, certPath, keyPath string, alternateIPs []net.I
 		NotAfter:  time.Now().Add(time.Hour * 24 * 365),
 
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 		IsCA: true,
 	}
