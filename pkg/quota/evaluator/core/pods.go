@@ -23,12 +23,14 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/validation"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/qos/util"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // NewPodEvaluator returns an evaluator that can evaluate pods
@@ -64,10 +66,24 @@ func NewPodEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 }
 
 // PodConstraintsFunc verifies that all required resources are present on the pod
+// In addition, it validates that the resources are valid (i.e. requests < limits)
 func PodConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
 	pod, ok := object.(*api.Pod)
 	if !ok {
 		return fmt.Errorf("Unexpected input object %v", object)
+	}
+
+	// Pod level resources are often set during admission control
+	// As a consequence, we want to verify that resources are valid prior
+	// to ever charging quota prematurely in case they are not.
+	allErrs := field.ErrorList{}
+	fldPath := field.NewPath("spec").Child("containers")
+	for i, ctr := range pod.Spec.Containers {
+		idxPath := fldPath.Index(i)
+		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
+	}
+	if len(allErrs) > 0 {
+		return allErrs.ToAggregate()
 	}
 
 	// TODO: fix this when we have pod level cgroups
