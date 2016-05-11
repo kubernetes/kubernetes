@@ -139,7 +139,6 @@ type Runtime struct {
 	runtimeHelper       kubecontainer.RuntimeHelper
 	recorder            record.EventRecorder
 	livenessManager     proberesults.Manager
-	volumeGetter        VolumeGetter
 	imagePuller         kubecontainer.ImagePuller
 	runner              kubecontainer.HandlerRunner
 	execer              utilexec.Interface
@@ -161,11 +160,6 @@ type Runtime struct {
 }
 
 var _ kubecontainer.Runtime = &Runtime{}
-
-// TODO(yifan): Remove this when volumeManager is moved to separate package.
-type VolumeGetter interface {
-	GetVolumes(podUID kubetypes.UID) (kubecontainer.VolumeMap, bool)
-}
 
 // TODO(yifan): This duplicates the podGetter in dockertools.
 type podGetter interface {
@@ -190,7 +184,6 @@ func New(
 	containerRefManager *kubecontainer.RefManager,
 	podGetter podGetter,
 	livenessManager proberesults.Manager,
-	volumeGetter VolumeGetter,
 	httpClient types.HttpGetter,
 	networkPlugin network.NetworkPlugin,
 	hairpinMode bool,
@@ -243,7 +236,6 @@ func New(
 		runtimeHelper:       runtimeHelper,
 		recorder:            recorder,
 		livenessManager:     livenessManager,
-		volumeGetter:        volumeGetter,
 		networkPlugin:       networkPlugin,
 		execer:              execer,
 		touchPath:           touchPath,
@@ -621,20 +613,6 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 		}
 	}
 
-	volumeMap, ok := r.volumeGetter.GetVolumes(pod.UID)
-	if !ok {
-		return nil, fmt.Errorf("cannot get the volumes for pod %q", format.Pod(pod))
-	}
-
-	// Set global volumes.
-	for vname, volume := range volumeMap {
-		manifest.Volumes = append(manifest.Volumes, appctypes.Volume{
-			Name:   convertToACName(vname),
-			Kind:   "host",
-			Source: volume.Mounter.GetPath(),
-		})
-	}
-
 	// TODO(yifan): Set pod-level isolators once it's supported in kubernetes.
 	return manifest, nil
 }
@@ -778,6 +756,16 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, requiresPrivi
 	ctx := securitycontext.DetermineEffectiveSecurityContext(pod, &c)
 	if err := setApp(imgManifest, &c, opts, ctx, pod.Spec.SecurityContext); err != nil {
 		return err
+	}
+
+	for _, mnt := range opts.Mounts {
+		readOnly := mnt.ReadOnly
+		manifest.Volumes = append(manifest.Volumes, appctypes.Volume{
+			Name:     convertToACName(mnt.Name),
+			Source:   mnt.HostPath,
+			Kind:     "host",
+			ReadOnly: &readOnly,
+		})
 	}
 
 	ra := appcschema.RuntimeApp{
