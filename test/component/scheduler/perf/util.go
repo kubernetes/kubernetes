@@ -56,7 +56,7 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 	}))
 
 	c := client.NewOrDie(&restclient.Config{
-		Host:          s.URL,
+		Hosts:         []string{s.URL},
 		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 		QPS:           5000.0,
 		Burst:         5000,

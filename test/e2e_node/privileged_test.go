@@ -56,7 +56,7 @@ type PrivilegedPodTestConfig struct {
 
 var _ = Describe("PrivilegedPod", func() {
 	var c *client.Client
-	restClientConfig := &restclient.Config{Host: *apiServerAddress}
+	restClientConfig := &restclient.Config{Hosts: []string{*apiServerAddress}}
 	BeforeEach(func() {
 		// Setup the apiserver client
 		c = client.NewOrDie(restClientConfig)

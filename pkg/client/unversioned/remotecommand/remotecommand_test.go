@@ -212,12 +212,12 @@ func TestStream(t *testing.T) {
 
 			server := httptest.NewServer(fakeServer(t, name, exec, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount, testCase.ServerProtocols))
 
-			url, _ := url.ParseRequestURI(server.URL)
+			u, _ := url.ParseRequestURI(server.URL)
 			config := restclient.ContentConfig{
 				GroupVersion:         &unversioned.GroupVersion{Group: "x"},
 				NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			}
-			c, err := restclient.NewRESTClient(url, "", config, -1, -1, nil, nil)
+			c, err := restclient.NewRESTClient([]*url.URL{u}, "", config, -1, -1, nil, nil)
 			if err != nil {
 				t.Fatalf("failed to create a client: %v", err)
 			}
@@ -246,7 +246,7 @@ func TestStream(t *testing.T) {
 			}
 
 			conf := &restclient.Config{
-				Host: server.URL,
+				Hosts: []string{server.URL},
 			}
 			e, err := NewExecutor(conf, "POST", req.URL())
 			if err != nil {

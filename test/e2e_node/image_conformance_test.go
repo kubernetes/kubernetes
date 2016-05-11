@@ -36,7 +36,7 @@ var _ = Describe("Image Container Conformance Test", func() {
 
 	BeforeEach(func() {
 		// Setup the apiserver client
-		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
+		cl = client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
 	})
 
 	Describe("image conformance blackbox test", func() {

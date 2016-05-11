@@ -531,7 +531,7 @@ func newKubeClient() (*kclient.Client, error) {
 	if masterURL != "" && *argKubecfgFile == "" {
 		// Only --kube-master-url was provided.
 		config = &restclient.Config{
-			Host:          masterURL,
+			Hosts:         []string{masterURL},
 			ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}},
 		}
 	} else {
@@ -549,7 +549,7 @@ func newKubeClient() (*kclient.Client, error) {
 		}
 	}
 
-	glog.Infof("Using %s for kubernetes master", config.Host)
+	glog.Infof("Using %s for kubernetes master", config.Hosts)
 	glog.Infof("Using kubernetes API %v", config.GroupVersion)
 	return kclient.New(config)
 }

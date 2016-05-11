@@ -51,7 +51,7 @@ var _ = Describe("Container runtime Conformance Test", func() {
 
 	BeforeEach(func() {
 		// Setup the apiserver client
-		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
+		cl = client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
 	})
 
 	Describe("container runtime conformance blackbox test", func() {

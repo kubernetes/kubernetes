@@ -34,7 +34,7 @@ var _ = Describe("Kubelet Container Manager", func() {
 	var cl *client.Client
 	BeforeEach(func() {
 		// Setup the apiserver client
-		cl = client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
+		cl = client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
 	})
 	Describe("oom score adjusting", func() {
 		namespace := "oom-adj"

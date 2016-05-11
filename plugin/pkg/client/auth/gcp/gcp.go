@@ -39,7 +39,7 @@ type gcpAuthProvider struct {
 	persister   restclient.AuthProviderConfigPersister
 }
 
-func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+func newGCPAuthProvider(_ []string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	ts, err := newCachedTokenSource(gcpConfig["access-token"], gcpConfig["expiry"], persister)
 	if err != nil {
 		return nil, err

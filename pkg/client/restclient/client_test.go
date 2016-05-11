@@ -44,7 +44,7 @@ func TestDoRequestSuccess(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host: testServer.URL,
+		Hosts: []string{testServer.URL},
 		ContentConfig: ContentConfig{
 			GroupVersion:         testapi.Default.GroupVersion(),
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
@@ -89,7 +89,7 @@ func TestDoRequestFailed(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host: testServer.URL,
+		Hosts: []string{testServer.URL},
 		ContentConfig: ContentConfig{
 			GroupVersion:         testapi.Default.GroupVersion(),
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
@@ -127,7 +127,7 @@ func TestDoRequestCreated(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host: testServer.URL,
+		Hosts: []string{testServer.URL},
 		ContentConfig: ContentConfig{
 			GroupVersion:         testapi.Default.GroupVersion(),
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
