@@ -32,7 +32,7 @@ import (
 
 func init() {
 	if err := registered.AnnounceGroup(&registered.GroupMetaFactory{
-		GroupName:              "api",
+		GroupName:              "",
 		VersionPreferenceOrder: []string{"v1"},
 		ImportPrefix:           "k8s.io/kubernetes/pkg/api",
 		RootScopedKinds: sets.NewString(
