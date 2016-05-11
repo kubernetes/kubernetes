@@ -19,7 +19,6 @@ package oidc
 import (
 	"fmt"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path"
 	"reflect"
@@ -33,14 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	oidctesting "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc/testing"
 )
-
-func mustParseURL(t *testing.T, s string) *url.URL {
-	u, err := url.Parse(s)
-	if err != nil {
-		t.Fatalf("Failed to parse url: %v", err)
-	}
-	return u
-}
 
 func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string, iat, exp time.Time) string {
 	signer := op.PrivKey.Signer()
@@ -98,7 +89,7 @@ func TestOIDCDiscoveryNoKeyEndpoint(t *testing.T) {
 	defer srv.Close()
 
 	op.PCFG = oidc.ProviderConfig{
-		Issuer: mustParseURL(t, srv.URL), // An invalid ProviderConfig. Keys endpoint is required.
+		Issuer: oidctesting.MustParseURL(srv.URL), // An invalid ProviderConfig. Keys endpoint is required.
 	}
 
 	_, err = New(OIDCOptions{srv.URL, "client-foo", cert, "sub", "", 0, 0})
@@ -114,8 +105,8 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 	defer srv.Close()
 
 	op.PCFG = oidc.ProviderConfig{
-		Issuer:       mustParseURL(t, srv.URL),
-		KeysEndpoint: mustParseURL(t, srv.URL+"/keys"),
+		Issuer:       oidctesting.MustParseURL(srv.URL),
+		KeysEndpoint: oidctesting.MustParseURL(srv.URL + "/keys"),
 	}
 
 	expectErr := fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'", srv.URL, "http")
@@ -147,8 +138,8 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 	defer tlsSrv.Close()
 
 	op.PCFG = oidc.ProviderConfig{
-		Issuer:       mustParseURL(t, tlsSrv.URL),
-		KeysEndpoint: mustParseURL(t, tlsSrv.URL+"/keys"),
+		Issuer:       oidctesting.MustParseURL(tlsSrv.URL),
+		KeysEndpoint: oidctesting.MustParseURL(tlsSrv.URL + "/keys"),
 	}
 
 	// Create a client using cert2, should fail.
@@ -179,15 +170,7 @@ func TestOIDCAuthentication(t *testing.T) {
 	defer srv.Close()
 
 	// A provider config with all required fields.
-	op.PCFG = oidc.ProviderConfig{
-		Issuer:                  mustParseURL(t, srv.URL),
-		AuthEndpoint:            mustParseURL(t, srv.URL+"/auth"),
-		TokenEndpoint:           mustParseURL(t, srv.URL+"/token"),
-		KeysEndpoint:            mustParseURL(t, srv.URL+"/keys"),
-		ResponseTypesSupported:  []string{"code"},
-		SubjectTypesSupported:   []string{"public"},
-		IDTokenSigningAlgValues: []string{"RS256"},
-	}
+	op.AddMinimalProviderConfig(srv)
 
 	tests := []struct {
 		userClaim   string

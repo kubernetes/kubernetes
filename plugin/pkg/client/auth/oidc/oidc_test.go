@@ -1,14 +1,62 @@
+/*
+Copyright 2016 The Kubernetes Authors All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package oidc
 
 import (
+	"encoding/base64"
+	"io/ioutil"
+	"os"
+	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/diff"
-
 	"github.com/coreos/go-oidc/jose"
+
+	"k8s.io/kubernetes/pkg/util/diff"
+	oidctesting "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc/testing"
 )
 
 func TestNewOIDCAuthProvider(t *testing.T) {
+	cert := path.Join(os.TempDir(), "oidc-cert")
+	key := path.Join(os.TempDir(), "oidc-key")
+
+	defer os.Remove(cert)
+	defer os.Remove(key)
+
+	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert, key)
+	op := oidctesting.NewOIDCProvider(t)
+	srv, err := op.ServeTLSWithKeyPair(cert, key)
+	op.AddMinimalProviderConfig(srv)
+	if err != nil {
+		t.Fatalf("Cannot start server %v", err)
+	}
+	defer srv.Close()
+
+	certData, err := ioutil.ReadFile(cert)
+	if err != nil {
+		t.Fatalf("Could not read cert bytes %v", err)
+	}
+
+	jwt, err := jose.NewSignedJWT(jose.Claims(map[string]interface{}{
+		"test": "jwt",
+	}), op.PrivKey.Signer())
+	if err != nil {
+		t.Fatalf("Could not create signed JWT %v", err)
+	}
+
 	tests := []struct {
 		cfg map[string]string
 
@@ -16,9 +64,69 @@ func TestNewOIDCAuthProvider(t *testing.T) {
 		wantInitialIDToken jose.JWT
 	}{
 		{
+			// A Valid configuration
 			cfg: map[string]string{
-				cfgIssuerUrl: "auth.example.com",
+				cfgIssuerUrl:            srv.URL,
+				cfgCertificateAuthority: cert,
+				cfgClientID:             "client-id",
+				cfgClientSecret:         "client-secret",
 			},
+		},
+		{
+			// A Valid configuration with an Initial JWT
+			cfg: map[string]string{
+				cfgIssuerUrl:            srv.URL,
+				cfgCertificateAuthority: cert,
+				cfgClientID:             "client-id",
+				cfgClientSecret:         "client-secret",
+				cfgIDToken:              jwt.Encode(),
+			},
+			wantInitialIDToken: *jwt,
+		},
+		{
+			// Valid config, but using cfgCertificateAuthorityData
+			cfg: map[string]string{
+				cfgIssuerUrl:                srv.URL,
+				cfgCertificateAuthorityData: base64.StdEncoding.EncodeToString(certData),
+				cfgClientID:                 "client-id",
+				cfgClientSecret:             "client-secret",
+			},
+		},
+		{
+			// Missing client id
+			cfg: map[string]string{
+				cfgIssuerUrl:            srv.URL,
+				cfgCertificateAuthority: cert,
+				cfgClientSecret:         "client-secret",
+			},
+			wantErr: true,
+		},
+		{
+			// Missing client secret
+			cfg: map[string]string{
+				cfgIssuerUrl:            srv.URL,
+				cfgCertificateAuthority: cert,
+				cfgClientID:             "client-id",
+			},
+			wantErr: true,
+		},
+		{
+			// Missing issuer url.
+			cfg: map[string]string{
+				cfgCertificateAuthority: cert,
+				cfgClientID:             "client-id",
+				cfgClientSecret:         "secret",
+			},
+			wantErr: true,
+		},
+		{
+			// No TLS config
+			cfg: map[string]string{
+				cfgIssuerUrl:    srv.URL,
+				cfgClientID:     "client-id",
+				cfgClientSecret: "secret",
+			},
+			wantErr: true,
 		},
 	}
 
@@ -27,8 +135,8 @@ func TestNewOIDCAuthProvider(t *testing.T) {
 		if tt.wantErr {
 			if err == nil {
 				t.Errorf("case %d: want non-nil err", i)
-				continue
 			}
+			continue
 		}
 
 		if err != nil {
