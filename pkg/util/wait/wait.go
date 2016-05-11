@@ -143,6 +143,8 @@ func pollInternal(wait WaitFunc, condition ConditionFunc) error {
 	return WaitFor(wait, condition, done)
 }
 
+// PollImmediate is identical to Poll, except that it performs the first check
+// immediately, not waiting interval beforehand.
 func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) error {
 	return pollImmediateInternal(poller(interval, timeout), condition)
 }
