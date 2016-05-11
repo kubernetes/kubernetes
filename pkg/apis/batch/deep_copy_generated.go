@@ -35,6 +35,10 @@ func init() {
 		DeepCopy_batch_JobStatus,
 		DeepCopy_batch_JobTemplate,
 		DeepCopy_batch_JobTemplateSpec,
+		DeepCopy_batch_ScheduledJob,
+		DeepCopy_batch_ScheduledJobList,
+		DeepCopy_batch_ScheduledJobSpec,
+		DeepCopy_batch_ScheduledJobStatus,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
@@ -191,6 +195,84 @@ func DeepCopy_batch_JobTemplateSpec(in JobTemplateSpec, out *JobTemplateSpec, c 
 	}
 	if err := DeepCopy_batch_JobSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
+	}
+	return nil
+}
+
+func DeepCopy_batch_ScheduledJob(in ScheduledJob, out *ScheduledJob, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_batch_ScheduledJobSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_batch_ScheduledJobStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeepCopy_batch_ScheduledJobList(in ScheduledJobList, out *ScheduledJobList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]ScheduledJob, len(in))
+		for i := range in {
+			if err := DeepCopy_batch_ScheduledJob(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func DeepCopy_batch_ScheduledJobSpec(in ScheduledJobSpec, out *ScheduledJobSpec, c *conversion.Cloner) error {
+	out.Schedule = in.Schedule
+	if in.StartingDeadlineSeconds != nil {
+		in, out := in.StartingDeadlineSeconds, &out.StartingDeadlineSeconds
+		*out = new(int64)
+		**out = *in
+	} else {
+		out.StartingDeadlineSeconds = nil
+	}
+	out.ConcurrencyPolicy = in.ConcurrencyPolicy
+	out.Suspend = in.Suspend
+	if err := DeepCopy_batch_JobTemplateSpec(in.JobTemplate, &out.JobTemplate, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeepCopy_batch_ScheduledJobStatus(in ScheduledJobStatus, out *ScheduledJobStatus, c *conversion.Cloner) error {
+	if in.Active != nil {
+		in, out := in.Active, &out.Active
+		*out = make([]api.ObjectReference, len(in))
+		for i := range in {
+			if err := api.DeepCopy_api_ObjectReference(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Active = nil
+	}
+	if in.LastScheduleTime != nil {
+		in, out := in.LastScheduleTime, &out.LastScheduleTime
+		*out = new(unversioned.Time)
+		if err := unversioned.DeepCopy_unversioned_Time(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.LastScheduleTime = nil
 	}
 	return nil
 }

@@ -131,4 +131,48 @@ func (LabelSelectorRequirement) SwaggerDoc() map[string]string {
 	return map_LabelSelectorRequirement
 }
 
+var map_ScheduledJob = map[string]string{
+	"":         "ScheduledJob represents the configuration of a single scheduled job.",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"status":   "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+}
+
+func (ScheduledJob) SwaggerDoc() map[string]string {
+	return map_ScheduledJob
+}
+
+var map_ScheduledJobList = map[string]string{
+	"":         "ScheduledJobList is a collection of scheduled jobs.",
+	"metadata": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "Items is the list of ScheduledJob.",
+}
+
+func (ScheduledJobList) SwaggerDoc() map[string]string {
+	return map_ScheduledJobList
+}
+
+var map_ScheduledJobSpec = map[string]string{
+	"":                        "ScheduledJobSpec describes how the job execution will look like and when it will actually run.",
+	"schedule":                "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+	"startingDeadlineSeconds": "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
+	"concurrencyPolicy":       "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+	"suspend":                 "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+	"jobTemplate":             "JobTemplate is the object that describes the job that will be created when executing a ScheduledJob.",
+}
+
+func (ScheduledJobSpec) SwaggerDoc() map[string]string {
+	return map_ScheduledJobSpec
+}
+
+var map_ScheduledJobStatus = map[string]string{
+	"":                 "ScheduledJobStatus represents the current state of a Job.",
+	"active":           "Active holds pointers to currently running jobs.",
+	"lastScheduleTime": "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+}
+
+func (ScheduledJobStatus) SwaggerDoc() map[string]string {
+	return map_ScheduledJobStatus
+}
+
 // AUTO-GENERATED FUNCTIONS END HERE
