@@ -351,6 +351,8 @@ type KubeletConfiguration struct {
 	EvictionSoftGracePeriod string `json:"evictionSoftGracePeriod,omitempty"`
 	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
 	EvictionPressureTransitionPeriod unversioned.Duration `json:"evictionPressureTransitionPeriod,omitempty"`
+	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
+	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod,omitempty"`
 }
 
 type KubeSchedulerConfiguration struct {
