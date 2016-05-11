@@ -18,6 +18,7 @@ package fake
 
 import (
 	unversioned "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -27,4 +28,10 @@ type FakeFederation struct {
 
 func (c *FakeFederation) Clusters() unversioned.ClusterInterface {
 	return &FakeClusters{c}
+}
+
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *FakeFederation) GetRESTClient() *restclient.RESTClient {
+	return nil
 }
