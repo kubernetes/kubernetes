@@ -217,7 +217,7 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 		{"anything", "anything"},
 	}
 
-	// WARNING: EnvVarCluster.Server is set during package loading time and can not be overriden by os.Setenv inside this test
+	// WARNING: EnvVarCluster.Server is set during package loading time and can not be overridden by os.Setenv inside this test
 	EnvVarCluster.Server = ""
 	tt = append(tt, struct{ server, host string }{"", "http://localhost:8080"})
 
