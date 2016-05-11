@@ -336,6 +336,11 @@ func AddRecursiveFlag(cmd *cobra.Command, value *bool) {
 	cmd.Flags().BoolVarP(value, "recursive", "R", *value, "If true, process directory recursively.")
 }
 
+// AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
+func AddDryRunFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+}
+
 func AddApplyAnnotationFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.")
 }
@@ -344,7 +349,7 @@ func AddApplyAnnotationFlags(cmd *cobra.Command) {
 // TODO: need to take a pass at other generator commands to use this set of flags
 func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+	AddDryRunFlag(cmd)
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
@@ -431,6 +436,10 @@ func AddRecordFlag(cmd *cobra.Command) {
 
 func GetRecordFlag(cmd *cobra.Command) bool {
 	return GetFlagBool(cmd, "record")
+}
+
+func GetDryRunFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "dry-run")
 }
 
 // RecordChangeCause annotate change-cause to input runtime object.
@@ -527,4 +536,61 @@ func GetIncludeThirdPartyAPIs(cmd *cobra.Command) bool {
 
 func AddInclude3rdPartyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
+}
+
+// GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args
+func GetResourcesAndPairs(args []string, pairType string) (resources []string, pairArgs []string, err error) {
+	foundPair := false
+	for _, s := range args {
+		nonResource := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
+		switch {
+		case !foundPair && nonResource:
+			foundPair = true
+			fallthrough
+		case foundPair && nonResource:
+			pairArgs = append(pairArgs, s)
+		case !foundPair && !nonResource:
+			resources = append(resources, s)
+		case foundPair && !nonResource:
+			err = fmt.Errorf("all resources must be specified before %s changes: %s", pairType, s)
+			return
+		}
+	}
+	return
+}
+
+// ParsePairs retrieves new and remove pairs (if supportRemove is true) from "KEY=VALUE or KEY-" pair args
+func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPairs map[string]string, removePairs []string, err error) {
+	newPairs = map[string]string{}
+	if supportRemove {
+		removePairs = []string{}
+	}
+	var invalidBuf bytes.Buffer
+
+	for _, pairArg := range pairArgs {
+		if strings.Index(pairArg, "=") != -1 {
+			parts := strings.SplitN(pairArg, "=", 2)
+			if len(parts) != 2 || len(parts[1]) == 0 {
+				if invalidBuf.Len() > 0 {
+					invalidBuf.WriteString(", ")
+				}
+				invalidBuf.WriteString(fmt.Sprintf(pairArg))
+			} else {
+				newPairs[parts[0]] = parts[1]
+			}
+		} else if supportRemove && strings.HasSuffix(pairArg, "-") {
+			removePairs = append(removePairs, pairArg[:len(pairArg)-1])
+		} else {
+			if invalidBuf.Len() > 0 {
+				invalidBuf.WriteString(", ")
+			}
+			invalidBuf.WriteString(fmt.Sprintf(pairArg))
+		}
+	}
+	if invalidBuf.Len() > 0 {
+		err = fmt.Errorf("invalid %s format: %s", pairType, invalidBuf.String())
+		return
+	}
+
+	return
 }
