@@ -63,6 +63,8 @@ concurrent-endpoint-syncs
 concurrent-namespace-syncs
 concurrent-replicaset-syncs
 concurrent-resource-quota-syncs
+config-map-name
+config-map-namespace
 config-sync-period
 configure-cbr0
 conntrack-max

@@ -35,7 +35,9 @@ type SchedulerServer struct {
 	Master string
 	// Kubeconfig is Path to kubeconfig file with authorization and master
 	// location information.
-	Kubeconfig string
+	Kubeconfig         string
+	ConfigMapName      string
+	ConfigMapNamespace string
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -50,6 +52,8 @@ func NewSchedulerServer() *SchedulerServer {
 
 // AddFlags adds flags for a specific SchedulerServer to the specified FlagSet
 func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&s.ConfigMapName, "config-map-name", s.ConfigMapName, "The name of the configmap to use for component configuration.")
+	fs.StringVar(&s.ConfigMapNamespace, "config-map-namespace", s.ConfigMapNamespace, "The namespace of the configmap to use for component configuration.")
 	fs.Int32Var(&s.Port, "port", s.Port, "The port that the scheduler's http service runs on")
 	fs.StringVar(&s.Address, "address", s.Address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.AlgorithmProvider, "algorithm-provider", s.AlgorithmProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
