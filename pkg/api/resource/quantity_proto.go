@@ -19,7 +19,7 @@ package resource
 import (
 	"math/big"
 
-	"speter.net/go/exp/math/dec/inf"
+	inf "gopkg.in/inf.v0"
 )
 
 // QuantityProto is a struct that is equivalent to Quantity, but intended for

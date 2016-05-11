@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"time"
 
+	inf "gopkg.in/inf.v0"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
@@ -32,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"speter.net/go/exp/math/dec/inf"
 )
 
 const (
