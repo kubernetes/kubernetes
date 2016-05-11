@@ -35,7 +35,7 @@ func NewCmdClusterInfoDump(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "dump",
 		Short: "Dump lots of relevant info for debugging and diagnosis.",
-		Long:  dumpLong,
+		Long:  dumpLong + "\n" + dumpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(dumpClusterInfo(f, cmd, args, cmdOut))
 		},
@@ -52,22 +52,25 @@ Dumps cluster info out suitable for debugging and diagnosing cluster problems.  
 stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, kubernetes will
 build a set of files in that directory.  By default only dumps things in the 'kube-system' namespace, but you can
 switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.
+
+The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories
+based on namespace and pod name.
 `
 
 	dumpExample = `  # Dump current cluster state to stdout
   kubectl cluster-info dump
   
-  # Dump current cluster state to /tmp
-  kubectl cluster-info dump --output-directory=/tmp
+  # Dump current cluster state to /path/to/cluster-state
+  kubectl cluster-info dump --output-directory=/path/to/cluster-state
   
   # Dump all namespaces to stdout
   kubectl cluster-info dump --all-namespaces
   
-  # Dump a set of namespaces to /tmp
-  kubectl cluster-info dump --namespaces default,kube-system --output-directory=/tmp`
+  # Dump a set of namespaces to /path/to/cluster-state
+  kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`
 )
 
-func getWriter(cmd *cobra.Command, defaultWriter io.Writer, filename string) io.Writer {
+func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename string) io.Writer {
 	dir := cmdutil.GetFlagString(cmd, "output-directory")
 	if len(dir) == 0 || dir == "-" {
 		return defaultWriter
@@ -97,7 +100,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 		return err
 	}
 
-	if err := printer.PrintObj(nodes, getWriter(cmd, out, "nodes.json")); err != nil {
+	if err := printer.PrintObj(nodes, setupOutputWriter(cmd, out, "nodes.json")); err != nil {
 		return err
 	}
 
@@ -130,7 +133,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 		if err != nil {
 			return err
 		}
-		if err := printer.PrintObj(events, getWriter(cmd, out, path.Join(namespace, "events.json"))); err != nil {
+		if err := printer.PrintObj(events, setupOutputWriter(cmd, out, path.Join(namespace, "events.json"))); err != nil {
 			return err
 		}
 
@@ -138,7 +141,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 		if err != nil {
 			return err
 		}
-		if err := printer.PrintObj(rcs, getWriter(cmd, out, path.Join(namespace, "replication-controllers.json"))); err != nil {
+		if err := printer.PrintObj(rcs, setupOutputWriter(cmd, out, path.Join(namespace, "replication-controllers.json"))); err != nil {
 			return err
 		}
 
@@ -146,7 +149,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 		if err != nil {
 			return err
 		}
-		if err := printer.PrintObj(svcs, getWriter(cmd, out, path.Join(namespace, "services.json"))); err != nil {
+		if err := printer.PrintObj(svcs, setupOutputWriter(cmd, out, path.Join(namespace, "services.json"))); err != nil {
 			return err
 		}
 
@@ -154,7 +157,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 		if err != nil {
 			return err
 		}
-		if err := printer.PrintObj(sets, getWriter(cmd, out, path.Join(namespace, "daemonsets.json"))); err != nil {
+		if err := printer.PrintObj(sets, setupOutputWriter(cmd, out, path.Join(namespace, "daemonsets.json"))); err != nil {
 			return err
 		}
 
@@ -162,7 +165,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 		if err != nil {
 			return err
 		}
-		if err := printer.PrintObj(deps, getWriter(cmd, out, path.Join(namespace, "deployments.json"))); err != nil {
+		if err := printer.PrintObj(deps, setupOutputWriter(cmd, out, path.Join(namespace, "deployments.json"))); err != nil {
 			return err
 		}
 
@@ -170,7 +173,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 		if err != nil {
 			return err
 		}
-		if err := printer.PrintObj(rps, getWriter(cmd, out, path.Join(namespace, "replicasets.json"))); err != nil {
+		if err := printer.PrintObj(rps, setupOutputWriter(cmd, out, path.Join(namespace, "replicasets.json"))); err != nil {
 			return err
 		}
 
@@ -179,13 +182,13 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 			return err
 		}
 
-		if err := printer.PrintObj(pods, getWriter(cmd, out, path.Join(namespace, "pods.json"))); err != nil {
+		if err := printer.PrintObj(pods, setupOutputWriter(cmd, out, path.Join(namespace, "pods.json"))); err != nil {
 			return err
 		}
 
 		for ix := range pods.Items {
 			pod := &pods.Items[ix]
-			writer := getWriter(cmd, out, path.Join(namespace, pod.Name, "logs.txt"))
+			writer := setupOutputWriter(cmd, out, path.Join(namespace, pod.Name, "logs.txt"))
 			writer.Write([]byte(fmt.Sprintf("==== START logs for %s/%s ====\n", pod.Namespace, pod.Name)))
 			request, err := f.LogsForObject(pod, &api.PodLogOptions{})
 			if err != nil {
@@ -199,6 +202,13 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 			writer.Write(data)
 			writer.Write([]byte(fmt.Sprintf("==== END logs for %s/%s ====\n", pod.Namespace, pod.Name)))
 		}
+	}
+	dir := cmdutil.GetFlagString(cmd, "output-directory")
+	if len(dir) == 0 {
+		dir = "."
+	}
+	if dir != "-" {
+		fmt.Fprintf(out, "Cluster info dumped to %s", dir)
 	}
 	return nil
 }
