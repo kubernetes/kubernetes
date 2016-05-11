@@ -17,12 +17,12 @@ limitations under the License.
 package etcd
 
 import (
-	"net/http"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -33,8 +33,8 @@ import (
 type fakeConnectionInfoGetter struct {
 }
 
-func (fakeConnectionInfoGetter) GetRawConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	return "http", 12345, nil, nil
+func (fakeConnectionInfoGetter) GetRawConnectionInfo(ctx api.Context, nodeName string) (*client.ConnectionInfo, error) {
+	return &client.ConnectionInfo{"http", "somehost", 12345, nil}, nil
 }
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
@@ -147,4 +147,24 @@ func TestWatch(t *testing.T) {
 			{"metadata.name": "bar"},
 		},
 	)
+}
+
+func TestGetKubeletHost(t *testing.T) {
+	{
+		node := validNewNode()
+		address := getNodeAddress(node)
+		if address != "foo" {
+			t.Errorf("Expected address 'foo' for Node without Hostname Address set, got: %s", address)
+		}
+	}
+
+	{
+		node := validNewNode()
+		hostnameAddress := api.NodeAddress{Type: api.NodeHostName, Address: "192.168.123.1"}
+		node.Status.Addresses = []api.NodeAddress{hostnameAddress}
+		address := getNodeAddress(node)
+		if address != "192.168.123.1" {
+			t.Errorf("Expected address '192.168.123.1' for Node with Hostname Address set, got: %s", address)
+		}
+	}
 }

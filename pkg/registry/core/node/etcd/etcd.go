@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -139,17 +140,47 @@ func (r *REST) getKubeletPort(ctx api.Context, nodeName string) (int, error) {
 	return int(node.Status.DaemonEndpoints.KubeletEndpoint.Port), nil
 }
 
-func (c *REST) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	scheme, port, transport, err := c.connection.GetRawConnectionInfo(ctx, nodeName)
+func getNodeAddress(node *api.Node) string {
+	nodeAddresses := node.Status.Addresses
+	for _, address := range nodeAddresses {
+		if address.Type == api.NodeHostName {
+			return address.Address
+		}
+	}
+	nodeName := node.Name
+	glog.Warningf("Failed to retrieve Hostname for Node %s, falling back to NodeName", nodeName)
+	return nodeName
+}
+
+func (r *REST) getKubeletHost(nodeName string) (string, error) {
+	obj, err := r.Get(api.NewDefaultContext(), nodeName)
 	if err != nil {
-		return "", 0, nil, err
+		return "", err
+	}
+	node, ok := obj.(*api.Node)
+	if !ok {
+		return "", fmt.Errorf("Unexpected object type: %#v", node)
+	}
+
+	return getNodeAddress(node), nil
+}
+
+func (c *REST) GetConnectionInfo(ctx api.Context, nodeName string) (*client.ConnectionInfo, error) {
+	hostname, err := c.getKubeletHost(nodeName)
+	if err != nil {
+		return nil, err
+	}
+	connectionInfo, err := c.connection.GetRawConnectionInfo(ctx, hostname)
+	if err != nil {
+		return nil, err
 	}
 	daemonPort, err := c.getKubeletPort(ctx, nodeName)
 	if err != nil {
-		return "", 0, nil, err
+		return nil, err
 	}
 	if daemonPort > 0 {
-		return scheme, uint(daemonPort), transport, nil
+		connectionInfo.Port = uint(daemonPort)
 	}
-	return scheme, port, transport, nil
+
+	return connectionInfo, nil
 }

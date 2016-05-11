@@ -102,25 +102,35 @@ func TestNewKubeletClientTLSValid(t *testing.T) {
 	}
 
 	{
-		scheme, port, transport, err := client.GetRawConnectionInfo(nil, "foo")
+		connectionInfo, err := client.GetRawConnectionInfo(nil, "foo")
 		if err != nil {
 			t.Errorf("Error getting info: %v", err)
 		}
-		if scheme != "https" {
-			t.Errorf("Expected https, got %s", scheme)
+		if connectionInfo.Scheme != "https" {
+			t.Errorf("Expected https, got %s", connectionInfo.Scheme)
 		}
-		if port != 1234 {
-			t.Errorf("Expected 1234, got %d", port)
+		if connectionInfo.Hostname != "foo" {
+			t.Errorf("Expected foo, got %s", connectionInfo.Hostname)
 		}
-		if transport == nil {
+		if connectionInfo.Port != 1234 {
+			t.Errorf("Expected 1234, got %d", connectionInfo.Port)
+		}
+		if connectionInfo.Transport == nil {
 			t.Errorf("Expected transport, got nil")
 		}
 	}
 
 	{
-		_, _, _, err := client.GetRawConnectionInfo(nil, "foo bar")
+		_, err := client.GetRawConnectionInfo(nil, "foo bar")
 		if err == nil {
 			t.Errorf("Expected error getting connection info for invalid node name, got none")
+		}
+	}
+
+	{
+		_, err := client.GetRawConnectionInfo(nil, "192.168.1.1")
+		if err != nil {
+			t.Errorf("Expected no error when specifying ip as node name, got %v", err)
 		}
 	}
 }

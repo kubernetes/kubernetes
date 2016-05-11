@@ -51,11 +51,18 @@ type KubeletClientConfig struct {
 
 // KubeletClient is an interface for all kubelet functionality
 type KubeletClient interface {
-	GetRawConnectionInfo(ctx api.Context, nodeName string) (scheme string, port uint, transport http.RoundTripper, err error)
+	GetRawConnectionInfo(ctx api.Context, nodeName string) (info *ConnectionInfo, err error)
+}
+
+type ConnectionInfo struct {
+	Scheme    string
+	Hostname  string
+	Port      uint
+	Transport http.RoundTripper
 }
 
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(ctx api.Context, nodeName string) (scheme string, port uint, transport http.RoundTripper, err error)
+	GetConnectionInfo(ctx api.Context, nodeName string) (info *ConnectionInfo, err error)
 }
 
 // HTTPKubeletClient is the default implementation of KubeletHealthchecker, accesses the kubelet over HTTP.
@@ -98,15 +105,15 @@ func NewStaticKubeletClient(config *KubeletClientConfig) (KubeletClient, error) 
 }
 
 // In default HTTPKubeletClient ctx is unused.
-func (c *HTTPKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
+func (c *HTTPKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName string) (*ConnectionInfo, error) {
 	if errs := validation.ValidateNodeName(nodeName, false); len(errs) != 0 {
-		return "", 0, nil, fmt.Errorf("invalid node name: %s", strings.Join(errs, ";"))
+		return nil, fmt.Errorf("invalid node name: %s", strings.Join(errs, ";"))
 	}
 	scheme := "http"
 	if c.Config.EnableHttps {
 		scheme = "https"
 	}
-	return scheme, c.Config.Port, c.Client.Transport, nil
+	return &ConnectionInfo{scheme, nodeName, c.Config.Port, c.Client.Transport}, nil
 }
 
 // FakeKubeletClient is a fake implementation of KubeletClient which returns an error
@@ -114,8 +121,8 @@ func (c *HTTPKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName strin
 // no kubelets.
 type FakeKubeletClient struct{}
 
-func (c FakeKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	return "", 0, nil, errors.New("Not Implemented")
+func (c FakeKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName string) (*ConnectionInfo, error) {
+	return nil, errors.New("Not Implemented")
 }
 
 // transportConfig converts a client config to an appropriate transport config.
