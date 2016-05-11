@@ -316,6 +316,46 @@ EOF
 multizone = ${MULTIZONE}
 EOF
   fi
+
+  if [ -n "${GCP_AUTHN_URL:-}" ]; then
+    cat <<EOF >/etc/gcp_authn.config
+clusters:
+  - name: gcp-authentication-server
+    cluster:
+      server: ${GCP_AUTHN_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-authentication-server
+    user: kube-apiserver
+  name: webhook
+EOF
+  fi
+
+  if [ -n "${GCP_AUTHZ_URL:-}" ]; then
+    cat <<EOF >/etc/gcp_authz.config
+clusters:
+  - name: gcp-authorization-server
+    cluster:
+      server: ${GCP_AUTHZ_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-authorization-server
+    user: kube-apiserver
+  name: webhook
+EOF
+  fi
 }
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
@@ -413,7 +453,20 @@ start_kube_apiserver() {
   timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-apiserver.tar
 
   # Calculate variables and assemble the command line.
-  params="--cloud-provider=gce --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001 --tls-cert-file=/etc/srv/kubernetes/server.cert --tls-private-key-file=/etc/srv/kubernetes/server.key --secure-port=443 --client-ca-file=/etc/srv/kubernetes/ca.crt --token-auth-file=/etc/srv/kubernetes/known_tokens.csv --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv --allow-privileged=true --authorization-mode=ABAC --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl --etcd-servers-overrides=/events#http://127.0.0.1:4002 ${APISERVER_TEST_ARGS:-}"
+  params="${APISERVER_TEST_ARGS:-} ${API_SERVER_TEST_LOG_LEVEL:-"--v=2"}"
+  params="${params} --cloud-provider=gce"
+  params="${params} --address=127.0.0.1"
+  params="${params} --etcd-servers=http://127.0.0.1:4001"
+  params="${params} --tls-cert-file=/etc/srv/kubernetes/server.cert"
+  params="${params} --tls-private-key-file=/etc/srv/kubernetes/server.key"
+  params="${params} --secure-port=443"
+  params="${params} --client-ca-file=/etc/srv/kubernetes/ca.crt"
+  params="${params} --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
+  params="${params} --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
+  params="${params} --allow-privileged=true"
+  params="${params} --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
+  params="${params} --etcd-servers-overrides=/events#http://127.0.0.1:4002"
+
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
@@ -426,17 +479,31 @@ start_kube_apiserver() {
   if [ -n "${RUNTIME_CONFIG:-}" ]; then
     params="${params} --runtime-config=${RUNTIME_CONFIG}"
   fi
-  log_level="--v=2"
-  if [ -n "${API_SERVER_TEST_LOG_LEVEL:-}" ]; then
-    log_level="${API_SERVER_TEST_LOG_LEVEL}"
-  fi
-  params="${params} ${log_level}"
-
   if [ -n "${PROJECT_ID:-}" ] && [ -n "${TOKEN_URL:-}" ] && [ -n "${TOKEN_BODY:-}" ] && [ -n "${NODE_NETWORK:-}" ]; then
-    readonly vm_external_ip=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
-    params="${params} --cloud-config=/etc/gce.conf --advertise-address=${vm_external_ip} --ssh-user=${PROXY_SSH_USER} --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+    readonly vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
+    params="${params} --cloud-config=/etc/gce.conf"
+    params="${params} --advertise-address=${vm_external_ip}"
+    params="${params} --ssh-user=${PROXY_SSH_USER}"
+    params="${params} --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
   fi
   readonly kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
+
+  webhook_authn_config_mount=""
+  webhook_authn_config_volume=""
+  if [ -n "${GCP_AUTHN_URL:-}" ]; then
+    params="${params} --authentication-token-webhook-config-file=/etc/gcp_authn.config"
+    webhook_authn_config_mount="{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"/etc/gcp_authn.config\", \"readOnly\": false},"
+    webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\"}},"
+  fi
+
+  params="${params} --authorization-mode=ABAC"
+  webhook_config_mount=""
+  webhook_config_volume=""
+  if [ -n "${GCP_AUTHZ_URL:-}" ]; then
+    params="${params},Webhook --authorization-webhook-config-file=/etc/gcp_authz.config"
+    webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
+    webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
+  fi
 
   src_dir="/home/kubernetes/kube-manifests/kubernetes/gci-trusty"
   cp "${src_dir}/abac-authz-policy.jsonl" /etc/srv/kubernetes/
@@ -455,6 +522,11 @@ start_kube_apiserver() {
   sed -i -e "s@{{secure_port}}@8080@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
+  sed -i -e "s@{{webhook_authn_config_mount}}@${webhook_authn_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{webhook_authn_config_volume}}@${webhook_authn_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{webhook_config_mount}}@${webhook_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{webhook_config_volume}}@${webhook_config_volume}@g" "${src_file}"
+
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
