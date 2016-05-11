@@ -147,7 +147,7 @@ func TestAuthPluginPersist(t *testing.T) {
 		}
 		persister := &inMemoryPersister{make(map[string]string)}
 		persister.Persist(tc.startingConfig)
-		plugin, err := GetAuthProvider("127.0.0.1", cfg, persister)
+		plugin, err := GetAuthProvider([]string{"127.0.0.1"}, cfg, persister)
 		if err != nil {
 			t.Errorf("%d. Unexpected error: failed to get plugin %q: %v", i, tc.plugin, err)
 		}
@@ -218,7 +218,7 @@ func (*pluginA) WrapTransport(rt http.RoundTripper) http.RoundTripper {
 
 func (*pluginA) Login() error { return nil }
 
-func pluginAProvider(string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
+func pluginAProvider([]string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
 	return &pluginA{}, nil
 }
 
@@ -244,12 +244,12 @@ func (*pluginB) WrapTransport(rt http.RoundTripper) http.RoundTripper {
 
 func (*pluginB) Login() error { return nil }
 
-func pluginBProvider(string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
+func pluginBProvider([]string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
 	return &pluginB{}, nil
 }
 
 // pluginFailProvider simulates a registered AuthPlugin that fails to load.
-func pluginFailProvider(string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
+func pluginFailProvider([]string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
 	return nil, fmt.Errorf("Failed to load AuthProvider")
 }
 
@@ -306,6 +306,6 @@ func (p *pluginPersist) Login() error {
 	return nil
 }
 
-func pluginPersistProvider(_ string, config map[string]string, persister AuthProviderConfigPersister) (AuthProvider, error) {
+func pluginPersistProvider(_ []string, config map[string]string, persister AuthProviderConfigPersister) (AuthProvider, error) {
 	return &pluginPersist{config, persister}, nil
 }

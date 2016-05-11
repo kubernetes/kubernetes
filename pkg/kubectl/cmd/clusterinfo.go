@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -59,7 +60,7 @@ func RunClusterInfo(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error
 	if err != nil {
 		return err
 	}
-	printService(out, "Kubernetes master", client.Host)
+	printService(out, "Kubernetes master", strings.Join(client.Hosts, ","))
 
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	cmdNamespace := cmdutil.GetFlagString(cmd, "namespace")
@@ -91,9 +92,9 @@ func RunClusterInfo(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error
 				}
 			} else {
 				if len(client.GroupVersion.Group) == 0 {
-					link = client.Host + "/api/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+					link = client.Hosts[0] + "/api/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
 				} else {
-					link = client.Host + "/api/" + client.GroupVersion.Group + "/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+					link = client.Hosts[0] + "/api/" + client.GroupVersion.Group + "/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
 
 				}
 			}
