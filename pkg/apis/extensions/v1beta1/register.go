@@ -55,12 +55,16 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ThirdPartyResourceDataList{},
 		&Ingress{},
 		&IngressList{},
+		&v1.List{},
 		&ListOptions{},
 		&v1.DeleteOptions{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
+		&Template{},
+		&TemplateList{},
+		&TemplateParameters{},
 	)
 	// Add the watch version that applies
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
@@ -88,3 +92,6 @@ func (obj *ReplicaSet) GetObjectKind() unversioned.ObjectKind                  {
 func (obj *ReplicaSetList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
 func (obj *PodSecurityPolicy) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
 func (obj *PodSecurityPolicyList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
+func (obj *Template) GetObjectKind() unversioned.ObjectKind                    { return &obj.TypeMeta }
+func (obj *TemplateList) GetObjectKind() unversioned.ObjectKind                { return &obj.TypeMeta }
+func (obj *TemplateParameters) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
