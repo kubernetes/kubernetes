@@ -1,10 +1,8 @@
-name: kubectl
-synopsis: kubectl controls the Kubernetes cluster manager
-description: |-
-  kubectl controls the Kubernetes cluster manager.
-
-  Find more information at https://github.com/kubernetes/kubernetes.
-options:
+name: set
+synopsis: Set specific features on objects
+description: "Configure application resources\n\t\nThese commands help you make changes
+  to existing application resources."
+inherited_options:
 - name: alsologtostderr
   default_value: "false"
   usage: log to standard error as well as files
@@ -66,36 +64,4 @@ options:
   usage: |
     comma-separated list of pattern=N settings for file-filtered logging
 see_also:
-- get
-- set
-- describe
-- create
-- replace
-- patch
-- delete
-- edit
-- apply
-- namespace
-- logs
-- rolling-update
-- scale
-- cordon
-- drain
-- uncordon
-- attach
-- exec
-- port-forward
-- proxy
-- run
-- stop
-- expose
-- autoscale
-- rollout
-- label
-- annotate
-- config
-- cluster-info
-- api-versions
-- version
-- explain
-- convert
+- kubectl
