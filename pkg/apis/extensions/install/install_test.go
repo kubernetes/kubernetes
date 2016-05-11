@@ -78,10 +78,9 @@ func TestInterfacesFor(t *testing.T) {
 
 func TestRESTMapper(t *testing.T) {
 	gv := v1beta1.SchemeGroupVersion
-	hpaGVK := gv.WithKind("HorizontalPodAutoscaler")
 	daemonSetGVK := gv.WithKind("DaemonSet")
 
-	if gvk, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.KindFor(gv.WithResource("horizontalpodautoscalers")); err != nil || gvk != hpaGVK {
+	if gvk, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.KindFor(gv.WithResource("daemonsets")); err != nil || gvk != daemonSetGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 
@@ -90,12 +89,12 @@ func TestRESTMapper(t *testing.T) {
 	}
 
 	for _, version := range registered.GroupOrDie(extensions.GroupName).GroupVersions {
-		mapping, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.RESTMapping(hpaGVK.GroupKind(), version.Version)
+		mapping, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), version.Version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 
-		if mapping.Resource != "horizontalpodautoscalers" {
+		if mapping.Resource != "daemonsets" {
 			t.Errorf("incorrect resource name: %#v", mapping)
 		}
 		if mapping.GroupVersionKind.GroupVersion() != version {
@@ -107,7 +106,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 
-		rc := &extensions.HorizontalPodAutoscaler{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		rc := &extensions.DaemonSet{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		name, err := mapping.MetadataAccessor.Name(rc)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

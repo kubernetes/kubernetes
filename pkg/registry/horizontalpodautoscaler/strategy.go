@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -46,15 +46,15 @@ func (autoscalerStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (autoscalerStrategy) PrepareForCreate(obj runtime.Object) {
-	newHPA := obj.(*extensions.HorizontalPodAutoscaler)
+	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
 
 	// create cannot set status
-	newHPA.Status = extensions.HorizontalPodAutoscalerStatus{}
+	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
 }
 
 // Validate validates a new autoscaler.
 func (autoscalerStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
-	autoscaler := obj.(*extensions.HorizontalPodAutoscaler)
+	autoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
 	return validation.ValidateHorizontalPodAutoscaler(autoscaler)
 }
 
@@ -69,22 +69,22 @@ func (autoscalerStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (autoscalerStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newHPA := obj.(*extensions.HorizontalPodAutoscaler)
-	oldHPA := old.(*extensions.HorizontalPodAutoscaler)
+	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
+	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
 	// Update is not allowed to set status
 	newHPA.Status = oldHPA.Status
 }
 
 // ValidateUpdate is the default update validation for an end user.
 func (autoscalerStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateHorizontalPodAutoscalerUpdate(obj.(*extensions.HorizontalPodAutoscaler), old.(*extensions.HorizontalPodAutoscaler))
+	return validation.ValidateHorizontalPodAutoscalerUpdate(obj.(*autoscaling.HorizontalPodAutoscaler), old.(*autoscaling.HorizontalPodAutoscaler))
 }
 
 func (autoscalerStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func AutoscalerToSelectableFields(limitRange *extensions.HorizontalPodAutoscaler) fields.Set {
+func AutoscalerToSelectableFields(limitRange *autoscaling.HorizontalPodAutoscaler) fields.Set {
 	return fields.Set{}
 }
 
@@ -93,7 +93,7 @@ func MatchAutoscaler(label labels.Selector, field fields.Selector) generic.Match
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			hpa, ok := obj.(*extensions.HorizontalPodAutoscaler)
+			hpa, ok := obj.(*autoscaling.HorizontalPodAutoscaler)
 			if !ok {
 				return nil, nil, fmt.Errorf("given object is not a horizontal pod autoscaler.")
 			}
@@ -109,12 +109,12 @@ type autoscalerStatusStrategy struct {
 var StatusStrategy = autoscalerStatusStrategy{Strategy}
 
 func (autoscalerStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newAutoscaler := obj.(*extensions.HorizontalPodAutoscaler)
-	oldAutoscaler := old.(*extensions.HorizontalPodAutoscaler)
+	newAutoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
+	oldAutoscaler := old.(*autoscaling.HorizontalPodAutoscaler)
 	// status changes are not allowed to update spec
 	newAutoscaler.Spec = oldAutoscaler.Spec
 }
 
 func (autoscalerStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateHorizontalPodAutoscalerStatusUpdate(obj.(*extensions.HorizontalPodAutoscaler), old.(*extensions.HorizontalPodAutoscaler))
+	return validation.ValidateHorizontalPodAutoscalerStatusUpdate(obj.(*autoscaling.HorizontalPodAutoscaler), old.(*autoscaling.HorizontalPodAutoscaler))
 }
