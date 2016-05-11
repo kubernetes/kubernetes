@@ -153,7 +153,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 		tf.Client = &fake.RESTClient{
 			Codec: codec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			}),
 		}
 		tf.Namespace = "test"
@@ -290,7 +290,7 @@ func TestGenerateService(t *testing.T) {
 					if !reflect.DeepEqual(&test.service, svc) {
 						t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
 					}
-					return &http.Response{StatusCode: 200, Body: body}, nil
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				default:
 					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)

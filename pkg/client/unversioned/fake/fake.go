@@ -71,6 +71,7 @@ func (c *RESTClient) Delete() *restclient.Request {
 
 func (c *RESTClient) request(verb string) *restclient.Request {
 	config := restclient.ContentConfig{
+		ContentType:  runtime.ContentTypeJSON,
 		GroupVersion: testapi.Default.GroupVersion(),
 		Codec:        c.Codec,
 	}
