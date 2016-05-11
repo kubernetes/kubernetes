@@ -121,25 +121,24 @@ done
 shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${KUBE_GOFLAGS:-})"
-eval "testargs=(${KUBE_TEST_ARGS:-})"
-
+eval "GOFLAGS=(${KUBE_GOFLAGS:-})"
+eval "TESTARGS=(${KUBE_TEST_ARGS:-})"
 # Used to filter verbose test output.
 go_test_grep_pattern="."
 
 # The go-junit-report tool needs full test case information to produce a
 # meaningful report.
 if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
-  goflags+=(-v)
+  GOFLAGS+=(-v)
   # Show only summary lines by matching lines like "status package/test"
   go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
 fi
 
-# Filter out arguments that start with "-" and move them to goflags.
+# Filter out arguments that start with "-" and move them to GOFLAGS.
 testcases=()
 for arg; do
   if [[ "${arg}" == -* ]]; then
-    goflags+=("${arg}")
+    GOFLAGS+=("${arg}")
   else
     testcases+=("${arg}")
   fi
@@ -193,9 +192,9 @@ runTestIterations() {
     local pass=0
     local count=0
     for i in $(seq 1 ${iterations}); do
-      if go test "${goflags[@]:+${goflags[@]}}" \
+      if go test "${GOFLAGS[@]:+${GOFLAGS[@]}}" \
           ${KUBE_RACE} ${KUBE_TIMEOUT} "${pkg}" \
-          "${testargs[@]:+${testargs[@]}}"; then
+          "${TESTARGS[@]:+${TESTARGS[@]}}"; then
         pass=$((pass + 1))
       else
         ITERATION_FAILURES=$((ITERATION_FAILURES + 1))
@@ -232,9 +231,9 @@ runTests() {
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running tests without code coverage"
-    go test "${goflags[@]:+${goflags[@]}}" \
+    go test "${GOFLAGS[@]:+${GOFLAGS[@]}}" \
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
-     "${testargs[@]:+${testargs[@]}}" \
+     "${TESTARGS[@]:+${TESTARGS[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
      | grep "${go_test_grep_pattern}" && rc=$? || rc=$?
     produceJUnitXMLReport "${junit_filename_prefix}"
@@ -256,17 +255,21 @@ runTests() {
   # must make sure the output from parallel runs is not mixed. To achieve this,
   # we spawn a subshell for each parallel process, redirecting the output to
   # separate files.
-  if [ "$(uname)" == "Darwin" ]; then
-    args=(-I{} -n1)
-  else
-    args=(-I{} -n1 -d " ")
+
+  if [ ! -z ${GOFLAGS:-} ]; then
+    export GOFLAGS
   fi
+  if [ ! -z ${TESTARGS:-} ]; then
+    export TESTARGS
+  fi
+  export COVER_REPORT_DIR=$cover_report_dir
+  export COVER_PROFILE=$cover_profile
+  export JUNIT_FILENAME_PREFIX=$junit_filename_prefix
+  export GO_TEST_GREP_PATTERN=$go_test_grep_pattern
+  export KUBE_GO_PACKAGE KUBE_RACE KUBE_TIMEOUT KUBE_COVERMODE GOFLAGS TESTARGS
 
-  export goflags KUBE_GO_PACKAGE KUBE_RACE KUBE_TIMEOUT KUBE_COVERMODE cover_report_dir \
-  cover_profile testargs junit_filename_prefix go_test_grep_pattern
-
-  echo "${@}" | xargs "${args[@]}" -P${KUBE_COVERPROCS} \
-  bash -c "hack/run-go-test.sh {}" \
+  printf "%s\0" "${@}" | xargs -0 -I{} -n1 -P${KUBE_COVERPROCS} \
+    bash -c "${KUBE_ROOT}/hack/run-go-test.sh {}" \
     && test_result=$? || test_result=$?
 
   produceJUnitXMLReport "${junit_filename_prefix}"
