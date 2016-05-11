@@ -1461,7 +1461,9 @@ message ObjectMeta {
   map<string, string> annotations = 12;
 
   // List of objects depended by this object. If ALL objects in the list have
-  // been deleted, this object will be garbage collected.
+  // been deleted, this object will be garbage collected. If this object is managed by a controller,
+  // then an entry in this list will point to this controller, with the controller field set to true.
+  // There cannot be more than one managing controller.
   repeated OwnerReference ownerReferences = 13;
 
   // Must be empty before the object is deleted from the registry. Each entry
@@ -1525,6 +1527,9 @@ message OwnerReference {
   // UID of the referent.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
   optional string uid = 4;
+
+  // If true, this reference points to the managing controller.
+  optional bool controller = 6;
 }
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
