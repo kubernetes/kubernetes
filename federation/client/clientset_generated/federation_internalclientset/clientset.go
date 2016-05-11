@@ -38,6 +38,9 @@ type Clientset struct {
 
 // Federation retrieves the FederationClient
 func (c *Clientset) Federation() unversionedfederation.FederationInterface {
+	if c == nil {
+		return nil
+	}
 	return c.FederationClient
 }
 
