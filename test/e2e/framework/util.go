@@ -379,10 +379,10 @@ func logPodStates(pods []api.Pod) {
 		if pod.DeletionGracePeriodSeconds != nil {
 			grace = fmt.Sprintf("%ds", *pod.DeletionGracePeriodSeconds)
 		}
-		Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %-[7]*[8]s %[9]s",
+		Debugf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %-[7]*[8]s %[9]s",
 			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.NodeName, maxPhaseW, pod.Status.Phase, maxGraceW, grace, pod.Status.Conditions)
 	}
-	Logf("") // Final empty line helps for readability.
+	Debugf("") // Final empty line helps for readability.
 }
 
 // PodRunningReady checks whether pod p's phase is running and it has a ready
@@ -2131,7 +2131,7 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 	for _, p := range pods {
 		if p.Status.Phase != api.PodRunning {
 			if p.Spec.NodeName != "" {
-				Logf("Pod %v assigned to host %v (IP: %v) in %v", p.Name, p.Spec.NodeName, p.Status.HostIP, p.Status.Phase)
+				Debugf("Pod %v assigned to host %v (IP: %v) in %v", p.Name, p.Spec.NodeName, p.Status.HostIP, p.Status.Phase)
 				badNodes.Insert(p.Spec.NodeName)
 			} else {
 				Logf("Pod %v still unassigned", p.Name)
@@ -2152,7 +2152,7 @@ func DumpAllNamespaceInfo(c *client.Client, namespace string) {
 		sort.Sort(byFirstTimestamp(sortedEvents))
 	}
 	for _, e := range sortedEvents {
-		Logf("At %v - event for %v: %v %v: %v", e.FirstTimestamp, e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+		Debugf("At %v - event for %v: %v %v: %v", e.FirstTimestamp, e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
 	}
 	// Note that we don't wait for any Cleanup to propagate, which means
 	// that if you delete a bunch of pods right before ending your test,
@@ -2179,7 +2179,7 @@ func (o byFirstTimestamp) Less(i, j int) bool {
 func dumpAllPodInfo(c *client.Client) {
 	pods, err := c.Pods("").List(api.ListOptions{})
 	if err != nil {
-		Logf("unable to fetch pod debug info: %v", err)
+		Debugf("unable to fetch pod debug info: %v", err)
 	}
 	logPodStates(pods.Items)
 }
@@ -2188,7 +2188,7 @@ func dumpAllNodeInfo(c *client.Client) {
 	// It should be OK to list unschedulable Nodes here.
 	nodes, err := c.Nodes().List(api.ListOptions{})
 	if err != nil {
-		Logf("unable to fetch node list: %v", err)
+		Debugf("unable to fetch node list: %v", err)
 		return
 	}
 	names := make([]string, len(nodes.Items))
@@ -2200,26 +2200,26 @@ func dumpAllNodeInfo(c *client.Client) {
 
 func DumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 	for _, n := range nodeNames {
-		Logf("\nLogging node info for node %v", n)
+		Debugf("\nLogging node info for node %v", n)
 		node, err := c.Nodes().Get(n)
 		if err != nil {
 			Logf("Error getting node info %v", err)
 		}
-		Logf("Node Info: %v", node)
+		Debugf("Node Info: %v", node)
 
-		Logf("\nLogging kubelet events for node %v", n)
+		Debugf("\nLogging kubelet events for node %v", n)
 		for _, e := range getNodeEvents(c, n) {
-			Logf("source %v type %v message %v reason %v first ts %v last ts %v, involved obj %+v",
+			Debugf("source %v type %v message %v reason %v first ts %v last ts %v, involved obj %+v",
 				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
 		}
-		Logf("\nLogging pods the kubelet thinks is on node %v", n)
+		Debugf("\nLogging pods the kubelet thinks is on node %v", n)
 		podList, err := GetKubeletPods(c, n)
 		if err != nil {
-			Logf("Unable to retrieve kubelet pods for node %v", n)
+			Debugf("Unable to retrieve kubelet pods for node %v", n)
 			continue
 		}
 		for _, p := range podList.Items {
-			Logf("%v started at %v (%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.ContainerStatuses))
+			Debugf("%v started at %v (%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.ContainerStatuses))
 			for _, c := range p.Status.ContainerStatuses {
 				Logf("\tContainer %v ready: %v, restart count %v",
 					c.Name, c.Ready, c.RestartCount)

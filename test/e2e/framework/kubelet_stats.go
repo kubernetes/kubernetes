@@ -264,11 +264,11 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 	latencyMetrics := GetKubeletLatencyMetrics(ms)
 	sort.Sort(latencyMetrics)
 	var badMetrics KubeletLatencyMetrics
-	Logf("\nLatency metrics for node %v", nodeName)
+	Debugf("\nLatency metrics for node %v", nodeName)
 	for _, m := range latencyMetrics {
 		if m.Latency > threshold {
 			badMetrics = append(badMetrics, m)
-			Logf("%+v", m)
+			Debugf("%+v", m)
 		}
 	}
 	return badMetrics, nil
