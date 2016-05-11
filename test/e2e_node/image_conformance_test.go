@@ -19,6 +19,8 @@ package e2e_node
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/client/restclient"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -31,7 +33,13 @@ const (
 )
 
 var _ = Describe("Image Container Conformance Test", func() {
-	Describe("[Flaky] image conformance blackbox test", func() {
+	var cl *client.Client
+	BeforeEach(func() {
+		// Setup the apiserver client
+		cl = client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
+	})
+	Describe("image conformance blackbox test", func() {
+
 		Context("when testing images that exist", func() {
 			var conformImages []ConformanceImage
 			BeforeEach(func() {

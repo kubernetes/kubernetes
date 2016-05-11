@@ -25,3 +25,16 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 var buildServices = flag.Bool("build-services", true, "If true, build local executables")
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+
+
+type SharedContext struct {
+	NodeName      string
+	PodConfigPath string
+}
+
+func NewDefaultFramework(baseName string) *framework.Framework {
+	client := client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
+	return framework.NewFramework(baseName, framework.FrameworkOptions{
+		ClientQPS:   100,
+		ClientBurst: 100,
+	}, client)

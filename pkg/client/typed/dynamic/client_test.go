@@ -60,7 +60,7 @@ func getObject(version, kind, name string) *runtime.Unstructured {
 func getClientServer(gv *unversioned.GroupVersion, h func(http.ResponseWriter, *http.Request)) (*Client, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
 	cl, err := NewClient(&restclient.Config{
-		Host:          srv.URL,
+		Hosts:         []string{srv.URL},
 		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
 	})
 	if err != nil {

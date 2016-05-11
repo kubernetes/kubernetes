@@ -195,7 +195,7 @@ func TestCreateClean(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
+	matchStringArg(config.Clusters["clean"].Server, clientConfig.Hosts[0], t)
 	matchStringArg("", clientConfig.APIPath, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
@@ -235,7 +235,7 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		matchStringArg(tc.host, clientConfig.Host, t)
+		matchStringArg(tc.host, clientConfig.Hosts[0], t)
 	}
 }
 
@@ -248,7 +248,7 @@ func TestCreateCleanDefault(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
+	matchStringArg(config.Clusters["clean"].Server, clientConfig.Hosts[0], t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
@@ -263,7 +263,7 @@ func TestCreateMissingContext(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	expectedConfig := &restclient.Config{Host: clientConfig.Host}
+	expectedConfig := &restclient.Config{Hosts: clientConfig.Hosts}
 
 	if !reflect.DeepEqual(expectedConfig, clientConfig) {
 		t.Errorf("Expected %#v, got %#v", expectedConfig, clientConfig)

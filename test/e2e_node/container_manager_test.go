@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -34,6 +35,8 @@ var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
 
 	BeforeEach(func() {
 		podClient = f.PodClient()
+		// Setup the apiserver client
+		cl = client.NewOrDie(&restclient.Config{Hosts: []string{*apiServerAddress}})
 	})
 
 	Describe("oom score adjusting", func() {
