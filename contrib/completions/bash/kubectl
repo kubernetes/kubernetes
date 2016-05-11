@@ -476,6 +476,49 @@ _kubectl_get()
     noun_aliases+=("thirdpartyresources")
 }
 
+_kubectl_set()
+{
+    last_command="kubectl_set"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--alsologtostderr")
+    flags+=("--api-version=")
+    flags+=("--as=")
+    flags+=("--certificate-authority=")
+    flags+=("--client-certificate=")
+    flags+=("--client-key=")
+    flags+=("--cluster=")
+    flags+=("--context=")
+    flags+=("--insecure-skip-tls-verify")
+    flags+=("--kubeconfig=")
+    flags+=("--log-backtrace-at=")
+    flags+=("--log-dir=")
+    flags+=("--log-flush-frequency=")
+    flags+=("--logtostderr")
+    flags+=("--match-server-version")
+    flags+=("--namespace=")
+    flags_with_completion+=("--namespace")
+    flags_completion+=("__kubectl_get_namespaces")
+    flags+=("--password=")
+    flags+=("--server=")
+    two_word_flags+=("-s")
+    flags+=("--stderrthreshold=")
+    flags+=("--token=")
+    flags+=("--user=")
+    flags+=("--username=")
+    flags+=("--v=")
+    flags+=("--vmodule=")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
 _kubectl_describe()
 {
     last_command="kubectl_describe"
@@ -3518,6 +3561,7 @@ _kubectl()
     last_command="kubectl"
     commands=()
     commands+=("get")
+    commands+=("set")
     commands+=("describe")
     commands+=("create")
     commands+=("replace")
