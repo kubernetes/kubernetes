@@ -35,6 +35,7 @@ func init() {
 		DeepCopy_federation_ClusterMeta,
 		DeepCopy_federation_ClusterSpec,
 		DeepCopy_federation_ClusterStatus,
+		DeepCopy_federation_ServerAddressByClientCIDR,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
@@ -100,9 +101,9 @@ func DeepCopy_federation_ClusterMeta(in ClusterMeta, out *ClusterMeta, c *conver
 func DeepCopy_federation_ClusterSpec(in ClusterSpec, out *ClusterSpec, c *conversion.Cloner) error {
 	if in.ServerAddressByClientCIDRs != nil {
 		in, out := in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]unversioned.ServerAddressByClientCIDR, len(in))
+		*out = make([]ServerAddressByClientCIDR, len(in))
 		for i := range in {
-			if err := unversioned.DeepCopy_unversioned_ServerAddressByClientCIDR(in[i], &(*out)[i], c); err != nil {
+			if err := DeepCopy_federation_ServerAddressByClientCIDR(in[i], &(*out)[i], c); err != nil {
 				return err
 			}
 		}
@@ -154,5 +155,11 @@ func DeepCopy_federation_ClusterStatus(in ClusterStatus, out *ClusterStatus, c *
 	if err := DeepCopy_federation_ClusterMeta(in.ClusterMeta, &out.ClusterMeta, c); err != nil {
 		return err
 	}
+	return nil
+}
+
+func DeepCopy_federation_ServerAddressByClientCIDR(in ServerAddressByClientCIDR, out *ServerAddressByClientCIDR, c *conversion.Cloner) error {
+	out.ClientCIDR = in.ClientCIDR
+	out.ServerAddress = in.ServerAddress
 	return nil
 }

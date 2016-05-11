@@ -105,12 +105,6 @@ func DeepCopy_unversioned_ListMeta(in ListMeta, out *ListMeta, c *conversion.Clo
 	return nil
 }
 
-func DeepCopy_unversioned_ServerAddressByClientCIDR(in ServerAddressByClientCIDR, out *ServerAddressByClientCIDR, c *conversion.Cloner) error {
-	out.ClientCIDR = in.ClientCIDR
-	out.ServerAddress = in.ServerAddress
-	return nil
-}
-
 func DeepCopy_unversioned_Time(in Time, out *Time, c *conversion.Cloner) error {
 	if newVal, err := c.DeepCopy(in.Time); err != nil {
 		return err
