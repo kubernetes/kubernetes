@@ -54,10 +54,10 @@ func TestLog(t *testing.T) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
 					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Body: body}, nil
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				case p == test.logPath && m == "GET":
 					body := ioutil.NopCloser(bytes.NewBufferString(logContent))
-					return &http.Response{StatusCode: 200, Body: body}, nil
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				default:
 					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)

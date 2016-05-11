@@ -80,8 +80,11 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) Clien
 				if !ok {
 					t.Fatalf("%s: unexpected request: %s (%s)\n%#v", testName, p, req.URL, req)
 				}
+				header := http.Header{}
+				header.Set("Content-Type", runtime.ContentTypeJSON)
 				return &http.Response{
 					StatusCode: http.StatusOK,
+					Header:     header,
 					Body:       stringBody(body),
 				}, nil
 			}),
