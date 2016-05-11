@@ -195,18 +195,18 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		kubeletPort = ports.KubeletPort
 	}
 	if portReq == "" || strconv.Itoa(int(kubeletPort)) == portReq {
-		scheme, port, kubeletTransport, err := connection.GetConnectionInfo(ctx, node.Name)
+		connectionInfo, err := connection.GetConnectionInfo(ctx, node.Name)
 		if err != nil {
 			return nil, nil, err
 		}
 		return &url.URL{
-				Scheme: scheme,
+				Scheme: connectionInfo.Scheme,
 				Host: net.JoinHostPort(
 					host,
-					strconv.FormatUint(uint64(port), 10),
+					strconv.FormatUint(uint64(connectionInfo.Port), 10),
 				),
 			},
-			kubeletTransport,
+			connectionInfo.Transport,
 			nil
 	}
 	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(host, portReq)}, proxyTransport, nil

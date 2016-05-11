@@ -282,9 +282,9 @@ func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
 	kl.recorder.Eventf(kl.nodeRef, eventtype, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
-// Set IP addresses for the node.
+// Set IP and hostname addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *api.Node) error {
-
+	hostnameAddress := api.NodeAddress{Type: api.NodeHostName, Address: kl.GetHostname()}
 	if kl.cloud != nil {
 		instances, ok := kl.cloud.Instances()
 		if !ok {
@@ -298,7 +298,12 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
-		node.Status.Addresses = nodeAddresses
+		for _, address := range nodeAddresses {
+			if address.Type == api.NodeHostName {
+				return fmt.Errorf("HostnameAddress should not be set by cloudprovider.")
+			}
+		}
+		node.Status.Addresses = append(nodeAddresses, hostnameAddress)
 	} else {
 		var ipAddr net.IP
 		var err error
@@ -333,12 +338,12 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 			node.Status.Addresses = []api.NodeAddress{
 				{Type: api.NodeLegacyHostIP, Address: ipAddr.String()},
 				{Type: api.NodeInternalIP, Address: ipAddr.String()},
+				hostnameAddress,
 			}
 		}
 	}
 	return nil
 }
-
 func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
 	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.

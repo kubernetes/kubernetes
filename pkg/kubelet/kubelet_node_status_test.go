@@ -177,6 +177,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			Addresses: []api.NodeAddress{
 				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
 				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: api.NodeHostName, Address: testKubeletHostname},
 			},
 			Images: expectedImageList,
 		},
@@ -440,6 +441,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Addresses: []api.NodeAddress{
 				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
 				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: api.NodeHostName, Address: testKubeletHostname},
 			},
 			// images will be sorted from max to min in node status.
 			Images: []api.ContainerImage{
@@ -736,6 +738,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			Addresses: []api.NodeAddress{
 				{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"},
 				{Type: api.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: api.NodeHostName, Address: testKubeletHostname},
 			},
 			Images: []api.ContainerImage{
 				{
