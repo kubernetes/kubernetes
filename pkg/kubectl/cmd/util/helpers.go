@@ -83,20 +83,27 @@ func DefaultBehaviorOnFatal() {
 	fatalErrHandler = fatal
 }
 
-// fatal prints the message and then exits. If V(2) or greater, glog.Fatal
-// is invoked for extended information.
+// fatal prints the message (if provided) and then exits. If V(2) or greater,
+// glog.Fatal is invoked for extended information.
 func fatal(msg string) {
-	// add newline if needed
-	if !strings.HasSuffix(msg, "\n") {
-		msg += "\n"
-	}
-
 	if glog.V(2) {
 		glog.FatalDepth(2, msg)
 	}
-	fmt.Fprint(os.Stderr, msg)
+
+	if len(msg) > 0 {
+		// add newline if needed
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
+		fmt.Fprint(os.Stderr, msg)
+	}
+
 	os.Exit(1)
 }
+
+// ErrExit may be passed to CheckError to instruct it to output nothing but exit with
+// status code 1.
+var ErrExit = fmt.Errorf("exit")
 
 // CheckErr prints a user friendly error to STDERR and exits with a non-zero
 // exit code. Unrecognized errors will be printed with an "error: " prefix.
@@ -112,11 +119,17 @@ func checkErr(err error, handleErr func(string)) {
 		return
 	}
 
+	if err == ErrExit {
+		handleErr("")
+		return
+	}
+
 	if errors.IsInvalid(err) {
 		details := err.(*errors.StatusError).Status().Details
 		prefix := fmt.Sprintf("The %s %q is invalid.\n", details.Kind, details.Name)
 		errs := statusCausesToAggrError(details.Causes)
 		handleErr(MultilineError(prefix, errs))
+		return
 	}
 
 	if meta.IsNoResourceMatchError(err) {
@@ -138,9 +151,11 @@ func checkErr(err error, handleErr func(string)) {
 	// handle multiline errors
 	if clientcmd.IsConfigurationInvalid(err) {
 		handleErr(MultilineError("Error in configuration: ", err))
+		return
 	}
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
 		handleErr(MultipleErrors("", agg.Errors()))
+		return
 	}
 
 	msg, ok := StandardErrorMessage(err)
