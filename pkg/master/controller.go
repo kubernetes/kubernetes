@@ -39,7 +39,7 @@ import (
 )
 
 // Controller is the controller manager for the core bootstrap Kubernetes controller
-// loops, which manage creating the "kubernetes" service, the "default"
+// loops, which manage creating the "kubernetes" service, the "default" and "kube-system"
 // namespace, and provide the IP repair check on service IPs
 type Controller struct {
 	NamespaceRegistry namespace.Registry
@@ -57,6 +57,9 @@ type Controller struct {
 
 	EndpointRegistry endpoint.Registry
 	EndpointInterval time.Duration
+
+	SystemNamespaces         []string
+	SystemNamespacesInterval time.Duration
 
 	PublicIP net.IP
 
@@ -94,8 +97,20 @@ func (c *Controller) Start() {
 		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
 	}
 
-	c.runner = util.NewRunner(c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
+	c.runner = util.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
 	c.runner.Start()
+}
+
+// RunKubernetesNamespaces periodically makes sure that all internal namespaces exist
+func (c *Controller) RunKubernetesNamespaces(ch chan struct{}) {
+	wait.Until(func() {
+		// Loop the system namespace list, and create them if they do not exist
+		for _, ns := range c.SystemNamespaces {
+			if err := c.CreateNamespaceIfNeeded(ns); err != nil {
+				runtime.HandleError(fmt.Errorf("unable to create required kubernetes system namespace %s: %v", ns, err))
+			}
+		}
+	}, c.SystemNamespacesInterval, ch)
 }
 
 // RunKubernetesService periodically updates the kubernetes service
@@ -132,10 +147,10 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	return nil
 }
 
-// CreateNamespaceIfNeeded will create the namespace that contains the master services if it doesn't already exist
+// CreateNamespaceIfNeeded will create a namespace if it doesn't already exist
 func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 	ctx := api.NewContext()
-	if _, err := c.NamespaceRegistry.GetNamespace(ctx, api.NamespaceDefault); err == nil {
+	if _, err := c.NamespaceRegistry.GetNamespace(ctx, ns); err == nil {
 		// the namespace already exists
 		return nil
 	}
