@@ -103,7 +103,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 }
 
 const (
-	apiPackagePath        = "k8s.io/kubernetes/pkg/api"
+	runtimePackagePath    = "k8s.io/kubernetes/pkg/runtime"
 	conversionPackagePath = "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -130,7 +130,14 @@ func NewGenDeepCopy(sanitizedName, targetPackage string, generateInitFunc bool) 
 
 func (g *genDeepCopy) Namers(c *generator.Context) namer.NameSystems {
 	// Have the raw namer for this file track what it imports.
-	return namer.NameSystems{"raw": namer.NewRawNamer(g.targetPackage, g.imports)}
+	return namer.NameSystems{
+		"raw": namer.NewRawNamer(g.targetPackage, g.imports),
+		"dcFnName": &dcFnNamer{
+			public:    deepCopyNamer(),
+			tracker:   g.imports,
+			myPackage: g.targetPackage,
+		},
+	}
 }
 
 func (g *genDeepCopy) Filter(c *generator.Context, t *types.Type) bool {
@@ -172,12 +179,6 @@ func (g *genDeepCopy) isOtherPackage(pkg string) bool {
 
 func (g *genDeepCopy) Imports(c *generator.Context) (imports []string) {
 	importLines := []string{}
-	if g.isOtherPackage(apiPackagePath) && g.generateInitFunc {
-		importLines = append(importLines, "api \""+apiPackagePath+"\"")
-	}
-	if g.isOtherPackage(conversionPackagePath) {
-		importLines = append(importLines, "conversion \""+conversionPackagePath+"\"")
-	}
 	for _, singleImport := range g.imports.ImportLines() {
 		if g.isOtherPackage(singleImport) {
 			importLines = append(importLines, singleImport)
@@ -186,19 +187,25 @@ func (g *genDeepCopy) Imports(c *generator.Context) (imports []string) {
 	return importLines
 }
 
-func argsFromType(t *types.Type) interface{} {
-	return map[string]interface{}{
+func argsFromType(t *types.Type) generator.Args {
+	return generator.Args{
 		"type": t,
 	}
 }
 
-func (g *genDeepCopy) funcNameTmpl(t *types.Type) string {
-	tmpl := "DeepCopy_$.type|public$"
-	g.imports.AddType(t)
-	if t.Name.Package != g.targetPackage {
-		tmpl = g.imports.LocalNameOf(t.Name.Package) + "." + tmpl
+type dcFnNamer struct {
+	public    namer.Namer
+	tracker   namer.ImportTracker
+	myPackage string
+}
+
+func (n *dcFnNamer) Name(t *types.Type) string {
+	pubName := n.public.Name(t)
+	n.tracker.AddType(t)
+	if t.Name.Package == n.myPackage {
+		return "DeepCopy_" + pubName
 	}
-	return tmpl
+	return fmt.Sprintf("%s.DeepCopy_%s", n.tracker.LocalNameOf(t.Name.Package), pubName)
 }
 
 func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
@@ -210,30 +217,27 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 	}
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	sw.Do("func init() {\n", nil)
-	if g.targetPackage == apiPackagePath {
-		sw.Do("if err := Scheme.AddGeneratedDeepCopyFuncs(\n", nil)
-	} else {
-		sw.Do("if err := api.Scheme.AddGeneratedDeepCopyFuncs(\n", nil)
-	}
+	sw.Do("SchemeBuilder.Register(func(scheme *$.|raw$) {\n",
+		types.Ref(runtimePackagePath, "Scheme"),
+	)
+	sw.Do("if err := scheme.AddGeneratedDeepCopyFuncs(\n", nil)
 	for _, t := range g.typesForInit {
-		sw.Do(fmt.Sprintf("%s,\n", g.funcNameTmpl(t)), argsFromType(t))
+		sw.Do("$.type|dcFnName$,\n", argsFromType(t))
 	}
 	sw.Do("); err != nil {\n", nil)
 	sw.Do("// if one of the deep copy functions is malformed, detect it immediately.\n", nil)
 	sw.Do("panic(err)\n", nil)
 	sw.Do("}\n", nil)
+	sw.Do("})\n", nil)
 	sw.Do("}\n\n", nil)
 	return sw.Error()
 }
 
 func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	funcName := g.funcNameTmpl(t)
-	if g.targetPackage == conversionPackagePath {
-		sw.Do(fmt.Sprintf("func %s(in $.type|raw$, out *$.type|raw$, c *Cloner) error {\n", funcName), argsFromType(t))
-	} else {
-		sw.Do(fmt.Sprintf("func %s(in $.type|raw$, out *$.type|raw$, c *conversion.Cloner) error {\n", funcName), argsFromType(t))
-	}
+	args := argsFromType(t).
+		With("clonerType", types.Ref(conversionPackagePath, "Cloner"))
+	sw.Do("func $.type|dcFnName$(in $.type|raw$, out *$.type|raw$, c *$.clonerType|raw$) error {\n", args)
 	g.generateFor(t, sw)
 	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
@@ -279,8 +283,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 		} else {
 			if copyableWithinPackage(t.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", t.Elem)
-				funcName := g.funcNameTmpl(t.Elem)
-				sw.Do(fmt.Sprintf("if err := %s(val, newVal, c); err != nil {\n", funcName), argsFromType(t.Elem))
+				sw.Do("if err := $.type|dcFnName$(val, newVal, c); err != nil {\n", argsFromType(t.Elem))
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
 				sw.Do("(*out)[key] = *newVal\n", nil)
@@ -309,8 +312,7 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 		if t.Elem.IsAssignable() {
 			sw.Do("(*out)[i] = in[i]\n", nil)
 		} else if copyableWithinPackage(t.Elem) {
-			funcName := g.funcNameTmpl(t.Elem)
-			sw.Do(fmt.Sprintf("if err := %s(in[i], &(*out)[i], c); err != nil {\n", funcName), argsFromType(t.Elem))
+			sw.Do("if err := $.type|dcFnName$(in[i], &(*out)[i], c); err != nil {\n", argsFromType(t.Elem))
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 		} else {
@@ -342,8 +344,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("}\n", nil)
 		case types.Struct:
 			if copyableWithinPackage(m.Type) {
-				funcName := g.funcNameTmpl(m.Type)
-				sw.Do(fmt.Sprintf("if err := %s(in.$.name$, &out.$.name$, c); err != nil {\n", funcName), args)
+				sw.Do("if err := $.type|dcFnName$(in.$.name$, &out.$.name$, c); err != nil {\n", args)
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
 			} else {
@@ -379,8 +380,7 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 	if t.Elem.Kind == types.Builtin {
 		sw.Do("**out = *in", nil)
 	} else if copyableWithinPackage(t.Elem) {
-		funcName := g.funcNameTmpl(t.Elem)
-		sw.Do(fmt.Sprintf("if err := %s(*in, *out, c); err != nil {\n", funcName), argsFromType(t.Elem))
+		sw.Do("if err := $.type|dcFnName$(*in, *out, c); err != nil {\n", argsFromType(t.Elem))
 		sw.Do("return err\n", nil)
 		sw.Do("}\n", nil)
 	} else {
