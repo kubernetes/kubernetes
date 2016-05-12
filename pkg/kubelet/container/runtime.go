@@ -233,6 +233,8 @@ const (
 	ContainerStateExited  ContainerState = "exited"
 	// This unknown encompasses all the states that we currently don't care.
 	ContainerStateUnknown ContainerState = "unknown"
+	// Not in use yet.
+	ContainerStateCreated ContainerState = "created"
 )
 
 // Container provides the runtime information for a container, such as ID, hash,
