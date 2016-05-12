@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
+	qosutil "k8s.io/kubernetes/pkg/kubelet/qos/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -998,4 +999,32 @@ func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint
 	}
 
 	return true
+}
+
+// Determine if a pod is scheduled with best-effort QoS
+func isPodBestEffort(pod *api.Pod) bool {
+	return qosutil.GetPodQos(pod) == qosutil.BestEffort
+}
+
+// CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node
+// reporting memory pressure condition.
+func CheckNodeMemoryPressurePredicate(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, fmt.Errorf("node not found")
+	}
+
+	// pod is not BestEffort pod
+	if !isPodBestEffort(pod) {
+		return true, nil
+	}
+
+	// is node under presure?
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == api.NodeMemoryPressure && cond.Status == api.ConditionTrue {
+			return false, ErrNodeUnderMemoryPressure
+		}
+	}
+
+	return true, nil
 }

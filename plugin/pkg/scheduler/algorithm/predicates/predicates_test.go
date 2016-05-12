@@ -2641,3 +2641,111 @@ func TestPodToleratesTaints(t *testing.T) {
 		}
 	}
 }
+
+func makeEmptyNodeInfo(node *api.Node) *schedulercache.NodeInfo {
+	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo.SetNode(node)
+	return nodeInfo
+}
+
+func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
+	// specify best-effort pod
+	bestEffortPod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:            "container",
+					Image:           "image",
+					ImagePullPolicy: "Always",
+					// no requirements -> best effort pod
+					Resources: api.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	// specify non-best-effort pod
+	nonBestEffortPod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:            "container",
+					Image:           "image",
+					ImagePullPolicy: "Always",
+					// at least one requirement -> burstable pod
+					Resources: api.ResourceRequirements{
+						Requests: makeAllocatableResources(100, 100, 100, 100),
+					},
+				},
+			},
+		},
+	}
+
+	// specify a node with no memory pressure condition on
+	noMemoryPressureNode := &api.Node{
+		Status: api.NodeStatus{
+			Conditions: []api.NodeCondition{
+				{
+					Type:   "Ready",
+					Status: "True",
+				},
+			},
+		},
+	}
+
+	// specify a node with memory pressure condition on
+	memoryPressureNode := &api.Node{
+		Status: api.NodeStatus{
+			Conditions: []api.NodeCondition{
+				{
+					Type:   "MemoryPressure",
+					Status: "True",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		name     string
+	}{
+		{
+			pod:      bestEffortPod,
+			nodeInfo: makeEmptyNodeInfo(noMemoryPressureNode),
+			fits:     true,
+			name:     "best-effort pod schedulable on node without memory pressure condition on",
+		},
+		{
+			pod:      bestEffortPod,
+			nodeInfo: makeEmptyNodeInfo(memoryPressureNode),
+			fits:     false,
+			name:     "best-effort pod not schedulable on node with memory pressure condition on",
+		},
+		{
+			pod:      nonBestEffortPod,
+			nodeInfo: makeEmptyNodeInfo(memoryPressureNode),
+			fits:     true,
+			name:     "non best-effort pod schedulable on node with memory pressure condition on",
+		},
+		{
+			pod:      nonBestEffortPod,
+			nodeInfo: makeEmptyNodeInfo(noMemoryPressureNode),
+			fits:     true,
+			name:     "non best-effort pod schedulable on node without memory pressure condition on",
+		},
+	}
+
+	for _, test := range tests {
+		fits, err := CheckNodeMemoryPressurePredicate(test.pod, test.nodeInfo)
+		if fits != test.fits {
+			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
+		}
+
+		if err != nil && err != ErrNodeUnderMemoryPressure {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+			continue
+		}
+	}
+}
