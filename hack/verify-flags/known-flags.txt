@@ -18,6 +18,7 @@ api-token
 api-version
 apiserver-count
 auth-path
+authentication-token-webhook-config-file
 authorization-mode
 authorization-policy-file
 authorization-webhook-config-file
