@@ -174,7 +174,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 	namer := &testNamer{namespace, name}
 
-	versionedObj, err := api.Scheme.ConvertToVersion(&api.Pod{}, "v1")
+	versionedObj, err := api.Scheme.ConvertToVersion(&api.Pod{}, unversioned.GroupVersion{Version: "v1"})
 	if err != nil {
 		t.Errorf("%s: unexpected error: %v", tc.name, err)
 		return

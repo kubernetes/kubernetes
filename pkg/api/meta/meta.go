@@ -123,33 +123,21 @@ type objectAccessor struct {
 }
 
 func (obj objectAccessor) GetKind() string {
-	if gvk := obj.GetObjectKind().GroupVersionKind(); gvk != nil {
-		return gvk.Kind
-	}
-	return ""
+	return obj.GetObjectKind().GroupVersionKind().Kind
 }
 
 func (obj objectAccessor) SetKind(kind string) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
-	if gvk == nil {
-		gvk = &unversioned.GroupVersionKind{}
-	}
 	gvk.Kind = kind
 	obj.GetObjectKind().SetGroupVersionKind(gvk)
 }
 
 func (obj objectAccessor) GetAPIVersion() string {
-	if gvk := obj.GetObjectKind().GroupVersionKind(); gvk != nil {
-		return gvk.GroupVersion().String()
-	}
-	return ""
+	return obj.GetObjectKind().GroupVersionKind().GroupVersion().String()
 }
 
 func (obj objectAccessor) SetAPIVersion(version string) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
-	if gvk == nil {
-		gvk = &unversioned.GroupVersionKind{}
-	}
 	gv, err := unversioned.ParseGroupVersion(version)
 	if err != nil {
 		gv = unversioned.GroupVersion{Version: version}

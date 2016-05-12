@@ -25,12 +25,12 @@ func Kind(kind string) GroupKind {
 }
 
 // SetGroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
-func (obj *TypeMeta) SetGroupVersionKind(gvk *GroupVersionKind) {
+func (obj *TypeMeta) SetGroupVersionKind(gvk GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
 
 // GroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
-func (obj *TypeMeta) GroupVersionKind() *GroupVersionKind {
+func (obj *TypeMeta) GroupVersionKind() GroupVersionKind {
 	return FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 

@@ -301,18 +301,18 @@ func (u *Unstructured) SetAnnotations(annotations map[string]string) {
 	u.setNestedMap(annotations, "metadata", "annotations")
 }
 
-func (u *Unstructured) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+func (u *Unstructured) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
 	u.SetAPIVersion(gvk.GroupVersion().String())
 	u.SetKind(gvk.Kind)
 }
 
-func (u *Unstructured) GroupVersionKind() *unversioned.GroupVersionKind {
+func (u *Unstructured) GroupVersionKind() unversioned.GroupVersionKind {
 	gv, err := unversioned.ParseGroupVersion(u.GetAPIVersion())
 	if err != nil {
-		return nil
+		return unversioned.GroupVersionKind{}
 	}
 	gvk := gv.WithKind(u.GetKind())
-	return &gvk
+	return gvk
 }
 
 // UnstructuredList allows lists that do not have Golang structs
@@ -364,18 +364,18 @@ func (u *UnstructuredList) SetSelfLink(selfLink string) {
 	u.setNestedField(selfLink, "metadata", "selfLink")
 }
 
-func (u *UnstructuredList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+func (u *UnstructuredList) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
 	u.SetAPIVersion(gvk.GroupVersion().String())
 	u.SetKind(gvk.Kind)
 }
 
-func (u *UnstructuredList) GroupVersionKind() *unversioned.GroupVersionKind {
+func (u *UnstructuredList) GroupVersionKind() unversioned.GroupVersionKind {
 	gv, err := unversioned.ParseGroupVersion(u.GetAPIVersion())
 	if err != nil {
-		return nil
+		return unversioned.GroupVersionKind{}
 	}
 	gvk := gv.WithKind(u.GetKind())
-	return &gvk
+	return gvk
 }
 
 // VersionedObjects is used by Decoders to give callers a way to access all versions

@@ -182,7 +182,7 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if version.IsEmpty() {
 			continue
 		}
-		converted, err := p.convertor.ConvertToVersion(obj, version.String())
+		converted, err := p.convertor.ConvertToVersion(obj, version)
 		if runtime.IsNotRegisteredError(err) {
 			continue
 		}

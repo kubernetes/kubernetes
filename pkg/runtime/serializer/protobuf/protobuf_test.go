@@ -34,12 +34,12 @@ import (
 )
 
 type testObject struct {
-	gvk *unversioned.GroupVersionKind
+	gvk unversioned.GroupVersionKind
 }
 
-func (d *testObject) GetObjectKind() unversioned.ObjectKind                 { return d }
-func (d *testObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) { d.gvk = gvk }
-func (d *testObject) GroupVersionKind() *unversioned.GroupVersionKind       { return d.gvk }
+func (d *testObject) GetObjectKind() unversioned.ObjectKind                { return d }
+func (d *testObject) SetGroupVersionKind(gvk unversioned.GroupVersionKind) { d.gvk = gvk }
+func (d *testObject) GroupVersionKind() unversioned.GroupVersionKind       { return d.gvk }
 
 type testMarshalable struct {
 	testObject
@@ -106,7 +106,7 @@ func TestEncode(t *testing.T) {
 		0x22, 0x00, // content-encoding
 	}
 	obj2 := &testMarshalable{
-		testObject: testObject{gvk: &unversioned.GroupVersionKind{Kind: "test", Group: "other", Version: "version"}},
+		testObject: testObject{gvk: unversioned.GroupVersionKind{Kind: "test", Group: "other", Version: "version"}},
 		data:       []byte{0x01, 0x02, 0x03},
 	}
 	wire2 := []byte{

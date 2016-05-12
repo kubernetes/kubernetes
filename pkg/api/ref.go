@@ -54,10 +54,7 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 
 	// if the object referenced is actually persisted, we can just get kind from meta
 	// if we are building an object reference to something not yet persisted, we should fallback to scheme
-	var kind string
-	if gvk != nil {
-		kind = gvk.Kind
-	}
+	kind := gvk.Kind
 	if len(kind) == 0 {
 		// TODO: this is wrong
 		gvk, err := Scheme.ObjectKind(obj)
@@ -68,10 +65,7 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	}
 
 	// if the object referenced is actually persisted, we can also get version from meta
-	var version string
-	if gvk != nil {
-		version = gvk.GroupVersion().String()
-	}
+	version := gvk.GroupVersion().String()
 	if len(version) == 0 {
 		selfLink := meta.GetSelfLink()
 		if len(selfLink) == 0 {
@@ -111,9 +105,9 @@ func GetPartialReference(obj runtime.Object, fieldPath string) (*ObjectReference
 
 // IsAnAPIObject allows clients to preemptively get a reference to an API object and pass it to places that
 // intend only to get a reference to that object. This simplifies the event recording interface.
-func (obj *ObjectReference) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+func (obj *ObjectReference) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
-func (obj *ObjectReference) GroupVersionKind() *unversioned.GroupVersionKind {
+func (obj *ObjectReference) GroupVersionKind() unversioned.GroupVersionKind {
 	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }

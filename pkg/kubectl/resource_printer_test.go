@@ -105,7 +105,7 @@ func TestPrinter(t *testing.T) {
 		},
 	}
 	emptyListTest := &api.PodList{}
-	testapi, err := api.Scheme.ConvertToVersion(podTest, testapi.Default.GroupVersion().String())
+	testapi, err := api.Scheme.ConvertToVersion(podTest, *testapi.Default.GroupVersion())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
