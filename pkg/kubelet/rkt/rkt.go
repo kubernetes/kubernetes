@@ -41,7 +41,6 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -120,15 +119,13 @@ type Runtime struct {
 	apisvcConn *grpc.ClientConn
 	apisvc     rktapi.PublicAPIClient
 	config     *Config
-	// TODO(yifan): Refactor this to be generic keyring.
-	dockerKeyring credentialprovider.DockerKeyring
 
 	containerRefManager *kubecontainer.RefManager
 	runtimeHelper       kubecontainer.RuntimeHelper
 	recorder            record.EventRecorder
 	livenessManager     proberesults.Manager
 	volumeGetter        volumeGetter
-	imagemanager        images.ImageManager
+	imageManager        images.ImageManager
 	runner              kubecontainer.HandlerRunner
 	execer              utilexec.Interface
 	os                  kubecontainer.OSInterface
@@ -146,6 +143,31 @@ type volumeGetter interface {
 	GetVolumes(podUID types.UID) (kubecontainer.VolumeMap, bool)
 }
 
+func getAPISvcAndConfig(apiEndpoint string, config *Config) (*grpc.ClientConn, rktapi.PublicAPIClient, *Config, error) {
+	// TODO(yifan): Use secure connection.
+	apisvcConn, err := grpc.Dial(apiEndpoint, grpc.WithInsecure())
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("rkt: cannot connect to rkt api service: %v", err)
+	}
+
+	// TODO(yifan): Get the rkt path from API service.
+	if config.Path == "" {
+		// No default rkt path was set, so try to find one in $PATH.
+		var err error
+		config.Path, err = exec.LookPath("rkt")
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("cannot find rkt binary: %v", err)
+		}
+	}
+	apisvc := rktapi.NewPublicAPIClient(apisvcConn)
+	config, err = getConfig(apisvc, config)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return apisvcConn, apisvc, config, nil
+}
+
 // New creates the rkt container runtime which implements the container runtime interface.
 // It will test if the rkt binary is in the $PATH, and whether we can get the
 // version of it. If so, creates the rkt container runtime, otherwise returns an error.
@@ -160,8 +182,7 @@ func New(
 	httpClient kubetypes.HttpGetter,
 	execer utilexec.Interface,
 	os kubecontainer.OSInterface,
-	imageBackOff *flowcontrol.Backoff,
-	serializeImagePulls bool,
+	imageManager images.ImageManager,
 ) (*Runtime, error) {
 	// Create dbus connection.
 	systemd, err := newSystemd()
@@ -169,20 +190,9 @@ func New(
 		return nil, fmt.Errorf("rkt: cannot create systemd interface: %v", err)
 	}
 
-	// TODO(yifan): Use secure connection.
-	apisvcConn, err := grpc.Dial(apiEndpoint, grpc.WithInsecure())
+	apisvcConn, apisvc, config, err := getAPISvcAndConfig(apiEndpoint, config)
 	if err != nil {
-		return nil, fmt.Errorf("rkt: cannot connect to rkt api service: %v", err)
-	}
-
-	// TODO(yifan): Get the rkt path from API service.
-	if config.Path == "" {
-		// No default rkt path was set, so try to find one in $PATH.
-		var err error
-		config.Path, err = execer.LookPath("rkt")
-		if err != nil {
-			return nil, fmt.Errorf("cannot find rkt binary: %v", err)
-		}
+		return nil, err
 	}
 
 	touchPath, err := execer.LookPath("touch")
@@ -193,9 +203,8 @@ func New(
 	rkt := &Runtime{
 		systemd:             systemd,
 		apisvcConn:          apisvcConn,
-		apisvc:              rktapi.NewPublicAPIClient(apisvcConn),
+		apisvc:              apisvc,
 		config:              config,
-		dockerKeyring:       credentialprovider.NewDockerKeyring(),
 		containerRefManager: containerRefManager,
 		runtimeHelper:       runtimeHelper,
 		recorder:            recorder,
@@ -204,16 +213,15 @@ func New(
 		execer:              execer,
 		os:                  os,
 		touchPath:           touchPath,
+		imageManager:        imageManager,
 	}
 
-	rkt.config, err = rkt.getConfig(rkt.config)
+	rkt.config, err = getConfig(rkt.apisvc, rkt.config)
 	if err != nil {
 		return nil, fmt.Errorf("rkt: cannot get config from rkt api service: %v", err)
 	}
 
 	rkt.runner = lifecycle.NewHandlerRunner(httpClient, rkt, rkt)
-
-	rkt.imagemanager, err = images.NewImageManager(recorder, rkt, imageBackOff, serializeImagePulls)
 
 	if err := rkt.getVersions(); err != nil {
 		return nil, fmt.Errorf("rkt: error getting version info: %v", err)
@@ -222,9 +230,9 @@ func New(
 	return rkt, nil
 }
 
-func (r *Runtime) buildCommand(args ...string) *exec.Cmd {
-	cmd := exec.Command(r.config.Path)
-	cmd.Args = append(cmd.Args, r.config.buildGlobalOptions()...)
+func buildCommand(config *Config, args ...string) *exec.Cmd {
+	cmd := exec.Command(config.Path)
+	cmd.Args = append(cmd.Args, config.buildGlobalOptions()...)
 	cmd.Args = append(cmd.Args, args...)
 	return cmd
 }
@@ -239,11 +247,11 @@ func convertToACName(name string) appctypes.ACName {
 
 // runCommand invokes rkt binary with arguments and returns the result
 // from stdout in a list of strings. Each string in the list is a line.
-func (r *Runtime) runCommand(args ...string) ([]string, error) {
+func runCommand(config *Config, args ...string) ([]string, error) {
 	glog.V(4).Info("rkt: Run command:", args)
 
 	var stdout, stderr bytes.Buffer
-	cmd := r.buildCommand(args...)
+	cmd := buildCommand(config, args...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("failed to run %v: %v\nstdout: %v\nstderr: %v", args, err, stdout.String(), stderr.String())
@@ -663,7 +671,7 @@ func makeContainerLogMount(opts *kubecontainer.RunContainerOptions, container *a
 }
 
 func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets []api.Secret, manifest *appcschema.PodManifest) error {
-	if err, _ := r.imagemanager.EnsureImageExists(pod, &c, pullSecrets); err != nil {
+	if err, _ := r.imageManager.EnsureImageExists(pod, &c, pullSecrets); err != nil {
 		return err
 	}
 	imgManifest, err := r.getImageManifest(c.Image)
@@ -675,7 +683,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets [
 		imgManifest.App = new(appctypes.App)
 	}
 
-	imageID, err := r.getImageID(c.Image)
+	imageID, err := getImageID(c.Image, r.apisvc)
 	if err != nil {
 		return err
 	}
@@ -827,7 +835,7 @@ func serviceFilePath(serviceName string) string {
 
 // generateRunCommand crafts a 'rkt run-prepared' command with necessary parameters.
 func (r *Runtime) generateRunCommand(pod *api.Pod, uuid string) (string, error) {
-	runPrepared := r.buildCommand("run-prepared").Args
+	runPrepared := buildCommand(r.config, "run-prepared").Args
 
 	var hostname string
 	var err error
@@ -910,7 +918,7 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 	if r.config.Stage1Image != "" {
 		cmds = append(cmds, "--stage1-path", r.config.Stage1Image)
 	}
-	output, err := r.runCommand(cmds...)
+	output, err := runCommand(r.config, cmds...)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1148,116 +1156,6 @@ func (r *Runtime) runLifecycleHooks(pod *api.Pod, runtimePod *kubecontainer.Pod,
 	return errors.NewAggregate(errlist)
 }
 
-// convertRktPod will convert a rktapi.Pod to a kubecontainer.Pod
-func (r *Runtime) convertRktPod(rktpod *rktapi.Pod) (*kubecontainer.Pod, error) {
-	manifest := &appcschema.PodManifest{}
-	err := json.Unmarshal(rktpod.Manifest, manifest)
-	if err != nil {
-		return nil, err
-	}
-
-	podUID, ok := manifest.Annotations.Get(k8sRktUIDAnno)
-	if !ok {
-		return nil, fmt.Errorf("pod is missing annotation %s", k8sRktUIDAnno)
-	}
-	podName, ok := manifest.Annotations.Get(k8sRktNameAnno)
-	if !ok {
-		return nil, fmt.Errorf("pod is missing annotation %s", k8sRktNameAnno)
-	}
-	podNamespace, ok := manifest.Annotations.Get(k8sRktNamespaceAnno)
-	if !ok {
-		return nil, fmt.Errorf("pod is missing annotation %s", k8sRktNamespaceAnno)
-	}
-
-	kubepod := &kubecontainer.Pod{
-		ID:        types.UID(podUID),
-		Name:      podName,
-		Namespace: podNamespace,
-	}
-
-	for i, app := range rktpod.Apps {
-		// The order of the apps is determined by the rkt pod manifest.
-		// TODO(yifan): Let the server to unmarshal the annotations? https://github.com/coreos/rkt/issues/1872
-		hashStr, ok := manifest.Apps[i].Annotations.Get(k8sRktContainerHashAnno)
-		if !ok {
-			return nil, fmt.Errorf("app %q is missing annotation %s", app.Name, k8sRktContainerHashAnno)
-		}
-		containerHash, err := strconv.ParseUint(hashStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse container's hash %q: %v", hashStr, err)
-		}
-
-		kubepod.Containers = append(kubepod.Containers, &kubecontainer.Container{
-			ID:   buildContainerID(&containerID{rktpod.Id, app.Name}),
-			Name: app.Name,
-			// By default, the version returned by rkt API service will be "latest" if not specified.
-			Image:   fmt.Sprintf("%s:%s", app.Image.Name, app.Image.Version),
-			Hash:    containerHash,
-			State:   appStateToContainerState(app.State),
-			Created: time.Unix(0, rktpod.CreatedAt).Unix(), // convert ns to s
-		})
-	}
-
-	return kubepod, nil
-}
-
-// GetPods runs 'systemctl list-unit' and 'rkt list' to get the list of rkt pods.
-// Then it will use the result to construct a list of container runtime pods.
-// If all is false, then only running pods will be returned, otherwise all pods will be
-// returned.
-func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
-	glog.V(4).Infof("Rkt getting pods")
-
-	listReq := &rktapi.ListPodsRequest{
-		Detail: true,
-		Filters: []*rktapi.PodFilter{
-			{
-				Annotations: []*rktapi.KeyValue{
-					{
-						Key:   k8sRktKubeletAnno,
-						Value: k8sRktKubeletAnnoValue,
-					},
-				},
-			},
-		},
-	}
-	if !all {
-		listReq.Filters[0].States = []rktapi.PodState{rktapi.PodState_POD_STATE_RUNNING}
-	}
-	listResp, err := r.apisvc.ListPods(context.Background(), listReq)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't list pods: %v", err)
-	}
-
-	pods := make(map[types.UID]*kubecontainer.Pod)
-	var podIDs []types.UID
-	for _, pod := range listResp.Pods {
-		pod, err := r.convertRktPod(pod)
-		if err != nil {
-			glog.Warningf("rkt: Cannot construct pod from unit file: %v.", err)
-			continue
-		}
-
-		// Group pods together.
-		oldPod, found := pods[pod.ID]
-		if !found {
-			pods[pod.ID] = pod
-			podIDs = append(podIDs, pod.ID)
-			continue
-		}
-
-		oldPod.Containers = append(oldPod.Containers, pod.Containers...)
-	}
-
-	// Convert map to list, using the consistent order from the podIDs array.
-	var result []*kubecontainer.Pod
-	for _, id := range podIDs {
-		result = append(result, pods[id])
-	}
-
-	return result, nil
-}
-
 func (r *Runtime) waitPreStopHooks(pod *api.Pod, runningPod *kubecontainer.Pod) {
 	gracePeriod := int64(minimumGracePeriodInSeconds)
 	switch {
@@ -1434,7 +1332,7 @@ func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy) error
 		glog.Errorf("rkt: Failed to reset failed systemd services: %v, continue to gc anyway...", err)
 	}
 
-	if _, err := r.runCommand("gc", "--grace-period="+gcPolicy.MinAge.String(), "--expire-prepared="+gcPolicy.MinAge.String()); err != nil {
+	if _, err := runCommand(r.config, "gc", "--grace-period="+gcPolicy.MinAge.String(), "--expire-prepared="+gcPolicy.MinAge.String()); err != nil {
 		glog.Errorf("rkt: Failed to gc: %v", err)
 	}
 
@@ -1480,7 +1378,7 @@ func (r *Runtime) RunInContainer(containerID kubecontainer.ContainerID, cmd []st
 	args := append([]string{}, "enter", fmt.Sprintf("--app=%s", id.appName), id.uuid)
 	args = append(args, cmd...)
 
-	result, err := r.buildCommand(args...).CombinedOutput()
+	result, err := buildCommand(r.config, args...).CombinedOutput()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			err = &rktExitError{exitErr}
@@ -1517,7 +1415,7 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 	}
 	args := append([]string{}, "enter", fmt.Sprintf("--app=%s", id.appName), id.uuid)
 	args = append(args, cmd...)
-	command := r.buildCommand(args...)
+	command := buildCommand(r.config, args...)
 
 	if tty {
 		p, err := kubecontainer.StartPty(command)
@@ -1772,7 +1670,17 @@ func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecont
 	return podStatus, nil
 }
 
-// FIXME: I need to be implemented.
-func (r *Runtime) ImageStats() (*kubecontainer.ImageStats, error) {
-	return &kubecontainer.ImageStats{}, nil
+// getImageManifest retrieves the image manifest for the given image.
+func (r *Runtime) getImageManifest(image string) (*appcschema.ImageManifest, error) {
+	var manifest appcschema.ImageManifest
+
+	images, err := listImages(image, true, r.apisvc)
+	if err != nil {
+		return nil, err
+	}
+	if len(images) == 0 {
+		return nil, fmt.Errorf("cannot find the image %q", image)
+	}
+
+	return &manifest, json.Unmarshal(images[0].Manifest, &manifest)
 }

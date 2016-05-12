@@ -119,12 +119,8 @@ type DockerManager struct {
 	// (Optional) Additional environment variables to be set for the pod infra container.
 	podInfraContainerEnv []api.EnvVar
 
-	// TODO(yifan): Record the pull failure so we can eliminate the image checking?
-	// Lower level docker image puller.
-	dockerPuller DockerPuller
-
-	// wrapped image puller.
-	imagemanager images.ImageManager
+	// Manages images.
+	imageManager images.ImageManager
 
 	// Root of the Docker runtime.
 	dockerRoot string
@@ -167,11 +163,10 @@ type DockerManager struct {
 	// it might already be true.
 	configureHairpinMode bool
 
-	// Provides image stats
-	*imageStatsProvider
-
 	// The version cache of docker daemon.
 	versionCache *cache.ObjectCache
+
+	podGetter kubecontainer.PodGetter
 }
 
 // A subset of the pod.Manager interface extracted for testing purposes.
@@ -199,8 +194,6 @@ func NewDockerManager(
 	podGetter podGetter,
 	machineInfo *cadvisorapi.MachineInfo,
 	podInfraContainerImage string,
-	qps float32,
-	burst int,
 	containerLogsDir string,
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
@@ -209,9 +202,10 @@ func NewDockerManager(
 	execHandler ExecHandler,
 	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFSInterface,
+	imageManager images.ImageManager,
+	runtimePodGetter kubecontainer.PodGetter,
 	cpuCFSQuota bool,
 	imageBackOff *flowcontrol.Backoff,
-	serializeImagePulls bool,
 	enableCustomMetrics bool,
 	hairpinMode bool,
 	options ...kubecontainer.Option) *DockerManager {
@@ -237,7 +231,6 @@ func NewDockerManager(
 		os:                     osInterface,
 		machineInfo:            machineInfo,
 		podInfraContainerImage: podInfraContainerImage,
-		dockerPuller:           newDockerPuller(client, qps, burst),
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
@@ -249,14 +242,10 @@ func NewDockerManager(
 		cpuCFSQuota:            cpuCFSQuota,
 		enableCustomMetrics:    enableCustomMetrics,
 		configureHairpinMode:   hairpinMode,
-		imageStatsProvider:     &imageStatsProvider{client},
+		imageManager:           imageManager,
+		podGetter:              runtimePodGetter,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	dm.imagemanager, err = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls)
-	if err != nil {
-		// FIXME: Inject imagemanager. Split image management from runtime.
-		glog.Errorf("Critical error: Failed to initialize Image Manager - %v", err)
-	}
 	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
 
 	dm.versionCache = cache.NewObjectCache(
@@ -759,89 +748,6 @@ func (dm *DockerManager) GetContainers(all bool) ([]*kubecontainer.Container, er
 	return result, nil
 }
 
-func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
-	start := time.Now()
-	defer func() {
-		metrics.ContainerManagerLatency.WithLabelValues("GetPods").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	pods := make(map[types.UID]*kubecontainer.Pod)
-	var result []*kubecontainer.Pod
-
-	containers, err := GetKubeletDockerContainers(dm.client, all)
-	if err != nil {
-		return nil, err
-	}
-
-	// Group containers by pod.
-	for _, c := range containers {
-		converted, err := toRuntimeContainer(c)
-		if err != nil {
-			glog.Errorf("Error examining the container: %v", err)
-			continue
-		}
-
-		podUID, podName, podNamespace, err := getPodInfoFromContainer(c)
-		if err != nil {
-			glog.Errorf("Error examining the container: %v", err)
-			continue
-		}
-
-		pod, found := pods[podUID]
-		if !found {
-			pod = &kubecontainer.Pod{
-				ID:        podUID,
-				Name:      podName,
-				Namespace: podNamespace,
-			}
-			pods[podUID] = pod
-		}
-		pod.Containers = append(pod.Containers, converted)
-	}
-
-	// Convert map to list.
-	for _, p := range pods {
-		result = append(result, p)
-	}
-	return result, nil
-}
-
-// List all images in the local storage.
-func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
-	var images []kubecontainer.Image
-
-	dockerImages, err := dm.client.ListImages(dockertypes.ImageListOptions{})
-	if err != nil {
-		return images, err
-	}
-
-	for _, di := range dockerImages {
-		image, err := toRuntimeImage(&di)
-		if err != nil {
-			continue
-		}
-		images = append(images, *image)
-	}
-	return images, nil
-}
-
-// TODO(vmarmol): Consider unexporting.
-// PullImage pulls an image from network to local storage.
-func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, secrets []api.Secret) error {
-	return dm.dockerPuller.Pull(image.Image, secrets)
-}
-
-// IsImagePresent checks whether the container image is already in the local storage.
-func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
-	return dm.dockerPuller.IsImagePresent(image.Image)
-}
-
-// Removes the specified image.
-func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
-	// TODO(harryz) currently Runtime interface does not provide other remove options.
-	_, err := dm.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{})
-	return err
-}
-
 // podInfraContainerChanged returns true if the pod infra container has changed.
 func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContainerStatus *kubecontainer.ContainerStatus) (bool, error) {
 	var ports []api.ContainerPort
@@ -1262,7 +1168,7 @@ func (dm *DockerManager) KillContainerInPod(containerID kubecontainer.ContainerI
 	switch {
 	case containerID.IsEmpty():
 		// Locate the container.
-		pods, err := dm.GetPods(false)
+		pods, err := dm.podGetter.GetPods(false)
 		if err != nil {
 			return err
 		}
@@ -1641,7 +1547,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 
 	// No pod secrets for the infra container.
 	// The message isnt needed for the Infra container
-	if err, msg := dm.imagemanager.EnsureImageExists(pod, container, nil); err != nil {
+	if err, msg := dm.imageManager.EnsureImageExists(pod, container, nil); err != nil {
 		return "", err, msg
 	}
 
@@ -1929,7 +1835,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			}
 		}
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
-		err, msg := dm.imagemanager.EnsureImageExists(pod, container, pullSecrets)
+		err, msg := dm.imageManager.EnsureImageExists(pod, container, pullSecrets)
 		if err != nil {
 			startContainerResult.Fail(err, msg)
 			continue

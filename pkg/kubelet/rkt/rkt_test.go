@@ -276,8 +276,9 @@ func TestCheckVersion(t *testing.T) {
 
 func TestListImages(t *testing.T) {
 	fr := newFakeRktInterface()
-	fs := newFakeSystemd()
-	r := &Runtime{apisvc: fr, systemd: fs}
+	r := &runtimeImages{
+		apisvc: fr,
+	}
 
 	tests := []struct {
 		images   []*rktapi.Image
@@ -345,8 +346,7 @@ func TestListImages(t *testing.T) {
 
 func TestGetPods(t *testing.T) {
 	fr := newFakeRktInterface()
-	fs := newFakeSystemd()
-	r := &Runtime{apisvc: fr, systemd: fs}
+	r := &runtimePodGetter{apisvc: fr}
 
 	ns := func(seconds int64) int64 {
 		return seconds * 1e9
@@ -517,8 +517,7 @@ func TestGetPods(t *testing.T) {
 
 func TestGetPodsFilters(t *testing.T) {
 	fr := newFakeRktInterface()
-	fs := newFakeSystemd()
-	r := &Runtime{apisvc: fr, systemd: fs}
+	r := &runtimePodGetter{apisvc: fr}
 
 	for _, test := range []struct {
 		All             bool

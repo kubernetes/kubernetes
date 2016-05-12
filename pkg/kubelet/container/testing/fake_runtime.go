@@ -179,17 +179,6 @@ func (f *FakeRuntime) Status() error {
 	return f.StatusErr
 }
 
-func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "GetPods")
-	if all {
-		return f.AllPodList, f.Err
-	}
-	return f.PodList, f.Err
-}
-
 func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
@@ -293,52 +282,6 @@ func (f *FakeRuntime) GetContainerLogs(pod *api.Pod, containerID ContainerID, lo
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []api.Secret) error {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
-	return f.PullErr
-}
-
-func (f *FakeRuntime) IsImagePresent(image ImageSpec) (bool, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "IsImagePresent")
-	for _, i := range f.ImageList {
-		if i.ID == image.Image {
-			return true, nil
-		}
-	}
-	return false, f.InspectErr
-}
-
-func (f *FakeRuntime) ListImages() ([]Image, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "ListImages")
-	return f.ImageList, f.Err
-}
-
-func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "RemoveImage")
-	index := 0
-	for i := range f.ImageList {
-		if f.ImageList[i].ID == image.Image {
-			index = i
-			break
-		}
-	}
-	f.ImageList = append(f.ImageList[:index], f.ImageList[index+1:]...)
-
-	return f.Err
-}
-
 func (f *FakeRuntime) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error {
 	f.Lock()
 	defer f.Unlock()
@@ -353,12 +296,4 @@ func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy) error {
 
 	f.CalledFunctions = append(f.CalledFunctions, "GarbageCollect")
 	return f.Err
-}
-
-func (f *FakeRuntime) ImageStats() (*ImageStats, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "ImageStats")
-	return nil, f.Err
 }

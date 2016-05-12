@@ -31,6 +31,7 @@ type ImageManager interface {
 	// EnsureImageExists will ensure that image specified in `container` exists.
 	// Returns error and a human friendly message on failure; nil otherwise.
 	// TODO: Consider failing when conflicting PullPolicy is provided for the same image.
+
 	EnsureImageExists(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
 	// DecImageUsage decreases the usage count of the image specified in `imageSpec`.
 	// This is useful for reference counting images.

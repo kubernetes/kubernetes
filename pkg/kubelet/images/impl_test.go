@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
-func TestPuller(t *testing.T) {
-	pod := &api.Pod{
+func getApiPod() *api.Pod {
+	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test_pod",
 			Namespace:       "test-ns",
@@ -39,100 +39,175 @@ func TestPuller(t *testing.T) {
 			ResourceVersion: "42",
 			SelfLink:        "/api/v1/pods/foo",
 		}}
+}
 
-	cases := []struct {
-		containerImage     string
-		policy             api.PullPolicy
-		calledFunctions    [][]string
-		pullerErr          error
-		expectedErr        []error
-		deleteUnusedImages bool
-	}{
-		{ // pull missing image
-			containerImage:  "missing_image",
-			policy:          api.PullIfNotPresent,
-			calledFunctions: [][]string{{"ListImages", "GetPods", "PullImage"}},
-			pullerErr:       nil,
-			expectedErr:     []error{nil}},
-
-		{ // image present, dont pull
-			containerImage: "present_image",
-			policy:         api.PullIfNotPresent,
-			calledFunctions: [][]string{
-				{"ListImages", "GetPods"},
-				{"ListImages", "GetPods"},
-				{"ListImages", "GetPods"}},
-			pullerErr:   nil,
-			expectedErr: []error{nil, nil, nil}},
-		// image present, pull it
-		{containerImage: "present_image",
-			policy:          api.PullAlways,
-			calledFunctions: [][]string{{"ListImages", "GetPods", "PullImage"}},
-			pullerErr:       nil,
-			expectedErr:     []error{nil}},
-		// missing image, error PullNever
-		{containerImage: "missing_image",
-			policy: api.PullNever,
-			calledFunctions: [][]string{
-				{"ListImages", "GetPods"},
-				{"ListImages", "GetPods"},
-				{"ListImages", "GetPods"}},
-			pullerErr:   nil,
-			expectedErr: []error{ErrImageNeverPull, ErrImageNeverPull, ErrImageNeverPull}},
-		// missing image, unable to fetch
-		{containerImage: "typo_image",
-			policy: api.PullIfNotPresent,
-			calledFunctions: [][]string{{"ListImages", "GetPods", "PullImage"},
-				{"ListImages", "GetPods", "PullImage", "PullImage"},
-				{"ListImages", "GetPods", "PullImage", "PullImage"},
-				{"ListImages", "GetPods", "PullImage", "PullImage", "PullImage"},
-				{"ListImages", "GetPods", "PullImage", "PullImage", "PullImage"},
-				{"ListImages", "GetPods", "PullImage", "PullImage", "PullImage"}},
-			pullerErr:   errors.New("404"),
-			expectedErr: []error{ErrImagePull, ErrImagePull, ErrImagePullBackOff, ErrImagePull, ErrImagePullBackOff, ErrImagePullBackOff}},
-		// image present, then GCed, so pull it.
-		{containerImage: "present_image",
-			policy: api.PullIfNotPresent,
-			calledFunctions: [][]string{{"ListImages", "GetPods"},
-				{"ListImages", "GetPods", "PullImage"},
-				{"ListImages", "GetPods", "PullImage"}},
-			pullerErr:          nil,
-			expectedErr:        []error{nil},
-			deleteUnusedImages: true},
-	}
-
-	for i, c := range cases {
-		container := &api.Container{
-			Name:            "container_name",
-			Image:           c.containerImage,
-			ImagePullPolicy: c.policy,
-		}
-
-		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-		fakeClock := util.NewFakeClock(time.Now())
-		backOff.Clock = fakeClock
-
-		fakeRuntime := &ctest.FakeRuntime{
-			ImageList: []runtime.Image{{RepoTags: []string{"present_image"}, ID: "", Size: 0}},
-			PullErr:   c.pullerErr,
-		}
-
-		fakeRecorder := &record.FakeRecorder{}
-		manager, err := NewImageManager(fakeRecorder, fakeRuntime, backOff, false /*parallel*/)
-		assert.Nil(t, err, "image manager creation failed")
-
-		for tick, expected := range c.expectedErr {
-			fakeClock.Step(time.Second)
-			err, _ := manager.EnsureImageExists(pod, container, nil)
-			assert.Nil(t, fakeRuntime.AssertCalls(c.calledFunctions[tick]), "in test %d tick=%d", i, tick)
-			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
-			if c.deleteUnusedImages {
-				manager.DeleteUnusedImages()
-			}
-		}
-
+func getRuntimeImage(image string) runtime.Image {
+	return runtime.Image{
+		RepoTags: []string{image},
 	}
 }
 
-func TestGarbageCollection(t *testing.T) {
+func TestPullMissingImage(t *testing.T) {
+	as := assert.New(t)
+	mockRuntimeImages := new(ctest.MockRuntimeImages)
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	fakeClock := util.NewFakeClock(time.Now())
+	backOff.Clock = fakeClock
+	fakeRecorder := &record.FakeRecorder{}
+	containerImage := "missing_image"
+	mockRuntimeImages.On("ListImages").Return([]runtime.Image{}, nil)
+	mockRuntimeImages.On("PullImage", runtime.ImageSpec{Image: containerImage}, []api.Secret(nil)).Return(nil)
+	manager, err := NewImageManager(fakeRecorder, mockRuntimeImages, []runtime.Pod{}, backOff, false /*parallel*/)
+	as.Nil(err, "image manager creation failed")
+
+	container := &api.Container{
+		Name:            "container_name",
+		Image:           containerImage,
+		ImagePullPolicy: api.PullIfNotPresent,
+	}
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Nil(err, "Unexpected error. Pulling images failed")
+}
+
+func TestDontPullExistingImage(t *testing.T) {
+	as := assert.New(t)
+	mockRuntimeImages := new(ctest.MockRuntimeImages)
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	fakeClock := util.NewFakeClock(time.Now())
+	backOff.Clock = fakeClock
+	fakeRecorder := &record.FakeRecorder{}
+	containerImage := "existing_image"
+	container := &api.Container{
+		Name:            "container_name",
+		Image:           containerImage,
+		ImagePullPolicy: api.PullIfNotPresent,
+	}
+
+	mockRuntimeImages.On("ListImages").Once().Return([]runtime.Image{getRuntimeImage(containerImage)}, nil)
+	mockRuntimeImages.AssertNotCalled(t, "PullImage")
+
+	manager, err := NewImageManager(fakeRecorder, mockRuntimeImages, []runtime.Pod{}, backOff, false /*parallel*/)
+	as.Nil(err, "image manager creation failed")
+
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Nil(err, "Unexpected error. Pulling images failed")
+}
+
+func TestPullExistingImage(t *testing.T) {
+	as := assert.New(t)
+	mockRuntimeImages := new(ctest.MockRuntimeImages)
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	fakeClock := util.NewFakeClock(time.Now())
+	backOff.Clock = fakeClock
+	fakeRecorder := &record.FakeRecorder{}
+	containerImage := "existing_image"
+	container := &api.Container{
+		Name:            "container_name",
+		Image:           containerImage,
+		ImagePullPolicy: api.PullAlways,
+	}
+
+	mockRuntimeImages.On("ListImages").Once().Return([]runtime.Image{getRuntimeImage(containerImage)}, nil)
+	mockRuntimeImages.On("PullImage", runtime.ImageSpec{Image: containerImage}, []api.Secret(nil)).Return(nil)
+	manager, err := NewImageManager(fakeRecorder, mockRuntimeImages, []runtime.Pod{}, backOff, false /*parallel*/)
+	as.Nil(err, "image manager creation failed")
+
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Nil(err, "Unexpected error. Pulling images failed")
+}
+
+func TestDontPullImagePullNeverPolicy(t *testing.T) {
+	as := assert.New(t)
+	mockRuntimeImages := new(ctest.MockRuntimeImages)
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	fakeClock := util.NewFakeClock(time.Now())
+	backOff.Clock = fakeClock
+	fakeRecorder := &record.FakeRecorder{}
+	containerImage := "missing_image"
+	container := &api.Container{
+		Name:            "container_name",
+		Image:           containerImage,
+		ImagePullPolicy: api.PullNever,
+	}
+
+	mockRuntimeImages.On("ListImages").Once().Return([]runtime.Image{}, nil)
+	mockRuntimeImages.AssertNotCalled(t, "PullImage")
+	manager, err := NewImageManager(fakeRecorder, mockRuntimeImages, []runtime.Pod{}, backOff, false /*parallel*/)
+	as.Nil(err, "image manager creation failed")
+
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Equal(err, ErrImageNeverPull, "expected error")
+}
+
+func TestPullFailure(t *testing.T) {
+	as := assert.New(t)
+	mockRuntimeImages := new(ctest.MockRuntimeImages)
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	fakeClock := util.NewFakeClock(time.Now())
+	backOff.Clock = fakeClock
+	fakeRecorder := &record.FakeRecorder{}
+	containerImage := "typo_image"
+	container := &api.Container{
+		Name:            "container_name",
+		Image:           containerImage,
+		ImagePullPolicy: api.PullIfNotPresent,
+	}
+
+	mockRuntimeImages.On("ListImages").Once().Return([]runtime.Image{}, nil)
+	mockRuntimeImages.On("PullImage", runtime.ImageSpec{Image: containerImage}, []api.Secret(nil)).Return(errors.New("404"))
+	manager, err := NewImageManager(fakeRecorder, mockRuntimeImages, []runtime.Pod{}, backOff, false /*parallel*/)
+	as.Nil(err, "image manager creation failed")
+
+	// Attempt 1 - Fails to pull image
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Equal(err, ErrImagePull, "expected error")
+	fakeClock.Step(time.Second)
+	// Attempt 2 - Pull backoff
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Equal(err, ErrImagePull, "expected error")
+	fakeClock.Step(time.Second)
+	// Attempt 3 - Pull backoff
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Equal(err, ErrImagePullBackOff, "expected error")
+	fakeClock.Step(time.Second)
+	// Attempt 4 - Fails to pull image
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Equal(err, ErrImagePull, "expected error")
+	fakeClock.Step(time.Second)
+	// Attempt 5 - Pull backoff
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Equal(err, ErrImagePullBackOff, "expected error")
+	fakeClock.Step(time.Second)
+	// Attempt 6 - Pull backoff
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Equal(err, ErrImagePullBackOff, "expected error")
+}
+
+func TestPullGCedExistingImage(t *testing.T) {
+	as := assert.New(t)
+	mockRuntimeImages := new(ctest.MockRuntimeImages)
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	fakeClock := util.NewFakeClock(time.Now())
+	backOff.Clock = fakeClock
+	fakeRecorder := &record.FakeRecorder{}
+	containerImage := "existing_image"
+	container := &api.Container{
+		Name:            "container_name",
+		Image:           containerImage,
+		ImagePullPolicy: api.PullIfNotPresent,
+	}
+
+	mockRuntimeImages.On("ListImages").Once().Return([]runtime.Image{getRuntimeImage(containerImage)}, nil)
+	mockRuntimeImages.On("PullImage", runtime.ImageSpec{Image: containerImage}, []api.Secret(nil)).Once().Return(nil)
+
+	manager, err := NewImageManager(fakeRecorder, mockRuntimeImages, []runtime.Pod{}, backOff, false /*parallel*/)
+	as.Nil(err, "image manager creation failed")
+
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Nil(err, "Unexpected error. Pulling images failed")
+
+	manager.DeleteUnusedImages()
+
+	err, _ = manager.EnsureImageExists(getApiPod(), container, nil)
+	as.Nil(err, "Unexpected error. Pulling images failed")
 }

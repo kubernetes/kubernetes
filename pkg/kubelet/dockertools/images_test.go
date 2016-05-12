@@ -17,7 +17,10 @@ limitations under the License.
 package dockertools
 
 import (
+	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/stretchr/testify/assert"
@@ -100,4 +103,26 @@ func TestImageStatsWithImages(t *testing.T) {
 	as.NoError(err)
 	const expectedOutput uint64 = 1300
 	as.Equal(expectedOutput, st.TotalStorageBytes, "expected %d, got %d", expectedOutput, st.TotalStorageBytes)
+}
+
+func TestListImages(t *testing.T) {
+	fakeDockerClient := NewFakeDockerClient()
+	ri := &runtimeImages{client: fakeDockerClient, dockerPuller: &FakeDockerPuller{}}
+	dockerImages := []dockertypes.Image{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
+	expected := sets.NewString([]string{"1111", "2222", "3333"}...)
+
+	fakeDockerClient.Images = dockerImages
+	actualImages, err := ri.ListImages()
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	actual := sets.NewString()
+	for _, i := range actualImages {
+		actual.Insert(i.ID)
+	}
+	// We can compare the two sets directly because util.StringSet.List()
+	// returns a "sorted" list.
+	if !reflect.DeepEqual(expected.List(), actual.List()) {
+		t.Errorf("expected %#v, got %#v", expected.List(), actual.List())
+	}
 }

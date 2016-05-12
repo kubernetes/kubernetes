@@ -24,10 +24,10 @@ type imagePuller interface {
 }
 
 type parallelImagePuller struct {
-	runtime container.Runtime
+	runtime container.RuntimeImages
 }
 
-func newParallelImagePuller(runtime container.Runtime) imagePuller {
+func newParallelImagePuller(runtime container.RuntimeImages) imagePuller {
 	return &parallelImagePuller{runtime}
 }
 
@@ -42,11 +42,11 @@ func (pip *parallelImagePuller) pullImage(spec ImageSpec, prePullChan chan<- str
 const maxImagePullRequests = 10
 
 type serialImagePuller struct {
-	runtime      container.Runtime
+	runtime      container.RuntimeImages
 	pullRequests chan *imagePullRequest
 }
 
-func newSerialImagePuller(runtime container.Runtime) imagePuller {
+func newSerialImagePuller(runtime container.RuntimeImages) imagePuller {
 	return &serialImagePuller{runtime, make(chan *imagePullRequest, maxImagePullRequests)}
 }
 

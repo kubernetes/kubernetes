@@ -69,10 +69,6 @@ type Runtime interface {
 	APIVersion() (Version, error)
 	// Status returns error if the runtime is unhealthy; nil otherwise.
 	Status() error
-	// GetPods returns a list containers group by pods. The boolean parameter
-	// specifies whether the runtime returns all containers including those already
-	// exited and dead containers (used for garbage collection).
-	GetPods(all bool) ([]*Pod, error)
 	// GarbageCollect removes dead containers using the specified container gc policy
 	GarbageCollect(gcPolicy ContainerGCPolicy) error
 	// Syncs the running pod into the desired pod.
@@ -86,6 +82,28 @@ type Runtime interface {
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
+	// TODO(vmarmol): Unify pod and containerID args.
+	// GetContainerLogs returns logs of a specific container. By
+	// default, it returns a snapshot of the container log. Set 'follow' to true to
+	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
+	// "100" or "all") to tail the log.
+	GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
+	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
+	ContainerCommandRunner
+	// ContainerAttach encapsulates the attaching to containers for testability
+	ContainerAttacher
+}
+
+// PodGetter includes methods that provide read-only access to existing pods.
+type PodGetter interface {
+	// GetPods returns a list containers group by pods. The boolean parameter
+	// specifies whether the runtime returns all containers including those already
+	// exited and dead containers (used for garbage collection).
+	GetPods(all bool) ([]*Pod, error)
+}
+
+// RuntimeImages helps with managing container images.
+type RuntimeImages interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
 	PullImage(image ImageSpec, pullSecrets []api.Secret) error
@@ -97,16 +115,6 @@ type Runtime interface {
 	RemoveImage(image ImageSpec) error
 	// Returns Image statistics.
 	ImageStats() (*ImageStats, error)
-	// TODO(vmarmol): Unify pod and containerID args.
-	// GetContainerLogs returns logs of a specific container. By
-	// default, it returns a snapshot of the container log. Set 'follow' to true to
-	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
-	// "100" or "all") to tail the log.
-	GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
-	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
-	ContainerCommandRunner
-	// ContainerAttach encapsulates the attaching to containers for testability
-	ContainerAttacher
 }
 
 type ContainerAttacher interface {

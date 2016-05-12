@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -38,21 +39,39 @@ func NewFakeDockerManager(
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
 	podInfraContainerImage string,
-	qps float32,
-	burst int,
 	containerLogsDir string,
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
 	runtimeHelper kubecontainer.RuntimeHelper,
-	httpClient kubetypes.HttpGetter, imageBackOff *flowcontrol.Backoff) *DockerManager {
+	httpClient kubetypes.HttpGetter,
+	imageBackOff *flowcontrol.Backoff,
+	imageManager images.ImageManager,
+	podGetter kubecontainer.PodGetter) *DockerManager {
 
 	fakeOOMAdjuster := oom.NewFakeOOMAdjuster()
 	fakeProcFs := procfs.NewFakeProcFS()
 	fakePodGetter := &fakePodGetter{}
-	dm := NewDockerManager(client, recorder, livenessManager, containerRefManager, fakePodGetter, machineInfo, podInfraContainerImage, qps,
-		burst, containerLogsDir, osInterface, networkPlugin, runtimeHelper, httpClient, &NativeExecHandler{},
-		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, false, false, true)
-	dm.dockerPuller = &FakeDockerPuller{}
+	dm := NewDockerManager(client,
+		recorder,
+		livenessManager,
+		containerRefManager,
+		fakePodGetter,
+		machineInfo,
+		podInfraContainerImage,
+		containerLogsDir,
+		osInterface,
+		networkPlugin,
+		runtimeHelper,
+		httpClient,
+		&NativeExecHandler{},
+		fakeOOMAdjuster,
+		fakeProcFs,
+		imageManager,
+		podGetter,
+		false,
+		imageBackOff,
+		false,
+		false)
 
 	// ttl of version cache is set to 0 so we always call version api directly in tests.
 	dm.versionCache = cache.NewObjectCache(

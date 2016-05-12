@@ -29,36 +29,36 @@ import (
 )
 
 type imageManager struct {
-	recorder record.EventRecorder
-	backOff  *flowcontrol.Backoff
-	runtime  runtime.Runtime
-	puller   imagePuller
-	images   map[string]uint64
+	recorder      record.EventRecorder
+	backOff       *flowcontrol.Backoff
+	runtimeImages runtime.RuntimeImages
+	puller        imagePuller
+	images        map[string]uint64
 	sync.Mutex
 }
 
 var _ ImageManager = &imageManager{}
 
 // TODO: Add support for tracking images with PullNever policy and avoid garbage collecting them.
-func NewImageManager(recorder record.EventRecorder, runtime runtime.Runtime, backOff *flowcontrol.Backoff, serialized bool) (ImageManager, error) {
+func NewImageManager(recorder record.EventRecorder, runtimeImages runtime.RuntimeImages, pods []runtime.Pod, backOff *flowcontrol.Backoff, serialized bool) (ImageManager, error) {
 	var puller imagePuller
 	if serialized {
-		puller = newSerialImagePuller(runtime)
+		puller = newSerialImagePuller(runtimeImages)
 	} else {
-		puller = newParallelImagePuller(runtime)
+		puller = newParallelImagePuller(runtimeImages)
 	}
 	im := &imageManager{
-		recorder: recorder,
-		runtime:  runtime,
-		backOff:  backOff,
-		puller:   puller,
-		images:   make(map[string]uint64),
+		recorder:      recorder,
+		runtimeImages: runtimeImages,
+		backOff:       backOff,
+		puller:        puller,
+		images:        make(map[string]uint64),
 	}
-	return im, im.detectExistingImages()
+	return im, im.detectExistingImages(pods)
 }
 
-func (im *imageManager) detectExistingImages() error {
-	images, err := im.runtime.ListImages()
+func (im *imageManager) detectExistingImages(pods []runtime.Pod) error {
+	images, err := im.runtimeImages.ListImages()
 	if err != nil {
 		return err
 	}
@@ -68,11 +68,7 @@ func (im *imageManager) detectExistingImages() error {
 			im.images[tag] = 0
 		}
 	}
-	allPods, err := im.runtime.GetPods(true)
-	if err != nil {
-		return err
-	}
-	for _, pod := range allPods {
+	for _, pod := range pods {
 		for _, container := range pod.Containers {
 			im.incrementImageUsage(container.Image)
 		}
@@ -99,7 +95,7 @@ func (im *imageManager) DeleteUnusedImages() {
 		if usage > 0 {
 			continue
 		}
-		err := im.runtime.RemoveImage(runtime.ImageSpec{image})
+		err := im.runtimeImages.RemoveImage(runtime.ImageSpec{image})
 		if err != nil {
 			glog.V(2).Infof("failed to remove unused image %q", image)
 		}

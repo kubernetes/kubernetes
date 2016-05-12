@@ -78,8 +78,8 @@ func (c *Config) buildGlobalOptions() []string {
 // and merge it with the existing config. The merge rule is
 // that the fields in the provided config will override the
 // result that get from the rkt api service.
-func (r *Runtime) getConfig(cfg *Config) (*Config, error) {
-	resp, err := r.apisvc.GetInfo(context.Background(), &rktapi.GetInfoRequest{})
+func getConfig(apisvc rktapi.PublicAPIClient, cfg *Config) (*Config, error) {
+	resp, err := apisvc.GetInfo(context.Background(), &rktapi.GetInfoRequest{})
 	if err != nil {
 		return nil, err
 	}

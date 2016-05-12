@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"hash/adler32"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -29,16 +28,10 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 	dockertypes "github.com/docker/engine-api/types"
 	dockernat "github.com/docker/go-connections/nat"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
@@ -493,185 +486,6 @@ type containersByID []*kubecontainer.Container
 func (b containersByID) Len() int           { return len(b) }
 func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
-
-func TestFindContainersByPod(t *testing.T) {
-	tests := []struct {
-		runningContainerList []dockertypes.Container
-		exitedContainerList  []dockertypes.Container
-		all                  bool
-		expectedPods         []*kubecontainer.Pod
-	}{
-
-		{
-			[]dockertypes.Container{
-				{
-					ID:    "foobar",
-					Names: []string{"/k8s_foobar.1234_qux_ns_1234_42"},
-				},
-				{
-					ID:    "barbar",
-					Names: []string{"/k8s_barbar.1234_qux_ns_2343_42"},
-				},
-				{
-					ID:    "baz",
-					Names: []string{"/k8s_baz.1234_qux_ns_1234_42"},
-				},
-			},
-			[]dockertypes.Container{
-				{
-					ID:    "barfoo",
-					Names: []string{"/k8s_barfoo.1234_qux_ns_1234_42"},
-				},
-				{
-					ID:    "bazbaz",
-					Names: []string{"/k8s_bazbaz.1234_qux_ns_5678_42"},
-				},
-			},
-			false,
-			[]*kubecontainer.Pod{
-				{
-					ID:        "1234",
-					Name:      "qux",
-					Namespace: "ns",
-					Containers: []*kubecontainer.Container{
-						{
-							ID:    kubecontainer.DockerID("foobar").ContainerID(),
-							Name:  "foobar",
-							Hash:  0x1234,
-							State: kubecontainer.ContainerStateUnknown,
-						},
-						{
-							ID:    kubecontainer.DockerID("baz").ContainerID(),
-							Name:  "baz",
-							Hash:  0x1234,
-							State: kubecontainer.ContainerStateUnknown,
-						},
-					},
-				},
-				{
-					ID:        "2343",
-					Name:      "qux",
-					Namespace: "ns",
-					Containers: []*kubecontainer.Container{
-						{
-							ID:    kubecontainer.DockerID("barbar").ContainerID(),
-							Name:  "barbar",
-							Hash:  0x1234,
-							State: kubecontainer.ContainerStateUnknown,
-						},
-					},
-				},
-			},
-		},
-		{
-			[]dockertypes.Container{
-				{
-					ID:    "foobar",
-					Names: []string{"/k8s_foobar.1234_qux_ns_1234_42"},
-				},
-				{
-					ID:    "barbar",
-					Names: []string{"/k8s_barbar.1234_qux_ns_2343_42"},
-				},
-				{
-					ID:    "baz",
-					Names: []string{"/k8s_baz.1234_qux_ns_1234_42"},
-				},
-			},
-			[]dockertypes.Container{
-				{
-					ID:    "barfoo",
-					Names: []string{"/k8s_barfoo.1234_qux_ns_1234_42"},
-				},
-				{
-					ID:    "bazbaz",
-					Names: []string{"/k8s_bazbaz.1234_qux_ns_5678_42"},
-				},
-			},
-			true,
-			[]*kubecontainer.Pod{
-				{
-					ID:        "1234",
-					Name:      "qux",
-					Namespace: "ns",
-					Containers: []*kubecontainer.Container{
-						{
-							ID:    kubecontainer.DockerID("foobar").ContainerID(),
-							Name:  "foobar",
-							Hash:  0x1234,
-							State: kubecontainer.ContainerStateUnknown,
-						},
-						{
-							ID:    kubecontainer.DockerID("barfoo").ContainerID(),
-							Name:  "barfoo",
-							Hash:  0x1234,
-							State: kubecontainer.ContainerStateUnknown,
-						},
-						{
-							ID:    kubecontainer.DockerID("baz").ContainerID(),
-							Name:  "baz",
-							Hash:  0x1234,
-							State: kubecontainer.ContainerStateUnknown,
-						},
-					},
-				},
-				{
-					ID:        "2343",
-					Name:      "qux",
-					Namespace: "ns",
-					Containers: []*kubecontainer.Container{
-						{
-							ID:    kubecontainer.DockerID("barbar").ContainerID(),
-							Name:  "barbar",
-							Hash:  0x1234,
-							State: kubecontainer.ContainerStateUnknown,
-						},
-					},
-				},
-				{
-					ID:        "5678",
-					Name:      "qux",
-					Namespace: "ns",
-					Containers: []*kubecontainer.Container{
-						{
-							ID:    kubecontainer.DockerID("bazbaz").ContainerID(),
-							Name:  "bazbaz",
-							Hash:  0x1234,
-							State: kubecontainer.ContainerStateUnknown,
-						},
-					},
-				},
-			},
-		},
-		{
-			[]dockertypes.Container{},
-			[]dockertypes.Container{},
-			true,
-			nil,
-		},
-	}
-	fakeClient := NewFakeDockerClient()
-	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil))
-	// image back-off is set to nil, this test should not pull images
-	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, options.GetDefaultPodInfraContainerImage(), 0, 0, "", containertest.FakeOS{}, np, nil, nil, nil)
-	for i, test := range tests {
-		fakeClient.RunningContainerList = test.runningContainerList
-		fakeClient.ExitedContainerList = test.exitedContainerList
-
-		result, _ := containerManager.GetPods(test.all)
-		for i := range result {
-			sort.Sort(containersByID(result[i].Containers))
-		}
-		for i := range test.expectedPods {
-			sort.Sort(containersByID(test.expectedPods[i].Containers))
-		}
-		sort.Sort(podsByID(result))
-		sort.Sort(podsByID(test.expectedPods))
-		if !reflect.DeepEqual(test.expectedPods, result) {
-			t.Errorf("%d: expected: %#v, saw: %#v", i, test.expectedPods, result)
-		}
-	}
-}
 
 func TestMakePortsAndBindings(t *testing.T) {
 	ports := []kubecontainer.PortMapping{
