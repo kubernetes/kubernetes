@@ -299,7 +299,7 @@ func (d *defaultPetHealthChecker) isHealthy(pod *api.Pod) bool {
 	if err != nil {
 		return false
 	}
-	return b
+	return b && api.IsPodReady(pod)
 }
 
 // isDying returns true if the pod has a non-nil deletion timestamp. Since the
