@@ -515,6 +515,7 @@ func Example_printPodWithWideFormat() {
 				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 				{RestartCount: 3},
 			},
+			PodIP: "10.1.1.3",
 		},
 	}
 	mapper, _ := f.Object(false)
@@ -523,8 +524,8 @@ func Example_printPodWithWideFormat() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      READY     STATUS     RESTARTS   AGE       NODE
-	// test1     1/2       podPhase   6          10y       kubernetes-minion-abcd
+	// NAME      READY     STATUS     RESTARTS   AGE       IP         NODE
+	// test1     1/2       podPhase   6          10y       10.1.1.3   kubernetes-minion-abcd
 }
 
 func Example_printPodWithShowLabels() {
