@@ -24,16 +24,15 @@ package v1alpha1
 import (
 	"errors"
 	"fmt"
-	"reflect"
-	"runtime"
-	time "time"
-
 	codec1978 "github.com/ugorji/go/codec"
-	pkg4_inf "gopkg.in/inf.v0"
+	pkg4_inf_v0 "gopkg.in/inf.v0"
 	pkg3_resource "k8s.io/kubernetes/pkg/api/resource"
 	pkg2_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	pkg1_v1 "k8s.io/kubernetes/pkg/api/v1"
 	pkg5_types "k8s.io/kubernetes/pkg/types"
+	"reflect"
+	"runtime"
+	time "time"
 )
 
 const (
@@ -66,11 +65,11 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg3_resource.Quantity
-		var v1 pkg2_unversioned.Time
-		var v2 pkg1_v1.ConditionStatus
-		var v3 pkg5_types.UID
-		var v4 pkg4_inf.Dec
+		var v0 pkg4_inf_v0.Dec
+		var v1 pkg3_resource.Quantity
+		var v2 pkg2_unversioned.Time
+		var v3 pkg1_v1.ConditionStatus
+		var v4 pkg5_types.UID
 		var v5 time.Time
 		_, _, _, _, _, _ = v0, v1, v2, v3, v4, v5
 	}
