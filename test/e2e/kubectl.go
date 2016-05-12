@@ -669,7 +669,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDieInput(string(controllerJson[:]), "create", "-f", "-", nsFlag)
 			framework.RunKubectlOrDieInput(string(serviceJson[:]), "create", "-f", "-", nsFlag)
 
-			// Wait for the redis pods to come online...
+			By("Waiting for Redis master to start.")
 			waitFor(1)
 			// Pod
 			forEachPod(func(pod api.Pod) {
@@ -892,6 +892,14 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		It("should be able to retrieve and filter logs [Conformance]", func() {
 			framework.SkipUnlessServerVersionGTE(extendedPodLogFilterVersion, c)
 
+			// Split("something\n", "\n") returns ["something", ""], so
+			// strip trailing newline first
+			lines := func(out string) []string {
+				return strings.Split(strings.TrimRight(out, "\n"), "\n")
+			}
+
+			By("Waiting for Redis master to start.")
+			waitFor(1)
 			forEachPod(func(pod api.Pod) {
 				By("checking for a matching strings")
 				_, err := framework.LookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", framework.PodStartTimeout)
@@ -900,18 +908,18 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				By("limiting log lines")
 				out := framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--tail=1")
 				Expect(len(out)).NotTo(BeZero())
-				Expect(len(strings.Split(out, "\n"))).To(Equal(1))
+				Expect(len(lines(out))).To(Equal(1))
 
 				By("limiting log bytes")
 				out = framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--limit-bytes=1")
-				Expect(len(strings.Split(out, "\n"))).To(Equal(1))
+				Expect(len(lines(out))).To(Equal(1))
 				Expect(len(out)).To(Equal(1))
 
 				By("exposing timestamps")
 				out = framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--tail=1", "--timestamps")
-				lines := strings.Split(out, "\n")
-				Expect(len(lines)).To(Equal(1))
-				words := strings.Split(lines[0], " ")
+				l := lines(out)
+				Expect(len(l)).To(Equal(1))
+				words := strings.Split(l[0], " ")
 				Expect(len(words)).To(BeNumerically(">", 1))
 				if _, err := time.Parse(time.RFC3339Nano, words[0]); err != nil {
 					if _, err := time.Parse(time.RFC3339, words[0]); err != nil {
@@ -942,6 +950,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
 			framework.RunKubectlOrDieInput(string(controllerJson[:]), "create", "-f", "-", nsFlag)
+			By("Waiting for Redis master to start.")
+			waitFor(1)
 			By("patching all pods")
 			forEachPod(func(pod api.Pod) {
 				framework.RunKubectlOrDie("patch", "pod", pod.Name, nsFlag, "-p", "{\"metadata\":{\"annotations\":{\"x\":\"y\"}}}")
