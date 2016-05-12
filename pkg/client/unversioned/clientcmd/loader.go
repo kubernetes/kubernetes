@@ -260,7 +260,7 @@ func (rules *ClientConfigLoadingRules) GetDefaultFilename() string {
 			return filename
 		}
 	}
-	// If none exists, use the first from precendence.
+	// If none exists, use the first from precedence.
 	if len(rules.Precedence) > 0 {
 		return rules.Precedence[0]
 	}

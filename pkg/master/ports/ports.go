@@ -18,7 +18,7 @@ package ports
 
 const (
 	// ProxyPort is the default port for the proxy healthz server.
-	// May be overriden by a flag at startup.
+	// May be overridden by a flag at startup.
 	ProxyStatusPort = 10249
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.

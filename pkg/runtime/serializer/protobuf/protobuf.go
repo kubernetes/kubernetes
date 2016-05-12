@@ -31,7 +31,7 @@ import (
 
 var (
 	// protoEncodingPrefix serves as a magic number for an encoded protobuf message on this serializer. All
-	// proto messages serialized by this schema will be precedeed by the bytes 0x6b 0x38 0x73, with the fourth
+	// proto messages serialized by this schema will be preceded by the bytes 0x6b 0x38 0x73, with the fourth
 	// byte being reserved for the encoding style. The only encoding style defined is 0x00, which means that
 	// the rest of the byte stream is a message of type k8s.io.kubernetes.pkg.runtime.Unknown (proto2).
 	//

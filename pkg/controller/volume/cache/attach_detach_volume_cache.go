@@ -124,7 +124,7 @@ type volume struct {
 	name string
 
 	// attachedNodes is a map containing the set of nodes this volume has
-	// succesfully been attached to. The key in this map is the name of the
+	// successfully been attached to. The key in this map is the name of the
 	// node and the value is a node object containing more information about
 	// the node.
 	attachedNodes map[string]node
