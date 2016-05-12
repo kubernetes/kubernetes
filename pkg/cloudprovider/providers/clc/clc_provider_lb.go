@@ -29,6 +29,7 @@ type clcProviderLB struct {
 }
 
 const (
+	// EnsureLoadBalancer uses this to highlight, in a datacenter's list of LB instances, which were created via Kubernetes integration.
 	k8sLBPrefix = "Kubernetes:"
 )
 
