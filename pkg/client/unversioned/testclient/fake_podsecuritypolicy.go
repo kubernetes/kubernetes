@@ -47,16 +47,16 @@ func (c *FakePodSecurityPolicy) Get(name string) (*extensions.PodSecurityPolicy,
 	return obj.(*extensions.PodSecurityPolicy), err
 }
 
-func (c *FakePodSecurityPolicy) Create(scc *extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("podsecuritypolicies", c.Namespace, scc), &extensions.PodSecurityPolicy{})
+func (c *FakePodSecurityPolicy) Create(psp *extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error) {
+	obj, err := c.Fake.Invokes(NewCreateAction("podsecuritypolicies", c.Namespace, psp), &extensions.PodSecurityPolicy{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*extensions.PodSecurityPolicy), err
 }
 
-func (c *FakePodSecurityPolicy) Update(scc *extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("podsecuritypolicies", c.Namespace, scc), &extensions.PodSecurityPolicy{})
+func (c *FakePodSecurityPolicy) Update(psp *extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error) {
+	obj, err := c.Fake.Invokes(NewUpdateAction("podsecuritypolicies", c.Namespace, psp), &extensions.PodSecurityPolicy{})
 	if obj == nil {
 		return nil, err
 	}

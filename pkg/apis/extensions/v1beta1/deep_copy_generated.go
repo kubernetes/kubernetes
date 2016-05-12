@@ -48,6 +48,7 @@ func init() {
 		DeepCopy_v1beta1_DeploymentStatus,
 		DeepCopy_v1beta1_DeploymentStrategy,
 		DeepCopy_v1beta1_ExportOptions,
+		DeepCopy_v1beta1_FSGroupStrategyOptions,
 		DeepCopy_v1beta1_HTTPIngressPath,
 		DeepCopy_v1beta1_HTTPIngressRuleValue,
 		DeepCopy_v1beta1_HorizontalPodAutoscaler,
@@ -88,6 +89,7 @@ func init() {
 		DeepCopy_v1beta1_ScaleSpec,
 		DeepCopy_v1beta1_ScaleStatus,
 		DeepCopy_v1beta1_SubresourceReference,
+		DeepCopy_v1beta1_SupplementalGroupsStrategyOptions,
 		DeepCopy_v1beta1_ThirdPartyResource,
 		DeepCopy_v1beta1_ThirdPartyResourceData,
 		DeepCopy_v1beta1_ThirdPartyResourceDataList,
@@ -344,6 +346,22 @@ func DeepCopy_v1beta1_ExportOptions(in ExportOptions, out *ExportOptions, c *con
 	}
 	out.Export = in.Export
 	out.Exact = in.Exact
+	return nil
+}
+
+func DeepCopy_v1beta1_FSGroupStrategyOptions(in FSGroupStrategyOptions, out *FSGroupStrategyOptions, c *conversion.Cloner) error {
+	out.Rule = in.Rule
+	if in.Ranges != nil {
+		in, out := in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(in))
+		for i := range in {
+			if err := DeepCopy_v1beta1_IDRange(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
+	}
 	return nil
 }
 
@@ -814,14 +832,32 @@ func DeepCopy_v1beta1_PodSecurityPolicyList(in PodSecurityPolicyList, out *PodSe
 
 func DeepCopy_v1beta1_PodSecurityPolicySpec(in PodSecurityPolicySpec, out *PodSecurityPolicySpec, c *conversion.Cloner) error {
 	out.Privileged = in.Privileged
-	if in.Capabilities != nil {
-		in, out := in.Capabilities, &out.Capabilities
+	if in.DefaultAddCapabilities != nil {
+		in, out := in.DefaultAddCapabilities, &out.DefaultAddCapabilities
 		*out = make([]v1.Capability, len(in))
 		for i := range in {
 			(*out)[i] = in[i]
 		}
 	} else {
-		out.Capabilities = nil
+		out.DefaultAddCapabilities = nil
+	}
+	if in.RequiredDropCapabilities != nil {
+		in, out := in.RequiredDropCapabilities, &out.RequiredDropCapabilities
+		*out = make([]v1.Capability, len(in))
+		for i := range in {
+			(*out)[i] = in[i]
+		}
+	} else {
+		out.RequiredDropCapabilities = nil
+	}
+	if in.AllowedCapabilities != nil {
+		in, out := in.AllowedCapabilities, &out.AllowedCapabilities
+		*out = make([]v1.Capability, len(in))
+		for i := range in {
+			(*out)[i] = in[i]
+		}
+	} else {
+		out.AllowedCapabilities = nil
 	}
 	if in.Volumes != nil {
 		in, out := in.Volumes, &out.Volumes
@@ -852,6 +888,13 @@ func DeepCopy_v1beta1_PodSecurityPolicySpec(in PodSecurityPolicySpec, out *PodSe
 	if err := DeepCopy_v1beta1_RunAsUserStrategyOptions(in.RunAsUser, &out.RunAsUser, c); err != nil {
 		return err
 	}
+	if err := DeepCopy_v1beta1_SupplementalGroupsStrategyOptions(in.SupplementalGroups, &out.SupplementalGroups, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v1beta1_FSGroupStrategyOptions(in.FSGroup, &out.FSGroup, c); err != nil {
+		return err
+	}
+	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	return nil
 }
 
@@ -1027,6 +1070,22 @@ func DeepCopy_v1beta1_SubresourceReference(in SubresourceReference, out *Subreso
 	out.Name = in.Name
 	out.APIVersion = in.APIVersion
 	out.Subresource = in.Subresource
+	return nil
+}
+
+func DeepCopy_v1beta1_SupplementalGroupsStrategyOptions(in SupplementalGroupsStrategyOptions, out *SupplementalGroupsStrategyOptions, c *conversion.Cloner) error {
+	out.Rule = in.Rule
+	if in.Ranges != nil {
+		in, out := in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(in))
+		for i := range in {
+			if err := DeepCopy_v1beta1_IDRange(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
+	}
 	return nil
 }
 

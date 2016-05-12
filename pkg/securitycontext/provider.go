@@ -159,6 +159,11 @@ func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *
 		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
 	}
 
+	if containerSc.ReadOnlyRootFilesystem != nil {
+		effectiveSc.ReadOnlyRootFilesystem = new(bool)
+		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
+	}
+
 	return effectiveSc
 }
 
