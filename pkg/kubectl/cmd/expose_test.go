@@ -314,9 +314,9 @@ func TestRunExposeService(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.calls[m] && m == "GET":
-					return &http.Response{StatusCode: test.status, Body: objBody(codec, test.input)}, nil
+					return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.input)}, nil
 				case p == test.calls[m] && m == "POST":
-					return &http.Response{StatusCode: test.status, Body: objBody(codec, test.output)}, nil
+					return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.output)}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil

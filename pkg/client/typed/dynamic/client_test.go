@@ -125,6 +125,7 @@ func TestList(t *testing.T) {
 				t.Errorf("List(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
+			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
 			w.Write(tc.resp)
 		})
 		if err != nil {
@@ -179,6 +180,7 @@ func TestGet(t *testing.T) {
 				t.Errorf("Get(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
+			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
 			w.Write(tc.resp)
 		})
 		if err != nil {
@@ -231,6 +233,7 @@ func TestDelete(t *testing.T) {
 				t.Errorf("Delete(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
+			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
 			runtime.UnstructuredJSONScheme.EncodeToStream(statusOK, w)
 		})
 		if err != nil {
@@ -279,6 +282,7 @@ func TestDeleteCollection(t *testing.T) {
 				t.Errorf("DeleteCollection(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
+			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
 			runtime.UnstructuredJSONScheme.EncodeToStream(statusOK, w)
 		})
 		if err != nil {
@@ -326,6 +330,7 @@ func TestCreate(t *testing.T) {
 				t.Errorf("Create(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
+			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
 			data, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				t.Errorf("Create(%q) unexpected error reading body: %v", tc.name, err)
@@ -384,6 +389,7 @@ func TestUpdate(t *testing.T) {
 				t.Errorf("Update(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
+			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
 			data, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				t.Errorf("Update(%q) unexpected error reading body: %v", tc.name, err)
