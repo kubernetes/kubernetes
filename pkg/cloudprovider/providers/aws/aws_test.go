@@ -1199,3 +1199,106 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 
 	c.EnsureLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{}, map[string]string{})
 }
+
+func TestBuildListener(t *testing.T) {
+	tests := []struct {
+		name string
+
+		lbPort                    int64
+		instancePort              int64
+		backendProtocolAnnotation string
+		certAnnotation            string
+
+		expectError      bool
+		lbProtocol       string
+		instanceProtocol string
+		certID           string
+	}{
+		{
+			"No cert or BE protocol annotation, passthrough",
+			80, 7999, "", "",
+			false, "tcp", "tcp", "",
+		},
+		{
+			"Cert annotation without BE protocol specified, SSL->TCP",
+			80, 8000, "", "cert",
+			false, "ssl", "tcp", "cert",
+		},
+		{
+			"BE protocol without cert annotation, passthrough",
+			443, 8001, "https", "",
+			false, "tcp", "tcp", "",
+		},
+		{
+			"Invalid cert annotation, bogus backend protocol",
+			443, 8002, "bacon", "foo",
+			true, "tcp", "tcp", "cert",
+		},
+		{
+			"Invalid cert annotation, protocol followed by equal sign",
+			443, 8003, "http=", "=",
+			true, "tcp", "tcp", "cert",
+		},
+		{
+			"HTTPS->HTTPS",
+			443, 8004, "https", "cert",
+			false, "https", "https", "cert",
+		},
+		{
+			"HTTPS->HTTP",
+			443, 8005, "http", "cert",
+			false, "https", "http", "cert",
+		},
+		{
+			"SSL->SSL",
+			443, 8006, "ssl", "cert",
+			false, "ssl", "ssl", "cert",
+		},
+		{
+			"SSL->TCP",
+			443, 8007, "tcp", "cert",
+			false, "ssl", "tcp", "cert",
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		annotations := make(map[string]string)
+		if test.backendProtocolAnnotation != "" {
+			annotations[ServiceAnnotationLoadBalancerBEProtocol] = test.backendProtocolAnnotation
+		}
+		if test.certAnnotation != "" {
+			annotations[ServiceAnnotationLoadBalancerCertificate] = test.certAnnotation
+		}
+		l, err := buildListener(api.ServicePort{
+			NodePort: int32(test.instancePort),
+			Port:     int32(test.lbPort),
+			Protocol: api.Protocol("tcp"),
+		}, annotations)
+		if test.expectError {
+			if err == nil {
+				t.Errorf("Should error for case %s", test.name)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Should succeed for case: %s, got %v", test.name, err)
+			} else {
+				var cert *string
+				if test.certID != "" {
+					cert = &test.certID
+				}
+				expected := &elb.Listener{
+					InstancePort:     &test.instancePort,
+					InstanceProtocol: &test.instanceProtocol,
+					LoadBalancerPort: &test.lbPort,
+					Protocol:         &test.lbProtocol,
+					SSLCertificateId: cert,
+				}
+				if !reflect.DeepEqual(l, expected) {
+					t.Errorf("Incorrect listener (%v vs expected %v) for case: %s",
+						l, expected, test.name)
+				}
+			}
+		}
+	}
+}
