@@ -61,33 +61,34 @@ type ServerRunOptions struct {
 	DefaultStorageMediaType    string
 	DeleteCollectionWorkers    int
 	// Used to specify the storage version that should be used for the legacy v1 api group.
-	DeprecatedStorageVersion  string
-	EnableLogsSupport         bool
-	EnableProfiling           bool
-	EnableSwaggerUI           bool
-	EnableWatchCache          bool
-	EtcdServersOverrides      []string
-	StorageConfig             storagebackend.Config
-	ExternalHost              string
-	InsecureBindAddress       net.IP
-	InsecurePort              int
-	KeystoneURL               string
-	KubernetesServiceNodePort int
-	LongRunningRequestRE      string
-	MasterCount               int
-	MasterServiceNamespace    string
-	MaxRequestsInFlight       int
-	MinRequestTimeout         int
-	OIDCCAFile                string
-	OIDCClientID              string
-	OIDCIssuerURL             string
-	OIDCUsernameClaim         string
-	OIDCGroupsClaim           string
-	RuntimeConfig             config.ConfigurationMap
-	SecurePort                int
-	ServiceClusterIPRange     net.IPNet // TODO: make this a list
-	ServiceNodePortRange      utilnet.PortRange
-	StorageVersions           string
+	DeprecatedStorageVersion     string
+	EnableLogsSupport            bool
+	EnableProfiling              bool
+	EnableSwaggerUI              bool
+	EnableWatchCache             bool
+	EtcdServersOverrides         []string
+	StorageConfig                storagebackend.Config
+	ExternalHost                 string
+	InsecureBindAddress          net.IP
+	InsecurePort                 int
+	KeystoneTokenAuthnConfigFile string
+	KeystoneURL                  string
+	KubernetesServiceNodePort    int
+	LongRunningRequestRE         string
+	MasterCount                  int
+	MasterServiceNamespace       string
+	MaxRequestsInFlight          int
+	MinRequestTimeout            int
+	OIDCCAFile                   string
+	OIDCClientID                 string
+	OIDCIssuerURL                string
+	OIDCUsernameClaim            string
+	OIDCGroupsClaim              string
+	RuntimeConfig                config.ConfigurationMap
+	SecurePort                   int
+	ServiceClusterIPRange        net.IPNet // TODO: make this a list
+	ServiceNodePortRange         utilnet.PortRange
+	StorageVersions              string
 	// The default values for StorageVersions. StorageVersions overrides
 	// these; you can change this if you want to change the defaults (e.g.,
 	// for testing). This is not actually exposed as a flag.
@@ -266,6 +267,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead")
 	fs.MarkDeprecated("port", "see --insecure-port instead")
 
+	fs.StringVar(&s.KeystoneTokenAuthnConfigFile, "experimental-keystone-config-file", s.KeystoneTokenAuthnConfigFile, "File with keystone configuration for token authentication in kubeconfig format. The API server will query keystone api to determine authentication for bearer tokens.")
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")
 
 	// See #14282 for details on how to test/try this option out.  TODO remove this comment once this option is tested in CI.

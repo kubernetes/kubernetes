@@ -177,19 +177,20 @@ func Run(s *options.APIServer) error {
 	}
 
 	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
-		BasicAuthFile:               s.BasicAuthFile,
-		ClientCAFile:                s.ClientCAFile,
-		TokenAuthFile:               s.TokenAuthFile,
-		OIDCIssuerURL:               s.OIDCIssuerURL,
-		OIDCClientID:                s.OIDCClientID,
-		OIDCCAFile:                  s.OIDCCAFile,
-		OIDCUsernameClaim:           s.OIDCUsernameClaim,
-		OIDCGroupsClaim:             s.OIDCGroupsClaim,
-		ServiceAccountKeyFile:       s.ServiceAccountKeyFile,
-		ServiceAccountLookup:        s.ServiceAccountLookup,
-		ServiceAccountTokenGetter:   serviceAccountGetter,
-		KeystoneURL:                 s.KeystoneURL,
-		WebhookTokenAuthnConfigFile: s.WebhookTokenAuthnConfigFile,
+		BasicAuthFile:                s.BasicAuthFile,
+		ClientCAFile:                 s.ClientCAFile,
+		TokenAuthFile:                s.TokenAuthFile,
+		OIDCIssuerURL:                s.OIDCIssuerURL,
+		OIDCClientID:                 s.OIDCClientID,
+		OIDCCAFile:                   s.OIDCCAFile,
+		OIDCUsernameClaim:            s.OIDCUsernameClaim,
+		OIDCGroupsClaim:              s.OIDCGroupsClaim,
+		ServiceAccountKeyFile:        s.ServiceAccountKeyFile,
+		ServiceAccountLookup:         s.ServiceAccountLookup,
+		ServiceAccountTokenGetter:    serviceAccountGetter,
+		KeystoneTokenAuthnConfigFile: s.KeystoneTokenAuthnConfigFile,
+		KeystoneURL:                  s.KeystoneURL,
+		WebhookTokenAuthnConfigFile:  s.WebhookTokenAuthnConfigFile,
 	})
 
 	if err != nil {
