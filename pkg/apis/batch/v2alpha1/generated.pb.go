@@ -644,16 +644,14 @@ func (m *ScheduledJobSpec) MarshalTo(data []byte) (int, error) {
 		data[i] = 0
 	}
 	i++
-	if m.JobTemplate != nil {
-		data[i] = 0x2a
-		i++
-		i = encodeVarintGenerated(data, i, uint64(m.JobTemplate.Size()))
-		n19, err := m.JobTemplate.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n19
+	data[i] = 0x2a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.JobTemplate.Size()))
+	n19, err := m.JobTemplate.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
 	}
+	i += n19
 	return i, nil
 }
 
@@ -908,10 +906,8 @@ func (m *ScheduledJobSpec) Size() (n int) {
 	l = len(m.ConcurrencyPolicy)
 	n += 1 + l + sovGenerated(uint64(l))
 	n += 2
-	if m.JobTemplate != nil {
-		l = m.JobTemplate.Size()
-		n += 1 + l + sovGenerated(uint64(l))
-	}
+	l = m.JobTemplate.Size()
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -2771,9 +2767,6 @@ func (m *ScheduledJobSpec) Unmarshal(data []byte) error {
 			postIndex := iNdEx + msglen
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
-			}
-			if m.JobTemplate == nil {
-				m.JobTemplate = &JobTemplateSpec{}
 			}
 			if err := m.JobTemplate.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
