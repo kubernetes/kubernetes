@@ -48,6 +48,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/metrics"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -78,6 +80,9 @@ type Factory struct {
 	// Returns interfaces for dealing with arbitrary runtime.Objects. If thirdPartyDiscovery is true, performs API calls
 	// to discovery dynamic API objects registered by third parties.
 	Object func(thirdPartyDiscovery bool) (meta.RESTMapper, runtime.ObjectTyper)
+	// Returns interfaces for dealing with arbitrary
+	// runtime.Unstructured. This performs API calls to discover types.
+	DynamicObject func() (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns interfaces for decoding objects - if toInternal is set, decoded objects will be converted
 	// into their internal form (if possible). Eventually the internal form will be removed as an option,
 	// and only versioned objects will be returned.
@@ -86,6 +91,8 @@ type Factory struct {
 	JSONEncoder func() runtime.Encoder
 	// Returns a client for accessing Kubernetes resources or an error.
 	Client func() (*client.Client, error)
+	// Returns a dynamic client for accessing specified group version.
+	DynamicClient func(unversioned.GroupVersion) (*dynamic.Client, error)
 	// Returns a client.Config for accessing the Kubernetes server.
 	ClientConfig func() (*restclient.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
@@ -226,6 +233,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	clients := NewClientCache(clientConfig)
+	cfg, err := clientConfig.ClientConfig()
+	CheckErr(err)
+
+	dynamicClientPool := dynamic.NewClientPool(cfg, dynamic.LegacyAPIPathResolverFunc)
 
 	return &Factory{
 		clients: clients,
@@ -301,8 +312,35 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return priorityRESTMapper, api.Scheme
 		},
+		DynamicObject: func() (meta.RESTMapper, runtime.ObjectTyper) {
+			cfg, err := clients.ClientConfigForVersion(nil)
+			CheckErr(err)
+
+			discovery, err := discovery.NewDiscoveryClientForConfig(cfg)
+			CheckErr(err)
+
+			resourceMap, err := discovery.ServerResources()
+			CheckErr(err)
+
+			var resources []*unversioned.APIResourceList
+
+			for _, resourceList := range resourceMap {
+				resources = append(resources, resourceList)
+			}
+
+			mapper, err := NewDiscoveryRESTMapper(resources, DynamicVersionInterfaces)
+			CheckErr(err)
+
+			typer, err := NewDynamicObjectTyper(resources)
+			CheckErr(err)
+
+			return kubectl.ShortcutExpander{RESTMapper: mapper}, typer
+		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion(nil)
+		},
+		DynamicClient: func(gv unversioned.GroupVersion) (*dynamic.Client, error) {
+			return dynamicClientPool.ClientForGroupVersion(gv)
 		},
 		ClientConfig: func() (*restclient.Config, error) {
 			return clients.ClientConfigForVersion(nil)
