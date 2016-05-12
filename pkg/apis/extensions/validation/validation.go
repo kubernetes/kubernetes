@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"net"
 	"regexp"
 	"strconv"
@@ -28,6 +29,7 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
+	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
@@ -529,7 +531,11 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 
 	allErrs = append(allErrs, validatePSPRunAsUser(fldPath.Child("runAsUser"), &spec.RunAsUser)...)
 	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
+	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
+	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
 	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
+	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
+	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
 
 	return allErrs
 }
@@ -568,24 +574,48 @@ func validatePSPRunAsUser(fldPath *field.Path, runAsUser *extensions.RunAsUserSt
 	return allErrs
 }
 
+// validatePSPFSGroup validates the FSGroupStrategyOptions fields of the PodSecurityPolicy.
+func validatePSPFSGroup(fldPath *field.Path, groupOptions *extensions.FSGroupStrategyOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	supportedRules := sets.NewString(
+		string(extensions.FSGroupStrategyMustRunAs),
+		string(extensions.FSGroupStrategyRunAsAny),
+	)
+	if !supportedRules.Has(string(groupOptions.Rule)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), groupOptions.Rule, supportedRules.List()))
+	}
+
+	for idx, rng := range groupOptions.Ranges {
+		allErrs = append(allErrs, validateIDRanges(fldPath.Child("ranges").Index(idx), rng)...)
+	}
+	return allErrs
+}
+
+// validatePSPSupplementalGroup validates the SupplementalGroupsStrategyOptions fields of the PodSecurityPolicy.
+func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *extensions.SupplementalGroupsStrategyOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	supportedRules := sets.NewString(
+		string(extensions.SupplementalGroupsStrategyRunAsAny),
+		string(extensions.SupplementalGroupsStrategyMustRunAs),
+	)
+	if !supportedRules.Has(string(groupOptions.Rule)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), groupOptions.Rule, supportedRules.List()))
+	}
+
+	for idx, rng := range groupOptions.Ranges {
+		allErrs = append(allErrs, validateIDRanges(fldPath.Child("ranges").Index(idx), rng)...)
+	}
+	return allErrs
+}
+
 // validatePodSecurityPolicyVolumes validates the volume fields of PodSecurityPolicy.
 func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []extensions.FSType) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allowed := sets.NewString(string(extensions.HostPath),
-		string(extensions.EmptyDir),
-		string(extensions.GCEPersistentDisk),
-		string(extensions.AWSElasticBlockStore),
-		string(extensions.GitRepo),
-		string(extensions.Secret),
-		string(extensions.NFS),
-		string(extensions.ISCSI),
-		string(extensions.Glusterfs),
-		string(extensions.PersistentVolumeClaim),
-		string(extensions.RBD),
-		string(extensions.Cinder),
-		string(extensions.CephFS),
-		string(extensions.DownwardAPI),
-		string(extensions.FC))
+	allowed := psputil.GetAllFSTypesAsSet()
+	// add in the * value since that is a pseudo type that is not included by default
+	allowed.Insert(string(extensions.All))
 	for _, v := range volumes {
 		if !allowed.Has(string(v)) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumes"), v, allowed.List()))
@@ -612,6 +642,31 @@ func validateIDRanges(fldPath *field.Path, rng extensions.IDRange) field.ErrorLi
 	}
 
 	return allErrs
+}
+
+// validatePSPCapsAgainstDrops ensures an allowed cap is not listed in the required drops.
+func validatePSPCapsAgainstDrops(requiredDrops []api.Capability, capsToCheck []api.Capability, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if requiredDrops == nil {
+		return allErrs
+	}
+	for _, cap := range capsToCheck {
+		if hasCap(cap, requiredDrops) {
+			allErrs = append(allErrs, field.Invalid(fldPath, cap,
+				fmt.Sprintf("capability is listed in %s and requiredDropCapabilities", fldPath.String())))
+		}
+	}
+	return allErrs
+}
+
+// hasCap checks for needle in haystack.
+func hasCap(needle api.Capability, haystack []api.Capability) bool {
+	for _, c := range haystack {
+		if needle == c {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidatePodSecurityPolicyUpdate validates a PSP for updates.

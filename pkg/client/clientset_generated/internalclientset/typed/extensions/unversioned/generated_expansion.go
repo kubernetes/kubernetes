@@ -24,6 +24,8 @@ type IngressExpansion interface{}
 
 type JobExpansion interface{}
 
+type PodSecurityPolicyExpansion interface{}
+
 type ThirdPartyResourceExpansion interface{}
 
 type ReplicaSetExpansion interface{}

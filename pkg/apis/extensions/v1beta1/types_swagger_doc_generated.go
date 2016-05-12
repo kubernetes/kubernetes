@@ -186,6 +186,16 @@ func (ExportOptions) SwaggerDoc() map[string]string {
 	return map_ExportOptions
 }
 
+var map_FSGroupStrategyOptions = map[string]string{
+	"":       "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+	"rule":   "Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.",
+	"ranges": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end.",
+}
+
+func (FSGroupStrategyOptions) SwaggerDoc() map[string]string {
+	return map_FSGroupStrategyOptions
+}
+
 var map_HTTPIngressPath = map[string]string{
 	"":        "HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
 	"path":    "Path is a extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend.",
@@ -467,16 +477,21 @@ func (PodSecurityPolicyList) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicySpec = map[string]string{
-	"":             "Pod Security Policy Spec defines the policy enforced.",
-	"privileged":   "privileged determines if a pod can request to be run as privileged.",
-	"capabilities": "capabilities is a list of capabilities that can be added.",
-	"volumes":      "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
-	"hostNetwork":  "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
-	"hostPorts":    "hostPorts determines which host port ranges are allowed to be exposed.",
-	"hostPID":      "hostPID determines if the policy allows the use of HostPID in the pod spec.",
-	"hostIPC":      "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
-	"seLinux":      "seLinux is the strategy that will dictate the allowable labels that may be set.",
-	"runAsUser":    "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
+	"":                         "Pod Security Policy Spec defines the policy enforced.",
+	"privileged":               "privileged determines if a pod can request to be run as privileged.",
+	"defaultAddCapabilities":   "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities.",
+	"requiredDropCapabilities": "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
+	"allowedCapabilities":      "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
+	"volumes":                  "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
+	"hostNetwork":              "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
+	"hostPorts":                "hostPorts determines which host port ranges are allowed to be exposed.",
+	"hostPID":                  "hostPID determines if the policy allows the use of HostPID in the pod spec.",
+	"hostIPC":                  "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
+	"seLinux":                  "seLinux is the strategy that will dictate the allowable labels that may be set.",
+	"runAsUser":                "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
+	"supplementalGroups":       "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
+	"fsGroup":                  "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
+	"readOnlyRootFilesystem":   "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
 }
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
@@ -613,6 +628,16 @@ var map_SubresourceReference = map[string]string{
 
 func (SubresourceReference) SwaggerDoc() map[string]string {
 	return map_SubresourceReference
+}
+
+var map_SupplementalGroupsStrategyOptions = map[string]string{
+	"":       "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+	"rule":   "Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
+	"ranges": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end.",
+}
+
+func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
+	return map_SupplementalGroupsStrategyOptions
 }
 
 var map_ThirdPartyResource = map[string]string{

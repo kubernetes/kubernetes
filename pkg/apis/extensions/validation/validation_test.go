@@ -24,7 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestValidateDaemonSetStatusUpdate(t *testing.T) {
@@ -1418,7 +1420,7 @@ func TestValidateReplicaSet(t *testing.T) {
 }
 
 func TestValidatePodSecurityPolicy(t *testing.T) {
-	validSCC := func() *extensions.PodSecurityPolicy {
+	validPSP := func() *extensions.PodSecurityPolicy {
 		return &extensions.PodSecurityPolicy{
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: extensions.PodSecurityPolicySpec{
@@ -1428,114 +1430,246 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 				RunAsUser: extensions.RunAsUserStrategyOptions{
 					Rule: extensions.RunAsUserStrategyRunAsAny,
 				},
+				FSGroup: extensions.FSGroupStrategyOptions{
+					Rule: extensions.FSGroupStrategyRunAsAny,
+				},
+				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+				},
 			},
 		}
 	}
 
-	noUserOptions := validSCC()
+	noUserOptions := validPSP()
 	noUserOptions.Spec.RunAsUser.Rule = ""
 
-	noSELinuxOptions := validSCC()
+	noSELinuxOptions := validPSP()
 	noSELinuxOptions.Spec.SELinux.Rule = ""
 
-	invalidUserStratRule := validSCC()
-	invalidUserStratRule.Spec.RunAsUser.Rule = "invalid"
+	invalidUserStratType := validPSP()
+	invalidUserStratType.Spec.RunAsUser.Rule = "invalid"
 
-	invalidSELinuxStratRule := validSCC()
-	invalidSELinuxStratRule.Spec.SELinux.Rule = "invalid"
+	invalidSELinuxStratType := validPSP()
+	invalidSELinuxStratType.Spec.SELinux.Rule = "invalid"
 
-	missingObjectMetaName := validSCC()
+	invalidUIDPSP := validPSP()
+	invalidUIDPSP.Spec.RunAsUser.Rule = extensions.RunAsUserStrategyMustRunAs
+	invalidUIDPSP.Spec.RunAsUser.Ranges = []extensions.IDRange{
+		{Min: -1, Max: 1},
+	}
+
+	missingObjectMetaName := validPSP()
 	missingObjectMetaName.ObjectMeta.Name = ""
 
-	invalidRangeMinGreaterThanMax := validSCC()
-	invalidRangeMinGreaterThanMax.Spec.RunAsUser.Ranges = []extensions.IDRange{
+	noFSGroupOptions := validPSP()
+	noFSGroupOptions.Spec.FSGroup.Rule = ""
+
+	invalidFSGroupStratType := validPSP()
+	invalidFSGroupStratType.Spec.FSGroup.Rule = "invalid"
+
+	noSupplementalGroupsOptions := validPSP()
+	noSupplementalGroupsOptions.Spec.SupplementalGroups.Rule = ""
+
+	invalidSupGroupStratType := validPSP()
+	invalidSupGroupStratType.Spec.SupplementalGroups.Rule = "invalid"
+
+	invalidRangeMinGreaterThanMax := validPSP()
+	invalidRangeMinGreaterThanMax.Spec.FSGroup.Ranges = []extensions.IDRange{
 		{Min: 2, Max: 1},
 	}
 
-	invalidRangeNegativeMin := validSCC()
-	invalidRangeNegativeMin.Spec.RunAsUser.Ranges = []extensions.IDRange{
+	invalidRangeNegativeMin := validPSP()
+	invalidRangeNegativeMin.Spec.FSGroup.Ranges = []extensions.IDRange{
 		{Min: -1, Max: 10},
 	}
 
-	invalidRangeNegativeMax := validSCC()
-	invalidRangeNegativeMax.Spec.RunAsUser.Ranges = []extensions.IDRange{
+	invalidRangeNegativeMax := validPSP()
+	invalidRangeNegativeMax.Spec.FSGroup.Ranges = []extensions.IDRange{
 		{Min: 1, Max: -10},
 	}
 
+	requiredCapAddAndDrop := validPSP()
+	requiredCapAddAndDrop.Spec.DefaultAddCapabilities = []api.Capability{"foo"}
+	requiredCapAddAndDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
+
+	allowedCapListedInRequiredDrop := validPSP()
+	allowedCapListedInRequiredDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
+	allowedCapListedInRequiredDrop.Spec.AllowedCapabilities = []api.Capability{"foo"}
+
 	errorCases := map[string]struct {
-		scc         *extensions.PodSecurityPolicy
+		psp         *extensions.PodSecurityPolicy
+		errorType   field.ErrorType
 		errorDetail string
 	}{
 		"no user options": {
-			scc:         noUserOptions,
+			psp:         noUserOptions,
+			errorType:   field.ErrorTypeNotSupported,
 			errorDetail: "supported values: MustRunAs, MustRunAsNonRoot, RunAsAny",
 		},
 		"no selinux options": {
-			scc:         noSELinuxOptions,
+			psp:         noSELinuxOptions,
+			errorType:   field.ErrorTypeNotSupported,
 			errorDetail: "supported values: MustRunAs, RunAsAny",
 		},
-		"invalid user strategy rule": {
-			scc:         invalidUserStratRule,
+		"no fsgroup options": {
+			psp:         noFSGroupOptions,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"no sup group options": {
+			psp:         noSupplementalGroupsOptions,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"invalid user strategy type": {
+			psp:         invalidUserStratType,
+			errorType:   field.ErrorTypeNotSupported,
 			errorDetail: "supported values: MustRunAs, MustRunAsNonRoot, RunAsAny",
 		},
-		"invalid selinux strategy rule": {
-			scc:         invalidSELinuxStratRule,
+		"invalid selinux strategy type": {
+			psp:         invalidSELinuxStratType,
+			errorType:   field.ErrorTypeNotSupported,
 			errorDetail: "supported values: MustRunAs, RunAsAny",
 		},
+		"invalid sup group strategy type": {
+			psp:         invalidSupGroupStratType,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"invalid fs group strategy type": {
+			psp:         invalidFSGroupStratType,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"invalid uid": {
+			psp:         invalidUIDPSP,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "min cannot be negative",
+		},
 		"missing object meta name": {
-			scc:         missingObjectMetaName,
+			psp:         missingObjectMetaName,
+			errorType:   field.ErrorTypeRequired,
 			errorDetail: "name or generateName is required",
 		},
 		"invalid range min greater than max": {
-			scc:         invalidRangeMinGreaterThanMax,
+			psp:         invalidRangeMinGreaterThanMax,
+			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "min cannot be greater than max",
 		},
 		"invalid range negative min": {
-			scc:         invalidRangeNegativeMin,
+			psp:         invalidRangeNegativeMin,
+			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "min cannot be negative",
 		},
 		"invalid range negative max": {
-			scc:         invalidRangeNegativeMax,
+			psp:         invalidRangeNegativeMax,
+			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "max cannot be negative",
+		},
+		"invalid required caps": {
+			psp:         requiredCapAddAndDrop,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "capability is listed in defaultAddCapabilities and requiredDropCapabilities",
+		},
+		"allowed cap listed in required drops": {
+			psp:         allowedCapListedInRequiredDrop,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "capability is listed in allowedCapabilities and requiredDropCapabilities",
 		},
 	}
 
 	for k, v := range errorCases {
-		if errs := ValidatePodSecurityPolicy(v.scc); len(errs) == 0 || errs[0].Detail != v.errorDetail {
-			t.Errorf("Expected error with detail %s for %s, got %v", v.errorDetail, k, errs[0].Detail)
+		errs := ValidatePodSecurityPolicy(v.psp)
+		if len(errs) == 0 {
+			t.Errorf("%s expected errors but got none", k)
+			continue
+		}
+		if errs[0].Type != v.errorType {
+			t.Errorf("%s received an unexpected error type.  Expected: %v got: %v", k, v.errorType, errs[0].Type)
+		}
+		if errs[0].Detail != v.errorDetail {
+			t.Errorf("%s received an unexpected error detail.  Expected %v got: %v", k, v.errorDetail, errs[0].Detail)
 		}
 	}
 
-	mustRunAs := validSCC()
+	mustRunAs := validPSP()
+	mustRunAs.Spec.FSGroup.Rule = extensions.FSGroupStrategyMustRunAs
+	mustRunAs.Spec.SupplementalGroups.Rule = extensions.SupplementalGroupsStrategyMustRunAs
 	mustRunAs.Spec.RunAsUser.Rule = extensions.RunAsUserStrategyMustRunAs
 	mustRunAs.Spec.RunAsUser.Ranges = []extensions.IDRange{
-		{
-			Min: 1,
-			Max: 1,
-		},
+		{Min: 1, Max: 1},
 	}
 	mustRunAs.Spec.SELinux.Rule = extensions.SELinuxStrategyMustRunAs
 
-	runAsNonRoot := validSCC()
+	runAsNonRoot := validPSP()
 	runAsNonRoot.Spec.RunAsUser.Rule = extensions.RunAsUserStrategyMustRunAsNonRoot
 
+	caseInsensitiveAddDrop := validPSP()
+	caseInsensitiveAddDrop.Spec.DefaultAddCapabilities = []api.Capability{"foo"}
+	caseInsensitiveAddDrop.Spec.RequiredDropCapabilities = []api.Capability{"FOO"}
+
+	caseInsensitiveAllowedDrop := validPSP()
+	caseInsensitiveAllowedDrop.Spec.RequiredDropCapabilities = []api.Capability{"FOO"}
+	caseInsensitiveAllowedDrop.Spec.AllowedCapabilities = []api.Capability{"foo"}
+
 	successCases := map[string]struct {
-		scc *extensions.PodSecurityPolicy
+		psp *extensions.PodSecurityPolicy
 	}{
 		"must run as": {
-			scc: mustRunAs,
+			psp: mustRunAs,
 		},
 		"run as any": {
-			scc: validSCC(),
+			psp: validPSP(),
 		},
 		"run as non-root (user only)": {
-			scc: runAsNonRoot,
+			psp: runAsNonRoot,
+		},
+		"comparison for add -> drop is case sensitive": {
+			psp: caseInsensitiveAddDrop,
+		},
+		"comparison for allowed -> drop is case sensitive": {
+			psp: caseInsensitiveAllowedDrop,
 		},
 	}
 
 	for k, v := range successCases {
-		if errs := ValidatePodSecurityPolicy(v.scc); len(errs) != 0 {
+		if errs := ValidatePodSecurityPolicy(v.psp); len(errs) != 0 {
 			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+	}
+}
+
+func TestValidatePSPVolumes(t *testing.T) {
+	validPSP := func() *extensions.PodSecurityPolicy {
+		return &extensions.PodSecurityPolicy{
+			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			Spec: extensions.PodSecurityPolicySpec{
+				SELinux: extensions.SELinuxStrategyOptions{
+					Rule: extensions.SELinuxStrategyRunAsAny,
+				},
+				RunAsUser: extensions.RunAsUserStrategyOptions{
+					Rule: extensions.RunAsUserStrategyRunAsAny,
+				},
+				FSGroup: extensions.FSGroupStrategyOptions{
+					Rule: extensions.FSGroupStrategyRunAsAny,
+				},
+				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+				},
+			},
+		}
+	}
+
+	volumes := psputil.GetAllFSTypesAsSet()
+	// add in the * value since that is a pseudo type that is not included by default
+	volumes.Insert(string(extensions.All))
+
+	for _, strVolume := range volumes.List() {
+		psp := validPSP()
+		psp.Spec.Volumes = []extensions.FSType{extensions.FSType(strVolume)}
+		errs := ValidatePodSecurityPolicy(psp)
+		if len(errs) != 0 {
+			t.Errorf("%s validation expected no errors but received %v", strVolume, errs)
 		}
 	}
 }

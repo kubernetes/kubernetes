@@ -624,6 +624,8 @@ type ReplicaSetStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+// +genclient=true,nonNamespaced=true
+
 // PodSecurityPolicy governs the ability to make requests that affect the SecurityContext
 // that will be applied to a pod and container.
 type PodSecurityPolicy struct {
@@ -638,8 +640,17 @@ type PodSecurityPolicy struct {
 type PodSecurityPolicySpec struct {
 	// Privileged determines if a pod can request to be run as privileged.
 	Privileged bool `json:"privileged,omitempty"`
-	// Capabilities is a list of capabilities that can be added.
-	Capabilities []api.Capability `json:"capabilities,omitempty"`
+	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
+	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
+	// DefaultAddCapabilities and RequiredDropCapabilities.
+	DefaultAddCapabilities []api.Capability `json:"defaultAddCapabilities,omitempty"`
+	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
+	// are required to be dropped and cannot be added.
+	RequiredDropCapabilities []api.Capability `json:"requiredDropCapabilities,omitempty"`
+	// AllowedCapabilities is a list of capabilities that can be requested to add to the container.
+	// Capabilities in this field may be added at the pod author's discretion.
+	// You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
+	AllowedCapabilities []api.Capability `json:"allowedCapabilities,omitempty"`
 	// Volumes is a white list of allowed volume plugins.  Empty indicates that all plugins
 	// may be used.
 	Volumes []FSType `json:"volumes,omitempty"`
@@ -652,9 +663,19 @@ type PodSecurityPolicySpec struct {
 	// HostIPC determines if the policy allows the use of HostIPC in the pod spec.
 	HostIPC bool `json:"hostIPC,omitempty"`
 	// SELinux is the strategy that will dictate the allowable labels that may be set.
-	SELinux SELinuxStrategyOptions `json:"seLinux,omitempty"`
+	SELinux SELinuxStrategyOptions `json:"seLinux"`
 	// RunAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
-	RunAsUser RunAsUserStrategyOptions `json:"runAsUser,omitempty"`
+	RunAsUser RunAsUserStrategyOptions `json:"runAsUser"`
+	// SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
+	SupplementalGroups SupplementalGroupsStrategyOptions `json:"supplementalGroups"`
+	// FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.
+	FSGroup FSGroupStrategyOptions `json:"fsGroup"`
+	// ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file
+	// system.  If the container specifically requests to run with a non-read only root file system
+	// the PSP should deny the pod.
+	// If set to false the container may run with a read only root file system if it wishes but it
+	// will not be forced to.
+	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty"`
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy
@@ -670,6 +691,9 @@ type HostPortRange struct {
 type FSType string
 
 var (
+	AzureFile             FSType = "azureFile"
+	Flocker               FSType = "flocker"
+	FlexVolume            FSType = "flexVolume"
 	HostPath              FSType = "hostPath"
 	EmptyDir              FSType = "emptyDir"
 	GCEPersistentDisk     FSType = "gcePersistentDisk"
@@ -685,6 +709,8 @@ var (
 	CephFS                FSType = "cephFS"
 	DownwardAPI           FSType = "downwardAPI"
 	FC                    FSType = "fc"
+	ConfigMap             FSType = "configMap"
+	All                   FSType = "*"
 )
 
 // SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
@@ -734,6 +760,46 @@ const (
 	RunAsUserStrategyMustRunAsNonRoot RunAsUserStrategy = "MustRunAsNonRoot"
 	// container may make requests for any uid.
 	RunAsUserStrategyRunAsAny RunAsUserStrategy = "RunAsAny"
+)
+
+// FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
+type FSGroupStrategyOptions struct {
+	// Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
+	Rule FSGroupStrategyType `json:"rule,omitempty"`
+	// Ranges are the allowed ranges of fs groups.  If you would like to force a single
+	// fs group then supply a single range with the same start and end.
+	Ranges []IDRange `json:"ranges,omitempty"`
+}
+
+// FSGroupStrategyType denotes strategy types for generating FSGroup values for a
+// SecurityContext
+type FSGroupStrategyType string
+
+const (
+	// container must have FSGroup of X applied.
+	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
+	// container may make requests for any FSGroup labels.
+	FSGroupStrategyRunAsAny FSGroupStrategyType = "RunAsAny"
+)
+
+// SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
+type SupplementalGroupsStrategyOptions struct {
+	// Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
+	Rule SupplementalGroupsStrategyType `json:"rule,omitempty"`
+	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
+	// supplemental group then supply a single range with the same start and end.
+	Ranges []IDRange `json:"ranges,omitempty"`
+}
+
+// SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental
+// groups for a SecurityContext.
+type SupplementalGroupsStrategyType string
+
+const (
+	// container must run as a particular gid.
+	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
+	// container may make requests for any gid.
+	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
 
 // PodSecurityPolicyList is a list of PodSecurityPolicy objects.
