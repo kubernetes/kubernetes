@@ -215,7 +215,7 @@ type ScheduledJobSpec struct {
 
 	// JobTemplate is the object that describes the job that will be created when
 	// executing a ScheduledJob.
-	JobTemplate *JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
+	JobTemplate JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
 }
 
 // ConcurrencyPolicy describes how the job will be handled.
