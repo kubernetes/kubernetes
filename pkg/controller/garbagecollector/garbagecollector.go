@@ -93,21 +93,19 @@ type Propagator struct {
 	gc        *GarbageCollector
 }
 
-// insertNode insert the node to p.uidToNode; then it finds all owners as listed
-// in n.owners, and adds the node to their dependents list. ownerExists
-// indicates if any owner listed in n.owners exists in p.uidToNode.
-func (p *Propagator) insertNode(n *node) (ownerExists bool) {
-	p.uidToNode[n.identity.UID] = n
-	for _, owner := range n.owners {
+// insertToOwners adds n to owners' dependents list. If the owner does not exist
+// in the p.uidToNode yet, a "virtual" node will be created to represent the
+// owner. The "virtual" node will be enqueued to the dirtyQueue, so that
+// processItem() will verify if the owner exists according to the API server.
+func (p *Propagator) insertToOwners(n *node, owners []metatypes.OwnerReference) {
+	for _, owner := range owners {
 		ownerNode, ok := p.uidToNode[owner.UID]
-		if ok {
-			ownerExists = true
-		} else {
-			// Create a virtual node in the graph for the owner if it doesn't
-			// exist yet. Then enqueue the virtual node into the dirtyQueue. The
-			// garbage processor will enqueue a virtual delete event for it if
-			// API server confirms this owner doesn't exist. Probably we don't
-			// need to specially handle nodes with ownerExists=false anymore.
+		if !ok {
+			// Create a "virtual" node in the graph for the owner if it doesn't
+			// exist in the graph yet. Then enqueue the virtual node into the
+			// dirtyQueue. The garbage processor will enqueue a virtual delete
+			// event to delete it from the graph if API server confirms this
+			// owner doesn't exist.
 			ownerNode = &node{
 				identity: objectReference{
 					OwnerReference: owner,
@@ -120,7 +118,13 @@ func (p *Propagator) insertNode(n *node) (ownerExists bool) {
 		}
 		ownerNode.dependents[n] = struct{}{}
 	}
-	return ownerExists
+}
+
+// insertNode insert the node to p.uidToNode; then it finds all owners as listed
+// in n.owners, and adds the node to their dependents list.
+func (p *Propagator) insertNode(n *node) {
+	p.uidToNode[n.identity.UID] = n
+	p.insertToOwners(n, n.owners)
 }
 
 // removeFromOwners remove n from owners' dependents list.
@@ -208,11 +212,7 @@ func (p *Propagator) processEvent() {
 			dependents: make(map[*node]struct{}),
 			owners:     accessor.GetOwnerReferences(),
 		}
-		ownerExists := p.insertNode(newNode)
-		// Push the object to the dirty queue if none of its owners exists in the Graph.
-		if !ownerExists && len(newNode.owners) != 0 {
-			//	p.gc.dirtyQueue.Add(newNode)
-		}
+		p.insertNode(newNode)
 	case (event.eventType == addEvent || event.eventType == updateEvent) && found:
 		// TODO: finalizer: Check if ObjectMeta.DeletionTimestamp is updated from nil to non-nil
 		// We only need to add/remove owner refs for now
@@ -223,15 +223,10 @@ func (p *Propagator) processEvent() {
 		}
 		// update the node itself
 		existingNode.owners = accessor.GetOwnerReferences()
-		// Add the node to its new owners' dependent lists. We just go through
-		// all the owners so we know if we should put the object into the
-		// dirtyQueue.
-		ownerExists := p.insertNode(existingNode)
-		if !ownerExists && len(existingNode.owners) != 0 {
-			p.gc.dirtyQueue.Add(existingNode)
-		}
-		// remove the node from the dependent list of node pionted by the
-		// removed refrences.
+		// Add the node to its new owners' dependent lists.
+		p.insertToOwners(existingNode, added)
+		// remove the node from the dependent list of node that are no long in
+		// the node's owners list.
 		p.removeFromOwners(existingNode, removed)
 	case event.eventType == deleteEvent:
 		if !found {
