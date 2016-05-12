@@ -172,6 +172,10 @@ function kube-up() {
     create_args+=("--cluster-ipv4-cidr=${CLUSTER_IP_RANGE}")
   fi
 
+  if [[ ! -z "${IMAGE_TYPE:-}" ]]; then
+    create_args+=("--image-type=${IMAGE_TYPE}")
+  fi
+
   create_args+=( ${GKE_CREATE_FLAGS:-} )
 
   # Bring up the cluster.
