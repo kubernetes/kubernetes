@@ -3,17 +3,27 @@
 
 .SH NAME
 .PP
-kubectl rollout \- rollout manages a deployment
+kubectl rollout status \- Watch rollout status until it's done
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl rollout\fP [OPTIONS]
+\fBkubectl rollout status\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Manages a deployment using subcommands like "kubectl rollout undo deployment/abc"
+Watch the status of current rollout, until it's done.
+
+
+.SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to get from a server.
+
+.PP
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    If true, process directory recursively.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -119,8 +129,8 @@ Manages a deployment using subcommands like "kubectl rollout undo deployment/abc
 .RS
 
 .nf
-# Rollback to the previous deployment
-kubectl rollout undo deployment/abc
+# Watch the rollout status of a deployment
+kubectl rollout status deployment/nginx
 
 .fi
 .RE
@@ -128,7 +138,7 @@ kubectl rollout undo deployment/abc
 
 .SH SEE ALSO
 .PP
-\fBkubectl(1)\fP, \fBkubectl\-rollout\-history(1)\fP, \fBkubectl\-rollout\-pause(1)\fP, \fBkubectl\-rollout\-resume(1)\fP, \fBkubectl\-rollout\-undo(1)\fP, \fBkubectl\-rollout\-status(1)\fP,
+\fBkubectl\-rollout(1)\fP,
 
 
 .SH HISTORY
