@@ -162,7 +162,7 @@ func (c *parameterCodec) EncodeParameters(obj Object, to unversioned.GroupVersio
 		return nil, err
 	}
 	if to != gvk.GroupVersion() {
-		out, err := c.convertor.ConvertToVersion(obj, to.String())
+		out, err := c.convertor.ConvertToVersion(obj, to)
 		if err != nil {
 			return nil, err
 		}

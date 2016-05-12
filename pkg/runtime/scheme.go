@@ -124,11 +124,8 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 
 // fromScope gets the input version, desired output version, and desired Scheme
 // from a conversion.Scope.
-func (s *Scheme) fromScope(scope conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
-	scheme = s
-	inVersion = scope.Meta().SrcVersion
-	outVersion = scope.Meta().DestVersion
-	return inVersion, outVersion, scheme
+func (s *Scheme) fromScope(scope conversion.Scope) *Scheme {
+	return s
 }
 
 // Converter allows access to the converter for the scheme
@@ -476,16 +473,12 @@ func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, 
 // contain the inKind (or a mapping by name defined with AddKnownTypeWithName). Will also
 // return an error if the conversion does not result in a valid Object being
 // returned. The serializer handles loading/serializing nested objects.
-func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) {
-	gv, err := unversioned.ParseGroupVersion(outVersion)
-	if err != nil {
-		return nil, err
-	}
+func (s *Scheme) ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
 	switch in.(type) {
 	case *Unknown, *Unstructured, *UnstructuredList:
 		old := in.GetObjectKind().GroupVersionKind()
 		defer in.GetObjectKind().SetGroupVersionKind(old)
-		setTargetVersion(in, s, gv)
+		setTargetVersion(in, s, outVersion)
 		return in, nil
 	}
 	t := reflect.TypeOf(in)
@@ -509,7 +502,7 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 		kind = kinds[0]
 	}
 
-	outKind := gv.WithKind(kind.Kind)
+	outKind := outVersion.WithKind(kind.Kind)
 
 	inKind, err := s.ObjectKind(in)
 	if err != nil {
@@ -521,29 +514,106 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 		return nil, err
 	}
 
-	flags, meta := s.generateConvertMeta(inKind.GroupVersion(), gv, in)
+	flags, meta := s.generateConvertMeta(inKind.GroupVersion(), outVersion, in)
 	if err := s.converter.Convert(in, out, flags, meta); err != nil {
 		return nil, err
 	}
 
-	setTargetVersion(out, s, gv)
+	setTargetVersion(out, s, outVersion)
+	return out, nil
+}
+
+// UnsafeConvertToVersion will convert in to the provided outVersion if such a conversion is possible,
+// but does not guarantee the output object does not share fields with the input object. It attempts to be as
+// efficient as possible when doing conversion.
+func (s *Scheme) UnsafeConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
+	switch t := in.(type) {
+	case *Unknown:
+		t.APIVersion = outVersion.String()
+		return t, nil
+	case *Unstructured:
+		t.SetAPIVersion(outVersion.String())
+		return t, nil
+	case *UnstructuredList:
+		t.SetAPIVersion(outVersion.String())
+		return t, nil
+	}
+
+	// determine the incoming kinds with as few allocations as possible.
+	t := reflect.TypeOf(in)
+	if t.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("only pointer types may be converted: %v", t)
+	}
+	t = t.Elem()
+	if t.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("only pointers to struct types may be converted: %v", t)
+	}
+	kinds, ok := s.typeToGVK[t]
+	if !ok || len(kinds) == 0 {
+		return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, outVersion)
+	}
+
+	// if the Go type is also registered to the destination kind, no conversion is necessary
+	for i := range kinds {
+		if kinds[i].Version == outVersion.Version && kinds[i].Group == outVersion.Group {
+			setTargetKind(in, kinds[i])
+			return in, nil
+		}
+	}
+
+	// type is unversioned, no conversion necessary
+	// it should be possible to avoid this allocation
+	if unversionedKind, ok := s.unversionedTypes[t]; ok {
+		kind := unversionedKind
+		outKind := outVersion.WithKind(kind.Kind)
+		setTargetKind(in, outKind)
+		return in, nil
+	}
+
+	// allocate a new object as the target using the target kind
+	// TODO: this should look in the target group version and find the first kind that matches, rather than the
+	//   first kind registered in typeToGVK
+	kind := kinds[0]
+	kind.Version = outVersion.Version
+	kind.Group = outVersion.Group
+	out, err := s.New(kind)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: try to avoid the allocations here - in fast paths we are not likely to need these flags or meta
+	flags, meta := s.converter.DefaultMeta(t)
+	if err := s.converter.Convert(in, out, flags, meta); err != nil {
+		return nil, err
+	}
+
+	setTargetKind(out, kind)
 	return out, nil
 }
 
 // generateConvertMeta constructs the meta value we pass to Convert.
 func (s *Scheme) generateConvertMeta(srcGroupVersion, destGroupVersion unversioned.GroupVersion, in interface{}) (conversion.FieldMatchingFlags, *conversion.Meta) {
-	flags, meta := s.converter.DefaultMeta(reflect.TypeOf(in))
-	meta.SrcVersion = srcGroupVersion.String()
-	meta.DestVersion = destGroupVersion.String()
-	return flags, meta
+	return s.converter.DefaultMeta(reflect.TypeOf(in))
 }
 
+// setTargetVersion is deprecated and should be replaced by use of setTargetKind
 func setTargetVersion(obj Object, raw *Scheme, gv unversioned.GroupVersion) {
 	if gv.Version == APIVersionInternal {
 		// internal is a special case
-		obj.GetObjectKind().SetGroupVersionKind(nil)
-	} else {
-		gvk, _ := raw.ObjectKind(obj)
-		obj.GetObjectKind().SetGroupVersionKind(&unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: gvk.Kind})
+		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+		return
 	}
+	gvk, _ := raw.ObjectKind(obj)
+	obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: gvk.Kind})
+}
+
+// setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.
+func setTargetKind(obj Object, kind unversioned.GroupVersionKind) {
+	if kind.Version == APIVersionInternal {
+		// internal is a special case
+		// TODO: look at removing the need to special case this
+		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+		return
+	}
+	obj.GetObjectKind().SetGroupVersionKind(kind)
 }

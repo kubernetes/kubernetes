@@ -149,7 +149,7 @@ func validateOwnerReference(ownerReference api.OwnerReference, fldPath *field.Pa
 	if len(ownerReference.UID) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), ownerReference.UID, "uid must not be empty"))
 	}
-	if _, ok := BannedOwners[*gvk]; ok {
+	if _, ok := BannedOwners[gvk]; ok {
 		allErrs = append(allErrs, field.Invalid(fldPath, ownerReference, fmt.Sprintf("%s is disallowed from being an owner", gvk)))
 	}
 	return allErrs

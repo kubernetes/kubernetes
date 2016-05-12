@@ -45,10 +45,10 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *unversioned.GroupVersionK
 
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	if len(gvk.Kind) == 0 {
-		return nil, gvk, NewMissingKindErr(string(data))
+		return nil, &gvk, NewMissingKindErr(string(data))
 	}
 
-	return obj, gvk, nil
+	return obj, &gvk, nil
 }
 
 func (unstructuredJSONScheme) EncodeToStream(obj Object, w io.Writer, overrides ...unversioned.GroupVersion) error {

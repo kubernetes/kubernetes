@@ -281,7 +281,7 @@ func TestObjectWatchFraming(t *testing.T) {
 	secret.Data["binary"] = []byte{0x00, 0x10, 0x30, 0x55, 0xff, 0x00}
 	secret.Data["utf8"] = []byte("a string with \u0345 characters")
 	secret.Data["long"] = bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x00}, 1000)
-	converted, _ := api.Scheme.ConvertToVersion(secret, "v1")
+	converted, _ := api.Scheme.ConvertToVersion(secret, v1.SchemeGroupVersion)
 	v1secret := converted.(*v1.Secret)
 	for _, streamingMediaType := range api.Codecs.SupportedStreamingMediaTypes() {
 		s, _ := api.Codecs.StreamingSerializerForMediaType(streamingMediaType, nil)
@@ -358,7 +358,7 @@ func benchmarkItems() []v1.Pod {
 	for i := range items {
 		var pod api.Pod
 		apiObjectFuzzer.Fuzz(&pod)
-		out, err := api.Scheme.ConvertToVersion(&pod, "v1")
+		out, err := api.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
 		if err != nil {
 			panic(err)
 		}

@@ -50,11 +50,11 @@ func BenchmarkPodConversion(b *testing.B) {
 	var result *api.Pod
 	for i := 0; i < b.N; i++ {
 		pod := &items[i%width]
-		versionedObj, err := scheme.ConvertToVersion(pod, testapi.Default.GroupVersion().String())
+		versionedObj, err := scheme.UnsafeConvertToVersion(pod, *testapi.Default.GroupVersion())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, testapi.Default.InternalGroupVersion().String())
+		obj, err := scheme.UnsafeConvertToVersion(versionedObj, testapi.Default.InternalGroupVersion())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -76,11 +76,11 @@ func BenchmarkNodeConversion(b *testing.B) {
 	scheme := api.Scheme
 	var result *api.Node
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&node, testapi.Default.GroupVersion().String())
+		versionedObj, err := scheme.UnsafeConvertToVersion(&node, *testapi.Default.GroupVersion())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, testapi.Default.InternalGroupVersion().String())
+		obj, err := scheme.UnsafeConvertToVersion(versionedObj, testapi.Default.InternalGroupVersion())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -104,11 +104,11 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 	scheme := api.Scheme
 	var result *api.ReplicationController
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&replicationController, testapi.Default.GroupVersion().String())
+		versionedObj, err := scheme.UnsafeConvertToVersion(&replicationController, *testapi.Default.GroupVersion())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, testapi.Default.InternalGroupVersion().String())
+		obj, err := scheme.UnsafeConvertToVersion(versionedObj, testapi.Default.InternalGroupVersion())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}

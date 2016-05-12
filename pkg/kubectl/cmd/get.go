@@ -246,7 +246,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
-		obj, err := resource.AsVersionedObject(infos, !singular, version.String(), f.JSONEncoder())
+		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
 		if err != nil {
 			return err
 		}
@@ -273,7 +273,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		}
 
 		for ix := range infos {
-			objs[ix], err = infos[ix].Mapping.ConvertToVersion(infos[ix].Object, version.String())
+			objs[ix], err = infos[ix].Mapping.ConvertToVersion(infos[ix].Object, version)
 			if err != nil {
 				allErrs = append(allErrs, err)
 				continue

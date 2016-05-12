@@ -30,12 +30,12 @@ import (
 type testDecodable struct {
 	Other string
 	Value int `json:"value"`
-	gvk   *unversioned.GroupVersionKind
+	gvk   unversioned.GroupVersionKind
 }
 
-func (d *testDecodable) GetObjectKind() unversioned.ObjectKind                 { return d }
-func (d *testDecodable) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) { d.gvk = gvk }
-func (d *testDecodable) GroupVersionKind() *unversioned.GroupVersionKind       { return d.gvk }
+func (d *testDecodable) GetObjectKind() unversioned.ObjectKind                { return d }
+func (d *testDecodable) SetGroupVersionKind(gvk unversioned.GroupVersionKind) { d.gvk = gvk }
+func (d *testDecodable) GroupVersionKind() unversioned.GroupVersionKind       { return d.gvk }
 
 func TestDecode(t *testing.T) {
 	gvk1 := &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}
@@ -65,12 +65,12 @@ func TestDecode(t *testing.T) {
 	}{
 		{
 			serializer:  &mockSerializer{actual: gvk1},
-			convertor:   &checkConvertor{groupVersion: "other/__internal"},
+			convertor:   &checkConvertor{groupVersion: unversioned.GroupVersion{Group: "other", Version: "__internal"}},
 			expectedGVK: gvk1,
 		},
 		{
 			serializer:  &mockSerializer{actual: gvk1, obj: decodable1},
-			convertor:   &checkConvertor{in: decodable1, obj: decodable2, groupVersion: "other/__internal"},
+			convertor:   &checkConvertor{in: decodable1, obj: decodable2, groupVersion: unversioned.GroupVersion{Group: "other", Version: "__internal"}},
 			expectedGVK: gvk1,
 			sameObject:  decodable2,
 		},
@@ -78,7 +78,7 @@ func TestDecode(t *testing.T) {
 		{
 			serializer:  &mockSerializer{actual: gvk1, obj: decodable1},
 			defaultGVK:  &unversioned.GroupVersionKind{Group: "force"},
-			convertor:   &checkConvertor{in: decodable1, obj: decodable2, groupVersion: "force/__internal"},
+			convertor:   &checkConvertor{in: decodable1, obj: decodable2, groupVersion: unversioned.GroupVersion{Group: "force", Version: "__internal"}},
 			expectedGVK: gvk1,
 			sameObject:  decodable2,
 		},
@@ -118,7 +118,7 @@ func TestDecode(t *testing.T) {
 
 			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
 			copier:         &checkCopy{in: decodable1, obj: decodable1},
-			convertor:      &checkConvertor{in: decodable1, obj: decodable2, groupVersion: "other/__internal"},
+			convertor:      &checkConvertor{in: decodable1, obj: decodable2, groupVersion: unversioned.GroupVersion{Group: "other", Version: "__internal"}},
 			expectedGVK:    gvk1,
 			expectedObject: &runtime.VersionedObjects{Objects: []runtime.Object{decodable1, decodable2}},
 		},
@@ -127,7 +127,7 @@ func TestDecode(t *testing.T) {
 
 			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
 			copier:         &checkCopy{in: decodable1, obj: nil, err: fmt.Errorf("error on copy")},
-			convertor:      &checkConvertor{in: decodable1, obj: decodable2, groupVersion: "other/__internal"},
+			convertor:      &checkConvertor{in: decodable1, obj: decodable2, groupVersion: unversioned.GroupVersion{Group: "other", Version: "__internal"}},
 			expectedGVK:    gvk1,
 			expectedObject: &runtime.VersionedObjects{Objects: []runtime.Object{decodable1, decodable2}},
 		},
@@ -228,7 +228,7 @@ func (c *checkCopy) Copy(obj runtime.Object) (runtime.Object, error) {
 type checkConvertor struct {
 	err           error
 	in, obj       runtime.Object
-	groupVersion  string
+	groupVersion  unversioned.GroupVersion
 	directConvert bool
 }
 
@@ -244,7 +244,7 @@ func (c *checkConvertor) Convert(in, out interface{}) error {
 	}
 	return c.err
 }
-func (c *checkConvertor) ConvertToVersion(in runtime.Object, outVersion string) (out runtime.Object, err error) {
+func (c *checkConvertor) ConvertToVersion(in runtime.Object, outVersion unversioned.GroupVersion) (out runtime.Object, err error) {
 	if c.directConvert {
 		return nil, fmt.Errorf("unexpected call to ConvertToVersion")
 	}

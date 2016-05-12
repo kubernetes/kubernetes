@@ -174,8 +174,6 @@ func DeepCopy_conversion_Equalities(in Equalities, out *Equalities, c *Cloner) e
 }
 
 func DeepCopy_conversion_Meta(in Meta, out *Meta, c *Cloner) error {
-	out.SrcVersion = in.SrcVersion
-	out.DestVersion = in.DestVersion
 	if in.KeyNameMapping == nil {
 		out.KeyNameMapping = nil
 	} else if newVal, err := c.DeepCopy(in.KeyNameMapping); err != nil {
