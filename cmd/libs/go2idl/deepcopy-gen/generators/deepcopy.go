@@ -216,8 +216,6 @@ type genDeepCopy struct {
 	registerTypes bool
 	imports       namer.ImportTracker
 	typesForInit  []*types.Type
-
-	globalVariables map[string]interface{}
 }
 
 func NewGenDeepCopy(sanitizedName, targetPackage string, boundingDirs []string, allTypes, registerTypes bool) generator.Generator {
@@ -236,7 +234,14 @@ func NewGenDeepCopy(sanitizedName, targetPackage string, boundingDirs []string, 
 
 func (g *genDeepCopy) Namers(c *generator.Context) namer.NameSystems {
 	// Have the raw namer for this file track what it imports.
-	return namer.NameSystems{"raw": namer.NewRawNamer(g.targetPackage, g.imports)}
+	return namer.NameSystems{
+		"raw": namer.NewRawNamer(g.targetPackage, g.imports),
+		"dcFnName": &dcFnNamer{
+			public:    deepCopyNamer(),
+			tracker:   g.imports,
+			myPackage: g.targetPackage,
+		},
+	}
 }
 
 func (g *genDeepCopy) Filter(c *generator.Context, t *types.Type) bool {
@@ -338,36 +343,30 @@ func (g *genDeepCopy) Imports(c *generator.Context) (imports []string) {
 	return importLines
 }
 
-func (g *genDeepCopy) withGlobals(args map[string]interface{}) map[string]interface{} {
-	for k, v := range g.globalVariables {
-		if _, ok := args[k]; !ok {
-			args[k] = v
-		}
-	}
-	return args
-}
-
-func argsFromType(t *types.Type) map[string]interface{} {
-	return map[string]interface{}{
+func argsFromType(t *types.Type) generator.Args {
+	return generator.Args{
 		"type": t,
 	}
 }
 
-func (g *genDeepCopy) funcNameTmpl(t *types.Type) string {
-	tmpl := "DeepCopy_$.type|public$"
-	g.imports.AddType(t)
-	if t.Name.Package != g.targetPackage {
-		tmpl = g.imports.LocalNameOf(t.Name.Package) + "." + tmpl
+type dcFnNamer struct {
+	public    namer.Namer
+	tracker   namer.ImportTracker
+	myPackage string
+}
+
+func (n *dcFnNamer) Name(t *types.Type) string {
+	pubName := n.public.Name(t)
+	n.tracker.AddType(t)
+	if t.Name.Package == n.myPackage {
+		return "DeepCopy_" + pubName
 	}
-	return tmpl
+	return fmt.Sprintf("%s.DeepCopy_%s", n.tracker.LocalNameOf(t.Name.Package), pubName)
 }
 
 func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 	cloner := c.Universe.Type(types.Name{Package: conversionPackagePath, Name: "Cloner"})
 	g.imports.AddType(cloner)
-	g.globalVariables = map[string]interface{}{
-		"Cloner": cloner,
-	}
 	if !g.registerTypes {
 		// TODO: We should come up with a solution to register all generated
 		// deep-copy functions. However, for now, to avoid import cycles
@@ -377,18 +376,15 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 	glog.V(5).Infof("registering types in pkg %q", g.targetPackage)
 
 	scheme := c.Universe.Variable(types.Name{Package: apiPackagePath, Name: "Scheme"})
-	g.imports.AddType(scheme)
-	g.globalVariables["scheme"] = scheme
-
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	sw.Do("func init() {\n", nil)
-	sw.Do("if err := $.scheme|raw$.AddGeneratedDeepCopyFuncs(\n", map[string]interface{}{
+	sw.Do("if err := $.scheme|raw$.AddGeneratedDeepCopyFuncs(\n", generator.Args{
 		"scheme": scheme,
 	})
-	reflect := c.Universe.Type(types.Name{Package: "reflect", Name: "TypeOf"})
 	for _, t := range g.typesForInit {
-		g.imports.AddType(reflect)
-		sw.Do(fmt.Sprintf("conversion.GeneratedDeepCopyFunc{Fn: %s, InType: reflect.TypeOf(&$.type|raw${})},\n", g.funcNameTmpl(t)), argsFromType(t))
+		args := argsFromType(t).
+			With("typeof", c.Universe.Package("reflect").Function("TypeOf"))
+		sw.Do("conversion.GeneratedDeepCopyFunc{Fn: $.type|dcFnName$, InType: $.typeof|raw$(&$.type|raw${})},\n", args)
 	}
 	sw.Do("); err != nil {\n", nil)
 	sw.Do("// if one of the deep copy functions is malformed, detect it immediately.\n", nil)
@@ -427,9 +423,10 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	glog.V(5).Infof("generating for type %v", t)
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	funcName := g.funcNameTmpl(t)
-	sw.Do(fmt.Sprintf("func %s(in interface{}, out interface{}, c *$.Cloner|raw$) error {{\n", funcName), g.withGlobals(argsFromType(t)))
-	sw.Do("in := in.(*$.type|raw$)\nout := out.(*$.type|raw$)\n", g.withGlobals(argsFromType(t)))
+	args := argsFromType(t).
+		With("clonerType", types.Ref(conversionPackagePath, "Cloner"))
+	sw.Do("func $.type|dcFnName$(in interface{}, out interface{}, c *$.clonerType|raw$) error {{\n", args)
+	sw.Do("in := in.(*$.type|raw$)\nout := out.(*$.type|raw$)\n", argsFromType(t))
 	g.generateFor(t, sw)
 	sw.Do("return nil\n", nil)
 	sw.Do("}}\n\n", nil)
@@ -486,8 +483,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("for key, val := range *in {\n", nil)
 			if g.copyableAndInBounds(t.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", t.Elem)
-				funcName := g.funcNameTmpl(t.Elem)
-				sw.Do(fmt.Sprintf("if err := %s(&val, newVal, c); err != nil {\n", funcName), argsFromType(t.Elem))
+				sw.Do("if err := $.type|dcFnName$(&val, newVal, c); err != nil {\n", argsFromType(t.Elem))
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
 				sw.Do("(*out)[key] = *newVal\n", nil)
@@ -519,8 +515,7 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 		} else if t.Elem.IsAssignable() {
 			sw.Do("(*out)[i] = (*in)[i]\n", nil)
 		} else if g.copyableAndInBounds(t.Elem) {
-			funcName := g.funcNameTmpl(t.Elem)
-			sw.Do(fmt.Sprintf("if err := %s(&(*in)[i], &(*out)[i], c); err != nil {\n", funcName), argsFromType(t.Elem))
+			sw.Do("if err := $.type|dcFnName$(&(*in)[i], &(*out)[i], c); err != nil {\n", argsFromType(t.Elem))
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 		} else {
@@ -546,7 +541,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			copied.Name = t.Name
 			t = &copied
 		}
-		args := map[string]interface{}{
+		args := generator.Args{
 			"type": t,
 			"name": m.Name,
 		}
@@ -566,8 +561,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			} else if t.IsAssignable() {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 			} else if g.copyableAndInBounds(t) {
-				funcName := g.funcNameTmpl(t)
-				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, c); err != nil {\n", funcName), args)
+				sw.Do("if err := $.type|dcFnName$(&in.$.name$, &out.$.name$, c); err != nil {\n", args)
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
 			} else {
@@ -602,9 +596,8 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("*out = new($.Elem|raw$)\n", t)
 		sw.Do("**out = **in", nil)
 	} else if g.copyableAndInBounds(t.Elem) {
-		funcName := g.funcNameTmpl(t.Elem)
 		sw.Do("*out = new($.Elem|raw$)\n", t)
-		sw.Do(fmt.Sprintf("if err := %s(*in, *out, c); err != nil {\n", funcName), argsFromType(t.Elem))
+		sw.Do("if err := $.type|dcFnName$(*in, *out, c); err != nil {\n", argsFromType(t.Elem))
 		sw.Do("return err\n", nil)
 		sw.Do("}\n", nil)
 	} else {
