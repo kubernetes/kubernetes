@@ -379,9 +379,10 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	return &scheduler.Config{
 		SchedulerCache: f.schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
-		NodeLister: f.NodeLister.NodeCondition(getNodeConditionPredicate()),
-		Algorithm:  algo,
-		Binder:     &binder{f.Client},
+		NodeLister:          f.NodeLister.NodeCondition(getNodeConditionPredicate()),
+		Algorithm:           algo,
+		Binder:              &binder{f.Client},
+		PodConditionUpdater: &podConditionUpdater{f.Client},
 		NextPod: func() *api.Pod {
 			return f.getNextPod()
 		},
@@ -539,6 +540,19 @@ func (b *binder) Bind(binding *api.Binding) error {
 	return b.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 	// TODO: use Pods interface for binding once clusters are upgraded
 	// return b.Pods(binding.Namespace).Bind(binding)
+}
+
+type podConditionUpdater struct {
+	*client.Client
+}
+
+func (p *podConditionUpdater) Update(pod *api.Pod, condition *api.PodCondition) error {
+	glog.V(2).Infof("Updating pod condition for %s/%s to (%s==%s)", pod.Namespace, pod.Name, condition.Type, condition.Status)
+	if api.UpdatePodCondition(&pod.Status, condition) {
+		_, err := p.Pods(pod.Namespace).UpdateStatus(pod)
+		return err
+	}
+	return nil
 }
 
 type clock interface {
