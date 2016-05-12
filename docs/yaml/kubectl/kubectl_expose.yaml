@@ -59,9 +59,8 @@ options:
   usage: |
     The port that the service should serve on. Copied from the resource being exposed, if unspecified
 - name: protocol
-  default_value: TCP
   usage: |
-    The network protocol for the service to be created. Default is 'tcp'.
+    The network protocol for the service to be created. Default is 'TCP'.
 - name: record
   default_value: "false"
   usage: Record current kubectl command in the resource annotation.

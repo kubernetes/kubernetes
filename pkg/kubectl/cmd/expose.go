@@ -101,7 +101,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "service/v2", "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.")
-	cmd.Flags().String("protocol", "TCP", "The network protocol for the service to be created. Default is 'tcp'.")
+	cmd.Flags().String("protocol", "", "The network protocol for the service to be created. Default is 'TCP'.")
 	cmd.Flags().String("port", "", "The port that the service should serve on. Copied from the resource being exposed, if unspecified")
 	cmd.Flags().String("type", "", "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.")
 	// TODO: remove create-external-load-balancer in code on or after Aug 25, 2016.
@@ -198,6 +198,19 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 				params["ports"] = strings.Join(ports, ",")
 			}
 		}
+
+		// Always try to derive protocols from the exposed object, may use
+		// different protocols for different ports.
+		if _, found := params["protocol"]; found {
+			protocolsMap, err := f.ProtocolsForObject(info.Object)
+			if err != nil {
+				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find protocol via introspection: %s", err))
+			}
+			if protocols := kubectl.MakeProtocols(protocolsMap); !kubectl.IsZero(protocols) {
+				params["protocols"] = protocols
+			}
+		}
+
 		if kubectl.IsZero(params["labels"]) {
 			labels, err := f.LabelsForObject(info.Object)
 			if err != nil {
