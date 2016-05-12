@@ -26,6 +26,8 @@ fi
 
 sudo -v
 "${ginkgo}" "${KUBE_ROOT}/test/docker_validation/conformance"
+sudo -v
+"${ginkgo}" "${KUBE_ROOT}/test/docker_validation/performance"
 
 # Provided for backwards compatibility
 #focus="Conformance"
