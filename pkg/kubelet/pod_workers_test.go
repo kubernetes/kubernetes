@@ -229,36 +229,12 @@ func TestFakePodWorkers(t *testing.T) {
 			&api.Pod{},
 		},
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "12345678",
-					Name:      "foo",
-					Namespace: "new",
-				},
-			},
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "12345678",
-					Name:      "fooMirror",
-					Namespace: "new",
-				},
-			},
+			podWithUidNameNs("12345678", "foo", "new"),
+			podWithUidNameNs("12345678", "fooMirror", "new"),
 		},
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "98765",
-					Name:      "bar",
-					Namespace: "new",
-				},
-			},
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "98765",
-					Name:      "barMirror",
-					Namespace: "new",
-				},
-			},
+			podWithUidNameNs("98765", "bar", "new"),
+			podWithUidNameNs("98765", "barMirror", "new"),
 		},
 	}
 
