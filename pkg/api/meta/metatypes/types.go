@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// The types defined in this package are used by the meta package to represent
+// the in-memory version of objects. We cannot reuse the __internal version of
+// API objects because it causes import cycle.
 package metatypes
 
 import "k8s.io/kubernetes/pkg/types"

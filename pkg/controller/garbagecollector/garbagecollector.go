@@ -100,10 +100,24 @@ func (p *Propagator) insertNode(n *node) (ownerExists bool) {
 	p.uidToNode[n.identity.UID] = n
 	for _, owner := range n.owners {
 		ownerNode, ok := p.uidToNode[owner.UID]
-		if !ok {
-			continue
+		if ok {
+			ownerExists = true
+		} else {
+			// Create a virtual node in the graph for the owner if it doesn't
+			// exist yet. Then enqueue the virtual node into the dirtyQueue. The
+			// garbage processor will enqueue a virtual delete event for it if
+			// API server confirms this owner doesn't exist. Probably we don't
+			// need to specially handle nodes with ownerExists=false anymore.
+			ownerNode = &node{
+				identity: objectReference{
+					OwnerReference: owner,
+					Namespace:      n.identity.Namespace,
+				},
+				dependents: make(map[*node]struct{}),
+			}
+			p.uidToNode[ownerNode.identity.UID] = ownerNode
+			p.gc.dirtyQueue.Add(ownerNode)
 		}
-		ownerExists = true
 		ownerNode.dependents[n] = struct{}{}
 	}
 	return ownerExists
@@ -111,7 +125,7 @@ func (p *Propagator) insertNode(n *node) (ownerExists bool) {
 
 // removeFromOwners remove n from owners' dependents list.
 func (p *Propagator) removeFromOwners(n *node, owners []metatypes.OwnerReference) {
-	for _, owner := range n.owners {
+	for _, owner := range owners {
 		ownerNode, ok := p.uidToNode[owner.UID]
 		if !ok {
 			continue
@@ -196,17 +210,8 @@ func (p *Propagator) processEvent() {
 		}
 		ownerExists := p.insertNode(newNode)
 		// Push the object to the dirty queue if none of its owners exists in the Graph.
-		// TODO: when handling such an object in the dirtyQueue, the worker
-		// should enqueue an Add event to the eventQueue if any owner exists.
-		// This is to prevent the following bug: Propagator observes the
-		// creation of dependent D, but hasn't observed the creation of Owner O
-		// yet; GC adds D to the dirtyQueue, worker works on D, and O exists in
-		// the API server, so GC doesn't remove D. Then, Propagator sees the
-		// creation of O, but no one will update the graph to reflect that D is
-		// the dependent of O, so when O is deleted, D will not be cascadingly
-		// deleted.
 		if !ownerExists && len(newNode.owners) != 0 {
-			p.gc.dirtyQueue.Add(newNode)
+			//	p.gc.dirtyQueue.Add(newNode)
 		}
 	case (event.eventType == addEvent || event.eventType == updateEvent) && found:
 		// TODO: finalizer: Check if ObjectMeta.DeletionTimestamp is updated from nil to non-nil
@@ -354,7 +359,7 @@ func (gc *GarbageCollector) worker() {
 
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
 // namespace> tuple to a unversioned.APIResource struct.
-func (gc *GarbageCollector) apiResource(apiVersion, kind, namespace string) (*unversioned.APIResource, error) {
+func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool) (*unversioned.APIResource, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
 	if err != nil {
@@ -363,7 +368,7 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind, namespace string) (*un
 	glog.V(6).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
 	resource := unversioned.APIResource{
 		Name:       mapping.Resource,
-		Namespaced: namespace != "",
+		Namespaced: namespaced,
 		Kind:       kind,
 	}
 	return &resource, nil
@@ -372,7 +377,7 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind, namespace string) (*un
 func (gc *GarbageCollector) deleteObject(item objectReference) error {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, item.Namespace)
+	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return err
 	}
@@ -385,11 +390,21 @@ func (gc *GarbageCollector) deleteObject(item objectReference) error {
 func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructured, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	resource, err := gc.apiResource(item.APIVersion, item.Kind, item.Namespace)
+	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return nil, err
 	}
 	return client.Resource(resource, item.Namespace).Get(item.Name)
+}
+
+func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
+	ret := &runtime.Unstructured{}
+	ret.SetKind(ref.Kind)
+	ret.SetAPIVersion(ref.APIVersion)
+	ret.SetUID(ref.UID)
+	ret.SetNamespace(ref.Namespace)
+	ret.SetName(ref.Name)
+	return ret
 }
 
 func (gc *GarbageCollector) processItem(item *node) error {
@@ -397,7 +412,15 @@ func (gc *GarbageCollector) processItem(item *node) error {
 	latest, err := gc.getObject(item.identity)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			glog.V(6).Infof("item %v not found, ignore it", item.identity)
+			// the Propagator can add "virtual" node for an owner that doesn't
+			// exist yet, so we need to enqueue a virtual Delete event to remove
+			// the virtual node from Propagator.uidToNode.
+			glog.V(6).Infof("item %v not found, generating a virtual delete event", item.identity)
+			event := event{
+				eventType: deleteEvent,
+				obj:       objectReferenceToUnstructured(item.identity),
+			}
+			gc.propagator.eventQueue.Add(event)
 			return nil
 		}
 		return err
@@ -425,7 +448,7 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		if err != nil {
 			return err
 		}
-		resource, err := gc.apiResource(reference.APIVersion, reference.Kind, item.identity.Namespace)
+		resource, err := gc.apiResource(reference.APIVersion, reference.Kind, len(item.identity.Namespace) != 0)
 		if err != nil {
 			return err
 		}
@@ -462,4 +485,17 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Shutting down garbage collector")
 	gc.dirtyQueue.ShutDown()
 	gc.propagator.eventQueue.ShutDown()
+}
+
+func (gc *GarbageCollector) QueuesDrained() bool {
+	return gc.dirtyQueue.Len() == 0 && gc.propagator.eventQueue.Len() == 0
+}
+
+func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
+	for _, u := range UIDs {
+		if _, ok := gc.propagator.uidToNode[u]; ok {
+			return true
+		}
+	}
+	return false
 }

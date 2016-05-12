@@ -178,8 +178,7 @@ func TestProcessItem(t *testing.T) {
 }
 
 // verifyGraphInvariants verifies that all of a node's owners list the node as a
-// dependent and vice versa. This invariant holds when the owners are created
-// before their dependents. uidToNode has all the nodes in the graph.
+// dependent and vice versa. uidToNode has all the nodes in the graph.
 func verifyGraphInvariants(scenario string, uidToNode map[types.UID]*node, t *testing.T) {
 	for myUID, node := range uidToNode {
 		for dependentNode := range node.dependents {
@@ -214,8 +213,8 @@ func createEvent(eventType eventType, selfUID string, owners []string) event {
 		ownerReferences = append(ownerReferences, api.OwnerReference{UID: types.UID(owners[i])})
 	}
 	return event{
-		Type: eventType,
-		Obj: &api.Pod{
+		eventType: eventType,
+		obj: &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				UID:             types.UID(selfUID),
 				OwnerReferences: ownerReferences,
@@ -259,6 +258,16 @@ func TestProcessEvent(t *testing.T) {
 				createEvent(updateEvent, "2", []string{"4"}),
 			},
 		},
+		{
+			name: "reverse test2",
+			events: []event{
+				createEvent(addEvent, "4", []string{"2"}),
+				createEvent(addEvent, "3", []string{"1", "2"}),
+				createEvent(addEvent, "2", []string{"1"}),
+				createEvent(addEvent, "1", []string{}),
+				createEvent(deleteEvent, "2", []string{"doesn't matter"}),
+			},
+		},
 	}
 
 	for _, scenario := range testScenarios {
@@ -272,7 +281,7 @@ func TestProcessEvent(t *testing.T) {
 		for i := 0; i < len(scenario.events); i++ {
 			propagator.eventQueue.Add(scenario.events[i])
 			propagator.processEvent()
+			verifyGraphInvariants(scenario.name, propagator.uidToNode, t)
 		}
-		verifyGraphInvariants(scenario.name, propagator.uidToNode, t)
 	}
 }
