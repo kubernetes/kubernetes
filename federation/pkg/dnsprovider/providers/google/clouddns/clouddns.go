@@ -17,13 +17,13 @@ package clouddns
 import (
 	"io"
 
-	"code.google.com/p/gcfg"
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/dns/v1"
 	"google.golang.org/cloud/compute/metadata"
+	"gopkg.in/gcfg.v1"
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal"

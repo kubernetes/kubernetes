@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/gcfg"
+	"gopkg.in/gcfg.v1"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
