@@ -17,13 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	fmt "fmt"
 	api "k8s.io/kubernetes/pkg/api"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type FederationInterface interface {
+	GetRESTClient() *restclient.RESTClient
 	ClustersGetter
 }
 
@@ -80,11 +80,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	codec, ok := api.Codecs.SerializerForFileExtension("json")
-	if !ok {
-		return fmt.Errorf("unable to find serializer for JSON")
-	}
-	config.Codec = codec
+	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5
@@ -93,4 +89,13 @@ func setConfigDefaults(config *restclient.Config) error {
 		config.Burst = 10
 	}
 	return nil
+}
+
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *FederationClient) GetRESTClient() *restclient.RESTClient {
+	if c == nil {
+		return nil
+	}
+	return c.RESTClient
 }
