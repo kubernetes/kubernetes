@@ -25,13 +25,13 @@ import (
 )
 
 //// api use involves calls to both addresses
-var clcServerapiV2 = "api.ctl.io"               // URL form  https://api.ctl.io/v2/<resource>/<accountAlias>
-var clcServerLBBETA = "api.loadbalancer.ctl.io" // URL form  https://api.loadbalancer.ctl.io/<accountAlias>/<datacenter>/loadbalancers
+var clcServerApiV2 = "api.ctl.io"               // URL form  https://api.ctl.io/v2/<resource>/<accountAlias>
+var clcServerBetaLB = "api.loadbalancer.ctl.io" // URL form  https://api.loadbalancer.ctl.io/<accountAlias>/<datacenter>/loadbalancers
 
 //// auth methods
 func implMakeCLC() CenturyLinkClient {
 	return clcImpl{
-		creds: MakeEmptyCreds(clcServerapiV2, "/v2/authentication/login"),
+		creds: MakeEmptyCreds(clcServerApiV2, "/v2/authentication/login"),
 	}
 }
 
@@ -57,7 +57,7 @@ func (clc clcImpl) listAllDC() ([]DataCenterName, error) {
 	uri := fmt.Sprintf("/v2/datacenters/%s", clc.creds.GetAccount())
 	dcret := make([]*dcNamesJSON, 0)
 
-	_, err := simpleGET(clcServerapiV2, uri, clc.creds, &dcret)
+	_, err := simpleGET(clcServerApiV2, uri, clc.creds, &dcret)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (clc clcImpl) listAllLB() ([]LoadBalancerSummary, error) {
 	uri := fmt.Sprintf("/%s/loadbalancers", clc.creds.GetAccount())
 	apiret := &lbListingWrapperJSON{}
 
-	_, err := simpleGET(clcServerLBBETA, uri, clc.creds, &apiret)
+	_, err := simpleGET(clcServerBetaLB, uri, clc.creds, &apiret)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func rawCreateLB(clcCreds Credentials, dc string, lbname string, desc string) (*
 
 	body := fmt.Sprintf("{ \"name\":\"%s\", \"description\":\"%s\" }", lbname, desc)
 
-	_, err := simplePOST(clcServerLBBETA, uri, clcCreds, body, apiret)
+	_, err := simplePOST(clcServerBetaLB, uri, clcCreds, body, apiret)
 
 	if err != nil {
 		return nil, err
@@ -218,7 +218,7 @@ func (clc clcImpl) inspectLB(dc, lbid string) (*LoadBalancerDetails, error) {
 	uri := fmt.Sprintf("/%s/%s/loadbalancers/%s", clc.creds.GetAccount(), dc, lbid)
 	apiret := &lbDetailsJSON{}
 
-	_, err := simpleGET(clcServerLBBETA, uri, clc.creds, apiret)
+	_, err := simpleGET(clcServerBetaLB, uri, clc.creds, apiret)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +309,7 @@ func (clc clcImpl) deleteLB(dc, lbid string) (bool, error) {
 	uri := fmt.Sprintf("/%s/%s/loadbalancers/%s", clc.creds.GetAccount(), dc, lbid)
 	apiret := &lbDeleteJSON{}
 
-	code, err := simpleDELETE(clcServerLBBETA, uri, clc.creds, apiret)
+	code, err := simpleDELETE(clcServerBetaLB, uri, clc.creds, apiret)
 	if err == nil { // ordinary success, LB was deleted
 		return true, nil
 	}
@@ -403,7 +403,7 @@ func (clc clcImpl) createPool(dc, lbid string, newpool *PoolDetails) (*PoolCreat
 	poolReq := poolToJSON(newpool)
 
 	poolResp := &CreatePoolResponseJSON{}
-	_, err := marshalledPOST(clcServerLBBETA, uri, clc.creds, poolReq, poolResp)
+	_, err := marshalledPOST(clcServerBetaLB, uri, clc.creds, poolReq, poolResp)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +429,7 @@ func (clc clcImpl) updatePool(dc, lbid string, newpool *PoolDetails) (*PoolDetai
 		dc, lbid, newpool.PoolID)
 
 	updateReq := poolToJSON(newpool) // and ignore async-request return object
-	_, err := marshalledPUT(clcServerLBBETA, uri, clc.creds, updateReq, nil)
+	_, err := marshalledPUT(clcServerBetaLB, uri, clc.creds, updateReq, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +443,7 @@ func (clc clcImpl) deletePool(dc, lbid string, poolID string) error {
 	uri := fmt.Sprintf("/%s/%s/loadbalancers/%s/pools/%s", clc.creds.GetAccount(),
 		dc, lbid, poolID)
 
-	_, err := simpleDELETE(clcServerLBBETA, uri, clc.creds, nil)
+	_, err := simpleDELETE(clcServerBetaLB, uri, clc.creds, nil)
 	return err // no other return body
 }
 

@@ -27,31 +27,33 @@ import (
 	"github.com/golang/glog"
 )
 
-//// requests honor this state, no need to pass in with every call
+//// requests honor this state, no need to pass in with every call.  But these three functions are exported publicly.
 var bCloseConnections = true
 var bDebugRequests = true
 var bDebugResponses = true
 
-func setCloseConnectionMode(b bool) {
+func SetCloseConnectionMode(b bool) {
 	bCloseConnections = b
 }
 
-func setDebugRequestMode(b bool) {
+func SetDebugRequestMode(b bool) {
 	bDebugRequests = b
 }
 
-func setDebugResponseMode(b bool) {
+func SetDebugResponseMode(b bool) {
 	bDebugResponses = b
 }
 
 //// most funcs here return HttpError, which is an error
 
 const ( // HttpError codes when the error occurred here, not in the remote call.  Hijacking the 000 range for this.
-	httpErrorUnknown = iota
-	httpErrorNoCreds
-	httpErrorClient
-	httpErrorNoRequest
-	httpErrorJSON
+	// Do not use Go 'iota' here, because we want specific integer values.  Do make them public exports, because they
+	// are returned as integer error results available to callers.
+	HttpErrorUnknown = 0
+	HttpErrorNoCreds = 1
+	HttpErrorClient = 2
+	HttpErrorNoRequest = 3
+	HttpErrorJSON = 4
 )
 
 // no request message body sent.  Response body returned if ret is not nil
@@ -69,7 +71,7 @@ func marshalledPOST(server, uri string, creds Credentials, body interface{}, ret
 	b := new(bytes.Buffer)
 	err := json.NewEncoder(b).Encode(body)
 	if err != nil {
-		return httpErrorJSON, clcError(fmt.Sprintf("JSON marshalling failed, err=%s", err.Error()))
+		return HttpErrorJSON, clcError(fmt.Sprintf("JSON marshalling failed, err=%s", err.Error()))
 	}
 
 	return invokeHTTP("POST", server, uri, creds, b, ret)
@@ -80,7 +82,7 @@ func marshalledPUT(server, uri string, creds Credentials, body interface{}, ret 
 	b := new(bytes.Buffer)
 	err := json.NewEncoder(b).Encode(body)
 	if err != nil {
-		return httpErrorJSON, clcError(fmt.Sprintf("JSON marshalling failed, err=%s", err.Error()))
+		return HttpErrorJSON, clcError(fmt.Sprintf("JSON marshalling failed, err=%s", err.Error()))
 	}
 
 	return invokeHTTP("PUT", server, uri, creds, b, ret)
@@ -99,7 +101,7 @@ func simplePOST(server, uri string, creds Credentials, body string, ret interfac
 // body may be be nil
 
 // return int is HTTP response code.  Or an HTTP_ERROR series-000 value, especially if no request was made
-// So the possible returns are: (httpErrorXXX, err) (non-2xx, err), (2xx, json-err), (2xx, nil)
+// So the possible returns are: (HttpErrorXXX, err) (non-2xx, err), (2xx, json-err), (2xx, nil)
 //      caller couldn't marshal a payload                                                        (0, err)
 // 		failed to issue a request.  Does anyone really need the integer code of why not?         (0, err)
 //		HTTP response had a failure code.  Retain this code, a 404 might not really be an error. (4xx, err)
@@ -109,13 +111,13 @@ func simplePOST(server, uri string, creds Credentials, body string, ret interfac
 
 func invokeHTTP(method, server, uri string, creds Credentials, body io.Reader, ret interface{}) (int, error) {
 	if (creds == nil) || !creds.IsValid() {
-		return httpErrorNoCreds, clcError("username and/or password not provided")
+		return HttpErrorNoCreds, clcError("username and/or password not provided")
 	}
 
 	fullURL := ("https://" + server + uri)
 	req, err := http.NewRequest(method, fullURL, body)
 	if err != nil {
-		return httpErrorNoRequest, err
+		return HttpErrorNoRequest, err
 	} else if body != nil {
 		req.Header.Add("Content-Type", "application/json") // incoming body to be a marshaled object already
 	}
@@ -137,12 +139,13 @@ func invokeHTTP(method, server, uri string, creds Credentials, body io.Reader, r
 	// this should be the normal code
 	resp, err := http.DefaultClient.Do(req) // execute the call
 
-	// instead, we have this which tolerates bad certs [fixme both here and in CredsLogin]
+	// instead, we have this which tolerates bad certs (both here and in CredsLogin)
 	// tlscfg := &tls.Config{InsecureSkipVerify: true} // true means to skip the verification
 	// transp := &http.Transport{TLSClientConfig: tlscfg}
 	// client := &http.Client{Transport: transp}
 	// resp, err := client.Do(req)
 	// end of tolerating bad certs.  Do not keep this code - it allows MITM etc. attacks
+	// also note the bad-cert code requires: [import tls crypto/tls"] above
 
 	defer resp.Body.Close() // avoid CLOSE_WAIT state
 
@@ -152,7 +155,7 @@ func invokeHTTP(method, server, uri string, creds Credentials, body io.Reader, r
 	}
 
 	if err != nil { // failed HTTP call
-		return httpErrorClient, err
+		return HttpErrorClient, err
 	}
 
 	if resp.StatusCode == 401 { // Unauthorized.  Not a failure yet, perhaps we can reauth.  This is why we need a whole Credentials and not just the token
