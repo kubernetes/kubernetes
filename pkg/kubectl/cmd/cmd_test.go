@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"reflect"
 	"testing"
@@ -47,6 +48,21 @@ func initTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string) {
 		t.Errorf("Error running command: %s", str)
 	})
+}
+
+func defaultHeader() http.Header {
+	header := http.Header{}
+	header.Set("Content-Type", runtime.ContentTypeJSON)
+	return header
+}
+
+func defaultClientConfig() *restclient.Config {
+	return &restclient.Config{
+		ContentConfig: restclient.ContentConfig{
+			ContentType:  runtime.ContentTypeJSON,
+			GroupVersion: testapi.Default.GroupVersion(),
+		},
+	}
 }
 
 type internalType struct {

@@ -39,7 +39,7 @@ func TestDeleteObjectByTuple(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				// Ensures no GET is performed when deleting by name
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -71,7 +71,7 @@ func TestDeleteNamedObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				// Ensures no GET is performed when deleting by name
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -103,7 +103,7 @@ func TestDeleteObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -133,7 +133,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("")}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -163,7 +163,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("")}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -200,11 +200,11 @@ func TestDeleteAllNotFound(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == "GET":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
 			case p == "/namespaces/test/services/foo" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, notFoundError)}, nil
 			case p == "/namespaces/test/services/baz" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -242,11 +242,11 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == "GET":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
 			case p == "/namespaces/test/services/foo" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, notFoundError)}, nil
 			case p == "/namespaces/test/services/baz" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -277,9 +277,9 @@ func TestDeleteMultipleObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/services/frontend" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -311,9 +311,9 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("")}, nil
 			case p == "/namespaces/test/services/frontend" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -348,13 +348,13 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/baz" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers/foo" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/services/baz" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			case p == "/namespaces/test/services/foo" && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				// Ensures no GET is performed when deleting by name
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -384,7 +384,7 @@ func TestDeleteDirectory(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -418,16 +418,16 @@ func TestDeleteMultipleSelector(t *testing.T) {
 				if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				}
-				return &http.Response{StatusCode: 200, Body: objBody(codec, pods)}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
 			case p == "/namespaces/test/services" && m == "GET":
 				if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				}
-				return &http.Response{StatusCode: 200, Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
 			case strings.HasPrefix(p, "/namespaces/test/pods/") && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
 			case strings.HasPrefix(p, "/namespaces/test/services/") && m == "DELETE":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

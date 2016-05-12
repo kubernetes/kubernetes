@@ -35,9 +35,9 @@ func TestReplaceObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == "GET" || m == "PUT" || m == "DELETE"):
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -78,13 +78,13 @@ func TestReplaceMultipleObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == "GET" || m == "PUT" || m == "DELETE"):
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/services/frontend" && (m == "GET" || m == "PUT" || m == "DELETE"):
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			case p == "/namespaces/test/services" && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -125,9 +125,9 @@ func TestReplaceDirectory(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && (m == "GET" || m == "PUT" || m == "DELETE"):
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers") && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -168,9 +168,9 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
-				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("")}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

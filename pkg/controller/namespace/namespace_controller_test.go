@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -268,6 +269,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	defer f.lock.Unlock()
 
 	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
+	response.Header().Set("Content-Type", runtime.ContentTypeJSON)
 	response.WriteHeader(f.statusCode)
 	response.Write([]byte("{\"kind\": \"List\"}"))
 }

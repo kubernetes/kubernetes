@@ -187,11 +187,11 @@ func TestApplyObject(t *testing.T) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-				return &http.Response{StatusCode: 200, Body: bodyRC}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 			case p == pathRC && m == "PATCH":
 				validatePatchApplication(t, req)
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-				return &http.Response{StatusCode: 200, Body: bodyRC}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -225,10 +225,10 @@ func TestApplyNonExistObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathNameRC && m == "GET":
-				return &http.Response{StatusCode: 404, Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
 			case p == pathRC && m == "POST":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-				return &http.Response{StatusCode: 201, Body: bodyRC}, nil
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: bodyRC}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -273,18 +273,18 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-				return &http.Response{StatusCode: 200, Body: bodyRC}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 			case p == pathRC && m == "PATCH":
 				validatePatchApplication(t, req)
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-				return &http.Response{StatusCode: 200, Body: bodyRC}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 			case p == pathSVC && m == "GET":
 				bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
-				return &http.Response{StatusCode: 200, Body: bodySVC}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodySVC}, nil
 			case p == pathSVC && m == "PATCH":
 				validatePatchApplication(t, req)
 				bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
-				return &http.Response{StatusCode: 200, Body: bodySVC}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodySVC}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

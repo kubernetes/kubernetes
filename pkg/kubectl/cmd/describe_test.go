@@ -32,7 +32,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})},
+		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &internalType{Name: "foo"})},
 	}
 	tf.Namespace = "non-default"
 	buf := bytes.NewBuffer([]byte{})
@@ -59,7 +59,7 @@ func TestDescribeObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -89,7 +89,7 @@ func TestDescribeListObjects(t *testing.T) {
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
+		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
 	tf.Namespace = "test"
@@ -108,7 +108,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
+		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
 	tf.Namespace = "test"
@@ -128,7 +128,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
+		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
 	tf.Namespace = "test"
