@@ -45,6 +45,9 @@ type deployments struct {
 	ns     string
 }
 
+// Ensure statically that deployments implements DeploymentInterface.
+var _ DeploymentInterface = &deployments{}
+
 // newDeployments returns a Deployments
 func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 	return &deployments{

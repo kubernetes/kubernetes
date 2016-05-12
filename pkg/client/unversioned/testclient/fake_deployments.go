@@ -19,16 +19,20 @@ package testclient
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	kclientlib "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// FakeDeployments implements DeploymentsInterface. Meant to be embedded into a struct to get a default
+// FakeDeployments implements DeploymentInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the methods you want to test easier.
 type FakeDeployments struct {
 	Fake      *FakeExperimental
 	Namespace string
 }
+
+// Ensure statically that FakeDeployments implements DeploymentInterface.
+var _ kclientlib.DeploymentInterface = &FakeDeployments{}
 
 func (c *FakeDeployments) Get(name string) (*extensions.Deployment, error) {
 	obj, err := c.Fake.Invokes(NewGetAction("deployments", c.Namespace, name), &extensions.Deployment{})
