@@ -1616,8 +1616,7 @@ func (b kubectlBuilder) exec() (string, error) {
 		return "", fmt.Errorf("Timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 	}
 	Logf("stderr: %q", stderr.String())
-	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
-	return strings.TrimSpace(stdout.String()), nil
+	return stdout.String(), nil
 }
 
 // runKubectlOrDie is a convenience wrapper over kubectlBuilder

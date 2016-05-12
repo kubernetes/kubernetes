@@ -195,7 +195,7 @@ var _ = Describe("Kubectl client", func() {
 		It("should support exec", func() {
 			By("executing a command in the container")
 			execOutput := runKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), simplePodName, "echo", "running", "in", "container")
-			if e, a := "running in container", execOutput; e != a {
+			if e, a := "running in container", strings.TrimSpace(execOutput); e != a {
 				Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
 
@@ -219,7 +219,7 @@ var _ = Describe("Kubectl client", func() {
 			execOutput = newKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "bash").
 				withStdinReader(r).
 				execOrDie()
-			if e, a := "hi", execOutput; e != a {
+			if e, a := "hi", strings.TrimSpace(execOutput); e != a {
 				Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
 		})
