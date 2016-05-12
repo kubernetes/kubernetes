@@ -48,6 +48,7 @@ docs/man/man1/kubectl-rolling-update.1
 docs/man/man1/kubectl-rollout-history.1
 docs/man/man1/kubectl-rollout-pause.1
 docs/man/man1/kubectl-rollout-resume.1
+docs/man/man1/kubectl-rollout-status.1
 docs/man/man1/kubectl-rollout-undo.1
 docs/man/man1/kubectl-rollout.1
 docs/man/man1/kubectl-run.1
@@ -102,6 +103,7 @@ docs/user-guide/kubectl/kubectl_rollout.md
 docs/user-guide/kubectl/kubectl_rollout_history.md
 docs/user-guide/kubectl/kubectl_rollout_pause.md
 docs/user-guide/kubectl/kubectl_rollout_resume.md
+docs/user-guide/kubectl/kubectl_rollout_status.md
 docs/user-guide/kubectl/kubectl_rollout_undo.md
 docs/user-guide/kubectl/kubectl_run.md
 docs/user-guide/kubectl/kubectl_scale.md
