@@ -71,7 +71,7 @@ cd "${_kubetmp}"
 go get -u github.com/tools/godep 2>/dev/null
 GODEP="${GOPATH}/bin/godep"
 pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
-  git checkout v53
+  git checkout v63
   "${GODEP}" go install
 popd > /dev/null
 
@@ -88,7 +88,8 @@ rm -rf ./Godeps ./vendor
 git init > /dev/null 2>&1
 
 # Recreate the Godeps using the nice clean set we just downloaded
-"${GODEP}" save ./...
+# TODO(thockin, eparis): Move this in to a common script with hack/godep-save.sh
+"${GODEP}" save github.com/ugorji/go/codec/codecgen github.com/onsi/ginkgo/ginkgo ./...
 
 # Test for diffs
 if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
