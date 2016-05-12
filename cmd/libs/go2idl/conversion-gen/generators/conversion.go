@@ -99,8 +99,8 @@ type conversions map[conversionType]*types.Type
 
 // Returns all already existing conversion functions that we are able to find.
 func existingConversionFunctions(context *generator.Context) conversions {
-	scopeName := types.Name{Package: conversionPackagePath, Name: "Scope"}
-	errorName := types.Name{Package: "", Name: "error"}
+	scopeName := types.Ref(conversionPackagePath, "Scope").Name
+	errorName := types.Ref("", "error").Name
 	buffer := &bytes.Buffer{}
 	sw := generator.NewSnippetWriter(buffer, context, "$", "$")
 
@@ -368,7 +368,7 @@ func isDirectlyConvertible(in, out *types.Type, preexisting conversions) bool {
 }
 
 const (
-	apiPackagePath        = "k8s.io/kubernetes/pkg/api"
+	runtimePackagePath    = "k8s.io/kubernetes/pkg/runtime"
 	conversionPackagePath = "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -380,8 +380,6 @@ type genConversion struct {
 	defaulters    defaulters
 	imports       namer.ImportTracker
 	typesForInit  []conversionType
-
-	globalVariables map[string]interface{}
 }
 
 func NewGenConversion(sanitizedName, targetPackage string, preexisting conversions, defaulters defaulters) generator.Generator {
@@ -399,7 +397,23 @@ func NewGenConversion(sanitizedName, targetPackage string, preexisting conversio
 
 func (g *genConversion) Namers(c *generator.Context) namer.NameSystems {
 	// Have the raw namer for this file track what it imports.
-	return namer.NameSystems{"raw": namer.NewRawNamer(g.targetPackage, g.imports)}
+	return namer.NameSystems{
+		"raw": namer.NewRawNamer(g.targetPackage, g.imports),
+		"publicIT": &namerPlusImportTracking{
+			delegate: conversionNamer(),
+			tracker:  g.imports,
+		},
+	}
+}
+
+type namerPlusImportTracking struct {
+	delegate namer.Namer
+	tracker  namer.ImportTracker
+}
+
+func (n *namerPlusImportTracking) Name(t *types.Type) string {
+	n.tracker.AddType(t)
+	return n.delegate.Name(t)
 }
 
 func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type) bool {
@@ -470,33 +484,20 @@ func (g *genConversion) Imports(c *generator.Context) (imports []string) {
 	return importLines
 }
 
-func (g *genConversion) withGlobals(args map[string]interface{}) map[string]interface{} {
-	for k, v := range g.globalVariables {
-		if _, ok := args[k]; !ok {
-			args[k] = v
-		}
-	}
-	return args
-}
-
-func argsFromType(inType, outType *types.Type) map[string]interface{} {
-	return map[string]interface{}{
+func argsFromType(inType, outType *types.Type) generator.Args {
+	return generator.Args{
 		"inType":  inType,
 		"outType": outType,
 	}
 }
 
-func defaultingArgsFromType(inType *types.Type) interface{} {
-	return map[string]interface{}{
+func defaultingArgsFromType(inType *types.Type) generator.Args {
+	return generator.Args{
 		"inType": inType,
 	}
 }
-func (g *genConversion) funcNameTmpl(inType, outType *types.Type) string {
-	tmpl := "Convert_$.inType|public$_To_$.outType|public$"
-	g.imports.AddType(inType)
-	g.imports.AddType(outType)
-	return tmpl
-}
+
+const nameTmpl = "Convert_$.inType|publicIT$_To_$.outType|publicIT$"
 
 func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, bool) {
 	function, ok := g.preexisting[conversionType{inType, outType}]
@@ -504,28 +505,20 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 }
 
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
-	scheme := c.Universe.Variable(types.Name{Package: apiPackagePath, Name: "Scheme"})
-	g.imports.AddType(scheme)
-	scope := c.Universe.Type(types.Name{Package: conversionPackagePath, Name: "Scope"})
-	g.imports.AddType(scope)
-	g.globalVariables = map[string]interface{}{
-		"scheme": scheme,
-		"Scope":  scope,
-	}
-
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	sw.Do("func init() {\n", nil)
-	sw.Do("if err := $.scheme|raw$.AddGeneratedConversionFuncs(\n", map[string]interface{}{
-		"scheme": scheme,
-	})
+	sw.Do("SchemeBuilder.Register(func(scheme *$.|raw$) {\n",
+		types.Ref(runtimePackagePath, "Scheme"),
+	)
+	sw.Do("if err := scheme.AddGeneratedConversionFuncs(\n", nil)
 	for _, conv := range g.typesForInit {
-		funcName := g.funcNameTmpl(conv.inType, conv.outType)
-		sw.Do(fmt.Sprintf("%s,\n", funcName), argsFromType(conv.inType, conv.outType))
+		sw.Do(nameTmpl+",\n", argsFromType(conv.inType, conv.outType))
 	}
 	sw.Do("); err != nil {\n", nil)
 	sw.Do("// if one of the conversion functions is malformed, detect it immediately.\n", nil)
 	sw.Do("panic(err)\n", nil)
 	sw.Do("}\n", nil)
+	sw.Do("})\n", nil)
 	sw.Do("}\n\n", nil)
 	return sw.Error()
 }
@@ -543,9 +536,11 @@ func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.W
 }
 
 func (g *genConversion) generateConversion(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	funcName := g.funcNameTmpl(inType, outType)
-
-	sw.Do(fmt.Sprintf("func auto%s(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", funcName), g.withGlobals(argsFromType(inType, outType)))
+	args := argsFromType(inType, outType).With(
+		"scopeType",
+		types.Ref(conversionPackagePath, "Scope"),
+	)
+	sw.Do("func auto"+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.scopeType|raw$) error {\n", args)
 	// if no defaulter of form SetDefaults_XXX is defined, do not inline a check for defaulting.
 	if function, ok := g.defaulters[inType]; ok {
 		sw.Do("$.|raw$(in)\n", function)
@@ -556,8 +551,8 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 
 	// If there is no public preexisting Convert method, generate it.
 	if _, ok := g.preexists(inType, outType); !ok {
-		sw.Do(fmt.Sprintf("func %s(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", funcName), g.withGlobals(argsFromType(inType, outType)))
-		sw.Do(fmt.Sprintf("return auto%s(in, out, s)\n", funcName), argsFromType(inType, outType))
+		sw.Do("func "+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.scopeType|raw$) error {\n", args)
+		sw.Do("return auto"+nameTmpl+"(in, out, s)\n", args)
 		sw.Do("}\n\n", nil)
 	}
 }
@@ -614,8 +609,7 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 			if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 				sw.Do("if err := $.|raw$(&val, newVal, s); err != nil {\n", function)
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
-				funcName := g.funcNameTmpl(inType.Elem, outType.Elem)
-				sw.Do(fmt.Sprintf("if err := %s(&val, newVal, s); err != nil {\n", funcName), argsFromType(inType.Elem, outType.Elem))
+				sw.Do("if err := "+nameTmpl+"(&val, newVal, s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
 				sw.Do("if err := s.Convert(&val, newVal, 0); err != nil {\n", nil)
@@ -652,8 +646,7 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 			if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 				sw.Do("if err := $.|raw$(&(*in)[i], &(*out)[i], s); err != nil {\n", function)
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
-				funcName := g.funcNameTmpl(inType.Elem, outType.Elem)
-				sw.Do(fmt.Sprintf("if err := %s(&(*in)[i], &(*out)[i], s); err != nil {\n", funcName), argsFromType(inType.Elem, outType.Elem))
+				sw.Do("if err := "+nameTmpl+"(&(*in)[i], &(*out)[i], s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
 				sw.Do("if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {\n", nil)
@@ -701,8 +694,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("}\n", nil)
 		case types.Struct:
 			if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
-				funcName := g.funcNameTmpl(m.Type, outMember.Type)
-				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
+				sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
 				sw.Do("if err := s.Convert(&in.$.name$, &out.$.name$, 0); err != nil {\n", args)
@@ -718,8 +710,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				}
 			} else {
 				if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
-					funcName := g.funcNameTmpl(m.Type, outMember.Type)
-					sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
+					sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 				} else {
 					sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
 					sw.Do("if err := s.Convert(&in.$.name$, &out.$.name$, 0); err != nil {\n", args)
@@ -729,8 +720,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			}
 		default:
 			if g.convertibleOnlyWithinPackage(m.Type, outMember.Type) {
-				funcName := g.funcNameTmpl(m.Type, outMember.Type)
-				sw.Do(fmt.Sprintf("if err := %s(&in.$.name$, &out.$.name$, s); err != nil {\n", funcName), args)
+				sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
 				sw.Do("if err := s.Convert(&in.$.name$, &out.$.name$, 0); err != nil {\n", args)
@@ -753,8 +743,7 @@ func (g *genConversion) doPointer(inType, outType *types.Type, sw *generator.Sni
 		if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 			sw.Do("if err := $.|raw$(*in, *out, s); err != nil {\n", function)
 		} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
-			funcName := g.funcNameTmpl(inType.Elem, outType.Elem)
-			sw.Do(fmt.Sprintf("if err := %s(*in, *out, s); err != nil {\n", funcName), argsFromType(inType.Elem, outType.Elem))
+			sw.Do("if err := "+nameTmpl+"(*in, *out, s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 		} else {
 			sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
 			sw.Do("if err := s.Convert(*in, *out, 0); err != nil {\n", nil)
