@@ -34,6 +34,8 @@ var (
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
+var AddToScheme = SchemeBuilder.AddToScheme
+
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,

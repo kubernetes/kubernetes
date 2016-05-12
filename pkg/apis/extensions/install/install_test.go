@@ -27,9 +27,26 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
+func constructForTests() (*registered.Manager, *runtime.Scheme) {
+	s := runtime.NewScheme()
+	m, err := registered.NewManager("extensions/v1beta1")
+	if err != nil {
+		panic(err)
+	}
+	registered.RegisterAnnouncedVersions(m, s)
+	return m, s
+}
+
 func TestResourceVersioner(t *testing.T) {
+	m, _ := constructForTests()
+	vi, err := m.GroupOrDie(extensions.GroupName).InterfacesFor(unversioned.GroupVersion{"extensions", "v1beta1"})
+	if err != nil {
+		t.Fatalf("unexpected non-error: %v", err)
+	}
+	accessor := vi.MetadataAccessor
 	daemonSet := extensions.DaemonSet{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
 	version, err := accessor.ResourceVersion(&daemonSet)
 	if err != nil {
@@ -50,10 +67,12 @@ func TestResourceVersioner(t *testing.T) {
 }
 
 func TestCodec(t *testing.T) {
+	m, s := constructForTests()
+	codecs := serializer.NewCodecFactory(s)
 	daemonSet := extensions.DaemonSet{}
 	// We do want to use package registered rather than testapi here, because we
 	// want to test if the package install and package registered work as expected.
-	data, err := runtime.Encode(api.Codecs.LegacyCodec(registered.GroupOrDie(extensions.GroupName).GroupVersion), &daemonSet)
+	data, err := runtime.Encode(codecs.LegacyCodec(m.GroupOrDie(extensions.GroupName).GroupVersion), &daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -61,36 +80,38 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != registered.GroupOrDie(extensions.GroupName).GroupVersion.String() || other.Kind != "DaemonSet" {
+	if other.APIVersion != m.GroupOrDie(extensions.GroupName).GroupVersion.String() || other.Kind != "DaemonSet" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := registered.GroupOrDie(extensions.GroupName).InterfacesFor(extensions.SchemeGroupVersion); err == nil {
+	m, _ := constructForTests()
+	if _, err := m.GroupOrDie(extensions.GroupName).InterfacesFor(extensions.SchemeGroupVersion); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, version := range registered.GroupOrDie(extensions.GroupName).GroupVersions {
-		if vi, err := registered.GroupOrDie(extensions.GroupName).InterfacesFor(version); err != nil || vi == nil {
+	for i, version := range m.GroupOrDie(extensions.GroupName).GroupVersions {
+		if vi, err := m.GroupOrDie(extensions.GroupName).InterfacesFor(version); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
 }
 
 func TestRESTMapper(t *testing.T) {
+	m, _ := constructForTests()
 	gv := v1beta1.SchemeGroupVersion
 	daemonSetGVK := gv.WithKind("DaemonSet")
 
-	if gvk, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.KindFor(gv.WithResource("daemonsets")); err != nil || gvk != daemonSetGVK {
+	if gvk, err := m.GroupOrDie(extensions.GroupName).RESTMapper.KindFor(gv.WithResource("daemonsets")); err != nil || gvk != hpaGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 
-	if m, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != daemonSetGVK || m.Resource != "daemonsets" {
+	if m, err := m.GroupOrDie(extensions.GroupName).RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != daemonSetGVK || m.Resource != "daemonsets" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, version := range registered.GroupOrDie(extensions.GroupName).GroupVersions {
-		mapping, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), version.Version)
+	for _, version := range m.GroupOrDie(extensions.GroupName).GroupVersions {
+		mapping, err := m.GroupOrDie(extensions.GroupName).RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), version.Version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -102,7 +123,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-		interfaces, _ := registered.GroupOrDie(extensions.GroupName).InterfacesFor(version)
+		interfaces, _ := m.GroupOrDie(extensions.GroupName).InterfacesFor(version)
 		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
 			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
