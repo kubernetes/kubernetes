@@ -24,21 +24,23 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-func getNodesResourceName() string {
-	return "nodes"
+func getNodesResource() unversioned.GroupVersionResource {
+	return v1.SchemeGroupVersion.WithResource("nodes")
 }
 
 func TestListNodes(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(getNodesResource(), "", ""),
 		},
-		Response: simple.Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
+		Response:     simple.Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).Nodes().List(api.ListOptions{})
 	defer c.Close()
@@ -50,7 +52,7 @@ func TestListNodesLabels(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(getNodesResource(), "", ""),
 			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: simple.Response{
 			StatusCode: 200,
@@ -67,6 +69,7 @@ func TestListNodesLabels(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	c.Setup(t)
 	defer c.Close()
@@ -81,9 +84,10 @@ func TestGetNode(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "1"),
+			Path:   testapi.Default.ResourcePath(getNodesResource(), "", "1"),
 		},
-		Response: simple.Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node-1"}}},
+		Response:     simple.Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node-1"}}},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).Nodes().Get("1")
 	defer c.Close()
@@ -119,12 +123,13 @@ func TestCreateNode(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(getNodesResource(), "", ""),
 			Body:   requestNode},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body:       requestNode,
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedNode, err := c.Setup(t).Nodes().Create(requestNode)
 	defer c.Close()
@@ -135,9 +140,10 @@ func TestDeleteNode(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
+			Path:   testapi.Default.ResourcePath(getNodesResource(), "", "foo"),
 		},
-		Response: simple.Response{StatusCode: 200},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).Nodes().Delete("foo")
 	defer c.Close()
@@ -163,9 +169,10 @@ func TestUpdateNode(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
+			Path:   testapi.Default.ResourcePath(getNodesResource(), "", "foo"),
 		},
-		Response: simple.Response{StatusCode: 200, Body: requestNode},
+		Response:     simple.Response{StatusCode: 200, Body: requestNode},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).Nodes().Update(requestNode)
 	defer c.Close()

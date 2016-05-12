@@ -22,11 +22,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
-func getPodTemplatesResoureName() string {
-	return "podtemplates"
+func getPodTemplatesResoure() unversioned.GroupVersionResource {
+	return v1.SchemeGroupVersion.WithResource("podtemplates")
 }
 
 func TestPodTemplateCreate(t *testing.T) {
@@ -41,11 +43,12 @@ func TestPodTemplateCreate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(getPodTemplatesResoure(), ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   &podTemplate,
 		},
-		Response: simple.Response{StatusCode: 200, Body: &podTemplate},
+		Response:     simple.Response{StatusCode: 200, Body: &podTemplate},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 
 	response, err := c.Setup(t).PodTemplates(ns).Create(&podTemplate)
@@ -65,11 +68,12 @@ func TestPodTemplateGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "abc"),
+			Path:   testapi.Default.ResourcePath(getPodTemplatesResoure(), ns, "abc"),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: podTemplate},
+		Response:     simple.Response{StatusCode: 200, Body: podTemplate},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 
 	response, err := c.Setup(t).PodTemplates(ns).Get("abc")
@@ -92,11 +96,12 @@ func TestPodTemplateList(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(getPodTemplatesResoure(), ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: podTemplateList},
+		Response:     simple.Response{StatusCode: 200, Body: podTemplateList},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).PodTemplates(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -114,8 +119,9 @@ func TestPodTemplateUpdate(t *testing.T) {
 		Template: api.PodTemplateSpec{},
 	}
 	c := &simple.Client{
-		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "abc"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: 200, Body: podTemplate},
+		Request:      simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getPodTemplatesResoure(), ns, "abc"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: 200, Body: podTemplate},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).PodTemplates(ns).Update(podTemplate)
 	defer c.Close()
@@ -125,8 +131,9 @@ func TestPodTemplateUpdate(t *testing.T) {
 func TestPodTemplateDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: 200},
+		Request:      simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getPodTemplatesResoure(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).PodTemplates(ns).Delete("foo", nil)
 	defer c.Close()
@@ -137,9 +144,10 @@ func TestPodTemplateWatch(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePathWithPrefix("watch", getPodTemplatesResoureName(), "", ""),
+			Path:   testapi.Default.ResourcePathWithPrefix("watch", getPodTemplatesResoure(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
-		Response: simple.Response{StatusCode: 200},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	_, err := c.Setup(t).PodTemplates(api.NamespaceAll).Watch(api.ListOptions{})
 	defer c.Close()

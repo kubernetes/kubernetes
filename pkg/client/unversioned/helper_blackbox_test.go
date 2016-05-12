@@ -91,7 +91,7 @@ func TestNegotiateVersion(t *testing.T) {
 			expectErr:      func(err error) bool { return strings.Contains(err.Error(), "connection refused") },
 		},
 	}
-	codec := testapi.Default.Codec()
+	codec := testapi.Default.Codec(testapi.Default.GroupVersion())
 
 	for _, test := range tests {
 		fakeClient := &fake.RESTClient{

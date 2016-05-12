@@ -22,8 +22,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
+
+func getNamespaceResource() unversioned.GroupVersionResource {
+	return v1.SchemeGroupVersion.WithResource("namespaces")
+}
 
 func TestNamespaceCreate(t *testing.T) {
 	// we create a namespace relative to another namespace
@@ -33,10 +39,11 @@ func TestNamespaceCreate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath("namespaces", "", ""),
+			Path:   testapi.Default.ResourcePath(getNamespaceResource(), "", ""),
 			Body:   namespace,
 		},
-		Response: simple.Response{StatusCode: 200, Body: namespace},
+		Response:     simple.Response{StatusCode: 200, Body: namespace},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 
 	// from the source ns, provision a new global namespace "foo"
@@ -59,10 +66,11 @@ func TestNamespaceGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("namespaces", "", "foo"),
+			Path:   testapi.Default.ResourcePath(getNamespaceResource(), "", "foo"),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: namespace},
+		Response:     simple.Response{StatusCode: 200, Body: namespace},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 
 	response, err := c.Setup(t).Namespaces().Get("foo")
@@ -88,10 +96,11 @@ func TestNamespaceList(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("namespaces", "", ""),
+			Path:   testapi.Default.ResourcePath(getNamespaceResource(), "", ""),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: namespaceList},
+		Response:     simple.Response{StatusCode: 200, Body: namespaceList},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).Namespaces().List(api.ListOptions{})
 	defer c.Close()
@@ -127,8 +136,9 @@ func TestNamespaceUpdate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Default.ResourcePath("namespaces", "", "foo")},
-		Response: simple.Response{StatusCode: 200, Body: requestNamespace},
+			Path:   testapi.Default.ResourcePath(getNamespaceResource(), "", "foo")},
+		Response:     simple.Response{StatusCode: 200, Body: requestNamespace},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedNamespace, err := c.Setup(t).Namespaces().Update(requestNamespace)
 	defer c.Close()
@@ -152,9 +162,10 @@ func TestNamespaceFinalize(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Default.ResourcePath("namespaces", "", "foo") + "/finalize",
+			Path:   testapi.Default.ResourcePath(getNamespaceResource(), "", "foo") + "/finalize",
 		},
-		Response: simple.Response{StatusCode: 200, Body: requestNamespace},
+		Response:     simple.Response{StatusCode: 200, Body: requestNamespace},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedNamespace, err := c.Setup(t).Namespaces().Finalize(requestNamespace)
 	defer c.Close()
@@ -163,8 +174,9 @@ func TestNamespaceFinalize(t *testing.T) {
 
 func TestNamespaceDelete(t *testing.T) {
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath("namespaces", "", "foo")},
-		Response: simple.Response{StatusCode: 200},
+		Request:      simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getNamespaceResource(), "", "foo")},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).Namespaces().Delete("foo")
 	defer c.Close()
@@ -175,9 +187,10 @@ func TestNamespaceWatch(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePathWithPrefix("watch", "namespaces", "", ""),
+			Path:   testapi.Default.ResourcePathWithPrefix("watch", getNamespaceResource(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
-		Response: simple.Response{StatusCode: 200},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	_, err := c.Setup(t).Namespaces().Watch(api.ListOptions{})
 	defer c.Close()

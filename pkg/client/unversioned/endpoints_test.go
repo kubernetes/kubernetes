@@ -21,13 +21,19 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
+
+func getEndpointsResource() unversioned.GroupVersionResource {
+	return v1.SchemeGroupVersion.WithResource("endpoints")
+}
 
 func TestListEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, ""), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(getEndpointsResource(), ns, ""), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200,
 			Body: &api.EndpointsList{
 				Items: []api.Endpoints{
@@ -41,6 +47,7 @@ func TestListEndpoints(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	receivedEndpointsList, err := c.Setup(t).Endpoints(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -50,8 +57,9 @@ func TestListEndpoints(t *testing.T) {
 func TestGetEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, "endpoint-1"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
+		Request:      simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(getEndpointsResource(), ns, "endpoint-1"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).Endpoints(ns).Get("endpoint-1")
 	defer c.Close()

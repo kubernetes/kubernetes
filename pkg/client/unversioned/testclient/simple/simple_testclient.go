@@ -71,6 +71,9 @@ type Client struct {
 	// If your object could exist in multiple groups, set this to
 	// correspond to the URL you're testing it with.
 	ResourceGroup string
+
+	// Specific GroupVersion that should be used for testing.
+	GroupVersion *unversioned.GroupVersion
 }
 
 func (c *Client) Setup(t *testing.T) *Client {
@@ -91,21 +94,29 @@ func (c *Client) Setup(t *testing.T) *Client {
 		// We will fix this by supporting multiple group versions in Config
 		c.AutoscalingClient = client.NewAutoscalingOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Autoscaling.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: c.groupVersion(testapi.Autoscaling)},
 		})
 		c.BatchClient = client.NewBatchOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Batch.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: c.groupVersion(testapi.Batch)},
 		})
 		c.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: c.groupVersion(testapi.Extensions)},
 		})
 
 		c.Clientset = clientset.NewForConfigOrDie(&restclient.Config{Host: c.server.URL})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}
 	return c
+}
+
+func (c *Client) groupVersion(group testapi.TestGroup) *unversioned.GroupVersion {
+	if c.GroupVersion != nil && group.IsEnabledVersion(c.GroupVersion) {
+		return c.GroupVersion
+	}
+
+	return group.GroupVersion()
 }
 
 func (c *Client) Close() {
@@ -233,7 +244,7 @@ func (c *Client) body(t *testing.T, obj runtime.Object, raw *string) *string {
 		if !found {
 			t.Errorf("Group %s is not registered in testapi", groupName)
 		}
-		bs, err = runtime.Encode(g.Codec(), obj)
+		bs, err = runtime.Encode(g.Codec(c.GroupVersion), obj)
 		if err != nil {
 			t.Errorf("unexpected encoding error: %v", err)
 		}

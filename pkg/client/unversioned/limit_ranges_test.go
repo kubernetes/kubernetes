@@ -23,11 +23,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
-func getLimitRangesResourceName() string {
-	return "limitranges"
+func getLimitRangesResource() unversioned.GroupVersionResource {
+	return v1.SchemeGroupVersion.WithResource("limitranges")
 }
 
 func TestLimitRangeCreate(t *testing.T) {
@@ -55,11 +57,12 @@ func TestLimitRangeCreate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(getLimitRangesResource(), ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   limitRange,
 		},
-		Response: simple.Response{StatusCode: 200, Body: limitRange},
+		Response:     simple.Response{StatusCode: 200, Body: limitRange},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 
 	response, err := c.Setup(t).LimitRanges(ns).Create(limitRange)
@@ -92,11 +95,12 @@ func TestLimitRangeGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, "abc"),
+			Path:   testapi.Default.ResourcePath(getLimitRangesResource(), ns, "abc"),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: limitRange},
+		Response:     simple.Response{StatusCode: 200, Body: limitRange},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 
 	response, err := c.Setup(t).LimitRanges(ns).Get("abc")
@@ -117,11 +121,12 @@ func TestLimitRangeList(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(getLimitRangesResource(), ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: limitRangeList},
+		Response:     simple.Response{StatusCode: 200, Body: limitRangeList},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).LimitRanges(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -152,8 +157,9 @@ func TestLimitRangeUpdate(t *testing.T) {
 		},
 	}
 	c := &simple.Client{
-		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: 200, Body: limitRange},
+		Request:      simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getLimitRangesResource(), ns, "abc"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: 200, Body: limitRange},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	response, err := c.Setup(t).LimitRanges(ns).Update(limitRange)
 	defer c.Close()
@@ -163,8 +169,9 @@ func TestLimitRangeUpdate(t *testing.T) {
 func TestLimitRangeDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getLimitRangesResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: 200},
+		Request:      simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getLimitRangesResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).LimitRanges(ns).Delete("foo")
 	defer c.Close()
@@ -175,7 +182,7 @@ func TestLimitRangeWatch(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePathWithPrefix("watch", getLimitRangesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePathWithPrefix("watch", getLimitRangesResource(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: simple.Response{StatusCode: 200},
 	}

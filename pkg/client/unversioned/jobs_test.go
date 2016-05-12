@@ -21,34 +21,38 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/batch/v1"
+	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
-func getJobsResourceName() string {
-	return "jobs"
+func getJobsResource(gv *unversioned.GroupVersion) unversioned.GroupVersionResource {
+	return gv.WithResource("jobs")
 }
 
-func getJobClient(t *testing.T, c *simple.Client, ns, resourceGroup string) unversioned.JobInterface {
-	switch resourceGroup {
+func getJobClient(t *testing.T, c *simple.Client, ns string, gv *unversioned.GroupVersion) client.JobInterface {
+	switch gv.Group {
 	case batch.GroupName:
 		return c.Setup(t).Batch().Jobs(ns)
 	case extensions.GroupName:
 		return c.Setup(t).Extensions().Jobs(ns)
 	default:
-		t.Fatalf("Unknown group %v", resourceGroup)
+		t.Fatalf("Unknown group %v", gv.Group)
 	}
 	return nil
 }
 
-func testListJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
+func testListJob(t *testing.T, group testapi.TestGroup, gv *unversioned.GroupVersion) {
 	ns := api.NamespaceAll
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   group.ResourcePath(getJobsResourceName(), ns, ""),
+			Path:   group.ResourcePath(getJobsResource(gv), ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &batch.JobList{
@@ -68,24 +72,26 @@ func testListJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 				},
 			},
 		},
-		ResourceGroup: resourceGroup,
+		ResourceGroup: gv.Group,
+		GroupVersion:  gv,
 	}
-	receivedJobList, err := getJobClient(t, c, ns, resourceGroup).List(api.ListOptions{})
+	receivedJobList, err := getJobClient(t, c, ns, gv).List(api.ListOptions{})
 	defer c.Close()
 	c.Validate(t, receivedJobList, err)
 }
 
 func TestListJob(t *testing.T) {
-	testListJob(t, testapi.Extensions, extensions.GroupName)
-	testListJob(t, testapi.Batch, batch.GroupName)
+	testListJob(t, testapi.Extensions, &v1beta1.SchemeGroupVersion)
+	testListJob(t, testapi.Batch, &v1.SchemeGroupVersion)
+	testListJob(t, testapi.Batch, &v2alpha1.SchemeGroupVersion)
 }
 
-func testGetJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
+func testGetJob(t *testing.T, group testapi.TestGroup, gv *unversioned.GroupVersion) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   group.ResourcePath(getJobsResourceName(), ns, "foo"),
+			Path:   group.ResourcePath(getJobsResource(gv), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -103,19 +109,21 @@ func testGetJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
 				},
 			},
 		},
-		ResourceGroup: resourceGroup,
+		ResourceGroup: gv.Group,
+		GroupVersion:  gv,
 	}
-	receivedJob, err := getJobClient(t, c, ns, resourceGroup).Get("foo")
+	receivedJob, err := getJobClient(t, c, ns, gv).Get("foo")
 	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }
 
 func TestGetJob(t *testing.T) {
-	testGetJob(t, testapi.Extensions, extensions.GroupName)
-	testGetJob(t, testapi.Batch, batch.GroupName)
+	testGetJob(t, testapi.Extensions, &v1beta1.SchemeGroupVersion)
+	testGetJob(t, testapi.Batch, &v1.SchemeGroupVersion)
+	testGetJob(t, testapi.Batch, &v2alpha1.SchemeGroupVersion)
 }
 
-func testUpdateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
+func testUpdateJob(t *testing.T, group testapi.TestGroup, gv *unversioned.GroupVersion) {
 	ns := api.NamespaceDefault
 	requestJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
@@ -127,7 +135,7 @@ func testUpdateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) 
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   group.ResourcePath(getJobsResourceName(), ns, "foo"),
+			Path:   group.ResourcePath(getJobsResource(gv), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -145,19 +153,21 @@ func testUpdateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) 
 				},
 			},
 		},
-		ResourceGroup: resourceGroup,
+		ResourceGroup: gv.Group,
+		GroupVersion:  gv,
 	}
-	receivedJob, err := getJobClient(t, c, ns, resourceGroup).Update(requestJob)
+	receivedJob, err := getJobClient(t, c, ns, gv).Update(requestJob)
 	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }
 
 func TestUpdateJob(t *testing.T) {
-	testUpdateJob(t, testapi.Extensions, extensions.GroupName)
-	testUpdateJob(t, testapi.Batch, batch.GroupName)
+	testUpdateJob(t, testapi.Extensions, &v1beta1.SchemeGroupVersion)
+	testUpdateJob(t, testapi.Batch, &v1.SchemeGroupVersion)
+	testUpdateJob(t, testapi.Batch, &v2alpha1.SchemeGroupVersion)
 }
 
-func testUpdateJobStatus(t *testing.T, group testapi.TestGroup, resourceGroup string) {
+func testUpdateJobStatus(t *testing.T, group testapi.TestGroup, gv *unversioned.GroupVersion) {
 	ns := api.NamespaceDefault
 	requestJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
@@ -169,7 +179,7 @@ func testUpdateJobStatus(t *testing.T, group testapi.TestGroup, resourceGroup st
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   group.ResourcePath(getJobsResourceName(), ns, "foo") + "/status",
+			Path:   group.ResourcePath(getJobsResource(gv), ns, "foo") + "/status",
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -190,40 +200,44 @@ func testUpdateJobStatus(t *testing.T, group testapi.TestGroup, resourceGroup st
 				},
 			},
 		},
-		ResourceGroup: resourceGroup,
+		ResourceGroup: gv.Group,
+		GroupVersion:  gv,
 	}
-	receivedJob, err := getJobClient(t, c, ns, resourceGroup).UpdateStatus(requestJob)
+	receivedJob, err := getJobClient(t, c, ns, gv).UpdateStatus(requestJob)
 	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }
 
 func TestUpdateJobStatus(t *testing.T) {
-	testUpdateJobStatus(t, testapi.Extensions, extensions.GroupName)
-	testUpdateJobStatus(t, testapi.Batch, batch.GroupName)
+	testUpdateJobStatus(t, testapi.Extensions, &v1beta1.SchemeGroupVersion)
+	testUpdateJobStatus(t, testapi.Batch, &v1.SchemeGroupVersion)
+	testUpdateJobStatus(t, testapi.Batch, &v2alpha1.SchemeGroupVersion)
 }
 
-func testDeleteJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
+func testDeleteJob(t *testing.T, group testapi.TestGroup, gv *unversioned.GroupVersion) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   group.ResourcePath(getJobsResourceName(), ns, "foo"),
+			Path:   group.ResourcePath(getJobsResource(gv), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response:      simple.Response{StatusCode: 200},
-		ResourceGroup: resourceGroup,
+		ResourceGroup: gv.Group,
+		GroupVersion:  gv,
 	}
-	err := getJobClient(t, c, ns, resourceGroup).Delete("foo", nil)
+	err := getJobClient(t, c, ns, gv).Delete("foo", nil)
 	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
 func TestDeleteJob(t *testing.T) {
-	testDeleteJob(t, testapi.Extensions, extensions.GroupName)
-	testDeleteJob(t, testapi.Batch, batch.GroupName)
+	testDeleteJob(t, testapi.Extensions, &v1beta1.SchemeGroupVersion)
+	testDeleteJob(t, testapi.Batch, &v1.SchemeGroupVersion)
+	testDeleteJob(t, testapi.Batch, &v2alpha1.SchemeGroupVersion)
 }
 
-func testCreateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) {
+func testCreateJob(t *testing.T, group testapi.TestGroup, gv *unversioned.GroupVersion) {
 	ns := api.NamespaceDefault
 	requestJob := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
@@ -234,7 +248,7 @@ func testCreateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) 
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   group.ResourcePath(getJobsResourceName(), ns, ""),
+			Path:   group.ResourcePath(getJobsResource(gv), ns, ""),
 			Body:   requestJob,
 			Query:  simple.BuildQueryValues(nil),
 		},
@@ -253,9 +267,10 @@ func testCreateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) 
 				},
 			},
 		},
-		ResourceGroup: resourceGroup,
+		ResourceGroup: gv.Group,
+		GroupVersion:  gv,
 	}
-	receivedJob, err := getJobClient(t, c, ns, resourceGroup).Create(requestJob)
+	receivedJob, err := getJobClient(t, c, ns, gv).Create(requestJob)
 	defer c.Close()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -264,6 +279,7 @@ func testCreateJob(t *testing.T, group testapi.TestGroup, resourceGroup string) 
 }
 
 func TestCreateJob(t *testing.T) {
-	testCreateJob(t, testapi.Extensions, extensions.GroupName)
-	testCreateJob(t, testapi.Batch, batch.GroupName)
+	testCreateJob(t, testapi.Extensions, &v1beta1.SchemeGroupVersion)
+	testCreateJob(t, testapi.Batch, &v1.SchemeGroupVersion)
+	testCreateJob(t, testapi.Batch, &v2alpha1.SchemeGroupVersion)
 }

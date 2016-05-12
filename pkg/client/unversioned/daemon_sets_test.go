@@ -17,19 +17,18 @@ limitations under the License.
 package unversioned_test
 
 import (
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
-)
-
-import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
-func getDSResourceName() string {
-	return "daemonsets"
+func getDSResource() unversioned.GroupVersionResource {
+	return v1beta1.SchemeGroupVersion.WithResource("daemonsets")
 }
 
 func TestListDaemonSets(t *testing.T) {
@@ -37,7 +36,7 @@ func TestListDaemonSets(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getDSResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getDSResource(), ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &extensions.DaemonSetList{
@@ -57,6 +56,7 @@ func TestListDaemonSets(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedDSs, err := c.Setup(t).Extensions().DaemonSets(ns).List(api.ListOptions{})
 	defer c.Close()
@@ -67,7 +67,7 @@ func TestListDaemonSets(t *testing.T) {
 func TestGetDaemonSet(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Extensions.ResourcePath(getDSResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.DaemonSet{
@@ -83,6 +83,7 @@ func TestGetDaemonSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedDaemonSet, err := c.Setup(t).Extensions().DaemonSets(ns).Get("foo")
 	defer c.Close()
@@ -107,7 +108,7 @@ func TestUpdateDaemonSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.DaemonSet{
@@ -123,6 +124,7 @@ func TestUpdateDaemonSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedDaemonSet, err := c.Setup(t).Extensions().DaemonSets(ns).Update(requestDaemonSet)
 	defer c.Close()
@@ -135,7 +137,7 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getDSResource(), ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.DaemonSet{
@@ -152,6 +154,7 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 				Status: extensions.DaemonSetStatus{},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedDaemonSet, err := c.Setup(t).Extensions().DaemonSets(ns).UpdateStatus(requestDaemonSet)
 	defer c.Close()
@@ -161,7 +164,7 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 func TestDeleteDaemon(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Extensions.ResourcePath(getDSResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Extensions().DaemonSets(ns).Delete("foo")
@@ -175,7 +178,7 @@ func TestCreateDaemonSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "POST", Path: testapi.Extensions.ResourcePath(getDSResourceName(), ns, ""), Body: requestDaemonSet, Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "POST", Path: testapi.Extensions.ResourcePath(getDSResource(), ns, ""), Body: requestDaemonSet, Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.DaemonSet{
@@ -191,6 +194,7 @@ func TestCreateDaemonSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedDaemonSet, err := c.Setup(t).Extensions().DaemonSets(ns).Create(requestDaemonSet)
 	defer c.Close()

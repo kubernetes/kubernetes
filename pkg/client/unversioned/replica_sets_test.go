@@ -21,12 +21,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
-func getReplicaSetResourceName() string {
-	return "replicasets"
+func getReplicaSetResource() unversioned.GroupVersionResource {
+	return v1beta1.SchemeGroupVersion.WithResource("replicasets")
 }
 
 func TestListReplicaSets(t *testing.T) {
@@ -34,7 +36,7 @@ func TestListReplicaSets(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getReplicaSetResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getReplicaSetResource(), ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &extensions.ReplicaSetList{
@@ -55,6 +57,7 @@ func TestListReplicaSets(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedRSList, err := c.Setup(t).Extensions().ReplicaSets(ns).List(api.ListOptions{})
 	c.Validate(t, receivedRSList, err)
@@ -63,7 +66,7 @@ func TestListReplicaSets(t *testing.T) {
 func TestGetReplicaSet(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Extensions.ResourcePath(getReplicaSetResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Extensions.ResourcePath(getReplicaSetResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.ReplicaSet{
@@ -80,6 +83,7 @@ func TestGetReplicaSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedRS, err := c.Setup(t).Extensions().ReplicaSets(ns).Get("foo")
 	c.Validate(t, receivedRS, err)
@@ -102,7 +106,7 @@ func TestUpdateReplicaSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getReplicaSetResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getReplicaSetResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.ReplicaSet{
@@ -119,6 +123,7 @@ func TestUpdateReplicaSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedRS, err := c.Setup(t).Extensions().ReplicaSets(ns).Update(requestRS)
 	c.Validate(t, receivedRS, err)
@@ -130,7 +135,7 @@ func TestUpdateStatusReplicaSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getReplicaSetResourceName(), ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getReplicaSetResource(), ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.ReplicaSet{
@@ -150,6 +155,7 @@ func TestUpdateStatusReplicaSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedRS, err := c.Setup(t).Extensions().ReplicaSets(ns).UpdateStatus(requestRS)
 	c.Validate(t, receivedRS, err)
@@ -157,8 +163,9 @@ func TestUpdateStatusReplicaSet(t *testing.T) {
 func TestDeleteReplicaSet(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Extensions.ResourcePath(getReplicaSetResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
-		Response: simple.Response{StatusCode: 200},
+		Request:      simple.Request{Method: "DELETE", Path: testapi.Extensions.ResourcePath(getReplicaSetResource(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response:     simple.Response{StatusCode: 200},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	err := c.Setup(t).Extensions().ReplicaSets(ns).Delete("foo", nil)
 	c.Validate(t, nil, err)
@@ -170,7 +177,7 @@ func TestCreateReplicaSet(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "POST", Path: testapi.Extensions.ResourcePath(getReplicaSetResourceName(), ns, ""), Body: requestRS, Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "POST", Path: testapi.Extensions.ResourcePath(getReplicaSetResource(), ns, ""), Body: requestRS, Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.ReplicaSet{
@@ -187,6 +194,7 @@ func TestCreateReplicaSet(t *testing.T) {
 				},
 			},
 		},
+		GroupVersion: &v1beta1.SchemeGroupVersion,
 	}
 	receivedRS, err := c.Setup(t).Extensions().ReplicaSets(ns).Create(requestRS)
 	c.Validate(t, receivedRS, err)
