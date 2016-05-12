@@ -37,7 +37,7 @@ type AuthProvider interface {
 
 // Factory generates an AuthProvider plugin.
 //  clusterAddress is the address of the current cluster.
-//  config is the inital configuration for this plugin.
+//  config is the initial configuration for this plugin.
 //  persister allows the plugin to save updated configuration.
 type Factory func(clusterAddress string, config map[string]string, persister AuthProviderConfigPersister) (AuthProvider, error)
 

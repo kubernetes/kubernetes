@@ -123,7 +123,7 @@ type Factory struct {
 	SwaggerSchema func(unversioned.GroupVersionKind) (*swagger.ApiDeclaration, error)
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
-	// overriden.
+	// overridden.
 	DefaultNamespace func() (string, bool, error)
 	// Generators returns the generators for the provided command
 	Generators func(cmdName string) map[string]kubectl.Generator
