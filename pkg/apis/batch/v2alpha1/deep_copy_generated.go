@@ -38,6 +38,10 @@ func init() {
 		DeepCopy_v2alpha1_JobTemplateSpec,
 		DeepCopy_v2alpha1_LabelSelector,
 		DeepCopy_v2alpha1_LabelSelectorRequirement,
+		DeepCopy_v2alpha1_ScheduledJob,
+		DeepCopy_v2alpha1_ScheduledJobList,
+		DeepCopy_v2alpha1_ScheduledJobSpec,
+		DeepCopy_v2alpha1_ScheduledJobStatus,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
@@ -231,6 +235,90 @@ func DeepCopy_v2alpha1_LabelSelectorRequirement(in LabelSelectorRequirement, out
 		copy(*out, in)
 	} else {
 		out.Values = nil
+	}
+	return nil
+}
+
+func DeepCopy_v2alpha1_ScheduledJob(in ScheduledJob, out *ScheduledJob, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v2alpha1_ScheduledJobSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_v2alpha1_ScheduledJobStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeepCopy_v2alpha1_ScheduledJobList(in ScheduledJobList, out *ScheduledJobList, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := in.Items, &out.Items
+		*out = make([]ScheduledJob, len(in))
+		for i := range in {
+			if err := DeepCopy_v2alpha1_ScheduledJob(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func DeepCopy_v2alpha1_ScheduledJobSpec(in ScheduledJobSpec, out *ScheduledJobSpec, c *conversion.Cloner) error {
+	out.Schedule = in.Schedule
+	if in.StartingDeadlineSeconds != nil {
+		in, out := in.StartingDeadlineSeconds, &out.StartingDeadlineSeconds
+		*out = new(int64)
+		**out = *in
+	} else {
+		out.StartingDeadlineSeconds = nil
+	}
+	out.ConcurrencyPolicy = in.ConcurrencyPolicy
+	out.Suspend = in.Suspend
+	if in.JobTemplate != nil {
+		in, out := in.JobTemplate, &out.JobTemplate
+		*out = new(JobTemplateSpec)
+		if err := DeepCopy_v2alpha1_JobTemplateSpec(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.JobTemplate = nil
+	}
+	return nil
+}
+
+func DeepCopy_v2alpha1_ScheduledJobStatus(in ScheduledJobStatus, out *ScheduledJobStatus, c *conversion.Cloner) error {
+	if in.Active != nil {
+		in, out := in.Active, &out.Active
+		*out = make([]v1.ObjectReference, len(in))
+		for i := range in {
+			if err := v1.DeepCopy_v1_ObjectReference(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Active = nil
+	}
+	if in.LastScheduleTime != nil {
+		in, out := in.LastScheduleTime, &out.LastScheduleTime
+		*out = new(unversioned.Time)
+		if err := unversioned.DeepCopy_unversioned_Time(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.LastScheduleTime = nil
 	}
 	return nil
 }

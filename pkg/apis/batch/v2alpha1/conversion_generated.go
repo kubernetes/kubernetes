@@ -48,6 +48,8 @@ func init() {
 		Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector,
 		Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
 		Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement,
+		Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus,
+		Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus,
 	); err != nil {
 		// if one of the conversion functions is malformed, detect it immediately.
 		panic(err)
@@ -507,4 +509,62 @@ func autoConvert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorR
 
 func Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
 	return autoConvert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in, out, s)
+}
+
+func autoConvert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus(in *ScheduledJobStatus, out *batch.ScheduledJobStatus, s conversion.Scope) error {
+	if in.Active != nil {
+		in, out := &in.Active, &out.Active
+		*out = make([]api.ObjectReference, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Active = nil
+	}
+	if in.LastScheduleTime != nil {
+		in, out := &in.LastScheduleTime, &out.LastScheduleTime
+		*out = new(unversioned.Time)
+		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.LastScheduleTime = nil
+	}
+	return nil
+}
+
+func Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus(in *ScheduledJobStatus, out *batch.ScheduledJobStatus, s conversion.Scope) error {
+	return autoConvert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus(in, out, s)
+}
+
+func autoConvert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus(in *batch.ScheduledJobStatus, out *ScheduledJobStatus, s conversion.Scope) error {
+	if in.Active != nil {
+		in, out := &in.Active, &out.Active
+		*out = make([]v1.ObjectReference, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Active = nil
+	}
+	if in.LastScheduleTime != nil {
+		in, out := &in.LastScheduleTime, &out.LastScheduleTime
+		*out = new(unversioned.Time)
+		if err := api.Convert_unversioned_Time_To_unversioned_Time(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.LastScheduleTime = nil
+	}
+	return nil
+}
+
+func Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus(in *batch.ScheduledJobStatus, out *ScheduledJobStatus, s conversion.Scope) error {
+	return autoConvert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus(in, out, s)
 }

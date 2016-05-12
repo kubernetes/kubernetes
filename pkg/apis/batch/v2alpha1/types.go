@@ -169,6 +169,82 @@ type JobCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
+// ScheduledJob represents the configuration of a single scheduled job.
+type ScheduledJob struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec is a structure defining the expected behavior of a job, including the schedule.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec ScheduledJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+
+	// Status is a structure describing current status of a job.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Status ScheduledJobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// ScheduledJobList is a collection of scheduled jobs.
+type ScheduledJobList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of ScheduledJob.
+	Items []ScheduledJob `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// ScheduledJobSpec describes how the job execution will look like and when it will actually run.
+type ScheduledJobSpec struct {
+
+	// Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
+
+	// Optional deadline in seconds for starting the job if it misses scheduled
+	// time for any reason.  Missed jobs executions will be counted as failed ones.
+	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=startingDeadlineSeconds"`
+
+	// ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
+	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty" protobuf:"bytes,3,opt,name=concurrencyPolicy,casttype=ConcurrencyPolicy"`
+
+	// Suspend flag tells the controller to suspend subsequent executions, it does
+	// not apply to already started executions.  Defaults to false.
+	Suspend bool `json:"suspend" protobuf:"varint,4,opt,name=suspend"`
+
+	// JobTemplate is the object that describes the job that will be created when
+	// executing a ScheduledJob.
+	JobTemplate *JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
+}
+
+// ConcurrencyPolicy describes how the job will be handled.
+// Only one of the following concurrent policies may be specified.
+// If none of the following policies is specified, the default one
+// is AllowConcurrent.
+type ConcurrencyPolicy string
+
+const (
+	// AllowConcurrent allows ScheduledJobs to run concurrently.
+	AllowConcurrent ConcurrencyPolicy = "Allow"
+
+	// ForbidConcurrent forbids concurrent runs, skipping next run if previous
+	// hasn't finished yet.
+	ForbidConcurrent ConcurrencyPolicy = "Forbid"
+
+	// ReplaceConcurrent cancels currently running job and replaces it with a new one.
+	ReplaceConcurrent ConcurrencyPolicy = "Replace"
+)
+
+// ScheduledJobStatus represents the current state of a Job.
+type ScheduledJobStatus struct {
+	// Active holds pointers to currently running jobs.
+	Active []v1.ObjectReference `json:"active,omitempty" protobuf:"bytes,1,rep,name=active"`
+
+	// LastScheduleTime keeps information of when was the last time the job was successfully scheduled.
+	LastScheduleTime *unversioned.Time `json:"lastScheduleTime,omitempty" protobuf:"bytes,4,opt,name=lastScheduleTime"`
+}
+
 // A label selector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
