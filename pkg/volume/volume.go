@@ -152,9 +152,8 @@ type Attacher interface {
 
 // Detacher can detach a volume from a node.
 type Detacher interface {
-
-	// Detach the given volume from the given host.
-	Detach(deviceMountPath string, hostName string) error
+	// Detach the given device from the given host.
+	Detach(deviceName, hostName string) error
 
 	// WaitForDetach blocks until the device is detached from this
 	// node. If the device does not detach within the given timeout
