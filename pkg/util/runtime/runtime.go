@@ -67,6 +67,11 @@ var ErrorHandlers = []func(error){logError}
 // is preferable to logging the error - the default behavior is to log but the
 // errors may be sent to a remote server for analysis.
 func HandleError(err error) {
+	// this is sometimes called with a nil error.  We probably shouldn't fail and should do nothing instead
+	if err == nil {
+		return
+	}
+
 	for _, fn := range ErrorHandlers {
 		fn(err)
 	}
