@@ -30,6 +30,12 @@ e2e_test=$(kube::util::find-binary "e2e.test")
 
 GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
 
+# The number of tests that can run in parallel depends on what tests
+# are running and on the size of the cluster. Too many, and tests will
+# fail due to resource contention. 25 is a reasonable default for a
+# 3-node (n1-standard-1) cluster running all fast, non-disruptive tests.
+GINKGO_PARALLELISM=${GINKGO_PARALLELISM:-25}
+
 : ${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
@@ -78,7 +84,7 @@ fi
 if [[ -n "${GINKGO_PARALLEL_NODES:-}" ]]; then
   ginkgo_args+=("--nodes=${GINKGO_PARALLEL_NODES}")
 elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
-  ginkgo_args+=("--nodes=30") # By default, set --nodes=30.
+  ginkgo_args+=("--nodes=25")
 fi
 
 # The --host setting is used only when providing --auth_config
