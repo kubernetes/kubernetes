@@ -315,6 +315,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	rf := cmdutil.NewFactory(nil)
 	f.MapBasedSelectorForObject = rf.MapBasedSelectorForObject
 	f.PortsForObject = rf.PortsForObject
+	f.ProtocolsForObject = rf.ProtocolsForObject
 	f.LabelsForObject = rf.LabelsForObject
 	f.CanBeExposed = rf.CanBeExposed
 	return f, t, testapi.Default.Codec()
