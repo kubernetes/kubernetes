@@ -18,7 +18,14 @@ FROM gcr.io/google_containers/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
-WORKDIR /go/src/k8s.io/kubernetes
+# TO run as non-root we sometimes need to rebuild go stdlib packages.
+RUN chmod -R a+rwx /usr/local/go/pkg
+
+# The kubernetes source is expected to be mounted here.  This will be the base
+# of operations.
+ENV HOME /go/src/k8s.io/kubernetes
+WORKDIR ${HOME}
+RUN chmod -R a+rwx ${HOME}
 
 # Propagate the git tree version into the build image
 ADD kube-version-defs /kube-version-defs

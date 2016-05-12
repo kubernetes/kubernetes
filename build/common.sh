@@ -565,6 +565,7 @@ function kube::build::ensure_data_container() {
       "${DOCKER[@]}" run
       "${DOCKER_DATA_MOUNT_ARGS[@]}"
       --name "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+      --user "$(id -u):$(id -g)"
       "${KUBE_BUILD_IMAGE}"
       true
     )
@@ -583,6 +584,7 @@ function kube::build::run_build_command() {
 
   local -a docker_run_opts=(
     "--name=${KUBE_BUILD_CONTAINER_NAME}"
+    "--user=$(id -u):$(id -g)"
     "${DOCKER_MOUNT_ARGS[@]}"
   )
 
@@ -635,9 +637,10 @@ function kube::build::copy_output() {
     # Bug: https://github.com/docker/docker/pull/8509
     local -a docker_run_opts=(
       "--name=${KUBE_BUILD_CONTAINER_NAME}"
-       "${DOCKER_MOUNT_ARGS[@]}"
-       -d
-      )
+      "--user=$(id -u):$(id -g)"
+      "${DOCKER_MOUNT_ARGS[@]}"
+      -d
+    )
 
     local -ra docker_cmd=(
       "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}"
