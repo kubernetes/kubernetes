@@ -399,6 +399,9 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 	if res.PrevNode != nil && res.PrevNode.Value != "" {
 		// Ignore problems reading the old object.
 		if oldObj, err = w.decodeObject(res.PrevNode); err == nil {
+			if err := w.versioner.UpdateObject(oldObj, res.Node.ModifiedIndex); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", res.Node.ModifiedIndex, oldObj, err))
+			}
 			oldObjPasses = w.filter(oldObj)
 		}
 	}
