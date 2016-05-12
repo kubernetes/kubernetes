@@ -298,7 +298,7 @@ func TestRefetchSchemaWhenValidationFails(t *testing.T) {
 	}
 
 	// Re-get request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if requests["/swaggerapi/foo/bar"] != 1 {
@@ -343,7 +343,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// Initial request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if _, err := os.Stat(path.Join(dir, "foo", "bar", schemaFileName)); err != nil {
@@ -354,7 +354,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// Same version and group, should skip HTTP
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if requests["/swaggerapi/foo/bar"] != 2 {
@@ -362,7 +362,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// Different API group, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "baz", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "baz", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if _, err := os.Stat(path.Join(dir, "foo", "baz", schemaFileName)); err != nil {
@@ -373,7 +373,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// Different version, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo2", "bar", dir, nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo2", "bar", dir, nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if _, err := os.Stat(path.Join(dir, "foo2", "bar", schemaFileName)); err != nil {
@@ -384,7 +384,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 
 	// No cache dir, should go straight to HTTP and not write
-	if getSchemaAndValidate(c, data, "foo", "blah", "", nil); err != nil {
+	if getSchemaAndValidate(c, data, "foo", "blah", "", nil, map[string]string{}); err != nil {
 		t.Errorf("unexpected error validating: %v", err)
 	}
 	if requests["/swaggerapi/foo/blah"] != 1 {

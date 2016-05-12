@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net"
 	"regexp"
@@ -695,8 +696,16 @@ func ValidatePodSecurityPolicyUpdate(old *extensions.PodSecurityPolicy, new *ext
 
 // Template Api Validation
 func ValidateTemplateSpec(spec *extensions.TemplateSpec, fldPath *field.Path) field.ErrorList {
-	// TODO: Write this
 	allErrs := field.ErrorList{}
+
+	// Validate the Parameters
+	allErrs = append(allErrs, ValidateTemplateParamsList(field.NewPath("spec", "parameters"), spec.Parameters)...)
+
+	// TODO: Verify the namespace is not present in any of the Objects
+
+	// TODO: Validate that all TemplateParameter Names appear in a template Object at least once either as
+	// $(NAME)
+
 	return allErrs
 }
 
@@ -710,4 +719,136 @@ func ValidateTemplate(obj *extensions.Template) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateTemplateName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateTemplateSpec(&obj.Spec, field.NewPath("spec"))...)
 	return allErrs
+}
+
+func ValidateTemplateParams(params *extensions.TemplateParameters) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Validate the Parameter Name
+	if len(params.Name) <= 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("name"), params.Name, "must be specified"))
+	}
+	if ok, _ := ValidateTemplateName(params.Name, false); !ok {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("name"), params.Name, "is not a valid Template Name"))
+	}
+
+	// Validate the TemplateParameters
+	allErrs = append(allErrs, ValidateTemplateParamsMap(field.NewPath("parameters"), params.ParameterValues)...)
+
+	return allErrs
+}
+
+var templateParamNameFmt = regexp.MustCompile("^[A-Z0-9_]+$")
+
+func ValidateTemplateParamsMap(fldPath *field.Path, params map[string]string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	names := sets.NewString()
+	for name := range params {
+		// Verify the Name
+		indexPath := fldPath.Key(name)
+		if !templateParamNameFmt.MatchString(name) {
+			allErrs = append(allErrs, field.Invalid(indexPath, name, "Parameter name can only contain characters [A-z0-9_]."))
+		}
+		if names.Has(name) {
+			allErrs = append(allErrs, field.Invalid(indexPath, name, "Parameter cannot be specified more than once."))
+		}
+		names.Insert(name)
+	}
+	return allErrs
+}
+
+func ValidateTemplateParamsList(fldPath *field.Path, params []extensions.Parameter) field.ErrorList {
+	allErrs := field.ErrorList{}
+	names := sets.NewString()
+	for i, p := range params {
+		// Verify the Name passes validation
+		indexPath := fldPath.Index(i)
+		if len(p.Name) <= 0 {
+			allErrs = append(allErrs, field.Invalid(indexPath, p, "Parameter name cannot be empty."))
+		}
+		if !templateParamNameFmt.MatchString(p.Name) {
+			allErrs = append(allErrs, field.Invalid(indexPath, p, "Parameter name can only contain characters [A-z0-9_]."))
+		}
+		if names.Has(p.Name) {
+			allErrs = append(allErrs, field.Invalid(indexPath, p, "Parameter cannot be specified more than once."))
+		}
+		names.Insert(p.Name)
+
+		// Verify the [Type, Value, Required] result passes validation
+		err := ValidateTemplateParamType(p)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(indexPath, p, err.Error()))
+		}
+		allErrs = append(allErrs, ValidateTemplateParamRequired(indexPath, p)...)
+	}
+	return allErrs
+}
+
+// Verify required parameters do not have default values.
+// Verify boolean and int type parameters have default values set or are required.
+// String and Base64 types can default to unspecified if not-required.
+func ValidateTemplateParamRequired(fldPath *field.Path, p extensions.Parameter) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if p.Required && len(p.Value) > 0 {
+		allErrs = append(
+			allErrs, field.Invalid(fldPath, p, fmt.Sprintf("Required Parameters cannot have default values specified.")))
+	}
+
+	if (p.Type != extensions.StringParam && p.Type != extensions.Base64Param) && !p.Required && len(p.Value) <= 0 {
+		allErrs = append(allErrs, field.Invalid(
+			fldPath, p, fmt.Sprintf("Parameters of type %s must either be required or have a default value specified.")))
+	}
+	return allErrs
+}
+
+//ValidateTemplateParamType Verifies that the Parameter value can be parsed into the Type
+// if both are defined.  Non-String Parameters must be Required or have a DefaultValue.
+func ValidateTemplateParamType(p extensions.Parameter) error {
+	// Verify the Parameter Type and Value match if the Value they are both specified
+	var err error
+	if len(p.Type) > 0 {
+		switch p.Type {
+		case extensions.StringParam, extensions.IntParam, extensions.BoolParam, extensions.Base64Param:
+			// No-Op, known types.
+		default:
+			return fmt.Errorf(
+				"Type for Parameter is not a supported Type: %s.  Supported types are: [%s, %s, %s, %s]",
+				p.Type, extensions.StringParam, extensions.IntParam, extensions.BoolParam, extensions.Base64Param)
+		}
+	}
+
+	// Verify non-String Types have a default value or are required
+	if len(p.Value) <= 0 && !p.Required {
+		switch p.Type {
+		// This is ok, Strings have a valid default value
+		case extensions.IntParam, extensions.BoolParam, extensions.Base64Param:
+			return fmt.Errorf(
+				"Parameter %s must have a Value or be Required because it has Type %s", p.Name, p.Type)
+		default:
+			// Passes.  Strings can default to the empty-String.
+		}
+	}
+
+	if len(p.Type) > 0 && len(p.Value) > 0 {
+		switch p.Type {
+		case extensions.StringParam:
+			// Passes.  This is the native format it is already in.
+		case extensions.IntParam:
+			// Verify the value can be parsed to an int
+			_, err = strconv.ParseInt(p.Value, 10, 64)
+		case extensions.BoolParam:
+			// Verify the value can be parsed to a bool
+			_, err = strconv.ParseBool(p.Value)
+		case extensions.Base64Param:
+			// Verify the value can be parsed to a byte array
+			_, err = base64.StdEncoding.DecodeString(p.Value)
+		default:
+			err = fmt.Errorf("Unsupported Type %s", p.Type)
+		}
+		if err != nil {
+			err = fmt.Errorf("Value %s for Parameter %s does not match Type %s", p.Value, p.Name, p.Type)
+		}
+	}
+	return err
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package etcd
 
 import (
-	"fmt"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
@@ -79,34 +78,5 @@ func NewREST(opts generic.RESTOptions) (*REST, *ProcessREST) {
 
 		Storage: storageInterface,
 	}
-	return &REST{store}, &ProcessREST{store}
-}
-
-type ProcessREST struct {
-	store *registry.Store
-}
-
-func (r *ProcessREST) New() runtime.Object {
-	return &extensions.TemplateParameters{}
-}
-
-func (r *ProcessREST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	tparams, ok := obj.(*extensions.TemplateParameters)
-	if !ok {
-		return nil, fmt.Errorf("expected input object type to be TemplateParameters, but %T", obj)
-	}
-	return r.processTemplate(ctx, tparams)
-}
-
-func (r *ProcessREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	tparams, ok := obj.(*extensions.TemplateParameters)
-	if !ok {
-		return nil, false, fmt.Errorf("expected input object type to be TemplateParameters, but %T", obj)
-	}
-	obj, err := r.processTemplate(ctx, tparams)
-	return obj, true, err
-}
-
-func (r *ProcessREST) processTemplate(ctx api.Context, obj *extensions.TemplateParameters) (runtime.Object, error) {
-	return &api.List{}, nil
+	return &REST{store}, NewProcessRest(store)
 }

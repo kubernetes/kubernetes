@@ -26,8 +26,19 @@ type TemplateExpansion interface {
 	Process(tp *extensions.TemplateParameters) (*api.List, error)
 }
 
-func (t *templates) Process(tp *extensions.TemplateParameters) (result *api.List, err error) {
-	result = &api.List{}
-	err = t.client.Post().Namespace(t.ns).Resource("templates").SubResource("process").Body(tp).Do().Into(result)
-	return
+func (t *templates) Process(tp *extensions.TemplateParameters) (*api.List, error) {
+	result := &api.List{}
+	err := t.client.Put().Namespace(t.ns).
+		Resource("templates").
+		Name(tp.Name).
+		SubResource("process").
+		Body(tp).Do().Into(result)
+
+	// Manually fixup missing/extra fields for export so that we can
+	// pipe the result back into `kubectl -f -` to instantiate the values
+	// from the expanded Template.
+	result.Kind = "List"
+	result.TypeMeta.APIVersion = "v1"
+	result.ListMeta.SelfLink = ""
+	return result, err
 }

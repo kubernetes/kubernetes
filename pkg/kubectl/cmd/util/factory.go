@@ -106,6 +106,8 @@ type Factory struct {
 	Rollbacker func(mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
 	// Returns a StatusViewer for printing rollout status.
 	StatusViewer func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
+	// Returns a Processor for processing the the object specified RESTMapping type or an error
+	Processor func(mapping *meta.RESTMapping) (kubectl.Processor, error)
 	// MapBasedSelectorForObject returns the map-based selector associated with the provided object. If a
 	// new set-based selector is provided, an error is returned if the selector cannot be converted to a
 	// map-based selector
@@ -155,6 +157,7 @@ const (
 	JobV1Beta1GeneratorName                     = "job/v1beta1"
 	JobV1GeneratorName                          = "job/v1"
 	NamespaceV1GeneratorName                    = "namespace/v1"
+	TemplateParametersV1GeneratorName           = "templateparameters/v1beta1"
 	SecretV1GeneratorName                       = "secret/v1"
 	SecretForDockerRegistryV1GeneratorName      = "secret-for-docker-registry/v1"
 	ConfigMapV1GeneratorName                    = "configmap/v1"
@@ -185,6 +188,9 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 	}
 	generators["secret-for-docker-registry"] = map[string]kubectl.Generator{
 		SecretForDockerRegistryV1GeneratorName: kubectl.SecretForDockerRegistryGeneratorV1{},
+	}
+	generators["process"] = map[string]kubectl.Generator{
+		TemplateParametersV1GeneratorName: kubectl.TemplateParametersGeneratorV1Beta1{},
 	}
 	return generators[cmdName]
 }
@@ -598,6 +604,15 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), client)
 		},
+		Processor: func(mapping *meta.RESTMapping) (kubectl.Processor, error) {
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
+			if err != nil {
+				return nil, err
+			}
+			return kubectl.ProcessorFor(
+				mapping.GroupVersionKind.GroupKind(), clientset.FromUnversionedClient(client))
+		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
 			if validate {
 				client, err := clients.ClientForVersion(nil)
@@ -814,6 +829,8 @@ type clientSwaggerSchema struct {
 	mapper   meta.RESTMapper
 }
 
+var _ validation.Schema = &clientSwaggerSchema{}
+
 const schemaFileName = "schema.json"
 
 type schemaClient interface {
@@ -870,7 +887,7 @@ func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersio
 	return nil
 }
 
-func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string, delegate validation.Schema) (err error) {
+func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string, delegate validation.Schema, templateParamTypes map[string]string) (err error) {
 	var schemaData []byte
 	var firstSeen bool
 	fullDir, err := substituteUserHome(cacheDir)
@@ -895,7 +912,7 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 	if err != nil {
 		return err
 	}
-	err = schema.ValidateBytes(data)
+	err = schema.ValidateBytesWithTemplates(data, templateParamTypes)
 	if _, ok := err.(validation.TypeNotFoundError); ok && !firstSeen {
 		// As a temporay hack, kubectl would re-get the schema if validation
 		// fails for type not found reason.
@@ -908,7 +925,7 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 		if err != nil {
 			return err
 		}
-		return schema.ValidateBytes(data)
+		return schema.ValidateBytesWithTemplates(data, templateParamTypes)
 	}
 
 	return err
@@ -932,6 +949,10 @@ func downloadSchemaAndStore(c schemaClient, cacheDir, fullDir, cacheFile, prefix
 }
 
 func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
+	return c.ValidateBytesWithTemplates(data, map[string]string{})
+}
+
+func (c *clientSwaggerSchema) ValidateBytesWithTemplates(data []byte, templateParamTypes map[string]string) error {
 	gvk, err := json.DefaultMetaFactory.Interpret(data)
 	if err != nil {
 		return err
@@ -943,26 +964,26 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		if c.c.AutoscalingClient == nil {
 			return errors.New("unable to validate: no autoscaling client")
 		}
-		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c, templateParamTypes)
 	}
 	if gvk.Group == policy.GroupName {
 		if c.c.PolicyClient == nil {
 			return errors.New("unable to validate: no policy client")
 		}
-		return getSchemaAndValidate(c.c.PolicyClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+		return getSchemaAndValidate(c.c.PolicyClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c, templateParamTypes)
 	}
 	if gvk.Group == apps.GroupName {
 		if c.c.AppsClient == nil {
 			return errors.New("unable to validate: no autoscaling client")
 		}
-		return getSchemaAndValidate(c.c.AppsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+		return getSchemaAndValidate(c.c.AppsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c, templateParamTypes)
 	}
 
 	if gvk.Group == batch.GroupName {
 		if c.c.BatchClient == nil {
 			return errors.New("unable to validate: no batch client")
 		}
-		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c, templateParamTypes)
 	}
 	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 		// Don't attempt to validate third party objects
@@ -972,9 +993,9 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		if c.c.ExtensionsClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}
-		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c, templateParamTypes)
 	}
-	return getSchemaAndValidate(c.c.RESTClient, data, "api", gvk.GroupVersion().String(), c.cacheDir, c)
+	return getSchemaAndValidate(c.c.RESTClient, data, "api", gvk.GroupVersion().String(), c.cacheDir, c, templateParamTypes)
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
