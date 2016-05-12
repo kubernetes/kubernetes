@@ -47,9 +47,10 @@ type TestContextType struct {
 	VerifyServiceAccount  bool
 	DeleteNamespace       bool
 	CleanStart            bool
-	// If set to true framework will start a goroutine monitoring resource usage of system add-ons.
-	// It will read the data every 30 seconds from all Nodes and print summary during afterEach.
-	GatherKubeSystemResourceUsageData bool
+	// If set to 'true' or 'all' framework will start a goroutine monitoring resource usage of system add-ons.
+	// It will read the data every 30 seconds from all Nodes and print summary during afterEach. If set to 'master'
+	// only master Node will be monitored.
+	GatherKubeSystemResourceUsageData string
 	GatherLogsSizes                   bool
 	GatherMetricsAfterTest            bool
 	// Currently supported values are 'hr' for human-readable and 'json'. It's a comma separated list.
@@ -123,7 +124,7 @@ func RegisterFlags() {
 	flag.BoolVar(&TestContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
 	flag.BoolVar(&TestContext.DeleteNamespace, "delete-namespace", true, "If true tests will delete namespace after completion. It is only designed to make debugging easier, DO NOT turn it off by default.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
-	flag.BoolVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", false, "If set to true framework will be monitoring resource usage of system add-ons in (some) e2e tests.")
+	flag.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flag.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
 	flag.BoolVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after each test.")
 	flag.StringVar(&TestContext.OutputPrintType, "output-print-type", "hr", "Comma separated list: 'hr' for human readable summaries 'json' for JSON ones.")

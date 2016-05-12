@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/system"
 )
 
 const (
@@ -225,6 +226,7 @@ type containerResourceGatherer struct {
 
 type ResourceGathererOptions struct {
 	inKubemark bool
+	masterOnly bool
 }
 
 func NewResourceUsageGatherer(c *client.Client, options ResourceGathererOptions) (*containerResourceGatherer, error) {
@@ -263,18 +265,21 @@ func NewResourceUsageGatherer(c *client.Client, options ResourceGathererOptions)
 			return nil, err
 		}
 
-		g.workerWg.Add(len(nodeList.Items))
 		for _, node := range nodeList.Items {
-			g.workers = append(g.workers, resourceGatherWorker{
-				c:                    c,
-				nodeName:             node.Name,
-				wg:                   &g.workerWg,
-				containerIDToNameMap: g.containerIDToNameMap,
-				containerIDs:         g.containerIDs,
-				stopCh:               g.stopCh,
-				finished:             false,
-				inKubemark:           false,
-			})
+			if !options.masterOnly || system.IsMasterNode(&node) {
+				g.workerWg.Add(1)
+				g.workers = append(g.workers, resourceGatherWorker{
+					c:                    c,
+					nodeName:             node.Name,
+					wg:                   &g.workerWg,
+					containerIDToNameMap: g.containerIDToNameMap,
+					containerIDs:         g.containerIDs,
+					stopCh:               g.stopCh,
+					finished:             false,
+					inKubemark:           false,
+				})
+				break
+			}
 		}
 	}
 	return &g, nil
