@@ -2006,7 +2006,8 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 					glog.Errorf("Could not unmount the global mount for %q: %v", name, err)
 				}
 
-				err = detacher.Detach(refs[0], kl.hostname)
+				pdName := path.Base(refs[0])
+				err = detacher.Detach(pdName, kl.hostname)
 				if err != nil {
 					glog.Errorf("Could not detach volume %q at %q: %v", name, volumePath, err)
 				}
