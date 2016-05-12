@@ -48,6 +48,12 @@ func init() {
 		Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector,
 		Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
 		Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement,
+		Convert_v2alpha1_ScheduledJob_To_batch_ScheduledJob,
+		Convert_batch_ScheduledJob_To_v2alpha1_ScheduledJob,
+		Convert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList,
+		Convert_batch_ScheduledJobList_To_v2alpha1_ScheduledJobList,
+		Convert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec,
+		Convert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec,
 		Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus,
 		Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus,
 	); err != nil {
@@ -507,6 +513,141 @@ func autoConvert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorR
 
 func Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
 	return autoConvert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in, out, s)
+}
+
+func autoConvert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(in *ScheduledJob, out *batch.ScheduledJob, s conversion.Scope) error {
+	SetDefaults_ScheduledJob(in)
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(in *ScheduledJob, out *batch.ScheduledJob, s conversion.Scope) error {
+	return autoConvert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(in, out, s)
+}
+
+func autoConvert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(in *batch.ScheduledJob, out *ScheduledJob, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(in *batch.ScheduledJob, out *ScheduledJob, s conversion.Scope) error {
+	return autoConvert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(in, out, s)
+}
+
+func autoConvert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList(in *ScheduledJobList, out *batch.ScheduledJobList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]batch.ScheduledJob, len(*in))
+		for i := range *in {
+			if err := Convert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList(in *ScheduledJobList, out *batch.ScheduledJobList, s conversion.Scope) error {
+	return autoConvert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList(in, out, s)
+}
+
+func autoConvert_batch_ScheduledJobList_To_v2alpha1_ScheduledJobList(in *batch.ScheduledJobList, out *ScheduledJobList, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ScheduledJob, len(*in))
+		for i := range *in {
+			if err := Convert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_batch_ScheduledJobList_To_v2alpha1_ScheduledJobList(in *batch.ScheduledJobList, out *ScheduledJobList, s conversion.Scope) error {
+	return autoConvert_batch_ScheduledJobList_To_v2alpha1_ScheduledJobList(in, out, s)
+}
+
+func autoConvert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec(in *ScheduledJobSpec, out *batch.ScheduledJobSpec, s conversion.Scope) error {
+	out.Schedule = in.Schedule
+	if in.StartingDeadlineSeconds != nil {
+		in, out := &in.StartingDeadlineSeconds, &out.StartingDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.StartingDeadlineSeconds = nil
+	}
+	out.ConcurrencyPolicy = batch.ConcurrencyPolicy(in.ConcurrencyPolicy)
+	out.Suspend = in.Suspend
+	if err := Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec(in *ScheduledJobSpec, out *batch.ScheduledJobSpec, s conversion.Scope) error {
+	return autoConvert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec(in, out, s)
+}
+
+func autoConvert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec(in *batch.ScheduledJobSpec, out *ScheduledJobSpec, s conversion.Scope) error {
+	out.Schedule = in.Schedule
+	if in.StartingDeadlineSeconds != nil {
+		in, out := &in.StartingDeadlineSeconds, &out.StartingDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.StartingDeadlineSeconds = nil
+	}
+	out.ConcurrencyPolicy = ConcurrencyPolicy(in.ConcurrencyPolicy)
+	out.Suspend = in.Suspend
+	if err := Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec(in *batch.ScheduledJobSpec, out *ScheduledJobSpec, s conversion.Scope) error {
+	return autoConvert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec(in, out, s)
 }
 
 func autoConvert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus(in *ScheduledJobStatus, out *batch.ScheduledJobStatus, s conversion.Scope) error {
