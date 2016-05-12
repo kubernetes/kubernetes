@@ -35,31 +35,36 @@ import (
 // APIServer runs a kubernetes api server.
 type APIServer struct {
 	*genericapiserver.ServerRunOptions
-	AdmissionControl           string
-	AdmissionControlConfigFile string
-	AllowPrivileged            bool
-	AuthorizationMode          string
-	AuthorizationConfig        apiserver.AuthorizationConfig
-	BasicAuthFile              string
-	DefaultStorageMediaType    string
-	DeleteCollectionWorkers    int
-	EtcdServersOverrides       []string
-	EventTTL                   time.Duration
-	KeystoneURL                string
-	KubeletConfig              kubeletclient.KubeletClientConfig
-	MasterServiceNamespace     string
-	MaxConnectionBytesPerSec   int64
-	OIDCCAFile                 string
-	OIDCClientID               string
-	OIDCIssuerURL              string
-	OIDCUsernameClaim          string
-	OIDCGroupsClaim            string
-	SSHKeyfile                 string
-	SSHUser                    string
-	ServiceAccountKeyFile      string
-	ServiceAccountLookup       bool
-	TokenAuthFile              string
-	WatchCacheSizes            []string
+	AdmissionControl            string
+	AdmissionControlConfigFile  string
+	AllowPrivileged             bool
+	AuthorizationMode           string
+	AuthorizationConfig         apiserver.AuthorizationConfig
+	BasicAuthFile               string
+	DefaultStorageMediaType     string
+	DeleteCollectionWorkers     int
+	EtcdServersOverrides        []string
+	EventTTL                    time.Duration
+	KeystoneURL                 string
+	KubeletConfig               kubeletclient.KubeletClientConfig
+	MasterServiceNamespace      string
+	MaxConnectionBytesPerSec    int64
+	OIDCCAFile                  string
+	OIDCClientID                string
+	OIDCIssuerURL               string
+	OIDCUsernameClaim           string
+	OIDCGroupsClaim             string
+	SSHKeyfile                  string
+	SSHUser                     string
+	ServiceAccountKeyFile       string
+	ServiceAccountLookup        bool
+	WebhookTokenAuthnConfigFile string
+	// The default values for StorageVersions. StorageVersions overrides
+	// these; you can change this if you want to change the defaults (e.g.,
+	// for testing). This is not actually exposed as a flag.
+	DefaultStorageVersions string
+	TokenAuthFile          string
+	WatchCacheSizes        []string
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -104,6 +109,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
 	fs.StringVar(&s.AuthorizationConfig.PolicyFile, "authorization-policy-file", s.AuthorizationConfig.PolicyFile, "File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")
 	fs.StringVar(&s.AuthorizationConfig.WebhookConfigFile, "authorization-webhook-config-file", s.AuthorizationConfig.WebhookConfigFile, "File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. The API server will query the remote service to determine access on the API server's secure port.")
+	fs.StringVar(&s.WebhookTokenAuthnConfigFile, "authentication-token-webhook-config-file", s.WebhookTokenAuthnConfigFile, "File with webhook configuration for token authentication in kubeconfig format. The API server will query the remote service to determine authentication for bearer tokens.")
 	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
 	fs.StringVar(&s.AdmissionControlConfigFile, "admission-control-config-file", s.AdmissionControlConfigFile, "File with admission control configuration.")
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, "Per-resource etcd servers overrides, comma separated. The individual override format: group/resource#servers, where servers are http://ip:port, semicolon separated.")

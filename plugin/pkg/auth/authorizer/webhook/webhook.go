@@ -19,35 +19,24 @@ package webhook
 
 import (
 	"errors"
-	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/runtime"
-	runtimeserializer "k8s.io/kubernetes/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/runtime/serializer/json"
-	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
+	"k8s.io/kubernetes/plugin/pkg/webhook"
 
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
 )
 
 var (
-	encodeVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
-	decodeVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
-
-	requireEnabled = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
+	groupVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
 )
 
 // Ensure Webhook implements the authorizer.Authorizer interface.
 var _ authorizer.Authorizer = (*WebhookAuthorizer)(nil)
 
 type WebhookAuthorizer struct {
-	restClient *restclient.RESTClient
+	*webhook.GenericWebhook
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -71,37 +60,11 @@ type WebhookAuthorizer struct {
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
 func New(kubeConfigFile string) (*WebhookAuthorizer, error) {
-
-	for _, groupVersion := range requireEnabled {
-		if !registered.IsEnabledVersion(groupVersion) {
-			return nil, fmt.Errorf("webhook authz plugin requires enabling extension resource: %s", groupVersion)
-		}
-	}
-
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	loadingRules.ExplicitPath = kubeConfigFile
-	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-
-	clientConfig, err := loader.ClientConfig()
+	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions)
 	if err != nil {
 		return nil, err
 	}
-
-	serializer := json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), false)
-	codec := versioning.NewCodecForScheme(api.Scheme, serializer, serializer, encodeVersions, decodeVersions)
-	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(
-		runtime.SerializerInfo{Serializer: codec},
-		runtime.StreamSerializerInfo{},
-	)
-
-	restClient, err := restclient.UnversionedRESTClientFor(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO(ericchiang): Can we ensure remote service is reachable?
-
-	return &WebhookAuthorizer{restClient}, nil
+	return &WebhookAuthorizer{gw}, nil
 }
 
 // Authorize makes a REST request to the remote service describing the attempted action as a JSON
@@ -171,7 +134,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
 			Verb: attr.GetVerb(),
 		}
 	}
-	result := w.restClient.Post().Body(r).Do()
+	result := w.RestClient.Post().Body(r).Do()
 	if err := result.Error(); err != nil {
 		return err
 	}
