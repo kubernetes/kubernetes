@@ -71,7 +71,7 @@ cd "${_kubetmp}"
 go get -u github.com/tools/godep 2>/dev/null
 GODEP="${GOPATH}/bin/godep"
 pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
-  git checkout v53
+  git checkout v66
   "${GODEP}" go install
 popd > /dev/null
 

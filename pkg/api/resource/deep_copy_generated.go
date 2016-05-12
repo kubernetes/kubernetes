@@ -21,8 +21,8 @@ limitations under the License.
 package resource
 
 import (
+	inf "gopkg.in/inf.v0"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	inf "speter.net/go/exp/math/dec/inf"
 )
 
 func DeepCopy_resource_Quantity(in Quantity, out *Quantity, c *conversion.Cloner) error {
