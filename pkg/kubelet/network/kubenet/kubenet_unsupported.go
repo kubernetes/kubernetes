@@ -21,6 +21,7 @@ package kubenet
 import (
 	"fmt"
 
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 )
@@ -33,7 +34,7 @@ func NewPlugin() network.NetworkPlugin {
 	return &kubenetNetworkPlugin{}
 }
 
-func (plugin *kubenetNetworkPlugin) Init(host network.Host) error {
+func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode) error {
 	return fmt.Errorf("Kubenet is not supported in this build")
 }
 
