@@ -510,6 +510,9 @@ func (m *Master) NewBootstrapController() *Controller {
 		EndpointRegistry: m.endpointRegistry,
 		EndpointInterval: 10 * time.Second,
 
+		SystemNamespaces:         []string{api.NamespaceSystem},
+		SystemNamespacesInterval: 1 * time.Minute,
+
 		ServiceClusterIPRegistry: m.serviceClusterIPAllocator,
 		ServiceClusterIPRange:    m.ServiceClusterIPRange,
 		ServiceClusterIPInterval: 3 * time.Minute,
