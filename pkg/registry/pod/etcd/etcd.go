@@ -166,6 +166,10 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 		for k, v := range annotations {
 			pod.Annotations[k] = v
 		}
+		api.UpdatePodCondition(&pod.Status, &api.PodCondition{
+			Type:   api.PodScheduled,
+			Status: api.ConditionTrue,
+		})
 		finalPod = pod
 		return pod, nil
 	}))

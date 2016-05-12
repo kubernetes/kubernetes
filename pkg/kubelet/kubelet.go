@@ -3351,6 +3351,16 @@ func (kl *Kubelet) generateAPIPodStatus(pod *api.Pod, podStatus *kubecontainer.P
 	s.Phase = GetPhase(spec, s.ContainerStatuses)
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
 	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.ContainerStatuses, s.Phase))
+	// s (the PodStatus we are creating) will not have a PodScheduled condition yet, because converStatusToAPIStatus()
+	// does not create one. If the existing PodStatus has a PodScheduled condition, then copy it into s and make sure
+	// it is set to true. If the existing PodStatus does not have a PodScheduled condition, then create one that is set to true.
+	if _, oldPodScheduled := api.GetPodCondition(&pod.Status, api.PodScheduled); oldPodScheduled != nil {
+		s.Conditions = append(s.Conditions, *oldPodScheduled)
+	}
+	api.UpdatePodCondition(&pod.Status, &api.PodCondition{
+		Type:   api.PodScheduled,
+		Status: api.ConditionTrue,
+	})
 
 	if !kl.standaloneMode {
 		hostIP, err := kl.GetHostIP()
