@@ -41,7 +41,7 @@ Documentation for other releases can be found at
 Currently Node.Status has Capacity, but no concept of node Allocatable. We need additional
 parameters to serve several purposes:
 
-1. [Kubernetes metrics](compute-resource-metrics-api.md) provides "/docker-daemon", "/kubelet",
+1. Kubernetes metrics provides "/docker-daemon", "/kubelet",
    "/kube-proxy", "/system" etc. raw containers for monitoring system component resource usage
    patterns and detecting regressions. Eventually we want to cap system component usage to a certain
    limit / request. However this is not currently feasible due to a variety of reasons including:

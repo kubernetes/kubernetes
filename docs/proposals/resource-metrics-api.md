@@ -29,8 +29,6 @@ Documentation for other releases can be found at
 
 # Resource Metrics API
 
-*This proposal is based on and supersedes [compute-resource-metrics-api.md](compute-resource-metrics-api.md).*
-
 This document describes API part of MVP version of Resource Metrics API effort in Kubernetes.
 Once the agreement will be made the document will be extended to also cover implementation details.
 The shape of the effort may be also a subject of changes once we will have more well-defined use cases.
