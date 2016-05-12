@@ -508,6 +508,11 @@
 			"Rev": "d043ae190b3202550d026daf009359bb5d761672"
 		},
 		{
+			"ImportPath": "github.com/coreos/go-systemd/activation",
+			"Comment": "v4",
+			"Rev": "b4a58d95188dd092ae20072bac14cece0e67c388"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
 			"Comment": "v4",
 			"Rev": "b4a58d95188dd092ae20072bac14cece0e67c388"
@@ -1778,7 +1783,27 @@
 			"Rev": "9a8b7d4e8f347bfa230879db9d7d4e4d9e19f962"
 		},
 		{
+			"ImportPath": "github.com/skynetservices/skydns/cache",
+			"Comment": "2.5.3a-32-gf7b6fb7",
+			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
+		},
+		{
+			"ImportPath": "github.com/skynetservices/skydns/metrics",
+			"Comment": "2.5.3a-32-gf7b6fb7",
+			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
+		},
+		{
 			"ImportPath": "github.com/skynetservices/skydns/msg",
+			"Comment": "2.5.3a-32-gf7b6fb7",
+			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
+		},
+		{
+			"ImportPath": "github.com/skynetservices/skydns/server",
+			"Comment": "2.5.3a-32-gf7b6fb7",
+			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
+		},
+		{
+			"ImportPath": "github.com/skynetservices/skydns/singleflight",
 			"Comment": "2.5.3a-32-gf7b6fb7",
 			"Rev": "f7b6fb74bcfab300b4e7e0e27b1fe6c0ed555f78"
 		},
