@@ -91,6 +91,7 @@ kubelet
       --eviction-soft="": A set of eviction thresholds (e.g. memory.available<1.5Gi) that if met over a corresponding grace period would trigger a pod eviction.
       --eviction-soft-grace-period="": A set of eviction grace periods (e.g. memory.available=1m30s) that correspond to how long a soft eviction threshold must hold before triggering a pod eviction.
       --experimental-flannel-overlay[=false]: Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]
+      --experimental-nvidia-gpus=0: Number of NVIDIA GPU devices on this node. Only 0 (default) and 1 are currently supported.
       --file-check-frequency=20s: Duration between checking config files for new data
       --google-json-key="": The Google Cloud Platform Service Account JSON Key to use for authentication.
       --hairpin-mode="promiscuous-bridge": How should the kubelet setup hairpin NAT. This allows endpoints of a Service to loadbalance back to themselves if they should try to access their own Service. Valid values are "promiscuous-bridge", "hairpin-veth" and "none".

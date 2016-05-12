@@ -127,6 +127,7 @@ executor-path
 executor-suicide-timeout
 experimental-flannel-overlay
 experimental-keystone-url
+experimental-nvidia-gpus
 experimental-prefix
 external-hostname
 external-ip

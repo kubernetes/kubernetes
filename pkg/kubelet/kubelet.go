@@ -206,6 +206,7 @@ func NewMainKubelet(
 	podCIDR string,
 	reconcileCIDR bool,
 	maxPods int,
+	nvidiaGPUs int,
 	dockerExecHandler dockertools.ExecHandler,
 	resolverConfig string,
 	cpuCFSQuota bool,
@@ -332,6 +333,7 @@ func NewMainKubelet(
 		nonMasqueradeCIDR:          nonMasqueradeCIDR,
 		reconcileCIDR:              reconcileCIDR,
 		maxPods:                    maxPods,
+		nvidiaGPUs:                 nvidiaGPUs,
 		syncLoopMonitor:            atomic.Value{},
 		resolverConfig:             resolverConfig,
 		cpuCFSQuota:                cpuCFSQuota,
@@ -709,6 +711,9 @@ type Kubelet struct {
 
 	// Maximum Number of Pods which can be run by this Kubelet
 	maxPods int
+
+	// Number of NVIDIA GPUs on this node
+	nvidiaGPUs int
 
 	// Monitor Kubelet's sync loop
 	syncLoopMonitor atomic.Value
@@ -2941,9 +2946,10 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 		// TODO(roberthbailey): This is required for test-cmd.sh to pass.
 		// See if the test should be updated instead.
 		node.Status.Capacity = api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
-			api.ResourceMemory: resource.MustParse("0Gi"),
-			api.ResourcePods:   *resource.NewQuantity(int64(kl.maxPods), resource.DecimalSI),
+			api.ResourceCPU:       *resource.NewMilliQuantity(0, resource.DecimalSI),
+			api.ResourceMemory:    resource.MustParse("0Gi"),
+			api.ResourcePods:      *resource.NewQuantity(int64(kl.maxPods), resource.DecimalSI),
+			api.ResourceNvidiaGPU: *resource.NewQuantity(int64(kl.nvidiaGPUs), resource.DecimalSI),
 		}
 		glog.Errorf("Error getting machine info: %v", err)
 	} else {
@@ -2952,6 +2958,8 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 		node.Status.Capacity = cadvisor.CapacityFromMachineInfo(info)
 		node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(
 			int64(kl.maxPods), resource.DecimalSI)
+		node.Status.Capacity[api.ResourceNvidiaGPU] = *resource.NewQuantity(
+			int64(kl.nvidiaGPUs), resource.DecimalSI)
 		if node.Status.NodeInfo.BootID != "" &&
 			node.Status.NodeInfo.BootID != info.BootID {
 			// TODO: This requires a transaction, either both node status is updated
