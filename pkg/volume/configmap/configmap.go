@@ -107,7 +107,10 @@ func (sv *configMapVolume) GetAttributes() volume.Attributes {
 
 // This is the spec for the volume that this plugin wraps.
 var wrappedVolumeSpec = volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+	// This should be on a tmpfs instead of the local disk; the problem is
+	// charging the memory for the tmpfs to the right cgroup.  We should make
+	// this a tmpfs when we can do the accounting correctly.
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 }
 
 func (b *configMapVolumeMounter) SetUp(fsGroup *int64) error {
