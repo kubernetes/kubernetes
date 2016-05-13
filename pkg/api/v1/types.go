@@ -184,7 +184,7 @@ type ObjectMeta struct {
 	// is an identifier for the responsible component that will remove the entry
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
 	// in this list can only be removed.
-	Finalizers []string `json:"finalizers,omitempty" protobuf:"bytes,14,rep,name=finalizers"`
+	Finalizers []string `json:"finalizers,omitempty" patchStrategy:"merge" protobuf:"bytes,14,rep,name=finalizers"`
 }
 
 const (
