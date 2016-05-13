@@ -38,11 +38,9 @@ coreos:
         Type=oneshot
         RemainAfterExit=yes
         EnvironmentFile=/etc/kube-env
-        ExecStartPre=/usr/bin/mkdir -p /etc/rkt
-        ExecStartPre=/usr/bin/mkdir -p /opt/downloads
-        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output \
-        /opt/downloads/rkt.tar.gz https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
-        ExecStart=/usr/bin/tar xf /opt/downloads/rkt.tar.gz -C /opt --overwrite
+        ExecStartPre=/usr/bin/mkdir -p /etc/rkt /opt/downloads /opt/rkt/
+        ExecStartPre=/usr/bin/curl --fail --silent --location --create-dirs --output /opt/downloads/rkt.tar.gz https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
+        ExecStart=/usr/bin/tar --strip-components=1 -xf /opt/downloads/rkt.tar.gz -C /opt/rkt/ --overwrite
 
     - name: kubernetes-download-manifests.service
       command: start
@@ -82,6 +80,18 @@ coreos:
         /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz ${SERVER_BINARY_TAR_URL}
         ExecStart=/usr/bin/tar xf /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz -C /opt --overwrite
 
+    - name: rkt-api-service.service
+      command: start
+      content: |
+        [Unit]
+        Description=Start rkt API service as Daemon
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        ExecStart=/opt/rkt/rkt api-service
+        Restart=always
+        RestartSec=10
+
     - name: kubelet.service
       command: start
       content: |
@@ -112,7 +122,8 @@ coreos:
         --cluster-domain=${DNS_DOMAIN} \
         --logtostderr=true \
         --container-runtime=${KUBERNETES_CONTAINER_RUNTIME} \
-        --rkt-path=/opt/rkt-v${RKT_VERSON}/rkt \
+        --rkt-path=/opt/rkt/rkt \
+        --rkt-stage1-image=/opt/rkt/stage1-coreos.aci \
         --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0}
         Restart=always
         RestartSec=10

@@ -79,6 +79,11 @@ function configure-etcd-events() {
   evaluate-manifest ${MANIFESTS_DIR}/etcd-events.yaml /etc/kubernetes/manifests/etcd-events.yaml
 }
 
+function configure-addon-manager() {
+  echo "Configuring addon-manager"
+  evaluate-manifest ${MANIFESTS_DIR}/kube-addon-manager.yaml /etc/kubernetes/manifests/kube-addon-manager.yaml
+}
+
 function configure-kube-apiserver() {
   echo "Configuring kube-apiserver"
   
@@ -164,6 +169,7 @@ function configure-master-components() {
   configure-kube-apiserver
   configure-kube-scheduler
   configure-kube-controller-manager
+  configure-addon-manager
   configure-master-addons
 }
 
