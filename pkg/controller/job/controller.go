@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -41,6 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
+
+const jobLookupCacheSize = 2048
 
 type JobController struct {
 	kubeClient clientset.Interface
@@ -70,6 +73,8 @@ type JobController struct {
 
 	// A store of pods, populated by the podController
 	podStore cache.StoreToPodLister
+
+	lookupCache *controller.MatchingCache
 
 	// Jobs that need to be updated
 	queue *workqueue.Type
@@ -113,6 +118,8 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: jm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
+				// We don't need invalidate the whole lookup cache here like other controllers,
+				// since  selector is one of the immutable fields for a job.
 				if job := cur.(*batch.Job); !isJobFinished(job) {
 					jm.enqueueController(job)
 				}
@@ -128,6 +135,8 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 	})
 	jm.podStore.Indexer = podInformer.GetIndexer()
 	jm.podStoreSynced = podInformer.HasSynced
+	//TODO(mqliang): make jobLookupCacheSize configurable
+	jm.lookupCache = controller.NewMatchingCache(jobLookupCacheSize)
 
 	jm.updateHandler = jm.updateJobStatus
 	jm.syncHandler = jm.syncJob
@@ -161,6 +170,19 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodJob returns the job managing the given pod.
 func (jm *JobController) getPodJob(pod *api.Pod) *batch.Job {
+	// look up in the cache, if cached and the cache is valid, just return cached value
+	if obj, cached := jm.lookupCache.GetMatchingObject(pod); cached {
+		job, ok := obj.(*batch.Job)
+		if !ok {
+			// This should not happen
+			glog.Errorf("lookup cache does not return a Job object")
+			return nil
+		}
+		if cached && jm.isCacheValid(pod, job) {
+			return job
+		}
+	}
+
 	jobs, err := jm.jobStore.GetPodJobs(pod)
 	if err != nil {
 		glog.V(4).Infof("No jobs found for pod %v, job controller will avoid syncing", pod.Name)
@@ -170,7 +192,39 @@ func (jm *JobController) getPodJob(pod *api.Pod) *batch.Job {
 		glog.Errorf("user error! more than one job is selecting pods with labels: %+v", pod.Labels)
 		sort.Sort(byCreationTimestamp(jobs))
 	}
+
+	// update lookup cache
+	jm.lookupCache.Update(pod, &jobs[0])
+
 	return &jobs[0]
+}
+
+// isCacheValid check if the cache is valid
+func (jm *JobController) isCacheValid(pod *api.Pod, cachedJob *batch.Job) bool {
+	_, exists, err := jm.jobStore.Get(cachedJob)
+	// job has been deleted or updated, cache is invalid
+	if err != nil || !exists || !isJobMatch(pod, cachedJob) {
+		return false
+	}
+	return true
+}
+
+// isJobMatch take a Pod and Job, return whether the Pod and Job are matching
+// TODO(mqliang): This logic is a copy from GetPodJobs(), remove the duplication
+func isJobMatch(pod *api.Pod, job *batch.Job) bool {
+	if job.Namespace != pod.Namespace {
+		return false
+	}
+	selector, err := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
+	if err != nil {
+		return false
+	}
+
+	// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
+	if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+		return false
+	}
+	return true
 }
 
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
