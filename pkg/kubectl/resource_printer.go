@@ -634,7 +634,12 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 
 	if options.Wide {
 		nodeName := pod.Spec.NodeName
-		if _, err := fmt.Fprintf(w, "\t%s",
+		podIP := pod.Status.PodIP
+		if podIP == "" {
+			podIP = "<none>"
+		}
+		if _, err := fmt.Fprintf(w, "\t%s\t%s",
+			podIP,
 			nodeName,
 		); err != nil {
 			return err
@@ -1780,7 +1785,7 @@ func formatLabelHeaders(columnLabels []string) []string {
 func formatWideHeaders(wide bool, t reflect.Type) []string {
 	if wide {
 		if t.String() == "*api.Pod" || t.String() == "*api.PodList" {
-			return []string{"NODE"}
+			return []string{"IP", "NODE"}
 		}
 		if t.String() == "*api.ReplicationController" || t.String() == "*api.ReplicationControllerList" {
 			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
