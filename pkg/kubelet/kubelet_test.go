@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
@@ -55,6 +56,7 @@ import (
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
@@ -202,6 +204,24 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, util.RealClock{})
 	kubelet.clock = fakeClock
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
+
+	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
+	volumeStatsAggPeriod := time.Second * 10
+	kubelet.resourceAnalyzer = stats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.containerRuntime)
+	nodeRef := &api.ObjectReference{
+		Kind:      "Node",
+		Name:      kubelet.nodeName,
+		UID:       types.UID(kubelet.nodeName),
+		Namespace: "",
+	}
+	// setup eviction manager
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers), fakeRecorder, nodeRef, kubelet.clock)
+	if err != nil {
+		t.Fatalf("failed to initialize eviction manager: %v", err)
+	}
+	kubelet.evictionManager = evictionManager
+	kubelet.AddPodAdmitHandler(evictionAdmitHandler)
+
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil}
 }
 
@@ -2376,6 +2396,14 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					LastTransitionTime: unversioned.Time{},
 				},
 				{
+					Type:               api.NodeMemoryPressure,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletHasSufficientMemory",
+					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
 					Type:               api.NodeReady,
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletReady",
@@ -2555,6 +2583,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 					{
+						Type:               api.NodeMemoryPressure,
+						Status:             api.ConditionFalse,
+						Reason:             "KubeletHasSufficientMemory",
+						Message:            fmt.Sprintf("kubelet has sufficient memory available"),
+						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+					{
 						Type:               api.NodeReady,
 						Status:             api.ConditionTrue,
 						Reason:             "KubeletReady",
@@ -2609,6 +2645,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Message:            "out of disk space",
 					LastHeartbeatTime:  unversioned.Time{}, // placeholder
 					LastTransitionTime: unversioned.Time{}, // placeholder
+				},
+				{
+					Type:               api.NodeMemoryPressure,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletHasSufficientMemory",
+					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
 				},
 				{
 					Type:               api.NodeReady,
@@ -2892,6 +2936,14 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
+				{
+					Type:               api.NodeMemoryPressure,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletHasSufficientMemory",
+					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
 				{}, //placeholder
 			},
 			NodeInfo: api.NodeSystemInfo{
@@ -2964,10 +3016,11 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		}
 
 		// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
-		if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+		lastIndex := len(updatedNode.Status.Conditions) - 1
+		if updatedNode.Status.Conditions[lastIndex].Type != api.NodeReady {
 			t.Errorf("unexpected node condition order. NodeReady should be last.")
 		}
-		expectedNode.Status.Conditions[1] = api.NodeCondition{
+		expectedNode.Status.Conditions[lastIndex] = api.NodeCondition{
 			Type:               api.NodeReady,
 			Status:             status,
 			Reason:             reason,
