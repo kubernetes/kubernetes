@@ -34,7 +34,7 @@ type fakeConnectionInfoGetter struct {
 }
 
 func (fakeConnectionInfoGetter) GetRawConnectionInfo(ctx api.Context, nodeName string) (*client.ConnectionInfo, error) {
-	return &client.ConnectionInfo{"http", "somehost", 12345, nil}, nil
+	return &client.ConnectionInfo{Scheme: "http", Hostname: "somehost", Port: 12345, Transport: nil}, nil
 }
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
