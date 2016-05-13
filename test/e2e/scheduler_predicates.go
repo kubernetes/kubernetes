@@ -718,7 +718,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-labels"
-		nodeSelectionRoot := filepath.Join(framework.TestContext.RepoRoot, "test/e2e/node-selection")
+		nodeSelectionRoot := filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/node-selection")
 		testPodPath := filepath.Join(nodeSelectionRoot, "pod-with-node-affinity.yaml")
 		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
 		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
@@ -1265,7 +1265,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to launch a pod that with PodAffinity & PodAntiAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-newlabels"
-		nodeSelectionRoot := filepath.Join(framework.TestContext.RepoRoot, "test/e2e/node-selection")
+		nodeSelectionRoot := filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/node-selection")
 		testPodPath := filepath.Join(nodeSelectionRoot, "pod-with-pod-affinity.yaml")
 		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
 		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
