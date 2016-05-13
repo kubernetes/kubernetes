@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -529,6 +530,9 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
 func (rm *ReplicationManager) syncReplicationController(key string) error {
+	trace := util.NewTrace("syncReplicationController: " + key)
+	defer trace.LogIfLong(250 * time.Millisecond)
+
 	startTime := time.Now()
 	defer func() {
 		glog.V(4).Infof("Finished syncing controller %q (%v)", key, time.Now().Sub(startTime))
@@ -563,19 +567,23 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
 		return err
 	}
+	trace.Step("ReplicationController restored")
 	rcNeedsSync := rm.expectations.SatisfiedExpectations(rcKey)
+	trace.Step("Expectations restored")
 	podList, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelector())
 	if err != nil {
 		glog.Errorf("Error getting pods for rc %q: %v", key, err)
 		rm.queue.Add(key)
 		return err
 	}
+	trace.Step("Pods listed")
 
 	// TODO: Do this in a single pass, or use an index.
 	filteredPods := controller.FilterActivePods(podList.Items)
 	if rcNeedsSync {
 		rm.manageReplicas(filteredPods, &rc)
 	}
+	trace.Step("manageReplicas done")
 
 	// Count the number of pods that have labels matching the labels of the pod
 	// template of the replication controller, the matching pods may have more
