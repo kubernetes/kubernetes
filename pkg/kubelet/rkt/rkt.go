@@ -1771,8 +1771,3 @@ func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecont
 
 	return podStatus, nil
 }
-
-// FIXME: I need to be implemented.
-func (r *Runtime) ImageStats() (*kubecontainer.ImageStats, error) {
-	return &kubecontainer.ImageStats{}, nil
-}
