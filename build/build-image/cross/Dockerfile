@@ -35,7 +35,7 @@ RUN for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${plat
 
 # Install g++, then download and install protoc for generating protobuf output
 RUN apt-get update \
-  && apt-get install -y g++ rsync \
+  && apt-get install -y g++ rsync apt-utils file \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /usr/local/src/protobuf \
@@ -64,6 +64,8 @@ ENV TMPDIR /tmp.k8s
 
 # Get the code coverage tool and godep
 RUN mkdir $TMPDIR \
+  && chmod a+rwx $TMPDIR \
+  && chmod o+t $TMPDIR \
   && go get golang.org/x/tools/cmd/cover github.com/tools/godep
 
 # Download and symlink etcd. We need this for our integration tests.
