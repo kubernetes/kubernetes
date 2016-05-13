@@ -149,8 +149,11 @@ func (f *Framework) BeforeEach() {
 		Logf("Skipping waiting for service account")
 	}
 
-	if TestContext.GatherKubeSystemResourceUsageData {
-		f.gatherer, err = NewResourceUsageGatherer(f.Client, ResourceGathererOptions{inKubemark: ProviderIs("kubemark")})
+	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
+		f.gatherer, err = NewResourceUsageGatherer(f.Client, ResourceGathererOptions{
+			inKubemark: ProviderIs("kubemark"),
+			masterOnly: TestContext.GatherKubeSystemResourceUsageData == "master",
+		})
 		if err != nil {
 			Logf("Error while creating NewResourceUsageGatherer: %v", err)
 		} else {
@@ -209,7 +212,7 @@ func (f *Framework) AfterEach() {
 	}
 
 	summaries := make([]TestDataSummary, 0)
-	if TestContext.GatherKubeSystemResourceUsageData && f.gatherer != nil {
+	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
 		By("Collecting resource usage data")
 		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints))
 	}
