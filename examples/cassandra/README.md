@@ -229,7 +229,7 @@ spec:
             - /run.sh
           resources:
             limits:
-              cpu: 0.1
+              cpu: .5
           env:
             - name: MAX_HEAP_SIZE
               value: 512M
@@ -239,7 +239,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google-samples/cassandra:v8
+          image: gcr.io/google-samples/cassandra:v9
           name: cassandra
           ports:
             - containerPort: 9042
@@ -286,7 +286,7 @@ You can list the new controller:
 
 $ kubectl get rc -o wide
 NAME        DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)                             SELECTOR
-cassandra   2         2         11s       cassandra      gcr.io/google-samples/cassandra:v8   app=cassandra
+cassandra   2         2         11s       cassandra      gcr.io/google-samples/cassandra:v9   app=cassandra
 
 ```
 
@@ -457,7 +457,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google-samples/cassandra:v8
+          image: gcr.io/google-samples/cassandra:v9
           name: cassandra
           ports:
             - containerPort: 9042
@@ -466,7 +466,7 @@ spec:
               name: thrift
           resources:
             request:
-              cpu: 0.1
+              cpu: .5
           volumeMounts:
             - mountPath: /cassandra_data
               name: data
