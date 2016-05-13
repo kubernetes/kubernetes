@@ -33,15 +33,16 @@ type TestContextType struct {
 	KubeVolumeDir      string
 	CertDir            string
 	Host               string
-	RepoRoot           string
-	Provider           string
-	CloudConfig        CloudConfig
-	KubectlPath        string
-	OutputDir          string
-	ReportDir          string
-	ReportPrefix       string
-	Prefix             string
-	MinStartupPods     int
+	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
+	RepoRoot       string
+	Provider       string
+	CloudConfig    CloudConfig
+	KubectlPath    string
+	OutputDir      string
+	ReportDir      string
+	ReportPrefix   string
+	Prefix         string
+	MinStartupPods int
 	// Timeout for waiting for system pods to be running
 	SystemPodsStartupTimeout time.Duration
 	UpgradeTarget            string
