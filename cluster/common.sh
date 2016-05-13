@@ -209,7 +209,7 @@ function gen-kube-bearertoken() {
 # Vars set:
 #   KUBE_UID
 function gen-uid {
-    KUBE_UID=$(python -c 'import uuid; print uuid.uuid1().fields[0]')
+    KUBE_UID=$(python -c 'import uuid; print(uuid.uuid1().fields[0])')
 }
 
 
