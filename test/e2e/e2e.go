@@ -81,7 +81,6 @@ func setupProviderConfig() error {
 		if cloudConfig.Zone == "" {
 			return fmt.Errorf("gce-zone must be specified for AWS")
 		}
-
 	}
 
 	return nil
@@ -227,5 +226,6 @@ func RunE2ETests(t *testing.T) {
 		}
 	}
 	glog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunId, config.GinkgoConfig.ParallelNode)
+
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
