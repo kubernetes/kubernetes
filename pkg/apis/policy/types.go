@@ -28,8 +28,8 @@ type PodDisruptionBudgetSpec struct {
 	// can be either an integer or a string specifying a percentage, e.g. "28%".
 	MinAvailable intstr.IntOrString `json:"minAvailable,omitempty"`
 
-	// Selector is a label query over pods whose evictions are managed by the
-	// disruption budget.
+	// Label query over pods whose evictions are managed by the disruption
+	// budget.
 	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 }
 
