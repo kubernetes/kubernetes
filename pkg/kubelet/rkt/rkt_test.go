@@ -1382,3 +1382,18 @@ func TestLifeCycleHooks(t *testing.T) {
 		runner.Reset()
 	}
 }
+
+func TestImageStats(t *testing.T) {
+	fr := newFakeRktInterface()
+	rkt := &Runtime{apisvc: fr}
+
+	fr.images = []*rktapi.Image{
+		{Size: 100},
+		{Size: 200},
+		{Size: 300},
+	}
+
+	result, err := rkt.ImageStats()
+	assert.NoError(t, err)
+	assert.Equal(t, result, &kubecontainer.ImageStats{TotalStorageBytes: 600})
+}
