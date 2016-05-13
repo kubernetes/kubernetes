@@ -1585,6 +1585,8 @@ func DeepCopy_api_NodeSystemInfo(in NodeSystemInfo, out *NodeSystemInfo, c *conv
 	out.ContainerRuntimeVersion = in.ContainerRuntimeVersion
 	out.KubeletVersion = in.KubeletVersion
 	out.KubeProxyVersion = in.KubeProxyVersion
+	out.OperatingSystem = in.OperatingSystem
+	out.Architecture = in.Architecture
 	return nil
 }
 

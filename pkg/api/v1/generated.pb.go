@@ -4163,6 +4163,14 @@ func (m *NodeSystemInfo) MarshalTo(data []byte) (int, error) {
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.KubeProxyVersion)))
 	i += copy(data[i:], m.KubeProxyVersion)
+	data[i] = 0x4a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.OperatingSystem)))
+	i += copy(data[i:], m.OperatingSystem)
+	data[i] = 0x52
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Architecture)))
+	i += copy(data[i:], m.Architecture)
 	return i, nil
 }
 
@@ -8630,6 +8638,10 @@ func (m *NodeSystemInfo) Size() (n int) {
 	l = len(m.KubeletVersion)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.KubeProxyVersion)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.OperatingSystem)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Architecture)
 	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
@@ -21461,6 +21473,64 @@ func (m *NodeSystemInfo) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.KubeProxyVersion = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OperatingSystem", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.OperatingSystem = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Architecture", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Architecture = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

@@ -894,6 +894,8 @@ var map_NodeSystemInfo = map[string]string{
 	"containerRuntimeVersion": "ContainerRuntime Version reported by the node through runtime remote API (e.g. docker://1.5.0).",
 	"kubeletVersion":          "Kubelet Version reported by the node.",
 	"kubeProxyVersion":        "KubeProxy Version reported by the node.",
+	"operatingSystem":         "The Operating System reported by the node",
+	"architecture":            "The Architecture reported by the node",
 }
 
 func (NodeSystemInfo) SwaggerDoc() map[string]string {
