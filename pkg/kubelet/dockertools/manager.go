@@ -324,6 +324,11 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 
 	if container.NetworkSettings != nil {
 		result = container.NetworkSettings.IPAddress
+
+		// Fall back to IPv6 address if no IPv4 address is present
+		if result == "" {
+			result = container.NetworkSettings.GlobalIPv6Address
+		}
 	}
 
 	if dm.networkPlugin.Name() != network.DefaultPluginName {
@@ -1171,6 +1176,15 @@ func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (stri
 	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
 	command := exec.Command("nsenter", args...)
 	out, err := command.CombinedOutput()
+
+	// Fall back to IPv6 address if no IPv4 address is present
+	if err == nil && string(out) == "" {
+		extractIPCmd = fmt.Sprintf("ip -6 addr show %s scope global | grep inet6 | awk -F\" \" '{print $2}'", interfaceName)
+		args = []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "--", "bash", "-c", extractIPCmd}
+		command = exec.Command("nsenter", args...)
+		out, err = command.CombinedOutput()
+	}
+
 	if err != nil {
 		return "", err
 	}
