@@ -35,3 +35,10 @@ func (sb *SchemeBuilder) Register(funcs ...func(*Scheme)) {
 		*sb = append(*sb, f)
 	}
 }
+
+// NewSchemeBuilder calls Register for you.
+func NewSchemeBuilder(funcs ...func(*Scheme)) SchemeBuilder {
+	var sb SchemeBuilder
+	sb.Register(funcs...)
+	return sb
+}

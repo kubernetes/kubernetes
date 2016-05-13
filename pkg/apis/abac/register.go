@@ -32,7 +32,16 @@ var Scheme = runtime.NewScheme()
 var Codecs = serializer.NewCodecFactory(Scheme)
 
 func init() {
-	Scheme.AddKnownTypes(unversioned.GroupVersion{Group: Group, Version: runtime.APIVersionInternal},
+	addKnownTypes(Scheme)
+}
+
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(unversioned.GroupVersion{Group: Group, Version: runtime.APIVersionInternal},
 		&Policy{},
 	)
 }
