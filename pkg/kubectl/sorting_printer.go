@@ -156,10 +156,10 @@ func isLess(i, j reflect.Value) (bool, error) {
 	case reflect.Ptr:
 		return isLess(i.Elem(), j.Elem())
 	case reflect.Struct:
-		// special case handling
-		lessFuncList := []structLessFunc{timeLess}
-		if ok, less := structLess(i, j, lessFuncList); ok {
-			return less, nil
+		// sort unversioned.Time
+		in := i.Interface()
+		if t, ok := in.(unversioned.Time); ok {
+			return t.Before(j.Interface().(unversioned.Time)), nil
 		}
 		// fallback to the fields comparision
 		for idx := 0; idx < i.NumField(); idx++ {
@@ -181,28 +181,6 @@ func isLess(i, j reflect.Value) (bool, error) {
 	default:
 		return false, fmt.Errorf("unsortable type: %v", i.Kind())
 	}
-}
-
-// structLessFunc checks whether i and j could be compared(the first return value),
-// and if it could, return whether i is less than j(the second return value)
-type structLessFunc func(i, j reflect.Value) (bool, bool)
-
-// structLess returns whether i and j could be compared with the given function list
-func structLess(i, j reflect.Value, lessFuncList []structLessFunc) (bool, bool) {
-	for _, lessFunc := range lessFuncList {
-		if ok, less := lessFunc(i, j); ok {
-			return ok, less
-		}
-	}
-	return false, false
-}
-
-// compare two unversioned.Time values.
-func timeLess(i, j reflect.Value) (bool, bool) {
-	if i.Type() != reflect.TypeOf(unversioned.Unix(0, 0)) {
-		return false, false
-	}
-	return true, i.MethodByName("Before").Call([]reflect.Value{j})[0].Bool()
 }
 
 func (r *RuntimeSort) Less(i, j int) bool {
