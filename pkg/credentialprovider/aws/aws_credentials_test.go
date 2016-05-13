@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws_credentials
+package credentials
 
 import (
 	"encoding/base64"
@@ -58,17 +58,18 @@ func (p *testTokenGetter) GetAuthorizationToken(input *ecr.GetAuthorizationToken
 
 func TestEcrProvide(t *testing.T) {
 	registry := "123456789012.dkr.ecr.lala-land-1.amazonaws.com"
-	otherRegistries := []string{"private.registry.com",
+	otherRegistries := []string{
+		"private.registry.com",
 		"gcr.io",
 	}
 	image := "foo/bar"
 
-	provider := &ecrProvider{
-		getter: &testTokenGetter{
+	provider := newEcrProvider("lala-land-1",
+		&testTokenGetter{
 			user:     user,
 			password: password,
-			endpoint: registry},
-	}
+			endpoint: registry,
+		})
 
 	keyring := &credentialprovider.BasicDockerKeyring{}
 	keyring.Add(provider.Provide())
