@@ -122,6 +122,7 @@ eviction-hard
 eviction-soft
 eviction-soft-grace-period
 eviction-pressure-transition-period
+eviction-max-pod-grace-period
 executor-bindall
 executor-logv
 executor-path
