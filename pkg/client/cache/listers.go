@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -709,4 +710,39 @@ func (i *IndexerToNamespaceLister) List(selector labels.Selector) (namespaces []
 	}
 
 	return namespaces, nil
+}
+
+type StoreToPodDisruptionBudgetLister struct {
+	Store
+}
+
+func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.Pod) (pdbList []policy.PodDisruptionBudget, err error) {
+	var selector labels.Selector
+	var pdb policy.PodDisruptionBudget
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no PodDisruptionBudgets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		pdb = *m.(*policy.PodDisruptionBudget)
+		if pdb.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = unversioned.LabelSelectorAsSelector(pdb.Spec.Selector)
+		if err != nil {
+			err = fmt.Errorf("invalid selector: %v", err)
+			return
+		}
+
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		pdbList = append(pdbList, pdb)
+	}
+	if len(pdbList) == 0 {
+		err = fmt.Errorf("could not find PodDisruptionBudget for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
 }
