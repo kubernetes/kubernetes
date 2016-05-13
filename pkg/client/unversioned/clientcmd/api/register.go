@@ -29,7 +29,17 @@ var Scheme = runtime.NewScheme()
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 
 func init() {
-	Scheme.AddKnownTypes(SchemeGroupVersion,
+	// TODO: is this really necessary?
+	addKnownTypes(Scheme)
+}
+
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Config{},
 	)
 }

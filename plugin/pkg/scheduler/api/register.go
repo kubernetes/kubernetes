@@ -28,11 +28,20 @@ var Scheme = runtime.NewScheme()
 // TODO this should be in the "scheduler" group
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
 func init() {
-	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+	addKnownTypes(Scheme)
+}
+
+func addKnownTypes(scheme *runtime.Scheme) {
+	if err := scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
 		panic(err)
 	}
-	Scheme.AddKnownTypes(SchemeGroupVersion,
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Policy{},
 	)
 }
