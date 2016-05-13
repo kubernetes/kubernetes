@@ -92,6 +92,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunGet(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
+		SuggestFor: []string{"list", "ps"},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}

@@ -92,6 +92,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunDelete(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
+		SuggestFor: []string{"rm"},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
