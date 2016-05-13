@@ -31,7 +31,7 @@ func Test_NewGoRoutineMap_Positive_SingleOp(t *testing.T) {
 	operation := func() error { return nil }
 
 	// Act
-	err := grm.NewGoRoutine(operationName, operation)
+	err := grm.Run(operationName, operation)
 
 	// Assert
 	if err != nil {
@@ -45,7 +45,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletes(t *testing.T) {
 	operationName := "operation-name"
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateCallbackFunc(operation1DoneCh)
-	err1 := grm.NewGoRoutine(operationName, operation1)
+	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
@@ -56,7 +56,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletes(t *testing.T) {
 	err2 := retryWithExponentialBackOff(
 		time.Duration(20*time.Millisecond),
 		func() (bool, error) {
-			err := grm.NewGoRoutine(operationName, operation2)
+			err := grm.Run(operationName, operation2)
 			if err != nil {
 				t.Logf("Warning: NewGoRoutine failed. Expected: <no error> Actual: <%v>. Will retry.", err)
 				return false, nil
@@ -76,7 +76,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanics(t *testing.T) {
 	grm := NewGoRoutineMap()
 	operationName := "operation-name"
 	operation1 := generatePanicFunc()
-	err1 := grm.NewGoRoutine(operationName, operation1)
+	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
@@ -86,7 +86,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanics(t *testing.T) {
 	err2 := retryWithExponentialBackOff(
 		time.Duration(20*time.Millisecond),
 		func() (bool, error) {
-			err := grm.NewGoRoutine(operationName, operation2)
+			err := grm.Run(operationName, operation2)
 			if err != nil {
 				t.Logf("Warning: NewGoRoutine failed. Expected: <no error> Actual: <%v>. Will retry.", err)
 				return false, nil
@@ -107,14 +107,14 @@ func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletes(t *testing.T) {
 	operationName := "operation-name"
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
-	err1 := grm.NewGoRoutine(operationName, operation1)
+	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
 	operation2 := generateNoopFunc()
 
 	// Act
-	err2 := grm.NewGoRoutine(operationName, operation2)
+	err2 := grm.Run(operationName, operation2)
 
 	// Assert
 	if err2 == nil {
@@ -128,7 +128,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 	operationName := "operation-name"
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
-	err1 := grm.NewGoRoutine(operationName, operation1)
+	err1 := grm.Run(operationName, operation1)
 	if err1 != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
 	}
@@ -136,7 +136,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 	operation3 := generateNoopFunc()
 
 	// Act
-	err2 := grm.NewGoRoutine(operationName, operation2)
+	err2 := grm.Run(operationName, operation2)
 
 	// Assert
 	if err2 == nil {
@@ -148,7 +148,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 	err3 := retryWithExponentialBackOff(
 		time.Duration(20*time.Millisecond),
 		func() (bool, error) {
-			err := grm.NewGoRoutine(operationName, operation3)
+			err := grm.Run(operationName, operation3)
 			if err != nil {
 				t.Logf("Warning: NewGoRoutine failed. Expected: <no error> Actual: <%v>. Will retry.", err)
 				return false, nil
@@ -224,7 +224,7 @@ func Test_NewGoRoutineMap_Positive_Wait(t *testing.T) {
 	operationName := "operation-name"
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
-	err := grm.NewGoRoutine(operationName, operation1)
+	err := grm.Run(operationName, operation1)
 	if err != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err)
 	}
