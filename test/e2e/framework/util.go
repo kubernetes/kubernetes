@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"net"
@@ -640,10 +639,7 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 func podFromManifest(filename string) (*api.Pod, error) {
 	var pod api.Pod
 	Logf("Parsing pod from %v", filename)
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
+	data := ReadOrDie(filename)
 	json, err := utilyaml.ToJSON(data)
 	if err != nil {
 		return nil, err
@@ -656,8 +652,13 @@ func podFromManifest(filename string) (*api.Pod, error) {
 
 // Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
 // to flip to Ready, log its output and delete it.
-func RunKubernetesServiceTestContainer(c *client.Client, repoRoot string, ns string) {
-	path := filepath.Join(repoRoot, "test", "images", "clusterapi-tester", "pod.yaml")
+func RunKubernetesServiceTestContainer(c *client.Client, ns string) {
+	c, err := LoadClient()
+	if err != nil {
+		Logf("Failed to load client")
+		return
+	}
+	path := "test/images/clusterapi-tester/pod.yaml"
 	p, err := podFromManifest(path)
 	if err != nil {
 		Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
