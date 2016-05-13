@@ -21,25 +21,27 @@ limitations under the License.
 package authorization
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_authorization_LocalSubjectAccessReview,
-		DeepCopy_authorization_NonResourceAttributes,
-		DeepCopy_authorization_ResourceAttributes,
-		DeepCopy_authorization_SelfSubjectAccessReview,
-		DeepCopy_authorization_SelfSubjectAccessReviewSpec,
-		DeepCopy_authorization_SubjectAccessReview,
-		DeepCopy_authorization_SubjectAccessReviewSpec,
-		DeepCopy_authorization_SubjectAccessReviewStatus,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_authorization_LocalSubjectAccessReview,
+			DeepCopy_authorization_NonResourceAttributes,
+			DeepCopy_authorization_ResourceAttributes,
+			DeepCopy_authorization_SelfSubjectAccessReview,
+			DeepCopy_authorization_SelfSubjectAccessReviewSpec,
+			DeepCopy_authorization_SubjectAccessReview,
+			DeepCopy_authorization_SubjectAccessReviewSpec,
+			DeepCopy_authorization_SubjectAccessReviewStatus,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_authorization_LocalSubjectAccessReview(in LocalSubjectAccessReview, out *LocalSubjectAccessReview, c *conversion.Cloner) error {

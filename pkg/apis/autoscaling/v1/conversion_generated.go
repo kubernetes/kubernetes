@@ -25,30 +25,33 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
-		Convert_v1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference,
-		Convert_autoscaling_CrossVersionObjectReference_To_v1_CrossVersionObjectReference,
-		Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler,
-		Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler,
-		Convert_v1_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList,
-		Convert_autoscaling_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscalerList,
-		Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec,
-		Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec,
-		Convert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus,
-		Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus,
-		Convert_v1_Scale_To_autoscaling_Scale,
-		Convert_autoscaling_Scale_To_v1_Scale,
-		Convert_v1_ScaleSpec_To_autoscaling_ScaleSpec,
-		Convert_autoscaling_ScaleSpec_To_v1_ScaleSpec,
-		Convert_v1_ScaleStatus_To_autoscaling_ScaleStatus,
-		Convert_autoscaling_ScaleStatus_To_v1_ScaleStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedConversionFuncs(
+			Convert_v1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference,
+			Convert_autoscaling_CrossVersionObjectReference_To_v1_CrossVersionObjectReference,
+			Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler,
+			Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler,
+			Convert_v1_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList,
+			Convert_autoscaling_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscalerList,
+			Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec,
+			Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec,
+			Convert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus,
+			Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus,
+			Convert_v1_Scale_To_autoscaling_Scale,
+			Convert_autoscaling_Scale_To_v1_Scale,
+			Convert_v1_ScaleSpec_To_autoscaling_ScaleSpec,
+			Convert_autoscaling_ScaleSpec_To_v1_ScaleSpec,
+			Convert_v1_ScaleStatus_To_autoscaling_ScaleStatus,
+			Convert_autoscaling_ScaleStatus_To_v1_ScaleStatus,
+		); err != nil {
+			// if one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func autoConvert_v1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in *CrossVersionObjectReference, out *autoscaling.CrossVersionObjectReference, s conversion.Scope) error {

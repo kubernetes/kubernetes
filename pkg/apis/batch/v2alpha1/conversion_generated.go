@@ -26,34 +26,37 @@ import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
-		Convert_v2alpha1_Job_To_batch_Job,
-		Convert_batch_Job_To_v2alpha1_Job,
-		Convert_v2alpha1_JobCondition_To_batch_JobCondition,
-		Convert_batch_JobCondition_To_v2alpha1_JobCondition,
-		Convert_v2alpha1_JobList_To_batch_JobList,
-		Convert_batch_JobList_To_v2alpha1_JobList,
-		Convert_v2alpha1_JobSpec_To_batch_JobSpec,
-		Convert_batch_JobSpec_To_v2alpha1_JobSpec,
-		Convert_v2alpha1_JobStatus_To_batch_JobStatus,
-		Convert_batch_JobStatus_To_v2alpha1_JobStatus,
-		Convert_v2alpha1_JobTemplate_To_batch_JobTemplate,
-		Convert_batch_JobTemplate_To_v2alpha1_JobTemplate,
-		Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec,
-		Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec,
-		Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector,
-		Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector,
-		Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
-		Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement,
-		Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus,
-		Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedConversionFuncs(
+			Convert_v2alpha1_Job_To_batch_Job,
+			Convert_batch_Job_To_v2alpha1_Job,
+			Convert_v2alpha1_JobCondition_To_batch_JobCondition,
+			Convert_batch_JobCondition_To_v2alpha1_JobCondition,
+			Convert_v2alpha1_JobList_To_batch_JobList,
+			Convert_batch_JobList_To_v2alpha1_JobList,
+			Convert_v2alpha1_JobSpec_To_batch_JobSpec,
+			Convert_batch_JobSpec_To_v2alpha1_JobSpec,
+			Convert_v2alpha1_JobStatus_To_batch_JobStatus,
+			Convert_batch_JobStatus_To_v2alpha1_JobStatus,
+			Convert_v2alpha1_JobTemplate_To_batch_JobTemplate,
+			Convert_batch_JobTemplate_To_v2alpha1_JobTemplate,
+			Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec,
+			Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec,
+			Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector,
+			Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector,
+			Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
+			Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement,
+			Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus,
+			Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus,
+		); err != nil {
+			// if one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func autoConvert_v2alpha1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Scope) error {

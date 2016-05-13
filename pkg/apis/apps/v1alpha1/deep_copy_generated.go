@@ -21,22 +21,24 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v1alpha1_PetSet,
-		DeepCopy_v1alpha1_PetSetList,
-		DeepCopy_v1alpha1_PetSetSpec,
-		DeepCopy_v1alpha1_PetSetStatus,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_v1alpha1_PetSet,
+			DeepCopy_v1alpha1_PetSetList,
+			DeepCopy_v1alpha1_PetSetSpec,
+			DeepCopy_v1alpha1_PetSetStatus,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_v1alpha1_PetSet(in PetSet, out *PetSet, c *conversion.Cloner) error {

@@ -28,31 +28,33 @@ import (
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole,
-		Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole,
-		Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding,
-		Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding,
-		Convert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList,
-		Convert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList,
-		Convert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList,
-		Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList,
-		Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule,
-		Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule,
-		Convert_v1alpha1_Role_To_rbac_Role,
-		Convert_rbac_Role_To_v1alpha1_Role,
-		Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding,
-		Convert_rbac_RoleBinding_To_v1alpha1_RoleBinding,
-		Convert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList,
-		Convert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList,
-		Convert_v1alpha1_RoleList_To_rbac_RoleList,
-		Convert_rbac_RoleList_To_v1alpha1_RoleList,
-		Convert_v1alpha1_Subject_To_rbac_Subject,
-		Convert_rbac_Subject_To_v1alpha1_Subject,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedConversionFuncs(
+			Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole,
+			Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole,
+			Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding,
+			Convert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding,
+			Convert_v1alpha1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList,
+			Convert_rbac_ClusterRoleBindingList_To_v1alpha1_ClusterRoleBindingList,
+			Convert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList,
+			Convert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList,
+			Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule,
+			Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule,
+			Convert_v1alpha1_Role_To_rbac_Role,
+			Convert_rbac_Role_To_v1alpha1_Role,
+			Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding,
+			Convert_rbac_RoleBinding_To_v1alpha1_RoleBinding,
+			Convert_v1alpha1_RoleBindingList_To_rbac_RoleBindingList,
+			Convert_rbac_RoleBindingList_To_v1alpha1_RoleBindingList,
+			Convert_v1alpha1_RoleList_To_rbac_RoleList,
+			Convert_rbac_RoleList_To_v1alpha1_RoleList,
+			Convert_v1alpha1_Subject_To_rbac_Subject,
+			Convert_rbac_Subject_To_v1alpha1_Subject,
+		); err != nil {
+			// if one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {

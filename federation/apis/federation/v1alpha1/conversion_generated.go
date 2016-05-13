@@ -26,28 +26,31 @@ import (
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_Cluster_To_federation_Cluster,
-		Convert_federation_Cluster_To_v1alpha1_Cluster,
-		Convert_v1alpha1_ClusterCondition_To_federation_ClusterCondition,
-		Convert_federation_ClusterCondition_To_v1alpha1_ClusterCondition,
-		Convert_v1alpha1_ClusterList_To_federation_ClusterList,
-		Convert_federation_ClusterList_To_v1alpha1_ClusterList,
-		Convert_v1alpha1_ClusterMeta_To_federation_ClusterMeta,
-		Convert_federation_ClusterMeta_To_v1alpha1_ClusterMeta,
-		Convert_v1alpha1_ClusterSpec_To_federation_ClusterSpec,
-		Convert_federation_ClusterSpec_To_v1alpha1_ClusterSpec,
-		Convert_v1alpha1_ClusterStatus_To_federation_ClusterStatus,
-		Convert_federation_ClusterStatus_To_v1alpha1_ClusterStatus,
-		Convert_v1alpha1_ServerAddressByClientCIDR_To_federation_ServerAddressByClientCIDR,
-		Convert_federation_ServerAddressByClientCIDR_To_v1alpha1_ServerAddressByClientCIDR,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedConversionFuncs(
+			Convert_v1alpha1_Cluster_To_federation_Cluster,
+			Convert_federation_Cluster_To_v1alpha1_Cluster,
+			Convert_v1alpha1_ClusterCondition_To_federation_ClusterCondition,
+			Convert_federation_ClusterCondition_To_v1alpha1_ClusterCondition,
+			Convert_v1alpha1_ClusterList_To_federation_ClusterList,
+			Convert_federation_ClusterList_To_v1alpha1_ClusterList,
+			Convert_v1alpha1_ClusterMeta_To_federation_ClusterMeta,
+			Convert_federation_ClusterMeta_To_v1alpha1_ClusterMeta,
+			Convert_v1alpha1_ClusterSpec_To_federation_ClusterSpec,
+			Convert_federation_ClusterSpec_To_v1alpha1_ClusterSpec,
+			Convert_v1alpha1_ClusterStatus_To_federation_ClusterStatus,
+			Convert_federation_ClusterStatus_To_v1alpha1_ClusterStatus,
+			Convert_v1alpha1_ServerAddressByClientCIDR_To_federation_ServerAddressByClientCIDR,
+			Convert_federation_ServerAddressByClientCIDR_To_v1alpha1_ServerAddressByClientCIDR,
+		); err != nil {
+			// if one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func autoConvert_v1alpha1_Cluster_To_federation_Cluster(in *Cluster, out *federation.Cluster, s conversion.Scope) error {

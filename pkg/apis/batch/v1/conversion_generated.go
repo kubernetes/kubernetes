@@ -26,28 +26,31 @@ import (
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
-		Convert_v1_Job_To_batch_Job,
-		Convert_batch_Job_To_v1_Job,
-		Convert_v1_JobCondition_To_batch_JobCondition,
-		Convert_batch_JobCondition_To_v1_JobCondition,
-		Convert_v1_JobList_To_batch_JobList,
-		Convert_batch_JobList_To_v1_JobList,
-		Convert_v1_JobSpec_To_batch_JobSpec,
-		Convert_batch_JobSpec_To_v1_JobSpec,
-		Convert_v1_JobStatus_To_batch_JobStatus,
-		Convert_batch_JobStatus_To_v1_JobStatus,
-		Convert_v1_LabelSelector_To_unversioned_LabelSelector,
-		Convert_unversioned_LabelSelector_To_v1_LabelSelector,
-		Convert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
-		Convert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedConversionFuncs(
+			Convert_v1_Job_To_batch_Job,
+			Convert_batch_Job_To_v1_Job,
+			Convert_v1_JobCondition_To_batch_JobCondition,
+			Convert_batch_JobCondition_To_v1_JobCondition,
+			Convert_v1_JobList_To_batch_JobList,
+			Convert_batch_JobList_To_v1_JobList,
+			Convert_v1_JobSpec_To_batch_JobSpec,
+			Convert_batch_JobSpec_To_v1_JobSpec,
+			Convert_v1_JobStatus_To_batch_JobStatus,
+			Convert_batch_JobStatus_To_v1_JobStatus,
+			Convert_v1_LabelSelector_To_unversioned_LabelSelector,
+			Convert_unversioned_LabelSelector_To_v1_LabelSelector,
+			Convert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
+			Convert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement,
+		); err != nil {
+			// if one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func autoConvert_v1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Scope) error {

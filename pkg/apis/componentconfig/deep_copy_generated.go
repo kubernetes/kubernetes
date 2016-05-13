@@ -21,26 +21,28 @@ limitations under the License.
 package componentconfig
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_componentconfig_IPVar,
-		DeepCopy_componentconfig_KubeControllerManagerConfiguration,
-		DeepCopy_componentconfig_KubeProxyConfiguration,
-		DeepCopy_componentconfig_KubeSchedulerConfiguration,
-		DeepCopy_componentconfig_KubeletConfiguration,
-		DeepCopy_componentconfig_LeaderElectionConfiguration,
-		DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration,
-		DeepCopy_componentconfig_PortRangeVar,
-		DeepCopy_componentconfig_VolumeConfiguration,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_componentconfig_IPVar,
+			DeepCopy_componentconfig_KubeControllerManagerConfiguration,
+			DeepCopy_componentconfig_KubeProxyConfiguration,
+			DeepCopy_componentconfig_KubeSchedulerConfiguration,
+			DeepCopy_componentconfig_KubeletConfiguration,
+			DeepCopy_componentconfig_LeaderElectionConfiguration,
+			DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration,
+			DeepCopy_componentconfig_PortRangeVar,
+			DeepCopy_componentconfig_VolumeConfiguration,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_componentconfig_IPVar(in IPVar, out *IPVar, c *conversion.Cloner) error {

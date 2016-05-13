@@ -21,31 +21,33 @@ limitations under the License.
 package v2alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_v2alpha1_Job,
-		DeepCopy_v2alpha1_JobCondition,
-		DeepCopy_v2alpha1_JobList,
-		DeepCopy_v2alpha1_JobSpec,
-		DeepCopy_v2alpha1_JobStatus,
-		DeepCopy_v2alpha1_JobTemplate,
-		DeepCopy_v2alpha1_JobTemplateSpec,
-		DeepCopy_v2alpha1_LabelSelector,
-		DeepCopy_v2alpha1_LabelSelectorRequirement,
-		DeepCopy_v2alpha1_ScheduledJob,
-		DeepCopy_v2alpha1_ScheduledJobList,
-		DeepCopy_v2alpha1_ScheduledJobSpec,
-		DeepCopy_v2alpha1_ScheduledJobStatus,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_v2alpha1_Job,
+			DeepCopy_v2alpha1_JobCondition,
+			DeepCopy_v2alpha1_JobList,
+			DeepCopy_v2alpha1_JobSpec,
+			DeepCopy_v2alpha1_JobStatus,
+			DeepCopy_v2alpha1_JobTemplate,
+			DeepCopy_v2alpha1_JobTemplateSpec,
+			DeepCopy_v2alpha1_LabelSelector,
+			DeepCopy_v2alpha1_LabelSelectorRequirement,
+			DeepCopy_v2alpha1_ScheduledJob,
+			DeepCopy_v2alpha1_ScheduledJobList,
+			DeepCopy_v2alpha1_ScheduledJobSpec,
+			DeepCopy_v2alpha1_ScheduledJobStatus,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_v2alpha1_Job(in Job, out *Job, c *conversion.Cloner) error {

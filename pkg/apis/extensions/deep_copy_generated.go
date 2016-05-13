@@ -25,63 +25,66 @@ import (
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_extensions_APIVersion,
-		DeepCopy_extensions_CustomMetricCurrentStatus,
-		DeepCopy_extensions_CustomMetricCurrentStatusList,
-		DeepCopy_extensions_CustomMetricTarget,
-		DeepCopy_extensions_CustomMetricTargetList,
-		DeepCopy_extensions_DaemonSet,
-		DeepCopy_extensions_DaemonSetList,
-		DeepCopy_extensions_DaemonSetSpec,
-		DeepCopy_extensions_DaemonSetStatus,
-		DeepCopy_extensions_Deployment,
-		DeepCopy_extensions_DeploymentList,
-		DeepCopy_extensions_DeploymentRollback,
-		DeepCopy_extensions_DeploymentSpec,
-		DeepCopy_extensions_DeploymentStatus,
-		DeepCopy_extensions_DeploymentStrategy,
-		DeepCopy_extensions_FSGroupStrategyOptions,
-		DeepCopy_extensions_HTTPIngressPath,
-		DeepCopy_extensions_HTTPIngressRuleValue,
-		DeepCopy_extensions_HostPortRange,
-		DeepCopy_extensions_IDRange,
-		DeepCopy_extensions_Ingress,
-		DeepCopy_extensions_IngressBackend,
-		DeepCopy_extensions_IngressList,
-		DeepCopy_extensions_IngressRule,
-		DeepCopy_extensions_IngressRuleValue,
-		DeepCopy_extensions_IngressSpec,
-		DeepCopy_extensions_IngressStatus,
-		DeepCopy_extensions_IngressTLS,
-		DeepCopy_extensions_PodSecurityPolicy,
-		DeepCopy_extensions_PodSecurityPolicyList,
-		DeepCopy_extensions_PodSecurityPolicySpec,
-		DeepCopy_extensions_ReplicaSet,
-		DeepCopy_extensions_ReplicaSetList,
-		DeepCopy_extensions_ReplicaSetSpec,
-		DeepCopy_extensions_ReplicaSetStatus,
-		DeepCopy_extensions_ReplicationControllerDummy,
-		DeepCopy_extensions_RollbackConfig,
-		DeepCopy_extensions_RollingUpdateDeployment,
-		DeepCopy_extensions_RunAsUserStrategyOptions,
-		DeepCopy_extensions_SELinuxStrategyOptions,
-		DeepCopy_extensions_Scale,
-		DeepCopy_extensions_ScaleSpec,
-		DeepCopy_extensions_ScaleStatus,
-		DeepCopy_extensions_SupplementalGroupsStrategyOptions,
-		DeepCopy_extensions_ThirdPartyResource,
-		DeepCopy_extensions_ThirdPartyResourceData,
-		DeepCopy_extensions_ThirdPartyResourceDataList,
-		DeepCopy_extensions_ThirdPartyResourceList,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_extensions_APIVersion,
+			DeepCopy_extensions_CustomMetricCurrentStatus,
+			DeepCopy_extensions_CustomMetricCurrentStatusList,
+			DeepCopy_extensions_CustomMetricTarget,
+			DeepCopy_extensions_CustomMetricTargetList,
+			DeepCopy_extensions_DaemonSet,
+			DeepCopy_extensions_DaemonSetList,
+			DeepCopy_extensions_DaemonSetSpec,
+			DeepCopy_extensions_DaemonSetStatus,
+			DeepCopy_extensions_Deployment,
+			DeepCopy_extensions_DeploymentList,
+			DeepCopy_extensions_DeploymentRollback,
+			DeepCopy_extensions_DeploymentSpec,
+			DeepCopy_extensions_DeploymentStatus,
+			DeepCopy_extensions_DeploymentStrategy,
+			DeepCopy_extensions_FSGroupStrategyOptions,
+			DeepCopy_extensions_HTTPIngressPath,
+			DeepCopy_extensions_HTTPIngressRuleValue,
+			DeepCopy_extensions_HostPortRange,
+			DeepCopy_extensions_IDRange,
+			DeepCopy_extensions_Ingress,
+			DeepCopy_extensions_IngressBackend,
+			DeepCopy_extensions_IngressList,
+			DeepCopy_extensions_IngressRule,
+			DeepCopy_extensions_IngressRuleValue,
+			DeepCopy_extensions_IngressSpec,
+			DeepCopy_extensions_IngressStatus,
+			DeepCopy_extensions_IngressTLS,
+			DeepCopy_extensions_PodSecurityPolicy,
+			DeepCopy_extensions_PodSecurityPolicyList,
+			DeepCopy_extensions_PodSecurityPolicySpec,
+			DeepCopy_extensions_ReplicaSet,
+			DeepCopy_extensions_ReplicaSetList,
+			DeepCopy_extensions_ReplicaSetSpec,
+			DeepCopy_extensions_ReplicaSetStatus,
+			DeepCopy_extensions_ReplicationControllerDummy,
+			DeepCopy_extensions_RollbackConfig,
+			DeepCopy_extensions_RollingUpdateDeployment,
+			DeepCopy_extensions_RunAsUserStrategyOptions,
+			DeepCopy_extensions_SELinuxStrategyOptions,
+			DeepCopy_extensions_Scale,
+			DeepCopy_extensions_ScaleSpec,
+			DeepCopy_extensions_ScaleStatus,
+			DeepCopy_extensions_SupplementalGroupsStrategyOptions,
+			DeepCopy_extensions_ThirdPartyResource,
+			DeepCopy_extensions_ThirdPartyResourceData,
+			DeepCopy_extensions_ThirdPartyResourceDataList,
+			DeepCopy_extensions_ThirdPartyResourceList,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_extensions_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {

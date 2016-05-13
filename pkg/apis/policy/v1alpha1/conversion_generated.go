@@ -25,20 +25,23 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget,
-		Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget,
-		Convert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec,
-		Convert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec,
-		Convert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus,
-		Convert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedConversionFuncs(
+			Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget,
+			Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget,
+			Convert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec,
+			Convert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec,
+			Convert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus,
+			Convert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus,
+		); err != nil {
+			// if one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *PodDisruptionBudget, out *policy.PodDisruptionBudget, s conversion.Scope) error {

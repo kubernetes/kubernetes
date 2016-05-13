@@ -24,30 +24,33 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview,
-		Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview,
-		Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes,
-		Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes,
-		Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes,
-		Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes,
-		Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview,
-		Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview,
-		Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec,
-		Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec,
-		Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview,
-		Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview,
-		Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec,
-		Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec,
-		Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus,
-		Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedConversionFuncs(
+			Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview,
+			Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview,
+			Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes,
+			Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes,
+			Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes,
+			Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes,
+			Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview,
+			Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview,
+			Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec,
+			Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec,
+			Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview,
+			Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview,
+			Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec,
+			Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec,
+			Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus,
+			Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus,
+		); err != nil {
+			// if one of the conversion functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func autoConvert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(in *LocalSubjectAccessReview, out *authorization.LocalSubjectAccessReview, s conversion.Scope) error {

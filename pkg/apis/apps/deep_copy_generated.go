@@ -24,18 +24,21 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_apps_PetSet,
-		DeepCopy_apps_PetSetList,
-		DeepCopy_apps_PetSetSpec,
-		DeepCopy_apps_PetSetStatus,
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) {
+		if err := scheme.AddGeneratedDeepCopyFuncs(
+			DeepCopy_apps_PetSet,
+			DeepCopy_apps_PetSetList,
+			DeepCopy_apps_PetSetSpec,
+			DeepCopy_apps_PetSetStatus,
+		); err != nil {
+			// if one of the deep copy functions is malformed, detect it immediately.
+			panic(err)
+		}
+	})
 }
 
 func DeepCopy_apps_PetSet(in PetSet, out *PetSet, c *conversion.Cloner) error {
