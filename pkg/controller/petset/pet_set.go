@@ -30,6 +30,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -46,6 +47,9 @@ const (
 	statusUpdateRetries = 2
 	// period to relist petsets and verify pets
 	petSetResyncPeriod = 30 * time.Second
+	// lookupcCache size of petset
+	// TODO(mqliang) make this configurable
+	petSetLookupCacheSize = 2048
 )
 
 // PetSetController controls petsets.
@@ -71,6 +75,8 @@ type PetSetController struct {
 
 	// A store of the 1 unhealthy pet blocking progress for a given ps
 	blockingPetStore *unhealthyPetTracker
+
+	lookupCache *controller.MatchingCache
 
 	// Controllers that need to be synced.
 	queue *workqueue.Type
@@ -124,6 +130,22 @@ func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *
 			UpdateFunc: func(old, cur interface{}) {
 				oldPS := old.(*apps.PetSet)
 				curPS := cur.(*apps.PetSet)
+
+				// We should invalidate the whole lookup cache if a PetSet's selector has been updated.
+				//
+				// Imagine that you have two Jobs:
+				// * old PS1
+				// * new PS2
+				// You also have a pod that is attached to PS2 (because it doesn't match PS1 selector).
+				// Now imagine that you are changing PS1 selector so that it is now matching that pod,
+				// in such case we must invalidate the whole cache so that pod could be adopted by PS1
+				//
+				// This makes the lookup cache less helpful, but selector update does not happen often,
+				// so it's not a big problem
+				if !reflect.DeepEqual(oldPS.Spec.Selector, curPS.Spec.Selector) {
+					psc.lookupCache.InvalidateAll()
+				}
+
 				if oldPS.Status.Replicas != curPS.Status.Replicas {
 					glog.V(4).Infof("Observed updated replica count for PetSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
 				}
@@ -135,6 +157,7 @@ func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *
 	// TODO: Watch volumes
 	psc.podStoreSynced = psc.podController.HasSynced
 	psc.syncHandler = psc.Sync
+	psc.lookupCache = controller.NewMatchingCache(petSetLookupCacheSize)
 	return psc
 }
 
@@ -229,6 +252,19 @@ func (psc *PetSetController) getPodsForPetSet(ps *apps.PetSet) ([]*api.Pod, erro
 
 // getPetSetForPod returns the pet set managing the given pod.
 func (psc *PetSetController) getPetSetForPod(pod *api.Pod) *apps.PetSet {
+	// look up in the cache, if cached and the cache is valid, just return cached value
+	if obj, cached := psc.lookupCache.GetMatchingObject(pod); cached {
+		ps, ok := obj.(*apps.PetSet)
+		if !ok {
+			// This should not happen
+			glog.Errorf("lookup cache does not retuen a ReplicaSet object")
+			return nil
+		}
+		if cached && psc.isCacheValid(pod, ps) {
+			return ps
+		}
+	}
+
 	ps, err := psc.psStore.GetPodPetSets(pod)
 	if err != nil {
 		glog.V(4).Infof("No PetSets found for pod %v, PetSet controller will avoid syncing", pod.Name)
@@ -240,7 +276,39 @@ func (psc *PetSetController) getPetSetForPod(pod *api.Pod) *apps.PetSet {
 		glog.Errorf("user error! more than one PetSet is selecting pods with labels: %+v", pod.Labels)
 		sort.Sort(overlappingPetSets(ps))
 	}
+
+	// update lookup cache
+	psc.lookupCache.Update(pod, &ps[0])
+
 	return &ps[0]
+}
+
+// isCacheValid check if the cache is valid
+func (psc *PetSetController) isCacheValid(pod *api.Pod, cachedPS *apps.PetSet) bool {
+	_, exists, err := psc.psStore.Get(cachedPS)
+	// rs has been deleted or updated, cache is invalid
+	if err != nil || !exists || !isPetSetMatch(pod, cachedPS) {
+		return false
+	}
+	return true
+}
+
+// isPetSetMatch take a Pod and PetSet, return whether the Pod and PetSet are matching
+// TODO(mqliang): This logic is a copy from GetPodPetSets(), remove the duplication
+func isPetSetMatch(pod *api.Pod, ps *apps.PetSet) bool {
+	if ps.Namespace != pod.Namespace {
+		return false
+	}
+	selector, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
+	if err != nil {
+		return false
+	}
+
+	// If a PetSet with a nil or empty selector creeps in, it should match nothing, not everything.
+	if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+		return false
+	}
+	return true
 }
 
 // enqueuePetSet enqueues the given petset in the work queue.
