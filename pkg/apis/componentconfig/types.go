@@ -349,6 +349,8 @@ type KubeletConfiguration struct {
 	EvictionSoft string `json:"evictionSoft,omitempty"`
 	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
 	EvictionSoftGracePeriod string `json:"evictionSoftGracePeriod,omitempty"`
+	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
+	EvictionPressureTransitionPeriod unversioned.Duration `json:"evictionPressureTransitionPeriod,omitempty"`
 }
 
 type KubeSchedulerConfiguration struct {
