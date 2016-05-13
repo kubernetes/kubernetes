@@ -29,7 +29,7 @@ function generate_version() {
 
   echo "Generating swagger type docs for ${group_version}"
 
-  sed 's/YEAR/2015/' hack/boilerplate/boilerplate.go.txt > "$TMPFILE"
+  sed 's/YEAR/2016/' hack/boilerplate/boilerplate.go.txt > "$TMPFILE"
   echo "package ${group_version##*/}" >> "$TMPFILE"
   cat >> "$TMPFILE" <<EOF
 
