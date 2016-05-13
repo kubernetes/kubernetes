@@ -18,6 +18,7 @@ package v1alpha1
 
 import "k8s.io/kubernetes/pkg/runtime"
 
-func addConversionFuncs(scheme *runtime.Scheme) {
+func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions here. Currently there are none.
+	return nil
 }

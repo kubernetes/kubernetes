@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,13 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package latest
+package api
 
 import (
-	_ "k8s.io/kubernetes/pkg/apis/abac"
-	_ "k8s.io/kubernetes/pkg/apis/abac/v0"
-	_ "k8s.io/kubernetes/pkg/apis/abac/v1beta1"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// TODO: this file is totally wrong, it should look like other latest files.
-// lavalamp is in the middle of fixing this code, so wait for the new way of doing things..
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	return scheme.AddDefaultingFuncs(
+		func(obj *ListOptions) {
+			if obj.LabelSelector == nil {
+				obj.LabelSelector = labels.Everything()
+			}
+			if obj.FieldSelector == nil {
+				obj.FieldSelector = fields.Everything()
+			}
+		},
+	)
+}

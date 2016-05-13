@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) {
+func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
 		v1.Convert_v1_DeleteOptions_To_api_DeleteOptions,
@@ -60,8 +60,7 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		v1.Convert_api_ServiceStatus_To_v1_ServiceStatus,
 	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
@@ -79,8 +78,8 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 				}
 			})
 		if err != nil {
-			// If one of the conversion functions is malformed, detect it immediately.
-			panic(err)
+			return err
 		}
 	}
+	return nil
 }
