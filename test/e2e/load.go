@@ -44,6 +44,10 @@ const (
 	smallRCBatchSize  = 30
 	mediumRCBatchSize = 5
 	bigRCBatchSize    = 1
+	// We start RCs/Services/pods/... in different namespace in this test.
+	// nodeCountPerNamespace determines how many namespaces we will be using
+	// depending on the number of nodes in the underlying cluster.
+	nodeCountPerNamespace = 250
 )
 
 // This test suite can take a long time to run, so by default it is added to
@@ -55,6 +59,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	var nodeCount int
 	var ns string
 	var configs []*framework.RCConfig
+	var namespaces []*api.Namespace
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
@@ -113,8 +118,11 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		itArg := testArg
 
 		It(name, func() {
+			// Create a number of namespaces.
+			namespaces = createNamespaces(f, nodeCount, itArg.podsPerNode)
+
 			totalPods := itArg.podsPerNode * nodeCount
-			configs = generateRCConfigs(totalPods, itArg.image, itArg.command, c, ns)
+			configs = generateRCConfigs(totalPods, itArg.image, itArg.command, c, namespaces)
 			var services []*api.Service
 			// Read the environment variable to see if we want to create services
 			createServices := os.Getenv("CREATE_SERVICES")
@@ -175,6 +183,17 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	}
 })
 
+func createNamespaces(f *framework.Framework, nodeCount, podsPerNode int) []*api.Namespace {
+	namespaceCount := (nodeCount + nodeCountPerNamespace - 1) / nodeCountPerNamespace
+	namespaces := []*api.Namespace{}
+	for i := 1; i <= namespaceCount; i++ {
+		namespace, err := f.CreateNamespace(fmt.Sprintf("load-%d-nodepods-%d", podsPerNode, i), nil)
+		framework.ExpectNoError(err)
+		namespaces = append(namespaces, namespace)
+	}
+	return namespaces
+}
+
 func computeRCCounts(total int) (int, int, int) {
 	// Small RCs owns ~0.5 of total number of pods, medium and big RCs ~0.25 each.
 	// For example for 3000 pods (100 nodes, 30 pods per node) there are:
@@ -189,24 +208,24 @@ func computeRCCounts(total int) (int, int, int) {
 	return smallRCCount, mediumRCCount, bigRCCount
 }
 
-func generateRCConfigs(totalPods int, image string, command []string, c *client.Client, ns string) []*framework.RCConfig {
+func generateRCConfigs(totalPods int, image string, command []string, c *client.Client, nss []*api.Namespace) []*framework.RCConfig {
 	configs := make([]*framework.RCConfig, 0)
 
 	smallRCCount, mediumRCCount, bigRCCount := computeRCCounts(totalPods)
-	configs = append(configs, generateRCConfigsForGroup(c, ns, smallRCGroupName, smallRCSize, smallRCCount, image, command)...)
-	configs = append(configs, generateRCConfigsForGroup(c, ns, mediumRCGroupName, mediumRCSize, mediumRCCount, image, command)...)
-	configs = append(configs, generateRCConfigsForGroup(c, ns, bigRCGroupName, bigRCSize, bigRCCount, image, command)...)
+	configs = append(configs, generateRCConfigsForGroup(c, nss, smallRCGroupName, smallRCSize, smallRCCount, image, command)...)
+	configs = append(configs, generateRCConfigsForGroup(c, nss, mediumRCGroupName, mediumRCSize, mediumRCCount, image, command)...)
+	configs = append(configs, generateRCConfigsForGroup(c, nss, bigRCGroupName, bigRCSize, bigRCCount, image, command)...)
 
 	return configs
 }
 
-func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, count int, image string, command []string) []*framework.RCConfig {
+func generateRCConfigsForGroup(c *client.Client, nss []*api.Namespace, groupName string, size, count int, image string, command []string) []*framework.RCConfig {
 	configs := make([]*framework.RCConfig, 0, count)
 	for i := 1; i <= count; i++ {
 		config := &framework.RCConfig{
 			Client:     c,
 			Name:       groupName + "-" + strconv.Itoa(i),
-			Namespace:  ns,
+			Namespace:  nss[i%len(nss)].Name,
 			Timeout:    10 * time.Minute,
 			Image:      image,
 			Command:    command,
@@ -226,7 +245,8 @@ func generateServicesForConfigs(configs []*framework.RCConfig) []*api.Service {
 		labels := map[string]string{"name": config.Name}
 		service := &api.Service{
 			ObjectMeta: api.ObjectMeta{
-				Name: serviceName,
+				Name:      serviceName,
+				Namespace: config.Namespace,
 			},
 			Spec: api.ServiceSpec{
 				Selector: labels,
