@@ -52,9 +52,14 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func AddToScheme(scheme *runtime.Scheme) {
-	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
-		panic(err)
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	if err := scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+		return err
 	}
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&api.ServiceList{},
@@ -68,7 +73,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	)
 
 	// Register Unversioned types under their own special group
-	Scheme.AddUnversionedTypes(Unversioned,
+	scheme.AddUnversionedTypes(Unversioned,
 		&unversioned.ExportOptions{},
 		&unversioned.Status{},
 		&unversioned.APIVersions{},
@@ -76,7 +81,5 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&unversioned.APIGroup{},
 		&unversioned.APIResourceList{},
 	)
-
-	addDefaultingFuncs(scheme)
-	addConversionFuncs(scheme)
+	return nil
 }
