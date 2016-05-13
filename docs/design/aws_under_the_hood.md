@@ -139,7 +139,8 @@ pods.
 
 ELB has some restrictions:
 * ELB requires that all nodes listen on a single port,
-* ELB acts as a forwarding proxy (i.e. the source IP is not preserved).
+* ELB acts as a forwarding proxy (i.e. the source IP is not preserved, but see below
+on ELB annotations for pods speaking HTTP).
 
 To work with these restrictions, in Kubernetes, [LoadBalancer
 services](../user-guide/services.md#type-loadbalancer) are exposed as
@@ -161,6 +162,32 @@ NodePort services are more of a building block for things like inter-cluster
 services or for LoadBalancer. To consume a NodePort service externally, you
 will likely have to open the port in the node security group
 (`kubernetes-minion-<clusterid>`).
+
+For SSL support, starting with 1.3 two annotations can be added to a service:
+
+```
+service.beta.kubernetes.io/aws-load-balancer-ssl-cert=arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012
+```
+
+The first specifies which certificate to use. It can be either a
+certificate from a third party issuer that was uploaded to IAM or one created
+within AWS Certificate Manager.
+
+```
+service.beta.kubernetes.io/aws-load-balancer-backend-protocol=(https|http|ssl|tcp)
+```
+
+The second annotation specificies which protocol a pod speaks. For HTTPS and
+SSL, the ELB will expect the pod to authenticate itself over the encrypted
+connection.
+
+HTTP and HTTPS will select layer 7 proxying: the ELB will terminate
+the connection with the user, parse headers and inject the `X-Forwarded-For`
+header with the user's IP address (pods will only see the IP address of the
+ELB at the other end of its connection) when forwarding requests.
+
+TCP and SSL will select layer 4 proxying: the ELB will forward traffic without
+modifying the headers.
 
 ### Identity and Access Management (IAM)
 
@@ -306,6 +333,7 @@ concatenates some of the scripts found in the cluster/aws/templates directory.
 These scripts are responsible for mounting and formatting volumes, downloading
 Salt and Kubernetes from the S3 bucket, and then triggering Salt to actually
 install Kubernetes.
+
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
