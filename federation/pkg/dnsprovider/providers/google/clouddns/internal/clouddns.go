@@ -22,7 +22,7 @@ package internal
 // Only the parts of the API that we use are included.
 // Others can be added as needed.
 
-import "google.golang.org/api/dns/v1"
+import dns "google.golang.org/api/dns/v1"
 
 type (
 	Project struct{ impl *dns.Project }

@@ -32,7 +32,7 @@ type ResourceRecordSets struct {
 func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error) {
 	response, err := rrsets.impl.List(rrsets.project(), rrsets.zone.impl.Name()).Do()
 	if err != nil {
-		return []dnsprovider.ResourceRecordSet{}, err
+		return nil, err
 	}
 	list := make([]dnsprovider.ResourceRecordSet, len(response.Rrsets()))
 	for i, rrset := range response.Rrsets() {
@@ -47,11 +47,11 @@ func (rrsets ResourceRecordSets) Add(rrset dnsprovider.ResourceRecordSet) (dnspr
 	change := service.NewChange(additions, []interfaces.ResourceRecordSet{})
 	newChange, err := service.Create(rrsets.project(), rrsets.zone.impl.Name(), change).Do()
 	if err != nil {
-		return dnsprovider.ResourceRecordSet(nil), err
+		return nil, err
 	}
 	newAdditions := newChange.Additions()
 	if len(newAdditions) != len(additions) {
-		return dnsprovider.ResourceRecordSet(nil), fmt.Errorf("Internal error when adding resource record set.  Call succeeded but number of records returned is incorrect.  Records sent=%d, records returned=%s, record set:%v", len(additions), len(newAdditions), rrset)
+		return nil, fmt.Errorf("Internal error when adding resource record set.  Call succeeded but number of records returned is incorrect.  Records sent=%d, records returned=%s, record set:%v", len(additions), len(newAdditions), rrset)
 	}
 	return ResourceRecordSet{newChange.Additions()[0], &rrsets}, nil
 }

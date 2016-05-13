@@ -20,28 +20,42 @@ import "k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 
 // Interface is an abstract, pluggable interface for DNS providers.
 type Interface interface {
+	// Zones returns the provider's Zones interface, or false if not supported.
 	Zones() (Zones, bool)
 }
 
 type Zones interface {
+	// List returns the managed Zones, or an error if the list operation failed.
 	List() ([]Zone, error)
 }
 
 type Zone interface {
+	// Name returns the name of the zone, e.g. "example.com"
 	Name() string
+	// ResourceRecordsets returns the provider's ResourceRecordSets interface, or false if not supported.
 	ResourceRecordSets() (ResourceRecordSets, bool)
 }
 
 type ResourceRecordSets interface {
+	// List returns the ResourceRecordSets of the Zone, or an error if the list operation failed.
 	List() ([]ResourceRecordSet, error)
+	// Add adds and returns a ResourceRecordSet of the Zone, or an error if the add operation failed.
 	Add(ResourceRecordSet) (ResourceRecordSet, error)
+	// Remove removes a ResourceRecordSet from the Zone, or an error if the remove operation failed.
+	// The supplied ResourceRecordSet must match one of the existing zones (obtained via List()) exactly.
 	Remove(ResourceRecordSet) error
+	// New allocates a new ResourceRecordSet, which can then be passed to Add() or Remove()
+	// Arguments are as per the ResourceRecordSet interface below.
 	New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) ResourceRecordSet
 }
 
 type ResourceRecordSet interface {
-	Name() string // e.g. "www.example.com"
+	// Name returns the name of the ResourceRecordSet, e.g. "www.example.com".
+	Name() string
+	// Rrdatas returns the Resource Record Datas of the record set.
 	Rrdatas() []string
+	// Ttl returns the time-to-live of the record set, in seconds.
 	Ttl() int64
+	// Type returns the type of the record set (A, CNAME, SRV, etc)
 	Type() rrstype.RrsType
 }

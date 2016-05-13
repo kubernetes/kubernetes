@@ -76,8 +76,7 @@ func InitDnsProvider(name string, configFilePath string) (Interface, error) {
 		var config *os.File
 		config, err = os.Open(configFilePath)
 		if err != nil {
-			glog.Fatalf("Couldn't open DNS provider configuration %s: %#v",
-				configFilePath, err)
+			return nil, fmt.Errorf("Couldn't open DNS provider configuration %s: %#v", configFilePath, err)
 		}
 
 		defer config.Close()

@@ -17,7 +17,7 @@ limitations under the License.
 package internal
 
 import (
-	"google.golang.org/api/dns/v1"
+	dns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 )

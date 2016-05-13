@@ -31,11 +31,7 @@ func newTestInterface() (dnsprovider.Interface, error) {
 	// Use this to test the real cloud service - insert appropriate project-id.  Default token source will be used.  See
 	// https://github.com/golang/oauth2/blob/master/google/default.go for details.
 	// i, err := dnsprovider.GetDnsProvider(ProviderName, strings.NewReader("\n[global]\nproject-id = federation0-cluster00"))
-	i, err := newFakeInterface() // Use this to stub out the entire cloud service
-	if err != nil {
-		return nil, err
-	}
-	return i, nil
+	return newFakeInterface() // Use this to stub out the entire cloud service
 }
 
 func newFakeInterface() (dnsprovider.Interface, error) {
@@ -68,13 +64,12 @@ func TestMain(m *testing.M) {
 // firstZone returns the first zone for the configured dns provider account/project,
 // or fails if it can't be found
 func firstZone(t *testing.T) dnsprovider.Zone {
-	i := interface_
 	t.Logf("Getting zones")
-	z, supported := i.Zones()
+	z, supported := interface_.Zones()
 	if supported {
 		t.Logf("Got zones %v\n", z)
 	} else {
-		t.Fatalf("Zones interface not supported by interface %v", i)
+		t.Fatalf("Zones interface not supported by interface %v", interface_)
 	}
 	zones, err := z.List()
 	if err != nil {
@@ -83,7 +78,7 @@ func firstZone(t *testing.T) dnsprovider.Zone {
 		t.Logf("Got zone list: %v\n", zones)
 	}
 	if len(zones) < 1 {
-		t.Fatalf("Zone listing returned %d, expected %d", len(zones), 1)
+		t.Fatalf("Zone listing returned %d, expected >= %d", len(zones), 1)
 	} else {
 		t.Logf("Got at least 1 zone in list:%v\n", zones[0])
 	}
@@ -159,9 +154,8 @@ func TestResourceRecordSetsAdditionVisible(t *testing.T) {
 	set := addRrsetOrFail(t, sets, rrset)
 	defer sets.Remove(set)
 	t.Logf("Successfully added resource record set: %v", set)
-	list := listRrsOrFail(t, sets)
 	found := false
-	for _, record := range list {
+	for _, record := range listRrsOrFail(t, sets) {
 		if record.Name() == rrset.Name() {
 			found = true
 			break

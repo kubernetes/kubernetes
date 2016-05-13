@@ -23,10 +23,10 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/dns/v1"
+	compute "google.golang.org/api/compute/v1"
+	dns "google.golang.org/api/dns/v1"
 	"google.golang.org/cloud/compute/metadata"
-	"gopkg.in/gcfg.v1"
+	gcfg "gopkg.in/gcfg.v1"
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal"
@@ -35,13 +35,6 @@ import (
 
 const (
 	ProviderName = "google-clouddns"
-	// operationPollInterval        = 3 * time.Second
-	// operationPollTimeoutDuration = 30 * time.Minute
-
-	// Each page can have 500 results, but we cap how many pages
-	// are iterated through to prevent infinite loops if the API
-	// were to continuously return a nextPageToken.
-	// maxPages = 25
 )
 
 func init() {
@@ -58,10 +51,9 @@ type Config struct {
 	}
 }
 
-// newCloudDns creates a new instance of .
+// newCloudDns creates a new instance of a Google Cloud DNS Interface.
 func newCloudDns(config io.Reader) (*Interface, error) {
 	projectID, _ := metadata.ProjectID() // On error we get an empty string, which is fine for now.
-	// tokenSource := google.ComputeTokenSource("")
 	var tokenSource oauth2.TokenSource
 	// Possibly override defaults with config below
 	if config != nil {
@@ -81,7 +73,7 @@ func newCloudDns(config io.Reader) (*Interface, error) {
 	return CreateInterface(projectID, tokenSource)
 }
 
-// Creates a  clouddns.Interface object using the specified parameters.
+// CreateInterface creates a clouddns.Interface object using the specified parameters.
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 func CreateInterface(projectID string, tokenSource oauth2.TokenSource) (*Interface, error) {
 	if tokenSource == nil {

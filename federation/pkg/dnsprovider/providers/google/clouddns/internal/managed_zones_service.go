@@ -17,7 +17,7 @@ limitations under the License.
 package internal
 
 import (
-	"google.golang.org/api/dns/v1"
+	dns "google.golang.org/api/dns/v1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 )
 
@@ -29,11 +29,11 @@ func (m *ManagedZonesService) Create(project string, managedzone interfaces.Mana
 	return &ManagedZonesCreateCall{m.impl.Create(project, managedzone.(ManagedZone).impl)}
 }
 
-func (m *ManagedZonesService) Delete(project string, managedZone string) interfaces.ManagedZonesDeleteCall {
+func (m *ManagedZonesService) Delete(project, managedZone string) interfaces.ManagedZonesDeleteCall {
 	return &ManagedZonesDeleteCall{m.impl.Delete(project, managedZone)}
 }
 
-func (m *ManagedZonesService) Get(project string, managedZone string) interfaces.ManagedZonesGetCall {
+func (m *ManagedZonesService) Get(project, managedZone string) interfaces.ManagedZonesGetCall {
 	return &ManagedZonesGetCall{m.impl.Get(project, managedZone)}
 }
 

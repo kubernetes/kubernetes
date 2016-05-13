@@ -22,7 +22,7 @@ package stubs
 // Only the parts of the API that we use are included.
 // Others can be added as needed.
 
-import "google.golang.org/api/dns/v1"
+import dns "google.golang.org/api/dns/v1"
 
 type (
 	// TODO: We dont' need these yet, so they remain unimplemented.  Add later as required.

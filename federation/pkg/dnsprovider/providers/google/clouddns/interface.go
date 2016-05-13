@@ -28,50 +28,12 @@ type Interface struct {
 	service  interfaces.Service
 }
 
-/*
-// NewInterface initializes the underlying Google Cloud DNS library
-// and wraps it in a provider-independent interface, which it returns.
-func NewInterface(project string, tokenSource oauth2.TokenSource) dnsprovider.Interface {
-	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
-	if client != nil {
-		return client, nil
-	} else {
-		return nil, fmt.Errorf("Failed to get OAuth client.  No details provided.")
-	}
-	service, err := dns.New(oauthClient)
-	if err != nil {
-		glog.Errorf("Failed to get Cloud DNS client: %v", err)
-	}
-	glog.Infof("Successfully got DNS service: %v\n", service)
-	return newInterfaceWithStub(project, internal.NewService(service))
-}
-*/
-
 // newInterfaceWithStub facilitates stubbing out the underlying Google Cloud DNS
 // library for testing purposes.  It returns an provider-independent interface.
 func newInterfaceWithStub(project string, service interfaces.Service) *Interface {
 	return &Interface{project, service}
 }
 
-/*
-func getOauthClient() (*http.Client, error) {
-	tokenSource, err := google.DefaultTokenSource(
-		oauth2.NoContext,
-		compute.CloudPlatformScope,
-		compute.ComputeScope)
-	if err != nil {
-		return nil, err
-	}
-	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
-	if client != nil {
-		return client, nil
-	} else {
-		return nil, fmt.Errorf("Failed to get OAuth client.  No details provided.")
-	}
-}
-*/
-
-// Zones returns the provider's Zones interface, or false if not supported.
 func (i Interface) Zones() (zones dnsprovider.Zones, supported bool) {
 	return Zones{i.service.ManagedZones(), &i}, true
 }

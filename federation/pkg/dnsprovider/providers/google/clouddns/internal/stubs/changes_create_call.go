@@ -30,7 +30,7 @@ type ChangesCreateCall struct {
 	Project string
 	Zone    string
 	Change  interfaces.Change
-	Error   *error // Use this to over-ride response if necessary
+	Error   error // Use this to over-ride response if necessary
 }
 
 func hashKey(set interfaces.ResourceRecordSet) string {
@@ -39,7 +39,7 @@ func hashKey(set interfaces.ResourceRecordSet) string {
 
 func (c ChangesCreateCall) Do(opts ...googleapi.CallOption) (interfaces.Change, error) {
 	if c.Error != nil {
-		return nil, *c.Error
+		return nil, c.Error
 	}
 	zone := (c.Service.Service.ManagedZones_.Impl[c.Project][c.Zone]).(*ManagedZone)
 	rrsets := map[string]int{} // Simple mechanism to detect dupes and missing rrsets before committing - stores index+1
