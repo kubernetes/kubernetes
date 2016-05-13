@@ -70,10 +70,14 @@ cd "${_kubetmp}"
 # Build the godep tool
 go get -u github.com/tools/godep 2>/dev/null
 GODEP="${GOPATH}/bin/godep"
-pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
-  git checkout v63
-  "${GODEP}" go install
-popd > /dev/null
+pin-godep() {
+  pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
+    git checkout "$1"
+    "${GODEP}" go install
+  popd > /dev/null
+}
+# Use to following if we ever need to pin godep to a specific version again
+#pin-godep 'v63'
 
 # Fill out that nice clean place with the kube godeps
 echo "Starting to download all kubernetes godeps. This takes a while"
@@ -88,11 +92,10 @@ rm -rf ./Godeps ./vendor
 git init > /dev/null 2>&1
 
 # Recreate the Godeps using the nice clean set we just downloaded
-# TODO(thockin, eparis): Move this in to a common script with hack/godep-save.sh
-"${GODEP}" save github.com/ugorji/go/codec/codecgen github.com/onsi/ginkgo/ginkgo ./...
+hack/godep-save.sh
 
 # Test for diffs
-if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
+if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
   echo "Your Godeps.json is different:"
   echo "${_out}"
   exit 1
