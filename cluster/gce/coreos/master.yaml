@@ -38,11 +38,9 @@ coreos:
         Type=oneshot
         RemainAfterExit=yes
         EnvironmentFile=/etc/kube-env
-        ExecStartPre=/usr/bin/mkdir -p /etc/rkt
-        ExecStartPre=/usr/bin/mkdir -p /opt/downloads
-        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output \
-        /opt/downloads/rkt.tar.gz https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
-        ExecStart=/usr/bin/tar xf /opt/downloads/rkt.tar.gz -C /opt --overwrite
+        ExecStartPre=/usr/bin/mkdir -p /etc/rkt /opt/downloads /opt/rkt/
+        ExecStartPre=/usr/bin/curl --fail --silent --location --create-dirs --output /opt/downloads/rkt.tar.gz https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
+        ExecStart=/usr/bin/tar --strip-components=1 -xf /opt/downloads/rkt.tar.gz -C /opt/rkt/ --overwrite
 
     - name: kubernetes-download-salt.service
       command: start
@@ -132,7 +130,8 @@ coreos:
         --cluster-domain=${DNS_DOMAIN} \
         --logtostderr=true \
         --container-runtime=${KUBERNETES_CONTAINER_RUNTIME} \
-        --rkt-path=/opt/rkt-v${RKT_VERSON}/rkt \
+        --rkt-path=/opt/rkt/rkt \
+        --rkt-stage1-image=/opt/rkt/stage1-coreos.aci \
         --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0} \
         --pod-cidr=${MASTER_IP_RANGE} \
         --register-schedulable=false \
@@ -181,18 +180,3 @@ coreos:
         http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-node
         ExecStartPre=/usr/bin/chmod 0755 /run/configure-node.sh
         ExecStart=/run/configure-node.sh
-
-    - name: kubernetes-addons.service
-      command: start
-      content: |
-        [Unit]
-        Description=Start Kubernetes addons and watch for updates.
-        Requires=kubernetes-configure-node.service
-        After=kubernetes-configure-node.service
-        [Service]
-        Environment=KUBECTL_BIN=/opt/kubernetes/server/bin/kubectl
-        Environment=kubelet_kubeconfig_file=/var/lib/kubelet/kubeconfig
-        ExecStartPre=/usr/bin/chmod 0755 /opt/kubernetes/saltbase/salt/kube-addons/kube-addons.sh
-        ExecStart=/opt/kubernetes/saltbase/salt/kube-addons/kube-addons.sh
-        Restart=always
-        RestartSec=10
