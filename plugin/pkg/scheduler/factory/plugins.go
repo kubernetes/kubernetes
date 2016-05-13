@@ -121,6 +121,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 	} else if predicateFactory, ok = fitPredicateMap[policy.Name]; ok {
 		// checking to see if a pre-defined predicate is requested
 		glog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
+		return policy.Name
 	}
 
 	if predicateFactory == nil {
