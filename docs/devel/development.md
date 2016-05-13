@@ -166,9 +166,9 @@ See [Faster Reviews](faster_reviews.md) for more details.
 
 Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies.
 It is not strictly required for building Kubernetes but it is required when
-managing dependencies under the Godeps/ tree, and is required by a number of the
-build and test scripts. Please make sure that ``godep`` is installed and in your
-``$PATH``.
+managing dependencies under the vendor/ tree, and is required by a number of the
+build and test scripts. Please make sure that `godep` is installed and in your
+`$PATH`, and that `godep version` says it is at least v63.
 
 ### Installing godep
 
@@ -186,10 +186,10 @@ from mercurial.
 ```sh
 export GOPATH=$HOME/go-tools
 mkdir -p $GOPATH
-go get github.com/tools/godep
+go get -u github.com/tools/godep
 ```
 
-3) Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
+3) Add this $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
 
 ```sh
 export GOPATH=$HOME/go-tools
@@ -197,15 +197,17 @@ export PATH=$PATH:$GOPATH/bin
 ```
 
 Note:
-At this time, godep update in the Kubernetes project only works properly if your
-version of godep is < 54.
+At this time, godep version >= v63 is known to work in the Kubernetes project
 
 To check your version of godep:
 
 ```sh
 $ godep version
-godep v53 (linux/amd64/go1.5.3)
+godep v66 (linux/amd64/go1.6.2)
 ```
+
+If it is not a valid version try, make sure you have updated the godep repo
+with `go get -u github.com/tools/godep`.
 
 ### Using godep
 
@@ -215,8 +217,8 @@ instructions in [godep's documentation](https://github.com/tools/godep).
 
 1) Devote a directory to this endeavor:
 
-_Devoting a separate directory is not required, but it is helpful to separate
-dependency updates from other changes._
+_Devoting a separate directory is not strictly required, but it is helpful to
+separate dependency updates from other changes._
 
 ```sh
 export KPATH=$HOME/code/kubernetes
@@ -229,11 +231,8 @@ git clone https://path/to/your/fork .
 2) Set up your GOPATH.
 
 ```sh
-# Option A: this will let your builds see packages that exist elsewhere on your system.
-export GOPATH=$KPATH:$GOPATH
-# Option B: This will *not* let your local builds see packages that exist elsewhere on your system.
+# This will *not* let your local builds see packages that exist elsewhere on your system.
 export GOPATH=$KPATH
-# Option B is recommended if you're going to mess with the dependencies.
 ```
 
 3) Populate your new GOPATH.
@@ -248,32 +247,34 @@ godep restore
 ```sh
 # To add a new dependency, do:
 cd $KPATH/src/k8s.io/kubernetes
-go get path/to/dependency
-# Change code in Kubernetes to use the dependency.
-godep save ./...
+godep get path/to/dependency
+# Now change code in Kubernetes to use the dependency.
+hack/godep-save.sh
+
 
 # To update an existing dependency, do:
 cd $KPATH/src/k8s.io/kubernetes
 go get -u path/to/dependency
 # Change code in Kubernetes accordingly if necessary.
-godep update path/to/dependency/...
+godep update path/to/dependency
 ```
 
 _If `go get -u path/to/dependency` fails with compilation errors, instead try
 `go get -d -u path/to/dependency` to fetch the dependencies without compiling
-them. This can happen when updating the cadvisor dependency._
+them. This is unusual, but has been observed._
 
 
 5) Before sending your PR, it's a good idea to sanity check that your
-Godeps.json file is ok by running `hack/verify-godeps.sh`
+Godeps.json file and the contents of `vendor/ `are ok by running `hack/verify-godeps.sh`
 
-_If hack/verify-godeps.sh fails after a `godep update`, it is possible that a
+_If `hack/verify-godeps.sh` fails after a `godep update`, it is possible that a
 transitive dependency was added or removed but not updated by godeps. It then
-may be necessary to perform a `godep save ./...` to pick up the transitive
+may be necessary to perform a `hack/godep-save.sh` to pick up the transitive
 dependency changes._
 
-It is sometimes expedient to manually fix the /Godeps/godeps.json file to
-minimize the changes.
+It is sometimes expedient to manually fix the /Godeps/Godeps.json file to
+minimize the changes. However without great care this can lead to failures
+with `hack/verify-godeps.sh`. This must pass for every PR.
 
 Please send dependency updates in separate commits within your PR, for easier
 reviewing.
