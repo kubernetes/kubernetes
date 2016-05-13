@@ -49,7 +49,7 @@ func Chain(handler *Handler, notify ...func()) *Handler {
 
 // New creates a new handler that guarantees all notify functions are run after the critical
 // section exits (or is interrupted by the OS), then invokes the final handler. If no final
-// handler is specified, the default final is `os.Exit(0)`. A handler can only be used for
+// handler is specified, the default final is `os.Exit(1)`. A handler can only be used for
 // one critical section.
 func New(final func(os.Signal), notify ...func()) *Handler {
 	return &Handler{
@@ -76,7 +76,7 @@ func (h *Handler) Signal(s os.Signal) {
 			fn()
 		}
 		if h.final == nil {
-			os.Exit(0)
+			os.Exit(1)
 		}
 		h.final(s)
 	})
