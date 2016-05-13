@@ -171,6 +171,10 @@ func (c *Client) Rbac() RbacInterface {
 	return c.RbacClient
 }
 
+func (c *Client) Policy() PolicyInterface {
+	return c.PolicyClient
+}
+
 func (c *Client) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryClient
 }
