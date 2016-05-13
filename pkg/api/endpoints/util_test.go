@@ -67,6 +67,16 @@ func TestPackSubsets(t *testing.T) {
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
 		}, {
+			name: "one set, one ip, one port (IPv6)",
+			given: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "beef::1:2:3:4"}},
+				Ports:     []api.EndpointPort{{Port: 111}},
+			}},
+			expect: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "beef::1:2:3:4"}},
+				Ports:     []api.EndpointPort{{Port: 111}},
+			}},
+		}, {
 			name: "one set, one notReady ip, one port",
 			given: []api.EndpointSubset{{
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
@@ -167,6 +177,16 @@ func TestPackSubsets(t *testing.T) {
 			}},
 			expect: []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+				Ports:     []api.EndpointPort{{Port: 111}},
+			}},
+		}, {
+			name: "one set, dup ips, one port (IPv6)",
+			given: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "beef::1"}, {IP: "beef::1"}},
+				Ports:     []api.EndpointPort{{Port: 111}},
+			}},
+			expect: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "beef::1"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
 		}, {
