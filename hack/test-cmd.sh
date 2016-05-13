@@ -305,7 +305,7 @@ runTests() {
   kubectl config set-cluster test-cluster --server="https://does-not-work"
 
   # Get the api cert and add a comment to avoid flag parsing problems
-  cert_data=$(echo "#Comment" && cat "${TMPDIR:-/tmp/}apiserver.crt")
+  cert_data=$(echo "#Comment" && cat "${TMPDIR:-/tmp}/apiserver.crt")
 
   kubectl config set clusters.test-cluster.certificate-authority-data "$cert_data" --set-raw-bytes
   r_writen=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
