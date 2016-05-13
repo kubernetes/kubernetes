@@ -314,8 +314,15 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 		evaluator: evaluator,
 	}
 	indexer.Add(resourceQuota)
+	// verify all values are specified as required on the quota
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
 	err := handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an error because the pod does not specify a memory limit")
+	}
+	// verify the requests and limits are actually valid (in this case, we fail because the limits < requests)
+	newPod = validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("200m", "2Gi"), getResourceList("100m", "1Gi")))
+	err = handler.Admit(admission.NewAttributesRecord(newPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod does not specify a memory limit")
 	}
