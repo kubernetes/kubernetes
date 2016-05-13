@@ -128,6 +128,8 @@ type APIVersion struct {
 	Name string `json:"name,omitempty"`
 }
 
+// +genclient=true
+
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
 type ThirdPartyResourceData struct {
 	unversioned.TypeMeta `json:",inline"`
