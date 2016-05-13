@@ -26,10 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -125,7 +123,10 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 
 func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 	// add the internal version to Scheme
-	core.AddToScheme(core.Scheme)
+	if err := core.AddToScheme(core.Scheme); err != nil {
+		// Programmer error, detect immediately
+		panic(err)
+	}
 	// add the enabled external versions to Scheme
 	for _, v := range externalVersions {
 		if !registered.IsEnabledVersion(v) {
@@ -134,27 +135,10 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 		}
 		switch v {
 		case core_v1.SchemeGroupVersion:
-			core_v1.AddToScheme(core.Scheme)
+			if err := core_v1.AddToScheme(core.Scheme); err != nil {
+				// Programmer error, detect immediately
+				panic(err)
+			}
 		}
 	}
-
-	// This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
-	// converted the most in the cluster.
-	// TODO: generate one of these for every external API group - this is to prove the impact
-	core.Scheme.AddGenericConversionFunc(func(objA, objB interface{}, s conversion.Scope) (bool, error) {
-		switch a := objA.(type) {
-		case *v1.Service:
-			switch b := objB.(type) {
-			case *api.Service:
-				return true, v1.Convert_v1_Service_To_api_Service(a, b, s)
-			}
-		case *api.Service:
-			switch b := objB.(type) {
-			case *v1.Service:
-				return true, v1.Convert_api_Service_To_v1_Service(a, b, s)
-			}
-
-		}
-		return false, nil
-	})
 }
