@@ -30,13 +30,13 @@ import (
 
 // GoRoutineMap defines the supported set of operations.
 type GoRoutineMap interface {
-	// NewGoRoutine adds operationName to the list of running operations and
-	// spawns a new go routine to execute the operation. If an operation with
-	// the same name already exists, an error is returned. Once the operation
-	// is complete, the go routine is terminated and the operationName is
-	// removed from the list of executing operations allowing a new operation
-	// to be started with the same name without error.
-	NewGoRoutine(operationName string, operation func() error) error
+	// Run adds operationName to the list of running operations and spawns a new
+	// go routine to execute the operation. If an operation with the same name
+	// already exists, an error is returned. Once the operation is complete, the
+	// go routine is terminated and the operationName is removed from the list
+	// of executing operations allowing a new operation to be started with the
+	// same name without error.
+	Run(operationName string, operation func() error) error
 
 	// Wait blocks until all operations are completed. This is typically
 	// necessary during tests - the test should wait until all operations finish
@@ -57,7 +57,7 @@ type goRoutineMap struct {
 	wg sync.WaitGroup
 }
 
-func (grm *goRoutineMap) NewGoRoutine(operationName string, operation func() error) error {
+func (grm *goRoutineMap) Run(operationName string, operation func() error) error {
 	grm.Lock()
 	defer grm.Unlock()
 	if grm.operations[operationName] {
