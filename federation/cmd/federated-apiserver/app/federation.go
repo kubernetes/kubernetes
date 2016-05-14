@@ -20,7 +20,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/federation/cmd/federated-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -31,7 +30,7 @@ import (
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
 )
 
-func installFederationAPIs(s *options.APIServer, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
+func installFederationAPIs(s *genericapiserver.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
 	storage, err := f.New(federation.Resource("clusters"))
 	if err != nil {
 		glog.Fatalf("Unable to find storage destination for %v, due to %v", "clusters", err.Error())
