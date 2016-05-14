@@ -313,7 +313,7 @@ kube::util::gv-to-swagger-name() {
 # repo, e.g. "upstream" or "origin".
 kube::util::git_upstream_remote_name() {
   git remote -v | grep fetch |\
-    grep -E 'github.com/kubernetes/kubernetes|k8s.io/kubernetes' |\
+    grep -E 'github.com[/:]kubernetes/kubernetes|k8s.io/kubernetes' |\
     head -n 1 | awk '{print $1}'
 }
 
