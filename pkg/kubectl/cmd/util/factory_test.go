@@ -102,6 +102,48 @@ func TestPortsForObject(t *testing.T) {
 	}
 }
 
+func TestProtocolsForObject(t *testing.T) {
+	f := NewFactory(nil)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Ports: []api.ContainerPort{
+						{
+							ContainerPort: 101,
+							Protocol:      api.ProtocolTCP,
+						},
+						{
+							ContainerPort: 102,
+							Protocol:      api.ProtocolUDP,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expected := "101/TCP,102/UDP"
+	protocolsMap, err := f.ProtocolsForObject(pod)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	got := kubectl.MakeProtocols(protocolsMap)
+	expectedSlice := strings.Split(expected, ",")
+	gotSlice := strings.Split(got, ",")
+
+	sort.Strings(expectedSlice)
+	sort.Strings(gotSlice)
+
+	for i, protocol := range gotSlice {
+		if protocol != expectedSlice[i] {
+			t.Fatalf("Protocols mismatch! Expected %s, got %s", expectedSlice[i], protocol)
+		}
+	}
+}
+
 func TestLabelsForObject(t *testing.T) {
 	f := NewFactory(nil)
 
